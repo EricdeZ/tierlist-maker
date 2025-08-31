@@ -392,7 +392,7 @@ const DragDropRankings = () => {
                             }`}>
                                 <img
                                     src={roleImages[role]}
-                                    alt={}
+                                    alt=''
                                     className="w-6 h-6 object-contain"
                                 />
                                 <span>{role}</span>
