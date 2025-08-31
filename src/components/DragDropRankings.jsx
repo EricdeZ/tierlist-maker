@@ -1,7 +1,5 @@
-// src/components/DragDropRankings.jsx - Fixed version
+// src/components/DragDropRankings.jsx - Updated to use database
 import { useState, useRef, useEffect } from 'react'
-import teamsData from '../data/teams.json'
-import playersData from '../data/players.json'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { useImageExport } from '../hooks/useImageExport'
 import { exportRankingsAsImage } from '../utils/canvasExport'
@@ -10,6 +8,7 @@ import {
     loadRankingsFromStorage,
     clearRankingsFromStorage
 } from '../utils/localStorage'
+import { useBabylonLeague, useTeamsLegacyFormat } from '../hooks/useDatabase'
 
 // Import role images
 import soloImage from '../assets/roles/solo.webp'
@@ -29,33 +28,11 @@ const roleImages = {
     'ADC': adcImage
 }
 
-// Utility functions for player data
-const getPlayerByName = (playerName) => {
-    return playersData.find(p => p.name === playerName)
-}
-
-const getPlayerRole = (playerName) => {
-    const player = getPlayerByName(playerName)
-    return player ? player.role.toUpperCase() : ''
-}
-
-const getPlayerTracker = (playerName) => {
-    const player = getPlayerByName(playerName)
-    return player ? player.tracker : ''
-}
-
-const getPlayerTeamColor = (playerName, teams) => {
-    const team = teams.find(team => team.players.includes(playerName))
-    return team ? team.color : '#6b7280'
-}
-
-const getPlayerTeamName = (playerName, teams) => {
-    const team = teams.find(team => team.players.includes(playerName))
-    return team ? team.name : 'Unknown Team'
-}
-
 const DragDropRankings = () => {
-    const [teams] = useState(teamsData)
+    // Use database hooks instead of JSON imports
+    const { league, loading: leagueLoading, error: leagueError, leagueId } = useBabylonLeague()
+    const { data: teams, loading: teamsLoading, error: teamsError } = useTeamsLegacyFormat(leagueId)
+
     const [isMobile, setIsMobile] = useState(false)
 
     // Initialize rankings with localStorage data if available
@@ -85,26 +62,20 @@ const DragDropRankings = () => {
             setIsMobile(window.innerWidth < 800)
         }
 
-        // Check initial size
         checkScreenSize()
-
-        // Add resize listener
         window.addEventListener('resize', checkScreenSize)
-
-        // Cleanup
         return () => window.removeEventListener('resize', checkScreenSize)
     }, [])
 
     // Auto-save rankings to localStorage whenever rankings change
     useEffect(() => {
-        // Only save if there are actually some rankings (avoid saving empty initial state)
         const hasAnyRankings = Object.values(rankings).some(roleArray => roleArray.length > 0)
         if (hasAnyRankings) {
             saveRankingsToStorage(rankings)
         }
     }, [rankings])
 
-    // FIXED: Add cleanup effect to reset drag state
+    // Cleanup effect to reset drag state
     useEffect(() => {
         const handleDragEnd = () => {
             setDraggedItem(null)
@@ -112,10 +83,7 @@ const DragDropRankings = () => {
             setDragOverIndex(null)
         }
 
-        // Listen for dragend events on the document to catch failed drags
         document.addEventListener('dragend', handleDragEnd)
-
-        // Also listen for mouse up events as a fallback
         document.addEventListener('mouseup', handleDragEnd)
 
         return () => {
@@ -124,6 +92,92 @@ const DragDropRankings = () => {
         }
     }, [])
 
+    // Utility functions - now work with database data
+    const getPlayerByName = (playerName) => {
+        if (!teams) return null
+
+        for (const team of teams) {
+            const player = team.players.find(p => p === playerName)
+            if (player) {
+                // Return player info - we'll need to enhance this later
+                return { name: player }
+            }
+        }
+        return null
+    }
+
+    const getPlayerRole = (playerName) => {
+        // This will need to be updated when we have proper player role data from database
+        // For now, return empty string as fallback
+        return ''
+    }
+
+    const getPlayerTeamColor = (playerName, teams) => {
+        if (!teams) return '#6b7280'
+
+        const team = teams.find(team => team.players.includes(playerName))
+        return team ? team.color : '#6b7280'
+    }
+
+    const getPlayerTeamName = (playerName, teams) => {
+        if (!teams) return 'Unknown Team'
+
+        const team = teams.find(team => team.players.includes(playerName))
+        return team ? team.name : 'Unknown Team'
+    }
+
+    // Loading states
+    if (leagueLoading || teamsLoading) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading league data...</p>
+                </div>
+            </div>
+        )
+    }
+
+    // Error states
+    if (leagueError || teamsError) {
+        return (
+            <div className="p-4 bg-red-100 rounded mb-4">
+                <h3 className="font-bold text-red-800">Failed to Load Data</h3>
+                <p className="text-red-600">
+                    {leagueError || teamsError}
+                </p>
+                <p className="text-sm text-red-500 mt-2">
+                    Check your database connection and API functions.
+                </p>
+            </div>
+        )
+    }
+
+    // No league found
+    if (!league) {
+        return (
+            <div className="p-4 bg-yellow-100 rounded mb-4">
+                <h3 className="font-bold text-yellow-800">League Not Found</h3>
+                <p className="text-yellow-600">
+                    Babylon League not found in database. Please check your data migration.
+                </p>
+            </div>
+        )
+    }
+
+    // No teams data
+    if (!teams || teams.length === 0) {
+        return (
+            <div className="p-4 bg-yellow-100 rounded mb-4">
+                <h3 className="font-bold text-yellow-800">No Teams Found</h3>
+                <p className="text-yellow-600">
+                    No teams found for {league.name}. Please check your team data migration.
+                </p>
+            </div>
+        )
+    }
+
+    // Rest of your existing drag and drop logic remains the same...
     const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
         setDraggedItem({
             player,
@@ -135,9 +189,7 @@ const DragDropRankings = () => {
         e.dataTransfer.effectAllowed = 'move'
     }
 
-    // FIXED: Add dragend handler to clear state
     const handleDragEnd = (e) => {
-        // Small delay to allow drop to complete if successful
         setTimeout(() => {
             setDraggedItem(null)
             setDragOverZone(null)
@@ -166,7 +218,6 @@ const DragDropRankings = () => {
     const handleDrop = (e, targetRole, targetIndex = null) => {
         e.preventDefault()
 
-        // FIXED: Clear drag state immediately on successful drop
         setDragOverZone(null)
         setDragOverIndex(null)
 
@@ -175,9 +226,7 @@ const DragDropRankings = () => {
         const { player, sourceRole, sourceIndex } = draggedItem
 
         if (sourceRole && targetRole) {
-            // Moving within or between ranking columns
             if (sourceRole === targetRole) {
-                // Same column reordering
                 if (sourceIndex === targetIndex) {
                     setDraggedItem(null)
                     return
@@ -191,7 +240,6 @@ const DragDropRankings = () => {
                     return { ...prev, [sourceRole]: newList }
                 })
             } else {
-                // Between different columns
                 setRankings(prev => {
                     const sourceList = [...prev[sourceRole]]
                     sourceList.splice(sourceIndex, 1)
@@ -208,7 +256,6 @@ const DragDropRankings = () => {
                 })
             }
         } else if (!sourceRole && targetRole) {
-            // From teams to rankings - use specific position if provided
             setRankings(prev => {
                 const newList = [...prev[targetRole]]
                 const insertIndex = targetIndex !== null ? targetIndex : newList.length
@@ -220,7 +267,6 @@ const DragDropRankings = () => {
             })
         }
 
-        // FIXED: Clear drag state after successful drop
         setDraggedItem(null)
     }
 
@@ -239,7 +285,6 @@ const DragDropRankings = () => {
             SUPPORT: [],
             ADC: []
         })
-        // Clear from localStorage when user explicitly clears all
         clearRankingsFromStorage()
     }
 
@@ -267,16 +312,13 @@ const DragDropRankings = () => {
         }
     }
 
-    // FIXED: Improved display rankings logic
     const getDisplayRankings = (role) => {
-        // If no drag in progress, return actual rankings
         if (!draggedItem || dragOverZone !== role) {
             return rankings[role]
         }
 
         const { player, sourceRole, sourceIndex } = draggedItem
 
-        // If dragging from teams, show the player inserted at hover position
         if (!sourceRole) {
             const newList = [...rankings[role]]
             const insertIndex = dragOverIndex !== null ? dragOverIndex : newList.length
@@ -284,22 +326,18 @@ const DragDropRankings = () => {
             return newList
         }
 
-        // If dragging within rankings, show live shuffle
         if (sourceRole === role) {
-            // Same column - show reordered list
             const newList = [...rankings[role]]
-            newList.splice(sourceIndex, 1) // Remove from original position
+            newList.splice(sourceIndex, 1)
 
-            // Find where to insert based on drag position
             if (dragOverIndex !== null) {
                 const adjustedIndex = dragOverIndex > sourceIndex ? dragOverIndex - 1 : dragOverIndex
                 newList.splice(adjustedIndex, 0, player)
             } else {
-                newList.push(player) // Add to end if no specific index
+                newList.push(player)
             }
             return newList
         } else {
-            // Between columns - add at hover position
             const newList = [...rankings[role]]
             const insertIndex = dragOverIndex !== null ? dragOverIndex : newList.length
             newList.splice(insertIndex, 0, player)
@@ -333,7 +371,9 @@ const DragDropRankings = () => {
             {/* Rankings Container */}
             <div ref={rankingsRef} className="rankings-container mb-6 bg-gray-50 p-6 rounded-lg">
                 <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Ishtar Tierlist</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        {league.name} Tierlist
+                    </h2>
                 </div>
 
                 {/* Ranking Grid */}
@@ -365,7 +405,6 @@ const DragDropRankings = () => {
                                 {getDisplayRankings(role).map((player, index) => {
                                     const teamColor = getPlayerTeamColor(player, teams)
                                     const isDraggedItem = draggedItem && draggedItem.player === player
-                                    // FIXED: More precise check for original position
                                     const isOriginalPosition = draggedItem &&
                                         draggedItem.sourceRole === role &&
                                         draggedItem.sourceIndex === index &&
@@ -373,7 +412,6 @@ const DragDropRankings = () => {
 
                                     return (
                                         <div key={`${role}-${player}-${index}`}>
-                                            {/* Drop zone above each item */}
                                             <div
                                                 className="h-3 -mb-1"
                                                 onDragOver={handleDragOver}
@@ -398,7 +436,7 @@ const DragDropRankings = () => {
                                                 }}
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, player, null, role, index)}
-                                                onDragEnd={handleDragEnd} // FIXED: Add dragend handler
+                                                onDragEnd={handleDragEnd}
                                                 onDragOver={handleDragOver}
                                                 onDragEnter={(e) => {
                                                     e.stopPropagation()
@@ -426,7 +464,6 @@ const DragDropRankings = () => {
                                     )
                                 })}
 
-                                {/* Drop zone at the end for last position */}
                                 <div
                                     className="h-3"
                                     onDragOver={handleDragOver}
@@ -449,7 +486,7 @@ const DragDropRankings = () => {
                         </div>
                     ))}
                 </div>
-                {/* Header Controls */}
+
                 {FEATURE_FLAGS.ENABLE_EXPORT_IMPORT && (
                     <div className="export-controls flex justify-center gap-4">
                         <button
@@ -463,7 +500,7 @@ const DragDropRankings = () => {
                 )}
             </div>
 
-            {/* Teams Section - source for dragging */}
+            {/* Teams Section - now uses database data */}
             <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className={`text-2xl font-bold text-gray-900 text-center ${
                     FEATURE_FLAGS.COMPACT_MODE ? 'mb-4' : 'mb-6'
@@ -498,7 +535,7 @@ const DragDropRankings = () => {
                                             style={{ backgroundColor: team.color }}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, player, team.id)}
-                                            onDragEnd={handleDragEnd} // FIXED: Add dragend handler
+                                            onDragEnd={handleDragEnd}
                                         >
                                             <span>{player}</span>
                                             {roleImage && (

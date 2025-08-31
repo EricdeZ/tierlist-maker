@@ -243,3 +243,77 @@ export const usePlayerStatsLegacyFormat = (leagueId) => {
         error: playersError
     }
 }
+
+// Add this to src/hooks/useDatabase.js
+export const usePlayerListData = (leagueId) => {
+    const { data: players, loading: playersLoading, error: playersError } = usePlayers(leagueId)
+    const [formattedPlayers, setFormattedPlayers] = useState([])
+    const [statsLoading, setStatsLoading] = useState(false)
+
+    useEffect(() => {
+        if (!players) return
+
+        const formatPlayersForList = async () => {
+            setStatsLoading(true)
+            try {
+                // Import games data for stats calculation (temporary)
+                const gamesData = await import('../data/games.json')
+
+                const processedPlayers = players.map(player => {
+                    // Calculate stats from games
+                    let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalDamage = 0, totalMitigated = 0, gamesPlayed = 0
+
+                    gamesData.default.forEach(game => {
+                        const playerGameData = game.players.find(p => p.playerName === player.name)
+                        if (playerGameData) {
+                            totalKills += playerGameData.kills
+                            totalDeaths += playerGameData.deaths
+                            totalAssists += playerGameData.assists
+                            totalDamage += playerGameData.damage
+                            totalMitigated += playerGameData.mitigated
+                            gamesPlayed++
+                        }
+                    })
+
+                    const kda = totalDeaths === 0 ? totalKills + (totalAssists / 2) : (totalKills + (totalAssists / 2)) / totalDeaths
+
+                    return {
+                        ...player,
+                        team: { name: player.team_name || 'No Team', color: player.team_color || '#6b7280' },
+                        stats: {
+                            kills: totalKills,
+                            deaths: totalDeaths,
+                            assists: totalAssists,
+                            damage: totalDamage,
+                            mitigated: totalMitigated,
+                            gamesPlayed
+                        },
+                        avgStats: {
+                            avgKills: gamesPlayed > 0 ? totalKills / gamesPlayed : 0,
+                            avgDeaths: gamesPlayed > 0 ? totalDeaths / gamesPlayed : 0,
+                            avgAssists: gamesPlayed > 0 ? totalAssists / gamesPlayed : 0,
+                            avgDamage: gamesPlayed > 0 ? totalDamage / gamesPlayed : 0,
+                            avgMitigated: gamesPlayed > 0 ? totalMitigated / gamesPlayed : 0
+                        },
+                        kda,
+                        winRate: 50 // Placeholder
+                    }
+                })
+
+                setFormattedPlayers(processedPlayers)
+            } catch (error) {
+                console.error('Error processing player stats:', error)
+            } finally {
+                setStatsLoading(false)
+            }
+        }
+
+        formatPlayersForList()
+    }, [players])
+
+    return {
+        data: formattedPlayers,
+        loading: playersLoading || statsLoading,
+        error: playersError
+    }
+}
