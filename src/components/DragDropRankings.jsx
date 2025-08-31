@@ -8,7 +8,7 @@ import {
     loadRankingsFromStorage,
     clearRankingsFromStorage
 } from '../utils/localStorage'
-import { useBabylonLeague, useTeamsLegacyFormat } from '../hooks/useDatabase'
+import {useCurrentTeamsWithPlayers} from '../hooks/useDatabase'
 
 // Import role images
 import soloImage from '../assets/roles/solo.webp'
