@@ -1,0 +1,113 @@
+[
+  {
+    "id": "mystic-sea-serpents",
+    "name": "Mystic Sea Serpents",
+    "color": "#4A90E2",
+    "players": [
+      "Akuma007",
+      "Brudih",
+      "ElDirtyBubble",
+      "Boxingtyler",
+      "iWforRed",
+      "Trollacademy",
+      "ArchonicPrince"
+    ]
+  },
+  {
+    "id": "order-of-blight",
+    "name": "Order of the Blight",
+    "color": "#8E44AD",
+    "players": [
+      "Seishin Ban",
+      "Whose_Evin",
+      "MentalDepressed",
+      "fatherlessho",
+      "Flaassk",
+      "Bracking"
+    ]
+  },
+  {
+    "id": "food-fighters",
+    "name": "Food Fighters",
+    "color": "#F39C12",
+    "players": [
+      "Zapzy",
+      "ThatOnePanther",
+      "Chip",
+      "YakeBrr",
+      "Xarxith",
+      "sarcastronaut",
+      "Tekkno"
+    ]
+  },
+  {
+    "id": "nat20",
+    "name": "Nat20",
+    "color": "#34495E",
+    "players": [
+      "Asinus",
+      "szax",
+      "UnsTrick",
+      "Dusty",
+      "BongRipErik",
+      "BigggTony",
+      "Pooped Pants"
+    ]
+  },
+  {
+    "id": "far-out",
+    "name": "Far Out",
+    "color": "#1ABC9C",
+    "players": [
+      "Freakitself",
+      "Denny",
+      "SniffanyFineGold",
+      "SonicRefuGee",
+      "undrclashero",
+      "KoalaMan!",
+      "MattDuck"
+    ]
+  },
+  {
+    "id": "the-crew",
+    "name": "The Crew",
+    "color": "#27AE60",
+    "players": [
+      "MentalBooming",
+      "Reaper",
+      "Xyrve",
+      "joshthelandlord",
+      "CrusteezNuts",
+      "Duckie",
+      "KazaR-"
+    ]
+  },
+  {
+    "id": "cyberpunk-otters",
+    "name": "Cyberpunk Otters",
+    "color": "#E91E63",
+    "players": [
+      "Kaiii",
+      "Narwhal",
+      "DrxKILLxJOY",
+      "ΩCog",
+      "Melancholy",
+      "McThiccLeQuicc",
+      "Kuma"
+    ]
+  },
+  {
+    "id": "gunshow-shoguns",
+    "name": "Gunshow Shoguns",
+    "color": "#FF5722",
+    "players": [
+      "RoughMarshmllw",
+      "Mylosis",
+      "mytwistedf8",
+      "ReVeNgE",
+      "luketheduke13",
+      "RimCleaner",
+      "Meow Meow"
+    ]
+  }
+]

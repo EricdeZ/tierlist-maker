@@ -1,0 +1,182 @@
+[
+  {
+    "id": "game-001",
+    "date": "2025-01-15",
+    "teams": ["mystic-sea-serpents", "order-of-blight"],
+    "players": [
+      {"playerName": "Akuma007", "kills": 12, "deaths": 4, "assists": 8, "damage": 45670, "mitigated": 12890},
+      {"playerName": "Brudih", "kills": 8, "deaths": 3, "assists": 11, "damage": 38420, "mitigated": 3450},
+      {"playerName": "ElDirtyBubble", "kills": 3, "deaths": 6, "assists": 9, "damage": 22100, "mitigated": 28900},
+      {"playerName": "Boxingtyler", "kills": 2, "deaths": 7, "assists": 15, "damage": 18750, "mitigated": 34500},
+      {"playerName": "iWforRed", "kills": 11, "deaths": 2, "assists": 6, "damage": 52300, "mitigated": 8900},
+      {"playerName": "Seishin Ban", "kills": 9, "deaths": 5, "assists": 7, "damage": 41200, "mitigated": 4200},
+      {"playerName": "Whose_Evin", "kills": 7, "deaths": 8, "assists": 4, "damage": 39800, "mitigated": 7300},
+      {"playerName": "MentalDepressed", "kills": 1, "deaths": 9, "assists": 12, "damage": 16900, "mitigated": 31200},
+      {"playerName": "EliteTortuga", "kills": 6, "deaths": 7, "assists": 8, "damage": 28400, "mitigated": 15600},
+      {"playerName": "Flaassk", "kills": 4, "deaths": 6, "assists": 9, "damage": 35700, "mitigated": 3800}
+    ],
+    "score": {"team1": 36, "team2": 27}
+  },
+  {
+    "id": "game-002",
+    "date": "2025-01-16",
+    "teams": ["food-fighters", "nat20"],
+    "players": [
+      {"playerName": "Zapzy", "kills": 15, "deaths": 2, "assists": 9, "damage": 48900, "mitigated": 5200},
+      {"playerName": "ThatOnePanther", "kills": 4, "deaths": 5, "assists": 11, "damage": 26800, "mitigated": 31400},
+      {"playerName": "Chip", "kills": 8, "deaths": 4, "assists": 13, "damage": 32100, "mitigated": 18700},
+      {"playerName": "YakeBrr", "kills": 13, "deaths": 3, "assists": 7, "damage": 51600, "mitigated": 9800},
+      {"playerName": "sarcastronaut", "kills": 3, "deaths": 8, "assists": 18, "damage": 21400, "mitigated": 36900},
+      {"playerName": "Asinus", "kills": 2, "deaths": 6, "assists": 14, "damage": 19800, "mitigated": 33200},
+      {"playerName": "szax", "kills": 9, "deaths": 7, "assists": 5, "damage": 44300, "mitigated": 11200},
+      {"playerName": "UnsTrick", "kills": 11, "deaths": 8, "assists": 6, "damage": 42700, "mitigated": 6400},
+      {"playerName": "Dusty", "kills": 6, "deaths": 9, "assists": 8, "damage": 38900, "mitigated": 10500},
+      {"playerName": "BongRipErik", "kills": 7, "deaths": 11, "assists": 9, "damage": 29600, "mitigated": 16800}
+    ],
+    "score": {"team1": 43, "team2": 33}
+  },
+  {
+    "id": "game-003",
+    "date": "2025-01-17",
+    "teams": ["far-out", "the-crew"],
+    "players": [
+      {"playerName": "Freakitself", "kills": 6, "deaths": 4, "assists": 12, "damage": 37800, "mitigated": 4900},
+      {"playerName": "Denny", "kills": 1, "deaths": 7, "assists": 16, "damage": 18600, "mitigated": 29800},
+      {"playerName": "SniffanyFineGold", "kills": 10, "deaths": 5, "assists": 8, "damage": 46200, "mitigated": 12400},
+      {"playerName": "SonicRefuGee", "kills": 5, "deaths": 6, "assists": 10, "damage": 24900, "mitigated": 27600},
+      {"playerName": "undrclashero", "kills": 9, "deaths": 3, "assists": 11, "damage": 35400, "mitigated": 19200},
+      {"playerName": "MentalBooming", "kills": 7, "deaths": 5, "assists": 9, "damage": 31800, "mitigated": 17300},
+      {"playerName": "Reaper", "kills": 12, "deaths": 6, "assists": 4, "damage": 49700, "mitigated": 8600},
+      {"playerName": "Xyrve", "kills": 2, "deaths": 8, "assists": 13, "damage": 21500, "mitigated": 32100},
+      {"playerName": "joshthelandlord", "kills": 8, "deaths": 7, "assists": 7, "damage": 39600, "mitigated": 5800},
+      {"playerName": "Duckie", "kills": 4, "deaths": 9, "assists": 11, "damage": 33200, "mitigated": 4200}
+    ],
+    "score": {"team1": 31, "team2": 38}
+  },
+  {
+    "id": "game-004",
+    "date": "2025-01-18",
+    "teams": ["cyberpunk-otters", "gunshow-shoguns"],
+    "players": [
+      {"playerName": "Kaiii", "kills": 11, "deaths": 3, "assists": 14, "damage": 38900, "mitigated": 21400},
+      {"playerName": "Narwhal", "kills": 2, "deaths": 5, "assists": 19, "damage": 20100, "mitigated": 38600},
+      {"playerName": "DrxKILLxJOY", "kills": 14, "deaths": 4, "assists": 6, "damage": 53200, "mitigated": 9700},
+      {"playerName": "ΩCog", "kills": 6, "deaths": 7, "assists": 12, "damage": 28400, "mitigated": 31900},
+      {"playerName": "Melancholy", "kills": 9, "deaths": 6, "assists": 8, "damage": 41800, "mitigated": 6300},
+      {"playerName": "RoughMarshmllw", "kills": 7, "deaths": 8, "assists": 10, "damage": 36700, "mitigated": 7200},
+      {"playerName": "Mylosis", "kills": 3, "deaths": 9, "assists": 14, "damage": 22800, "mitigated": 29500},
+      {"playerName": "ReVeNgE", "kills": 5, "deaths": 6, "assists": 9, "damage": 26300, "mitigated": 28700},
+      {"playerName": "luketheduke13", "kills": 8, "deaths": 11, "assists": 7, "damage": 33600, "mitigated": 18900},
+      {"playerName": "Meow Meow", "kills": 1, "deaths": 8, "assists": 17, "damage": 17400, "mitigated": 34800}
+    ],
+    "score": {"team1": 42, "team2": 26}
+  },
+  {
+    "id": "game-005",
+    "date": "2025-01-19",
+    "teams": ["mystic-sea-serpents", "food-fighters"],
+    "players": [
+      {"playerName": "Akuma007", "kills": 9, "deaths": 6, "assists": 12, "damage": 41200, "mitigated": 16800},
+      {"playerName": "Brudih", "kills": 13, "deaths": 4, "assists": 8, "damage": 44900, "mitigated": 5600},
+      {"playerName": "ElDirtyBubble", "kills": 4, "deaths": 7, "assists": 11, "damage": 25400, "mitigated": 32100},
+      {"playerName": "Boxingtyler", "kills": 3, "deaths": 8, "assists": 14, "damage": 22700, "mitigated": 37200},
+      {"playerName": "Trollacademy", "kills": 7, "deaths": 5, "assists": 10, "damage": 34800, "mitigated": 19400},
+      {"playerName": "Zapzy", "kills": 8, "deaths": 9, "assists": 6, "damage": 39100, "mitigated": 7800},
+      {"playerName": "ThatOnePanther", "kills": 2, "deaths": 8, "assists": 13, "damage": 23600, "mitigated": 28900},
+      {"playerName": "Chip", "kills": 6, "deaths": 7, "assists": 11, "damage": 31400, "mitigated": 20700},
+      {"playerName": "YakeBrr", "kills": 11, "deaths": 5, "assists": 4, "damage": 47800, "mitigated": 11300},
+      {"playerName": "Veroxas", "kills": 10, "deaths": 6, "assists": 9, "damage": 42300, "mitigated": 6900}
+    ],
+    "score": {"team1": 36, "team2": 39}
+  },
+  {
+    "id": "game-006",
+    "date": "2025-01-20",
+    "teams": ["order-of-blight", "far-out"],
+    "players": [
+      {"playerName": "Seishin Ban", "kills": 12, "deaths": 3, "assists": 9, "damage": 46800, "mitigated": 4700},
+      {"playerName": "Whose_Evin", "kills": 8, "deaths": 6, "assists": 7, "damage": 42100, "mitigated": 9200},
+      {"playerName": "MentalDepressed", "kills": 2, "deaths": 9, "assists": 15, "damage": 19400, "mitigated": 33800},
+      {"playerName": "EliteTortuga", "kills": 10, "deaths": 4, "assists": 11, "damage": 37600, "mitigated": 18200},
+      {"playerName": "Bracking", "kills": 9, "deaths": 5, "assists": 6, "damage": 44300, "mitigated": 10800},
+      {"playerName": "Freakitself", "kills": 7, "deaths": 8, "assists": 8, "damage": 33900, "mitigated": 6400},
+      {"playerName": "Denny", "kills": 1, "deaths": 11, "assists": 18, "damage": 16800, "mitigated": 31600},
+      {"playerName": "SniffanyFineGold", "kills": 6, "deaths": 9, "assists": 9, "damage": 38700, "mitigated": 12900},
+      {"playerName": "SonicRefuGee", "kills": 3, "deaths": 8, "assists": 12, "damage": 22400, "mitigated": 29700},
+      {"playerName": "KoalaMan!", "kills": 14, "deaths": 7, "assists": 5, "damage": 51200, "mitigated": 8400}
+    ],
+    "score": {"team1": 41, "team2": 30}
+  },
+  {
+    "id": "game-007",
+    "date": "2025-01-21",
+    "teams": ["nat20", "the-crew"],
+    "players": [
+      {"playerName": "Asinus", "kills": 1, "deaths": 6, "assists": 16, "damage": 18300, "mitigated": 35400},
+      {"playerName": "szax", "kills": 13, "deaths": 4, "assists": 7, "damage": 49600, "mitigated": 11700},
+      {"playerName": "UnsTrick", "kills": 8, "deaths": 5, "assists": 9, "damage": 40200, "mitigated": 7800},
+      {"playerName": "Dusty", "kills": 10, "deaths": 6, "assists": 8, "damage": 43800, "mitigated": 12300},
+      {"playerName": "Pooped Pants", "kills": 2, "deaths": 8, "assists": 14, "damage": 21600, "mitigated": 32900},
+      {"playerName": "MentalBooming", "kills": 9, "deaths": 7, "assists": 10, "damage": 36400, "mitigated": 19800},
+      {"playerName": "Reaper", "kills": 11, "deaths": 5, "assists": 6, "damage": 47200, "mitigated": 9600},
+      {"playerName": "Xyrve", "kills": 4, "deaths": 9, "assists": 11, "damage": 24800, "mitigated": 28600},
+      {"playerName": "joshthelandlord", "kills": 6, "deaths": 8, "assists": 12, "damage": 37100, "mitigated": 8900},
+      {"playerName": "KazaR-", "kills": 7, "deaths": 9, "assists": 8, "damage": 39900, "mitigated": 10400}
+    ],
+    "score": {"team1": 34, "team2": 33}
+  },
+  {
+    "id": "game-008",
+    "date": "2025-01-22",
+    "teams": ["cyberpunk-otters", "mystic-sea-serpents"],
+    "players": [
+      {"playerName": "Kaiii", "kills": 14, "deaths": 2, "assists": 11, "damage": 43700, "mitigated": 22100},
+      {"playerName": "Narwhal", "kills": 3, "deaths": 7, "assists": 17, "damage": 23400, "mitigated": 39800},
+      {"playerName": "DrxKILLxJOY", "kills": 12, "deaths": 3, "assists": 8, "damage": 48900, "mitigated": 10200},
+      {"playerName": "ΩCog", "kills": 5, "deaths": 8, "assists": 13, "damage": 27600, "mitigated": 30400},
+      {"playerName": "McThiccLeQuicc", "kills": 7, "deaths": 6, "assists": 9, "damage": 34200, "mitigated": 15800},
+      {"playerName": "Akuma007", "kills": 6, "deaths": 9, "assists": 8, "damage": 32800, "mitigated": 18300},
+      {"playerName": "Brudih", "kills": 4, "deaths": 11, "assists": 12, "damage": 29600, "mitigated": 6700},
+      {"playerName": "ElDirtyBubble", "kills": 2, "deaths": 8, "assists": 14, "damage": 20400, "mitigated": 31700},
+      {"playerName": "ArchonicPrince", "kills": 1, "deaths": 9, "assists": 16, "damage": 17800, "mitigated": 36900},
+      {"playerName": "iWforRed", "kills": 9, "deaths": 7, "assists": 5, "damage": 41300, "mitigated": 11800}
+    ],
+    "score": {"team1": 41, "team2": 24}
+  },
+  {
+    "id": "game-009",
+    "date": "2025-01-23",
+    "teams": ["gunshow-shoguns", "order-of-blight"],
+    "players": [
+      {"playerName": "RoughMarshmllw", "kills": 10, "deaths": 5, "assists": 7, "damage": 41800, "mitigated": 8200},
+      {"playerName": "Mylosis", "kills": 2, "deaths": 7, "assists": 15, "damage": 21300, "mitigated": 32600},
+      {"playerName": "ReVeNgE", "kills": 6, "deaths": 8, "assists": 10, "damage": 28900, "mitigated": 26700},
+      {"playerName": "luketheduke13", "kills": 11, "deaths": 4, "assists": 9, "damage": 39400, "mitigated": 17800},
+      {"playerName": "Meow Meow", "kills": 2, "deaths": 6, "assists": 18, "damage": 19700, "mitigated": 37400},
+      {"playerName": "Seishin Ban", "kills": 8, "deaths": 7, "assists": 6, "damage": 38600, "mitigated": 7300},
+      {"playerName": "gigglygoose", "kills": 9, "deaths": 8, "assists": 8, "damage": 36700, "mitigated": 14200},
+      {"playerName": "MentalDepressed", "kills": 1, "deaths": 10, "assists": 14, "damage": 16900, "mitigated": 34800},
+      {"playerName": "EliteTortuga", "kills": 7, "deaths": 9, "assists": 11, "damage": 31200, "mitigated": 19600},
+      {"playerName": "Flaassk", "kills": 12, "deaths": 6, "assists": 5, "damage": 44100, "mitigated": 5900}
+    ],
+    "score": {"team1": 31, "team2": 37}
+  },
+  {
+    "id": "game-010",
+    "date": "2025-01-24",
+    "teams": ["food-fighters", "far-out"],
+    "players": [
+      {"playerName": "Zapzy", "kills": 11, "deaths": 4, "assists": 10, "damage": 45300, "mitigated": 6800},
+      {"playerName": "ThatOnePanther", "kills": 3, "deaths": 6, "assists": 14, "damage": 24700, "mitigated": 29800},
+      {"playerName": "Chip", "kills": 9, "deaths": 5, "assists": 12, "damage": 36800, "mitigated": 18400},
+      {"playerName": "Xarxith", "kills": 14, "deaths": 3, "assists": 6, "damage": 51900, "mitigated": 9300},
+      {"playerName": "Veroxas", "kills": 8, "deaths": 7, "assists": 8, "damage": 39400, "mitigated": 7600},
+      {"playerName": "Freakitself", "kills": 5, "deaths": 9, "assists": 9, "damage": 31200, "mitigated": 8900},
+      {"playerName": "Denny", "kills": 2, "deaths": 8, "assists": 15, "damage": 20400, "mitigated": 33600},
+      {"playerName": "SniffanyFineGold", "kills": 7, "deaths": 10, "assists": 7, "damage": 37800, "mitigated": 13200},
+      {"playerName": "undrclashero", "kills": 6, "deaths": 8, "assists": 11, "damage": 32600, "mitigated": 21700},
+      {"playerName": "MattDuck", "kills": 1, "deaths": 11, "assists": 17, "damage": 18600, "mitigated": 35900}
+    ],
+    "score": {"team1": 45, "team2": 23}
+  }
+]

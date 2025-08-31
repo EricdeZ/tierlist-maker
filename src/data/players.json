@@ -1,0 +1,332 @@
+[
+  {
+    "name": "Akuma007",
+    "id": "akuma007",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198059202616/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "ArchonicPrince",
+    "id": "archonicprince",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198281753249/gods?gamemode=conquest-ranked",
+    "role": "Support"
+  },
+  {
+    "name": "Asinus",
+    "id": "asinus",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198871864508/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "BigggTony",
+    "id": "bigggtony",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199084287991/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "BongRipErik",
+    "id": "bongriperik",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199163771364/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "Boxingtyler",
+    "id": "boxingtyler",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198925066251/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Bracking",
+    "id": "bracking",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198248973952/overview",
+    "role": "ADC"
+  },
+  {
+    "name": "Brudih",
+    "id": "brudih",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198065123360/overview?gamemode=conquest",
+    "role": "Mid"
+  },
+  {
+    "name": "Chip",
+    "id": "chip",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199446338499/overview?gamemode=conquest",
+    "role": "Jungle"
+  },
+  {
+    "name": "CrusteezNuts",
+    "id": "crusteeznuts",
+    "tracker": "",
+    "role": ""
+  },
+  {
+    "name": "Denny",
+    "id": "denny",
+    "tracker": "https://tracker.gg/smite2/profile/epic/GSDenny/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "DrxKILLxJOY",
+    "id": "drxkillxjoy",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199376284905/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "Duckie",
+    "id": "duckie",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198985481207/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "Dusty",
+    "id": "dusty",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199129125529/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "ElDirtyBubble",
+    "id": "eldirtybubble",
+    "tracker": "",
+    "role": "Solo"
+  },
+  {
+    "name": "Flaassk",
+    "id": "flaassk",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198155449288/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "Freakitself",
+    "id": "freakitself",
+    "tracker": "",
+    "role": "Mid"
+  },
+  {
+    "name": "fatherlessho",
+    "id": "fatherlessho",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199674200491/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "iWforRed",
+    "id": "iwforred",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198303109858/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "joshthelandlord",
+    "id": "joshthelandlord",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198166987322/overview?gamemode=conquest-ranked",
+    "role": "Mid"
+  },
+  {
+    "name": "Kaiii",
+    "id": "kaiii",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198079533121/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "KazaR-",
+    "id": "kazar",
+    "tracker": "https://tracker.gg/smite2/profile/epic/KazaR-/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "KoalaMan!",
+    "id": "koalaman",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198151098467/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "Kuma",
+    "id": "kuma",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199184709689/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "luketheduke13",
+    "id": "luketheduke13",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199092558434/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "MattDuck",
+    "id": "mattduck",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198239408426/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "McThiccLeQuicc",
+    "id": "mcthicclequicc",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198407252994/overview?gamemode=conquest-ranked&season=3",
+    "role": ""
+  },
+  {
+    "name": "Melancholy",
+    "id": "melancholy",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198926183276/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "MentalBooming",
+    "id": "mentalbooming",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198374944468/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "MentalDepressed",
+    "id": "mentaldepressed",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198139591446/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Meow Meow",
+    "id": "meow-meow",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198224157504/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Mylosis",
+    "id": "mylosis",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198120740469/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "mytwistedf8",
+    "id": "mytwistedf8",
+    "tracker": "https://tracker.gg/smite2/profile/epic/MyTwistedF8/overview?gamemode=conquest-ranked&season=3",
+    "role": ""
+  },
+  {
+    "name": "Narwhal",
+    "id": "narwhal",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198119750942/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Pooped Pants",
+    "id": "pooped-pants",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198263125137/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Reaper",
+    "id": "reaper",
+    "tracker": "",
+    "role": "ADC"
+  },
+  {
+    "name": "ReVeNgE",
+    "id": "revenge",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198796158843/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "RimCleaner",
+    "id": "rimcleaner",
+    "tracker": "",
+    "role": ""
+  },
+  {
+    "name": "RoughMarshmllw",
+    "id": "roughmarshmllw",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199117184340/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "sarcastronaut",
+    "id": "sarcastronaut",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198271141749/overview?gamemode=conquest-ranked&season=3",
+    "role": "Support"
+  },
+  {
+    "name": "Seishin Ban",
+    "id": "seishin-ban",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198801904431/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "SniffanyFineGold",
+    "id": "sniffanyfinegold",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199024174643/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "SonicRefuGee",
+    "id": "sonicrefugee",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199052812779/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "szax",
+    "id": "szax",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198219008159/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "ThatOnePanther",
+    "id": "thatonepanther",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199200842870/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "Trollacademy",
+    "id": "trollacademy",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198375432141/overview",
+    "role": "Jungle"
+  },
+  {
+    "name": "undrclashero",
+    "id": "undrclashero",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199075563905/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "UnsTrick",
+    "id": "unstrick",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199261759568/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "Tekkno",
+    "id": "tekkno",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199049317354/overview?gamemode=conquest-ranked&season=3",
+    "role": "Jungle"
+  },
+  {
+    "name": "Whose_Evin",
+    "id": "whose-evin",
+    "tracker": "",
+    "role": "ADC"
+  },
+  {
+    "name": "Xarxith",
+    "id": "xarxith",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198095615813/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "Xyrve",
+    "id": "xyrve",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198160882738/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  },
+  {
+    "name": "YakeBrr",
+    "id": "yakebrr",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199071553096/overview?gamemode=conquest-ranked&season=3",
+    "role": "ADC"
+  },
+  {
+    "name": "Zapzy",
+    "id": "zapzy",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561198204206261/overview?gamemode=conquest-ranked&season=3",
+    "role": "Mid"
+  },
+  {
+    "name": "ΩCog",
+    "id": "omega-cog",
+    "tracker": "https://tracker.gg/smite2/profile/steam/76561199020071963/overview?gamemode=conquest-ranked&season=3",
+    "role": "Solo"
+  }
+]
