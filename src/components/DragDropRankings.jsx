@@ -97,19 +97,17 @@ const DragDropRankings = () => {
         if (!teams) return null
 
         for (const team of teams) {
-            const player = team.players.find(p => p === playerName)
+            const player = team.playersWithRoles?.find(p => p.name === playerName)
             if (player) {
-                // Return player info - we'll need to enhance this later
-                return { name: player }
+                return player
             }
         }
         return null
     }
 
     const getPlayerRole = (playerName) => {
-        // This will need to be updated when we have proper player role data from database
-        // For now, return empty string as fallback
-        return ''
+        const player = getPlayerByName(playerName)
+        return player ? player.role : ''
     }
 
     const getPlayerTeamColor = (playerName, teams) => {
