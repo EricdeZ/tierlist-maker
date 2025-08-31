@@ -7,7 +7,7 @@ export const handler = async (event, context) => {
         if (event.httpMethod === 'GET') {
             const leagues = await sql`
         SELECT * FROM leagues 
-        ORDER BY created_at DESC
+        ORDER BY name
       `
 
             return {
