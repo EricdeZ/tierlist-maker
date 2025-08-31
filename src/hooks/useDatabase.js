@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { leagueService, teamService, playerService, matchService, statsService } from '../services/database'
 
+// League configuration - change this to switch leagues
+const CURRENT_LEAGUE_SLUG = 'babylon-league' // Change this to 'babylon-league-test' for testing
+
 // Simple in-memory cache
 const cache = new Map()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
@@ -83,122 +86,103 @@ const useApiData = (fetchFunction, dependencies = [], cacheKey = null) => {
     return { data, loading, error, refetch }
 }
 
-// League hooks
-export const useLeagues = () => {
-    return useApiData(
-        () => leagueService.getAll(),
-        [],
-        'leagues_all'
-    )
+// Single hook that loads everything sequentially for current league
+export const useCurrentLeagueData = () => {
+    const [state, setState] = useState({
+        league: null,
+        teams: [],
+        players: [],
+        loading: true,
+        error: null
+    })
+
+    useEffect(() => {
+        const cacheKey = `league_data_${CURRENT_LEAGUE_SLUG}`
+
+        // Check cache first
+        const cachedData = getCachedData(cacheKey)
+        if (cachedData) {
+            console.log('Using cached league data')
+            setState({
+                ...cachedData,
+                loading: false,
+                error: null
+            })
+            return
+        }
+
+        const loadAllData = async () => {
+            try {
+                setState(prev => ({ ...prev, loading: true, error: null }))
+
+                // Step 1: Get current league
+                console.log('Loading league data...')
+                const leagues = await leagueService.getAll()
+                const league = leagues.find(l => l.slug === CURRENT_LEAGUE_SLUG)
+
+                if (!league) {
+                    throw new Error(`League "${CURRENT_LEAGUE_SLUG}" not found`)
+                }
+
+                // Step 2: Get teams and players for this league
+                console.log('Loading teams and players...')
+                const [teams, players] = await Promise.all([
+                    teamService.getAllByLeague(league.id),
+                    playerService.getAllByLeague(league.id)
+                ])
+
+                const result = {
+                    league,
+                    teams,
+                    players
+                }
+
+                // Cache the result
+                setCachedData(cacheKey, result)
+
+                setState({
+                    ...result,
+                    loading: false,
+                    error: null
+                })
+
+            } catch (error) {
+                console.error('Failed to load league data:', error)
+                setState(prev => ({
+                    ...prev,
+                    loading: false,
+                    error: error.message
+                }))
+            }
+        }
+
+        loadAllData()
+    }, []) // Only run once on mount
+
+    return state
 }
 
-export const useLeague = (slug) => {
-    return useApiData(
-        () => leagueService.getBySlug(slug),
-        [slug],
-        `league_${slug}`
-    )
-}
-
-// Team hooks
-export const useTeams = (leagueId) => {
-    return useApiData(
-        () => teamService.getAllByLeague(leagueId),
-        [leagueId],
-        `teams_${leagueId}`
-    )
-}
-
-export const useTeamWithPlayers = (teamSlug) => {
-    return useApiData(
-        () => teamService.getTeamWithPlayers(teamSlug),
-        [teamSlug],
-        `team_players_${teamSlug}`
-    )
-}
-
-// Player hooks
-export const usePlayers = (leagueId) => {
-    return useApiData(
-        () => playerService.getAllByLeague(leagueId),
-        [leagueId],
-        `players_${leagueId}`
-    )
-}
-
-export const usePlayerStats = (playerId, leagueId) => {
-    return useApiData(
-        () => playerService.getPlayerSummaryStats(playerId, leagueId),
-        [playerId, leagueId],
-        `player_stats_${playerId}_${leagueId}`
-    )
-}
-
-// Match hooks
-export const useMatches = (leagueId, limit = null) => {
-    return useApiData(
-        () => matchService.getAllByLeague(leagueId, limit),
-        [leagueId, limit],
-        `matches_${leagueId}_${limit || 'all'}`
-    )
-}
-
-export const useRecentMatches = (leagueId, limit = 5) => {
-    return useApiData(
-        () => matchService.getRecentMatches(leagueId, limit),
-        [leagueId, limit],
-        `recent_matches_${leagueId}_${limit}`
-    )
-}
-
-// Stats hooks
-export const useLeagueStats = (leagueId) => {
-    return useApiData(
-        () => statsService.getLeagueStats(leagueId),
-        [leagueId],
-        `league_stats_${leagueId}`
-    )
-}
-
-// League context hook for managing current league
-export const useBabylonLeague = () => {
-    const { data: leagues, loading, error } = useLeagues()
-
-    const babylonLeague = leagues?.find(l => l.slug === 'babylon-league')
-
-    return {
-        league: babylonLeague,
-        loading,
-        error,
-        leagueId: babylonLeague?.id
-    }
-}
-
-// Combined hook for components that need teams formatted like your JSON
-export const useTeamsLegacyFormat = (leagueId) => {
-    const { data: teams, loading: teamsLoading, error: teamsError } = useTeams(leagueId)
-    const { data: players, loading: playersLoading, error: playersError } = usePlayers(leagueId)
-
+// Hook for teams with player roles (for rankings page)
+export const useCurrentTeamsWithPlayers = () => {
+    const { league, teams, players, loading, error } = useCurrentLeagueData()
     const [formattedTeams, setFormattedTeams] = useState([])
 
     useEffect(() => {
         if (teams && players) {
-            // Transform database format to match your existing JSON structure
             const formatted = teams.map(team => {
-                // Find players for this team with their roles
                 const teamPlayers = players
                     .filter(p => p.team_id === team.id)
                     .map(p => ({
                         name: p.name,
-                        role: p.role // Include role information for role icons
+                        role: p.role
                     }))
 
                 return {
                     id: team.slug,
                     name: team.name,
                     color: team.color,
-                    players: teamPlayers.map(p => p.name), // Keep player names for compatibility
-                    playersWithRoles: teamPlayers // Add detailed player info with roles
+                    players: teamPlayers.map(p => p.name), // For compatibility
+                    playersWithRoles: teamPlayers // For role icons
                 }
             })
 
@@ -208,56 +192,28 @@ export const useTeamsLegacyFormat = (leagueId) => {
 
     return {
         data: formattedTeams,
-        loading: teamsLoading || playersLoading,
-        error: teamsError || playersError
-    }
-}
-
-// Combined hook for components that need players formatted like your JSON
-export const usePlayersLegacyFormat = (leagueId) => {
-    const { data: players, loading, error } = usePlayers(leagueId)
-
-    const [formattedPlayers, setFormattedPlayers] = useState([])
-
-    useEffect(() => {
-        if (players) {
-            // Transform database format to match your existing JSON structure
-            const formatted = players.map(player => ({
-                name: player.name,
-                id: player.slug,
-                tracker: player.tracker_url || '',
-                role: player.role || ''
-            }))
-
-            setFormattedPlayers(formatted)
-        }
-    }, [players])
-
-    return {
-        data: formattedPlayers,
         loading,
-        error
+        error,
+        league
     }
 }
 
-// Hook for getting comprehensive player stats (like your current PlayerList component uses)
-export const usePlayerStatsLegacyFormat = (leagueId) => {
-    const { data: players, loading: playersLoading, error: playersError } = usePlayers(leagueId)
-    const [playerStats, setPlayerStats] = useState([])
+// Hook for player stats (for stats page)
+export const useCurrentPlayerStats = () => {
+    const { league, players, loading, error } = useCurrentLeagueData()
+    const [formattedPlayers, setFormattedPlayers] = useState([])
     const [statsLoading, setStatsLoading] = useState(false)
 
     useEffect(() => {
-        if (!players || players.length === 0) return
+        if (!players || !league || statsLoading) return
 
-        const fetchAllPlayerStats = async () => {
+        const formatPlayersForList = async () => {
             setStatsLoading(true)
             try {
-                // For now, we'll use the existing JSON calculation logic
-                // Later this can be replaced with API calls to get real stats
+                // Import games data for stats calculation (temporary until we migrate game stats)
                 const gamesData = await import('../data/games.json')
 
-                const playersWithStats = players.map(player => {
-                    // Calculate stats from games JSON for this player
+                const processedPlayers = players.map(player => {
                     let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalDamage = 0, totalMitigated = 0, gamesPlayed = 0
 
                     gamesData.default.forEach(game => {
@@ -275,7 +231,14 @@ export const usePlayerStatsLegacyFormat = (leagueId) => {
                     const kda = totalDeaths === 0 ? totalKills + (totalAssists / 2) : (totalKills + (totalAssists / 2)) / totalDeaths
 
                     return {
-                        ...player,
+                        id: player.id,
+                        name: player.name,
+                        tracker: player.tracker_url || '',
+                        role: player.role || '',
+                        team: {
+                            name: player.team_name || 'No Team',
+                            color: player.team_color || '#6b7280'
+                        },
                         stats: {
                             kills: totalKills,
                             deaths: totalDeaths,
@@ -292,24 +255,24 @@ export const usePlayerStatsLegacyFormat = (leagueId) => {
                             avgMitigated: gamesPlayed > 0 ? totalMitigated / gamesPlayed : 0
                         },
                         kda,
-                        winRate: 50 // Placeholder - would need match data to calculate properly
+                        winRate: 50 // Placeholder
                     }
                 })
 
-                setPlayerStats(playersWithStats)
+                setFormattedPlayers(processedPlayers)
             } catch (error) {
-                console.error('Error calculating player stats:', error)
+                console.error('Error processing player stats:', error)
             } finally {
                 setStatsLoading(false)
             }
         }
 
-        fetchAllPlayerStats()
-    }, [players])
+        formatPlayersForList()
+    }, [players, league])
 
     return {
-        data: playerStats,
-        loading: playersLoading || statsLoading,
-        error: playersError
+        data: formattedPlayers,
+        loading: loading || statsLoading,
+        error
     }
 }

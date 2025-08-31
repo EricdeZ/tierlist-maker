@@ -30,8 +30,7 @@ const roleImages = {
 
 const DragDropRankings = () => {
     // Use database hooks instead of JSON imports
-    const { league, loading: leagueLoading, error: leagueError, leagueId } = useBabylonLeague()
-    const { data: teams, loading: teamsLoading, error: teamsError } = useTeamsLegacyFormat(leagueId)
+    const { data: teams, loading, error, league } = useCurrentTeamsWithPlayers()
 
     const [isMobile, setIsMobile] = useState(false)
 
@@ -125,7 +124,7 @@ const DragDropRankings = () => {
     }
 
     // Loading states
-    if (leagueLoading || teamsLoading) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center p-8">
                 <div className="text-center">
@@ -137,13 +136,11 @@ const DragDropRankings = () => {
     }
 
     // Error states
-    if (leagueError || teamsError) {
+    if (error) {
         return (
             <div className="p-4 bg-red-100 rounded mb-4">
                 <h3 className="font-bold text-red-800">Failed to Load Data</h3>
-                <p className="text-red-600">
-                    {leagueError || teamsError}
-                </p>
+                <p className="text-red-600">{error}</p>
                 <p className="text-sm text-red-500 mt-2">
                     Check your database connection and API functions.
                 </p>
