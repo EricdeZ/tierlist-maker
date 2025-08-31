@@ -8,7 +8,19 @@ export const handler = async (event, context) => {
         if (event.httpMethod === 'GET' && leagueId) {
             const matches = await sql`
         SELECT 
-          m.*,
+          m.id,
+          m.league_id,
+          m.date,
+          m.team1_id,
+          m.team2_id,
+          m.winner_team_id,
+          m.match_type,
+          m.week,
+          m.season,
+          m.best_of,
+          m.is_completed,
+          m.created_at,
+          m.updated_at,
           t1.name as team1_name,
           t1.color as team1_color,
           t1.slug as team1_slug,
@@ -24,8 +36,11 @@ export const handler = async (event, context) => {
         LEFT JOIN teams tw ON m.winner_team_id = tw.id
         LEFT JOIN games g ON m.id = g.match_id
         WHERE m.league_id = ${leagueId}
-        GROUP BY m.id, t1.id, t2.id, tw.id
-        ORDER BY m.date DESC, m.created_at DESC
+        GROUP BY m.id, m.league_id, m.date, m.team1_id, m.team2_id, m.winner_team_id, 
+                 m.match_type, m.week, m.season, m.best_of, m.is_completed, 
+                 m.created_at, m.updated_at, t1.id, t1.name, t1.color, t1.slug,
+                 t2.id, t2.name, t2.color, t2.slug, tw.name, tw.color
+        ORDER BY m.date DESC
         ${limit ? sql`LIMIT ${parseInt(limit)}` : sql``}
       `
 

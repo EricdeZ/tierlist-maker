@@ -6,7 +6,7 @@ export const handler = async (event, context) => {
     try {
         if (event.httpMethod === 'GET') {
             const leagues = await sql`
-        SELECT * FROM leagues 
+        SELECT id, name, slug FROM leagues 
         ORDER BY name
       `
 

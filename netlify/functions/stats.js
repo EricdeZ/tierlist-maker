@@ -6,28 +6,44 @@ export const handler = async (event, context) => {
 
     try {
         if (event.httpMethod === 'GET' && leagueId) {
-            const [stats] = await sql`
+            // Basic stats using only columns that exist
+            const [matchStats] = await sql`
         SELECT 
-          COUNT(DISTINCT m.id) as total_matches,
-          COUNT(DISTINCT g.id) as total_games,
-          COUNT(DISTINCT lp.player_id) as total_players,
-          COUNT(DISTINCT t.id) as total_teams,
-          COALESCE(SUM(pgs.kills), 0) as total_kills,
-          COALESCE(SUM(pgs.deaths), 0) as total_deaths,
-          COALESCE(SUM(pgs.assists), 0) as total_assists,
-          COALESCE(SUM(pgs.damage), 0) as total_damage
+          COUNT(m.id) as total_matches,
+          COUNT(g.id) as total_games
         FROM matches m
         LEFT JOIN games g ON m.id = g.match_id AND g.is_completed = true
-        LEFT JOIN teams t ON (m.team1_id = t.id OR m.team2_id = t.id)
-        LEFT JOIN league_players lp ON t.id = lp.team_id AND lp.league_id = m.league_id
-        LEFT JOIN player_game_stats pgs ON g.id = pgs.game_id
         WHERE m.league_id = ${leagueId}
       `
+
+            const [teamStats] = await sql`
+        SELECT COUNT(id) as total_teams
+        FROM teams 
+        WHERE league_id = ${leagueId}
+      `
+
+            const [playerStats] = await sql`
+        SELECT COUNT(id) as total_players
+        FROM league_players 
+        WHERE league_id = ${leagueId} AND is_active = true
+      `
+
+            // Combine results
+            const stats = {
+                total_matches: matchStats.total_matches || 0,
+                total_games: matchStats.total_games || 0,
+                total_teams: teamStats.total_teams || 0,
+                total_players: playerStats.total_players || 0,
+                total_kills: 0, // Will add when we have game stats
+                total_deaths: 0,
+                total_assists: 0,
+                total_damage: 0
+            }
 
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify(stats || {}),
+                body: JSON.stringify(stats),
             }
         }
 

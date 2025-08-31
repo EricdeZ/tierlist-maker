@@ -8,12 +8,16 @@ export const handler = async (event, context) => {
         if (event.httpMethod === 'GET' && leagueId) {
             const teams = await sql`
         SELECT 
-          t.*,
+          t.id,
+          t.league_id,
+          t.name,
+          t.color,
+          t.slug,
           COUNT(lp.id) as player_count
         FROM teams t
         LEFT JOIN league_players lp ON t.id = lp.team_id AND lp.is_active = true
         WHERE t.league_id = ${leagueId}
-        GROUP BY t.id
+        GROUP BY t.id, t.league_id, t.name, t.color, t.slug
         ORDER BY t.name
       `
 

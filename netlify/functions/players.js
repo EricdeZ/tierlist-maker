@@ -36,37 +36,28 @@ export const handler = async (event, context) => {
                 }
             }
 
-            // Get player stats
+            // Get player stats - simplified since we may not have game stats yet
             if (leagueId && playerId) {
-                const [summary] = await sql`
+                const [player] = await sql`
           SELECT 
-            COUNT(pgs.id) as games_played,
-            SUM(pgs.kills) as total_kills,
-            SUM(pgs.deaths) as total_deaths,
-            SUM(pgs.assists) as total_assists,
-            SUM(pgs.damage) as total_damage,
-            SUM(pgs.mitigated) as total_mitigated,
-            AVG(pgs.kills::numeric) as avg_kills,
-            AVG(pgs.deaths::numeric) as avg_deaths,
-            AVG(pgs.assists::numeric) as avg_assists,
-            AVG(pgs.damage::numeric) as avg_damage,
-            CASE 
-              WHEN SUM(pgs.deaths) = 0 THEN SUM(pgs.kills) + (SUM(pgs.assists)::numeric / 2)
-              ELSE (SUM(pgs.kills) + (SUM(pgs.assists)::numeric / 2)) / SUM(pgs.deaths)::numeric
-            END as kda_ratio
-          FROM player_game_stats pgs
-          JOIN games g ON pgs.game_id = g.id
-          JOIN matches m ON g.match_id = m.id
-          JOIN league_players lp ON pgs.league_player_id = lp.id
-          WHERE lp.player_id = ${playerId} 
-            AND m.league_id = ${leagueId}
-            AND g.is_completed = true
+            p.id,
+            p.name,
+            p.slug,
+            p.tracker_url,
+            lp.role,
+            t.name as team_name,
+            t.color as team_color
+          FROM league_players lp
+          JOIN players p ON lp.player_id = p.id
+          LEFT JOIN teams t ON lp.team_id = t.id
+          WHERE lp.league_id = ${leagueId} AND p.id = ${playerId}
         `
 
+                // Return basic player info for now - stats calculation can come later
                 return {
                     statusCode: 200,
                     headers,
-                    body: JSON.stringify(summary || {}),
+                    body: JSON.stringify(player || {}),
                 }
             }
         }
