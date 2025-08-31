@@ -1,4 +1,4 @@
-// src/components/DragDropRankings.jsx
+// src/components/DragDropRankings.jsx - Fixed version
 import { useState, useRef, useEffect } from 'react'
 import teamsData from '../data/teams.json'
 import playersData from '../data/players.json'
@@ -104,6 +104,26 @@ const DragDropRankings = () => {
         }
     }, [rankings])
 
+    // FIXED: Add cleanup effect to reset drag state
+    useEffect(() => {
+        const handleDragEnd = () => {
+            setDraggedItem(null)
+            setDragOverZone(null)
+            setDragOverIndex(null)
+        }
+
+        // Listen for dragend events on the document to catch failed drags
+        document.addEventListener('dragend', handleDragEnd)
+
+        // Also listen for mouse up events as a fallback
+        document.addEventListener('mouseup', handleDragEnd)
+
+        return () => {
+            document.removeEventListener('dragend', handleDragEnd)
+            document.removeEventListener('mouseup', handleDragEnd)
+        }
+    }, [])
+
     const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
         setDraggedItem({
             player,
@@ -113,6 +133,16 @@ const DragDropRankings = () => {
             type: sourceRole ? 'ranking' : 'team'
         })
         e.dataTransfer.effectAllowed = 'move'
+    }
+
+    // FIXED: Add dragend handler to clear state
+    const handleDragEnd = (e) => {
+        // Small delay to allow drop to complete if successful
+        setTimeout(() => {
+            setDraggedItem(null)
+            setDragOverZone(null)
+            setDragOverIndex(null)
+        }, 50)
     }
 
     const handleDragOver = (e) => {
@@ -135,6 +165,8 @@ const DragDropRankings = () => {
 
     const handleDrop = (e, targetRole, targetIndex = null) => {
         e.preventDefault()
+
+        // FIXED: Clear drag state immediately on successful drop
         setDragOverZone(null)
         setDragOverIndex(null)
 
@@ -146,7 +178,10 @@ const DragDropRankings = () => {
             // Moving within or between ranking columns
             if (sourceRole === targetRole) {
                 // Same column reordering
-                if (sourceIndex === targetIndex) return
+                if (sourceIndex === targetIndex) {
+                    setDraggedItem(null)
+                    return
+                }
 
                 setRankings(prev => {
                     const newList = [...prev[sourceRole]]
@@ -185,6 +220,7 @@ const DragDropRankings = () => {
             })
         }
 
+        // FIXED: Clear drag state after successful drop
         setDraggedItem(null)
     }
 
@@ -231,8 +267,9 @@ const DragDropRankings = () => {
         }
     }
 
-    // Get display rankings - either temp shuffled version or actual rankings
+    // FIXED: Improved display rankings logic
     const getDisplayRankings = (role) => {
+        // If no drag in progress, return actual rankings
         if (!draggedItem || dragOverZone !== role) {
             return rankings[role]
         }
@@ -328,7 +365,11 @@ const DragDropRankings = () => {
                                 {getDisplayRankings(role).map((player, index) => {
                                     const teamColor = getPlayerTeamColor(player, teams)
                                     const isDraggedItem = draggedItem && draggedItem.player === player
-                                    const isOriginalPosition = rankings[role][index] === player
+                                    // FIXED: More precise check for original position
+                                    const isOriginalPosition = draggedItem &&
+                                        draggedItem.sourceRole === role &&
+                                        draggedItem.sourceIndex === index &&
+                                        rankings[role][index] === player
 
                                     return (
                                         <div key={`${role}-${player}-${index}`}>
@@ -349,7 +390,7 @@ const DragDropRankings = () => {
                                             <div
                                                 className={`p-3 rounded shadow cursor-move border group hover:shadow-md transition-all ${
                                                     isDraggedItem && isOriginalPosition ? 'opacity-30' :
-                                                        isDraggedItem ? 'opacity-70 scale-95' : ''
+                                                        isDraggedItem && draggedItem.sourceRole !== role ? 'opacity-70 scale-95' : ''
                                                 }`}
                                                 style={{
                                                     backgroundColor: teamColor,
@@ -357,6 +398,7 @@ const DragDropRankings = () => {
                                                 }}
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, player, null, role, index)}
+                                                onDragEnd={handleDragEnd} // FIXED: Add dragend handler
                                                 onDragOver={handleDragOver}
                                                 onDragEnter={(e) => {
                                                     e.stopPropagation()
@@ -417,23 +459,9 @@ const DragDropRankings = () => {
                         >
                             Clear All
                         </button>
-                        {/*<button*/}
-                        {/*    onClick={exportRankings}*/}
-                        {/*    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"*/}
-                        {/*>*/}
-                        {/*    Export JSON*/}
-                        {/*</button>*/}
-                        {/*<button*/}
-                        {/*    onClick={exportAsImageHandler}*/}
-                        {/*    disabled={isExporting}*/}
-                        {/*    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"*/}
-                        {/*>*/}
-                        {/*    {isExporting ? 'Exporting...' : 'Export as Image'}*/}
-                        {/*</button>*/}
                     </div>
                 )}
             </div>
-
 
             {/* Teams Section - source for dragging */}
             <div className="bg-white rounded-lg shadow-lg p-6">
@@ -470,6 +498,7 @@ const DragDropRankings = () => {
                                             style={{ backgroundColor: team.color }}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, player, team.id)}
+                                            onDragEnd={handleDragEnd} // FIXED: Add dragend handler
                                         >
                                             <span>{player}</span>
                                             {roleImage && (

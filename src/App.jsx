@@ -5,6 +5,7 @@ import Home from './pages/Home'
 import Rankings from './pages/Rankings'
 import Stats from './pages/Stats'
 import { FEATURE_FLAGS } from './config/featureFlags'
+import DatabaseTest from "./components/DatabaseTest.jsx";
 
 function App() {
     // If navigation and home page are disabled, just show rankings directly
@@ -27,6 +28,7 @@ function App() {
                             )}
                         <Route path="/rankings" element={<Rankings />} />
                         <Route path="/stats" element={<Stats />} />
+                        <Route path="/test" element={<DatabaseTest />} />
                         <Route path="*" element={<Stats />} />
                     </>
                 </Routes>
