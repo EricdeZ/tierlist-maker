@@ -106,6 +106,7 @@ const DragDropRankings = () => {
 
     const getPlayerRole = (playerName) => {
         const player = getPlayerByName(playerName)
+        console.log(player)
         return player ? player.role : ''
     }
 
@@ -171,6 +172,8 @@ const DragDropRankings = () => {
             </div>
         )
     }
+
+    console.log(teams)
 
     // Rest of your existing drag and drop logic remains the same...
     const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
@@ -389,7 +392,7 @@ const DragDropRankings = () => {
                             }`}>
                                 <img
                                     src={roleImages[role]}
-                                    alt={role}
+                                    alt={}
                                     className="w-6 h-6 object-contain"
                                 />
                                 <span>{role}</span>
@@ -521,7 +524,7 @@ const DragDropRankings = () => {
                             <div className="space-y-2">
                                 {team.players.map((player, index) => {
                                     const playerRole = getPlayerRole(player)
-                                    const roleImage = playerRole ? roleImages[playerRole] : null
+                                    const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
 
                                     return (
                                         <div
