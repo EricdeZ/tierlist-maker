@@ -1,38 +1,44 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout'
-import Home from './pages/Home'
-import Rankings from './pages/Rankings'
-import Stats from './pages/Stats'
-import { FEATURE_FLAGS } from './config/featureFlags'
-import DatabaseTest from "./components/DatabaseTest.jsx";
+import AppLayout from './components/layout/AppLayout'
+import DivisionLayout from './components/layout/DivisionLayout'
+import Homepage from './pages/Homepage'
+import NotFound from './pages/NotFound'
+
+// Division pages
+import DivisionOverview from './pages/division/DivisionOverview'
+import Standings from './pages/division/Standings'
+import Matches from './pages/division/Matches'
+import Stats from './pages/division/Stats'
+import Rankings from './pages/division/Rankings'
+import Teams from './pages/division/Teams'
+import TeamDetail from './pages/division/TeamDetail'
+import PlayerProfile from './pages/division/PlayerProfile'
 
 function App() {
-    // If navigation and home page are disabled, just show rankings directly
-    if (!FEATURE_FLAGS.SHOW_NAVIGATION && !FEATURE_FLAGS.ENABLE_HOME_PAGE) {
-        return (
-            <div className="min-h-screen bg-gray-50">
-                <Rankings />
-            </div>
-        )
-    }
-
-    // Standard routing with layout
     return (
         <Router>
-            <Layout>
-                <Routes>
-                    <>
-                        {FEATURE_FLAGS.ENABLE_HOME_PAGE && (
-                        <Route path="/" element={<Home />} />
-                            )}
-                        <Route path="/rankings" element={<Rankings />} />
-                        <Route path="/stats" element={<Stats />} />
-                        <Route path="/test" element={<DatabaseTest />} />
-                        <Route path="*" element={<Stats />} />
-                    </>
-                </Routes>
-            </Layout>
+            <Routes>
+                <Route path="/" element={<AppLayout />}>
+                    {/* Homepage — league & division selector */}
+                    <Route index element={<Homepage />} />
+
+                    {/* Division-scoped pages (context provided by DivisionLayout) */}
+                    <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>
+                        <Route index element={<DivisionOverview />} />
+                        <Route path="standings" element={<Standings />} />
+                        <Route path="matches" element={<Matches />} />
+                        <Route path="stats" element={<Stats />} />
+                        <Route path="rankings" element={<Rankings />} />
+                        <Route path="teams" element={<Teams />} />
+                        <Route path="teams/:teamSlug" element={<TeamDetail />} />
+                        <Route path="players/:playerSlug" element={<PlayerProfile />} />
+                    </Route>
+
+                    {/* 404 */}
+                    <Route path="*" element={<NotFound />} />
+                </Route>
+            </Routes>
         </Router>
     )
 }

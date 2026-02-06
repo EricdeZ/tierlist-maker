@@ -1,6 +1,7 @@
 // src/components/Layout.jsx
 import { Link, useLocation } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
+import smiteLogo from '../assets/smite.svg'
 
 const Layout = ({ children }) => {
     const location = useLocation()
@@ -12,37 +13,38 @@ const Layout = ({ children }) => {
     ].filter(item => {
         // Filter out home page link if home page is disabled
         return !(item.path === '/' && !FEATURE_FLAGS.ENABLE_HOME_PAGE);
-
     })
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
             {/* Conditionally render navigation based on feature flag */}
             {FEATURE_FLAGS.SHOW_NAVIGATION && (
-                <nav className="bg-white shadow-sm border-b z-100">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex justify-between py-2">
-                            <div className="flex-shrink-0 flex items-center">
-                                <img src={'/babylon.png'} alt="" className='h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-5'/>
-                                {/* Hide title text on small screens */}
-                                <h1 className="hidden sm:block text-lg sm:text-xl font-bold text-gray-900">
-                                    Babylon League Ishtar
-                                </h1>
-                                {/* Short title for small screens */}
-                                <h1 className="block sm:hidden text-lg font-bold text-gray-900">
-                                    BLI
+                <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%]">
+                    <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-4 py-2 shadow-lg border border-white/10">
+                        <div className="flex items-center gap-8">
+                            {/* Logo */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                                <img
+                                    src={smiteLogo}
+                                    alt="SMITE 2"
+                                    className="h-15 w-auto smite-logo"
+                                />
+                                <h1 className="block sm:hidden text-lg font-bold text-(--color-text)">
+                                    S2C
                                 </h1>
                             </div>
+
+                            {/* Navigation Links */}
                             {navItems.length > 1 && (
-                                <div className="ml-2 sm:ml-6 flex space-x-2 sm:space-x-8">
+                                <div className="flex gap-6 text-(--nav-text)">
                                     {navItems.map((item) => (
                                         <Link
                                             key={item.path}
                                             to={item.path}
-                                            className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                                            className={`text-m font-bold uppercase px-3 py-2 rounded-lg transition-all duration-200 ${
                                                 location.pathname === item.path
-                                                    ? 'border-blue-500 text-gray-900'
-                                                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                                    ? 'underline underline-offset-5 decoration-(--color-accent) hover:text-(--color-accent)'
+                                                    : 'hover:text-(--color-accent)'
                                             }`}
                                         >
                                             {item.label}
@@ -50,14 +52,13 @@ const Layout = ({ children }) => {
                                     ))}
                                 </div>
                             )}
-                            {/* Remove the spacer div that was causing layout issues */}
                         </div>
                     </div>
                 </nav>
             )}
 
-            {/* Main content */}
-            <main className="flex-1 bg-(--color-primary)">
+            {/* Main content with top padding to account for fixed header */}
+            <main className="pt-24">
                 {children}
             </main>
         </div>

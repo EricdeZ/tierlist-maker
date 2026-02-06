@@ -139,3 +139,5 @@ Icon
 # Linux
 *~
 .nfs*
+# Local Netlify folder
+.netlify

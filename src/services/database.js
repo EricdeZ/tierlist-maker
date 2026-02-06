@@ -10,9 +10,14 @@ const apiCall = async (endpoint, params = {}) => {
     })
 
     const response = await fetch(url)
+    console.log(`API call to ${url} returned status ${response.status}`)
+
     if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`API error response:`, errorText)
         throw new Error(`API call failed: ${response.statusText}`)
     }
+
     return response.json()
 }
 
@@ -22,40 +27,86 @@ export const leagueService = {
     },
 
     async getBySlug(slug) {
-        const leagues = await this.getAll()
-        return leagues.find(l => l.slug === slug)
+        return apiCall('leagues', { slug })
+    }
+}
+
+export const seasonService = {
+    // Get active season for a league (uses first active season found)
+    async getActiveSeason(leagueSlug) {
+        const league = await leagueService.getBySlug(leagueSlug)
+
+        if (!league || !league.divisions) {
+            throw new Error('League not found or has no divisions')
+        }
+
+        // Find first active season across all divisions
+        for (const division of league.divisions) {
+            if (division.seasons) {
+                const activeSeason = division.seasons.find(s => s.is_active)
+                if (activeSeason) {
+                    return {
+                        ...activeSeason,
+                        division_id: division.id,
+                        division_name: division.name,
+                        league_id: league.id,
+                        league_name: league.name
+                    }
+                }
+            }
+        }
+
+        // If no active season, return the most recent season
+        for (const division of league.divisions) {
+            if (division.seasons && division.seasons.length > 0) {
+                const latestSeason = division.seasons[0] // Already ordered by start_date DESC
+                return {
+                    ...latestSeason,
+                    division_id: division.id,
+                    division_name: division.name,
+                    league_id: league.id,
+                    league_name: league.name
+                }
+            }
+        }
+
+        throw new Error('No seasons found for league')
     }
 }
 
 export const teamService = {
-    async getAllByLeague(leagueId) {
-        return apiCall('teams', { leagueId })
+    async getAllBySeason(seasonId) {
+        return apiCall('teams', { seasonId })
     }
 }
 
 export const playerService = {
-    async getAllByLeague(leagueId) {
-        return apiCall('players', { leagueId })
+    async getAllBySeason(seasonId) {
+        return apiCall('players', { seasonId })
     },
 
-    async getPlayerSummaryStats(playerId, leagueId) {
-        return apiCall('players', { leagueId, playerId })
+    async getPlayerSummaryStats(playerId, seasonId) {
+        return apiCall('players', { seasonId, playerId })
     }
 }
 
 export const matchService = {
-    async getAllByLeague(leagueId, limit = null) {
-        return apiCall('matches', { leagueId, ...(limit && { limit }) })
+    async getAllBySeason(seasonId, limit = null) {
+        return apiCall('matches', { seasonId, ...(limit && { limit }) })
     },
 
-    async getRecentMatches(leagueId, limit = 5) {
-        return this.getAllByLeague(leagueId, limit)
+    async getRecentMatches(seasonId, limit = 5) {
+        return this.getAllBySeason(seasonId, limit)
     }
 }
 
 export const statsService = {
-    async getLeagueStats(leagueId) {
-        return apiCall('stats', { leagueId })
+    async getSeasonStats(seasonId) {
+        return apiCall('stats', { seasonId })
+    },
+
+    async getPlayerStats(seasonId) {
+        return apiCall('stats', { seasonId, type: 'players' })
     }
 }
 

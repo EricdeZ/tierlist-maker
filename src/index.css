@@ -1,30 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #3b82f6;
+  --color-primary: #101829;
   --color-primary-hover: #2563eb;
-  --color-secondary: #e5e7eb;
-  --color-accent: #eab308;
+  --color-secondary: #060d1a;
+  --color-accent: #f8c56a;
   --color-background: #f9fafb;
   --color-surface: #ffffff;
   --color-border: #d1d5db;
-  --color-text: #111827;
-  --color-text-secondary: #6b7280;
+  --color-text: #ffffff;
+  --color-text-secondary: #d2d2d2;
   --color-drag-over: #dbeafe;
+  --nav-text: #b0b9cb;
+  --nav-bg: rgba(30, 36, 53, .75);
+
+  /* Fonts */
+  --font-heading: "Montserrat", sans-serif;
+  --font-body: "Lato", sans-serif;
 }
 
-/* Optional: Dark mode support */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-primary: #3b82f6;
-    --color-primary-hover: #1d4ed8;
-    --color-secondary: #374151;
-    --color-accent: #fbbf24;
-    --color-background: #111827;
-    --color-surface: #1f2937;
-    --color-border: #4b5563;
-    --color-text: #f9fafb;
-    --color-text-secondary: #d1d5db;
-    --color-drag-over: #1e3a8a;
-  }
+
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+.font-heading {
+  font-family: "Montserrat", sans-serif;
+}
+
+.font-body {
+  font-family: "Lato", sans-serif;
+}
+
+.smite-logo {
+  color: var(--color-accent);
 }

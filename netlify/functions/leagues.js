@@ -1,14 +1,67 @@
+/* global process */
 import { getDB, headers } from './lib/db.js'
 
 export const handler = async (event, context) => {
+
     const sql = getDB()
 
     try {
         if (event.httpMethod === 'GET') {
+            const { slug } = event.queryStringParameters || {}
+
+            // Get single league with divisions and seasons
+            if (slug) {
+                const [league] = await sql`
+                    SELECT id, name, slug, description 
+                    FROM leagues 
+                    WHERE slug = ${slug}
+                `
+
+                if (!league) {
+                    return {
+                        statusCode: 404,
+                        headers,
+                        body: JSON.stringify({ error: 'League not found' }),
+                    }
+                }
+
+                // Get divisions and seasons for this league
+                const divisions = await sql`
+                    SELECT 
+                        d.id,
+                        d.name,
+                        d.tier,
+                        d.slug,
+                        json_agg(
+                            json_build_object(
+                                'id', s.id,
+                                'name', s.name,
+                                'slug', s.slug,
+                                'is_active', s.is_active,
+                                'start_date', s.start_date,
+                                'end_date', s.end_date
+                            ) ORDER BY s.start_date DESC
+                        ) as seasons
+                    FROM divisions d
+                    LEFT JOIN seasons s ON s.division_id = d.id
+                    WHERE d.league_id = ${league.id}
+                    GROUP BY d.id, d.name, d.tier, d.slug
+                    ORDER BY d.tier
+                `
+
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({ ...league, divisions }),
+                }
+            }
+
+            // Get all leagues (basic info)
             const leagues = await sql`
-        SELECT id, name, slug FROM leagues 
-        ORDER BY name
-      `
+                SELECT id, name, slug, description 
+                FROM leagues 
+                ORDER BY name
+            `
 
             return {
                 statusCode: 200,

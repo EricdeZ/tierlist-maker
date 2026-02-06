@@ -1,6 +1,6 @@
 // src/components/DatabaseTest.jsx
 import { useEffect, useState } from 'react'
-import { healthCheck, leagueService, teamService } from '../services/database'
+import { healthCheck, leagueService, seasonService, teamService } from '../services/database'
 
 const DatabaseTest = () => {
     const [status, setStatus] = useState({ loading: true })
@@ -17,7 +17,6 @@ const DatabaseTest = () => {
                 try {
                     const response = await fetch('/.netlify/functions/leagues')
                     stepResults.push(`  - Functions response status: ${response.status}`)
-                    stepResults.push(`  - Functions response headers: ${JSON.stringify(Object.fromEntries(response.headers))}`)
 
                     if (!response.ok) {
                         const errorText = await response.text()
@@ -43,29 +42,46 @@ const DatabaseTest = () => {
                 let leagues = []
                 try {
                     leagues = await leagueService.getAll()
-                    stepResults.push(`  - Leagues response: ${JSON.stringify(leagues)}`)
+                    stepResults.push(`  - Found ${leagues.length} league(s)`)
                 } catch (leagueError) {
                     stepResults.push(`  - Leagues error: ${leagueError.message}`)
                     throw new Error(`Failed to fetch leagues: ${leagueError.message}`)
                 }
 
-                // Step 4: Find Babylon League
-                stepResults.push('Step 4: Looking for Babylon League...')
-                const babylonLeague = leagues.find(l => l.slug === 'babylon-league')
-                stepResults.push(`  - Babylon League found: ${JSON.stringify(babylonLeague)}`)
+                // Step 4: Find Test League
+                stepResults.push('Step 4: Looking for Test League...')
+                const testLeague = leagues.find(l => l.slug === 'test-league')
 
-                if (!babylonLeague) {
+                if (!testLeague) {
                     stepResults.push('  - Available leagues:')
                     leagues.forEach(l => stepResults.push(`    * ${l.name} (${l.slug})`))
-                    throw new Error('Babylon League not found in database')
+                    throw new Error('Test League not found in database')
+                }
+                stepResults.push(`  - Test League found: ${testLeague.name} (ID: ${testLeague.id})`)
+
+                // Step 5: Get full league with divisions and seasons
+                stepResults.push('Step 5: Loading league details with divisions/seasons...')
+                const leagueDetails = await leagueService.getBySlug('test-league')
+                stepResults.push(`  - Divisions found: ${leagueDetails.divisions?.length || 0}`)
+
+                if (leagueDetails.divisions) {
+                    leagueDetails.divisions.forEach(d => {
+                        stepResults.push(`    * ${d.name}: ${d.seasons?.length || 0} season(s)`)
+                    })
                 }
 
-                // Step 5: Test teams endpoint
-                stepResults.push('Step 5: Testing teams endpoint...')
+                // Step 6: Get active season
+                stepResults.push('Step 6: Finding active season...')
+                const activeSeason = await seasonService.getActiveSeason('test-league')
+                stepResults.push(`  - Active season: ${activeSeason.name} (ID: ${activeSeason.id})`)
+                stepResults.push(`  - Division: ${activeSeason.division_name}`)
+
+                // Step 7: Test teams endpoint
+                stepResults.push('Step 7: Testing teams endpoint...')
                 let teams = []
                 try {
-                    teams = await teamService.getAllByLeague(babylonLeague.id)
-                    stepResults.push(`  - Teams response: ${JSON.stringify(teams)}`)
+                    teams = await teamService.getAllBySeason(activeSeason.id)
+                    stepResults.push(`  - Teams found: ${teams.length}`)
                 } catch (teamError) {
                     stepResults.push(`  - Teams error: ${teamError.message}`)
                     throw new Error(`Failed to fetch teams: ${teamError.message}`)
@@ -77,11 +93,15 @@ const DatabaseTest = () => {
                     connected: true,
                     leagues: leagues.length,
                     teams: teams.length,
-                    leagueName: babylonLeague?.name,
-                    leagueId: babylonLeague?.id,
+                    leagueName: testLeague.name,
+                    leagueId: testLeague.id,
+                    seasonName: activeSeason.name,
+                    seasonId: activeSeason.id,
+                    divisionName: activeSeason.division_name,
                     stepResults,
                     details: {
                         allLeagues: leagues.map(l => ({ id: l.id, name: l.name, slug: l.slug })),
+                        divisions: leagueDetails.divisions,
                         teamNames: teams.map(t => t.name),
                         currentUrl: window.location.origin,
                         functionsBaseUrl: `${window.location.origin}/.netlify/functions`
@@ -152,7 +172,7 @@ const DatabaseTest = () => {
                     <li>Check if functions deployed: Visit {status.details?.functionsBaseUrl}/leagues directly</li>
                     <li>Verify DATABASE_URL in Netlify environment variables</li>
                     <li>Check Netlify Functions logs for errors</li>
-                    <li>Ensure netlify/functions/ directory is in project root</li>
+                    <li>Ensure fresh_start_schema.sql and mock_test_league.sql were run</li>
                 </ul>
             </div>
         </div>
@@ -163,6 +183,8 @@ const DatabaseTest = () => {
             <h3 className="font-bold text-green-800">Database Connected Successfully!</h3>
             <div className="text-green-700 mt-2">
                 <p><strong>League:</strong> {status.leagueName} (ID: {status.leagueId})</p>
+                <p><strong>Season:</strong> {status.seasonName} (ID: {status.seasonId})</p>
+                <p><strong>Division:</strong> {status.divisionName}</p>
                 <p><strong>Found:</strong> {status.leagues} leagues, {status.teams} teams</p>
                 <p><strong>API Base:</strong> {status.details?.functionsBaseUrl}</p>
             </div>
@@ -182,21 +204,28 @@ const DatabaseTest = () => {
 
             <details className="mt-2">
                 <summary className="text-sm font-medium text-green-800 cursor-pointer">
-                    View Data Details
+                    View League Structure
                 </summary>
                 <div className="mt-2 text-sm">
                     <div className="mb-2">
-                        <strong>All Leagues:</strong>
+                        <strong>Divisions & Seasons:</strong>
                         <ul className="ml-4">
-                            {status.details?.allLeagues?.map(league => (
-                                <li key={league.id} className="text-green-700">
-                                    {league.name} (ID: {league.id}, Slug: {league.slug})
+                            {status.details?.divisions?.map(division => (
+                                <li key={division.id} className="text-green-700">
+                                    <strong>{division.name}</strong>
+                                    <ul className="ml-4">
+                                        {division.seasons?.map(season => (
+                                            <li key={season.id}>
+                                                {season.name} {season.is_active ? '(active)' : ''}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </li>
                             ))}
                         </ul>
                     </div>
                     <div>
-                        <strong>Teams in Babylon League:</strong>
+                        <strong>Teams in {status.seasonName}:</strong>
                         <ul className="ml-4">
                             {status.details?.teamNames?.map(teamName => (
                                 <li key={teamName} className="text-green-700">{teamName}</li>

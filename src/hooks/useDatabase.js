@@ -1,9 +1,9 @@
 // src/hooks/useDatabase.js
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { leagueService, teamService, playerService, matchService, statsService } from '../services/database'
+import { leagueService, seasonService, teamService, playerService, matchService, statsService } from '../services/database'
 
 // League configuration - change this to switch leagues
-const CURRENT_LEAGUE_SLUG = 'babylon-league' // Change this to 'babylon-league-test' for testing
+const CURRENT_LEAGUE_SLUG = 'test-league' // Changed from 'babylon-league'
 
 // Simple in-memory cache
 const cache = new Map()
@@ -86,10 +86,11 @@ const useApiData = (fetchFunction, dependencies = [], cacheKey = null) => {
     return { data, loading, error, refetch }
 }
 
-// Single hook that loads everything sequentially for current league
+// Single hook that loads everything for current season
 export const useCurrentLeagueData = () => {
     const [state, setState] = useState({
         league: null,
+        season: null,
         teams: [],
         players: [],
         loading: true,
@@ -97,12 +98,12 @@ export const useCurrentLeagueData = () => {
     })
 
     useEffect(() => {
-        const cacheKey = `league_data_${CURRENT_LEAGUE_SLUG}`
+        const cacheKey = `season_data_${CURRENT_LEAGUE_SLUG}`
 
         // Check cache first
         const cachedData = getCachedData(cacheKey)
         if (cachedData) {
-            console.log('Using cached league data')
+            console.log('Using cached season data')
             setState({
                 ...cachedData,
                 loading: false,
@@ -115,24 +116,32 @@ export const useCurrentLeagueData = () => {
             try {
                 setState(prev => ({ ...prev, loading: true, error: null }))
 
-                // Step 1: Get current league
-                console.log('Loading league data...')
-                const leagues = await leagueService.getAll()
-                const league = leagues.find(l => l.slug === CURRENT_LEAGUE_SLUG)
+                // Step 1: Get league and active season
+                console.log(`Loading league data for: ${CURRENT_LEAGUE_SLUG}`)
+                const league = await leagueService.getBySlug(CURRENT_LEAGUE_SLUG)
 
                 if (!league) {
                     throw new Error(`League "${CURRENT_LEAGUE_SLUG}" not found`)
                 }
 
-                // Step 2: Get teams and players for this league
-                console.log('Loading teams and players...')
+                // Step 2: Get active season
+                console.log('Loading active season...')
+                const season = await seasonService.getActiveSeason(CURRENT_LEAGUE_SLUG)
+
+                if (!season) {
+                    throw new Error('No active season found')
+                }
+
+                // Step 3: Get teams and players for this season
+                console.log(`Loading teams and players for season ${season.id}...`)
                 const [teams, players] = await Promise.all([
-                    teamService.getAllByLeague(league.id),
-                    playerService.getAllByLeague(league.id)
+                    teamService.getAllBySeason(season.id),
+                    playerService.getAllBySeason(season.id)
                 ])
 
                 const result = {
                     league,
+                    season,
                     teams,
                     players
                 }
@@ -164,7 +173,7 @@ export const useCurrentLeagueData = () => {
 
 // Hook for teams with player roles (for rankings page)
 export const useCurrentTeamsWithPlayers = () => {
-    const { league, teams, players, loading, error } = useCurrentLeagueData()
+    const { league, season, teams, players, loading, error } = useCurrentLeagueData()
     const [formattedTeams, setFormattedTeams] = useState([])
 
     useEffect(() => {
@@ -174,7 +183,8 @@ export const useCurrentTeamsWithPlayers = () => {
                     .filter(p => p.team_id === team.id)
                     .map(p => ({
                         name: p.name,
-                        role: p.role
+                        role: p.role,
+                        secondary_role: p.secondary_role
                     }))
 
                 return {
@@ -194,47 +204,53 @@ export const useCurrentTeamsWithPlayers = () => {
         data: formattedTeams,
         loading,
         error,
-        league
+        league,
+        season
     }
 }
 
-// Hook for player stats (for stats page)
+// Hook for player stats (for stats page) - NOW USES DATABASE
 export const useCurrentPlayerStats = () => {
-    const { league, players, loading, error } = useCurrentLeagueData()
+    const { league, season, loading: baseLoading, error: baseError } = useCurrentLeagueData()
     const [formattedPlayers, setFormattedPlayers] = useState([])
     const [statsLoading, setStatsLoading] = useState(false)
+    const [statsError, setStatsError] = useState(null)
 
     useEffect(() => {
-        if (!players || !league || statsLoading) return
+        if (!season || !league || statsLoading) return
 
-        const formatPlayersForList = async () => {
+        const fetchPlayerStats = async () => {
             setStatsLoading(true)
+            setStatsError(null)
+
             try {
-                // Import games data for stats calculation (temporary until we migrate game stats)
-                const gamesData = await import('../data/games.json')
+                console.log(`Loading player stats for season ${season.id}...`)
+                const playerStats = await statsService.getPlayerStats(season.id)
 
-                const processedPlayers = players.map(player => {
-                    let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalDamage = 0, totalMitigated = 0, gamesPlayed = 0
+                // Transform database response to match expected format
+                const processedPlayers = playerStats.map(player => {
+                    const gamesPlayed = parseInt(player.games_played) || 0
+                    const wins = parseInt(player.wins) || 0
+                    const totalKills = parseInt(player.total_kills) || 0
+                    const totalDeaths = parseInt(player.total_deaths) || 0
+                    const totalAssists = parseInt(player.total_assists) || 0
+                    const totalDamage = parseInt(player.total_damage) || 0
+                    const totalMitigated = parseInt(player.total_mitigated) || 0
 
-                    gamesData.default.forEach(game => {
-                        const playerGameData = game.players.find(p => p.playerName === player.name)
-                        if (playerGameData) {
-                            totalKills += playerGameData.kills
-                            totalDeaths += playerGameData.deaths
-                            totalAssists += playerGameData.assists
-                            totalDamage += playerGameData.damage
-                            totalMitigated += playerGameData.mitigated
-                            gamesPlayed++
-                        }
-                    })
+                    // Calculate KDA
+                    const kda = totalDeaths === 0
+                        ? totalKills + (totalAssists / 2)
+                        : (totalKills + (totalAssists / 2)) / totalDeaths
 
-                    const kda = totalDeaths === 0 ? totalKills + (totalAssists / 2) : (totalKills + (totalAssists / 2)) / totalDeaths
+                    // Calculate win rate
+                    const winRate = gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0
 
                     return {
                         id: player.id,
                         name: player.name,
                         tracker: player.tracker_url || '',
                         role: player.role || '',
+                        secondary_role: player.secondary_role || '',
                         team: {
                             name: player.team_name || 'No Team',
                             color: player.team_color || '#6b7280'
@@ -248,31 +264,33 @@ export const useCurrentPlayerStats = () => {
                             gamesPlayed
                         },
                         avgStats: {
-                            avgKills: gamesPlayed > 0 ? totalKills / gamesPlayed : 0,
-                            avgDeaths: gamesPlayed > 0 ? totalDeaths / gamesPlayed : 0,
-                            avgAssists: gamesPlayed > 0 ? totalAssists / gamesPlayed : 0,
-                            avgDamage: gamesPlayed > 0 ? totalDamage / gamesPlayed : 0,
-                            avgMitigated: gamesPlayed > 0 ? totalMitigated / gamesPlayed : 0
+                            avgKills: parseFloat(player.avg_kills) || 0,
+                            avgDeaths: parseFloat(player.avg_deaths) || 0,
+                            avgAssists: parseFloat(player.avg_assists) || 0,
+                            avgDamage: parseFloat(player.avg_damage) || 0,
+                            avgMitigated: parseFloat(player.avg_mitigated) || 0
                         },
                         kda,
-                        winRate: 50 // Placeholder
+                        winRate
                     }
                 })
 
                 setFormattedPlayers(processedPlayers)
             } catch (error) {
-                console.error('Error processing player stats:', error)
+                console.error('Error loading player stats:', error)
+                setStatsError(error.message)
             } finally {
                 setStatsLoading(false)
             }
         }
 
-        formatPlayersForList()
-    }, [players, league])
+        fetchPlayerStats()
+    }, [season, league])
 
     return {
         data: formattedPlayers,
-        loading: loading || statsLoading,
-        error
+        loading: baseLoading || statsLoading,
+        error: baseError || statsError,
+        season
     }
 }

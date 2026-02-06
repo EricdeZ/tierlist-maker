@@ -1,23 +1,24 @@
 // src/utils/localStorage.js
 /**
- * Utilities for managing rankings in localStorage
+ * Utilities for managing rankings in localStorage.
+ * Storage key is now parameterized so rankings are scoped per division.
  */
 
-const RANKINGS_STORAGE_KEY = 'tierlist-rankings'
+const DEFAULT_KEY = 'tierlist-rankings'
 
 /**
  * Save rankings to localStorage
  * @param {Object} rankings - The rankings object to save
+ * @param {string} [storageKey] - Optional custom storage key (e.g. scoped by division)
  */
-export const saveRankingsToStorage = (rankings) => {
+export const saveRankingsToStorage = (rankings, storageKey = DEFAULT_KEY) => {
     try {
         const dataToSave = {
             rankings,
             timestamp: new Date().toISOString(),
-            version: '1.0' // For future migrations if needed
+            version: '2.0'
         }
-        localStorage.setItem(RANKINGS_STORAGE_KEY, JSON.stringify(dataToSave))
-        console.log('Rankings saved to localStorage')
+        localStorage.setItem(storageKey, JSON.stringify(dataToSave))
     } catch (error) {
         console.error('Failed to save rankings to localStorage:', error)
     }
@@ -25,33 +26,22 @@ export const saveRankingsToStorage = (rankings) => {
 
 /**
  * Load rankings from localStorage
+ * @param {string} [storageKey] - Optional custom storage key
  * @returns {Object|null} The saved rankings object or null if not found/invalid
  */
-export const loadRankingsFromStorage = () => {
+export const loadRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
     try {
-        const saved = localStorage.getItem(RANKINGS_STORAGE_KEY)
+        const saved = localStorage.getItem(storageKey)
         if (!saved) return null
 
         const data = JSON.parse(saved)
 
-        // Validate the data structure
-        if (!data.rankings || typeof data.rankings !== 'object') {
-            console.warn('Invalid rankings data in localStorage')
-            return null
-        }
+        if (!data.rankings || typeof data.rankings !== 'object') return null
 
-        // Validate that all required roles exist
         const requiredRoles = ['SOLO', 'JUNGLE', 'MID', 'SUPPORT', 'ADC']
-        const hasAllRoles = requiredRoles.every(role =>
-            Array.isArray(data.rankings[role])
-        )
+        const hasAllRoles = requiredRoles.every(role => Array.isArray(data.rankings[role]))
+        if (!hasAllRoles) return null
 
-        if (!hasAllRoles) {
-            console.warn('Missing required roles in saved rankings')
-            return null
-        }
-
-        console.log('Rankings loaded from localStorage:', data.timestamp)
         return data.rankings
     } catch (error) {
         console.error('Failed to load rankings from localStorage:', error)
@@ -61,11 +51,11 @@ export const loadRankingsFromStorage = () => {
 
 /**
  * Clear rankings from localStorage
+ * @param {string} [storageKey] - Optional custom storage key
  */
-export const clearRankingsFromStorage = () => {
+export const clearRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
     try {
-        localStorage.removeItem(RANKINGS_STORAGE_KEY)
-        console.log('Rankings cleared from localStorage')
+        localStorage.removeItem(storageKey)
     } catch (error) {
         console.error('Failed to clear rankings from localStorage:', error)
     }
@@ -73,13 +63,13 @@ export const clearRankingsFromStorage = () => {
 
 /**
  * Check if there are saved rankings in localStorage
- * @returns {boolean} True if saved rankings exist
+ * @param {string} [storageKey] - Optional custom storage key
+ * @returns {boolean}
  */
-export const hasSavedRankings = () => {
+export const hasSavedRankings = (storageKey = DEFAULT_KEY) => {
     try {
-        return localStorage.getItem(RANKINGS_STORAGE_KEY) !== null
-    } catch (error) {
-        console.error('Failed to check localStorage:', error)
+        return localStorage.getItem(storageKey) !== null
+    } catch {
         return false
     }
 }

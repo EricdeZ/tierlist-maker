@@ -35,9 +35,12 @@ const Home = () => {
                         <p className="text-gray-600 mb-4">
                             Organize players by teams with custom colors and export your rankings.
                         </p>
-                        <button className="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-700 rounded-lg cursor-not-allowed">
-                            Coming Soon
-                        </button>
+                        <Link
+                            to="/stats"
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Check out the player stats →
+                        </Link>
                     </div>
                 </div>
             </div>

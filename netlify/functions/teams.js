@@ -2,24 +2,24 @@ import { getDB, headers } from './lib/db.js'
 
 export const handler = async (event, context) => {
     const sql = getDB()
-    const { leagueId } = event.queryStringParameters || {}
+    const { seasonId } = event.queryStringParameters || {}
 
     try {
-        if (event.httpMethod === 'GET' && leagueId) {
+        if (event.httpMethod === 'GET' && seasonId) {
             const teams = await sql`
-        SELECT 
-          t.id,
-          t.league_id,
-          t.name,
-          t.color,
-          t.slug,
-          COUNT(lp.id) as player_count
-        FROM teams t
-        LEFT JOIN league_players lp ON t.id = lp.team_id AND lp.is_active = true
-        WHERE t.league_id = ${leagueId}
-        GROUP BY t.id, t.league_id, t.name, t.color, t.slug
-        ORDER BY t.name
-      `
+                SELECT 
+                    t.id,
+                    t.season_id,
+                    t.name,
+                    t.color,
+                    t.slug,
+                    COUNT(lp.id) as player_count
+                FROM teams t
+                LEFT JOIN league_players lp ON t.id = lp.team_id AND lp.is_active = true
+                WHERE t.season_id = ${seasonId}
+                GROUP BY t.id, t.season_id, t.name, t.color, t.slug
+                ORDER BY t.name
+            `
 
             return {
                 statusCode: 200,
@@ -31,7 +31,7 @@ export const handler = async (event, context) => {
         return {
             statusCode: 400,
             headers,
-            body: JSON.stringify({ error: 'leagueId parameter required' }),
+            body: JSON.stringify({ error: 'seasonId parameter required' }),
         }
     } catch (error) {
         console.error('Database error:', error)

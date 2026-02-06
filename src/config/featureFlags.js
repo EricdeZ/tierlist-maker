@@ -7,7 +7,7 @@
 export const FEATURE_FLAGS = {
     // Navigation and routing
     SHOW_NAVIGATION: true,        // Show/hide the top navigation bar
-    ENABLE_HOME_PAGE: false,       // Enable the separate home page
+    ENABLE_HOME_PAGE: true,       // Enable the separate home page
 
     // Future features
     ENABLE_TEAM_MANAGEMENT: false, // Team CRUD operations
