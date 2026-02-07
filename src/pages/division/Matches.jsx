@@ -57,7 +57,7 @@ const Matches = () => {
         )
     }
 
-    // Group matches by week (null week goes to "Unscheduled")
+    // Group matches by week
     const grouped = matches.reduce((acc, match) => {
         const key = match.week != null ? `Week ${match.week}` : 'Unscheduled'
         if (!acc[key]) acc[key] = []
@@ -65,7 +65,6 @@ const Matches = () => {
         return acc
     }, {})
 
-    // Sort week keys numerically
     const weekKeys = Object.keys(grouped).sort((a, b) => {
         const numA = parseInt(a.replace('Week ', ''))
         const numB = parseInt(b.replace('Week ', ''))
@@ -122,7 +121,8 @@ const MatchCard = ({ match, formatDate, basePath }) => {
 
     return (
         <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
-            <div className="flex items-center">
+            {/* ── Desktop layout (md+) ── */}
+            <div className="hidden md:flex items-center">
                 {/* Team 1 */}
                 <Link
                     to={`${basePath}/teams/${match.team1_slug}`}
@@ -179,6 +179,90 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                         style={{ backgroundColor: match.team2_color }}
                     />
                 </Link>
+            </div>
+
+            {/* ── Mobile layout (<md) ── */}
+            <div className="md:hidden p-4">
+                {/* Status bar */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        {isCompleted ? (
+                            <span className="text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5">
+                                Final
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-bold text-(--color-accent) uppercase tracking-wider px-2 py-0.5 rounded-full bg-(--color-accent)/10">
+                                Upcoming
+                            </span>
+                        )}
+                        {match.best_of > 1 && (
+                            <span className="text-[10px] text-(--color-text-secondary)/50 uppercase">
+                                Bo{match.best_of}
+                            </span>
+                        )}
+                    </div>
+                    {match.date && (
+                        <span className="text-xs text-(--color-text-secondary)/60">
+                            {formatDate(match.date)}
+                        </span>
+                    )}
+                </div>
+
+                {/* Teams stacked */}
+                <div className="space-y-2">
+                    {/* Team 1 */}
+                    <Link
+                        to={`${basePath}/teams/${match.team1_slug}`}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors ${
+                            team1Won
+                                ? 'bg-green-500/5 border border-green-500/15'
+                                : isCompleted
+                                    ? 'opacity-50'
+                                    : 'border border-transparent'
+                        }`}
+                    >
+                        <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: match.team1_color }}
+                        />
+                        <span className="text-sm font-semibold text-(--color-text) flex-1 truncate">
+                            {match.team1_name}
+                        </span>
+                        {team1Won && (
+                            <span className="text-xs font-bold text-green-400 flex-shrink-0">WIN</span>
+                        )}
+                    </Link>
+
+                    {/* VS divider */}
+                    <div className="flex items-center gap-2 px-3">
+                        <div className="flex-1 h-px bg-white/5" />
+                        <span className="text-[10px] font-bold text-(--color-text-secondary)/40 uppercase">vs</span>
+                        <div className="flex-1 h-px bg-white/5" />
+                    </div>
+
+                    {/* Team 2 */}
+                    <Link
+                        to={`${basePath}/teams/${match.team2_slug}`}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors ${
+                            team2Won
+                                ? 'bg-green-500/5 border border-green-500/15'
+                                : isCompleted
+                                    ? 'opacity-50'
+                                    : 'border border-transparent'
+                        }`}
+                    >
+                        <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: match.team2_color }}
+                        />
+                        <span className="text-sm font-semibold text-(--color-text) flex-1 truncate">
+                            {match.team2_name}
+                        </span>
+                        {team2Won && (
+                            <span className="text-xs font-bold text-green-400 flex-shrink-0">WIN</span>
+                        )}
+                    </Link>
+                </div>
             </div>
         </div>
     )

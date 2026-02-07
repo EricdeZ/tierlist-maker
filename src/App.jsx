@@ -15,10 +15,12 @@ import TeamDetail from './pages/division/TeamDetail'
 import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
+import ScrollToTop from "./components/ScrollToTop.jsx";
 
 function App() {
     return (
         <Router>
+            <ScrollToTop />
             <ErrorBoundary>
                 <Routes>
                     <Route path="/" element={<AppLayout />}>
