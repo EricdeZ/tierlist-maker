@@ -1,16 +1,87 @@
-import { getDB, headers } from './lib/db.js'
+import { getDB, headers, handleCors } from './lib/db.js'
 
-export const handler = async (event, context) => {
+export const handler = async (event) => {
+    const cors = handleCors(event)
+    if (cors) return cors
+
     const sql = getDB()
-    const { seasonId, type } = event.queryStringParameters || {}
+    const { seasonId, type, playerId } = event.queryStringParameters || {}
 
     try {
         if (event.httpMethod === 'GET' && seasonId) {
 
+            // Per-game stats for a specific player
+            if (type === 'player-games' && playerId) {
+                const games = await sql`
+                    SELECT
+                        g.id as game_id,
+                        g.game_number,
+                        m.id as match_id,
+                        m.date,
+                        m.week,
+                        m.best_of,
+                        m.team1_id,
+                        m.team2_id,
+                        t1.name as team1_name,
+                        t1.color as team1_color,
+                        t1.slug as team1_slug,
+                        t2.name as team2_name,
+                        t2.color as team2_color,
+                        t2.slug as team2_slug,
+                        g.winner_team_id,
+                        pgs.kills,
+                        pgs.deaths,
+                        pgs.assists,
+                        pgs.damage,
+                        pgs.mitigated,
+                        pgs.god_played,
+                        pgs.team_side,
+                        lp.team_id as player_team_id
+                    FROM player_game_stats pgs
+                    JOIN league_players lp ON pgs.league_player_id = lp.id
+                    JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+                    JOIN matches m ON g.match_id = m.id
+                    JOIN teams t1 ON m.team1_id = t1.id
+                    JOIN teams t2 ON m.team2_id = t2.id
+                    WHERE lp.player_id = ${playerId}
+                      AND lp.season_id = ${seasonId}
+                    ORDER BY m.date DESC, g.game_number
+                `
+
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify(games),
+                }
+            }
+
             // Player stats endpoint - detailed per-player statistics
             if (type === 'players') {
                 const playerStats = await sql`
-                    SELECT 
+                    WITH player_agg AS (
+                        SELECT
+                            pgs.league_player_id,
+                            COUNT(DISTINCT pgs.game_id) as games_played,
+                            COALESCE(SUM(pgs.kills), 0) as total_kills,
+                            COALESCE(SUM(pgs.deaths), 0) as total_deaths,
+                            COALESCE(SUM(pgs.assists), 0) as total_assists,
+                            COALESCE(SUM(pgs.damage), 0) as total_damage,
+                            COALESCE(SUM(pgs.mitigated), 0) as total_mitigated,
+                            COALESCE(AVG(pgs.kills), 0) as avg_kills,
+                            COALESCE(AVG(pgs.deaths), 0) as avg_deaths,
+                            COALESCE(AVG(pgs.assists), 0) as avg_assists,
+                            COALESCE(AVG(pgs.damage), 0) as avg_damage,
+                            COALESCE(AVG(pgs.mitigated), 0) as avg_mitigated,
+                            COUNT(DISTINCT pgs.game_id) FILTER (
+                                WHERE g.winner_team_id = (
+                                    SELECT lp2.team_id FROM league_players lp2 WHERE lp2.id = pgs.league_player_id
+                                )
+                            ) as wins
+                        FROM player_game_stats pgs
+                        JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+                        GROUP BY pgs.league_player_id
+                    )
+                    SELECT
                         p.id,
                         p.name,
                         p.tracker_url,
@@ -18,32 +89,25 @@ export const handler = async (event, context) => {
                         lp.secondary_role,
                         t.name as team_name,
                         t.color as team_color,
-                        COUNT(DISTINCT pgs.game_id) as games_played,
-                        COALESCE(SUM(pgs.kills), 0) as total_kills,
-                        COALESCE(SUM(pgs.deaths), 0) as total_deaths,
-                        COALESCE(SUM(pgs.assists), 0) as total_assists,
-                        COALESCE(SUM(pgs.damage), 0) as total_damage,
-                        COALESCE(SUM(pgs.mitigated), 0) as total_mitigated,
-                        COALESCE(AVG(pgs.kills), 0) as avg_kills,
-                        COALESCE(AVG(pgs.deaths), 0) as avg_deaths,
-                        COALESCE(AVG(pgs.assists), 0) as avg_assists,
-                        COALESCE(AVG(pgs.damage), 0) as avg_damage,
-                        COALESCE(AVG(pgs.mitigated), 0) as avg_mitigated,
-                        COUNT(DISTINCT CASE 
-                            WHEN g.winner_team_id = lp.team_id 
-                            THEN pgs.game_id 
-                        END) as wins,
-                        COUNT(DISTINCT pgs.game_id) as total_games_for_winrate
+                        COALESCE(pa.games_played, 0) as games_played,
+                        COALESCE(pa.total_kills, 0) as total_kills,
+                        COALESCE(pa.total_deaths, 0) as total_deaths,
+                        COALESCE(pa.total_assists, 0) as total_assists,
+                        COALESCE(pa.total_damage, 0) as total_damage,
+                        COALESCE(pa.total_mitigated, 0) as total_mitigated,
+                        COALESCE(pa.avg_kills, 0) as avg_kills,
+                        COALESCE(pa.avg_deaths, 0) as avg_deaths,
+                        COALESCE(pa.avg_assists, 0) as avg_assists,
+                        COALESCE(pa.avg_damage, 0) as avg_damage,
+                        COALESCE(pa.avg_mitigated, 0) as avg_mitigated,
+                        COALESCE(pa.wins, 0) as wins,
+                        COALESCE(pa.games_played, 0) as total_games_for_winrate
                     FROM league_players lp
                     JOIN players p ON lp.player_id = p.id
                     LEFT JOIN teams t ON lp.team_id = t.id
-                    LEFT JOIN player_game_stats pgs ON pgs.league_player_id = lp.id
-                    LEFT JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
-                    LEFT JOIN matches m ON g.match_id = m.id
-                    WHERE lp.season_id = ${seasonId} 
+                    LEFT JOIN player_agg pa ON pa.league_player_id = lp.id
+                    WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
-                      AND (m.season_id = ${seasonId} OR pgs.game_id IS NULL)
-                    GROUP BY p.id, p.name, p.tracker_url, lp.role, lp.secondary_role, t.name, t.color, lp.team_id
                     ORDER BY total_kills DESC
                 `
 
@@ -62,6 +126,7 @@ export const handler = async (event, context) => {
                 FROM matches m
                 LEFT JOIN games g ON m.id = g.match_id AND g.is_completed = true
                 WHERE m.season_id = ${seasonId}
+                  AND m.is_completed = true
             `
 
             const [teamStats] = await sql`
@@ -76,7 +141,6 @@ export const handler = async (event, context) => {
                 WHERE season_id = ${seasonId} AND is_active = true
             `
 
-            // Get player game stats if available
             const [gameStats] = await sql`
                 SELECT 
                     COALESCE(SUM(pgs.kills), 0) as total_kills,
@@ -89,7 +153,6 @@ export const handler = async (event, context) => {
                 WHERE m.season_id = ${seasonId}
             `
 
-            // Combine results
             const stats = {
                 total_matches: matchStats.total_matches || 0,
                 total_games: matchStats.total_games || 0,

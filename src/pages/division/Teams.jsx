@@ -2,6 +2,20 @@
 import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 
+import soloImage from '../../assets/roles/solo.webp'
+import jungleImage from '../../assets/roles/jungle.webp'
+import midImage from '../../assets/roles/mid.webp'
+import suppImage from '../../assets/roles/supp.webp'
+import adcImage from '../../assets/roles/adc.webp'
+
+const roleImages = {
+    'SOLO': soloImage,
+    'JUNGLE': jungleImage,
+    'MID': midImage,
+    'SUPPORT': suppImage,
+    'ADC': adcImage,
+}
+
 const Teams = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const { season, teams, players } = useDivision()
@@ -25,33 +39,55 @@ const Teams = () => {
                     const teamPlayers = getTeamPlayers(team.id)
 
                     return (
-                        <Link
+                        <div
                             key={team.id}
-                            to={`${basePath}/teams/${team.slug}`}
-                            className="group rounded-xl border border-white/10 bg-(--color-secondary) overflow-hidden hover:border-white/20 transition-all"
+                            className="rounded-xl border border-white/10 bg-(--color-secondary) overflow-hidden"
                         >
-                            <div className="h-2" style={{ backgroundColor: team.color }} />
-                            <div className="p-4">
-                                <h3 className="font-heading text-lg font-bold text-(--color-text) mb-3 group-hover:text-(--color-accent) transition-colors">
-                                    {team.name}
-                                </h3>
-                                <div className="space-y-1.5">
-                                    {teamPlayers.map(player => (
-                                        <div
+                            {/* Team header - links to team detail */}
+                            <Link
+                                to={`${basePath}/teams/${team.slug}`}
+                                className="block group"
+                            >
+                                <div className="h-2" style={{ backgroundColor: team.color }} />
+                                <div className="px-4 pt-4 pb-2">
+                                    <h3 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
+                                        {team.name}
+                                    </h3>
+                                </div>
+                            </Link>
+
+                            {/* Player list - each player links to their profile */}
+                            <div className="px-4 pb-4 space-y-1.5">
+                                {teamPlayers.map(player => {
+                                    const roleImg = player.role ? roleImages[player.role.toUpperCase()] : null
+
+                                    return (
+                                        <Link
                                             key={player.id}
-                                            className="text-sm text-(--color-text-secondary) flex items-center justify-between"
+                                            to={`${basePath}/players/${player.slug}`}
+                                            className="text-sm text-(--color-text-secondary) flex items-center justify-between hover:text-(--color-accent) transition-colors py-0.5 group"
                                         >
                                             <span>{player.name}</span>
-                                            {player.role && (
-                                                <span className="text-xs text-(--color-text-secondary)/50 uppercase">
-                                                    {player.role}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                                            <div className="flex items-center gap-1.5">
+                                                {player.role && !roleImg && (
+                                                    <span className="text-xs text-(--color-text-secondary)/50 uppercase">
+                                                        {player.role}
+                                                    </span>
+                                                )}
+                                                {roleImg && (
+                                                    <img
+                                                        src={roleImg}
+                                                        alt={player.role}
+                                                        className="w-5 h-5 object-contain opacity-50 group-hover:opacity-80 transition-opacity"
+                                                        title={player.role}
+                                                    />
+                                                )}
+                                            </div>
+                                        </Link>
+                                    )
+                                })}
                             </div>
-                        </Link>
+                        </div>
                     )
                 })}
             </div>

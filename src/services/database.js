@@ -107,6 +107,17 @@ export const statsService = {
 
     async getPlayerStats(seasonId) {
         return apiCall('stats', { seasonId, type: 'players' })
+    },
+
+    // NEW: per-game stats for a single player
+    async getPlayerGameStats(seasonId, playerId) {
+        return apiCall('stats', { seasonId, type: 'player-games', playerId })
+    }
+}
+
+export const standingsService = {
+    async getBySeason(seasonId) {
+        return apiCall('standings', { seasonId })
     }
 }
 

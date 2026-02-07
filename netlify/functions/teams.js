@@ -1,6 +1,8 @@
-import { getDB, headers } from './lib/db.js'
+import {getDB, handleCors, headers} from './lib/db.js'
 
 export const handler = async (event, context) => {
+    const cors = handleCors(event)
+    if (cors) return cors
     const sql = getDB()
     const { seasonId } = event.queryStringParameters || {}
 

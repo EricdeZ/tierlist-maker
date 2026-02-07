@@ -31,6 +31,8 @@ const DivisionOverview = () => {
     const basePath = `/${leagueSlug}/${divisionSlug}`
     const rankImg = division?.tier ? RANK_IMAGES[division.tier] : null
 
+    const formatNumber = (num) => new Intl.NumberFormat().format(Math.round(num))
+
     return (
         <div className="max-w-6xl mx-auto px-4 py-8">
             {/* Division Hero */}
@@ -58,25 +60,29 @@ const DivisionOverview = () => {
                 )}
             </div>
 
-            {/* Quick Stats */}
+            {/* Quick Stats — clickable */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
                 {[
-                    { label: 'Teams',          value: teams?.length || 0 },
-                    { label: 'Players',        value: players?.length || 0 },
-                    { label: 'Matches Played', value: seasonStats?.total_matches ?? '—' },
-                    { label: 'Games Played',   value: seasonStats?.total_games ?? '—' },
+                    { label: 'Teams',          value: teams?.length || 0, link: `${basePath}/teams` },
+                    { label: 'Players',        value: players?.length || 0, link: `${basePath}/stats` },
+                    { label: 'Matches Played', value: seasonStats?.total_matches ?? '—', link: `${basePath}/matches` },
+                    { label: 'Total Kills',    value: seasonStats?.total_kills ? formatNumber(seasonStats.total_kills) : '—', link: `${basePath}/stats` },
                 ].map(stat => (
-                    <div key={stat.label} className="bg-(--color-secondary) rounded-xl border border-white/10 p-5 text-center">
-                        <div className="text-3xl font-bold text-(--color-text) font-heading">
+                    <Link
+                        key={stat.label}
+                        to={stat.link}
+                        className="bg-(--color-secondary) rounded-xl border border-white/10 p-5 text-center group hover:border-(--color-accent)/40 transition-all duration-200"
+                    >
+                        <div className="text-3xl font-bold text-(--color-text) font-heading group-hover:text-(--color-accent) transition-colors">
                             {stat.value}
                         </div>
                         <div className="text-sm text-(--color-text-secondary)">{stat.label}</div>
-                    </div>
+                    </Link>
                 ))}
             </div>
 
             {/* Feature Banners */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                 <Link
                     to={`${basePath}/standings`}
                     className="group relative overflow-hidden rounded-xl border border-white/10 bg-(--color-secondary) p-6 hover:border-(--color-accent)/40 transition-all duration-300 hover:-translate-y-0.5"
@@ -101,6 +107,20 @@ const DivisionOverview = () => {
                     </h3>
                     <p className="text-sm text-(--color-text-secondary)">
                         Upcoming matches and past results for the current season.
+                    </p>
+                    <div className="absolute top-6 right-5 text-(--color-text-secondary) group-hover:text-(--color-accent) transition-all group-hover:translate-x-1 text-lg">→</div>
+                </Link>
+
+                <Link
+                    to={`${basePath}/stats`}
+                    className="group relative overflow-hidden rounded-xl border border-white/10 bg-(--color-secondary) p-6 hover:border-(--color-accent)/40 transition-all duration-300 hover:-translate-y-0.5"
+                >
+                    <div className="text-3xl mb-3">📊</div>
+                    <h3 className="font-heading text-xl font-bold text-(--color-text) mb-2 group-hover:text-(--color-accent) transition-colors">
+                        Player Stats
+                    </h3>
+                    <p className="text-sm text-(--color-text-secondary)">
+                        Full player statistics with KDA, win rates, damage, and more.
                     </p>
                     <div className="absolute top-6 right-5 text-(--color-text-secondary) group-hover:text-(--color-accent) transition-all group-hover:translate-x-1 text-lg">→</div>
                 </Link>

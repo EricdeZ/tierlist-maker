@@ -3,6 +3,17 @@ import postgres from 'postgres'
 
 let sql
 
+export const handleCors = (event) => {
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 204,
+            headers,
+            body: '',
+        }
+    }
+    return null
+}
+
 export const getDB = () => {
     if (!sql) {
         sql = postgres(process.env.DATABASE_URL, {

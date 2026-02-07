@@ -1,6 +1,8 @@
 // src/components/PlayerList.jsx - Refactored to use DivisionContext via usePlayerStats
 import { useState, useMemo } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { usePlayerStats } from '../hooks/usePlayerStats'
+import { useDivision } from '../context/DivisionContext'
 
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
@@ -9,6 +11,12 @@ import suppImage from '../assets/roles/supp.webp'
 import adcImage from '../assets/roles/adc.webp'
 
 const PlayerList = () => {
+    const { leagueSlug, divisionSlug } = useParams()
+    const basePath = `/${leagueSlug}/${divisionSlug}`
+
+    // Get raw players/teams from context for slug lookups
+    const { players: rawPlayers, teams: rawTeams } = useDivision()
+
     const [searchTerm, setSearchTerm] = useState('')
     const [sortBy, setSortBy] = useState('name')
     const [sortOrder, setSortOrder] = useState('asc')
@@ -25,6 +33,17 @@ const PlayerList = () => {
 
     // Fetch player stats via DivisionContext
     const { data: processedPlayers, loading, error, season } = usePlayerStats()
+
+    // Build lookup maps for slugs
+    const playerSlugMap = useMemo(() => {
+        if (!rawPlayers) return {}
+        return Object.fromEntries(rawPlayers.map(p => [p.id, p.slug]))
+    }, [rawPlayers])
+
+    const teamSlugMap = useMemo(() => {
+        if (!rawTeams) return {}
+        return Object.fromEntries(rawTeams.map(t => [t.name, t.slug]))
+    }, [rawTeams])
 
     // Filter and sort players
     const filteredAndSortedPlayers = useMemo(() => {
@@ -254,80 +273,104 @@ const PlayerList = () => {
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                        {filteredAndSortedPlayers.map((player, index) => (
-                            <tr key={player.id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-(--color-text)">
-                                    {player.name}
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                    {player.tracker ? (
-                                        <a
-                                            href={player.tracker}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="bg-(--color-accent) text-(--color-primary) px-2 py-1 rounded text-xs font-semibold hover:opacity-90 transition-opacity"
-                                        >
-                                            View Stats
-                                        </a>
-                                    ) : (
-                                        <span className="text-(--color-text-secondary)/50 text-xs">No Tracker</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                    <div className="flex gap-1 items-center justify-center">
-                                        {player.role && roleImages[player.role.toUpperCase()] && (
-                                            <img src={roleImages[player.role.toUpperCase()]} alt={player.role} className="w-8 h-8 object-contain" title={player.role} />
+                        {filteredAndSortedPlayers.map((player, index) => {
+                            const pSlug = playerSlugMap[player.id]
+                            const tSlug = teamSlugMap[player.team.name]
+
+                            return (
+                                <tr key={player.id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                        {pSlug ? (
+                                            <Link
+                                                to={`${basePath}/players/${pSlug}`}
+                                                className="text-(--color-text) hover:text-(--color-accent) transition-colors"
+                                            >
+                                                {player.name}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-(--color-text)">{player.name}</span>
                                         )}
-                                        {player.secondary_role && roleImages[player.secondary_role.toUpperCase()] && (
-                                            <img src={roleImages[player.secondary_role.toUpperCase()]} alt={player.secondary_role} className="w-8 h-8 object-contain opacity-50" title={`Secondary: ${player.secondary_role}`} />
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                        {player.tracker ? (
+                                            <a
+                                                href={player.tracker}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="bg-(--color-accent) text-(--color-primary) px-2 py-1 rounded text-xs font-semibold hover:opacity-90 transition-opacity"
+                                            >
+                                                View Stats
+                                            </a>
+                                        ) : (
+                                            <span className="text-(--color-text-secondary)/50 text-xs">No Tracker</span>
                                         )}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                    {player.stats.gamesPlayed}
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                    <div>{player.stats.kills}</div>
-                                    <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgKills.toFixed(1)}/game)</div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                    <div>{player.stats.deaths}</div>
-                                    <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgDeaths.toFixed(1)}/game)</div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                    <div>{player.stats.assists}</div>
-                                    <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgAssists.toFixed(1)}/game)</div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-center">
-                                    <span className={`${
-                                        player.kda >= 2 ? 'text-green-400' :
-                                            player.kda >= 1.5 ? 'text-yellow-400' : 'text-red-400'
-                                    }`}>
-                                        {player.kda.toFixed(2)}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-center">
-                                    <span className={`${
-                                        player.winRate >= 60 ? 'text-green-400' :
-                                            player.winRate >= 45 ? 'text-yellow-400' : 'text-red-400'
-                                    }`}>
-                                        {player.winRate.toFixed(0)}%
-                                    </span>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                    <div>{formatNumber(player.stats.damage)}</div>
-                                    <div className="text-xs text-(--color-text-secondary)">({formatNumber(player.avgStats.avgDamage)}/game)</div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                    <span
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white w-full text-center justify-center"
-                                        style={{ backgroundColor: player.team.color }}
-                                    >
-                                        {player.team.name}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                        <div className="flex gap-1 items-center justify-center">
+                                            {player.role && roleImages[player.role.toUpperCase()] && (
+                                                <img src={roleImages[player.role.toUpperCase()]} alt={player.role} className="w-8 h-8 object-contain" title={player.role} />
+                                            )}
+                                            {player.secondary_role && roleImages[player.secondary_role.toUpperCase()] && (
+                                                <img src={roleImages[player.secondary_role.toUpperCase()]} alt={player.secondary_role} className="w-8 h-8 object-contain opacity-50" title={`Secondary: ${player.secondary_role}`} />
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        {player.stats.gamesPlayed}
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        <div>{player.stats.kills}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgKills.toFixed(1)}/game)</div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        <div>{player.stats.deaths}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgDeaths.toFixed(1)}/game)</div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        <div>{player.stats.assists}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgAssists.toFixed(1)}/game)</div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-center">
+                                        <span className={`${
+                                            player.kda >= 2 ? 'text-green-400' :
+                                                player.kda >= 1.5 ? 'text-yellow-400' : 'text-red-400'
+                                        }`}>
+                                            {player.kda.toFixed(2)}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-center">
+                                        <span className={`${
+                                            player.winRate >= 60 ? 'text-green-400' :
+                                                player.winRate >= 45 ? 'text-yellow-400' : 'text-red-400'
+                                        }`}>
+                                            {player.winRate.toFixed(0)}%
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        <div>{formatNumber(player.stats.damage)}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">({formatNumber(player.avgStats.avgDamage)}/game)</div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                        {tSlug ? (
+                                            <Link
+                                                to={`${basePath}/teams/${tSlug}`}
+                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white w-full text-center justify-center hover:opacity-80 transition-opacity"
+                                                style={{ backgroundColor: player.team.color }}
+                                            >
+                                                {player.team.name}
+                                            </Link>
+                                        ) : (
+                                            <span
+                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white w-full text-center justify-center"
+                                                style={{ backgroundColor: player.team.color }}
+                                            >
+                                                {player.team.name}
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            )
+                        })}
                         </tbody>
                     </table>
                 </div>
