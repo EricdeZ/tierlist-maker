@@ -800,7 +800,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
 // ═══════════════════════════════════════════════════
 // GAME EDITOR (winner + player tables)
 // ═══════════════════════════════════════════════════
-function GameEditor({ game, gameIndex, team1, team2, seasonId, adminData, onChange }) {
+function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
     const updatePlayer = (side, playerIdx, updates) => {
         const key = side === 'left' ? 'left_players' : 'right_players'
         const players = [...game[key]]
@@ -860,7 +860,7 @@ function GameEditor({ game, gameIndex, team1, team2, seasonId, adminData, onChan
 // ═══════════════════════════════════════════════════
 // PLAYER TABLE
 // ═══════════════════════════════════════════════════
-function PlayerTable({ label, color, players, allGamePlayers, side, seasonId, adminData, onUpdatePlayer, isWinner }) {
+function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminData, onUpdatePlayer, isWinner }) {
     // Collect all matched league_player_ids already used in this game (both sides)
     const usedLpIds = new Set()
     const usedNames = new Set()

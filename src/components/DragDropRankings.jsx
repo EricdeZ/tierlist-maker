@@ -1,5 +1,5 @@
 // src/components/DragDropRankings.jsx - Refactored to use DivisionContext
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { useImageExport } from '../hooks/useImageExport'

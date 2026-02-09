@@ -26,7 +26,7 @@ export default function RosterManager() {
 
     // Selected season from localStorage
     const [selectedSeasonId, setSelectedSeasonId] = useState(() => loadState().selectedSeasonId || null)
-    const [showDropped, setShowDropped] = useState(false)
+
 
     // Operation state
     const [opLoading, setOpLoading] = useState({}) // { [key]: true }
@@ -651,8 +651,6 @@ function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart
         return () => document.removeEventListener('mousedown', handler)
     }, [showActions])
 
-    const roleLower = (player.role || '').toLowerCase()
-
     return (
         <div
             className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${
@@ -808,7 +806,7 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
 // ═══════════════════════════════════════════════════
 // ADD PLAYER MODAL
 // ═══════════════════════════════════════════════════
-function AddPlayerModal({ teamId, teamName, teamColor, seasonId, globalPlayers, seasonPlayers, onClose, onAddExisting, onCreateNew, opLoading }) {
+function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPlayers, onClose, onAddExisting, onCreateNew, opLoading }) {
     const [mode, setMode] = useState('search') // 'search' | 'create'
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedRole, setSelectedRole] = useState('Fill')
@@ -1033,7 +1031,7 @@ function AddPlayerModal({ teamId, teamName, teamColor, seasonId, globalPlayers, 
 // ═══════════════════════════════════════════════════
 // ALIAS MODAL
 // ═══════════════════════════════════════════════════
-function AliasModal({ playerId, playerName, aliases, onClose, onAddAlias, onRemoveAlias, opLoading }) {
+function AliasModal({ playerName, aliases, onClose, onAddAlias, onRemoveAlias, opLoading }) {
     const [newAlias, setNewAlias] = useState('')
     const [error, setError] = useState(null)
     const inputRef = useRef(null)
