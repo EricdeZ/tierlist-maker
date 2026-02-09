@@ -209,7 +209,7 @@ export default function AdminDashboard() {
             if (!ed.games.length) throw new Error('No games to submit')
 
             for (let i = 0; i < ed.games.length; i++) {
-                if (!ed.games[i].winning_side) throw new Error(`Game ${i + 1}: Winner not set`)
+                if (!ed.games[i].winning_team_id) throw new Error(`Game ${i + 1}: Winner not set`)
             }
 
             const payload = {
@@ -221,7 +221,7 @@ export default function AdminDashboard() {
                 date: ed.date || new Date().toISOString().split('T')[0],
                 best_of: ed.best_of || ed.games.length,
                 games: ed.games.map(g => ({
-                    winning_side: g.winning_side === 'left' ? 'order' : 'chaos',
+                    winning_side: g.winning_team_id === ed.team1_id ? 'order' : 'chaos',
                     order_players: g.left_players.map(p => ({
                         player_name: p.player_name,
                         god_played: p.god_played,
@@ -450,7 +450,7 @@ function buildEditData(result) {
 
         return {
             game_index: idx,
-            winning_side: gw?.winning_side || null,
+            winning_team_id: gw?.winning_team_id || null,
             left_players: mapPlayers(game.data.left_players, 'left'),
             right_players: mapPlayers(game.data.right_players, 'right'),
         }
@@ -520,8 +520,8 @@ function MatchReportCard({
     const meta = report.result?.match_meta
     const team1 = adminData?.teams?.find(t => String(t.team_id) === String(ed?.team1_id))
     const team2 = adminData?.teams?.find(t => String(t.team_id) === String(ed?.team2_id))
-    const t1Wins = ed?.games?.filter(g => g.winning_side === 'left').length || 0
-    const t2Wins = ed?.games?.filter(g => g.winning_side === 'right').length || 0
+    const t1Wins = ed?.games?.filter(g => g.winning_team_id && g.winning_team_id === ed?.team1_id).length || 0
+    const t2Wins = ed?.games?.filter(g => g.winning_team_id && g.winning_team_id === ed?.team2_id).length || 0
 
     const statusStyle = {
         pending: 'border-[var(--color-border)]',
@@ -798,9 +798,9 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
                                 }`}>
                             Game {idx + 1}
-                            {game.winning_side && (
+                            {game.winning_team_id && (
                                 <span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${
-                                    game.winning_side === 'left' ? 'bg-blue-400' : 'bg-red-400'
+                                    game.winning_team_id === ed.team1_id ? 'bg-blue-400' : 'bg-red-400'
                                 }`} />
                             )}
                         </button>
@@ -864,13 +864,13 @@ function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
                 <span className="text-xs text-[var(--color-text-secondary)] font-medium">Winner:</span>
                 <div className="flex gap-2">
                     <WinnerButton label={team1?.team_name || 'Team 1'} color="blue"
-                                  isActive={game.winning_side === 'left'}
-                                  onClick={() => onChange({ ...game, winning_side: 'left' })} />
+                                  isActive={game.winning_team_id === team1?.team_id}
+                                  onClick={() => onChange({ ...game, winning_team_id: team1?.team_id })} />
                     <WinnerButton label={team2?.team_name || 'Team 2'} color="red"
-                                  isActive={game.winning_side === 'right'}
-                                  onClick={() => onChange({ ...game, winning_side: 'right' })} />
-                    {game.winning_side && (
-                        <button onClick={() => onChange({ ...game, winning_side: null })}
+                                  isActive={game.winning_team_id === team2?.team_id}
+                                  onClick={() => onChange({ ...game, winning_team_id: team2?.team_id })} />
+                    {game.winning_team_id && (
+                        <button onClick={() => onChange({ ...game, winning_team_id: null })}
                                 className="px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:text-red-400">Clear</button>
                     )}
                 </div>
@@ -887,7 +887,7 @@ function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
                     seasonId={seasonId}
                     adminData={adminData}
                     onUpdatePlayer={(idx, updates) => updatePlayer('left', idx, updates)}
-                    isWinner={game.winning_side === 'left'}
+                    isWinner={game.winning_team_id === team1?.team_id}
                 />
                 <PlayerTable
                     label={team2?.team_name || 'Team 2'}
@@ -898,7 +898,7 @@ function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
                     seasonId={seasonId}
                     adminData={adminData}
                     onUpdatePlayer={(idx, updates) => updatePlayer('right', idx, updates)}
-                    isWinner={game.winning_side === 'right'}
+                    isWinner={game.winning_team_id === team2?.team_id}
                 />
             </div>
         </div>
