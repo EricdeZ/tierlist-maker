@@ -97,6 +97,10 @@ export const matchService = {
 
     async getRecentMatches(seasonId, limit = 5) {
         return this.getAllBySeason(seasonId, limit)
+    },
+
+    async getById(matchId) {
+        return apiCall('match-detail', { matchId })
     }
 }
 
@@ -109,7 +113,7 @@ export const statsService = {
         return apiCall('stats', { seasonId, type: 'players' })
     },
 
-    // NEW: per-game stats for a single player
+    // Per-game stats for a single player
     async getPlayerGameStats(seasonId, playerId) {
         return apiCall('stats', { seasonId, type: 'player-games', playerId })
     }

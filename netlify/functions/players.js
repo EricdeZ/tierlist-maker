@@ -9,7 +9,7 @@ export const handler = async (event, context) => {
     try {
         if (event.httpMethod === 'GET') {
 
-            // Get all players in a season
+            // Get all players in a season (exclude subs)
             if (seasonId && !playerId) {
                 const players = await sql`
                     SELECT 
@@ -27,7 +27,9 @@ export const handler = async (event, context) => {
                     FROM league_players lp
                     JOIN players p ON lp.player_id = p.id
                     LEFT JOIN teams t ON lp.team_id = t.id
-                    WHERE lp.season_id = ${seasonId} AND lp.is_active = true
+                    WHERE lp.season_id = ${seasonId} 
+                      AND lp.is_active = true
+                      AND LOWER(lp.role) != 'sub'
                     ORDER BY t.name, p.name
                 `
 

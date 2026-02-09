@@ -17,7 +17,10 @@ export const handler = async (event, context) => {
                     t.slug,
                     COUNT(lp.id) as player_count
                 FROM teams t
-                LEFT JOIN league_players lp ON t.id = lp.team_id AND lp.is_active = true
+                LEFT JOIN league_players lp 
+                    ON t.id = lp.team_id 
+                    AND lp.is_active = true
+                    AND LOWER(lp.role) != 'sub'
                 WHERE t.season_id = ${seasonId}
                 GROUP BY t.id, t.season_id, t.name, t.color, t.slug
                 ORDER BY t.name

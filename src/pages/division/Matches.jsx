@@ -119,14 +119,27 @@ const MatchCard = ({ match, formatDate, basePath }) => {
     const team1Won = match.winner_team_id === match.team1_id
     const team2Won = match.winner_team_id === match.team2_id
 
+    // Link to match detail for completed matches
+    const matchLink = isCompleted ? `${basePath}/matches/${match.id}` : null
+
+    // Wrapper: clickable link for completed matches, plain div otherwise
+    const CardWrapper = matchLink
+        ? ({ children, className }) => (
+            <Link to={matchLink} className={`${className} group cursor-pointer hover:border-(--color-accent)/30 transition-all`}>
+                {children}
+            </Link>
+        )
+        : ({ children, className }) => (
+            <div className={className}>{children}</div>
+        )
+
     return (
-        <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
+        <CardWrapper className="block bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
             {/* ── Desktop layout (md+) ── */}
             <div className="hidden md:flex items-center">
                 {/* Team 1 */}
-                <Link
-                    to={`${basePath}/teams/${match.team1_slug}`}
-                    className={`flex-1 flex items-center gap-3 px-5 py-4 group hover:bg-white/5 transition-colors ${team1Won ? '' : isCompleted ? 'opacity-50' : ''}`}
+                <div
+                    className={`flex-1 flex items-center gap-3 px-5 py-4 ${team1Won ? '' : isCompleted ? 'opacity-50' : ''}`}
                 >
                     <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
@@ -138,7 +151,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                     {team1Won && (
                         <span className="text-xs font-bold text-green-400 ml-auto flex-shrink-0">W</span>
                     )}
-                </Link>
+                </div>
 
                 {/* Center info */}
                 <div className="flex-shrink-0 px-4 py-4 text-center min-w-24">
@@ -164,9 +177,8 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                 </div>
 
                 {/* Team 2 */}
-                <Link
-                    to={`${basePath}/teams/${match.team2_slug}`}
-                    className={`flex-1 flex items-center gap-3 px-5 py-4 justify-end group hover:bg-white/5 transition-colors ${team2Won ? '' : isCompleted ? 'opacity-50' : ''}`}
+                <div
+                    className={`flex-1 flex items-center gap-3 px-5 py-4 justify-end ${team2Won ? '' : isCompleted ? 'opacity-50' : ''}`}
                 >
                     {team2Won && (
                         <span className="text-xs font-bold text-green-400 mr-auto flex-shrink-0">W</span>
@@ -178,7 +190,14 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: match.team2_color }}
                     />
-                </Link>
+                </div>
+
+                {/* View arrow for completed matches */}
+                {isCompleted && (
+                    <div className="pr-4 text-(--color-text-secondary)/30 group-hover:text-(--color-accent) transition-colors flex-shrink-0">
+                        →
+                    </div>
+                )}
             </div>
 
             {/* ── Mobile layout (<md) ── */}
@@ -201,23 +220,27 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                             </span>
                         )}
                     </div>
-                    {match.date && (
-                        <span className="text-xs text-(--color-text-secondary)/60">
-                            {formatDate(match.date)}
-                        </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {match.date && (
+                            <span className="text-xs text-(--color-text-secondary)/60">
+                                {formatDate(match.date)}
+                            </span>
+                        )}
+                        {isCompleted && (
+                            <span className="text-(--color-text-secondary)/30 group-hover:text-(--color-accent) transition-colors text-sm">→</span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Teams stacked */}
                 <div className="space-y-2">
                     {/* Team 1 */}
-                    <Link
-                        to={`${basePath}/teams/${match.team1_slug}`}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors ${
+                    <div
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg ${
                             team1Won
                                 ? 'bg-green-500/5 border border-green-500/15'
                                 : isCompleted
-                                    ? 'opacity-50'
+                                    ? 'opacity-50 border border-transparent'
                                     : 'border border-transparent'
                         }`}
                     >
@@ -231,7 +254,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                         {team1Won && (
                             <span className="text-xs font-bold text-green-400 flex-shrink-0">WIN</span>
                         )}
-                    </Link>
+                    </div>
 
                     {/* VS divider */}
                     <div className="flex items-center gap-2 px-3">
@@ -241,13 +264,12 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                     </div>
 
                     {/* Team 2 */}
-                    <Link
-                        to={`${basePath}/teams/${match.team2_slug}`}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors ${
+                    <div
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg ${
                             team2Won
                                 ? 'bg-green-500/5 border border-green-500/15'
                                 : isCompleted
-                                    ? 'opacity-50'
+                                    ? 'opacity-50 border border-transparent'
                                     : 'border border-transparent'
                         }`}
                     >
@@ -261,10 +283,10 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                         {team2Won && (
                             <span className="text-xs font-bold text-green-400 flex-shrink-0">WIN</span>
                         )}
-                    </Link>
+                    </div>
                 </div>
             </div>
-        </div>
+        </CardWrapper>
     )
 }
 

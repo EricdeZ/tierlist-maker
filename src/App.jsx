@@ -10,12 +10,17 @@ import NotFound from './pages/NotFound'
 import DivisionOverview from './pages/division/DivisionOverview'
 import Standings from './pages/division/Standings'
 import Matches from './pages/division/Matches'
+import MatchDetail from './pages/division/MatchDetail'
 import Teams from './pages/division/Teams'
 import TeamDetail from './pages/division/TeamDetail'
 import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
+
+// Admin
+import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import RosterManager from "./pages/admin/RosterManager.jsx";
 
 function App() {
     return (
@@ -27,11 +32,16 @@ function App() {
                         {/* Homepage — league & division selector */}
                         <Route index element={<Homepage />} />
 
+                        {/* Admin — match data entry */}
+                        <Route path="admin" element={<AdminDashboard />} />
+                        <Route path="admin/rosters" element={<RosterManager />} />
+
                         {/* Division-scoped pages (context provided by DivisionLayout) */}
                         <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>
                             <Route index element={<DivisionOverview />} />
                             <Route path="standings" element={<Standings />} />
                             <Route path="matches" element={<Matches />} />
+                            <Route path="matches/:matchId" element={<MatchDetail />} />
                             <Route path="stats" element={<Stats />} />
                             <Route path="rankings" element={<Rankings />} />
                             <Route path="teams" element={<Teams />} />

@@ -354,16 +354,32 @@ const PlayerList = () => {
                                         {tSlug ? (
                                             <Link
                                                 to={`${basePath}/teams/${tSlug}`}
-                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white w-full text-center justify-center hover:opacity-80 transition-opacity"
-                                                style={{ backgroundColor: player.team.color }}
+                                                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold w-full justify-center hover:opacity-80 transition-opacity border-2"
+                                                style={{
+                                                    borderColor: player.team.color,
+                                                    color: player.team.color,
+                                                    backgroundColor: `${player.team.color}15`,
+                                                }}
                                             >
+                                                <span
+                                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: player.team.color }}
+                                                />
                                                 {player.team.name}
                                             </Link>
                                         ) : (
                                             <span
-                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white w-full text-center justify-center"
-                                                style={{ backgroundColor: player.team.color }}
+                                                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold w-full justify-center border-2"
+                                                style={{
+                                                    borderColor: player.team.color,
+                                                    color: player.team.color,
+                                                    backgroundColor: `${player.team.color}15`,
+                                                }}
                                             >
+                                                <span
+                                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: player.team.color }}
+                                                />
                                                 {player.team.name}
                                             </span>
                                         )}

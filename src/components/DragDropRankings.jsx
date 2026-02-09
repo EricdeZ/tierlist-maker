@@ -1,9 +1,10 @@
 // src/components/DragDropRankings.jsx - Refactored to use DivisionContext
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { useImageExport } from '../hooks/useImageExport'
 import { exportRankingsAsImage } from '../utils/canvasExport'
+import { getContrastColor } from '../utils/colorContrast'
 import {
     saveRankingsToStorage,
     loadRankingsFromStorage,
@@ -77,8 +78,12 @@ const DragDropRankings = () => {
     const [dragOverZone, setDragOverZone] = useState(null)
     const [dragOverIndex, setDragOverIndex] = useState(null)
     const [isExporting, setIsExporting] = useState(false)
+    const [teamsPanelOpen, setTeamsPanelOpen] = useState(true)
+    const [teamsPanelPosition, setTeamsPanelPosition] = useState('bottom') // 'bottom' | 'right'
+    const [teamsPanelHeight, setTeamsPanelHeight] = useState(0)
 
     const rankingsRef = useRef(null)
+    const teamsPanelRef = useRef(null)
     const { exportAsImage } = useImageExport()
 
     // Check for mobile/small screen
@@ -113,6 +118,45 @@ const DragDropRankings = () => {
             document.removeEventListener('mouseup', handleDragEnd)
         }
     }, [])
+
+    // Auto-scroll when dragging near viewport edges
+    useEffect(() => {
+        const EDGE_ZONE = 80
+        const SCROLL_SPEED = 12
+
+        const onDragOver = (e) => {
+            const y = e.clientY
+            if (y < EDGE_ZONE) {
+                window.scrollBy(0, -SCROLL_SPEED)
+            } else if (y > window.innerHeight - EDGE_ZONE) {
+                window.scrollBy(0, SCROLL_SPEED)
+            }
+        }
+
+        window.addEventListener('dragover', onDragOver)
+        return () => window.removeEventListener('dragover', onDragOver)
+    }, [])
+
+    // Measure floating panel height so we can pad the content to prevent overlap
+    useEffect(() => {
+        const panel = teamsPanelRef.current
+        if (!panel || !teamsPanelOpen || teamsPanelPosition !== 'bottom') {
+            setTeamsPanelHeight(0)
+            return
+        }
+
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setTeamsPanelHeight(entry.contentRect.height)
+            }
+        })
+
+        // Set initial height
+        setTeamsPanelHeight(panel.offsetHeight)
+        observer.observe(panel)
+
+        return () => observer.disconnect()
+    }, [teamsPanelOpen, teamsPanelPosition])
 
     // Utility functions
     const getPlayerByName = (playerName) => {
@@ -339,8 +383,36 @@ const DragDropRankings = () => {
         )
     }
 
+    // Dynamic bottom padding based on measured panel height
+    const bottomPadding = teamsPanelOpen && teamsPanelPosition === 'bottom' && teamsPanelHeight > 0
+        ? `${teamsPanelHeight + 16}px`
+        : undefined
+
     return (
-        <div className="relative">
+        <div className="relative" style={{ paddingBottom: bottomPadding }}>
+            {/* Custom scrollbar styles for the teams panel */}
+            <style>{`
+                .teams-panel-scroll::-webkit-scrollbar {
+                    height: 8px;
+                }
+                .teams-panel-scroll::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 4px;
+                }
+                .teams-panel-scroll::-webkit-scrollbar-thumb {
+                    background: rgba(255, 255, 255, 0.15);
+                    border-radius: 4px;
+                }
+                .teams-panel-scroll::-webkit-scrollbar-thumb:hover {
+                    background: rgba(255, 255, 255, 0.25);
+                }
+                /* Firefox */
+                .teams-panel-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(255, 255, 255, 0.15) rgba(255, 255, 255, 0.05);
+                }
+            `}</style>
+
             {/* Rankings Container */}
             <div ref={rankingsRef} className="rankings-container mb-6 bg-(--color-secondary) p-6 rounded-xl border border-white/10">
                 <div className="text-center mb-6">
@@ -350,7 +422,9 @@ const DragDropRankings = () => {
                 </div>
 
                 {/* Ranking Grid */}
-                <div className="grid grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-5 gap-4 mb-8"
+                     style={{ paddingRight: teamsPanelOpen && teamsPanelPosition === 'right' ? '14rem' : undefined, transition: 'padding 0.2s' }}
+                >
                     {roles.map(role => (
                         <div
                             key={role}
@@ -369,6 +443,7 @@ const DragDropRankings = () => {
                             }`}>
                                 {getDisplayRankings(role).map((player, index) => {
                                     const teamColor = getPlayerTeamColor(player)
+                                    const textColor = getContrastColor(teamColor)
                                     const isDraggedItem = draggedItem && draggedItem.player === player
                                     const isOriginalPosition = draggedItem &&
                                         draggedItem.sourceRole === role &&
@@ -394,7 +469,7 @@ const DragDropRankings = () => {
                                                     isDraggedItem && isOriginalPosition ? 'opacity-30' :
                                                         isDraggedItem && draggedItem.sourceRole !== role ? 'opacity-70 scale-95' : ''
                                                 }`}
-                                                style={{ backgroundColor: teamColor, borderColor: teamColor }}
+                                                style={{ backgroundColor: teamColor, borderColor: teamColor, color: textColor }}
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, player, null, role, index)}
                                                 onDragEnd={handleDragEnd}
@@ -410,10 +485,11 @@ const DragDropRankings = () => {
                                                 title={`${player} (${getPlayerTeamName(player)})`}
                                             >
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-white text-sm font-medium">{player}</span>
+                                                    <span className="text-sm font-medium">{player}</span>
                                                     <button
                                                         onClick={() => removeFromRanking(role, index)}
-                                                        className="opacity-0 group-hover:opacity-100 text-white hover:text-red-200 text-sm transition-opacity ml-2 flex-shrink-0"
+                                                        className="opacity-0 group-hover:opacity-100 text-sm transition-opacity ml-2 flex-shrink-0"
+                                                        style={{ color: textColor }}
                                                     >
                                                         ✕
                                                     </button>
@@ -458,44 +534,163 @@ const DragDropRankings = () => {
                 )}
             </div>
 
-            {/* Teams Section */}
-            <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6">
-                <h2 className="text-2xl font-bold text-(--color-text) text-center mb-6 font-heading">Teams</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {teams.map(team => (
-                        <div key={team.id} className="bg-(--color-primary) rounded-lg border border-white/10 p-4">
-                            <h3
-                                className="text-lg font-semibold text-center py-2 px-3 rounded text-white mb-3"
-                                style={{ backgroundColor: team.color }}
-                            >
-                                {team.name}
-                            </h3>
-                            <div className="space-y-2">
-                                {team.players.map((player, index) => {
-                                    const playerRole = getPlayerRole(player)
-                                    const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+            {/* Floating Teams Panel - Toggle Button (visible when panel is closed) */}
+            {!teamsPanelOpen && (
+                <button
+                    onClick={() => setTeamsPanelOpen(true)}
+                    className="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg font-semibold text-sm shadow-lg transition-all hover:scale-105"
+                    style={{
+                        backgroundColor: 'var(--color-accent)',
+                        color: 'var(--color-primary)',
+                    }}
+                >
+                    Show Teams
+                </button>
+            )}
 
-                                    return (
-                                        <div
-                                            key={`${team.id}-${player}-${index}`}
-                                            className="p-2 rounded cursor-move text-sm text-white hover:opacity-80 transition-opacity flex items-center justify-between"
-                                            style={{ backgroundColor: team.color }}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, player, team.id)}
-                                            onDragEnd={handleDragEnd}
-                                        >
-                                            <span>{player}</span>
-                                            {roleImage && (
-                                                <img src={roleImage} alt={playerRole} className="w-6 h-6 object-contain flex-shrink-0" />
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </div>
+            {/* Floating Teams Panel - Bottom */}
+            {teamsPanelOpen && teamsPanelPosition === 'bottom' && (
+                <div
+                    ref={teamsPanelRef}
+                    className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10"
+                    style={{
+                        backgroundColor: 'var(--color-secondary)',
+                        boxShadow: '0 -4px 30px rgba(0,0,0,0.5)',
+                    }}
+                >
+                    {/* Panel header */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5">
+                        <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setTeamsPanelPosition('right')}
+                                className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                            >
+                                Dock Right →
+                            </button>
+                            <button
+                                onClick={() => setTeamsPanelOpen(false)}
+                                className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                            >
+                                Hide ✕
+                            </button>
                         </div>
-                    ))}
+                    </div>
+                    {/* Horizontally scrollable team cards */}
+                    <div className="teams-panel-scroll overflow-x-auto overflow-y-hidden px-4 py-3">
+                        <div className="flex gap-4" style={{ minWidth: 'fit-content' }}>
+                            {teams.map(team => {
+                                const teamTextColor = getContrastColor(team.color)
+                                return (
+                                    <div key={team.id} className="flex-shrink-0 rounded-lg border border-white/10 p-3" style={{ width: '12rem', backgroundColor: 'var(--color-primary)' }}>
+                                        <h4
+                                            className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate"
+                                            style={{ backgroundColor: team.color, color: teamTextColor }}
+                                            title={team.name}
+                                        >
+                                            {team.name}
+                                        </h4>
+                                        <div className="space-y-1">
+                                            {team.players.map((player, index) => {
+                                                const playerRole = getPlayerRole(player)
+                                                const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+
+                                                return (
+                                                    <div
+                                                        key={`${team.id}-${player}-${index}`}
+                                                        className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between"
+                                                        style={{ backgroundColor: team.color, color: teamTextColor }}
+                                                        draggable
+                                                        onDragStart={(e) => handleDragStart(e, player, team.id)}
+                                                        onDragEnd={handleDragEnd}
+                                                    >
+                                                        <span>{player}</span>
+                                                        {roleImage && (
+                                                            <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain flex-shrink-0" />
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* Floating Teams Panel - Right */}
+            {teamsPanelOpen && teamsPanelPosition === 'right' && (
+                <div
+                    className="fixed top-0 right-0 bottom-0 z-40 border-l border-white/10 overflow-y-auto teams-panel-scroll"
+                    style={{
+                        width: '13rem',
+                        backgroundColor: 'var(--color-secondary)',
+                        boxShadow: '-4px 0 30px rgba(0,0,0,0.5)',
+                    }}
+                >
+                    {/* Panel header */}
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-white/5 sticky top-0 z-10" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                        <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
+                        <div className="flex gap-1">
+                            <button
+                                onClick={() => setTeamsPanelPosition('bottom')}
+                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                                title="Dock to bottom"
+                            >
+                                ↓
+                            </button>
+                            <button
+                                onClick={() => setTeamsPanelOpen(false)}
+                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                                title="Hide panel"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    {/* Vertically scrollable team cards */}
+                    <div className="p-3 space-y-3">
+                        {teams.map(team => {
+                            const teamTextColor = getContrastColor(team.color)
+                            return (
+                                <div key={team.id} className="rounded-lg border border-white/10 p-2" style={{ backgroundColor: 'var(--color-primary)' }}>
+                                    <h4
+                                        className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate"
+                                        style={{ backgroundColor: team.color, color: teamTextColor }}
+                                        title={team.name}
+                                    >
+                                        {team.name}
+                                    </h4>
+                                    <div className="space-y-1">
+                                        {team.players.map((player, index) => {
+                                            const playerRole = getPlayerRole(player)
+                                            const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+
+                                            return (
+                                                <div
+                                                    key={`${team.id}-${player}-${index}`}
+                                                    className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between"
+                                                    style={{ backgroundColor: team.color, color: teamTextColor }}
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, player, team.id)}
+                                                    onDragEnd={handleDragEnd}
+                                                >
+                                                    <span>{player}</span>
+                                                    {roleImage && (
+                                                        <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain flex-shrink-0" />
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

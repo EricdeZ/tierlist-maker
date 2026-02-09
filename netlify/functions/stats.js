@@ -55,7 +55,7 @@ export const handler = async (event) => {
                 }
             }
 
-            // Player stats endpoint - detailed per-player statistics
+            // Player stats endpoint - detailed per-player statistics (exclude subs)
             if (type === 'players') {
                 const playerStats = await sql`
                     WITH player_agg AS (
@@ -108,6 +108,7 @@ export const handler = async (event) => {
                     LEFT JOIN player_agg pa ON pa.league_player_id = lp.id
                     WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
+                      AND LOWER(lp.role) != 'sub'
                     ORDER BY total_kills DESC
                 `
 
@@ -138,7 +139,9 @@ export const handler = async (event) => {
             const [playerStats] = await sql`
                 SELECT COUNT(id) as total_players
                 FROM league_players 
-                WHERE season_id = ${seasonId} AND is_active = true
+                WHERE season_id = ${seasonId} 
+                  AND is_active = true
+                  AND LOWER(role) != 'sub'
             `
 
             const [gameStats] = await sql`
