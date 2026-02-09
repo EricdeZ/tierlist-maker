@@ -1,5 +1,6 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { Link } from 'react-router-dom'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
@@ -801,6 +802,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
             {/* ─── Active game ─── */}
             {ed.games[activeGame] && (
                 <GameEditor
+                    key={activeGame}
                     game={ed.games[activeGame]}
                     gameIndex={activeGame}
                     team1={team1}
@@ -925,9 +927,8 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
 function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange }) {
     const [showSearch, setShowSearch] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
-    const [aliasSaving, setAliasSaving] = useState(false)
     const [aliasSaved, setAliasSaved] = useState(false)
-    const [manuallyReassigned, setManuallyReassigned] = useState(false)
+    const [showAliasModal, setShowAliasModal] = useState(false)
     const [originalExtractedName] = useState(player.player_name)
     const searchRef = useRef(null)
     const inputRef = useRef(null)
@@ -1048,8 +1049,6 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                 const val = e.target.value
                                 setSearchQuery(val)
                                 setShowSearch(true)
-                                setManuallyReassigned(false)
-                                setAliasSaved(false)
                                 // Also update the actual player name live
                                 onChange({ player_name: val, matched_name: null, matched_lp_id: null })
                             }}
@@ -1071,59 +1070,28 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     {isMatched && player.matched_name && player.matched_name !== player.player_name && !showSearch && (
                         <div className="text-[10px] text-[var(--color-text-secondary)] pl-3 truncate">→ {player.matched_name}</div>
                     )}
-                    {player.is_sub && !showSearch && (
-                        <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">
-                            {player.sub_type === 'new' ? 'NEW SUB' : 'SUB'}
-                        </span>
+                    {player.is_sub && !showSearch && !aliasSaved && (
+                        <>
+                            <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">
+                                {player.sub_type === 'new' ? 'NEW SUB' : 'SUB'}
+                            </span>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setShowAliasModal(true) }}
+                                className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors font-semibold"
+                                title={`Link "${originalExtractedName}" as alias for an existing player`}
+                            >
+                                Link Alias
+                            </button>
+                        </>
                     )}
 
                     {/* Alias match indicator — shown when auto-matched via alias */}
-                    {player.match_source === 'alias' && isMatched && !showSearch && !manuallyReassigned && (
+                    {player.match_source === 'alias' && isMatched && !showSearch && (
                         <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold">
                             via alias
                         </span>
                     )}
 
-                    {/* Save as alias button — only shown after manual reassignment from search dropdown */}
-                    {isMatched && !showSearch && manuallyReassigned && originalExtractedName && player.matched_name
-                        && originalExtractedName.toLowerCase() !== player.matched_name.toLowerCase()
-                        && !aliasSaved && (
-                        <button
-                            onClick={async (e) => {
-                                e.stopPropagation()
-                                setAliasSaving(true)
-                                try {
-                                    // Find player_id from adminData
-                                    const rosterPlayer = (adminData?.players || []).find(p => p.league_player_id === player.matched_lp_id)
-                                    const pid = rosterPlayer?.player_id
-                                    if (!pid) { setAliasSaving(false); return }
-
-                                    const res = await fetch(`${API}/roster-manage`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ action: 'add-alias', player_id: pid, alias: originalExtractedName }),
-                                    })
-                                    const data = await res.json()
-                                    if (res.ok) {
-                                        setAliasSaved(true)
-                                    } else {
-                                        console.warn('Alias save failed:', data.error)
-                                        // If alias already exists, just mark as saved
-                                        if (res.status === 409) setAliasSaved(true)
-                                    }
-                                } catch (err) {
-                                    console.error('Alias save error:', err)
-                                } finally {
-                                    setAliasSaving(false)
-                                }
-                            }}
-                            disabled={aliasSaving}
-                            className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors font-semibold disabled:opacity-50"
-                            title={`Save "${originalExtractedName}" as alias for "${player.matched_name}"`}
-                        >
-                            {aliasSaving ? '...' : 'Save Alias'}
-                        </button>
-                    )}
                     {aliasSaved && !showSearch && (
                         <span className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold">
                             Alias Saved
@@ -1152,8 +1120,6 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                                 is_sub: false,
                                                 sub_type: null,
                                             })
-                                            setManuallyReassigned(true)
-                                            setAliasSaved(false)
                                             setShowSearch(false)
                                             setSearchQuery('')
                                         }}>
@@ -1186,7 +1152,167 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
             <NumCell value={player.assists} onChange={v => onChange({ assists: v })} />
             <NumCell value={player.player_damage} onChange={v => onChange({ player_damage: v })} align="right" />
             <NumCell value={player.mitigated} onChange={v => onChange({ mitigated: v })} align="right" />
+
+            {/* Alias link modal — rendered via portal to avoid table nesting issues */}
+            {showAliasModal && ReactDOM.createPortal(
+                <AliasLinkModal
+                    extractedName={originalExtractedName}
+                    adminData={adminData}
+                    seasonId={seasonId}
+                    onSave={(selectedPlayer) => {
+                        onChange({
+                            player_name: selectedPlayer.name,
+                            matched_name: selectedPlayer.name,
+                            matched_lp_id: selectedPlayer.league_player_id,
+                            is_sub: false,
+                            sub_type: null,
+                        })
+                        setAliasSaved(true)
+                        setShowAliasModal(false)
+                    }}
+                    onClose={() => setShowAliasModal(false)}
+                />,
+                document.body
+            )}
         </tr>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// ALIAS LINK MODAL
+// ═══════════════════════════════════════════════════
+function AliasLinkModal({ extractedName, adminData, seasonId, onSave, onClose }) {
+    const [searchQuery, setSearchQuery] = useState('')
+    const [selectedPlayer, setSelectedPlayer] = useState(null)
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState(null)
+    const inputRef = useRef(null)
+
+    useEffect(() => { inputRef.current?.focus() }, [])
+
+    const searchResults = (() => {
+        const q = searchQuery.trim().toLowerCase()
+        if (q.length < 2) return []
+        const results = []
+        const seen = new Set()
+
+        // Search season roster
+        const seasonPlayers = seasonId
+            ? (adminData?.players || []).filter(p => String(p.season_id) === String(seasonId))
+            : (adminData?.players || [])
+
+        for (const p of seasonPlayers) {
+            if (seen.has(p.league_player_id)) continue
+            if (p.name.toLowerCase().includes(q)) {
+                seen.add(p.league_player_id)
+                results.push({ ...p, source: 'roster' })
+            }
+        }
+
+        // Search global players
+        if (q.length >= 2) {
+            for (const p of (adminData?.globalPlayers || [])) {
+                if (seen.has(p.player_id)) continue
+                if (p.name.toLowerCase().includes(q)) {
+                    seen.add(p.player_id)
+                    results.push({ ...p, source: 'global' })
+                }
+            }
+        }
+
+        return results.slice(0, 12)
+    })()
+
+    const handleSave = async () => {
+        if (!selectedPlayer) return
+        setSaving(true)
+        setError(null)
+        try {
+            const pid = selectedPlayer.player_id
+            const res = await fetch(`${API}/roster-manage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add-alias', player_id: pid, alias: extractedName }),
+            })
+            const data = await res.json()
+            if (res.ok || res.status === 409) {
+                onSave(selectedPlayer)
+            } else {
+                setError(data.error || 'Failed to save alias')
+            }
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+             onClick={onClose}>
+            <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full p-5"
+                 style={{ backgroundColor: 'var(--color-secondary)' }}
+                 onClick={e => e.stopPropagation()}>
+                <h3 className="text-sm font-bold text-[var(--color-text)] mb-3">Link Alias</h3>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                    Save <span className="text-yellow-400 font-semibold">"{extractedName}"</span> as an alias for an existing player.
+                </p>
+
+                {/* Player search */}
+                <div className="relative mb-3">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setSelectedPlayer(null) }}
+                        placeholder="Search for existing player..."
+                        className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-card)] border border-[var(--color-border)] text-[var(--color-text)] outline-none focus:border-[var(--color-accent)] transition-colors"
+                    />
+                    {searchResults.length > 0 && !selectedPlayer && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-lg shadow-xl max-h-48 overflow-y-auto"
+                             style={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }}>
+                            {searchResults.map((r, i) => (
+                                <button key={`${r.league_player_id || r.player_id}_${i}`}
+                                        className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-accent)]/10 flex items-center gap-2 transition-colors"
+                                        onClick={() => { setSelectedPlayer(r); setSearchQuery(r.name) }}>
+                                    {r.team_color && <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: r.team_color }} />}
+                                    <span className="text-[var(--color-text)]">{r.name}</span>
+                                    {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role}</span>}
+                                    {r.team_name && <span className="text-[var(--color-text-secondary)] ml-auto text-[10px]">{r.team_name}</span>}
+                                    {r.source === 'global' && <span className="text-yellow-400/60 ml-auto text-[10px]">global</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Selected player preview */}
+                {selectedPlayer && (
+                    <div className="mb-3 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs">
+                        <span className="text-green-400 font-semibold">{selectedPlayer.name}</span>
+                        {selectedPlayer.team_name && <span className="text-[var(--color-text-secondary)] ml-2">{selectedPlayer.team_name}</span>}
+                        <div className="text-[var(--color-text-secondary)] mt-1">
+                            "{extractedName}" will be saved as alias
+                        </div>
+                    </div>
+                )}
+
+                {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
+
+                <div className="flex items-center gap-2 justify-end">
+                    <button onClick={onClose}
+                            className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors">
+                        Cancel
+                    </button>
+                    <button onClick={handleSave}
+                            disabled={!selectedPlayer || saving}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        {saving ? 'Saving...' : 'Save Alias'}
+                    </button>
+                </div>
+            </div>
+        </div>
     )
 }
 
