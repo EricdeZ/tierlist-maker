@@ -433,6 +433,9 @@ export default function RosterManager() {
                     <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         ← Match Admin
                     </Link>
+                    <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Match Manager
+                    </Link>
                     <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
                 </div>
             </div>

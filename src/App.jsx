@@ -21,6 +21,7 @@ import ScrollToTop from "./components/ScrollToTop.jsx";
 // Admin
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import RosterManager from "./pages/admin/RosterManager.jsx";
+import MatchManager from "./pages/admin/MatchManager.jsx";
 
 function App() {
     return (
@@ -35,6 +36,7 @@ function App() {
                         {/* Admin — match data entry */}
                         <Route path="admin" element={<AdminDashboard />} />
                         <Route path="admin/rosters" element={<RosterManager />} />
+                        <Route path="admin/matches" element={<MatchManager />} />
 
                         {/* Division-scoped pages (context provided by DivisionLayout) */}
                         <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>

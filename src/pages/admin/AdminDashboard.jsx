@@ -314,7 +314,15 @@ export default function AdminDashboard() {
                         Paste match text + DETAILS screenshots → AI extracts → Review & edit → Submit
                     </p>
                 </div>
-                <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">← Home</Link>
+                <div className="flex items-center gap-3">
+                    <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Match Manager
+                    </Link>
+                    <Link to="/admin/rosters" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Rosters
+                    </Link>
+                    <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
+                </div>
             </div>
 
             {adminError && <ErrorBanner message={`Admin data: ${adminError}`} className="mb-4" />}
