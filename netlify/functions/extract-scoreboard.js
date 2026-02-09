@@ -538,6 +538,7 @@ async function autoMatchPlayers(extractedGames) {
                     all_matches: dbMatches,
                     confidence: 'exact',
                     match_source: aliasMatch ? 'alias' : 'name',
+                    matched_alias: aliasMatch ? ep.player_name : null,
                     is_sub: false,
                 })
             } else {
