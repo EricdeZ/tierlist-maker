@@ -178,9 +178,14 @@ export const handler = async (event) => {
             matchMeta = await parseMatchText(apiKey, match_text)
         }
 
-        // 2. Extract stats from each DETAILS screenshot (parallel) — pass god names
+        // 2a. Pass 1: Read god text labels from each screenshot (parallel)
+        const godLabelResults = await Promise.all(
+            images.map(image => readGodLabels(apiKey, image, godNames))
+        )
+
+        // 2b. Pass 2: Extract full stats with pre-identified gods (parallel)
         const extractedGames = await Promise.all(
-            images.map(image => extractDetailsTab(apiKey, image, godNames))
+            images.map((image, i) => extractDetailsTab(apiKey, image, godNames, godLabelResults[i]))
         )
 
         // 3. Resolve god names against DB (lightweight validation pass)
@@ -222,11 +227,97 @@ export const handler = async (event) => {
     }
 }
 
-async function extractDetailsTab(apiKey, image, godNames) {
+/**
+ * Pass 1: Read ONLY the god text labels from the screenshot.
+ * Pure OCR task — no stats, no god matching, no distractions.
+ */
+async function readGodLabels(apiKey, image, godNames) {
     try {
         const godListStr = godNames.join(', ')
 
-        // CRITICAL: god list text goes BEFORE the image so the model reads constraints first
+        const response = await fetch(ANTHROPIC_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-5-20250929',
+                max_tokens: 500,
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: `VALID GOD NAMES (you MUST pick from this list):\n${godListStr}`,
+                        },
+                        {
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: image.media_type || 'image/png',
+                                data: image.data,
+                            },
+                        },
+                        {
+                            type: 'text',
+                            text: `This is a SMITE 2 post-game DETAILS tab screenshot. There are 10 players: 5 on the LEFT (blue) and 5 on the RIGHT (red).
+
+Each player has an ALL-CAPS TEXT LABEL directly below their player name. This label is the god name. Examples: "RA", "HOU YI", "BELLONA", "AGNI", "HECATE".
+
+Your ONLY task: read those text labels character by character. Do NOT look at portrait artwork — it WILL mislead you. ONLY read the text.
+
+After reading each label, match it to the closest name from the VALID GOD NAMES list above. Each god appears AT MOST ONCE across all 10 players — no duplicates.
+
+Return ONLY valid JSON, no markdown:
+{
+  "left_gods": ["God1", "God2", "God3", "God4", "God5"],
+  "right_gods": ["God1", "God2", "God3", "God4", "God5"]
+}
+
+Players are ordered left-to-right within each team.`,
+                        },
+                    ],
+                }],
+            }),
+        })
+
+        if (!response.ok) return null
+
+        const result = await response.json()
+        const text = result.content.filter(b => b.type === 'text').map(b => b.text).join('')
+        const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+        const parsed = JSON.parse(clean)
+
+        if (parsed.left_gods?.length === 5 && parsed.right_gods?.length === 5) {
+            console.log('God label pass 1:', JSON.stringify(parsed))
+            return parsed
+        }
+        return null
+    } catch (err) {
+        console.error('God label read failed (non-fatal):', err.message)
+        return null
+    }
+}
+
+/**
+ * Pass 2: Extract full stats from the screenshot.
+ * If godLabels are available from pass 1, god names are pre-filled so the model
+ * only needs to focus on reading numbers.
+ */
+async function extractDetailsTab(apiKey, image, godNames, godLabels) {
+    try {
+        const godListStr = godNames.join(', ')
+
+        // If we have pre-identified gods from pass 1, inject them into the prompt
+        let godContext = ''
+        if (godLabels) {
+            godContext = `\n\nGOD NAMES ALREADY IDENTIFIED (use these exact names in god_played, do NOT re-identify from the image):\n` +
+                `Left team (left to right): ${godLabels.left_gods.join(', ')}\n` +
+                `Right team (left to right): ${godLabels.right_gods.join(', ')}`
+        }
+
         const response = await fetch(ANTHROPIC_API_URL, {
             method: 'POST',
             headers: {
@@ -243,7 +334,7 @@ async function extractDetailsTab(apiKey, image, godNames) {
                     content: [
                         {
                             type: 'text',
-                            text: `VALID GOD NAMES (you MUST pick from this list, no exceptions):\n${godListStr}\n\nNow extract the data from this screenshot:`,
+                            text: `VALID GOD NAMES (you MUST pick from this list, no exceptions):\n${godListStr}${godContext}\n\nNow extract the data from this screenshot:`,
                         },
                         {
                             type: 'image',
