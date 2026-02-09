@@ -236,6 +236,22 @@ async function resolveLeaguePlayerId(tx, player, teamId, seasonId, cache) {
         return exact.id
     }
 
+    // 2b. Alias match in this season
+    const [aliasSeason] = await tx`
+        SELECT lp.id
+        FROM player_aliases pa
+        JOIN players p ON pa.player_id = p.id
+        JOIN league_players lp ON lp.player_id = p.id
+        WHERE LOWER(pa.alias) = ${name.toLowerCase()}
+          AND lp.season_id = ${seasonId}
+          AND lp.is_active = true
+        LIMIT 1
+    `
+    if (aliasSeason) {
+        cache[cacheKey] = aliasSeason.id
+        return aliasSeason.id
+    }
+
     // 3. Check if player exists globally — by name first, then by slug
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
 
@@ -246,7 +262,19 @@ async function resolveLeaguePlayerId(tx, player, teamId, seasonId, cache) {
     `
     if (byName) {
         playerId = byName.id
-    } else {
+    }
+
+    // 3b. Check aliases globally
+    if (!playerId) {
+        const [byAlias] = await tx`
+            SELECT player_id FROM player_aliases
+            WHERE LOWER(alias) = ${name.toLowerCase()}
+            LIMIT 1
+        `
+        if (byAlias) playerId = byAlias.player_id
+    }
+
+    if (!playerId) {
         // Check by slug — e.g. "Bi€€Cosby" slugifies to "bi-cosby" which may match existing "BiggCosby"
         const [bySlug] = await tx`
             SELECT id FROM players WHERE slug = ${slug} LIMIT 1

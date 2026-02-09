@@ -70,7 +70,7 @@ const Matches = () => {
         const numB = parseInt(b.replace('Week ', ''))
         if (isNaN(numA)) return 1
         if (isNaN(numB)) return -1
-        return numA - numB
+        return numB - numA
     })
 
     const formatDate = (dateStr) => {

@@ -42,6 +42,12 @@ export default function RosterManager() {
     // Confirmation modal
     const [confirmModal, setConfirmModal] = useState(null)
 
+    // Alias modal
+    const [aliasModal, setAliasModal] = useState(null) // { playerId, playerName }
+
+    // Merge modal
+    const [showMerge, setShowMerge] = useState(false)
+
     // ─── Fetch admin data ───
     const fetchData = useCallback(async () => {
         setAdminLoading(true)
@@ -366,6 +372,47 @@ export default function RosterManager() {
                 />
             )}
 
+            {/* Alias Modal */}
+            {aliasModal && (
+                <AliasModal
+                    playerId={aliasModal.playerId}
+                    playerName={aliasModal.playerName}
+                    aliases={(adminData?.aliases || []).filter(a => a.player_id === aliasModal.playerId)}
+                    onClose={() => setAliasModal(null)}
+                    onAddAlias={async (alias) => {
+                        await rosterAction(`alias_add_${alias}`, {
+                            action: 'add-alias',
+                            player_id: aliasModal.playerId,
+                            alias,
+                        })
+                    }}
+                    onRemoveAlias={async (aliasId) => {
+                        await rosterAction(`alias_rm_${aliasId}`, {
+                            action: 'remove-alias',
+                            alias_id: aliasId,
+                        })
+                    }}
+                    opLoading={opLoading}
+                />
+            )}
+
+            {/* Merge Modal */}
+            {showMerge && (
+                <MergeModal
+                    globalPlayers={globalPlayers}
+                    onClose={() => setShowMerge(false)}
+                    onMerge={async (sourceId, targetId) => {
+                        await rosterAction(`merge_${sourceId}_${targetId}`, {
+                            action: 'merge-player',
+                            source_player_id: sourceId,
+                            target_player_id: targetId,
+                        })
+                        setShowMerge(false)
+                    }}
+                    opLoading={opLoading}
+                />
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -377,6 +424,12 @@ export default function RosterManager() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowMerge(true)}
+                        className="px-3 py-1.5 rounded-lg text-xs bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 transition-colors border border-white/10"
+                    >
+                        Merge Players
+                    </button>
                     <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         ← Match Admin
                     </Link>
@@ -456,6 +509,7 @@ export default function RosterManager() {
                             onDragEnd={handleDragEnd}
                             onRoleChange={handleRoleChange}
                             onDropPlayer={handleDropPlayer}
+                            onManageAliases={(playerId, playerName) => setAliasModal({ playerId, playerName })}
                             onAddPlayer={() => setAddModal({
                                 teamId: team.team_id,
                                 teamName: team.team_name,
@@ -494,7 +548,7 @@ export default function RosterManager() {
 function TeamCard({
     team, isDragOver, hasDraggedPlayer, isSameTeam, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
-    onRoleChange, onDropPlayer, onAddPlayer,
+    onRoleChange, onDropPlayer, onManageAliases, onAddPlayer,
 }) {
     const isValidTarget = hasDraggedPlayer && !isSameTeam
 
@@ -547,6 +601,7 @@ function TeamCard({
                         onDragEnd={onDragEnd}
                         onRoleChange={onRoleChange}
                         onDropPlayer={onDropPlayer}
+                        onManageAliases={onManageAliases}
                     />
                 ))}
 
@@ -581,7 +636,7 @@ function TeamCard({
 // ═══════════════════════════════════════════════════
 // PLAYER ROW (inside team card)
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart, onDragEnd, onRoleChange, onDropPlayer }) {
+function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart, onDragEnd, onRoleChange, onDropPlayer, onManageAliases }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
 
@@ -644,6 +699,15 @@ function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart
                             borderColor: 'rgba(255,255,255,0.1)',
                         }}
                     >
+                        <button
+                            onClick={() => {
+                                setShowActions(false)
+                                onManageAliases(player.player_id, player.name)
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors flex items-center gap-2"
+                        >
+                            <span>↔</span> Manage Aliases
+                        </button>
                         <button
                             onClick={() => {
                                 setShowActions(false)
@@ -960,6 +1024,291 @@ function AddPlayerModal({ teamId, teamName, teamColor, seasonId, globalPlayers, 
                         </button>
                     </div>
                 )}
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// ALIAS MODAL
+// ═══════════════════════════════════════════════════
+function AliasModal({ playerId, playerName, aliases, onClose, onAddAlias, onRemoveAlias, opLoading }) {
+    const [newAlias, setNewAlias] = useState('')
+    const [error, setError] = useState(null)
+    const inputRef = useRef(null)
+
+    useEffect(() => { inputRef.current?.focus() }, [])
+
+    const isAnyLoading = Object.values(opLoading).some(Boolean)
+
+    const handleAdd = async () => {
+        const trimmed = newAlias.trim()
+        if (!trimmed) { setError('Enter an alias'); return }
+        if (trimmed.length < 2) { setError('Alias must be at least 2 characters'); return }
+        if (trimmed.toLowerCase() === playerName.toLowerCase()) { setError('Alias cannot be the same as the player name'); return }
+        setError(null)
+        try {
+            await onAddAlias(trimmed)
+            setNewAlias('')
+        } catch {
+            // Error shown via toast
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div
+                className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full overflow-hidden"
+                style={{ backgroundColor: 'var(--color-secondary)' }}
+            >
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-base font-bold text-[var(--color-text)]">
+                            Aliases for {playerName}
+                        </h3>
+                        <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+                            Old names that should resolve to this player
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-lg">✕</button>
+                </div>
+
+                {/* Existing aliases */}
+                <div className="px-5 py-3">
+                    {aliases.length === 0 ? (
+                        <p className="text-xs text-[var(--color-text-secondary)] text-center py-3 italic">
+                            No aliases yet
+                        </p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {aliases.map(a => (
+                                <div key={a.alias_id} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/5 group">
+                                    <span className="text-sm text-[var(--color-text)]">{a.alias}</span>
+                                    <button
+                                        onClick={() => onRemoveAlias(a.alias_id)}
+                                        disabled={isAnyLoading}
+                                        className="text-xs text-red-400/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-30"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Add new alias */}
+                <div className="px-5 pb-4 border-t border-white/10 pt-3">
+                    {error && (
+                        <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20 text-[10px] text-red-400">
+                            {error}
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={newAlias}
+                            onChange={e => { setNewAlias(e.target.value); setError(null) }}
+                            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                            placeholder="Add old name..."
+                            className="flex-1 rounded-lg px-3 py-2 text-sm border focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50"
+                            style={{
+                                backgroundColor: 'var(--color-primary)',
+                                color: 'var(--color-text)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                            }}
+                        />
+                        <button
+                            onClick={handleAdd}
+                            disabled={isAnyLoading || !newAlias.trim()}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-primary)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
+                        >
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// MERGE MODAL
+// ═══════════════════════════════════════════════════
+function MergeModal({ globalPlayers, onClose, onMerge, opLoading }) {
+    const [sourceQuery, setSourceQuery] = useState('')
+    const [targetQuery, setTargetQuery] = useState('')
+    const [sourcePlayer, setSourcePlayer] = useState(null)
+    const [targetPlayer, setTargetPlayer] = useState(null)
+    const [showSourceDropdown, setShowSourceDropdown] = useState(false)
+    const [showTargetDropdown, setShowTargetDropdown] = useState(false)
+    const [confirmed, setConfirmed] = useState(false)
+    const sourceRef = useRef(null)
+    const targetRef = useRef(null)
+
+    const isAnyLoading = Object.values(opLoading).some(Boolean)
+
+    // Click-outside handlers
+    useEffect(() => {
+        const handler = (e) => {
+            if (sourceRef.current && !sourceRef.current.contains(e.target)) setShowSourceDropdown(false)
+            if (targetRef.current && !targetRef.current.contains(e.target)) setShowTargetDropdown(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    const filterPlayers = (query, excludeId) => {
+        const q = query.trim().toLowerCase()
+        if (q.length < 2) return []
+        return globalPlayers
+            .filter(p => p.name.toLowerCase().includes(q) && (!excludeId || p.player_id !== excludeId))
+            .slice(0, 10)
+    }
+
+    const sourceResults = filterPlayers(sourceQuery, targetPlayer?.player_id)
+    const targetResults = filterPlayers(targetQuery, sourcePlayer?.player_id)
+
+    const handleMerge = async () => {
+        if (!sourcePlayer || !targetPlayer) return
+        try {
+            await onMerge(sourcePlayer.player_id, targetPlayer.player_id)
+        } catch {
+            // Error shown via toast
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div
+                className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full"
+                style={{ backgroundColor: 'var(--color-secondary)' }}
+            >
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-base font-bold text-[var(--color-text)]">Merge Players</h3>
+                        <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+                            Merge a duplicate player's stats into the real player
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-lg">✕</button>
+                </div>
+
+                <div className="px-5 py-4 space-y-4">
+                    {/* Source player (duplicate) */}
+                    <div ref={sourceRef} className="relative">
+                        <label className="block text-xs font-medium text-red-400 mb-1">
+                            Duplicate Player (will be deleted)
+                        </label>
+                        {sourcePlayer ? (
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                                <span className="text-sm text-[var(--color-text)]">{sourcePlayer.name}</span>
+                                <button onClick={() => { setSourcePlayer(null); setSourceQuery(''); setConfirmed(false) }}
+                                        className="text-xs text-red-400 hover:text-red-300">✕</button>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="text"
+                                    value={sourceQuery}
+                                    onChange={e => { setSourceQuery(e.target.value); setShowSourceDropdown(true); setConfirmed(false) }}
+                                    onFocus={() => setShowSourceDropdown(true)}
+                                    placeholder="Search duplicate player..."
+                                    className="w-full rounded-lg px-3 py-2 text-sm border focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                                    style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                />
+                                {showSourceDropdown && sourceResults.length > 0 && (
+                                    <div className="absolute z-50 top-full left-0 mt-1 w-full border rounded-lg shadow-xl max-h-40 overflow-y-auto"
+                                         style={{ backgroundColor: 'var(--color-primary)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                                        {sourceResults.map(p => (
+                                            <button key={p.player_id}
+                                                    onMouseDown={e => e.preventDefault()}
+                                                    onClick={() => { setSourcePlayer(p); setShowSourceDropdown(false); setSourceQuery('') }}
+                                                    className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text)] hover:bg-white/5 transition-colors">
+                                                {p.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="text-center text-[var(--color-text-secondary)] text-lg">↓ merge into ↓</div>
+
+                    {/* Target player (real) */}
+                    <div ref={targetRef} className="relative">
+                        <label className="block text-xs font-medium text-green-400 mb-1">
+                            Real Player (will keep)
+                        </label>
+                        {targetPlayer ? (
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                                <span className="text-sm text-[var(--color-text)]">{targetPlayer.name}</span>
+                                <button onClick={() => { setTargetPlayer(null); setTargetQuery(''); setConfirmed(false) }}
+                                        className="text-xs text-green-400 hover:text-green-300">✕</button>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="text"
+                                    value={targetQuery}
+                                    onChange={e => { setTargetQuery(e.target.value); setShowTargetDropdown(true); setConfirmed(false) }}
+                                    onFocus={() => setShowTargetDropdown(true)}
+                                    placeholder="Search real player..."
+                                    className="w-full rounded-lg px-3 py-2 text-sm border focus:outline-none focus:ring-1 focus:ring-green-500/50"
+                                    style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                />
+                                {showTargetDropdown && targetResults.length > 0 && (
+                                    <div className="absolute z-50 top-full left-0 mt-1 w-full border rounded-lg shadow-xl max-h-40 overflow-y-auto"
+                                         style={{ backgroundColor: 'var(--color-primary)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                                        {targetResults.map(p => (
+                                            <button key={p.player_id}
+                                                    onMouseDown={e => e.preventDefault()}
+                                                    onClick={() => { setTargetPlayer(p); setShowTargetDropdown(false); setTargetQuery('') }}
+                                                    className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text)] hover:bg-white/5 transition-colors">
+                                                {p.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Summary & confirm */}
+                    {sourcePlayer && targetPlayer && (
+                        <div className="border-t border-white/10 pt-3 space-y-3">
+                            <div className="text-xs text-[var(--color-text-secondary)] bg-white/5 rounded-lg px-3 py-2">
+                                <strong className="text-red-400">{sourcePlayer.name}</strong> will be deleted.
+                                All their stats will be moved to <strong className="text-green-400">{targetPlayer.name}</strong>.
+                                <br /><span className="text-[10px]">"{sourcePlayer.name}" will be saved as an alias.</span>
+                            </div>
+
+                            {!confirmed ? (
+                                <button
+                                    onClick={() => setConfirmed(true)}
+                                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-yellow-600 text-white hover:bg-yellow-500 transition-colors"
+                                >
+                                    Confirm Merge
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleMerge}
+                                    disabled={isAnyLoading}
+                                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
+                                >
+                                    {isAnyLoading ? 'Merging...' : 'Yes, Merge & Delete Duplicate'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )

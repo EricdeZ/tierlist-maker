@@ -35,6 +35,7 @@ const DragDropRankings = () => {
     const { divisionSlug } = useParams()
 
     const [isMobile, setIsMobile] = useState(false)
+    const [mobileRole, setMobileRole] = useState('SOLO')
 
     // Format teams to match the shape the component expects
     const teams = useMemo(() => {
@@ -367,17 +368,181 @@ const DragDropRankings = () => {
         }
     }
 
+    const addToMobileRanking = (player) => {
+        setRankings(prev => {
+            if (prev[mobileRole].includes(player)) return prev
+            return { ...prev, [mobileRole]: [...prev[mobileRole], player] }
+        })
+    }
+
+    const removeFromMobileRanking = (role, index) => {
+        setRankings(prev => ({
+            ...prev,
+            [role]: prev[role].filter((_, i) => i !== index)
+        }))
+    }
+
+    const moveMobileRanking = (role, index, direction) => {
+        setRankings(prev => {
+            const list = [...prev[role]]
+            const newIndex = index + direction
+            if (newIndex < 0 || newIndex >= list.length) return prev
+            ;[list[index], list[newIndex]] = [list[newIndex], list[index]]
+            return { ...prev, [role]: list }
+        })
+    }
+
     if (isMobile) {
+        const currentRanking = rankings[mobileRole] || []
+        const rankedPlayers = new Set(Object.values(rankings).flat())
+
         return (
-            <div>
-                <div className="absolute inset-0 top-13 bg-(--color-primary)/95 backdrop-blur-sm z-50 flex border-t border-white/10">
-                    <div className="text-center p-8 max-w-sm mx-auto">
-                        <div className="text-6xl mb-4">📱</div>
-                        <h3 className="text-xl font-semibold text-(--color-text) mb-3">Desktop Only</h3>
-                        <p className="text-(--color-text-secondary) mb-4">
-                            The drag-and-drop ranking feature is only available on desktop browsers with screens wider than 800px.
+            <div className="px-3 py-4">
+                <h2 className="text-lg font-bold text-(--color-text) mb-3 font-heading text-center">
+                    {league.name} Tierlist
+                </h2>
+
+                {/* Role tabs */}
+                <div className="flex gap-1 mb-4 overflow-x-auto">
+                    {roles.map(role => (
+                        <button
+                            key={role}
+                            onClick={() => setMobileRole(role)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors ${
+                                mobileRole === role
+                                    ? 'bg-(--color-accent) text-(--color-primary)'
+                                    : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
+                            }`}
+                        >
+                            <img src={roleImages[role]} alt="" className="w-4 h-4 object-contain" />
+                            {role}
+                            {rankings[role].length > 0 && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                    mobileRole === role ? 'bg-white/20' : 'bg-white/10'
+                                }`}>
+                                    {rankings[role].length}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Current ranking for selected role */}
+                <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-3 mb-4">
+                    <h3 className="text-xs font-bold text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                        {mobileRole} Ranking
+                    </h3>
+                    {currentRanking.length === 0 ? (
+                        <p className="text-sm text-(--color-text-secondary)/50 italic py-4 text-center">
+                            Tap players below to add
                         </p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {currentRanking.map((player, index) => {
+                                const teamColor = getPlayerTeamColor(player)
+                                const textColor = getContrastColor(teamColor)
+                                return (
+                                    <div
+                                        key={`${mobileRole}-${player}-${index}`}
+                                        className="flex items-center gap-2 rounded-lg overflow-hidden"
+                                        style={{ backgroundColor: teamColor, color: textColor }}
+                                    >
+                                        <span className="text-xs font-bold w-7 text-center flex-shrink-0 py-2 bg-black/10">
+                                            {index + 1}
+                                        </span>
+                                        <span className="text-sm font-medium flex-1 py-2">{player}</span>
+                                        <div className="flex items-center flex-shrink-0">
+                                            <button
+                                                onClick={() => moveMobileRanking(mobileRole, index, -1)}
+                                                disabled={index === 0}
+                                                className="px-2 py-2 text-xs disabled:opacity-20 hover:bg-white/10 transition-colors"
+                                                style={{ color: textColor }}
+                                            >
+                                                ▲
+                                            </button>
+                                            <button
+                                                onClick={() => moveMobileRanking(mobileRole, index, 1)}
+                                                disabled={index === currentRanking.length - 1}
+                                                className="px-2 py-2 text-xs disabled:opacity-20 hover:bg-white/10 transition-colors"
+                                                style={{ color: textColor }}
+                                            >
+                                                ▼
+                                            </button>
+                                            <button
+                                                onClick={() => removeFromMobileRanking(mobileRole, index)}
+                                                className="px-2.5 py-2 text-xs hover:bg-white/10 transition-colors"
+                                                style={{ color: textColor }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Available players */}
+                <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-3 mb-4">
+                    <h3 className="text-xs font-bold text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                        Available Players
+                    </h3>
+                    <div className="space-y-3">
+                        {teams.map(team => {
+                            const teamTextColor = getContrastColor(team.color)
+                            const availablePlayers = team.players.filter(p => !currentRanking.includes(p))
+                            if (availablePlayers.length === 0) return null
+
+                            return (
+                                <div key={team.id}>
+                                    <div
+                                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded mb-1"
+                                        style={{ backgroundColor: team.color, color: teamTextColor }}
+                                    >
+                                        {team.name}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {availablePlayers.map(player => {
+                                            const alreadyRanked = rankedPlayers.has(player) && !currentRanking.includes(player)
+                                            return (
+                                                <button
+                                                    key={player}
+                                                    onClick={() => addToMobileRanking(player)}
+                                                    className={`text-xs px-2.5 py-1.5 rounded font-medium transition-colors ${
+                                                        alreadyRanked
+                                                            ? 'opacity-40'
+                                                            : 'hover:opacity-80'
+                                                    }`}
+                                                    style={{ backgroundColor: team.color, color: teamTextColor }}
+                                                >
+                                                    {player}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                    <button
+                        onClick={clearAllRankings}
+                        className="flex-1 px-4 py-2.5 bg-white/10 text-(--color-text) rounded-lg text-sm font-medium hover:bg-white/20 transition-colors"
+                    >
+                        Clear All
+                    </button>
+                    <button
+                        onClick={exportAsImageHandler}
+                        disabled={isExporting}
+                        className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-primary)' }}
+                    >
+                        {isExporting ? 'Exporting...' : 'Export Image'}
+                    </button>
                 </div>
             </div>
         )

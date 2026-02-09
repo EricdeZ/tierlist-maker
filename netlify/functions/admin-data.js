@@ -65,10 +65,17 @@ export const handler = async (event) => {
             ORDER BY name
         `
 
+        // Player aliases for name resolution
+        const aliases = await sql`
+            SELECT pa.id as alias_id, pa.player_id, pa.alias
+            FROM player_aliases pa
+            ORDER BY pa.player_id, pa.alias
+        `
+
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers }),
+            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases }),
         }
     } catch (error) {
         console.error('Admin data error:', error)

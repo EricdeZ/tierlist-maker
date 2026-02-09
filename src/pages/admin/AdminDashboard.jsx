@@ -907,6 +907,9 @@ function PlayerTable({ label, color, players, allGamePlayers, side, seasonId, ad
 function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange }) {
     const [showSearch, setShowSearch] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [aliasSaving, setAliasSaving] = useState(false)
+    const [aliasSaved, setAliasSaved] = useState(false)
+    const [originalExtractedName] = useState(player.player_name)
     const searchRef = useRef(null)
     const inputRef = useRef(null)
 
@@ -971,6 +974,34 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     results.push({ name: p.name, player_id: p.player_id, league_player_id: null, source: 'global' })
                 }
             }
+
+            // Also search aliases
+            const aliases = adminData.aliases || []
+            for (const a of aliases) {
+                if (!a.alias.toLowerCase().includes(q)) continue
+                // Find the player this alias belongs to
+                const rosterMatch = seasonPlayers.find(p => p.player_id === a.player_id)
+                const globalMatch = globalPlayers.find(p => p.player_id === a.player_id)
+                const alreadyInResults = results.find(r => r.name.toLowerCase() === (rosterMatch?.name || globalMatch?.name || '').toLowerCase())
+                if (alreadyInResults) continue
+
+                if (rosterMatch) {
+                    const isUsedById = rosterMatch.league_player_id && usedLpIds?.has(rosterMatch.league_player_id) && rosterMatch.league_player_id !== selfLpId
+                    if (!isUsedById) {
+                        results.push({
+                            name: rosterMatch.name,
+                            league_player_id: rosterMatch.league_player_id,
+                            team_name: rosterMatch.team_name,
+                            team_color: rosterMatch.team_color,
+                            role: rosterMatch.role,
+                            source: 'alias',
+                            alias_matched: a.alias,
+                        })
+                    }
+                } else if (globalMatch) {
+                    results.push({ name: globalMatch.name, player_id: globalMatch.player_id, league_player_id: null, source: 'alias', alias_matched: a.alias })
+                }
+            }
         }
 
         return results.slice(0, 12)
@@ -1025,6 +1056,52 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                         </span>
                     )}
 
+                    {/* Save as alias button — shown when matched name differs from extracted name */}
+                    {isMatched && !showSearch && originalExtractedName && player.matched_name
+                        && originalExtractedName.toLowerCase() !== player.matched_name.toLowerCase()
+                        && !aliasSaved && (
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation()
+                                setAliasSaving(true)
+                                try {
+                                    // Find player_id from adminData
+                                    const rosterPlayer = (adminData?.players || []).find(p => p.league_player_id === player.matched_lp_id)
+                                    const pid = rosterPlayer?.player_id
+                                    if (!pid) { setAliasSaving(false); return }
+
+                                    const res = await fetch(`${API}/roster-manage`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ action: 'add-alias', player_id: pid, alias: originalExtractedName }),
+                                    })
+                                    const data = await res.json()
+                                    if (res.ok) {
+                                        setAliasSaved(true)
+                                    } else {
+                                        console.warn('Alias save failed:', data.error)
+                                        // If alias already exists, just mark as saved
+                                        if (res.status === 409) setAliasSaved(true)
+                                    }
+                                } catch (err) {
+                                    console.error('Alias save error:', err)
+                                } finally {
+                                    setAliasSaving(false)
+                                }
+                            }}
+                            disabled={aliasSaving}
+                            className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors font-semibold disabled:opacity-50"
+                            title={`Save "${originalExtractedName}" as alias for "${player.matched_name}"`}
+                        >
+                            {aliasSaving ? '...' : 'Save Alias'}
+                        </button>
+                    )}
+                    {aliasSaved && !showSearch && (
+                        <span className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold">
+                            Alias Saved
+                        </span>
+                    )}
+
                     {/* Search dropdown */}
                     {showSearch && searchResults.length > 0 && (
                         <div className="absolute z-50 top-full left-0 mt-1 w-72 border rounded shadow-xl max-h-56 overflow-y-auto"
@@ -1055,6 +1132,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                     {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role}</span>}
                                     {r.team_name && <span className="text-[var(--color-text-secondary)] ml-auto text-[10px]">{r.team_name}</span>}
                                     {r.source === 'global' && <span className="text-yellow-400/60 ml-auto text-[10px]">global</span>}
+                                    {r.source === 'alias' && <span className="text-blue-400/60 ml-auto text-[10px]">alias: {r.alias_matched}</span>}
                                 </button>
                             ))}
                         </div>

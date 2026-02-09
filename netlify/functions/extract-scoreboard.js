@@ -449,6 +449,10 @@ async function autoMatchPlayers(extractedGames) {
         SELECT id as player_id, name, slug FROM players
     `
 
+    const allAliases = await sql`
+        SELECT pa.alias, pa.player_id FROM player_aliases pa
+    `
+
     const nameLookup = {}
     for (const p of allPlayers) {
         const key = p.name.toLowerCase()
@@ -456,11 +460,33 @@ async function autoMatchPlayers(extractedGames) {
         nameLookup[key].push(p)
     }
 
+    // Build alias → league player lookup (for active roster players)
+    const aliasLookup = {}
+    for (const a of allAliases) {
+        const key = a.alias.toLowerCase()
+        // Find this player's league entries in the active roster
+        const entries = allPlayers.filter(p => String(p.player_id) === String(a.player_id))
+        if (entries.length > 0) {
+            aliasLookup[key] = entries
+        }
+    }
+
     const globalNameLookup = {}
     for (const p of allGlobalPlayers) {
         const key = p.name.toLowerCase()
         if (!globalNameLookup[key]) globalNameLookup[key] = []
         globalNameLookup[key].push(p)
+    }
+
+    // Build alias → global player lookup
+    const globalAliasLookup = {}
+    for (const a of allAliases) {
+        const key = a.alias.toLowerCase()
+        const player = allGlobalPlayers.find(p => String(p.player_id) === String(a.player_id))
+        if (player) {
+            if (!globalAliasLookup[key]) globalAliasLookup[key] = []
+            globalAliasLookup[key].push(player)
+        }
     }
 
     const results = []
@@ -478,7 +504,7 @@ async function autoMatchPlayers(extractedGames) {
 
         for (const ep of allExtracted) {
             const key = ep.player_name.toLowerCase()
-            const dbMatches = nameLookup[key]
+            const dbMatches = nameLookup[key] || aliasLookup[key]
 
             if (dbMatches?.length > 0) {
                 matched.push({
@@ -502,7 +528,7 @@ async function autoMatchPlayers(extractedGames) {
                         is_sub: false,
                     })
                 } else {
-                    const globalMatch = globalNameLookup[key]
+                    const globalMatch = globalNameLookup[key] || globalAliasLookup[key]
                     const globalFuzzy = !globalMatch ? fuzzyMatch(ep.player_name, globalNameLookup) : null
 
                     if (globalMatch?.length > 0) {

@@ -252,11 +252,17 @@ const TeamDetail = () => {
                                     ? { name: match.team2_name, color: match.team2_color, slug: match.team2_slug }
                                     : { name: match.team1_name, color: match.team1_color, slug: match.team1_slug }
                                 const isWin = match.winner_team_id === team.id
+                                const matchLink = match.is_completed ? `${basePath}/matches/${match.id}` : null
+
+                                const CardTag = matchLink ? Link : 'div'
+                                const cardProps = matchLink
+                                    ? { to: matchLink, className: "block bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4 group hover:border-(--color-accent)/30 transition-all" }
+                                    : { className: "bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4" }
 
                                 return (
-                                    <div
+                                    <CardTag
                                         key={match.id}
-                                        className="bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4"
+                                        {...cardProps}
                                     >
                                         {/* Result indicator */}
                                         <div className="w-16 flex-shrink-0">
@@ -278,10 +284,7 @@ const TeamDetail = () => {
                                         {/* Opponent */}
                                         <div className="flex-1 flex items-center gap-3">
                                             <span className="text-sm text-(--color-text-secondary)">vs</span>
-                                            <Link
-                                                to={`${basePath}/teams/${opponent.slug}`}
-                                                className="flex items-center gap-2 group"
-                                            >
+                                            <div className="flex items-center gap-2">
                                                 <div
                                                     className="w-3 h-3 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: opponent.color }}
@@ -289,15 +292,18 @@ const TeamDetail = () => {
                                                 <span className="text-sm font-semibold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                                     {opponent.name}
                                                 </span>
-                                            </Link>
+                                            </div>
                                         </div>
 
                                         {/* Meta */}
                                         <div className="flex items-center gap-4 text-sm text-(--color-text-secondary) flex-shrink-0">
                                             {match.week && <span>Week {match.week}</span>}
                                             {match.date && <span>{formatDate(match.date)}</span>}
+                                            {match.is_completed && (
+                                                <span className="text-(--color-text-secondary)/30 group-hover:text-(--color-accent) transition-colors">→</span>
+                                            )}
                                         </div>
-                                    </div>
+                                    </CardTag>
                                 )
                             })}
                         </div>

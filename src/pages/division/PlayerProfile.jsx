@@ -243,6 +243,7 @@ const PlayerProfile = () => {
                                         <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">A</th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Damage</th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Mitigated</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider"></th>
                                     </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
@@ -254,8 +255,10 @@ const PlayerProfile = () => {
 
                                         return (
                                             <tr key={game.game_id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                                <td className="px-4 py-3 text-sm text-(--color-text-secondary) whitespace-nowrap">
-                                                    {formatDate(game.date)}
+                                                <td className="px-4 py-3 text-sm whitespace-nowrap">
+                                                    <Link to={`${basePath}/matches/${game.match_id}`} className="text-(--color-text-secondary) hover:text-(--color-accent) transition-colors">
+                                                        {formatDate(game.date)}
+                                                    </Link>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <Link
@@ -299,6 +302,11 @@ const PlayerProfile = () => {
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm text-(--color-text)">
                                                     {formatNumber(game.mitigated)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
+                                                    <Link to={`${basePath}/matches/${game.match_id}`} className="text-(--color-accent) hover:opacity-80 transition-opacity text-xs font-medium">
+                                                        View Match →
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         )

@@ -28,6 +28,12 @@ export const handler = async (event) => {
                 return await createAndAddPlayer(sql, body)
             case 'reactivate-player':
                 return await reactivatePlayer(sql, body)
+            case 'add-alias':
+                return await addAlias(sql, body)
+            case 'remove-alias':
+                return await removeAlias(sql, body)
+            case 'merge-player':
+                return await mergePlayer(sql, body)
             default:
                 return {
                     statusCode: 400,
@@ -295,6 +301,152 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role }) {
         `
 
         return { player, league_player: lp }
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, ...result }),
+    }
+}
+
+/**
+ * Add an alias (old name) for a player
+ */
+async function addAlias(sql, { player_id, alias }) {
+    if (!player_id || !alias?.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and alias required' }) }
+    }
+    const trimmed = alias.trim()
+
+    // Check alias doesn't match an existing player's actual name
+    const [nameConflict] = await sql`
+        SELECT id, name FROM players WHERE LOWER(name) = ${trimmed.toLowerCase()} LIMIT 1
+    `
+    if (nameConflict && nameConflict.id !== player_id) {
+        return {
+            statusCode: 409, headers,
+            body: JSON.stringify({ error: `"${trimmed}" is already the name of player "${nameConflict.name}"` }),
+        }
+    }
+
+    try {
+        const [created] = await sql`
+            INSERT INTO player_aliases (player_id, alias)
+            VALUES (${player_id}, ${trimmed})
+            RETURNING id, player_id, alias
+        `
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, alias: created }) }
+    } catch (err) {
+        if (err.code === '23505') {
+            return { statusCode: 409, headers, body: JSON.stringify({ error: `Alias "${trimmed}" is already in use` }) }
+        }
+        throw err
+    }
+}
+
+/**
+ * Remove an alias by its ID
+ */
+async function removeAlias(sql, { alias_id }) {
+    if (!alias_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'alias_id required' }) }
+    }
+    const [deleted] = await sql`
+        DELETE FROM player_aliases WHERE id = ${alias_id} RETURNING id, alias
+    `
+    if (!deleted) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Alias not found' }) }
+    }
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted }) }
+}
+
+/**
+ * Merge a duplicate player into the real player.
+ * Reassigns all stats, saves old name as alias, deletes the duplicate.
+ */
+async function mergePlayer(sql, { source_player_id, target_player_id }) {
+    if (!source_player_id || !target_player_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'source_player_id and target_player_id required' }) }
+    }
+    if (String(source_player_id) === String(target_player_id)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot merge a player into themselves' }) }
+    }
+
+    const result = await sql.begin(async (tx) => {
+        // Validate both players exist
+        const [source] = await tx`SELECT id, name, slug FROM players WHERE id = ${source_player_id}`
+        const [target] = await tx`SELECT id, name, slug FROM players WHERE id = ${target_player_id}`
+        if (!source) throw new Error(`Source player ID ${source_player_id} not found`)
+        if (!target) throw new Error(`Target player ID ${target_player_id} not found`)
+
+        // Get all league_player entries for the source
+        const sourceLps = await tx`
+            SELECT id, season_id, team_id, role FROM league_players WHERE player_id = ${source_player_id}
+        `
+
+        let statsReassigned = 0
+        let lpsReassigned = 0
+        let lpsDeleted = 0
+
+        for (const slp of sourceLps) {
+            // Check if target already has a league_player in this season
+            const [targetLp] = await tx`
+                SELECT id FROM league_players
+                WHERE player_id = ${target_player_id} AND season_id = ${slp.season_id}
+                LIMIT 1
+            `
+
+            if (targetLp) {
+                // Reassign all player_game_stats from source LP to target LP
+                const reassigned = await tx`
+                    UPDATE player_game_stats
+                    SET league_player_id = ${targetLp.id}
+                    WHERE league_player_id = ${slp.id}
+                `
+                statsReassigned += reassigned.count
+
+                // Delete the source league_player entry
+                await tx`DELETE FROM league_players WHERE id = ${slp.id}`
+                lpsDeleted++
+            } else {
+                // No target LP in this season — just re-parent the league_player
+                await tx`
+                    UPDATE league_players SET player_id = ${target_player_id} WHERE id = ${slp.id}
+                `
+                lpsReassigned++
+            }
+        }
+
+        // Save the source name as an alias for the target (ignore if already exists)
+        try {
+            await tx`
+                INSERT INTO player_aliases (player_id, alias)
+                VALUES (${target_player_id}, ${source.name})
+            `
+        } catch (err) {
+            if (err.code !== '23505') throw err // ignore unique violation
+        }
+
+        // Move any existing aliases from source to target
+        await tx`
+            UPDATE player_aliases SET player_id = ${target_player_id}
+            WHERE player_id = ${source_player_id}
+              AND LOWER(alias) NOT IN (
+                  SELECT LOWER(alias) FROM player_aliases WHERE player_id = ${target_player_id}
+              )
+        `
+
+        // Delete the source player (CASCADE cleans up remaining aliases)
+        await tx`DELETE FROM players WHERE id = ${source_player_id}`
+
+        return {
+            source_name: source.name,
+            target_name: target.name,
+            stats_reassigned: statsReassigned,
+            league_players_reassigned: lpsReassigned,
+            league_players_deleted: lpsDeleted,
+        }
     })
 
     return {
