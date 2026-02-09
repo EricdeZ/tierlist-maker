@@ -58,8 +58,7 @@ Return ONLY valid JSON in this exact format, no markdown, no explanation:
       "gpm": 0,
       "player_damage": 0,
       "mitigated": 0,
-      "structure_damage": 0,
-      "wards_placed": 0
+      "structure_damage": 0
     }
   ],
   "right_players": [
@@ -73,8 +72,7 @@ Return ONLY valid JSON in this exact format, no markdown, no explanation:
       "gpm": 0,
       "player_damage": 0,
       "mitigated": 0,
-      "structure_damage": 0,
-      "wards_placed": 0
+      "structure_damage": 0
     }
   ]
 }
