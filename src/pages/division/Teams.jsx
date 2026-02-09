@@ -34,8 +34,13 @@ const Teams = () => {
                 {season?.name} — {teams?.length || 0} teams
             </p>
 
+            {(!teams || teams.length === 0) ? (
+                <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-8 text-center">
+                    <p className="text-(--color-text-secondary)">No teams found for this season.</p>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {teams?.map(team => {
+                {teams.map(team => {
                     const teamPlayers = getTeamPlayers(team.id)
 
                     return (
@@ -91,6 +96,7 @@ const Teams = () => {
                     )
                 })}
             </div>
+            )}
         </div>
     )
 }

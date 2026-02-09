@@ -81,7 +81,7 @@ const TeamDetail = () => {
 
         fetchData()
         return () => { cancelled = true }
-    }, [team, season, teamPlayers.length])
+    }, [team, season, team?.id])
 
     if (!team) {
         return (
@@ -256,7 +256,7 @@ const TeamDetail = () => {
 
                                 const CardTag = matchLink ? Link : 'div'
                                 const cardProps = matchLink
-                                    ? { to: matchLink, className: "block bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4 group hover:border-(--color-accent)/30 transition-all" }
+                                    ? { to: matchLink, className: "bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4 group hover:border-(--color-accent)/30 transition-all" }
                                     : { className: "bg-(--color-secondary) rounded-xl border border-white/10 flex items-center px-5 py-4" }
 
                                 return (

@@ -103,13 +103,19 @@ export default function AdminDashboard() {
         ))
     }, [])
 
+    const [confirmDelete, setConfirmDelete] = useState(null) // mrId pending confirmation
+
     const removeReport = useCallback((mrId) => {
-        if (!confirm('Remove this match report?')) return
+        setConfirmDelete(prev => prev === mrId ? null : mrId)
+    }, [])
+
+    const confirmRemoveReport = useCallback((mrId) => {
         const live = liveImagesRef.current[mrId] || []
         live.forEach(img => { if (img.preview) URL.revokeObjectURL(img.preview) })
         delete liveImagesRef.current[mrId]
         setMatchReports(prev => prev.filter(m => m.id !== mrId))
         setSelected(prev => { const n = { ...prev }; delete n[mrId]; return n })
+        setConfirmDelete(null)
     }, [])
 
     // ─── Compress & convert image to base64 ───
@@ -378,6 +384,9 @@ export default function AdminDashboard() {
                         onAddImages={(files) => addImages(mr.id, files)}
                         onRemoveImage={(imgId) => removeImage(mr.id, imgId)}
                         onRemove={() => removeReport(mr.id)}
+                        confirmDelete={confirmDelete === mr.id}
+                        onConfirmRemove={() => confirmRemoveReport(mr.id)}
+                        onCancelRemove={() => setConfirmDelete(null)}
                         onProcess={() => processOne(mr.id)}
                         onRetry={() => updateReport(mr.id, { status: 'pending', error: null })}
                         onSubmit={() => submitOne(mr)}
@@ -461,6 +470,7 @@ function MatchReportCard({
                              onUpdateText, onUpdateEditData,
                              onAddImages, onRemoveImage, onRemove, onProcess, onRetry, onSubmit,
                              isSubmitting, submitResult,
+                             confirmDelete, onConfirmRemove, onCancelRemove,
                          }) {
     const [expanded, setExpanded] = useState(true)
     const [pasteFlash, setPasteFlash] = useState(false)
@@ -584,8 +594,17 @@ function MatchReportCard({
                             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
                         {expanded ? '▾' : '▸'}
                     </button>
-                    <button onClick={onRemove}
-                            className="text-[var(--color-text-secondary)] hover:text-red-400 transition-colors text-sm">✕</button>
+                    {confirmDelete ? (
+                        <div className="flex items-center gap-1">
+                            <button onClick={onConfirmRemove}
+                                    className="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-500 transition-colors">Remove</button>
+                            <button onClick={onCancelRemove}
+                                    className="px-2 py-1 text-xs rounded bg-white/10 text-[var(--color-text-secondary)] hover:bg-white/20 transition-colors">Cancel</button>
+                        </div>
+                    ) : (
+                        <button onClick={onRemove}
+                                className="text-[var(--color-text-secondary)] hover:text-red-400 transition-colors text-sm">✕</button>
+                    )}
                 </div>
             </div>
 

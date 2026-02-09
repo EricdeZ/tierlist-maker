@@ -71,12 +71,12 @@ const Homepage = () => {
 
         const fetchStats = async () => {
             try {
-                const res = await fetch(`/.netlify/functions/get-standings?seasonId=${activeSeason.id}`)
+                const res = await fetch(`/.netlify/functions/standings?seasonId=${activeSeason.id}`)
                 const teams = await res.json()
                 const teamCount = teams.length || 0
 
                 // Get player count from rosters
-                const rosterRes = await fetch(`/.netlify/functions/get-division-players?seasonId=${activeSeason.id}`)
+                const rosterRes = await fetch(`/.netlify/functions/players?seasonId=${activeSeason.id}`)
                 const players = await rosterRes.json()
                 const playerCount = players.length || 0
 

@@ -1,8 +1,9 @@
-import { getDB, handleCors, headers } from './lib/db.js'
+import { getDB, adminHeaders as headers } from './lib/db.js'
 
 export const handler = async (event) => {
-    const cors = handleCors(event)
-    if (cors) return cors
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 204, headers, body: '' }
+    }
 
     const sql = getDB()
 
@@ -82,7 +83,7 @@ export const handler = async (event) => {
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: error.message }),
+            body: JSON.stringify({ error: 'Internal server error' }),
         }
     }
 }

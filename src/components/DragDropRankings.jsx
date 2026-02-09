@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
-import { useImageExport } from '../hooks/useImageExport'
 import { exportRankingsAsImage } from '../utils/canvasExport'
 import { getContrastColor } from '../utils/colorContrast'
 import {
@@ -85,7 +84,6 @@ const DragDropRankings = () => {
 
     const rankingsRef = useRef(null)
     const teamsPanelRef = useRef(null)
-    const { exportAsImage } = useImageExport()
 
     // Check for mobile/small screen
     useEffect(() => {
@@ -318,17 +316,6 @@ const DragDropRankings = () => {
         clearRankingsFromStorage(storageKey)
     }
 
-    const exportRankingsJSON = () => {
-        const data = { rankings, timestamp: new Date().toISOString() }
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'rankings.json'
-        a.click()
-        URL.revokeObjectURL(url)
-    }
-
     const exportAsImageHandler = async () => {
         setIsExporting(true)
         try {
@@ -370,8 +357,16 @@ const DragDropRankings = () => {
 
     const addToMobileRanking = (player) => {
         setRankings(prev => {
+            // Prevent duplicates in the same role
             if (prev[mobileRole].includes(player)) return prev
-            return { ...prev, [mobileRole]: [...prev[mobileRole], player] }
+            // Remove from any other role first
+            const updated = { ...prev }
+            for (const role of roles) {
+                if (role !== mobileRole && updated[role].includes(player)) {
+                    updated[role] = updated[role].filter(p => p !== player)
+                }
+            }
+            return { ...updated, [mobileRole]: [...updated[mobileRole], player] }
         })
     }
 

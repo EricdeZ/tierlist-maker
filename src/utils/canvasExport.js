@@ -249,7 +249,7 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
     ctx.fillStyle = 'rgba(255,255,255,0.15)'
     ctx.font = `11px ${FONT_BODY}`
     ctx.textAlign = 'right'
-    ctx.fillText('tierlist-maker', WIDTH - PADDING, HEIGHT - 14)
+    ctx.fillText('SMITE 2 Companion', WIDTH - PADDING, HEIGHT - 14)
 
     // --- Export ---
     canvas.toBlob((blob) => {

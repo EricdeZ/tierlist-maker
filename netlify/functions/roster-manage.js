@@ -1,9 +1,10 @@
 /* global process */
-import { getDB, handleCors, headers } from './lib/db.js'
+import { getDB, adminHeaders as headers } from './lib/db.js'
 
 export const handler = async (event) => {
-    const cors = handleCors(event)
-    if (cors) return cors
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 204, headers, body: '' }
+    }
 
     const sql = getDB()
 
@@ -12,7 +13,15 @@ export const handler = async (event) => {
             return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
         }
 
-        const body = JSON.parse(event.body)
+        if (!event.body) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body is required' }) }
+        }
+        let body
+        try {
+            body = JSON.parse(event.body)
+        } catch {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON in request body' }) }
+        }
         const { action } = body
 
         switch (action) {
@@ -46,10 +55,7 @@ export const handler = async (event) => {
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({
-                error: error.message,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-            }),
+            body: JSON.stringify({ error: 'Internal server error' }),
         }
     }
 }

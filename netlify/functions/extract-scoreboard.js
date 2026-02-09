@@ -1,5 +1,5 @@
 /* global process */
-import { getDB, handleCors, headers } from './lib/db.js'
+import { getDB, adminHeaders as headers } from './lib/db.js'
 
 // Netlify function config — Sonnet needs more time than the 10s default
 export const config = {
@@ -114,8 +114,9 @@ Return ONLY valid JSON, no markdown:
 If you can't determine a value, use null. Be flexible with team name formats — Discord posts may use abbreviations, @mentions, or shorthand.`
 
 export const handler = async (event) => {
-    const cors = handleCors(event)
-    if (cors) return cors
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 204, headers, body: '' }
+    }
 
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
@@ -127,13 +128,36 @@ export const handler = async (event) => {
     }
 
     try {
-        const { images, match_text } = JSON.parse(event.body)
+        if (!event.body) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body is required' }) }
+        }
+
+        let parsed
+        try {
+            parsed = JSON.parse(event.body)
+        } catch {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON in request body' }) }
+        }
+
+        const { images, match_text } = parsed
 
         if (!images || !Array.isArray(images) || images.length === 0) {
             return {
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({ error: 'No images provided' }),
+            }
+        }
+
+        // Payload limits
+        const MAX_IMAGES = 10
+        const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB per image (base64)
+        if (images.length > MAX_IMAGES) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: `Too many images (max ${MAX_IMAGES})` }) }
+        }
+        for (let i = 0; i < images.length; i++) {
+            if (images[i].data && images[i].data.length > MAX_IMAGE_SIZE) {
+                return { statusCode: 400, headers, body: JSON.stringify({ error: `Image ${i + 1} exceeds 5MB size limit` }) }
             }
         }
 
@@ -188,7 +212,7 @@ export const handler = async (event) => {
         }
     } catch (error) {
         console.error('Extract error:', error)
-        return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
     }
 }
 

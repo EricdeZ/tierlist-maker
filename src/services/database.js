@@ -10,11 +10,8 @@ const apiCall = async (endpoint, params = {}) => {
     })
 
     const response = await fetch(url)
-    console.log(`API call to ${url} returned status ${response.status}`)
 
     if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`API error response:`, errorText)
         throw new Error(`API call failed: ${response.statusText}`)
     }
 
@@ -125,12 +122,3 @@ export const standingsService = {
     }
 }
 
-// Test function
-export const healthCheck = async () => {
-    try {
-        const leagues = await leagueService.getAll()
-        return { connected: true, leagues: leagues.length }
-    } catch (error) {
-        return { connected: false, error: error.message }
-    }
-}

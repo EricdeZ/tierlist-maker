@@ -23,9 +23,13 @@ const DivisionOverview = () => {
     const { league, division, season, teams, players } = useDivision()
     const [seasonStats, setSeasonStats] = useState(null)
 
+    const [statsError, setStatsError] = useState(false)
+
     useEffect(() => {
         if (!season) return
-        statsService.getSeasonStats(season.id).then(setSeasonStats).catch(console.error)
+        statsService.getSeasonStats(season.id)
+            .then(setSeasonStats)
+            .catch(() => setStatsError(true))
     }, [season])
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
@@ -65,8 +69,8 @@ const DivisionOverview = () => {
                 {[
                     { label: 'Teams',          value: teams?.length || 0, link: `${basePath}/teams` },
                     { label: 'Players',        value: players?.length || 0, link: `${basePath}/stats` },
-                    { label: 'Matches Played', value: seasonStats?.total_matches ?? '—', link: `${basePath}/matches` },
-                    { label: 'Total Kills',    value: seasonStats?.total_kills ? formatNumber(seasonStats.total_kills) : '—', link: `${basePath}/stats` },
+                    { label: 'Matches Played', value: statsError ? '—' : (seasonStats?.total_matches ?? '—'), link: `${basePath}/matches` },
+                    { label: 'Total Kills',    value: statsError ? '—' : (seasonStats?.total_kills ? formatNumber(seasonStats.total_kills) : '—'), link: `${basePath}/stats` },
                 ].map(stat => (
                     <Link
                         key={stat.label}
@@ -164,7 +168,7 @@ const DivisionOverview = () => {
                                     {team.name}
                                 </div>
                                 <div className="text-xs text-(--color-text-secondary)">
-                                    {team.player_count || '?'} players
+                                    {players?.filter(p => p.team_id === team.id).length || 0} players
                                 </div>
                             </Link>
                         ))}

@@ -133,12 +133,16 @@ const PlayerProfile = () => {
                                 {player.name}
                             </h1>
                             <p className="text-(--color-text-secondary)">
-                                <Link
-                                    to={`${basePath}/teams/${team?.slug}`}
-                                    className="hover:text-(--color-accent) transition-colors"
-                                >
-                                    {team?.name || 'No Team'}
-                                </Link>
+                                {team ? (
+                                    <Link
+                                        to={`${basePath}/teams/${team.slug}`}
+                                        className="hover:text-(--color-accent) transition-colors"
+                                    >
+                                        {team.name}
+                                    </Link>
+                                ) : (
+                                    <span>No Team</span>
+                                )}
                                 {player.role && ` · ${player.role}`}
                                 {player.secondary_role && ` / ${player.secondary_role}`}
                             </p>
