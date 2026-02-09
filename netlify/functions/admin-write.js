@@ -110,8 +110,18 @@ async function submitMatch(sql, body) {
                         throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for order side`)
                     }
                     await tx`
-                        INSERT INTO player_game_stats (game_id, league_player_id, team_side, kills, deaths, assists, damage, mitigated, god_played)
-                        VALUES (${gameId}, ${lpId}, 1, ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0}, ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'})
+                        INSERT INTO player_game_stats (
+                            game_id, league_player_id, team_side,
+                            kills, deaths, assists, damage, mitigated, god_played,
+                            gpm, structure_damage, wards_placed, self_healing, ally_healing
+                        )
+                        VALUES (
+                            ${gameId}, ${lpId}, 1,
+                            ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
+                            ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'},
+                            ${player.gpm || 0}, ${player.structure_damage || 0}, ${player.wards_placed || 0},
+                            ${player.self_healing || 0}, ${player.ally_healing || 0}
+                        )
                     `
                 }
 
@@ -122,8 +132,18 @@ async function submitMatch(sql, body) {
                         throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for chaos side`)
                     }
                     await tx`
-                        INSERT INTO player_game_stats (game_id, league_player_id, team_side, kills, deaths, assists, damage, mitigated, god_played)
-                        VALUES (${gameId}, ${lpId}, 2, ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0}, ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'})
+                        INSERT INTO player_game_stats (
+                            game_id, league_player_id, team_side,
+                            kills, deaths, assists, damage, mitigated, god_played,
+                            gpm, structure_damage, wards_placed, self_healing, ally_healing
+                        )
+                        VALUES (
+                            ${gameId}, ${lpId}, 2,
+                            ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
+                            ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'},
+                            ${player.gpm || 0}, ${player.structure_damage || 0}, ${player.wards_placed || 0},
+                            ${player.self_healing || 0}, ${player.ally_healing || 0}
+                        )
                     `
                 }
 

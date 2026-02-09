@@ -57,6 +57,37 @@ const Homepage = () => {
         return () => { cancelled = true }
     }, [])
 
+    const [ishtarStats, setIshtarStats] = useState(null)
+
+    // Fetch Ishtar division player/team count once leagues are loaded
+    useEffect(() => {
+        if (!leagues.length) return
+        const bsl = leagues.find(l => l.slug === 'bsl' || l.slug === 'babylon-smite-league')
+        if (!bsl) return
+        const ishtar = bsl.divisions?.find(d => d.slug === 'ishtar')
+        if (!ishtar) return
+        const activeSeason = ishtar.seasons?.find(s => s.is_active)
+        if (!activeSeason) return
+
+        const fetchStats = async () => {
+            try {
+                const res = await fetch(`/.netlify/functions/get-standings?seasonId=${activeSeason.id}`)
+                const teams = await res.json()
+                const teamCount = teams.length || 0
+
+                // Get player count from rosters
+                const rosterRes = await fetch(`/.netlify/functions/get-division-players?seasonId=${activeSeason.id}`)
+                const players = await rosterRes.json()
+                const playerCount = players.length || 0
+
+                setIshtarStats({ teams: teamCount, players: playerCount })
+            } catch {
+                // Silently fail — banner still renders without stats
+            }
+        }
+        fetchStats()
+    }, [leagues])
+
     const mainLeagues = leagues
     const hasActiveLeagues = mainLeagues.some(l =>
         l.divisions?.some(d => d.seasons?.some(s => s.is_active))
@@ -229,6 +260,93 @@ const Homepage = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
                     </div>
+                </div>
+            </section>
+
+            {/* ─── BSL ISHTAR DIVISION BANNER ─── */}
+            <section className="py-16 px-4">
+                <div
+                    className="w-2/3 h-px mx-auto mb-16"
+                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                />
+
+                <div className="max-w-5xl mx-auto">
+                    <Link
+                        to="/bsl/ishtar"
+                        className="group relative block overflow-hidden rounded-2xl border border-white/10 hover:border-(--color-accent)/40 transition-all duration-300 hover:shadow-lg hover:shadow-(--color-accent)/5 hover:-translate-y-1"
+                        style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                    >
+                        {/* Top accent line */}
+                        <div
+                            className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
+                        />
+
+                        {/* Background glow */}
+                        <div
+                            className="absolute top-0 right-0 w-72 h-72 opacity-10 group-hover:opacity-20 transition-opacity"
+                            style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                        />
+                        <div
+                            className="absolute bottom-0 left-0 w-48 h-48 opacity-5"
+                            style={{ background: 'radial-gradient(circle at bottom left, var(--color-accent), transparent 70%)' }}
+                        />
+
+                        <div className="relative z-10 p-6 sm:p-10">
+                            <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-10">
+
+                                {/* Left — Babylon logo */}
+                                <div className="flex-shrink-0">
+                                    <div
+                                        className="w-20 h-20 sm:w-28 sm:h-28 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden"
+                                        style={{ background: 'linear-gradient(135deg, var(--color-accent)/0.08, transparent)' }}
+                                    >
+                                        <img src={babylonLogo} alt="Babylon Smite League" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+                                    </div>
+                                </div>
+
+                                {/* Center — Content */}
+                                <div className="flex-1 text-center md:text-left">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-(--color-accent)/5 border border-(--color-accent)/20 mb-3">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                                        <span className="text-xs font-semibold text-(--color-accent) uppercase tracking-wider">Live Season</span>
+                                    </div>
+
+                                    <h2 className="font-heading text-2xl sm:text-3xl font-black text-(--color-text) mb-1.5 leading-tight">
+                                        Babylon Smite League
+                                    </h2>
+                                    <p className="text-base sm:text-lg font-semibold text-(--color-accent) mb-3">
+                                        Ishtar Division — First Tracked Season
+                                    </p>
+                                    <p className="text-sm text-(--color-text-secondary) max-w-lg leading-relaxed">
+                                        Follow every match, track player stats, and see live standings.
+                                        {ishtarStats ? ` Full performance analytics for ${ishtarStats.teams} teams and ${ishtarStats.players} players.` : ' Full performance analytics for every team and player.'}
+                                    </p>
+                                </div>
+
+                                {/* Right — CTA */}
+                                <div className="flex-shrink-0 flex flex-col items-center gap-3">
+                                    <div
+                                        className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-heading font-bold text-sm sm:text-base transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-lg group-hover:shadow-(--color-accent)/20"
+                                        style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)' }}
+                                    >
+                                        <span className="text-(--color-primary)">View Standings</span>
+                                        <svg className="w-4 h-4 text-(--color-primary) group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                        </svg>
+                                    </div>
+                                    {ishtarStats && (
+                                        <div className="flex items-center gap-3 text-xs text-(--color-text-secondary)/60">
+                                            <span>{ishtarStats.teams} Teams</span>
+                                            <span className="w-1 h-1 rounded-full bg-white/20" />
+                                            <span>{ishtarStats.players} Players</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                            </div>
+                        </div>
+                    </Link>
                 </div>
             </section>
 
