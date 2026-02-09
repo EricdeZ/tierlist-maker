@@ -73,10 +73,17 @@ export const handler = async (event) => {
             ORDER BY pa.player_id, pa.alias
         `
 
+        // All gods for autocomplete in match review
+        const gods = await sql`
+            SELECT id, name, slug, image_url
+            FROM gods
+            ORDER BY name
+        `
+
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases }),
+            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases, gods }),
         }
     } catch (error) {
         console.error('Admin data error:', error)

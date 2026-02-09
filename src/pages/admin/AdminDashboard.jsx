@@ -801,18 +801,38 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
             </div>
 
             {/* ─── Active game ─── */}
-            {ed.games[activeGame] && (
-                <GameEditor
-                    key={activeGame}
-                    game={ed.games[activeGame]}
-                    gameIndex={activeGame}
-                    team1={team1}
-                    team2={team2}
-                    seasonId={ed.season_id}
-                    adminData={adminData}
-                    onChange={(gameUpdate) => updateGame(activeGame, gameUpdate)}
-                />
-            )}
+            {ed.games[activeGame] && (() => {
+                const g = ed.games[activeGame]
+                // Sides swap each game in SMITE 2 — determine teams from matched players
+                const rosterPlayers = adminData?.players || []
+                const inferTeam = (players) => {
+                    const teamIds = players
+                        .filter(p => p.matched_lp_id)
+                        .map(p => rosterPlayers.find(r => r.league_player_id === p.matched_lp_id)?.team_id)
+                        .filter(Boolean)
+                    if (!teamIds.length) return null
+                    // Majority vote
+                    const counts = {}
+                    for (const id of teamIds) counts[id] = (counts[id] || 0) + 1
+                    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+                }
+                const leftTeamId = inferTeam(g.left_players)
+                const swapped = leftTeamId && String(leftTeamId) === String(ed.team2_id)
+                const leftTeam = swapped ? team2 : team1
+                const rightTeam = swapped ? team1 : team2
+                return (
+                    <GameEditor
+                        key={activeGame}
+                        game={g}
+                        gameIndex={activeGame}
+                        team1={leftTeam}
+                        team2={rightTeam}
+                        seasonId={ed.season_id}
+                        adminData={adminData}
+                        onChange={(gameUpdate) => updateGame(activeGame, gameUpdate)}
+                    />
+                )
+            })()}
         </div>
     )
 }
@@ -1146,7 +1166,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
             </td>
 
             <td className="py-1.5 pr-2">
-                <EditableCell value={player.god_played || ''} onChange={v => onChange({ god_played: v })} />
+                <GodAutocomplete value={player.god_played || ''} gods={adminData?.gods} onChange={updates => onChange(updates)} />
             </td>
             <NumCell value={player.kills} onChange={v => onChange({ kills: v })} />
             <NumCell value={player.deaths} onChange={v => onChange({ deaths: v })} />
@@ -1357,6 +1377,88 @@ function EditableCell({ value, onChange }) {
     return (
         <input type="text" value={value} onChange={e => onChange(e.target.value)}
                className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-xs text-[var(--color-text)] transition-colors" />
+    )
+}
+
+function GodAutocomplete({ value, gods, onChange }) {
+    const [showDropdown, setShowDropdown] = useState(false)
+    const [query, setQuery] = useState('')
+    const containerRef = useRef(null)
+    const inputRef = useRef(null)
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        if (!showDropdown) return
+        const handler = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) setShowDropdown(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [showDropdown])
+
+    const filtered = (() => {
+        if (!showDropdown || !gods?.length) return []
+        const q = query.trim().toLowerCase()
+        if (!q) return gods
+        return gods.filter(g => g.name.toLowerCase().includes(q))
+    })()
+
+    const currentGod = gods?.find(g => g.name.toLowerCase() === (value || '').toLowerCase())
+
+    return (
+        <div className="relative" ref={containerRef}>
+            <div className="flex items-center gap-1">
+                {currentGod?.image_url && !showDropdown && (
+                    <img src={currentGod.image_url} alt="" className="w-4 h-4 rounded-sm shrink-0 object-cover" />
+                )}
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={showDropdown ? query : (value || '')}
+                    onChange={e => { setQuery(e.target.value); setShowDropdown(true) }}
+                    onFocus={() => { setQuery(value || ''); setShowDropdown(true) }}
+                    onKeyDown={e => {
+                        if (e.key === 'Escape') { setShowDropdown(false); inputRef.current?.blur() }
+                        if (e.key === 'Tab') setShowDropdown(false)
+                    }}
+                    className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-xs text-[var(--color-text)] transition-colors"
+                />
+            </div>
+
+            {showDropdown && filtered.length > 0 && (
+                <div className="absolute z-50 top-full left-0 mt-1 w-56 border rounded shadow-xl max-h-56 overflow-y-auto"
+                     style={{ backgroundColor: 'var(--color-card, #1e1e2e)', borderColor: 'var(--color-border, #333)' }}>
+                    {query === '' && (
+                        <div className="px-3 py-1.5 text-[10px] text-[var(--color-text-secondary)] border-b border-[var(--color-border)]/50 sticky top-0"
+                             style={{ backgroundColor: 'var(--color-card, #1e1e2e)' }}>
+                            All gods — type to filter
+                        </div>
+                    )}
+                    {filtered.map(god => (
+                        <button key={god.id}
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-accent)]/10 flex items-center gap-2 transition-colors"
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => {
+                                    onChange({ god_played: god.name, god_id: god.id, god_image_url: god.image_url })
+                                    setShowDropdown(false)
+                                    setQuery('')
+                                }}>
+                            {god.image_url && (
+                                <img src={god.image_url} alt="" className="w-5 h-5 rounded-sm shrink-0 object-cover" />
+                            )}
+                            <span className="text-[var(--color-text)]">{god.name}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {showDropdown && query.length >= 2 && filtered.length === 0 && (
+                <div className="absolute z-50 top-full left-0 mt-1 w-48 border rounded shadow-lg px-3 py-2 text-[10px] text-[var(--color-text-secondary)]"
+                     style={{ backgroundColor: 'var(--color-card, #1e1e2e)', borderColor: 'var(--color-border, #333)' }}>
+                    No gods found for "{query}"
+                </div>
+            )}
+        </div>
     )
 }
 
