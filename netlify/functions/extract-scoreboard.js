@@ -11,11 +11,13 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const SYSTEM_PROMPT = `You are a data extraction bot that reads SMITE 2 post-game DETAILS tab screenshots.
 
 CRITICAL RULE FOR GOD NAMES:
-- Each player has a small ALL-CAPS text label directly below their player name (e.g., "RA", "HOU YI", "BELLONA", "AGNI"). This text label IS the god name.
-- You must READ THIS TEXT LABEL to determine the god. Do NOT attempt to identify the god from the portrait artwork or icon. The artwork is irrelevant.
+- Each player has an ALL-CAPS text label directly below their player name (e.g., "RA", "HOU YI", "BELLONA", "AGNI"). This text label IS the god name.
+- You MUST determine the god by reading this ALL-CAPS TEXT LABEL — character by character. The portrait artwork is IRRELEVANT and WILL mislead you. IGNORE the portraits completely.
+- COMMON MISTAKES: Agni, Hou Yi, Yemoja, Neith, and Hades are frequently misidentified from portraits. READ THE TEXT.
 - A god name might be as short as 2-3 characters (e.g., "RA", "SOL", "NUT"). Do not skip or misread short names.
 - You will be given a list of valid god names. You MUST return a name from that list. If the text you read is not an exact match, pick the closest name from the list.
-- NEVER return a god name that is not on the provided list.`
+- NEVER return a god name that is not on the provided list.
+- DUPLICATE GODS ARE IMPOSSIBLE. If you find yourself writing the same god twice, you misread a text label — go back and re-read it.`
 
 const EXTRACTION_PROMPT = `Extract ALL player stats from this DETAILS tab screenshot.
 
@@ -50,6 +52,7 @@ Return ONLY valid JSON in this exact format, no markdown, no explanation:
   "left_players": [
     {
       "player_name": "...",
+      "god_text_read": "...",
       "god_played": "...",
       "level": 20,
       "kills": 0,
@@ -64,6 +67,7 @@ Return ONLY valid JSON in this exact format, no markdown, no explanation:
   "right_players": [
     {
       "player_name": "...",
+      "god_text_read": "...",
       "god_played": "...",
       "level": 20,
       "kills": 0,
@@ -81,7 +85,11 @@ IMPORTANT:
 - Players on the LEFT side are listed left-to-right (leftmost player first)
 - Players on the RIGHT side are listed left-to-right (leftmost player first)
 - Extract player names EXACTLY as displayed (preserve capitalization, special characters, dashes)
-- For god_played: READ THE ALL-CAPS TEXT LABEL below the player name. Do NOT identify gods from portrait artwork. Pick the matching name from the VALID GOD NAMES list provided above.
+- For EACH player, you MUST follow these steps to identify the god:
+  1. IGNORE the portrait artwork completely — it WILL mislead you.
+  2. Find the ALL-CAPS TEXT LABEL below the player name.
+  3. Read that text character by character and write it EXACTLY in "god_text_read" (e.g., "HOU YI", "AGNI", "HADES").
+  4. Match that text to the closest name from the VALID GOD NAMES list and write it in "god_played".
 - DUPLICATE GODS ARE IMPOSSIBLE: Each god appears AT MOST ONCE across all 10 players.
 - KDA is shown as a single string like "8/4/8" — split into kills=8, deaths=4, assists=8
 - All number values are integers. Numbers may have commas (e.g., "33,137" = 33137). Remove commas.
@@ -319,10 +327,12 @@ async function resolveGodNames(extractedGames, gods) {
 
         for (const player of allPlayers) {
             const raw = (player.god_played || '').trim()
-            if (!raw) continue
+            const rawText = (player.god_text_read || '').trim()
+            if (!raw && !rawText) continue
 
             player.god_played_raw = raw
 
+            // Try exact match on god_played first
             const exactKey = raw.toLowerCase()
             if (godLookup[exactKey]) {
                 const god = godLookup[exactKey]
@@ -330,15 +340,45 @@ async function resolveGodNames(extractedGames, gods) {
                 player.god_id = god.id
                 player.god_image_url = god.image_url
                 player.god_match_type = 'exact'
+
+                // Cross-check: if god_text_read resolves to a DIFFERENT god, prefer the text reading
+                if (rawText) {
+                    const textKey = rawText.toLowerCase()
+                    const textGod = godLookup[textKey] || fuzzyMatchGod(rawText, godLookup, 2)?.god
+                    if (textGod && textGod.id !== god.id) {
+                        console.log(`God cross-check mismatch for ${player.player_name}: god_played="${raw}" -> ${god.name}, god_text_read="${rawText}" -> ${textGod.name}. Using text reading.`)
+                        player.god_played = textGod.name
+                        player.god_id = textGod.id
+                        player.god_image_url = textGod.image_url
+                        player.god_match_type = 'text_corrected'
+                    }
+                }
                 continue
             }
 
-            const match = fuzzyMatchGod(raw, godLookup)
+            // Try exact match on god_text_read
+            if (rawText) {
+                const textKey = rawText.toLowerCase()
+                if (godLookup[textKey]) {
+                    const god = godLookup[textKey]
+                    player.god_played = god.name
+                    player.god_id = god.id
+                    player.god_image_url = god.image_url
+                    player.god_match_type = 'text_exact'
+                    continue
+                }
+            }
+
+            // Fuzzy match — try god_text_read first (more likely to be correct), then god_played
+            const textMatch = rawText ? fuzzyMatchGod(rawText, godLookup) : null
+            const playedMatch = fuzzyMatchGod(raw, godLookup)
+            const match = textMatch || playedMatch
+
             if (match) {
                 player.god_played = match.god.name
                 player.god_id = match.god.id
                 player.god_image_url = match.god.image_url
-                player.god_match_type = 'fuzzy'
+                player.god_match_type = textMatch ? 'text_fuzzy' : 'fuzzy'
                 player.god_match_distance = match.distance
             } else {
                 player.god_match_type = 'unmatched'
