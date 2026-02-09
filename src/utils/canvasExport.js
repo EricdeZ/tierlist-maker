@@ -1,170 +1,257 @@
 // src/utils/canvasExport.js
 /**
- * Simple canvas-based export without external dependencies
- * Creates a styled rankings image using native Canvas API
- * Enhanced to match Tailwind design better
+ * Canvas-based export that matches the dark-themed page design.
+ * Renders team-colored player cards with ranking numbers.
  */
 
-export const exportRankingsAsImage = (rankings, teams, filename = 'rankings') => {
+import { getContrastColor } from './colorContrast'
+
+// Helper: draw a rounded rectangle
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.arcTo(x + w, y, x + w, y + r, r)
+    ctx.lineTo(x + w, y + h - r)
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+    ctx.lineTo(x + r, y + h)
+    ctx.arcTo(x, y + h, x, y + h - r, r)
+    ctx.lineTo(x, y + r)
+    ctx.arcTo(x, y, x + r, y, r)
+    ctx.closePath()
+}
+
+// Helper: draw a rounded rectangle clipped to just the top corners
+function roundRectTop(ctx, x, y, w, h, r) {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.arcTo(x + w, y, x + w, y + r, r)
+    ctx.lineTo(x + w, y + h)
+    ctx.lineTo(x, y + h)
+    ctx.lineTo(x, y + r)
+    ctx.arcTo(x, y, x + r, y, r)
+    ctx.closePath()
+}
+
+// Truncate text to fit within maxWidth
+function truncateText(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text
+    let t = text
+    while (t.length > 0 && ctx.measureText(t + '...').width > maxWidth) {
+        t = t.slice(0, -1)
+    }
+    return t + '...'
+}
+
+export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', leagueName = 'Player Rankings') => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
 
-    // Set canvas dimensions for high DPI displays
-    const scale = window.devicePixelRatio || 1
-    const width = 1400
-    const height = 1000
+    const scale = window.devicePixelRatio || 2
 
-    canvas.width = width * scale
-    canvas.height = height * scale
-    canvas.style.width = width + 'px'
-    canvas.style.height = height + 'px'
+    // --- Layout constants ---
+    const WIDTH = 1400
+    const PADDING = 40
+    const TITLE_AREA = 90
+    const COL_GAP = 12
+    const COL_HEADER_H = 48
+    const CARD_H = 40
+    const CARD_GAP = 8
+    const CARD_PAD_X = 10
+    const LEGEND_TOP_PAD = 30
+    const LEGEND_ROW_H = 28
+    const BOTTOM_PAD = 30
 
+    const roles = ['SOLO', 'JUNGLE', 'MID', 'SUPPORT', 'ADC']
+    const colWidth = (WIDTH - PADDING * 2 - COL_GAP * 4) / 5
+
+    // Calculate needed height based on tallest column
+    const maxPlayers = Math.max(...roles.map(r => (rankings[r] || []).length), 1)
+    const columnsBottom = TITLE_AREA + COL_HEADER_H + (maxPlayers * (CARD_H + CARD_GAP)) + CARD_GAP + 16
+
+    // Legend sizing
+    const teamsPerRow = Math.min(teams.length, 5)
+    const legendRows = Math.ceil(teams.length / teamsPerRow)
+    const legendH = 36 + legendRows * LEGEND_ROW_H + 16
+
+    const HEIGHT = Math.max(700, columnsBottom + LEGEND_TOP_PAD + legendH + BOTTOM_PAD)
+
+    canvas.width = WIDTH * scale
+    canvas.height = HEIGHT * scale
+    canvas.style.width = WIDTH + 'px'
+    canvas.style.height = HEIGHT + 'px'
     ctx.scale(scale, scale)
 
-    // Background (bg-gray-50)
-    ctx.fillStyle = '#f9fafb'
-    ctx.fillRect(0, 0, width, height)
+    // --- Colors matching the page theme ---
+    const BG = '#060d1a'           // --color-secondary
+    const COL_BG = '#101829'       // --color-primary
+    const COL_HEADER_BG = 'rgba(255,255,255,0.05)'
+    const TEXT_WHITE = '#ffffff'
+    const TEXT_DIM = '#9ca3af'
+    const ACCENT = '#f8c56a'       // --color-accent
+    const BORDER = 'rgba(255,255,255,0.1)'
 
-    // Title
-    ctx.fillStyle = '#111827'
-    ctx.font = 'bold 36px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    // Fonts (Montserrat for headings, Lato for body, with fallbacks)
+    const FONT_HEADING = '"Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif'
+    const FONT_BODY = '"Lato", system-ui, -apple-system, "Segoe UI", sans-serif'
+
+    // --- Background ---
+    ctx.fillStyle = BG
+    ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+    // Subtle outer border
+    ctx.strokeStyle = BORDER
+    ctx.lineWidth = 1
+    roundRect(ctx, 0.5, 0.5, WIDTH - 1, HEIGHT - 1, 16)
+    ctx.stroke()
+
+    // --- Title ---
+    ctx.fillStyle = TEXT_WHITE
+    ctx.font = `bold 28px ${FONT_HEADING}`
     ctx.textAlign = 'center'
-    ctx.fillText('Player Rankings', width / 2, 60)
+    ctx.fillText(leagueName, WIDTH / 2, 48)
 
-    // Date
-    ctx.font = '18px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
-    ctx.fillStyle = '#6b7280'
-    ctx.fillText(`Generated on ${new Date().toLocaleDateString()}`, width / 2, 90)
+    // Subtitle / date
+    ctx.fillStyle = TEXT_DIM
+    ctx.font = `14px ${FONT_BODY}`
+    ctx.fillText(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }), WIDTH / 2, 72)
 
-    // Role columns
-    const roles = ['SOLO', 'JUNGLE', 'MID', 'SUPPORT', 'ADC']
-    const columnWidth = (width - 140) / 5
-    const startX = 70
-    const startY = 130
+    // --- Role Columns ---
+    roles.forEach((role, ci) => {
+        const x = PADDING + ci * (colWidth + COL_GAP)
+        const y = TITLE_AREA
+        const playersInRole = rankings[role] || []
+        const colH = COL_HEADER_H + Math.max(playersInRole.length, 1) * (CARD_H + CARD_GAP) + CARD_GAP + 12
 
-    roles.forEach((role, columnIndex) => {
-        const x = startX + (columnIndex * columnWidth)
-
-        // Column background (white with shadow effect)
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(x, startY, columnWidth - 15, 500)
-
-        // Column shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'
-        ctx.fillRect(x + 3, startY + 3, columnWidth - 15, 500)
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(x, startY, columnWidth - 15, 500)
+        // Column background
+        ctx.fillStyle = COL_BG
+        roundRect(ctx, x, y, colWidth, colH, 10)
+        ctx.fill()
 
         // Column border
-        ctx.strokeStyle = '#e5e7eb'
+        ctx.strokeStyle = BORDER
         ctx.lineWidth = 1
-        ctx.strokeRect(x, startY, columnWidth - 15, 500)
+        roundRect(ctx, x, y, colWidth, colH, 10)
+        ctx.stroke()
 
-        // Column header background (bg-gray-100)
-        ctx.fillStyle = '#f3f4f6'
-        ctx.fillRect(x, startY, columnWidth - 15, 50)
+        // Column header background
+        ctx.fillStyle = COL_HEADER_BG
+        roundRectTop(ctx, x, y, colWidth, COL_HEADER_H, 10)
+        ctx.fill()
 
-        // Column header border
-        ctx.strokeStyle = '#d1d5db'
-        ctx.strokeRect(x, startY, columnWidth - 15, 50)
+        // Header divider line
+        ctx.strokeStyle = BORDER
+        ctx.beginPath()
+        ctx.moveTo(x, y + COL_HEADER_H)
+        ctx.lineTo(x + colWidth, y + COL_HEADER_H)
+        ctx.stroke()
 
-        // Column header text
-        ctx.fillStyle = '#111827'
-        ctx.font = 'bold 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+        // Role name
+        ctx.fillStyle = TEXT_WHITE
+        ctx.font = `bold 16px ${FONT_HEADING}`
         ctx.textAlign = 'center'
-        ctx.fillText(role, x + (columnWidth - 15) / 2, startY + 32)
+        ctx.fillText(role, x + colWidth / 2, y + COL_HEADER_H / 2 + 6)
 
-        // Player cards in column
-        const playersInRole = rankings[role] || []
-
+        // Player cards
         if (playersInRole.length === 0) {
-            // Empty state text
-            ctx.fillStyle = '#9ca3af'
-            ctx.font = 'italic 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+            ctx.fillStyle = TEXT_DIM
+            ctx.font = `italic 13px ${FONT_BODY}`
             ctx.textAlign = 'center'
-            ctx.fillText('Drop players here', x + (columnWidth - 15) / 2, startY + 200)
+            ctx.fillText('No players ranked', x + colWidth / 2, y + COL_HEADER_H + 50)
         } else {
-            playersInRole.forEach((player, playerIndex) => {
-                const cardY = startY + 70 + (playerIndex * 50)
+            playersInRole.forEach((player, pi) => {
+                const cardX = x + CARD_PAD_X
+                const cardY = y + COL_HEADER_H + CARD_GAP + pi * (CARD_H + CARD_GAP)
+                const cardW = colWidth - CARD_PAD_X * 2
 
-                // Player card background
-                ctx.fillStyle = '#ffffff'
-                ctx.fillRect(x + 8, cardY, columnWidth - 31, 40)
+                // Get team color for this player
+                const team = teams.find(t => t.players.includes(player))
+                const teamColor = team ? team.color : '#6b7280'
+                const textColor = getContrastColor(teamColor)
 
-                // Player card border
-                ctx.strokeStyle = '#d1d5db'
-                ctx.lineWidth = 1
-                ctx.strokeRect(x + 8, cardY, columnWidth - 31, 40)
+                // Card background (team color)
+                ctx.fillStyle = teamColor
+                roundRect(ctx, cardX, cardY, cardW, CARD_H, 6)
+                ctx.fill()
+
+                // Rank number badge (darker overlay on left)
+                const badgeW = 30
+                ctx.fillStyle = 'rgba(0,0,0,0.15)'
+                // Clip to left rounded corners only
+                ctx.save()
+                roundRect(ctx, cardX, cardY, badgeW, CARD_H, 6)
+                ctx.clip()
+                ctx.fillRect(cardX, cardY, badgeW, CARD_H)
+                ctx.restore()
+
+                // Rank number text
+                ctx.fillStyle = textColor
+                ctx.font = `bold 14px ${FONT_HEADING}`
+                ctx.textAlign = 'center'
+                ctx.fillText(String(pi + 1), cardX + badgeW / 2, cardY + CARD_H / 2 + 5)
 
                 // Player name
-                ctx.fillStyle = '#111827'
-                ctx.font = '16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+                ctx.fillStyle = textColor
+                ctx.font = `600 14px ${FONT_BODY}`
                 ctx.textAlign = 'left'
-
-                // Truncate long names
-                const maxWidth = columnWidth - 45
-                let displayName = player
-                const textWidth = ctx.measureText(player).width
-                if (textWidth > maxWidth) {
-                    while (ctx.measureText(displayName + '...').width > maxWidth && displayName.length > 0) {
-                        displayName = displayName.slice(0, -1)
-                    }
-                    displayName += '...'
-                }
-
-                ctx.fillText(displayName, x + 15, cardY + 25)
+                const nameMaxW = cardW - badgeW - 14
+                const displayName = truncateText(ctx, player, nameMaxW)
+                ctx.fillText(displayName, cardX + badgeW + 8, cardY + CARD_H / 2 + 5)
             })
         }
     })
 
-    // Team colors legend at bottom
-    let legendY = height - 180
+    // --- Team Legend ---
+    const legendY = columnsBottom + LEGEND_TOP_PAD
+    const legendX = PADDING
+    const legendW = WIDTH - PADDING * 2
 
-    // Legend background
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(50, legendY - 20, width - 100, 140)
-    ctx.strokeStyle = '#e5e7eb'
-    ctx.strokeRect(50, legendY - 20, width - 100, 140)
+    // Legend container
+    ctx.fillStyle = COL_BG
+    roundRect(ctx, legendX, legendY, legendW, legendH, 10)
+    ctx.fill()
+    ctx.strokeStyle = BORDER
+    roundRect(ctx, legendX, legendY, legendW, legendH, 10)
+    ctx.stroke()
 
-    ctx.fillStyle = '#111827'
-    ctx.font = 'bold 20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+    // Legend title
+    ctx.fillStyle = TEXT_DIM
+    ctx.font = `bold 12px ${FONT_HEADING}`
     ctx.textAlign = 'center'
-    ctx.fillText('Team Colors', width / 2, legendY + 10)
+    ctx.letterSpacing = '1px'
+    ctx.fillText('TEAM COLORS', WIDTH / 2, legendY + 24)
+    ctx.letterSpacing = '0px'
 
-    const teamsPerRow = 4
-    teams.forEach((team, index) => {
-        const row = Math.floor(index / teamsPerRow)
-        const col = index % teamsPerRow
-        const legendX = 80 + (col * (width - 160) / teamsPerRow)
-        const currentY = legendY + 40 + (row * 30)
+    // Team entries
+    const entryW = (legendW - 40) / teamsPerRow
+    teams.forEach((team, i) => {
+        const row = Math.floor(i / teamsPerRow)
+        const col = i % teamsPerRow
+        const ex = legendX + 20 + col * entryW
+        const ey = legendY + 40 + row * LEGEND_ROW_H
 
-        // Team color box with border
+        // Color swatch
         ctx.fillStyle = team.color
-        ctx.fillRect(legendX, currentY - 18, 20, 20)
-        ctx.strokeStyle = '#d1d5db'
-        ctx.lineWidth = 1
-        ctx.strokeRect(legendX, currentY - 18, 20, 20)
+        roundRect(ctx, ex, ey, 18, 18, 4)
+        ctx.fill()
 
         // Team name
-        ctx.fillStyle = '#111827'
-        ctx.font = '14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+        ctx.fillStyle = TEXT_WHITE
+        ctx.font = `13px ${FONT_BODY}`
         ctx.textAlign = 'left'
-
-        // Truncate team names if too long
-        const maxTeamNameWidth = (width - 160) / teamsPerRow - 40
-        let teamName = team.name
-        const teamTextWidth = ctx.measureText(teamName).width
-        if (teamTextWidth > maxTeamNameWidth) {
-            while (ctx.measureText(teamName + '...').width > maxTeamNameWidth && teamName.length > 0) {
-                teamName = teamName.slice(0, -1)
-            }
-            teamName += '...'
-        }
-
-        ctx.fillText(teamName, legendX + 25, currentY - 3)
+        const maxNameW = entryW - 32
+        const name = truncateText(ctx, team.name, maxNameW)
+        ctx.fillText(name, ex + 24, ey + 13)
     })
 
-    // Convert to blob and download
+    // --- Watermark ---
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'
+    ctx.font = `11px ${FONT_BODY}`
+    ctx.textAlign = 'right'
+    ctx.fillText('tierlist-maker', WIDTH - PADDING, HEIGHT - 14)
+
+    // --- Export ---
     canvas.toBlob((blob) => {
         if (blob) {
             const url = URL.createObjectURL(blob)
@@ -176,5 +263,5 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings') =>
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
         }
-    }, 'image/png', 0.95)
+    }, 'image/png')
 }

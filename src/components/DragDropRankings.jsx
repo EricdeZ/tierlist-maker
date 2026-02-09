@@ -332,7 +332,7 @@ const DragDropRankings = () => {
     const exportAsImageHandler = async () => {
         setIsExporting(true)
         try {
-            exportRankingsAsImage(rankings, teams, 'player-rankings')
+            exportRankingsAsImage(rankings, teams, 'player-rankings', `${league.name} Tierlist`)
         } finally {
             setTimeout(() => setIsExporting(false), 1000)
         }
