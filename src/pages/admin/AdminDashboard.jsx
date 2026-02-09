@@ -432,6 +432,7 @@ function buildEditData(result) {
                 ...p,
                 matched_name: m?.db_player?.name || null,
                 matched_lp_id: m?.db_player?.league_player_id || null,
+                match_source: m?.match_source || null,
                 is_sub: !!sub,
                 sub_type: sub?.sub_type || null,
             }
@@ -926,6 +927,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
     const [searchQuery, setSearchQuery] = useState('')
     const [aliasSaving, setAliasSaving] = useState(false)
     const [aliasSaved, setAliasSaved] = useState(false)
+    const [manuallyReassigned, setManuallyReassigned] = useState(false)
     const [originalExtractedName] = useState(player.player_name)
     const searchRef = useRef(null)
     const inputRef = useRef(null)
@@ -1046,6 +1048,8 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                 const val = e.target.value
                                 setSearchQuery(val)
                                 setShowSearch(true)
+                                setManuallyReassigned(false)
+                                setAliasSaved(false)
                                 // Also update the actual player name live
                                 onChange({ player_name: val, matched_name: null, matched_lp_id: null })
                             }}
@@ -1073,8 +1077,15 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                         </span>
                     )}
 
-                    {/* Save as alias button — shown when matched name differs from extracted name */}
-                    {isMatched && !showSearch && originalExtractedName && player.matched_name
+                    {/* Alias match indicator — shown when auto-matched via alias */}
+                    {player.match_source === 'alias' && isMatched && !showSearch && !manuallyReassigned && (
+                        <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold">
+                            via alias
+                        </span>
+                    )}
+
+                    {/* Save as alias button — only shown after manual reassignment from search dropdown */}
+                    {isMatched && !showSearch && manuallyReassigned && originalExtractedName && player.matched_name
                         && originalExtractedName.toLowerCase() !== player.matched_name.toLowerCase()
                         && !aliasSaved && (
                         <button
@@ -1141,6 +1152,8 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                                 is_sub: false,
                                                 sub_type: null,
                                             })
+                                            setManuallyReassigned(true)
+                                            setAliasSaved(false)
                                             setShowSearch(false)
                                             setSearchQuery('')
                                         }}>

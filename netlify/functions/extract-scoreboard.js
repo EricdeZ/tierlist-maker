@@ -526,7 +526,9 @@ async function autoMatchPlayers(extractedGames) {
 
         for (const ep of allExtracted) {
             const key = ep.player_name.toLowerCase()
-            const dbMatches = nameLookup[key] || aliasLookup[key]
+            const nameMatch = nameLookup[key]
+            const aliasMatch = !nameMatch ? aliasLookup[key] : null
+            const dbMatches = nameMatch || aliasMatch
 
             if (dbMatches?.length > 0) {
                 matched.push({
@@ -535,6 +537,7 @@ async function autoMatchPlayers(extractedGames) {
                     db_player: dbMatches[0],
                     all_matches: dbMatches,
                     confidence: 'exact',
+                    match_source: aliasMatch ? 'alias' : 'name',
                     is_sub: false,
                 })
             } else {
