@@ -22,6 +22,7 @@ const PlayerList = () => {
     const [sortOrder, setSortOrder] = useState('asc')
     const [roleFilter, setRoleFilter] = useState('all')
     const [teamFilter, setTeamFilter] = useState('all')
+    const [showPerGame, setShowPerGame] = useState(false)
 
     const roleImages = {
         'SOLO': soloImage,
@@ -73,16 +74,16 @@ const PlayerList = () => {
                     bValue = b.team.name.toLowerCase()
                     break
                 case 'kills':
-                    aValue = a.stats.kills
-                    bValue = b.stats.kills
+                    aValue = showPerGame ? a.avgStats.avgKills : a.stats.kills
+                    bValue = showPerGame ? b.avgStats.avgKills : b.stats.kills
                     break
                 case 'deaths':
-                    aValue = a.stats.deaths
-                    bValue = b.stats.deaths
+                    aValue = showPerGame ? a.avgStats.avgDeaths : a.stats.deaths
+                    bValue = showPerGame ? b.avgStats.avgDeaths : b.stats.deaths
                     break
                 case 'assists':
-                    aValue = a.stats.assists
-                    bValue = b.stats.assists
+                    aValue = showPerGame ? a.avgStats.avgAssists : a.stats.assists
+                    bValue = showPerGame ? b.avgStats.avgAssists : b.stats.assists
                     break
                 case 'kda':
                     aValue = a.kda
@@ -97,8 +98,12 @@ const PlayerList = () => {
                     bValue = b.stats.gamesPlayed
                     break
                 case 'damage':
-                    aValue = a.stats.damage
-                    bValue = b.stats.damage
+                    aValue = showPerGame ? a.avgStats.avgDamage : a.stats.damage
+                    bValue = showPerGame ? b.avgStats.avgDamage : b.stats.damage
+                    break
+                case 'mitigated':
+                    aValue = showPerGame ? a.avgStats.avgMitigated : a.stats.mitigated
+                    bValue = showPerGame ? b.avgStats.avgMitigated : b.stats.mitigated
                     break
                 default:
                     return 0
@@ -110,7 +115,7 @@ const PlayerList = () => {
         })
 
         return filtered
-    }, [processedPlayers, searchTerm, roleFilter, teamFilter, sortBy, sortOrder])
+    }, [processedPlayers, searchTerm, roleFilter, teamFilter, sortBy, sortOrder, showPerGame])
 
     const handleSort = (column) => {
         if (sortBy === column) {
@@ -225,7 +230,17 @@ const PlayerList = () => {
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-end">
+                    <div className="flex items-end gap-3">
+                        <button
+                            onClick={() => setShowPerGame(!showPerGame)}
+                            className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                                showPerGame
+                                    ? 'bg-(--color-accent)/20 text-(--color-accent) border-(--color-accent)/30'
+                                    : 'bg-white/5 text-(--color-text-secondary) border-white/10 hover:bg-white/10'
+                            }`}
+                        >
+                            {showPerGame ? 'Per Game' : 'Totals'}
+                        </button>
                         <div className="text-sm text-(--color-text-secondary)">
                             Showing {filteredAndSortedPlayers.length} of {processedPlayers.length} players
                         </div>
@@ -242,7 +257,7 @@ const PlayerList = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('name')}>
                                 Player {getSortIcon('name')}
                             </th>
-                            <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Tracker</th>
+                            <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Details</th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('role')}>
                                 Role {getSortIcon('role')}
                             </th>
@@ -250,13 +265,13 @@ const PlayerList = () => {
                                 Games {getSortIcon('gamesPlayed')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('kills')}>
-                                Kills {getSortIcon('kills')}
+                                {showPerGame ? 'Kills/G' : 'Kills'} {getSortIcon('kills')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('deaths')}>
-                                Deaths {getSortIcon('deaths')}
+                                {showPerGame ? 'Deaths/G' : 'Deaths'} {getSortIcon('deaths')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('assists')}>
-                                Assists {getSortIcon('assists')}
+                                {showPerGame ? 'Assists/G' : 'Assists'} {getSortIcon('assists')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('kda')}>
                                 KDA {getSortIcon('kda')}
@@ -265,7 +280,10 @@ const PlayerList = () => {
                                 Win Rate {getSortIcon('winRate')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('damage')}>
-                                Total Damage {getSortIcon('damage')}
+                                {showPerGame ? 'Dmg/G' : 'Total Damage'} {getSortIcon('damage')}
+                            </th>
+                            <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('mitigated')}>
+                                {showPerGame ? 'Mit/G' : 'Mitigated'} {getSortIcon('mitigated')}
                             </th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('team')}>
                                 Team {getSortIcon('team')}
@@ -291,18 +309,14 @@ const PlayerList = () => {
                                             <span className="text-(--color-text)">{player.name}</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                        {player.tracker ? (
-                                            <a
-                                                href={player.tracker}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="bg-(--color-accent) text-(--color-primary) px-2 py-1 rounded text-xs font-semibold hover:opacity-90 transition-opacity"
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
+                                        {pSlug && (
+                                            <Link
+                                                to={`${basePath}/players/${pSlug}`}
+                                                className="text-(--color-accent) hover:underline text-xs font-medium"
                                             >
-                                                View Stats
-                                            </a>
-                                        ) : (
-                                            <span className="text-(--color-text-secondary)/50 text-xs">No Tracker</span>
+                                                Profile →
+                                            </Link>
                                         )}
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm">
@@ -319,16 +333,22 @@ const PlayerList = () => {
                                         {player.stats.gamesPlayed}
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                        <div>{player.stats.kills}</div>
-                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgKills.toFixed(1)}/game)</div>
+                                        <div>{showPerGame ? player.avgStats.avgKills.toFixed(1) : player.stats.kills}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">
+                                            {showPerGame ? `(${player.stats.kills} total)` : `(${player.avgStats.avgKills.toFixed(1)}/game)`}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                        <div>{player.stats.deaths}</div>
-                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgDeaths.toFixed(1)}/game)</div>
+                                        <div>{showPerGame ? player.avgStats.avgDeaths.toFixed(1) : player.stats.deaths}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">
+                                            {showPerGame ? `(${player.stats.deaths} total)` : `(${player.avgStats.avgDeaths.toFixed(1)}/game)`}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                        <div>{player.stats.assists}</div>
-                                        <div className="text-xs text-(--color-text-secondary)">({player.avgStats.avgAssists.toFixed(1)}/game)</div>
+                                        <div>{showPerGame ? player.avgStats.avgAssists.toFixed(1) : player.stats.assists}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">
+                                            {showPerGame ? `(${player.stats.assists} total)` : `(${player.avgStats.avgAssists.toFixed(1)}/game)`}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-center">
                                         <span className={`${
@@ -347,8 +367,16 @@ const PlayerList = () => {
                                         </span>
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
-                                        <div>{formatNumber(player.stats.damage)}</div>
-                                        <div className="text-xs text-(--color-text-secondary)">({formatNumber(player.avgStats.avgDamage)}/game)</div>
+                                        <div>{formatNumber(showPerGame ? player.avgStats.avgDamage : player.stats.damage)}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">
+                                            {showPerGame ? `(${formatNumber(player.stats.damage)} total)` : `(${formatNumber(player.avgStats.avgDamage)}/game)`}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-(--color-text) font-medium text-center">
+                                        <div>{formatNumber(showPerGame ? player.avgStats.avgMitigated : player.stats.mitigated)}</div>
+                                        <div className="text-xs text-(--color-text-secondary)">
+                                            {showPerGame ? `(${formatNumber(player.stats.mitigated)} total)` : `(${formatNumber(player.avgStats.avgMitigated)}/game)`}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                                         {tSlug ? (
@@ -400,7 +428,7 @@ const PlayerList = () => {
             </div>
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 {[
                     { label: 'Total Kills', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.kills, 0) },
                     { label: 'Total Deaths', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.deaths, 0) },
@@ -408,6 +436,7 @@ const PlayerList = () => {
                     { label: 'Average KDA', value: filteredAndSortedPlayers.length > 0 ? (filteredAndSortedPlayers.reduce((sum, p) => sum + p.kda, 0) / filteredAndSortedPlayers.length).toFixed(2) : '0.00' },
                     { label: 'Average Win Rate', value: filteredAndSortedPlayers.length > 0 ? (filteredAndSortedPlayers.reduce((sum, p) => sum + p.winRate, 0) / filteredAndSortedPlayers.length).toFixed(0) + '%' : '0%' },
                     { label: 'Total Damage', value: formatNumber(filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.damage, 0)) },
+                    { label: 'Total Mitigated', value: formatNumber(filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.mitigated, 0)) },
                 ].map(stat => (
                     <div key={stat.label} className="bg-(--color-secondary) rounded-xl border border-white/10 p-4 text-center">
                         <div className="text-xl font-bold text-(--color-text)">{stat.value}</div>

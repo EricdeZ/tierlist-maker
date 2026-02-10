@@ -35,6 +35,12 @@ export default function RosterManager() {
     // Drag state
     const [draggedPlayer, setDraggedPlayer] = useState(null)
     const [dragOverTeam, setDragOverTeam] = useState(null)
+    const [dragOverPlayer, setDragOverPlayer] = useState(null)
+
+    // Batch changes state
+    const [pendingChanges, setPendingChanges] = useState([])
+    const [localRosters, setLocalRosters] = useState([])
+    const [saving, setSaving] = useState(false)
 
     // Add player modal
     const [addModal, setAddModal] = useState(null) // { teamId, teamName }
@@ -142,6 +148,46 @@ export default function RosterManager() {
     // Global players for "add player" search
     const globalPlayers = adminData?.globalPlayers || []
 
+    // ─── Sync local rosters from server data ───
+    useEffect(() => {
+        setLocalRosters(structuredClone(teamRosters))
+        setPendingChanges([])
+    }, [adminData, selectedSeasonId])
+
+    // ─── Warn on unsaved tab close/refresh ───
+    useEffect(() => {
+        if (pendingChanges.length === 0) return
+        const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+        window.addEventListener('beforeunload', handler)
+        return () => window.removeEventListener('beforeunload', handler)
+    }, [pendingChanges.length])
+
+    // ─── Guard in-app links when unsaved changes exist ───
+    const guardNavigation = (e) => {
+        if (pendingChanges.length > 0) {
+            if (!window.confirm(`You have ${pendingChanges.length} unsaved change${pendingChanges.length !== 1 ? 's' : ''}. Leave without saving?`)) {
+                e.preventDefault()
+            }
+        }
+    }
+
+    // ─── Auto-scroll while dragging near viewport edges ───
+    useEffect(() => {
+        if (!draggedPlayer) return
+        const handleDragOverScroll = (e) => {
+            const threshold = 80
+            const speed = 15
+            const y = e.clientY
+            if (y < threshold) {
+                window.scrollBy(0, -speed)
+            } else if (y > window.innerHeight - threshold) {
+                window.scrollBy(0, speed)
+            }
+        }
+        document.addEventListener('dragover', handleDragOverScroll)
+        return () => document.removeEventListener('dragover', handleDragOverScroll)
+    }, [draggedPlayer])
+
     // ─── Drag & Drop handlers ───
     const handleDragStart = (e, player, fromTeamId) => {
         setDraggedPlayer({ ...player, fromTeamId })
@@ -166,9 +212,10 @@ export default function RosterManager() {
         }
     }
 
-    const handleDrop = async (e, targetTeamId) => {
+    const handleDrop = (e, targetTeamId) => {
         e.preventDefault()
         setDragOverTeam(null)
+        setDragOverPlayer(null)
 
         if (!draggedPlayer) return
         if (String(draggedPlayer.team_id) === String(targetTeamId)) {
@@ -177,48 +224,111 @@ export default function RosterManager() {
         }
 
         const targetTeam = seasonTeams.find(t => String(t.team_id) === String(targetTeamId))
-        const fromTeam = seasonTeams.find(t => String(t.team_id) === String(draggedPlayer.team_id))
 
-        setConfirmModal({
-            title: 'Transfer Player',
-            message: `Move ${draggedPlayer.name} from ${fromTeam?.team_name || '?'} to ${targetTeam?.team_name || '?'}?`,
-            confirmLabel: 'Transfer',
-            confirmColor: 'blue',
-            onConfirm: async () => {
-                setConfirmModal(null)
-                try {
-                    await rosterAction(`transfer_${draggedPlayer.league_player_id}`, {
-                        action: 'transfer-player',
-                        league_player_id: draggedPlayer.league_player_id,
-                        new_team_id: parseInt(targetTeamId),
-                    })
-                    showToast('success', `${draggedPlayer.name} transferred to ${targetTeam?.team_name}`)
-                } catch {
-                    // Error already toasted
+        // Add pending transfer
+        setPendingChanges(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: 'transfer',
+            league_player_id: draggedPlayer.league_player_id,
+            new_team_id: parseInt(targetTeamId),
+            description: `Transfer ${draggedPlayer.name} to ${targetTeam?.team_name}`,
+        }])
+
+        // Update local rosters optimistically
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            const fromTeam = next.find(t => String(t.team_id) === String(draggedPlayer.team_id))
+            const toTeam = next.find(t => String(t.team_id) === String(targetTeamId))
+            if (fromTeam && toTeam) {
+                const idx = fromTeam.players.findIndex(p => p.league_player_id === draggedPlayer.league_player_id)
+                if (idx >= 0) {
+                    const [moved] = fromTeam.players.splice(idx, 1)
+                    moved.team_id = targetTeamId
+                    toTeam.players.push(moved)
                 }
-            },
+            }
+            return next
         })
 
         setDraggedPlayer(null)
     }
 
+    // ─── Drop on player (swap) ───
+    const handleDropOnPlayer = (targetPlayer) => {
+        if (!draggedPlayer) return
+        if (draggedPlayer.league_player_id === targetPlayer.league_player_id) return
+        if (String(draggedPlayer.team_id) === String(targetPlayer.team_id)) return
+
+        const targetTeam = seasonTeams.find(t => String(t.team_id) === String(targetPlayer.team_id))
+        const fromTeam = seasonTeams.find(t => String(t.team_id) === String(draggedPlayer.team_id))
+
+        // Two pending transfers for the swap
+        setPendingChanges(prev => [...prev,
+            {
+                id: crypto.randomUUID(),
+                type: 'transfer',
+                league_player_id: draggedPlayer.league_player_id,
+                new_team_id: parseInt(targetPlayer.team_id),
+                description: `Transfer ${draggedPlayer.name} to ${targetTeam?.team_name}`,
+            },
+            {
+                id: crypto.randomUUID(),
+                type: 'transfer',
+                league_player_id: targetPlayer.league_player_id,
+                new_team_id: parseInt(draggedPlayer.fromTeamId),
+                description: `Transfer ${targetPlayer.name} to ${fromTeam?.team_name}`,
+            },
+        ])
+
+        // Update local rosters optimistically
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            const teamA = next.find(t => String(t.team_id) === String(draggedPlayer.fromTeamId))
+            const teamB = next.find(t => String(t.team_id) === String(targetPlayer.team_id))
+            if (teamA && teamB) {
+                const idxA = teamA.players.findIndex(p => p.league_player_id === draggedPlayer.league_player_id)
+                const idxB = teamB.players.findIndex(p => p.league_player_id === targetPlayer.league_player_id)
+                if (idxA >= 0 && idxB >= 0) {
+                    const playerA = teamA.players[idxA]
+                    const playerB = teamB.players[idxB]
+                    playerA.team_id = targetPlayer.team_id
+                    playerB.team_id = draggedPlayer.fromTeamId
+                    teamA.players[idxA] = playerB
+                    teamB.players[idxB] = playerA
+                }
+            }
+            return next
+        })
+
+        setDraggedPlayer(null)
+        setDragOverTeam(null)
+        setDragOverPlayer(null)
+    }
+
     const handleDragEnd = () => {
         setDraggedPlayer(null)
         setDragOverTeam(null)
+        setDragOverPlayer(null)
     }
 
-    // ─── Role change ───
-    const handleRoleChange = async (leaguePlayerId, playerName, newRole) => {
-        try {
-            await rosterAction(`role_${leaguePlayerId}`, {
-                action: 'change-role',
-                league_player_id: leaguePlayerId,
-                role: newRole,
-            })
-            showToast('success', `${playerName}'s role changed to ${newRole}`)
-        } catch {
-            // Error already toasted
-        }
+    // ─── Role change (pending) ───
+    const handleRoleChange = (leaguePlayerId, playerName, newRole) => {
+        setPendingChanges(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: 'role-change',
+            league_player_id: leaguePlayerId,
+            role: newRole,
+            description: `Change ${playerName} role to ${newRole}`,
+        }])
+
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            for (const team of next) {
+                const player = team.players.find(p => p.league_player_id === leaguePlayerId)
+                if (player) { player.role = newRole; break }
+            }
+            return next
+        })
     }
 
     // ─── Drop player ───
@@ -241,6 +351,48 @@ export default function RosterManager() {
                 }
             },
         })
+    }
+
+    // ─── Save / Discard pending changes ───
+    const handleSave = async () => {
+        setSaving(true)
+        let successCount = 0
+        const errors = []
+
+        for (const change of pendingChanges) {
+            try {
+                const payload = change.type === 'transfer'
+                    ? { action: 'transfer-player', league_player_id: change.league_player_id, new_team_id: change.new_team_id }
+                    : { action: 'change-role', league_player_id: change.league_player_id, role: change.role }
+
+                const res = await fetch(`${API}/roster-manage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}))
+                    throw new Error(data.error || `Failed: ${change.description}`)
+                }
+                successCount++
+            } catch (err) {
+                errors.push({ change, error: err.message })
+            }
+        }
+
+        if (errors.length === 0) {
+            showToast('success', `All ${successCount} change${successCount !== 1 ? 's' : ''} saved!`)
+        } else {
+            showToast('error', `${errors.length} of ${pendingChanges.length} changes failed`)
+        }
+
+        await fetchData()
+        setSaving(false)
+    }
+
+    const handleDiscard = () => {
+        setPendingChanges([])
+        setLocalRosters(structuredClone(teamRosters))
     }
 
     // ─── Loading / Error states ───
@@ -430,13 +582,13 @@ export default function RosterManager() {
                     >
                         Merge Players
                     </button>
-                    <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                    <Link to="/admin" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         ← Match Admin
                     </Link>
-                    <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                    <Link to="/admin/matches" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Match Manager
                     </Link>
-                    <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
+                    <Link to="/" onClick={guardNavigation} className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
                 </div>
             </div>
 
@@ -495,14 +647,15 @@ export default function RosterManager() {
 
             {/* Team Cards Grid */}
             {selectedSeasonId && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                    {teamRosters.map(team => (
+                <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 ${pendingChanges.length > 0 ? 'pb-20' : ''}`}>
+                    {localRosters.map(team => (
                         <TeamCard
                             key={team.team_id}
                             team={team}
                             isDragOver={String(dragOverTeam) === String(team.team_id)}
                             hasDraggedPlayer={!!draggedPlayer}
                             isSameTeam={draggedPlayer && String(draggedPlayer.team_id) === String(team.team_id)}
+                            dragOverPlayer={dragOverPlayer}
                             opLoading={opLoading}
                             onDragStart={handleDragStart}
                             onDragOver={handleDragOver}
@@ -510,6 +663,8 @@ export default function RosterManager() {
                             onDragLeave={(e) => handleDragLeave(e, team.team_id)}
                             onDrop={(e) => handleDrop(e, team.team_id)}
                             onDragEnd={handleDragEnd}
+                            onDropOnPlayer={handleDropOnPlayer}
+                            onSetDragOverPlayer={setDragOverPlayer}
                             onRoleChange={handleRoleChange}
                             onDropPlayer={handleDropPlayer}
                             onManageAliases={(playerId, playerName) => setAliasModal({ playerId, playerName })}
@@ -523,7 +678,34 @@ export default function RosterManager() {
                 </div>
             )}
 
-            {selectedSeasonId && teamRosters.length === 0 && (
+            {/* Save / Discard bar */}
+            {pendingChanges.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 px-6 py-3 flex items-center justify-between shadow-xl"
+                     style={{ backgroundColor: 'var(--color-secondary)' }}>
+                    <div className="text-sm">
+                        <span className="font-bold text-[var(--color-accent)]">{pendingChanges.length}</span>
+                        <span className="text-[var(--color-text-secondary)]"> unsaved change{pendingChanges.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleDiscard}
+                            disabled={saving}
+                            className="px-4 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors disabled:opacity-50"
+                        >
+                            Discard
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="px-5 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-primary)] hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        >
+                            {saving ? 'Saving...' : `Save ${pendingChanges.length} Change${pendingChanges.length !== 1 ? 's' : ''}`}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {selectedSeasonId && localRosters.length === 0 && (
                 <div className="text-center py-20">
                     <div className="text-5xl mb-4 opacity-50">🏟️</div>
                     <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">No Teams Found</h3>
@@ -549,8 +731,9 @@ export default function RosterManager() {
 // TEAM CARD
 // ═══════════════════════════════════════════════════
 function TeamCard({
-    team, isDragOver, hasDraggedPlayer, isSameTeam, opLoading,
+    team, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
+    onDropOnPlayer, onSetDragOverPlayer,
     onRoleChange, onDropPlayer, onManageAliases, onAddPlayer,
 }) {
     const isValidTarget = hasDraggedPlayer && !isSameTeam
@@ -595,6 +778,8 @@ function TeamCard({
                         teamId={team.team_id}
                         teamName={team.team_name}
                         teamColor={team.color}
+                        isDragOverTarget={dragOverPlayer === player.league_player_id}
+                        hasDraggedPlayer={hasDraggedPlayer}
                         isLoading={
                             opLoading[`role_${player.league_player_id}`] ||
                             opLoading[`drop_${player.league_player_id}`] ||
@@ -602,6 +787,8 @@ function TeamCard({
                         }
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
+                        onDropOnPlayer={onDropOnPlayer}
+                        onSetDragOverPlayer={onSetDragOverPlayer}
                         onRoleChange={onRoleChange}
                         onDropPlayer={onDropPlayer}
                         onManageAliases={onManageAliases}
@@ -639,7 +826,7 @@ function TeamCard({
 // ═══════════════════════════════════════════════════
 // PLAYER ROW (inside team card)
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart, onDragEnd, onRoleChange, onDropPlayer, onManageAliases }) {
+function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onDropPlayer, onManageAliases }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
 
@@ -657,11 +844,26 @@ function PlayerRow({ player, teamId, teamName, teamColor, isLoading, onDragStart
     return (
         <div
             className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${
-                isLoading ? 'opacity-50 pointer-events-none' : 'hover:bg-white/5'
+                isLoading ? 'opacity-50 pointer-events-none' :
+                isDragOverTarget && hasDraggedPlayer ? 'bg-blue-500/15 ring-1 ring-blue-400/40' :
+                'hover:bg-white/5'
             }`}
             draggable={!isLoading}
             onDragStart={(e) => onDragStart(e, player, teamId)}
             onDragEnd={onDragEnd}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move' }}
+            onDragEnter={(e) => { e.stopPropagation(); onSetDragOverPlayer(player.league_player_id) }}
+            onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                    onSetDragOverPlayer(null)
+                }
+            }}
+            onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onSetDragOverPlayer(null)
+                onDropOnPlayer(player)
+            }}
         >
             {/* Drag handle indicator */}
             <div className="w-4 flex flex-col items-center gap-[2px] opacity-0 group-hover:opacity-40 transition-opacity shrink-0">

@@ -1444,8 +1444,10 @@ function EditableCell({ value, onChange }) {
 function GodAutocomplete({ value, gods, onChange }) {
     const [showDropdown, setShowDropdown] = useState(false)
     const [query, setQuery] = useState('')
+    const [highlightIndex, setHighlightIndex] = useState(0)
     const containerRef = useRef(null)
     const inputRef = useRef(null)
+    const dropdownRef = useRef(null)
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -1464,6 +1466,17 @@ function GodAutocomplete({ value, gods, onChange }) {
         return gods.filter(g => g.name.toLowerCase().includes(q))
     })()
 
+    // Reset highlight when results change
+    useEffect(() => { setHighlightIndex(0) }, [query])
+
+    // Scroll highlighted item into view
+    useEffect(() => {
+        if (!showDropdown || !dropdownRef.current) return
+        const offset = query === '' ? 1 : 0 // account for "All gods" sticky header
+        const el = dropdownRef.current.children[highlightIndex + offset]
+        el?.scrollIntoView({ block: 'nearest' })
+    }, [highlightIndex, showDropdown, query])
+
     const currentGod = gods?.find(g => g.name.toLowerCase() === (value || '').toLowerCase())
 
     return (
@@ -1481,13 +1494,31 @@ function GodAutocomplete({ value, gods, onChange }) {
                     onKeyDown={e => {
                         if (e.key === 'Escape') { setShowDropdown(false); inputRef.current?.blur() }
                         if (e.key === 'Tab') setShowDropdown(false)
+                        if (e.key === 'ArrowDown' && showDropdown && filtered.length > 0) {
+                            e.preventDefault()
+                            setHighlightIndex(prev => Math.min(prev + 1, filtered.length - 1))
+                        }
+                        if (e.key === 'ArrowUp' && showDropdown && filtered.length > 0) {
+                            e.preventDefault()
+                            setHighlightIndex(prev => Math.max(prev - 1, 0))
+                        }
+                        if (e.key === 'Enter' && showDropdown && filtered.length > 0) {
+                            e.preventDefault()
+                            const god = filtered[highlightIndex]
+                            if (god) {
+                                onChange({ god_played: god.name, god_id: god.id, god_image_url: god.image_url })
+                                setShowDropdown(false)
+                                setQuery('')
+                            }
+                        }
                     }}
                     className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-xs text-[var(--color-text)] transition-colors"
                 />
             </div>
 
             {showDropdown && filtered.length > 0 && (
-                <div className="absolute z-50 top-full left-0 mt-1 w-56 border rounded shadow-xl max-h-56 overflow-y-auto"
+                <div ref={dropdownRef}
+                     className="absolute z-50 top-full left-0 mt-1 w-56 border rounded shadow-xl max-h-56 overflow-y-auto"
                      style={{ backgroundColor: 'var(--color-card, #1e1e2e)', borderColor: 'var(--color-border, #333)' }}>
                     {query === '' && (
                         <div className="px-3 py-1.5 text-[10px] text-[var(--color-text-secondary)] border-b border-[var(--color-border)]/50 sticky top-0"
@@ -1495,10 +1526,15 @@ function GodAutocomplete({ value, gods, onChange }) {
                             All gods — type to filter
                         </div>
                     )}
-                    {filtered.map(god => (
+                    {filtered.map((god, idx) => (
                         <button key={god.id}
-                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-accent)]/10 flex items-center gap-2 transition-colors"
+                                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
+                                    idx === highlightIndex
+                                        ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
+                                        : 'hover:bg-[var(--color-accent)]/10'
+                                }`}
                                 onMouseDown={e => e.preventDefault()}
+                                onMouseEnter={() => setHighlightIndex(idx)}
                                 onClick={() => {
                                     onChange({ god_played: god.name, god_id: god.id, god_image_url: god.image_url })
                                     setShowDropdown(false)
