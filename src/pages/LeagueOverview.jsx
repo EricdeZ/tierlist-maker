@@ -5,7 +5,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageC
 
 import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
-import oslLogo from '../assets/leagues/osl.png'
+import oslLogo from '../assets/leagues/osltext.png'
 
 import deityImg from '../assets/ranks/deity.png'
 import demigodImg from '../assets/ranks/demigod.png'

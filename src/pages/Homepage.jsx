@@ -9,7 +9,7 @@ import smiteLogo from '../assets/smite2.png'
 // League logos
 import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
-import oslLogo from '../assets/leagues/osl.png'
+import oslLogo from '../assets/leagues/osltext.png'
 
 // Rank images
 import deityImg from '../assets/ranks/deity.png'
