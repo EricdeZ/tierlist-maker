@@ -4,11 +4,6 @@
   environment = { SECRETS_SCAN_OMIT_KEYS = "DISCORD_CLIENT_ID,DISCORD_REDIRECT_URI" }
 
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
