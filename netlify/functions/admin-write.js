@@ -67,7 +67,7 @@ async function submitMatch(sql, body) {
 
     // Validate each game has a winner
     for (let i = 0; i < games.length; i++) {
-        if (!games[i].winning_side) {
+        if (!games[i].winning_team_id) {
             return {
                 statusCode: 400,
                 headers,
@@ -77,8 +77,8 @@ async function submitMatch(sql, body) {
     }
 
     // Determine match winner based on game wins
-    const team1Wins = games.filter(g => g.winning_side === 'order').length
-    const team2Wins = games.filter(g => g.winning_side === 'chaos').length
+    const team1Wins = games.filter(g => String(g.winning_team_id) === String(team1_id)).length
+    const team2Wins = games.filter(g => String(g.winning_team_id) === String(team2_id)).length
 
     let winnerTeamId = null
     if (team1Wins > team2Wins) winnerTeamId = team1_id
@@ -102,21 +102,20 @@ async function submitMatch(sql, body) {
             // 2. Create each game and its player stats
             for (let i = 0; i < games.length; i++) {
                 const game = games[i]
-                const winnerGameTeamId = game.winning_side === 'order' ? team1_id : team2_id
 
                 const [gameRow] = await tx`
                     INSERT INTO games (match_id, game_number, winner_team_id, is_completed)
-                    VALUES (${matchId}, ${i + 1}, ${winnerGameTeamId}, true)
+                    VALUES (${matchId}, ${i + 1}, ${game.winning_team_id}, true)
                     RETURNING id
                 `
 
                 const gameId = gameRow.id
 
-                // Insert order side (team_side = 1)
-                for (const player of (game.order_players || [])) {
+                // Insert team 1 players (team_side = 1)
+                for (const player of (game.team1_players || [])) {
                     const lpId = await resolveLeaguePlayerId(tx, player, team1_id, season_id, playerCache)
                     if (!lpId) {
-                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for order side`)
+                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 1`)
                     }
                     await tx`
                         INSERT INTO player_game_stats (
@@ -134,11 +133,11 @@ async function submitMatch(sql, body) {
                     `
                 }
 
-                // Insert chaos side (team_side = 2)
-                for (const player of (game.chaos_players || [])) {
+                // Insert team 2 players (team_side = 2)
+                for (const player of (game.team2_players || [])) {
                     const lpId = await resolveLeaguePlayerId(tx, player, team2_id, season_id, playerCache)
                     if (!lpId) {
-                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for chaos side`)
+                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 2`)
                     }
                     await tx`
                         INSERT INTO player_game_stats (
@@ -219,9 +218,13 @@ async function batchSubmit(sql, body) {
  * 4. Create a new player + league_player entry as a sub (with unique slug)
  */
 async function resolveLeaguePlayerId(tx, player, teamId, seasonId, cache) {
-    // 1. Already resolved by frontend
+    // 1. Already resolved by frontend — validate it belongs to this season
     if (player.league_player_id) {
-        return player.league_player_id
+        const [valid] = await tx`
+            SELECT id FROM league_players WHERE id = ${player.league_player_id} AND season_id = ${seasonId}
+        `
+        if (valid) return player.league_player_id
+        // Wrong season — fall through to normal resolution
     }
 
     const name = (player.player_name || '').trim()

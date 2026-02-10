@@ -636,6 +636,18 @@ async function autoMatchPlayers(extractedGames) {
         const inferredSeasonId = mostCommon(seasonIds)
         const seasonInfo = matched.find(m => String(m.db_player.season_id) === String(inferredSeasonId))?.db_player
 
+        // Re-select correct league_player for players with entries in multiple leagues
+        if (inferredSeasonId) {
+            for (const m of matched) {
+                if (m.all_matches.length > 1 && String(m.db_player.season_id) !== String(inferredSeasonId)) {
+                    const correctEntry = m.all_matches.find(am => String(am.season_id) === String(inferredSeasonId))
+                    if (correctEntry) {
+                        m.db_player = correctEntry
+                    }
+                }
+            }
+        }
+
         for (const um of unmatched) {
             um.inferred_team_id = um.side === 'left' ? (leftTeamId ? parseInt(leftTeamId) : null) : (rightTeamId ? parseInt(rightTeamId) : null)
             um.inferred_team_name = um.side === 'left' ? leftInfo?.team_name : rightInfo?.team_name

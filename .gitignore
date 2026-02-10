@@ -141,3 +141,5 @@ Icon
 .nfs*
 # Local Netlify folder
 .netlify
+
+claude_images
