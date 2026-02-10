@@ -1,7 +1,7 @@
 # netlify.toml
 [build]
   functions = "netlify/functions"
-  environment = { SECRETS_SCAN_OMIT_KEYS = "DISCORD_CLIENT_ID" }
+  environment = { SECRETS_SCAN_OMIT_KEYS = "DISCORD_CLIENT_ID,DISCORD_REDIRECT_URI" }
 
 [[redirects]]
   from = "/.netlify/functions/*"
