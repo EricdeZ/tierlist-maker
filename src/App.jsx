@@ -19,9 +19,11 @@ import Rankings from "./pages/Rankings.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // Admin
+import AdminLanding from "./pages/admin/AdminLanding.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import RosterManager from "./pages/admin/RosterManager.jsx";
 import MatchManager from "./pages/admin/MatchManager.jsx";
+import PlayerManager from "./pages/admin/PlayerManager.jsx";
 
 function App() {
     return (
@@ -33,10 +35,12 @@ function App() {
                         {/* Homepage — league & division selector */}
                         <Route index element={<Homepage />} />
 
-                        {/* Admin — match data entry */}
-                        <Route path="admin" element={<AdminDashboard />} />
+                        {/* Admin pages */}
+                        <Route path="admin" element={<AdminLanding />} />
+                        <Route path="admin/matchreport" element={<AdminDashboard />} />
                         <Route path="admin/rosters" element={<RosterManager />} />
                         <Route path="admin/matches" element={<MatchManager />} />
+                        <Route path="admin/players" element={<PlayerManager />} />
 
                         {/* Division-scoped pages (context provided by DivisionLayout) */}
                         <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>

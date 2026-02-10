@@ -1,6 +1,8 @@
 // src/pages/admin/MatchManager.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { Home } from 'lucide-react'
+import { MatchManagerHelp } from '../../components/admin/AdminHelp'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const SEASON_KEY = 'smite2_admin_season'
@@ -233,7 +235,14 @@ export default function MatchManager() {
     const gods = adminData?.gods || []
 
     if (adminLoading) {
-        return <div className="max-w-7xl mx-auto py-8 px-4 text-[var(--color-text-secondary)] text-sm">Loading...</div>
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-2 border-[var(--color-accent)] border-t-transparent mx-auto mb-4" />
+                    <p className="text-[var(--color-text-secondary)]">Loading match data...</p>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -276,6 +285,9 @@ export default function MatchManager() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
+                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
+                        <Link to="/admin" className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
+                    </p>
                     <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Match Manager</h1>
                     <p className="text-[var(--color-text-secondary)] text-sm mt-1">
                         Edit or delete existing matches, games, and player stats
@@ -283,14 +295,24 @@ export default function MatchManager() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        ← Match Admin
+                        ← Dashboard
+                    </Link>
+                    <Link to="/admin/matchreport" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Match Report
                     </Link>
                     <Link to="/admin/rosters" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Rosters
                     </Link>
-                    <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
+                    <Link to="/admin/players" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Players
+                    </Link>
+                    <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
+                        <Home className="w-4 h-4" />
+                    </Link>
                 </div>
             </div>
+
+            <MatchManagerHelp />
 
             {/* Season Selector */}
             <div className="bg-[var(--color-secondary)] border border-white/10 rounded-xl p-4 mb-6">

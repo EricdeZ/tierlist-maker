@@ -2,6 +2,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { Link } from 'react-router-dom'
+import { Home } from 'lucide-react'
+import { MatchReportHelp } from '../../components/admin/AdminHelp'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const STORAGE_KEY = 'smite2_admin_pending'
@@ -341,21 +343,34 @@ export default function AdminDashboard() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Match Admin</h1>
+                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
+                        <Link to="/admin" className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
+                    </p>
+                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Match Report</h1>
                     <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-                        Paste match text + DETAILS screenshots → AI extracts → Review & edit → Submit
+                        Paste match text + DETAILS screenshots → AI extracts → Review & submit
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        ← Dashboard
+                    </Link>
                     <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Match Manager
                     </Link>
                     <Link to="/admin/rosters" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Rosters
                     </Link>
-                    <Link to="/" className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
+                    <Link to="/admin/players" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Players
+                    </Link>
+                    <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
+                        <Home className="w-4 h-4" />
+                    </Link>
                 </div>
             </div>
+
+            <MatchReportHelp />
 
             {adminError && <ErrorBanner message={`Admin data: ${adminError}`} className="mb-4" />}
 

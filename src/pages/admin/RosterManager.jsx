@@ -1,6 +1,8 @@
 // src/pages/admin/RosterManager.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { Home } from 'lucide-react'
+import { RosterManagerHelp } from '../../components/admin/AdminHelp'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const STORAGE_KEY = 'smite2_roster_admin'
@@ -590,6 +592,9 @@ export default function RosterManager() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
+                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
+                        <Link to="/admin" onClick={guardNavigation} className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
+                    </p>
                     <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">
                         Roster Manager
                     </h1>
@@ -605,14 +610,24 @@ export default function RosterManager() {
                         Merge Players
                     </button>
                     <Link to="/admin" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        ← Match Admin
+                        ← Dashboard
+                    </Link>
+                    <Link to="/admin/matchreport" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Match Report
                     </Link>
                     <Link to="/admin/matches" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Match Manager
                     </Link>
-                    <Link to="/" onClick={guardNavigation} className="text-sm text-[var(--color-accent)] hover:underline">Home</Link>
+                    <Link to="/admin/players" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Players
+                    </Link>
+                    <Link to="/" onClick={guardNavigation} className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
+                        <Home className="w-4 h-4" />
+                    </Link>
                 </div>
             </div>
+
+            <RosterManagerHelp />
 
             {/* Season Selector */}
             <div className="bg-[var(--color-secondary)] border border-white/10 rounded-xl p-4 mb-6">
