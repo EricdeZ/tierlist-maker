@@ -381,8 +381,8 @@ export default function AdminDashboard() {
                         ))}
                     </select>
 
-                    <button onClick={addMatchReport}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity">
+                    <button onClick={addMatchReport} disabled={!selectedSeasonId}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
                         + New Match
                     </button>
 
@@ -460,10 +460,12 @@ export default function AdminDashboard() {
                     <div className="text-5xl mb-4 opacity-50">📋</div>
                     <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">No match reports</h3>
                     <p className="text-[var(--color-text-secondary)] text-sm mb-6">
-                        Add a match, paste the Discord text and DETAILS tab screenshots, then extract & submit.
+                        {selectedSeasonId
+                            ? 'Add a match, paste the Discord text and DETAILS tab screenshots, then extract & submit.'
+                            : 'Select a season above to get started.'}
                     </p>
-                    <button onClick={addMatchReport}
-                            className="px-6 py-3 rounded-xl font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity">
+                    <button onClick={addMatchReport} disabled={!selectedSeasonId}
+                            className="px-6 py-3 rounded-xl font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
                         + New Match
                     </button>
                 </div>
