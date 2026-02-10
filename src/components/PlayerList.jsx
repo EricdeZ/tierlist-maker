@@ -10,6 +10,8 @@ import midImage from '../assets/roles/mid.webp'
 import suppImage from '../assets/roles/supp.webp'
 import adcImage from '../assets/roles/adc.webp'
 
+const perGameColumns = new Set(['kills', 'deaths', 'assists', 'damage', 'mitigated'])
+
 const PlayerList = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const basePath = `/${leagueSlug}/${divisionSlug}`
@@ -19,10 +21,11 @@ const PlayerList = () => {
 
     const [searchTerm, setSearchTerm] = useState('')
     const [sortBy, setSortBy] = useState('name')
-    const [sortOrder, setSortOrder] = useState('asc')
+    const [sortMode, setSortMode] = useState('asc') // 'asc' | 'desc' | 'perGameDesc'
     const [roleFilter, setRoleFilter] = useState('all')
     const [teamFilter, setTeamFilter] = useState('all')
-    const [showPerGame, setShowPerGame] = useState(false)
+
+    const showPerGame = sortMode === 'perGameDesc'
 
     const roleImages = {
         'SOLO': soloImage,
@@ -57,6 +60,9 @@ const PlayerList = () => {
             return matchesSearch && matchesRole && matchesTeam
         })
 
+        const usePerGame = sortMode === 'perGameDesc'
+        const effectiveOrder = sortMode === 'asc' ? 'asc' : 'desc'
+
         filtered.sort((a, b) => {
             let aValue, bValue
 
@@ -74,16 +80,16 @@ const PlayerList = () => {
                     bValue = b.team.name.toLowerCase()
                     break
                 case 'kills':
-                    aValue = showPerGame ? a.avgStats.avgKills : a.stats.kills
-                    bValue = showPerGame ? b.avgStats.avgKills : b.stats.kills
+                    aValue = usePerGame ? a.avgStats.avgKills : a.stats.kills
+                    bValue = usePerGame ? b.avgStats.avgKills : b.stats.kills
                     break
                 case 'deaths':
-                    aValue = showPerGame ? a.avgStats.avgDeaths : a.stats.deaths
-                    bValue = showPerGame ? b.avgStats.avgDeaths : b.stats.deaths
+                    aValue = usePerGame ? a.avgStats.avgDeaths : a.stats.deaths
+                    bValue = usePerGame ? b.avgStats.avgDeaths : b.stats.deaths
                     break
                 case 'assists':
-                    aValue = showPerGame ? a.avgStats.avgAssists : a.stats.assists
-                    bValue = showPerGame ? b.avgStats.avgAssists : b.stats.assists
+                    aValue = usePerGame ? a.avgStats.avgAssists : a.stats.assists
+                    bValue = usePerGame ? b.avgStats.avgAssists : b.stats.assists
                     break
                 case 'kda':
                     aValue = a.kda
@@ -98,37 +104,45 @@ const PlayerList = () => {
                     bValue = b.stats.gamesPlayed
                     break
                 case 'damage':
-                    aValue = showPerGame ? a.avgStats.avgDamage : a.stats.damage
-                    bValue = showPerGame ? b.avgStats.avgDamage : b.stats.damage
+                    aValue = usePerGame ? a.avgStats.avgDamage : a.stats.damage
+                    bValue = usePerGame ? b.avgStats.avgDamage : b.stats.damage
                     break
                 case 'mitigated':
-                    aValue = showPerGame ? a.avgStats.avgMitigated : a.stats.mitigated
-                    bValue = showPerGame ? b.avgStats.avgMitigated : b.stats.mitigated
+                    aValue = usePerGame ? a.avgStats.avgMitigated : a.stats.mitigated
+                    bValue = usePerGame ? b.avgStats.avgMitigated : b.stats.mitigated
                     break
                 default:
                     return 0
             }
 
-            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
-            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
+            if (aValue < bValue) return effectiveOrder === 'asc' ? -1 : 1
+            if (aValue > bValue) return effectiveOrder === 'asc' ? 1 : -1
             return 0
         })
 
         return filtered
-    }, [processedPlayers, searchTerm, roleFilter, teamFilter, sortBy, sortOrder, showPerGame])
+    }, [processedPlayers, searchTerm, roleFilter, teamFilter, sortBy, sortMode])
 
     const handleSort = (column) => {
         if (sortBy === column) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+            if (perGameColumns.has(column)) {
+                // cycle: desc → asc → perGameDesc → desc
+                if (sortMode === 'desc') setSortMode('asc')
+                else if (sortMode === 'asc') setSortMode('perGameDesc')
+                else setSortMode('desc')
+            } else {
+                setSortMode(sortMode === 'asc' ? 'desc' : 'asc')
+            }
         } else {
             setSortBy(column)
-            setSortOrder('asc')
+            const isText = ['name', 'role', 'team'].includes(column)
+            setSortMode(isText ? 'asc' : 'desc')
         }
     }
 
     const getSortIcon = (column) => {
         if (sortBy !== column) return ''
-        return sortOrder === 'asc' ? '↑' : '↓'
+        return sortMode === 'asc' ? '↑' : '↓'
     }
 
     const formatNumber = (num) => new Intl.NumberFormat().format(Math.round(num))
@@ -230,17 +244,7 @@ const PlayerList = () => {
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-end gap-3">
-                        <button
-                            onClick={() => setShowPerGame(!showPerGame)}
-                            className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
-                                showPerGame
-                                    ? 'bg-(--color-accent)/20 text-(--color-accent) border-(--color-accent)/30'
-                                    : 'bg-white/5 text-(--color-text-secondary) border-white/10 hover:bg-white/10'
-                            }`}
-                        >
-                            {showPerGame ? 'Per Game' : 'Totals'}
-                        </button>
+                    <div className="flex items-end">
                         <div className="text-sm text-(--color-text-secondary)">
                             Showing {filteredAndSortedPlayers.length} of {processedPlayers.length} players
                         </div>
@@ -257,7 +261,6 @@ const PlayerList = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('name')}>
                                 Player {getSortIcon('name')}
                             </th>
-                            <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Details</th>
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('role')}>
                                 Role {getSortIcon('role')}
                             </th>
@@ -288,6 +291,7 @@ const PlayerList = () => {
                             <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider cursor-pointer hover:bg-white/5" onClick={() => handleSort('team')}>
                                 Team {getSortIcon('team')}
                             </th>
+                            <th className="px-4 py-3 text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider"></th>
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -307,16 +311,6 @@ const PlayerList = () => {
                                             </Link>
                                         ) : (
                                             <span className="text-(--color-text)">{player.name}</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
-                                        {pSlug && (
-                                            <Link
-                                                to={`${basePath}/players/${pSlug}`}
-                                                className="text-(--color-accent) hover:underline text-xs font-medium"
-                                            >
-                                                Profile →
-                                            </Link>
                                         )}
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm">
@@ -410,6 +404,17 @@ const PlayerList = () => {
                                                 />
                                                 {player.team.name}
                                             </span>
+                                        )}
+                                    </td>
+                                    <td className="px-2 py-4 whitespace-nowrap text-sm text-center">
+                                        {pSlug && (
+                                            <Link
+                                                to={`${basePath}/players/${pSlug}`}
+                                                className="inline-flex items-center justify-center w-8 h-8 border border-white/20 rounded-lg text-(--color-accent) hover:bg-white/10 hover:border-(--color-accent)/50 transition-colors text-xl leading-none"
+                                                title="View profile"
+                                            >
+                                                &#8594;
+                                            </Link>
                                         )}
                                     </td>
                                 </tr>
