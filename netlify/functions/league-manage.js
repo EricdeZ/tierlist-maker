@@ -12,7 +12,7 @@ export const handler = async (event) => {
         // ─── GET: Full hierarchy with counts ───
         if (event.httpMethod === 'GET') {
             const leagues = await sql`
-                SELECT id, name, slug, description, created_at
+                SELECT id, name, slug, description, discord_url, color, created_at
                 FROM leagues ORDER BY name
             `
 
@@ -102,24 +102,26 @@ function slugify(str) {
 // LEAGUE CRUD
 // ═══════════════════════════════════════════════════
 
-async function createLeague(sql, { name, description }) {
+async function createLeague(sql, { name, description, discord_url, color }) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const slug = slugify(name.trim())
     const [row] = await sql`
-        INSERT INTO leagues (name, slug, description)
-        VALUES (${name.trim()}, ${slug}, ${description || null})
+        INSERT INTO leagues (name, slug, description, discord_url, color)
+        VALUES (${name.trim()}, ${slug}, ${description || null}, ${discord_url || null}, ${color || null})
         RETURNING *
     `
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, league: row }) }
 }
 
-async function updateLeague(sql, { id, name, slug, description }) {
+async function updateLeague(sql, { id, name, slug, description, discord_url, color }) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE leagues SET
             name = COALESCE(${name || null}, name),
             slug = COALESCE(${slug || null}, slug),
             description = ${description ?? null},
+            discord_url = ${discord_url ?? null},
+            color = COALESCE(${color || null}, color),
             updated_at = NOW()
         WHERE id = ${id} RETURNING *
     `

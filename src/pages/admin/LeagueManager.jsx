@@ -1,7 +1,7 @@
 // src/pages/admin/LeagueManager.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy } from 'lucide-react'
+import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
@@ -367,6 +367,8 @@ export default function LeagueManager() {
                                             { key: 'name', label: 'Name', value: editItem.name },
                                             { key: 'slug', label: 'Slug', value: editItem.slug },
                                             { key: 'description', label: 'Description', value: editItem.description || '', wide: true },
+                                            { key: 'discord_url', label: 'Discord URL', value: editItem.discord_url || '', wide: true },
+                                            { key: 'color', label: 'Color', value: editItem.color || '#3b82f6', type: 'color', small: true },
                                         ]}
                                         onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
                                         onSave={handleSaveEdit}
@@ -375,13 +377,15 @@ export default function LeagueManager() {
                                     />
                                 ) : (
                                     <>
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                                            {league.color && <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: league.color }} />}
                                             <span className="font-semibold text-[var(--color-text)]">{league.name}</span>
-                                            <span className="text-xs text-[var(--color-text-secondary)] ml-2">/{league.slug}</span>
-                                            <span className="text-xs text-[var(--color-text-secondary)] ml-2">{divs.length} div{divs.length !== 1 ? 's' : ''}</span>
+                                            <span className="text-xs text-[var(--color-text-secondary)]">/{league.slug}</span>
+                                            <span className="text-xs text-[var(--color-text-secondary)]">{divs.length} div{divs.length !== 1 ? 's' : ''}</span>
+                                            {league.discord_url && <MessageCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" title="Discord linked" />}
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'league', id: league.id, name: league.name, slug: league.slug, description: league.description || '' })} />
+                                            <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'league', id: league.id, name: league.name, slug: league.slug, description: league.description || '', discord_url: league.discord_url || '', color: league.color || '' })} />
                                             <IconBtn icon={Trash2} title="Delete" onClick={() => handleDelete('league', league.id, league.name)} danger />
                                         </div>
                                     </>
@@ -632,6 +636,8 @@ export default function LeagueManager() {
                             fields={[
                                 { key: 'name', label: 'League name', value: createItem.name || '' },
                                 { key: 'description', label: 'Description', value: createItem.description || '', wide: true },
+                                { key: 'discord_url', label: 'Discord URL', value: createItem.discord_url || '', wide: true },
+                                { key: 'color', label: 'Color', value: createItem.color || '#3b82f6', type: 'color', small: true },
                             ]}
                             onChange={(k, v) => setCreateItem(prev => ({ ...prev, [k]: v }))}
                             onSave={handleSaveCreate}
@@ -641,7 +647,7 @@ export default function LeagueManager() {
                     </div>
                 ) : (
                     <button
-                        onClick={() => setCreateItem({ type: 'league', name: '', description: '' })}
+                        onClick={() => setCreateItem({ type: 'league', name: '', description: '', discord_url: '', color: '' })}
                         className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors px-4 py-2 rounded-xl border border-dashed border-white/10 hover:border-white/20 w-full justify-center"
                     >
                         <Plus className="w-4 h-4" /> Add League

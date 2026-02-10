@@ -15,8 +15,8 @@ export const handler = async (event, context) => {
             // Get single league with divisions and seasons
             if (slug) {
                 const [league] = await sql`
-                    SELECT id, name, slug, description 
-                    FROM leagues 
+                    SELECT id, name, slug, description, discord_url, color
+                    FROM leagues
                     WHERE slug = ${slug}
                 `
 
@@ -61,8 +61,8 @@ export const handler = async (event, context) => {
 
             // Get all leagues (basic info)
             const leagues = await sql`
-                SELECT id, name, slug, description 
-                FROM leagues 
+                SELECT id, name, slug, description, discord_url, color
+                FROM leagues
                 ORDER BY name
             `
 
