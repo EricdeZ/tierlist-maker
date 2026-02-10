@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
+import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 
@@ -38,7 +39,7 @@ export default function LeagueManager() {
     // ─── Fetch ───
     const fetchData = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/league-manage`)
+            const res = await fetch(`${API}/league-manage`, { headers: getAuthHeaders() })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             setData(await res.json())
         } catch (e) {
@@ -54,7 +55,7 @@ export default function LeagueManager() {
     const doAction = useCallback(async (payload) => {
         const res = await fetch(`${API}/league-manage`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload),
         })
         const d = await res.json()

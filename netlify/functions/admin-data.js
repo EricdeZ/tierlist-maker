@@ -1,8 +1,14 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
+import { requireAdmin } from './lib/auth.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
+    }
+
+    const admin = await requireAdmin(event)
+    if (!admin) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
     const sql = getDB()

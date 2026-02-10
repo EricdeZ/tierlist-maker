@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
+import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const STORAGE_KEY = 'smite2_admin_pending'
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
     })
 
     useEffect(() => {
-        fetch(`${API}/admin-data`)
+        fetch(`${API}/admin-data`, { headers: getAuthHeaders() })
             .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
             .then(data => {
                 setAdminData(data)
@@ -180,7 +181,7 @@ export default function AdminDashboard() {
 
             const res = await fetch(`${API}/extract-scoreboard`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ images: imageData, match_text: mr.text || null }),
             })
 
@@ -285,7 +286,7 @@ export default function AdminDashboard() {
 
             const res = await fetch(`${API}/admin-write`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(payload),
             })
 
@@ -1332,7 +1333,7 @@ function AliasLinkModal({ extractedName, adminData, seasonId, onSave, onClose })
             const pid = selectedPlayer.player_id
             const res = await fetch(`${API}/roster-manage`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ action: 'add-alias', player_id: pid, alias: extractedName }),
             })
             const data = await res.json()

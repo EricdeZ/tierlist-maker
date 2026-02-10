@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.12",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.563.0",
     "postgres": "^3.4.7",
     "react": "^19.1.1",

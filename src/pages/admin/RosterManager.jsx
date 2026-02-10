@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { RosterManagerHelp } from '../../components/admin/AdminHelp'
+import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const STORAGE_KEY = 'smite2_roster_admin'
@@ -64,7 +65,7 @@ export default function RosterManager() {
         setAdminLoading(true)
         setAdminError(null)
         try {
-            const res = await fetch(`${API}/admin-data`)
+            const res = await fetch(`${API}/admin-data`, { headers: getAuthHeaders() })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
             setAdminData(data)
@@ -100,7 +101,7 @@ export default function RosterManager() {
         try {
             const res = await fetch(`${API}/roster-manage`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(payload),
             })
             const data = await res.json()
@@ -372,7 +373,7 @@ export default function RosterManager() {
 
                 const res = await fetch(`${API}/roster-manage`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(payload),
                 })
                 if (!res.ok) {

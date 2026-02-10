@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useParams } from 'react-router-dom'
 import { DivisionProvider, useDivision } from '../../context/DivisionContext'
+import UserMenu from '../UserMenu'
 import smiteLogo from '../../assets/smite2.png'
 
 // Rank images keyed by division tier (1 = highest skill)
@@ -103,7 +104,7 @@ const DivisionNav = () => {
                     </div>
 
                     {/* Desktop nav links */}
-                    <div className="hidden md:flex gap-1 text-(--nav-text) ml-auto">
+                    <div className="hidden md:flex items-center gap-1 text-(--nav-text) ml-auto">
                         {navItems.map((item) => (
                             <Link
                                 key={item.path}
@@ -117,15 +118,19 @@ const DivisionNav = () => {
                                 {item.label}
                             </Link>
                         ))}
+                        <div className="border-l border-white/10 ml-2 pl-2">
+                            <UserMenu compact />
+                        </div>
                     </div>
 
-                    {/* Mobile: active page label + hamburger */}
+                    {/* Mobile: active page label + user menu + hamburger */}
                     <div className="flex md:hidden items-center gap-2 ml-auto">
                         {activeItem && (
                             <span className="text-xs font-bold text-(--color-accent) uppercase tracking-wider">
                                 {activeItem.label}
                             </span>
                         )}
+                        <UserMenu compact />
                         <button
                             onClick={() => setMobileOpen(!mobileOpen)}
                             className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"

@@ -26,7 +26,7 @@ export const getDB = () => {
 
 export const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST',
     'Content-Type': 'application/json',
 }
@@ -34,7 +34,7 @@ export const headers = {
 // Admin endpoints: restrict origin if ALLOWED_ORIGIN is set
 export const adminHeaders = {
     'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST',
     'Content-Type': 'application/json',
 }

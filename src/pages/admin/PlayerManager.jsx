@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Home, ExternalLink, Download, Search, X, ChevronDown, ChevronRight, Check, Users } from 'lucide-react'
 import { PlayerManagerHelp } from '../../components/admin/AdminHelp'
+import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 
@@ -49,7 +50,7 @@ export default function PlayerManager() {
         setLoading(true)
         setError(null)
         try {
-            const res = await fetch(`${API}/player-manage`)
+            const res = await fetch(`${API}/player-manage`, { headers: getAuthHeaders() })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const d = await res.json()
             setData(d)
@@ -215,7 +216,7 @@ export default function PlayerManager() {
         try {
             const res = await fetch(`${API}/player-manage`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     action: 'bulk-enroll-season',
                     player_ids: [...selected],
@@ -244,7 +245,7 @@ export default function PlayerManager() {
         try {
             const res = await fetch(`${API}/player-manage`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     action: 'update-player-info',
                     player_id: editPlayer.id,

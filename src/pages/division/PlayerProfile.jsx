@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
+import { useAuth } from '../../context/AuthContext'
 import { statsService } from '../../services/database'
+import { UserCheck, User } from 'lucide-react'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -21,6 +23,7 @@ const roleImages = {
 const PlayerProfile = () => {
     const { leagueSlug, divisionSlug, playerSlug } = useParams()
     const { players, teams, season } = useDivision()
+    const { user, linkedPlayer, login, loading: authLoading } = useAuth()
 
     const [gameHistory, setGameHistory] = useState([])
     const [playerStats, setPlayerStats] = useState(null)
@@ -148,16 +151,59 @@ const PlayerProfile = () => {
                             </p>
                         </div>
                     </div>
-                    {player.tracker_url && (
-                        <a
-                            href={player.tracker_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm bg-(--color-accent) text-(--color-primary) px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity flex-shrink-0"
-                        >
-                            View Tracker ↗
-                        </a>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {player.tracker_url && (
+                            <a
+                                href={player.tracker_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm bg-(--color-accent) text-(--color-primary) px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                            >
+                                View Tracker ↗
+                            </a>
+                        )}
+
+                        {/* Claim / Profile badge */}
+                        {!authLoading && (() => {
+                            const isOwnProfile = linkedPlayer && linkedPlayer.id === player.id
+                            if (isOwnProfile) {
+                                return (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
+                                        <UserCheck className="w-4 h-4" />
+                                        Your Profile
+                                    </span>
+                                )
+                            }
+
+                            // Don't show claim button if another user already claimed this player
+                            // (we don't have that info yet, but we can check if current user has no link)
+                            if (!user) {
+                                return (
+                                    <button
+                                        onClick={login}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors"
+                                    >
+                                        <User className="w-4 h-4" />
+                                        Claim Profile
+                                    </button>
+                                )
+                            }
+
+                            if (!linkedPlayer) {
+                                return (
+                                    <button
+                                        onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal', { detail: { playerId: player.id, playerName: player.name } }))}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors"
+                                    >
+                                        <User className="w-4 h-4" />
+                                        Claim This Profile
+                                    </button>
+                                )
+                            }
+
+                            return null
+                        })()}
+                    </div>
                 </div>
             </div>
 

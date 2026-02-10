@@ -1,9 +1,10 @@
 // src/pages/division/DivisionOverview.jsx
 import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
+import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect } from 'react'
 import { statsService } from '../../services/database'
-import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users } from 'lucide-react'
+import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users, User } from 'lucide-react'
 
 import aglLogo from '../../assets/leagues/agl.png'
 import babylonLogo from '../../assets/leagues/babylon.png'
@@ -35,6 +36,7 @@ const RANK_IMAGES = {
 const DivisionOverview = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const { league, division, season, teams, players } = useDivision()
+    const { user, linkedPlayer, login, loading: authLoading } = useAuth()
     const [seasonStats, setSeasonStats] = useState(null)
 
     const [statsError, setStatsError] = useState(false)
@@ -249,6 +251,36 @@ const DivisionOverview = () => {
                             )
                         })}
                     </div>
+                </div>
+            )}
+
+            {/* ─── Claim Profile Banner ─── */}
+            {!authLoading && !linkedPlayer && (
+                <div className="mb-10 rounded-xl border border-[#5865F2]/20 bg-[#5865F2]/5 p-5 flex flex-col sm:flex-row items-center gap-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-[#5865F2]/20 flex items-center justify-center shrink-0">
+                            <User className="w-5 h-5 text-[#5865F2]" />
+                        </div>
+                        <p className="text-sm text-(--color-text-secondary)">
+                            <strong className="text-(--color-text)">Playing in this division?</strong>{' '}
+                            Claim your player profile to track your stats and match history.
+                        </p>
+                    </div>
+                    {!user ? (
+                        <button
+                            onClick={login}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors shrink-0"
+                        >
+                            Login with Discord
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors shrink-0"
+                        >
+                            Claim Your Profile
+                        </button>
+                    )}
                 </div>
             )}
 

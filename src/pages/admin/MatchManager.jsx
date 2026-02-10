@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchManagerHelp } from '../../components/admin/AdminHelp'
+import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const SEASON_KEY = 'smite2_admin_season'
@@ -30,7 +31,7 @@ export default function MatchManager() {
 
     // ─── Fetch admin data (seasons, teams, players, gods) ───
     useEffect(() => {
-        fetch(`${API}/admin-data`)
+        fetch(`${API}/admin-data`, { headers: getAuthHeaders() })
             .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
             .then(data => {
                 setAdminData(data)
@@ -55,7 +56,7 @@ export default function MatchManager() {
         if (!seasonId) { setMatches([]); return }
         setMatchesLoading(true)
         try {
-            const res = await fetch(`${API}/admin-match-manage?seasonId=${seasonId}`)
+            const res = await fetch(`${API}/admin-match-manage?seasonId=${seasonId}`, { headers: getAuthHeaders() })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
             setMatches(data.matches || [])
@@ -74,7 +75,7 @@ export default function MatchManager() {
     const fetchDetail = useCallback(async (matchId) => {
         setDetailLoading(true)
         try {
-            const res = await fetch(`${API}/admin-match-manage?matchId=${matchId}`)
+            const res = await fetch(`${API}/admin-match-manage?matchId=${matchId}`, { headers: getAuthHeaders() })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
             setMatchDetail(data)
@@ -109,7 +110,7 @@ export default function MatchManager() {
     const doAction = useCallback(async (payload) => {
         const res = await fetch(`${API}/admin-match-manage`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload),
         })
         const data = await res.json()

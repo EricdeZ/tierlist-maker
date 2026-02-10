@@ -1,6 +1,8 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import DivisionLayout from './components/layout/DivisionLayout'
 import Homepage from './pages/Homepage'
@@ -16,6 +18,7 @@ import TeamDetail from './pages/division/TeamDetail'
 import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
+import LeagueOverview from "./pages/LeagueOverview.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // Admin
@@ -25,44 +28,51 @@ import RosterManager from "./pages/admin/RosterManager.jsx";
 import MatchManager from "./pages/admin/MatchManager.jsx";
 import PlayerManager from "./pages/admin/PlayerManager.jsx";
 import LeagueManager from "./pages/admin/LeagueManager.jsx";
+import UserManager from "./pages/admin/UserManager.jsx";
 
 function App() {
     return (
-        <Router>
-            <ScrollToTop />
-            <ErrorBoundary>
-                <Routes>
-                    <Route path="/" element={<AppLayout />}>
-                        {/* Homepage — league & division selector */}
-                        <Route index element={<Homepage />} />
+        <AuthProvider>
+            <Router>
+                <ScrollToTop />
+                <ErrorBoundary>
+                    <Routes>
+                        <Route path="/" element={<AppLayout />}>
+                            {/* Homepage — league & division selector */}
+                            <Route index element={<Homepage />} />
 
-                        {/* Admin pages */}
-                        <Route path="admin" element={<AdminLanding />} />
-                        <Route path="admin/matchreport" element={<AdminDashboard />} />
-                        <Route path="admin/rosters" element={<RosterManager />} />
-                        <Route path="admin/matches" element={<MatchManager />} />
-                        <Route path="admin/players" element={<PlayerManager />} />
-                        <Route path="admin/leagues" element={<LeagueManager />} />
+                            {/* Admin pages (protected) */}
+                            <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLanding /></ProtectedRoute>} />
+                            <Route path="admin/matchreport" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
+                            <Route path="admin/rosters" element={<ProtectedRoute requireAdmin><RosterManager /></ProtectedRoute>} />
+                            <Route path="admin/matches" element={<ProtectedRoute requireAdmin><MatchManager /></ProtectedRoute>} />
+                            <Route path="admin/players" element={<ProtectedRoute requireAdmin><PlayerManager /></ProtectedRoute>} />
+                            <Route path="admin/leagues" element={<ProtectedRoute requireAdmin><LeagueManager /></ProtectedRoute>} />
+                            <Route path="admin/users" element={<ProtectedRoute requireAdmin><UserManager /></ProtectedRoute>} />
 
-                        {/* Division-scoped pages (context provided by DivisionLayout) */}
-                        <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>
-                            <Route index element={<DivisionOverview />} />
-                            <Route path="standings" element={<Standings />} />
-                            <Route path="matches" element={<Matches />} />
-                            <Route path="matches/:matchId" element={<MatchDetail />} />
-                            <Route path="stats" element={<Stats />} />
-                            <Route path="rankings" element={<Rankings />} />
-                            <Route path="teams" element={<Teams />} />
-                            <Route path="teams/:teamSlug" element={<TeamDetail />} />
-                            <Route path="players/:playerSlug" element={<PlayerProfile />} />
+                            {/* League overview page */}
+                            <Route path=":leagueSlug" element={<LeagueOverview />} />
+
+                            {/* Division-scoped pages (context provided by DivisionLayout) */}
+                            <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>
+                                <Route index element={<DivisionOverview />} />
+                                <Route path="standings" element={<Standings />} />
+                                <Route path="matches" element={<Matches />} />
+                                <Route path="matches/:matchId" element={<MatchDetail />} />
+                                <Route path="stats" element={<Stats />} />
+                                <Route path="rankings" element={<Rankings />} />
+                                <Route path="teams" element={<Teams />} />
+                                <Route path="teams/:teamSlug" element={<TeamDetail />} />
+                                <Route path="players/:playerSlug" element={<PlayerProfile />} />
+                            </Route>
+
+                            {/* 404 */}
+                            <Route path="*" element={<NotFound />} />
                         </Route>
-
-                        {/* 404 */}
-                        <Route path="*" element={<NotFound />} />
-                    </Route>
-                </Routes>
-            </ErrorBoundary>
-        </Router>
+                    </Routes>
+                </ErrorBoundary>
+            </Router>
+        </AuthProvider>
     )
 }
 
