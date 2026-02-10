@@ -3,17 +3,15 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
-const STORAGE_KEY = 'smite2_match_manager'
-
-function loadState() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
-}
-function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) }
+const SEASON_KEY = 'smite2_admin_season'
 
 export default function MatchManager() {
     const [adminData, setAdminData] = useState(null)
     const [adminLoading, setAdminLoading] = useState(true)
-    const [selectedSeasonId, setSelectedSeasonId] = useState(() => loadState().selectedSeasonId || null)
+    const [selectedSeasonId, setSelectedSeasonId] = useState(() => {
+        try { return parseInt(localStorage.getItem(SEASON_KEY)) || null }
+        catch { return null }
+    })
 
     const [matches, setMatches] = useState([])
     const [matchesLoading, setMatchesLoading] = useState(false)
@@ -42,8 +40,13 @@ export default function MatchManager() {
             .finally(() => setAdminLoading(false))
     }, [])
 
-    // Persist season selection
-    useEffect(() => { saveState({ selectedSeasonId }) }, [selectedSeasonId])
+    // Persist season selection (shared with AdminDashboard)
+    const handleSeasonChange = (id) => {
+        const parsed = id ? parseInt(id) : null
+        setSelectedSeasonId(parsed)
+        if (parsed) localStorage.setItem(SEASON_KEY, String(parsed))
+        else localStorage.removeItem(SEASON_KEY)
+    }
 
     // ─── Fetch matches for season ───
     const fetchMatches = useCallback(async (seasonId) => {
@@ -294,7 +297,7 @@ export default function MatchManager() {
                 <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Season</label>
                 <select
                     value={selectedSeasonId || ''}
-                    onChange={e => { setSelectedSeasonId(e.target.value || null); setExpandedMatchId(null); setMatchDetail(null); setEditData(null) }}
+                    onChange={e => { handleSeasonChange(e.target.value); setExpandedMatchId(null); setMatchDetail(null); setEditData(null) }}
                     className="w-full max-w-md rounded-lg px-3 py-2 text-sm border"
                     style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
                 >
