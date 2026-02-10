@@ -306,6 +306,9 @@ export default function MatchManager() {
                     <Link to="/admin/players" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Players
                     </Link>
+                    <Link to="/admin/leagues" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Leagues
+                    </Link>
                     <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
                         <Home className="w-4 h-4" />
                     </Link>

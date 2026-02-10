@@ -450,3 +450,78 @@ export function MatchManagerHelp() {
         />
     )
 }
+
+// ─── Help content for League Manager ───
+export function LeagueManagerHelp() {
+    return (
+        <AdminHelp
+            pageTitle="League Manager"
+            sections={[
+                {
+                    title: 'Understanding the Hierarchy',
+                    content: (
+                        <>
+                            <p>Everything is organized in a tree structure:</p>
+                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                <li><strong>Leagues</strong> — top level (e.g. "Babylon Smite League")</li>
+                                <li><strong>Divisions</strong> — skill tiers within a league (e.g. "Ishtar", Tier 1)</li>
+                                <li><strong>Seasons</strong> — time periods within a division (e.g. "Season 2")</li>
+                                <li><strong>Teams</strong> — competing teams within a season</li>
+                            </ul>
+                        </>
+                    ),
+                },
+                {
+                    title: 'Expand & Navigate',
+                    content: (
+                        <p>
+                            Click the <strong>arrow</strong> next to any league, division, or season to expand
+                            it and see its children. The tree shows counts (divisions, seasons, teams, matches)
+                            at each level so you can see the full scope at a glance.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Create New Items',
+                    content: (
+                        <p>
+                            At each level, you'll find an <strong>"+ Add"</strong> button to create a new child.
+                            For example, expand a league to see "+ Add division", expand a division to see "+ Add season",
+                            etc. Fill in the name and any relevant fields, then press Enter or click the checkmark to save.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Edit Names, Slugs & Settings',
+                    content: (
+                        <p>
+                            Click the <strong>pencil icon</strong> on any item to edit it inline. You can change
+                            names, URL slugs, tier numbers, team colors, and date ranges. The slug is used in
+                            URLs (e.g. <code>/bsl/ishtar</code>), so change it carefully.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Toggle Season Active Status',
+                    content: (
+                        <p>
+                            Click the <strong>power icon</strong> on a season to toggle it between Active and Inactive.
+                            Only active seasons appear on the public site and in admin dropdowns. You can have multiple
+                            active seasons across different divisions.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Delete Items',
+                    content: (
+                        <p>
+                            Click the <strong>trash icon</strong> to delete. Deletions cascade upward — you must remove
+                            children first (e.g. remove all teams before deleting a season, all seasons before a division).
+                            This prevents accidental data loss.
+                        </p>
+                    ),
+                },
+            ]}
+        />
+    )
+}

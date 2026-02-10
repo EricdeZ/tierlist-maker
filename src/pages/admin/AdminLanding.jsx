@@ -60,6 +60,20 @@ const tools = [
         iconColor: 'text-amber-400',
         btnClass: 'bg-amber-600 hover:bg-amber-700',
     },
+    {
+        title: 'League Manager',
+        description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
+        path: '/admin/leagues',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+            </svg>
+        ),
+        accent: 'from-rose-500/20 to-rose-600/5',
+        border: 'border-rose-500/20 hover:border-rose-500/40',
+        iconColor: 'text-rose-400',
+        btnClass: 'bg-rose-600 hover:bg-rose-700',
+    },
 ]
 
 export default function AdminLanding() {

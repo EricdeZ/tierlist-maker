@@ -24,6 +24,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import RosterManager from "./pages/admin/RosterManager.jsx";
 import MatchManager from "./pages/admin/MatchManager.jsx";
 import PlayerManager from "./pages/admin/PlayerManager.jsx";
+import LeagueManager from "./pages/admin/LeagueManager.jsx";
 
 function App() {
     return (
@@ -41,6 +42,7 @@ function App() {
                         <Route path="admin/rosters" element={<RosterManager />} />
                         <Route path="admin/matches" element={<MatchManager />} />
                         <Route path="admin/players" element={<PlayerManager />} />
+                        <Route path="admin/leagues" element={<LeagueManager />} />
 
                         {/* Division-scoped pages (context provided by DivisionLayout) */}
                         <Route path=":leagueSlug/:divisionSlug" element={<DivisionLayout />}>
