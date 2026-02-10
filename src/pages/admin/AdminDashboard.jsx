@@ -40,16 +40,34 @@ export default function AdminDashboard() {
     // Admin metadata
     const [adminData, setAdminData] = useState(null)
     const [adminError, setAdminError] = useState(null)
+    const [selectedSeasonId, setSelectedSeasonId] = useState(() => {
+        try { return parseInt(localStorage.getItem('smite2_admin_season')) || null }
+        catch { return null }
+    })
 
     useEffect(() => {
         fetch(`${API}/admin-data`)
             .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-            .then(setAdminData)
+            .then(data => {
+                setAdminData(data)
+                // Auto-select if only one season or if saved season is no longer valid
+                if (data.seasons?.length === 1 && !selectedSeasonId) {
+                    setSelectedSeasonId(data.seasons[0].season_id)
+                }
+            })
             .catch(e => setAdminError(e.message))
     }, [])
 
     // Persist on change
     useEffect(() => { saveStorage(matchReports) }, [matchReports])
+
+    // Persist selected season
+    const handleSeasonChange = (id) => {
+        const parsed = id ? parseInt(id) : null
+        setSelectedSeasonId(parsed)
+        if (parsed) localStorage.setItem('smite2_admin_season', String(parsed))
+        else localStorage.removeItem('smite2_admin_season')
+    }
 
     // ─── Helpers to update a report ───
     const updateReport = useCallback((mrId, updater) => {
@@ -174,6 +192,11 @@ export default function AdminDashboard() {
             // Build editable data from extraction result
             const editData = buildEditData(result)
 
+            // Apply the selected season if the AI didn't infer one or to override
+            if (selectedSeasonId) {
+                editData.season_id = selectedSeasonId
+            }
+
             const allGamesOk = result.games?.every(g => g.success)
             const status = allGamesOk ? 'review' : 'error'
 
@@ -181,7 +204,7 @@ export default function AdminDashboard() {
         } catch (err) {
             updateReport(mrId, { status: 'error', error: err.message })
         }
-    }, [matchReports, updateReport])
+    }, [matchReports, updateReport, selectedSeasonId])
 
     // ─── Process all pending ───
     const processAll = async () => {
@@ -204,8 +227,8 @@ export default function AdminDashboard() {
 
         try {
             if (!ed.season_id) throw new Error('Season is required')
-            if (!ed.team1_id) throw new Error('Team 1 (Order) is required')
-            if (!ed.team2_id) throw new Error('Team 2 (Chaos) is required')
+            if (!ed.team1_id) throw new Error('Team 1 is required')
+            if (!ed.team2_id) throw new Error('Team 2 is required')
             if (!ed.games.length) throw new Error('No games to submit')
 
             for (let i = 0; i < ed.games.length; i++) {
@@ -220,9 +243,24 @@ export default function AdminDashboard() {
                 week: ed.week || null,
                 date: ed.date || new Date().toISOString().split('T')[0],
                 best_of: ed.best_of || ed.games.length,
-                games: ed.games.map(g => ({
-                    winning_side: g.winning_team_id === ed.team1_id ? 'order' : 'chaos',
-                    order_players: g.left_players.map(p => ({
+                games: ed.games.map(g => {
+                    // Detect if teams swapped sides (SMITE 2 alternates Order/Chaos each game)
+                    const rosterPlayers = adminData?.players || []
+                    const leftTeamIds = g.left_players
+                        .filter(p => p.matched_lp_id)
+                        .map(p => rosterPlayers.find(r => r.league_player_id === p.matched_lp_id)?.team_id)
+                        .filter(Boolean)
+                    let leftTeamId = null
+                    if (leftTeamIds.length) {
+                        const counts = {}
+                        for (const id of leftTeamIds) counts[id] = (counts[id] || 0) + 1
+                        leftTeamId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+                    }
+                    const swapped = leftTeamId && String(leftTeamId) === String(ed.team2_id)
+                    const team1Players = swapped ? g.right_players : g.left_players
+                    const team2Players = swapped ? g.left_players : g.right_players
+
+                    const mapPlayer = p => ({
                         player_name: p.player_name,
                         god_played: p.god_played,
                         kills: p.kills || 0,
@@ -233,20 +271,14 @@ export default function AdminDashboard() {
                         structure_damage: p.structure_damage || 0,
                         gpm: p.gpm || 0,
                         league_player_id: p.matched_lp_id || null,
-                    })),
-                    chaos_players: g.right_players.map(p => ({
-                        player_name: p.player_name,
-                        god_played: p.god_played,
-                        kills: p.kills || 0,
-                        deaths: p.deaths || 0,
-                        assists: p.assists || 0,
-                        damage: p.player_damage || 0,
-                        mitigated: p.mitigated || 0,
-                        structure_damage: p.structure_damage || 0,
-                        gpm: p.gpm || 0,
-                        league_player_id: p.matched_lp_id || null,
-                    })),
-                })),
+                    })
+
+                    return {
+                        winning_team_id: g.winning_team_id,
+                        team1_players: team1Players.map(mapPlayer),
+                        team2_players: team2Players.map(mapPlayer),
+                    }
+                }),
             }
 
             const res = await fetch(`${API}/admin-write`, {
@@ -266,7 +298,7 @@ export default function AdminDashboard() {
         } finally {
             setSubmitting(prev => ({ ...prev, [id]: false }))
         }
-    }, [updateReport])
+    }, [updateReport, adminData])
 
     // ─── Bulk submit selected ───
     const submitSelected = async () => {
@@ -330,6 +362,25 @@ export default function AdminDashboard() {
             {/* Action bar */}
             <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
+                    {/* Season selector */}
+                    <select
+                        value={selectedSeasonId || ''}
+                        onChange={e => handleSeasonChange(e.target.value)}
+                        className="rounded-lg px-3 py-2 text-sm font-semibold border"
+                        style={{
+                            backgroundColor: 'var(--color-bg, #121212)',
+                            color: selectedSeasonId ? 'var(--color-text, #e0e0e0)' : 'var(--color-text-secondary, #999)',
+                            borderColor: selectedSeasonId ? 'var(--color-accent, #d4a843)' : 'var(--color-border, #333)',
+                        }}
+                    >
+                        <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— Season —</option>
+                        {(adminData?.seasons || []).map(s => (
+                            <option key={s.season_id} value={s.season_id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>
+                                {s.league_name} / {s.division_name}
+                            </option>
+                        ))}
+                    </select>
+
                     <button onClick={addMatchReport}
                             className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity">
                         + New Match
@@ -763,11 +814,11 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                 <FieldSelect label="Season" value={ed.season_id || ''}
                              onChange={v => onChange({ ...ed, season_id: v ? parseInt(v) : null, team1_id: null, team2_id: null })}
                              options={(adminData?.seasons || []).map(s => ({ value: s.season_id, label: `${s.league_name} / ${s.division_name}` }))} />
-                <FieldSelect label="Team 1 (Order/Left)" value={ed.team1_id || ''}
+                <FieldSelect label="Team 1" value={ed.team1_id || ''}
                              onChange={v => updateField('team1_id', v ? parseInt(v) : null)}
                              options={teamsForSeason.map(t => ({ value: t.team_id, label: t.team_name }))}
                              color={team1?.color} />
-                <FieldSelect label="Team 2 (Chaos/Right)" value={ed.team2_id || ''}
+                <FieldSelect label="Team 2" value={ed.team2_id || ''}
                              onChange={v => updateField('team2_id', v ? parseInt(v) : null)}
                              options={teamsForSeason.filter(t => String(t.team_id) !== String(ed.team1_id)).map(t => ({ value: t.team_id, label: t.team_name }))}
                              color={team2?.color} />
