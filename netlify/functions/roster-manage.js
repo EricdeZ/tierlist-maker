@@ -43,6 +43,8 @@ export const handler = async (event) => {
                 return await removeAlias(sql, body)
             case 'merge-player':
                 return await mergePlayer(sql, body)
+            case 'rename-player':
+                return await renamePlayer(sql, body)
             default:
                 return {
                     statusCode: 400,
@@ -459,5 +461,67 @@ async function mergePlayer(sql, { source_player_id, target_player_id }) {
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, ...result }),
+    }
+}
+
+/**
+ * Rename a player. Updates the global players table name + slug.
+ * Optionally saves the old name as an alias.
+ */
+async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }) {
+    if (!player_id || !new_name?.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and new_name required' }) }
+    }
+    const trimmed = new_name.trim()
+    if (trimmed.length < 2) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Name must be at least 2 characters' }) }
+    }
+
+    // Check if new name conflicts with another player
+    const [nameConflict] = await sql`
+        SELECT id, name FROM players WHERE LOWER(name) = ${trimmed.toLowerCase()} AND id != ${player_id} LIMIT 1
+    `
+    if (nameConflict) {
+        return {
+            statusCode: 409, headers,
+            body: JSON.stringify({ error: `"${trimmed}" is already taken by player "${nameConflict.name}"` }),
+        }
+    }
+
+    const result = await sql.begin(async (tx) => {
+        const [player] = await tx`SELECT id, name, slug FROM players WHERE id = ${player_id}`
+        if (!player) throw new Error('Player not found')
+
+        const oldName = player.name
+
+        // Save old name as alias if requested and it differs
+        if (save_old_as_alias && oldName.toLowerCase() !== trimmed.toLowerCase()) {
+            try {
+                await tx`INSERT INTO player_aliases (player_id, alias) VALUES (${player_id}, ${oldName})`
+            } catch (err) {
+                if (err.code !== '23505') throw err // ignore if alias already exists
+            }
+        }
+
+        // Generate new slug
+        let slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
+        const [slugExists] = await tx`SELECT 1 FROM players WHERE slug = ${slug} AND id != ${player_id} LIMIT 1`
+        if (slugExists) {
+            slug = `${slug}-${Date.now().toString(36).slice(-4)}`
+        }
+
+        const [updated] = await tx`
+            UPDATE players SET name = ${trimmed}, slug = ${slug}, updated_at = NOW()
+            WHERE id = ${player_id}
+            RETURNING id, name, slug
+        `
+
+        return { old_name: oldName, new_name: updated.name, new_slug: updated.slug }
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, message: `Renamed "${result.old_name}" to "${result.new_name}"`, ...result }),
     }
 }
