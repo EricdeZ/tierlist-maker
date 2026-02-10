@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
+import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2 } from 'lucide-react'
 import smiteLogo from '../assets/smite2.png'
 
 // League logos
@@ -88,10 +89,11 @@ const Homepage = () => {
         fetchStats()
     }, [leagues])
 
-    const mainLeagues = leagues
-    const hasActiveLeagues = mainLeagues.some(l =>
+    // Only show leagues that have at least one division with an active season
+    const mainLeagues = leagues.filter(l =>
         l.divisions?.some(d => d.seasons?.some(s => s.is_active))
     )
+    const hasActiveLeagues = mainLeagues.length > 0
 
     if (loading) {
         return (
@@ -267,7 +269,7 @@ const Homepage = () => {
             <section className="py-16 px-4">
                 <div
                     className="w-2/3 h-px mx-auto mb-16"
-                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                    style={{ background: `linear-gradient(90deg, transparent, ${leagues.find(l => l.slug === 'bsl' || l.slug === 'babylon-smite-league')?.color || 'var(--color-accent)'}40, transparent)` }}
                 />
 
                 <div className="max-w-5xl mx-auto">
@@ -388,7 +390,7 @@ const Homepage = () => {
                                     style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
                                 />
 
-                                <div className="text-7xl mb-6">⚔️</div>
+                                <div className="flex justify-center text-(--color-accent) mb-6"><Swords className="w-16 h-16" /></div>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-white/5">
                                         <span className="text-(--color-text-secondary) text-sm">Active Leagues</span>
@@ -432,17 +434,17 @@ const Homepage = () => {
                     <div className="grid sm:grid-cols-3 gap-6">
                         {[
                             {
-                                icon: '🎙️',
+                                icon: <Mic className="w-8 h-8" />,
                                 title: 'Organizers & Admins',
                                 desc: 'The ones who handle scheduling, rules, disputes, and everything behind the scenes so the rest of us can compete.',
                             },
                             {
-                                icon: '🎬',
+                                icon: <Video className="w-8 h-8" />,
                                 title: 'Casters & Streamers',
                                 desc: 'Bringing every match to life with commentary, hype, and production — giving these games the spotlight they deserve.',
                             },
                             {
-                                icon: '🎮',
+                                icon: <Gamepad2 className="w-8 h-8" />,
                                 title: 'Players & Captains',
                                 desc: 'The ones showing up week after week, grinding scrims, and proving that the passion for competitive SMITE burns stronger than ever.',
                             },
@@ -452,7 +454,7 @@ const Homepage = () => {
                                 className="rounded-xl border border-white/10 p-6 text-center"
                                 style={{ background: 'linear-gradient(to bottom, var(--color-secondary), var(--color-primary))' }}
                             >
-                                <div className="text-4xl mb-4">{group.icon}</div>
+                                <div className="flex justify-center text-(--color-accent) mb-4">{group.icon}</div>
                                 <h3 className="font-heading text-base font-bold text-(--color-text) mb-2">{group.title}</h3>
                                 <p className="text-sm text-(--color-text-secondary) leading-relaxed">{group.desc}</p>
                             </div>
@@ -474,22 +476,22 @@ const Homepage = () => {
                     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                         {[
                             {
-                                icon: '🏆',
+                                icon: <Trophy className="w-8 h-8" />,
                                 title: 'Standings',
                                 desc: 'Live league standings with match and game records for every division.',
                             },
                             {
-                                icon: '📊',
+                                icon: <BarChart3 className="w-8 h-8" />,
                                 title: 'Player Stats',
                                 desc: 'Full KDA, damage, win rates, and per-game breakdowns for every player.',
                             },
                             {
-                                icon: '📅',
+                                icon: <Calendar className="w-8 h-8" />,
                                 title: 'Match History',
                                 desc: 'Complete schedule and results organized by week with team details.',
                             },
                             {
-                                icon: '⚔️',
+                                icon: <Swords className="w-8 h-8" />,
                                 title: 'Tierlists',
                                 desc: 'Drag-and-drop player rankings by role. Save locally and export as images.',
                             },
@@ -504,7 +506,7 @@ const Homepage = () => {
                                     style={{ background: 'radial-gradient(circle at 50% 0%, var(--color-accent)/0.05, transparent 60%)' }}
                                 />
                                 <div className="relative z-10">
-                                    <div className="text-4xl mb-4">{feature.icon}</div>
+                                    <div className="text-(--color-accent) mb-4">{feature.icon}</div>
                                     <h3 className="font-heading text-lg font-bold text-(--color-text) mb-2 group-hover:text-(--color-accent) transition-colors">
                                         {feature.title}
                                     </h3>
@@ -535,7 +537,7 @@ const Homepage = () => {
                         {mainLeagues.map(league => {
                             const divisions = league.divisions || []
                             const logo = LEAGUE_LOGOS[league.slug]
-                            const hasActive = divisions.some(d => d.seasons?.some(s => s.is_active))
+                            const leagueColor = league.color || 'var(--color-accent)'
 
                             return (
                                 <div key={league.id}>
@@ -543,95 +545,93 @@ const Homepage = () => {
                                         {logo ? (
                                             <img src={logo} alt="" className="h-12 w-12 object-contain rounded-lg" />
                                         ) : (
-                                            <div className="h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center text-2xl">🛡️</div>
+                                            <div className="h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center">
+                                                <Trophy className="w-6 h-6" style={{ color: leagueColor }} />
+                                            </div>
                                         )}
-                                        <div>
-                                            <h3 className="font-heading text-2xl font-bold text-(--color-text)">
-                                                {league.name}
-                                            </h3>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <h3 className="font-heading text-2xl font-bold text-(--color-text)">
+                                                    {league.name}
+                                                </h3>
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
+                                                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />
+                                                    Live
+                                                </span>
+                                            </div>
                                             {league.description && league.description !== league.name && (
                                                 <p className="text-sm text-(--color-text-secondary)">
                                                     {league.description}
                                                 </p>
                                             )}
                                         </div>
-                                        {hasActive && (
-                                            <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-xs font-semibold text-(--color-accent) uppercase tracking-wider">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-(--color-accent) animate-pulse" />
-                                                Live
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {league.discord_url && (
+                                                <a
+                                                    href={league.discord_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors"
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <MessageCircle className="w-3.5 h-3.5" />
+                                                    <span className="hidden sm:inline">Discord</span>
+                                                </a>
+                                            )}
+                                            <Link
+                                                to={`/${league.slug}`}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-(--color-text-secondary) hover:text-(--color-text) border border-white/10 hover:border-white/20 transition-colors"
+                                            >
+                                                View League
+                                                <ChevronRight className="w-3.5 h-3.5" />
+                                            </Link>
+                                        </div>
                                     </div>
 
-                                    {divisions.length === 0 ? (
-                                        <p className="text-(--color-text-secondary) italic pl-16">
-                                            No divisions found for this league.
-                                        </p>
-                                    ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {divisions.map(division => {
-                                                const rankImg = RANK_IMAGES[division.tier]
-                                                const rankLabel = RANK_LABELS[division.tier]
-                                                const activeSeason = division.seasons?.find(s => s.is_active)
-                                                const hasData = !!activeSeason
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {divisions.filter(d => d.seasons?.some(s => s.is_active)).map(division => {
+                                            const rankImg = RANK_IMAGES[division.tier]
+                                            const rankLabel = RANK_LABELS[division.tier]
+                                            const activeSeason = division.seasons?.find(s => s.is_active)
 
-                                                return (
-                                                    <Link
-                                                        key={division.id}
-                                                        to={hasData ? `/${league.slug}/${division.slug}` : '#'}
-                                                        className={`group relative overflow-hidden rounded-xl border transition-all duration-300 ${
-                                                            hasData
-                                                                ? 'border-white/10 hover:border-(--color-accent)/40 hover:shadow-lg hover:shadow-(--color-accent)/5 hover:-translate-y-1'
-                                                                : 'border-white/5 opacity-40 cursor-not-allowed'
-                                                        }`}
-                                                        style={{ background: hasData
-                                                                ? 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))'
-                                                                : 'var(--color-secondary)'
-                                                        }}
-                                                        onClick={e => !hasData && e.preventDefault()}
-                                                    >
-                                                        <div
-                                                            className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
-                                                        />
-                                                        <div className="p-5">
-                                                            <div className="flex items-center gap-3 mb-3">
-                                                                {rankImg && (
-                                                                    <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
-                                                                )}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <h4 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
-                                                                        {division.name}
-                                                                    </h4>
-                                                                    {rankLabel && (
-                                                                        <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
-                                                                            {rankLabel} Tier
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {hasData && (
-                                                                    <span className="text-(--color-text-secondary) group-hover:text-(--color-accent) group-hover:translate-x-1 transition-all text-lg flex-shrink-0">
-                                                                        →
+                                            return (
+                                                <Link
+                                                    key={division.id}
+                                                    to={`/${league.slug}/${division.slug}`}
+                                                    className="group relative overflow-hidden rounded-xl border border-white/10 hover:border-white/20 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                                                    style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                                                >
+                                                    <div
+                                                        className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}, transparent)` }}
+                                                    />
+                                                    <div className="p-5">
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            {rankImg && (
+                                                                <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
+                                                                    {division.name}
+                                                                </h4>
+                                                                {rankLabel && (
+                                                                    <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
+                                                                        {rankLabel} Tier
                                                                     </span>
                                                                 )}
                                                             </div>
-
-                                                            {activeSeason ? (
-                                                                <div className="flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                                                                    {activeSeason.name}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-sm text-(--color-text-secondary)/50 italic">
-                                                                    No active season
-                                                                </div>
-                                                            )}
+                                                            <ChevronRight className="w-5 h-5 text-(--color-text-secondary) group-hover:translate-x-1 transition-all shrink-0" style={{ '--tw-text-opacity': 1 }} />
                                                         </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+
+                                                        <div className="flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                                            {activeSeason.name}
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             )
                         })}
@@ -745,6 +745,21 @@ const Homepage = () => {
                         <span className="text-sm text-(--color-text-secondary)/50">
                             SMITE 2 Companion
                         </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {mainLeagues.filter(l => l.discord_url).map(l => (
+                            <a
+                                key={l.id}
+                                href={l.discord_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-(--color-text-secondary)/50 hover:text-[#5865F2] transition-colors"
+                                title={`${l.name} Discord`}
+                            >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                {l.name}
+                            </a>
+                        ))}
                     </div>
                     <p className="text-xs text-(--color-text-secondary)/30">
                         Community project · Not affiliated with Hi-Rez Studios
