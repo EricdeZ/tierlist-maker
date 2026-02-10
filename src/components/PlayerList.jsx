@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePlayerStats } from '../hooks/usePlayerStats'
 import { useDivision } from '../context/DivisionContext'
+import { ChevronRight } from 'lucide-react'
 
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
@@ -410,10 +411,10 @@ const PlayerList = () => {
                                         {pSlug && (
                                             <Link
                                                 to={`${basePath}/players/${pSlug}`}
-                                                className="inline-flex items-center justify-center w-8 h-8 border border-white/20 rounded-lg text-(--color-accent) hover:bg-white/10 hover:border-(--color-accent)/50 transition-colors text-xl leading-none"
+                                                className="inline-flex items-center justify-center w-8 h-8 text-(--color-accent) hover:text-(--color-accent)/80 transition-colors"
                                                 title="View profile"
                                             >
-                                                &#8594;
+                                                <ChevronRight size={22} />
                                             </Link>
                                         )}
                                     </td>
