@@ -76,7 +76,7 @@ const tools = [
     },
     {
         title: 'User Manager',
-        description: 'Manage Discord-authenticated users. Approve or deny profile claims, promote or demote admins, and manually link or unlink player profiles.',
+        description: 'Manage Discord-authenticated users. Promote or demote admins, and manually link or unlink player profiles.',
         path: '/admin/users',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -87,6 +87,20 @@ const tools = [
         border: 'border-indigo-500/20 hover:border-indigo-500/40',
         iconColor: 'text-indigo-400',
         btnClass: 'bg-indigo-600 hover:bg-indigo-700',
+    },
+    {
+        title: 'Claim Requests',
+        description: 'Review and resolve player profile claim requests. Approve or deny users who want to link their Discord account to a player profile.',
+        path: '/admin/claims',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+        ),
+        accent: 'from-teal-500/20 to-teal-600/5',
+        border: 'border-teal-500/20 hover:border-teal-500/40',
+        iconColor: 'text-teal-400',
+        btnClass: 'bg-teal-600 hover:bg-teal-700',
     },
 ]
 

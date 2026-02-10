@@ -19,6 +19,8 @@ export default function UserMenu({ compact = false }) {
         return () => document.removeEventListener('mousedown', handle)
     }, [open])
 
+    console.log('[UserMenu] linkedPlayer:', linkedPlayer)
+
     if (!user) {
         return (
             <button
@@ -68,9 +70,9 @@ export default function UserMenu({ compact = false }) {
                     </div>
 
                     <div className="py-1">
-                        {linkedPlayer && (
+                        {linkedPlayer && linkedPlayer.league_slug && linkedPlayer.division_slug && (
                             <Link
-                                to={`/`}
+                                to={`/${linkedPlayer.league_slug}/${linkedPlayer.division_slug}/players/${linkedPlayer.slug}`}
                                 onClick={() => setOpen(false)}
                                 className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
                             >

@@ -29,6 +29,7 @@ import MatchManager from "./pages/admin/MatchManager.jsx";
 import PlayerManager from "./pages/admin/PlayerManager.jsx";
 import LeagueManager from "./pages/admin/LeagueManager.jsx";
 import UserManager from "./pages/admin/UserManager.jsx";
+import ClaimManager from "./pages/admin/ClaimManager.jsx";
 
 function App() {
     return (
@@ -49,6 +50,7 @@ function App() {
                             <Route path="admin/players" element={<ProtectedRoute requireAdmin><PlayerManager /></ProtectedRoute>} />
                             <Route path="admin/leagues" element={<ProtectedRoute requireAdmin><LeagueManager /></ProtectedRoute>} />
                             <Route path="admin/users" element={<ProtectedRoute requireAdmin><UserManager /></ProtectedRoute>} />
+                            <Route path="admin/claims" element={<ProtectedRoute requireAdmin><ClaimManager /></ProtectedRoute>} />
 
                             {/* League overview page */}
                             <Route path=":leagueSlug" element={<LeagueOverview />} />

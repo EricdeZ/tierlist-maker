@@ -17,13 +17,21 @@ export const handler = async (event) => {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid or expired token' }) }
     }
 
-    // If user has a linked player, fetch player details
+    // If user has a linked player, fetch player details + their most recent division
     let linkedPlayer = null
     if (user.linked_player_id) {
         const sql = getDB()
         const [player] = await sql`
-            SELECT id, name, slug, discord_name
-            FROM players WHERE id = ${user.linked_player_id}
+            SELECT p.id, p.name, p.slug, p.discord_name,
+                   l.slug AS league_slug, d.slug AS division_slug
+            FROM players p
+            LEFT JOIN league_players lp ON lp.player_id = p.id
+            LEFT JOIN seasons s ON s.id = lp.season_id
+            LEFT JOIN divisions d ON d.id = s.division_id
+            LEFT JOIN leagues l ON l.id = s.league_id
+            WHERE p.id = ${user.linked_player_id}
+            ORDER BY s.is_active DESC NULLS LAST, s.start_date DESC NULLS LAST
+            LIMIT 1
         `
         linkedPlayer = player || null
     }

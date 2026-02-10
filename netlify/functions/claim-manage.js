@@ -18,19 +18,22 @@ export const handler = async (event) => {
             }
 
             if (user.role === 'admin') {
-                // Admin sees all pending claims with user + player info
+                // Admin sees all claims with user + player info
                 const claims = await sql`
                     SELECT
                         cr.id, cr.user_id, cr.player_id, cr.status,
                         cr.message, cr.admin_note, cr.resolved_by,
                         cr.created_at, cr.resolved_at,
                         u.discord_username, u.discord_id as user_discord_id, u.discord_avatar,
-                        p.name as player_name, p.slug as player_slug
+                        p.name as player_name, p.slug as player_slug,
+                        resolver.discord_username as resolved_by_username
                     FROM claim_requests cr
                     JOIN users u ON cr.user_id = u.id
                     JOIN players p ON cr.player_id = p.id
-                    WHERE cr.status = 'pending'
-                    ORDER BY cr.created_at ASC
+                    LEFT JOIN users resolver ON cr.resolved_by = resolver.id
+                    ORDER BY
+                        CASE WHEN cr.status = 'pending' THEN 0 ELSE 1 END,
+                        cr.created_at DESC
                 `
                 return { statusCode: 200, headers, body: JSON.stringify({ claims }) }
             }

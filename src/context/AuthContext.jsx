@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }) => {
                 if (!res.ok) throw new Error('Invalid token')
                 const data = await res.json()
                 if (!cancelled) {
+                    console.log('[AuthContext] auth-me response:', data)
                     setUser(data.user)
                     setLinkedPlayer(data.linkedPlayer)
                 }

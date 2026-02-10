@@ -1,7 +1,7 @@
 // src/pages/admin/UserManager.jsx
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, Shield, User, UserCheck, UserX, Link2, Unlink, Check, X } from 'lucide-react'
+import { Home, Shield, User, UserX, Link2, Unlink } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi'
 import smiteLogo from '../../assets/smite2.png'
 
@@ -9,7 +9,6 @@ const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 
 export default function UserManager() {
     const [users, setUsers] = useState([])
-    const [claims, setClaims] = useState([])
     const [players, setPlayers] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -22,9 +21,8 @@ export default function UserManager() {
 
     const fetchData = async () => {
         try {
-            const [usersRes, claimsRes, playersRes] = await Promise.all([
+            const [usersRes, playersRes] = await Promise.all([
                 fetch(`${API}/user-manage`, { headers: getAuthHeaders() }),
-                fetch(`${API}/claim-manage`, { headers: getAuthHeaders() }),
                 fetch(`${API}/player-manage`, { headers: getAuthHeaders() }),
             ])
 
@@ -32,11 +30,6 @@ export default function UserManager() {
 
             const usersData = await usersRes.json()
             setUsers(usersData.users || [])
-
-            if (claimsRes.ok) {
-                const claimsData = await claimsRes.json()
-                setClaims(claimsData.claims || [])
-            }
 
             if (playersRes.ok) {
                 const playersData = await playersRes.json()
@@ -70,7 +63,6 @@ export default function UserManager() {
 
     const handleSetRole = (userId, role) => doAction('user-manage', { action: 'set-role', user_id: userId, role })
     const handleUnlink = (userId) => doAction('user-manage', { action: 'unlink-player', user_id: userId })
-    const handleResolveClaim = (claimId, status, adminNote) => doAction('claim-manage', { action: 'resolve-claim', claim_id: claimId, status, admin_note: adminNote })
 
     const handleLinkPlayer = () => {
         if (!linkModal || !selectedPlayerId) return
@@ -104,7 +96,7 @@ export default function UserManager() {
                     <img src={smiteLogo} alt="" className="h-10 w-auto" />
                     <div>
                         <h1 className="font-heading text-2xl font-bold text-(--color-text)">User Manager</h1>
-                        <p className="text-(--color-text-secondary) text-sm">Manage users, roles, and profile claims</p>
+                        <p className="text-(--color-text-secondary) text-sm">Manage users, roles, and player links</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -125,49 +117,6 @@ export default function UserManager() {
             )}
             {actionMsg?.success && (
                 <div className="mb-6 p-4 rounded-lg bg-green-900/20 border border-green-500/20 text-green-400 text-sm">{actionMsg.success}</div>
-            )}
-
-            {/* Pending Claims */}
-            {claims.length > 0 && (
-                <div className="mb-8">
-                    <h2 className="font-heading text-lg font-bold text-(--color-text) mb-4 flex items-center gap-2">
-                        <UserCheck className="w-5 h-5 text-(--color-accent)" />
-                        Pending Claims
-                        <span className="px-2 py-0.5 rounded-full bg-(--color-accent)/10 text-(--color-accent) text-xs font-bold">{claims.length}</span>
-                    </h2>
-                    <div className="space-y-3">
-                        {claims.map(claim => (
-                            <div key={claim.id} className="bg-(--color-secondary) rounded-xl border border-white/10 p-4 flex items-center gap-4">
-                                {claim.discord_avatar ? (
-                                    <img src={`https://cdn.discordapp.com/avatars/${claim.user_discord_id}/${claim.discord_avatar}.png?size=32`} alt="" className="w-8 h-8 rounded-full" />
-                                ) : (
-                                    <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-white text-xs font-bold">{claim.discord_username?.[0]?.toUpperCase()}</div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-(--color-text)">{claim.discord_username}</div>
-                                    <div className="text-xs text-(--color-text-secondary)">
-                                        wants to claim <strong>{claim.player_name}</strong>
-                                        {claim.message && ` — "${claim.message}"`}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => handleResolveClaim(claim.id, 'approved')}
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
-                                    >
-                                        <Check className="w-3.5 h-3.5" /> Approve
-                                    </button>
-                                    <button
-                                        onClick={() => handleResolveClaim(claim.id, 'denied')}
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors"
-                                    >
-                                        <X className="w-3.5 h-3.5" /> Deny
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
             )}
 
             {/* Users Table */}
