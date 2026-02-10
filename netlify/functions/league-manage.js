@@ -84,6 +84,7 @@ export const handler = async (event) => {
             case 'create-team':     return await createTeam(sql, body)
             case 'update-team':     return await updateTeam(sql, body)
             case 'delete-team':     return await deleteTeam(sql, body)
+            case 'copy-teams':      return await copyTeams(sql, body)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
         }
@@ -228,10 +229,22 @@ async function toggleSeason(sql, { id, is_active }) {
 
 async function deleteSeason(sql, { id }) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
-    const [hasTeams] = await sql`SELECT 1 FROM teams WHERE season_id = ${id} LIMIT 1`
-    if (hasTeams) {
-        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete season that has teams. Remove teams first.' }) }
+    // Block if any team in this season has players or matches
+    const [hasPlayers] = await sql`
+        SELECT 1 FROM league_players lp JOIN teams t ON t.id = lp.team_id
+        WHERE t.season_id = ${id} LIMIT 1
+    `
+    if (hasPlayers) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete season that has teams with players. Remove players first.' }) }
     }
+    const [hasMatches] = await sql`
+        SELECT 1 FROM matches WHERE season_id = ${id} LIMIT 1
+    `
+    if (hasMatches) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete season that has matches.' }) }
+    }
+    // Delete empty teams first, then the season
+    await sql`DELETE FROM teams WHERE season_id = ${id}`
     const [row] = await sql`DELETE FROM seasons WHERE id = ${id} RETURNING id, name`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found' }) }
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
@@ -266,6 +279,39 @@ async function updateTeam(sql, { id, name, color, slug }) {
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found' }) }
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, team: row }) }
+}
+
+async function copyTeams(sql, { source_season_id, target_season_id, team_ids }) {
+    if (!source_season_id || !target_season_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'source_season_id and target_season_id required' }) }
+    }
+    if (source_season_id === target_season_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Source and target season must be different' }) }
+    }
+    let sourceTeams
+    if (team_ids?.length) {
+        sourceTeams = await sql`
+            SELECT name, color FROM teams WHERE season_id = ${source_season_id} AND id = ANY(${team_ids}) ORDER BY name
+        `
+    } else {
+        sourceTeams = await sql`
+            SELECT name, color FROM teams WHERE season_id = ${source_season_id} ORDER BY name
+        `
+    }
+    if (sourceTeams.length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'No teams found to copy' }) }
+    }
+    const created = []
+    for (const t of sourceTeams) {
+        const slug = slugify(t.name)
+        const [row] = await sql`
+            INSERT INTO teams (season_id, name, color, slug)
+            VALUES (${target_season_id}, ${t.name}, ${t.color}, ${slug})
+            RETURNING *
+        `
+        created.push(row)
+    }
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, teams: created, count: created.length }) }
 }
 
 async function deleteTeam(sql, { id }) {

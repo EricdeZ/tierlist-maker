@@ -1,7 +1,7 @@
 // src/pages/admin/LeagueManager.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar } from 'lucide-react'
+import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
@@ -23,6 +23,9 @@ export default function LeagueManager() {
 
     // Confirm modal
     const [confirmModal, setConfirmModal] = useState(null)
+
+    // Copy teams modal: { targetSeasonId, sourceSeasonId?, selectedTeamIds: Set }
+    const [copyModal, setCopyModal] = useState(null)
 
     // Toast
     const [toast, setToast] = useState(null)
@@ -111,6 +114,19 @@ export default function LeagueManager() {
         })
     }
 
+    // ─── Copy teams from another season ───
+    const handleCopyTeams = async () => {
+        if (!copyModal?.sourceSeasonId || !copyModal?.selectedTeamIds?.size) return
+        const teamIds = [...copyModal.selectedTeamIds]
+        const targetId = copyModal.targetSeasonId
+        setCopyModal(null)
+        try {
+            const result = await doAction({ action: 'copy-teams', source_season_id: copyModal.sourceSeasonId, target_season_id: targetId, team_ids: teamIds })
+            showToast('success', `Copied ${result.count} team${result.count !== 1 ? 's' : ''}`)
+            fetchData()
+        } catch (e) { showToast('error', e.message) }
+    }
+
     // ─── Toggle expand ───
     const toggleExpand = (set, setter, id) => {
         setter(prev => {
@@ -121,8 +137,8 @@ export default function LeagueManager() {
     }
 
     // ─── Derived data ───
-    const { leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap } = useMemo(() => {
-        if (!data) return { leagues: [], divisionsByLeague: {}, seasonsByDivision: {}, teamsBySeason: {}, playerCountMap: {}, matchCountMap: {} }
+    const { leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons } = useMemo(() => {
+        if (!data) return { leagues: [], divisionsByLeague: {}, seasonsByDivision: {}, teamsBySeason: {}, playerCountMap: {}, matchCountMap: {}, allSeasons: [] }
 
         const divisionsByLeague = {}
         for (const d of data.divisions) {
@@ -152,7 +168,15 @@ export default function LeagueManager() {
             matchCountMap[mc.season_id] = parseInt(mc.match_count)
         }
 
-        return { leagues: data.leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap }
+        // Flat season list with context labels for copy picker
+        const allSeasons = data.seasons.map(s => {
+            const div = data.divisions.find(d => d.id === s.division_id)
+            const league = data.leagues.find(l => l.id === s.league_id)
+            const teamCount = (teamsBySeason[s.id] || []).length
+            return { ...s, label: `${league?.name || '?'} / ${div?.name || '?'} / ${s.name}`, teamCount }
+        })
+
+        return { leagues: data.leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons }
     }, [data])
 
     // ─── Loading ───
@@ -202,6 +226,99 @@ export default function LeagueManager() {
                             <button onClick={() => setConfirmModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
                             <button onClick={confirmModal.onConfirm} className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white ${confirmModal.danger ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}>Confirm</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Copy Teams Modal */}
+            {copyModal && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                        <h3 className="text-sm font-bold text-[var(--color-text)] mb-3 flex items-center gap-2">
+                            <Copy className="w-4 h-4 text-[var(--color-accent)]" />
+                            Copy Teams
+                        </h3>
+
+                        {!copyModal.sourceSeasonId ? (
+                            <>
+                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">Select a season to copy teams from:</p>
+                                <div className="max-h-60 overflow-y-auto space-y-0.5 mb-3">
+                                    {allSeasons
+                                        .filter(s => s.id !== copyModal.targetSeasonId && s.teamCount > 0)
+                                        .map(s => (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: s.id, selectedTeamIds: new Set(teamsBySeason[s.id]?.map(t => t.id) || []) }))}
+                                                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs hover:bg-white/5 transition-colors"
+                                            >
+                                                <span className="text-[var(--color-text)] truncate">{s.label}</span>
+                                                <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{s.teamCount} team{s.teamCount !== 1 ? 's' : ''}</span>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: null, selectedTeamIds: new Set() }))}
+                                    className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] mb-2 flex items-center gap-1"
+                                >
+                                    ← Change season
+                                </button>
+                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">
+                                    Select teams to copy ({copyModal.selectedTeamIds.size} selected):
+                                </p>
+                                <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
+                                    {(teamsBySeason[copyModal.sourceSeasonId] || []).map(team => (
+                                        <label key={team.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs">
+                                            <input
+                                                type="checkbox"
+                                                checked={copyModal.selectedTeamIds.has(team.id)}
+                                                onChange={() => setCopyModal(prev => {
+                                                    const next = new Set(prev.selectedTeamIds)
+                                                    if (next.has(team.id)) next.delete(team.id); else next.add(team.id)
+                                                    return { ...prev, selectedTeamIds: next }
+                                                })}
+                                                className="accent-[var(--color-accent)]"
+                                            />
+                                            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
+                                            <span className="text-[var(--color-text)]">{team.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => {
+                                            const all = teamsBySeason[copyModal.sourceSeasonId]?.map(t => t.id) || []
+                                            setCopyModal(prev => ({
+                                                ...prev,
+                                                selectedTeamIds: prev.selectedTeamIds.size === all.length ? new Set() : new Set(all)
+                                            }))
+                                        }}
+                                        className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                                    >
+                                        {copyModal.selectedTeamIds.size === (teamsBySeason[copyModal.sourceSeasonId]?.length || 0) ? 'Deselect all' : 'Select all'}
+                                    </button>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                                        <button
+                                            onClick={handleCopyTeams}
+                                            disabled={copyModal.selectedTeamIds.size === 0}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Copy {copyModal.selectedTeamIds.size} team{copyModal.selectedTeamIds.size !== 1 ? 's' : ''}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {!copyModal.sourceSeasonId && (
+                            <div className="flex justify-end">
+                                <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -428,12 +545,20 @@ export default function LeagueManager() {
                                                                                     />
                                                                                 </div>
                                                                             ) : (
-                                                                                <button
-                                                                                    onClick={() => setCreateItem({ type: 'team', season_id: season.id, name: '', color: '#3b82f6' })}
-                                                                                    className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors py-1"
-                                                                                >
-                                                                                    <Plus className="w-3 h-3" /> Add team
-                                                                                </button>
+                                                                                <div className="flex items-center gap-3 py-1">
+                                                                                    <button
+                                                                                        onClick={() => setCreateItem({ type: 'team', season_id: season.id, name: '', color: '#3b82f6' })}
+                                                                                        className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+                                                                                    >
+                                                                                        <Plus className="w-3 h-3" /> Add team
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => setCopyModal({ targetSeasonId: season.id, sourceSeasonId: null, selectedTeamIds: new Set() })}
+                                                                                        className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+                                                                                    >
+                                                                                        <Copy className="w-3 h-3" /> Copy from season...
+                                                                                    </button>
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     )}
