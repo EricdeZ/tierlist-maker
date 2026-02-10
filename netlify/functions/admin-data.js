@@ -22,14 +22,12 @@ export const handler = async (event) => {
         `
 
         const teams = await sql`
-            SELECT DISTINCT
+            SELECT
                 t.id as team_id, t.name as team_name, t.slug as team_slug, t.color,
-                lp.season_id
+                t.season_id
             FROM teams t
-            JOIN league_players lp ON lp.team_id = t.id
-            JOIN seasons s ON lp.season_id = s.id
-            WHERE s.is_active = true AND lp.is_active = true
-            GROUP BY t.id, t.name, t.slug, t.color, lp.season_id
+            JOIN seasons s ON t.season_id = s.id
+            WHERE s.is_active = true
             ORDER BY t.name
         `
 
