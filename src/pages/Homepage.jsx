@@ -89,7 +89,13 @@ const Homepage = () => {
         fetchStats()
     }, [leagues])
 
-    const mainLeagues = leagues
+    const mainLeagues = [...leagues]
+        .filter(l => l.name?.toLowerCase() !== 'test league')
+        .sort((a, b) => {
+            const aActive = a.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
+            const bActive = b.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
+            return aActive - bActive
+        })
     const hasActiveLeagues = mainLeagues.some(l =>
         l.divisions?.some(d => d.seasons?.some(s => s.is_active))
     )
@@ -596,48 +602,74 @@ const Homepage = () => {
                                         </div>
                                     </div>
 
-                                    {isActive && (
+                                    {divisions.length > 0 && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {divisions.filter(d => d.seasons?.some(s => s.is_active)).map(division => {
+                                            {divisions.map(division => {
                                                 const rankImg = RANK_IMAGES[division.tier]
                                                 const rankLabel = RANK_LABELS[division.tier]
                                                 const activeSeason = division.seasons?.find(s => s.is_active)
+                                                const divActive = !!activeSeason
+
+                                                if (divActive) {
+                                                    return (
+                                                        <Link
+                                                            key={division.id}
+                                                            to={`/${league.slug}/${division.slug}`}
+                                                            className="group relative overflow-hidden rounded-xl border border-white/10 hover:border-white/20 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                                                            style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                                                        >
+                                                            <div
+                                                                className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}, transparent)` }}
+                                                            />
+                                                            <div className="p-5">
+                                                                <div className="flex items-center gap-3 mb-3">
+                                                                    {rankImg && (
+                                                                        <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
+                                                                    )}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <h4 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
+                                                                            {division.name}
+                                                                        </h4>
+                                                                        {rankLabel && (
+                                                                            <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
+                                                                                {rankLabel} Tier
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <ChevronRight className="w-5 h-5 text-(--color-text-secondary) group-hover:translate-x-1 transition-all shrink-0" />
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                                                    {activeSeason.name}
+                                                                </div>
+                                                            </div>
+                                                        </Link>
+                                                    )
+                                                }
 
                                                 return (
-                                                    <Link
+                                                    <div
                                                         key={division.id}
-                                                        to={`/${league.slug}/${division.slug}`}
-                                                        className="group relative overflow-hidden rounded-xl border border-white/10 hover:border-white/20 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
-                                                        style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                                                        className="rounded-xl border border-white/5 bg-(--color-secondary)/50 p-5 opacity-35"
                                                     >
-                                                        <div
-                                                            className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}, transparent)` }}
-                                                        />
-                                                        <div className="p-5">
-                                                            <div className="flex items-center gap-3 mb-3">
-                                                                {rankImg && (
-                                                                    <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
+                                                        <div className="flex items-center gap-3">
+                                                            {rankImg && (
+                                                                <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-heading text-lg font-bold text-(--color-text) truncate">
+                                                                    {division.name}
+                                                                </h4>
+                                                                {rankLabel && (
+                                                                    <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
+                                                                        {rankLabel} Tier
+                                                                    </span>
                                                                 )}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <h4 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
-                                                                        {division.name}
-                                                                    </h4>
-                                                                    {rankLabel && (
-                                                                        <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
-                                                                            {rankLabel} Tier
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <ChevronRight className="w-5 h-5 text-(--color-text-secondary) group-hover:translate-x-1 transition-all shrink-0" />
-                                                            </div>
-
-                                                            <div className="flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                                                                {activeSeason.name}
                                                             </div>
                                                         </div>
-                                                    </Link>
+                                                    </div>
                                                 )
                                             })}
                                         </div>
