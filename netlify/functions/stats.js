@@ -36,7 +36,10 @@ export const handler = async (event) => {
                         pgs.mitigated,
                         pgs.god_played,
                         pgs.team_side,
-                        lp.team_id as player_team_id
+                        CASE pgs.team_side
+                            WHEN 1 THEN m.team1_id
+                            WHEN 2 THEN m.team2_id
+                        END as player_team_id
                     FROM player_game_stats pgs
                     JOIN league_players lp ON pgs.league_player_id = lp.id
                     JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
@@ -73,12 +76,14 @@ export const handler = async (event) => {
                             COALESCE(AVG(pgs.damage), 0) as avg_damage,
                             COALESCE(AVG(pgs.mitigated), 0) as avg_mitigated,
                             COUNT(DISTINCT pgs.game_id) FILTER (
-                                WHERE g.winner_team_id = (
-                                    SELECT lp2.team_id FROM league_players lp2 WHERE lp2.id = pgs.league_player_id
-                                )
+                                WHERE g.winner_team_id = CASE pgs.team_side
+                                    WHEN 1 THEN m.team1_id
+                                    WHEN 2 THEN m.team2_id
+                                END
                             ) as wins
                         FROM player_game_stats pgs
                         JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+                        JOIN matches m ON g.match_id = m.id
                         GROUP BY pgs.league_player_id
                     )
                     SELECT
