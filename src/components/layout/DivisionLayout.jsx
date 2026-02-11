@@ -95,7 +95,7 @@ const DivisionNav = () => {
                         )}
                         <div className="leading-tight">
                             <div className="text-[10px] sm:text-xs text-(--nav-text) uppercase tracking-wider">
-                                {loading ? '...' : league?.name || leagueSlug}
+                                {loading ? '...' : leagueSlug.toUpperCase()}
                             </div>
                             <div className="text-xs sm:text-sm font-bold text-(--color-text)">
                                 {loading ? '...' : division?.name || divisionSlug}

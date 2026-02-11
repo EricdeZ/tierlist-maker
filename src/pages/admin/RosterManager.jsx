@@ -782,7 +782,7 @@ function TeamCard({
 
     return (
         <div
-            className={`rounded-xl border overflow-hidden transition-all duration-200 ${
+            className={`rounded-xl border transition-all duration-200 ${
                 isDragOver && isValidTarget
                     ? 'border-blue-400/50 bg-blue-500/5 scale-[1.02] shadow-lg shadow-blue-500/10'
                     : isSameTeam && hasDraggedPlayer
@@ -796,7 +796,7 @@ function TeamCard({
             onDrop={onDrop}
         >
             {/* Team color bar */}
-            <div className="h-1.5" style={{ backgroundColor: team.color }} />
+            <div className="h-1.5 rounded-t-xl" style={{ backgroundColor: team.color }} />
 
             {/* Team header */}
             <div className="px-4 pt-3 pb-2 flex items-center justify-between">
