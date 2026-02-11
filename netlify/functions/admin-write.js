@@ -62,7 +62,7 @@ export const handler = async (event) => {
  * Expects pre-edited data from the admin dashboard.
  */
 async function submitMatch(sql, body, admin) {
-    const { season_id, team1_id, team2_id, week, date, best_of, games } = body
+    const { season_id, team1_id, team2_id, week, date, best_of, games, scheduled_match_id } = body
 
     if (!season_id || !team1_id || !team2_id || !games?.length) {
         return {
@@ -176,8 +176,21 @@ async function submitMatch(sql, body, admin) {
             return { match_id: matchId, games: gameResults }
         })
 
+        // Link scheduled match if provided
+        if (scheduled_match_id) {
+            try {
+                await sql`
+                    UPDATE scheduled_matches
+                    SET status = 'completed', match_id = ${result.match_id}, updated_at = NOW()
+                    WHERE id = ${scheduled_match_id} AND status = 'scheduled'
+                `
+            } catch (e) {
+                console.error('Failed to update scheduled match:', e)
+            }
+        }
+
         if (admin) {
-            await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length } })
+            await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length, scheduled_match_id: scheduled_match_id || null } })
         }
 
         return {

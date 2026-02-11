@@ -84,10 +84,24 @@ export const handler = async (event) => {
             ORDER BY name
         `
 
+        // Scheduled matches (pending) for linking during match report
+        const scheduledMatches = await sql`
+            SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
+                   sm.best_of, sm.scheduled_date, sm.week, sm.status,
+                   t1.name as team1_name, t1.color as team1_color,
+                   t2.name as team2_name, t2.color as team2_color
+            FROM scheduled_matches sm
+            JOIN teams t1 ON sm.team1_id = t1.id
+            JOIN teams t2 ON sm.team2_id = t2.id
+            WHERE sm.season_id IN (SELECT id FROM seasons WHERE is_active = true)
+              AND sm.status = 'scheduled'
+            ORDER BY sm.scheduled_date ASC
+        `
+
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases, gods }),
+            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases, gods, scheduledMatches }),
         }
     } catch (error) {
         console.error('Admin data error:', error)

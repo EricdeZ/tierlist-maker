@@ -62,6 +62,20 @@ const tools = [
         btnClass: 'bg-amber-600 hover:bg-amber-700',
     },
     {
+        title: 'Schedule Manager',
+        description: 'Create and manage match schedules. Set dates, weeks, and matchups for upcoming games. Track match status from scheduled through completion.',
+        path: '/admin/schedule',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+            </svg>
+        ),
+        accent: 'from-cyan-500/20 to-cyan-600/5',
+        border: 'border-cyan-500/20 hover:border-cyan-500/40',
+        iconColor: 'text-cyan-400',
+        btnClass: 'bg-cyan-600 hover:bg-cyan-700',
+    },
+    {
         title: 'League Manager',
         description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
         path: '/admin/leagues',

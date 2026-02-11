@@ -119,6 +119,32 @@ export default function AdminDashboard() {
         }])
     }
 
+    // ─── Add match report from scheduled match (pre-filled) ───
+    const addScheduledMatchReport = (sm) => {
+        const id = uid()
+        liveImagesRef.current[id] = []
+        setMatchReports(prev => [...prev, {
+            id,
+            text: '',
+            images: [],
+            status: 'review',
+            result: null,
+            editData: {
+                season_id: sm.season_id,
+                team1_id: sm.team1_id,
+                team2_id: sm.team2_id,
+                team1_name: sm.team1_name,
+                team2_name: sm.team2_name,
+                week: sm.week || null,
+                date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
+                best_of: sm.best_of || 3,
+                scheduled_match_id: sm.id,
+                games: [],
+            },
+            error: null,
+        }])
+    }
+
     // ─── Add images to a report ───
     const addImages = useCallback((mrId, files) => {
         const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -271,6 +297,7 @@ export default function AdminDashboard() {
                 week: ed.week || null,
                 date: ed.date || new Date().toISOString().split('T')[0],
                 best_of: ed.best_of || 3,
+                scheduled_match_id: ed.scheduled_match_id || null,
                 games: ed.games.map(g => {
                     // Forfeit games: no player stats needed
                     if (g.is_forfeit) {
@@ -379,6 +406,15 @@ export default function AdminDashboard() {
         submitted: matchReports.filter(m => m.status === 'submitted').length,
     }
 
+    // ─── Scheduled matches for sidebar ───
+    const scheduledForSeason = (adminData?.scheduledMatches || []).filter(
+        sm => String(sm.season_id) === String(selectedSeasonId)
+    )
+    // Track which scheduled matches already have a report in progress
+    const linkedScheduledIds = new Set(
+        matchReports.map(r => r.editData?.scheduled_match_id).filter(Boolean)
+    )
+
     return (
         <div className="max-w-7xl mx-auto py-8 px-4">
             {/* Header */}
@@ -395,6 +431,9 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-3">
                     <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         ← Dashboard
+                    </Link>
+                    <Link to="/admin/schedule" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                        Schedule
                     </Link>
                     <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
                         Match Manager
@@ -418,6 +457,58 @@ export default function AdminDashboard() {
 
             {adminError && <ErrorBanner message={`Admin data: ${adminError}`} className="mb-4" />}
 
+            <div className="flex gap-6">
+            {/* ─── Scheduled matches sidebar ─── */}
+            {selectedSeasonId && scheduledForSeason.length > 0 && (
+                <div className="w-64 shrink-0">
+                    <div className="sticky top-4 bg-[var(--color-secondary)] border border-white/10 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">Upcoming</h3>
+                            <span className="text-[10px] text-[var(--color-text-secondary)]">{scheduledForSeason.length} match{scheduledForSeason.length !== 1 ? 'es' : ''}</span>
+                        </div>
+                        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto divide-y divide-white/5">
+                            {scheduledForSeason.map(sm => {
+                                const isLinked = linkedScheduledIds.has(sm.id)
+                                return (
+                                    <div key={sm.id} className={`px-3 py-2.5 ${isLinked ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team1_color || '#3b82f6' }} />
+                                            <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team1_name}</span>
+                                            <span className="text-[10px] text-[var(--color-text-secondary)]">vs</span>
+                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team2_color || '#ef4444' }} />
+                                            <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team2_name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
+                                            {sm.scheduled_date && <span>{sm.scheduled_date.slice(0, 10)}</span>}
+                                            {sm.week && <span>W{sm.week}</span>}
+                                            <span>Bo{sm.best_of}</span>
+                                            {!isLinked && (
+                                                <button
+                                                    onClick={() => addScheduledMatchReport(sm)}
+                                                    className="ml-auto px-1.5 py-0.5 rounded text-cyan-400 hover:bg-cyan-500/15 font-semibold transition-colors"
+                                                >
+                                                    Report
+                                                </button>
+                                            )}
+                                            {isLinked && (
+                                                <span className="ml-auto text-cyan-400/60">In progress</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div className="px-3 py-2 border-t border-white/10">
+                            <Link to="/admin/schedule" className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                                Manage Schedule &rarr;
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Main content ─── */}
+            <div className="flex-1 min-w-0">
             {/* Action bar */}
             <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
@@ -534,6 +625,8 @@ export default function AdminDashboard() {
                     </button>
                 </div>
             )}
+            </div>{/* end main content */}
+            </div>{/* end flex row */}
         </div>
     )
 }
@@ -855,12 +948,46 @@ function MatchReportCard({
 // ═══════════════════════════════════════════════════
 function EditableMatchData({ editData, adminData, result, onChange }) {
     const [activeGame, setActiveGame] = useState(0)
+    const [dismissedSuggestion, setDismissedSuggestion] = useState(null)
     const ed = editData
     if (!ed) return null
 
     const teamsForSeason = adminData?.teams?.filter(t => String(t.season_id) === String(ed.season_id)) || []
     const team1 = teamsForSeason.find(t => String(t.team_id) === String(ed.team1_id))
     const team2 = teamsForSeason.find(t => String(t.team_id) === String(ed.team2_id))
+
+    // Scheduled matches for current season
+    const scheduledForSeason = (adminData?.scheduledMatches || []).filter(
+        sm => String(sm.season_id) === String(ed.season_id)
+    )
+
+    // Auto-detect matching scheduled match (teams match in either order)
+    const suggestedMatch = (!ed.scheduled_match_id && ed.team1_id && ed.team2_id)
+        ? scheduledForSeason.find(sm => {
+            const t1 = String(sm.team1_id), t2 = String(sm.team2_id)
+            const et1 = String(ed.team1_id), et2 = String(ed.team2_id)
+            return (t1 === et1 && t2 === et2) || (t1 === et2 && t2 === et1)
+        })
+        : null
+
+    const showSuggestion = suggestedMatch && String(dismissedSuggestion) !== String(suggestedMatch.id)
+
+    const linkScheduledMatch = (sm) => {
+        onChange({
+            ...ed,
+            team1_id: sm.team1_id,
+            team2_id: sm.team2_id,
+            date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : ed.date,
+            week: sm.week || ed.week,
+            best_of: sm.best_of || ed.best_of,
+            scheduled_match_id: sm.id,
+        })
+        setDismissedSuggestion(null)
+    }
+
+    const unlinkScheduledMatch = () => {
+        onChange({ ...ed, scheduled_match_id: null })
+    }
 
     const updateField = (key, value) => onChange({ ...ed, [key]: value })
     const updateGame = (gameIdx, gameUpdater) => {
@@ -874,12 +1001,17 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
     // Validation from text parse
     const gw = result?.game_winners
 
+    // Currently linked scheduled match
+    const linkedMatch = ed.scheduled_match_id
+        ? scheduledForSeason.find(sm => sm.id === ed.scheduled_match_id)
+        : null
+
     return (
         <div>
             {/* ─── Match metadata fields ─── */}
             <div className="px-4 py-3 border-t border-[var(--color-border)] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                 <FieldSelect label="Season" value={ed.season_id || ''}
-                             onChange={v => onChange({ ...ed, season_id: v ? parseInt(v) : null, team1_id: null, team2_id: null })}
+                             onChange={v => onChange({ ...ed, season_id: v ? parseInt(v) : null, team1_id: null, team2_id: null, scheduled_match_id: null })}
                              options={(adminData?.seasons || []).map(s => ({ value: s.season_id, label: `${s.league_name} / ${s.division_name}` }))} />
                 <FieldSelect label="Team 1" value={ed.team1_id || ''}
                              onChange={v => updateField('team1_id', v ? parseInt(v) : null)}
@@ -893,6 +1025,67 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                 <FieldInput label="Week" type="number" value={ed.week || ''} onChange={v => updateField('week', v ? parseInt(v) : null)} />
                 <FieldInput label="Best Of" type="number" value={ed.best_of || 3} onChange={v => updateField('best_of', v ? parseInt(v) : 3)} />
             </div>
+
+            {/* ─── Scheduled match selector ─── */}
+            {scheduledForSeason.length > 0 && (
+                <div className="px-4 py-2 border-t border-[var(--color-border)]">
+                    {linkedMatch ? (
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-medium">
+                                Linked: {linkedMatch.team1_name} vs {linkedMatch.team2_name}
+                                {linkedMatch.scheduled_date && ` — ${linkedMatch.scheduled_date.slice(0, 10)}`}
+                                {linkedMatch.week && ` (W${linkedMatch.week})`}
+                            </span>
+                            <button onClick={unlinkScheduledMatch}
+                                    className="text-[var(--color-text-secondary)] hover:text-red-400 transition-colors">
+                                ✕ Unlink
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <label className="text-[10px] text-[var(--color-text-secondary)] font-medium shrink-0">Scheduled Match</label>
+                            <select
+                                value=""
+                                onChange={e => {
+                                    const sm = scheduledForSeason.find(s => String(s.id) === e.target.value)
+                                    if (sm) linkScheduledMatch(sm)
+                                }}
+                                className="rounded px-2 py-1 text-xs border max-w-md"
+                                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                            >
+                                <option value="">— Select to auto-fill —</option>
+                                {scheduledForSeason.map(sm => (
+                                    <option key={sm.id} value={sm.id}>
+                                        {sm.team1_name} vs {sm.team2_name}
+                                        {sm.scheduled_date ? ` — ${sm.scheduled_date.slice(0, 10)}` : ''}
+                                        {sm.week ? ` (W${sm.week})` : ''}
+                                        {` Bo${sm.best_of}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ─── Auto-suggestion banner ─── */}
+            {showSuggestion && (
+                <div className="mx-4 mt-2 flex items-center gap-3 text-xs px-3 py-2 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+                    <span>
+                        Matches scheduled: <strong>{suggestedMatch.team1_name} vs {suggestedMatch.team2_name}</strong>
+                        {suggestedMatch.scheduled_date && ` on ${suggestedMatch.scheduled_date.slice(0, 10)}`}
+                        {suggestedMatch.week && ` (Week ${suggestedMatch.week})`}
+                    </span>
+                    <button onClick={() => linkScheduledMatch(suggestedMatch)}
+                            className="px-2 py-0.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-colors">
+                        Link
+                    </button>
+                    <button onClick={() => setDismissedSuggestion(suggestedMatch.id)}
+                            className="text-cyan-400/60 hover:text-cyan-400 transition-colors">
+                        Dismiss
+                    </button>
+                </div>
+            )}
 
             {/* ─── Validation banner ─── */}
             {gw?.validation && (
