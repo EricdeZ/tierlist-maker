@@ -13,6 +13,7 @@ const PERMISSION_KEYS = [
     { key: 'user_manage',       label: 'User Manage',       description: 'Manage Discord-authenticated users', scopeable: false },
     { key: 'claim_manage',      label: 'Claim Manage',      description: 'Review player claim requests', scopeable: false },
     { key: 'permission_manage', label: 'Permission Manage', description: 'Create roles, assign permissions to users', scopeable: false },
+    { key: 'audit_log_view',   label: 'Audit Log',         description: 'View the audit log of all admin actions', scopeable: false },
 ]
 
 const VALID_KEYS = PERMISSION_KEYS.map(p => p.key)
@@ -221,9 +222,13 @@ async function setRolePermissions(sql, { role_id, permissions }, admin) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Role not found' }) }
     }
 
-    // Owner must always have permission_manage
-    if (role.name === 'Owner' && !permissions.includes('permission_manage')) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Owner role must retain the permission_manage permission' }) }
+    // Owner must always have permission_manage and audit_log_view
+    if (role.name === 'Owner') {
+        const required = ['permission_manage', 'audit_log_view']
+        const missing = required.filter(k => !permissions.includes(k))
+        if (missing.length) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: `Owner role must retain: ${missing.join(', ')}` }) }
+        }
     }
 
     // Replace permissions in a transaction

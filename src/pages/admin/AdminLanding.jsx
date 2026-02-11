@@ -117,6 +117,20 @@ const tools = [
         iconColor: 'text-yellow-400',
         btnClass: 'bg-yellow-600 hover:bg-yellow-700',
     },
+    {
+        title: 'Audit Log',
+        description: 'View a chronological log of all admin actions. Filter by user, endpoint, action, and date range to track changes and investigate issues.',
+        path: '/admin/auditlog',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+        ),
+        accent: 'from-orange-500/20 to-orange-600/5',
+        border: 'border-orange-500/20 hover:border-orange-500/40',
+        iconColor: 'text-orange-400',
+        btnClass: 'bg-orange-600 hover:bg-orange-700',
+    },
 ]
 
 export default function AdminLanding() {
