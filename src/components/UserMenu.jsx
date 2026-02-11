@@ -49,11 +49,11 @@ export default function UserMenu({ compact = false }) {
                     </div>
                 )}
                 {!compact && (
-                    <span className="text-sm text-(--color-text) font-medium max-w-[100px] truncate">
+                    <span className="hidden sm:inline text-sm text-(--color-text) font-medium max-w-[100px] truncate">
                         {user.discord_username}
                     </span>
                 )}
-                <svg className={`w-3 h-3 text-(--color-text-secondary) transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <svg className={`w-2.5 h-2.5 sm:w-3 sm:h-3 text-(--color-text-secondary) transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
@@ -70,9 +70,9 @@ export default function UserMenu({ compact = false }) {
                     </div>
 
                     <div className="py-1">
-                        {linkedPlayer && linkedPlayer.league_slug && linkedPlayer.division_slug && (
+                        {linkedPlayer && (
                             <Link
-                                to={`/${linkedPlayer.league_slug}/${linkedPlayer.division_slug}/players/${linkedPlayer.slug}`}
+                                to={`/profile/${linkedPlayer.slug}`}
                                 onClick={() => setOpen(false)}
                                 className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
                             >

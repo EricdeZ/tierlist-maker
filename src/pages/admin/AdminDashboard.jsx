@@ -270,7 +270,7 @@ export default function AdminDashboard() {
                 team2_id: ed.team2_id,
                 week: ed.week || null,
                 date: ed.date || new Date().toISOString().split('T')[0],
-                best_of: ed.best_of || ed.games.length,
+                best_of: ed.best_of || 3,
                 games: ed.games.map(g => {
                     // Forfeit games: no player stats needed
                     if (g.is_forfeit) {
@@ -582,7 +582,7 @@ function buildEditData(result) {
         team2_name: pm0?.inferred?.right_team_name || null,
         week: null,
         date: new Date().toISOString().split('T')[0],
-        best_of: meta?.best_of || games.length || 3,
+        best_of: 3,
         games,
     }
 }
@@ -891,7 +891,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                              color={team2?.color} />
                 <FieldInput label="Date" type="date" value={ed.date || ''} onChange={v => updateField('date', v)} />
                 <FieldInput label="Week" type="number" value={ed.week || ''} onChange={v => updateField('week', v ? parseInt(v) : null)} />
-                <FieldInput label="Best Of" type="number" value={ed.best_of || ''} onChange={v => updateField('best_of', v ? parseInt(v) : null)} />
+                <FieldInput label="Best Of" type="number" value={ed.best_of || 3} onChange={v => updateField('best_of', v ? parseInt(v) : 3)} />
             </div>
 
             {/* ─── Validation banner ─── */}

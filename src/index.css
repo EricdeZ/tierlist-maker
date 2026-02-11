@@ -41,3 +41,23 @@ h1, h2, h3, h4, h5, h6 {
 .smite-logo {
   color: var(--color-accent);
 }
+
+/* Draft simulator scrollbar */
+.draft-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.draft-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+.draft-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.draft-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.draft-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.03);
+}

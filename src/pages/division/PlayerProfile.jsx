@@ -152,6 +152,12 @@ const PlayerProfile = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                        <Link
+                            to={`/profile/${player.slug}`}
+                            className="text-sm bg-white/10 text-(--color-text) px-4 py-2 rounded-lg font-semibold hover:bg-white/15 transition-colors"
+                        >
+                            Full Profile
+                        </Link>
                         {player.tracker_url && (
                             <a
                                 href={player.tracker_url}

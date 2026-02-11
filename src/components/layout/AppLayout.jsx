@@ -11,7 +11,7 @@ const AppLayout = () => {
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
             {/* Global user menu — top right, visible on non-division pages */}
             {!loading && (
-                <div className="fixed top-4 right-4 z-50">
+                <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50">
                     <UserMenu />
                 </div>
             )}

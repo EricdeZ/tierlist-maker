@@ -125,3 +125,15 @@ export const standingsService = {
     }
 }
 
+export const profileService = {
+    async getPlayerProfile(slug) {
+        return apiCall('player-profile', { slug })
+    }
+}
+
+export const godService = {
+    async getAll() {
+        return apiCall('gods')
+    }
+}
+
