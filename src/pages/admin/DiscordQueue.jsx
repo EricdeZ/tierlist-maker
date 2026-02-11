@@ -124,8 +124,16 @@ export default function DiscordQueue() {
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error)
-            const totalNew = data.results?.reduce((s, r) => s + (r.newImages || 0), 0) || 0
-            showToast('success', `Poll complete — ${totalNew} new image${totalNew !== 1 ? 's' : ''} found`)
+            const results = data.results || []
+            const totalNew = results.reduce((s, r) => s + (r.newImages || 0), 0)
+            const totalMsgs = results.reduce((s, r) => s + (r.totalMessages || 0), 0)
+            const errors = results.filter(r => r.error)
+
+            if (errors.length) {
+                showToast('error', `Poll errors: ${errors.map(e => `${e.channelName || e.channelId}: ${e.error}`).join('; ')}`)
+            } else {
+                showToast('success', `Poll complete — ${totalNew} new image${totalNew !== 1 ? 's' : ''} from ${totalMsgs} message${totalMsgs !== 1 ? 's' : ''}`)
+            }
             fetchQueue()
             // Refresh channels for updated poll times
             const chRes = await fetch(`${API}/discord-queue?action=channels`, { headers: getAuthHeaders() })
