@@ -33,6 +33,7 @@ import ClaimManager from "./pages/admin/ClaimManager.jsx";
 import PermissionManager from "./pages/admin/PermissionManager.jsx";
 import AuditLog from "./pages/admin/AuditLog.jsx";
 import ScheduleManager from "./pages/admin/ScheduleManager.jsx";
+import DiscordQueue from "./pages/admin/DiscordQueue.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
 import TierListPage from "./pages/TierListPage.jsx";
@@ -60,6 +61,7 @@ function App() {
                             <Route path="admin/permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
                             <Route path="admin/auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
                             <Route path="admin/schedule" element={<ProtectedRoute requireAdmin><ScheduleManager /></ProtectedRoute>} />
+                            <Route path="admin/discord" element={<ProtectedRoute requireAdmin><DiscordQueue /></ProtectedRoute>} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

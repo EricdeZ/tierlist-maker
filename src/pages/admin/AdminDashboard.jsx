@@ -1,7 +1,7 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
@@ -30,6 +30,7 @@ const uid = () => `mr_${_uid++}`
 // MAIN DASHBOARD
 // ═══════════════════════════════════════════════════
 export default function AdminDashboard() {
+    const location = useLocation()
     const [matchReports, setMatchReports] = useState(() => loadStorage())
     const [processing, setProcessing] = useState(false)
     const [submitting, setSubmitting] = useState({}) // { [mrId]: true }
@@ -63,6 +64,45 @@ export default function AdminDashboard() {
 
     // Persist on change
     useEffect(() => { saveStorage(matchReports) }, [matchReports])
+
+    // ─── Handle pre-loaded images from Discord Queue ───
+    useEffect(() => {
+        if (!location.state?.discordImages) return
+
+        const { discordImages, discordText, discordQueueItemIds } = location.state
+
+        const id = uid()
+        const liveImages = discordImages.map((img, i) => {
+            const byteString = atob(img.data)
+            const ab = new ArrayBuffer(byteString.length)
+            const ia = new Uint8Array(ab)
+            for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
+            const blob = new Blob([ab], { type: img.media_type || 'image/png' })
+            const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
+            return {
+                id: `img_${Date.now()}_${i}`,
+                name: file.name,
+                file,
+                preview: URL.createObjectURL(blob),
+            }
+        })
+
+        liveImagesRef.current[id] = liveImages
+
+        setMatchReports(prev => [...prev, {
+            id,
+            text: discordText || '',
+            images: liveImages.map(img => ({ id: img.id, name: img.name })),
+            status: 'pending',
+            result: null,
+            editData: null,
+            error: null,
+            discordQueueItemIds: discordQueueItemIds || [],
+        }])
+
+        // Clear navigation state to prevent re-adding on re-render
+        window.history.replaceState({}, document.title)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Persist selected season
     const handleSeasonChange = (id) => {
@@ -362,6 +402,19 @@ export default function AdminDashboard() {
 
             setSubmitResults(prev => ({ ...prev, [id]: { success: true, data } }))
             updateReport(id, { status: 'submitted', error: null })
+
+            // If this match report came from Discord Queue, mark items as used
+            if (mr.discordQueueItemIds?.length) {
+                fetch(`${API}/discord-queue`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        action: 'mark-used',
+                        queue_item_ids: mr.discordQueueItemIds,
+                        match_id: data.match_id || null,
+                    }),
+                }).catch(err => console.error('Failed to mark Discord queue items:', err))
+            }
         } catch (err) {
             setSubmitResults(prev => ({ ...prev, [id]: { success: false, error: err.message } }))
             updateReport(id, { error: err.message })

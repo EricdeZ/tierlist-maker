@@ -253,6 +253,47 @@ Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_
 CHECK (team1_id <> team2_id)
 CHECK (status IN ('scheduled', 'completed', 'cancelled'))
 
+### discord_channels
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| channel_id | varchar(32) | NO | UNIQUE |
+| channel_name | varchar(255) | YES | |
+| guild_id | varchar(32) | NO | |
+| guild_name | varchar(255) | YES | |
+| division_id | integer | NO | FK → divisions.id (CASCADE) |
+| is_active | boolean | NO | true |
+| last_message_id | varchar(32) | YES | |
+| last_polled_at | timestamptz | YES | |
+| created_by | integer | YES | FK → users.id (SET NULL) |
+| created_at | timestamptz | YES | NOW() |
+| updated_at | timestamptz | YES | NOW() |
+
+### discord_queue
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| channel_id | integer | NO | FK → discord_channels.id (CASCADE) |
+| message_id | varchar(32) | NO | |
+| attachment_id | varchar(32) | NO | |
+| attachment_filename | varchar(500) | YES | |
+| attachment_url | text | NO | |
+| attachment_size | integer | YES | |
+| attachment_width | integer | YES | |
+| attachment_height | integer | YES | |
+| message_content | text | YES | |
+| author_id | varchar(32) | YES | |
+| author_name | varchar(100) | YES | |
+| message_timestamp | timestamptz | NO | |
+| status | varchar(20) | NO | 'pending' |
+| used_in_match_id | integer | YES | FK → matches.id (SET NULL) |
+| processed_by | integer | YES | FK → users.id (SET NULL) |
+| processed_at | timestamptz | YES | |
+| created_at | timestamptz | YES | NOW() |
+
+UNIQUE(message_id, attachment_id)
+CHECK (status IN ('pending', 'processing', 'used', 'skipped'))
+
 ## Views
 
 ### season_hierarchy
@@ -317,15 +358,18 @@ Denormalized view of team rosters with player details.
 ```
 leagues
   ├── divisions (league_id)
-  │    └── seasons (league_id, division_id)
-  │         ├── teams (season_id)
-  │         │    └── league_players (team_id, season_id)
-  │         │         └── player_game_stats (league_player_id)
-  │         ├── matches (season_id, team1_id, team2_id)
-  │         │    └── games (match_id)
-  │         │         └── player_game_stats (game_id)
-  │         └── scheduled_matches (season_id, team1_id, team2_id)
-  │              └── matches (match_id, optional link)
+  │    ├── seasons (league_id, division_id)
+  │    │    ├── teams (season_id)
+  │    │    │    └── league_players (team_id, season_id)
+  │    │    │         └── player_game_stats (league_player_id)
+  │    │    ├── matches (season_id, team1_id, team2_id)
+  │    │    │    └── games (match_id)
+  │    │    │         └── player_game_stats (game_id)
+  │    │    └── scheduled_matches (season_id, team1_id, team2_id)
+  │    │         └── matches (match_id, optional link)
+  │    └── discord_channels (division_id)
+  │         └── discord_queue (channel_id)
+  │              └── matches (used_in_match_id, optional link)
   └── user_roles (league_id, optional scope)
 
 players
@@ -337,7 +381,9 @@ users
   ├── user_roles (user_id)
   ├── claim_requests (user_id, resolved_by)
   ├── audit_log (user_id)
-  └── scheduled_matches (created_by)
+  ├── scheduled_matches (created_by)
+  ├── discord_channels (created_by)
+  └── discord_queue (processed_by)
 
 gods (standalone lookup table)
 
