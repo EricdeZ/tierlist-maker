@@ -1,9 +1,9 @@
 // src/pages/Homepage.jsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
-import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Search, Shield } from 'lucide-react'
+import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Shield } from 'lucide-react'
 import smiteLogo from '../assets/smite2.png'
 import statsheetImg from '../assets/statsheet.png'
 
@@ -42,6 +42,28 @@ const Homepage = () => {
     const [leagues, setLeagues] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+
+    // Subtle interactive effects for hero section — one cursor drives everything
+    const heroRef = useRef(null)
+    const [heroLight, setHeroLight] = useState({ x: 50, y: 50, active: false })
+
+    const handleHeroMove = useCallback((e) => {
+        const el = heroRef.current
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        setHeroLight({
+            x: ((e.clientX - rect.left) / rect.width) * 100,
+            y: ((e.clientY - rect.top) / rect.height) * 100,
+            active: true,
+        })
+    }, [])
+    const handleHeroLeave = useCallback(() => {
+        setHeroLight(prev => ({ ...prev, active: false }))
+    }, [])
+
+    // Derive sheet tilt from hero cursor — very subtle
+    const sheetRy = heroLight.active ? -4 + (heroLight.x / 100 - 0.5) * 3 : -4   // base -4 ± 1.5deg
+    const sheetRx = heroLight.active ? 2 + (0.5 - heroLight.y / 100) * 2 : 2     // base  2 ± 1deg
 
     useEffect(() => {
         let cancelled = false
@@ -164,7 +186,12 @@ const Homepage = () => {
             `}</style>
 
             {/* ─── HERO SECTION ─── */}
-            <section className="relative min-h-[85vh] flex items-center px-4 py-20 overflow-hidden">
+            <section
+                ref={heroRef}
+                onMouseMove={handleHeroMove}
+                onMouseLeave={handleHeroLeave}
+                className="relative min-h-[85vh] flex items-center px-4 py-20 overflow-hidden"
+            >
                 {/* Background effects */}
                 <div className="absolute inset-0 overflow-hidden">
                     <div
@@ -200,16 +227,31 @@ const Homepage = () => {
                             <img src={smiteLogo} alt="SMITE 2" className="h-12 sm:h-14 w-auto drop-shadow-2xl" />
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-(--color-accent)/30 bg-(--color-accent)/5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-(--color-accent) animate-pulse" />
-                                <span className="text-xs font-semibold text-(--color-accent) uppercase tracking-wider">Live</span>
+                                <span className="text-xs font-semibold text-(--color-accent) uppercase tracking-wider">Community-Driven Competitive</span>
                             </div>
                         </div>
 
-                        <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black text-(--color-text) mb-5 leading-[1.1] tracking-tight">
-                            The Battleground{' '}
+                        <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black mb-5 leading-[1.1] tracking-tight">
+                            <span
+                                className="bg-clip-text text-transparent"
+                                style={{
+                                    WebkitBackgroundClip: 'text',
+                                    backgroundImage: heroLight.active
+                                        ? `radial-gradient(circle 300px at ${heroLight.x}% ${heroLight.y}%, rgba(255,255,255,1), rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.55))`
+                                        : 'linear-gradient(to right, rgba(255,255,255,0.55), rgba(255,255,255,0.55))',
+                                }}
+                            >
+                                The Battleground{' '}
+                            </span>
                             <span className="relative inline-block">
                                 <span
                                     className="bg-clip-text text-transparent"
-                                    style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent), #fde68a, var(--color-accent))' }}
+                                    style={{
+                                        WebkitBackgroundClip: 'text',
+                                        backgroundImage: heroLight.active
+                                            ? `radial-gradient(circle 300px at ${heroLight.x}% ${heroLight.y}%, #ffffff, transparent 55%), linear-gradient(135deg, var(--color-accent), #fde68a, var(--color-accent))`
+                                            : 'linear-gradient(135deg, var(--color-accent), #fde68a, var(--color-accent))',
+                                    }}
                                 >
                                     Lives On
                                 </span>
@@ -253,12 +295,23 @@ const Homepage = () => {
                         />
                         <div
                             className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60 lg:rounded-xl"
-                            style={{ transform: 'rotateY(-4deg) rotateX(2deg)' }}
+                            style={{
+                                transform: `rotateY(${sheetRy}deg) rotateX(${sheetRx}deg)`,
+                                transition: 'transform 0.4s ease-out',
+                            }}
                         >
                             <img
                                 src={statsheetImg}
                                 alt="Player stats dashboard"
                                 className="w-full h-auto block"
+                            />
+                            {/* Cursor light reflection */}
+                            <div
+                                className="absolute inset-0 pointer-events-none transition-opacity duration-500"
+                                style={{
+                                    background: `radial-gradient(circle at ${heroLight.x}% ${heroLight.y}%, rgba(255,255,255,0.04), transparent 50%)`,
+                                    opacity: heroLight.active ? 1 : 0,
+                                }}
                             />
                             {/* Bottom fade */}
                             <div
@@ -439,22 +492,22 @@ const Homepage = () => {
                 </div>
             </section>
 
-            {/* ─── TOOLS SHOWCASE ─── */}
+            {/* ─── TOOLS & PROFILE ─── */}
             <section className="py-20 px-4">
                 <div
                     className="w-2/3 h-px mx-auto mb-20"
                     style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
                 />
 
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-10">
-                        <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Tools</span>
+                        <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Your Toolkit</span>
                         <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
-                            Sharpen Your Edge
+                            More Than Just Stats
                         </h2>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-5">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {/* Draft Simulator */}
                         <Link
                             to="/draft"
@@ -472,7 +525,7 @@ const Homepage = () => {
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="w-12 h-12 rounded-xl bg-(--color-accent)/10 flex items-center justify-center">
-                                        <Shield className="w-6 h-6 text-(--color-accent)" />
+                                        <Swords className="w-6 h-6 text-(--color-accent)" />
                                     </div>
                                     <h3 className="font-heading text-xl font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                         Draft Simulator
@@ -518,38 +571,33 @@ const Homepage = () => {
                                 </span>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
 
-            {/* ─── PROFILE CTA ─── */}
-            {!authLoading && (
-                <section className="py-16 px-4">
-                    <div className="max-w-5xl mx-auto">
+                        {/* Comp Profile */}
                         <div
-                            className="relative overflow-hidden rounded-2xl border border-[#5865F2]/30 p-6 sm:p-10"
-                            style={{ background: 'linear-gradient(135deg, #5865F2/0.06, var(--color-secondary))' }}
+                            className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/20 p-6 sm:p-8"
+                            style={{ background: 'linear-gradient(135deg, #5865F2/0.04, var(--color-secondary))' }}
                         >
-                            <div className="absolute top-0 right-0 w-48 h-48 opacity-10" style={{ background: 'radial-gradient(circle at top right, #5865F2, transparent 70%)' }} />
-                            <div className="absolute bottom-0 left-0 w-32 h-32 opacity-5" style={{ background: 'radial-gradient(circle at bottom left, #5865F2, transparent 70%)' }} />
-
-                            <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6">
-                                <div className="w-14 h-14 rounded-xl bg-[#5865F2]/20 flex items-center justify-center shrink-0">
-                                    <User className="w-7 h-7 text-[#5865F2]" />
-                                </div>
-                                <div className="flex-1 text-center sm:text-left">
-                                    <h3 className="font-heading text-xl font-bold text-(--color-text) mb-1">
-                                        Track Your Stats Across Seasons
+                            <div
+                                className="absolute top-0 right-0 w-40 h-40 opacity-10"
+                                style={{ background: 'radial-gradient(circle at top right, #5865F2, transparent 70%)' }}
+                            />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 rounded-xl bg-[#5865F2]/10 flex items-center justify-center">
+                                        <User className="w-6 h-6 text-[#5865F2]" />
+                                    </div>
+                                    <h3 className="font-heading text-xl font-bold text-(--color-text)">
+                                        Comp Profile
                                     </h3>
-                                    <p className="text-sm text-(--color-text-secondary) leading-relaxed max-w-xl">
-                                        Link your Discord to claim your player profile. See your KDA, match history, and performance trends across every league and season — all in one place.
-                                    </p>
                                 </div>
-                                <div className="shrink-0">
-                                    {!user ? (
+                                <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-5">
+                                    Link your Discord to claim your player profile. Track your KDA, match history, and performance across every league and season.
+                                </p>
+                                {!authLoading && (
+                                    !user ? (
                                         <button
                                             onClick={login}
-                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
                                         >
                                             <DiscordIcon className="w-4 h-4" />
                                             Login with Discord
@@ -557,7 +605,7 @@ const Homepage = () => {
                                     ) : linkedPlayer ? (
                                         <Link
                                             to={`/profile/${linkedPlayer.slug}`}
-                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
                                         >
                                             <User className="w-4 h-4" />
                                             View My Profile
@@ -565,18 +613,18 @@ const Homepage = () => {
                                     ) : (
                                         <button
                                             onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
-                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
                                         >
                                             <User className="w-4 h-4" />
                                             Claim Your Profile
                                         </button>
-                                    )}
-                                </div>
+                                    )
+                                )}
                             </div>
                         </div>
                     </div>
-                </section>
-            )}
+                </div>
+            </section>
 
             {/* ─── WHAT IS SMITECOMP.COM? ─── */}
             <section className="py-20 px-4">
