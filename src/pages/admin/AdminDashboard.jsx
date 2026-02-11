@@ -1,5 +1,5 @@
 // src/pages/admin/AdminDashboard.jsx
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import ReactDOM from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
@@ -29,6 +29,52 @@ function saveStorage(items) {
 let _uid = Date.now()
 const uid = () => `mr_${_uid++}`
 
+// ─── Discord queue helpers ───
+function groupDiscordItems(items) {
+    const sorted = [...items].sort((a, b) => new Date(a.message_timestamp) - new Date(b.message_timestamp))
+    const groups = []
+    let cur = null
+
+    for (const item of sorted) {
+        const ts = new Date(item.message_timestamp).getTime()
+        const sameAuthor = cur?.author_id === item.author_id
+        const withinWindow = cur && (ts - cur.lastTs < 10 * 60 * 1000)
+
+        if (sameAuthor && withinWindow) {
+            cur.items.push(item)
+            cur.lastTs = ts
+            if (item.message_content) cur.texts.add(item.message_content)
+        } else {
+            cur = {
+                id: `grp_${item.id}`,
+                author_id: item.author_id,
+                author_name: item.author_name,
+                division_name: item.division_name,
+                league_name: item.league_name,
+                channel_name: item.channel_name,
+                firstTs: ts,
+                lastTs: ts,
+                texts: new Set(item.message_content ? [item.message_content] : []),
+                items: [item],
+            }
+            groups.push(cur)
+        }
+    }
+
+    return groups.reverse()
+}
+
+function timeAgo(ts) {
+    if (!ts) return ''
+    const diff = Date.now() - ts
+    const mins = Math.round(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.round(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.round(hrs / 24)}d ago`
+}
+
 // ═══════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ═══════════════════════════════════════════════════
@@ -39,10 +85,14 @@ export default function AdminDashboard() {
     const [selected, setSelected] = useState({}) // checkboxes for bulk submit
     const [bulkSubmitting, setBulkSubmitting] = useState(false)
 
+    // Discord queue state (shared across all cards)
+    const [discordItems, setDiscordItems] = useState([])
+    const [discordPolling, setDiscordPolling] = useState(false)
+
     // Floating panel state
-    const [showScheduledPanel, setShowScheduledPanel] = useState(true)
-    const [showDiscordPanel, setShowDiscordPanel] = useState(true)
-    const [activeCardId, setActiveCardId] = useState(null) // card that receives panel actions
+    const [showScheduledPanel, setShowScheduledPanel] = useState(false)
+    const [showDiscordPanel, setShowDiscordPanel] = useState(false)
+    const [activeCardId, setActiveCardId] = useState(null)
 
     // Live image refs (File objects can't go in localStorage)
     const liveImagesRef = useRef({}) // { [mrId]: [{ id, file, preview }] }
@@ -77,6 +127,94 @@ export default function AdminDashboard() {
         setSelectedSeasonId(parsed)
         if (parsed) localStorage.setItem('smite2_admin_season', String(parsed))
         else localStorage.removeItem('smite2_admin_season')
+    }
+
+    // ─── Discord queue management ───
+    const fetchDiscordQueue = useCallback(async () => {
+        try {
+            const res = await fetch(`${API}/discord-queue?action=queue`, { headers: getAuthHeaders() })
+            if (!res.ok) return
+            const data = await res.json()
+            setDiscordItems(data.items || [])
+        } catch { /* silent */ }
+    }, [])
+
+    useEffect(() => { fetchDiscordQueue() }, [fetchDiscordQueue])
+
+    const pollDiscord = useCallback(async () => {
+        setDiscordPolling(true)
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'poll-now' }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || `HTTP ${res.status}`)
+            }
+            await fetchDiscordQueue()
+        } finally {
+            setDiscordPolling(false)
+        }
+    }, [fetchDiscordQueue])
+
+    const skipDiscordItems = useCallback(async (itemIds) => {
+        try {
+            await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'update-status', queue_item_ids: itemIds, status: 'skipped' }),
+            })
+            await fetchDiscordQueue()
+        } catch { /* silent */ }
+    }, [fetchDiscordQueue])
+
+    // ─── Floating panel handlers ───
+    const handleScheduledMatchConfirm = (sm) => {
+        const mrId = activeCardId
+        if (!mrId) return
+        updateReport(mrId, prev => ({
+            ...prev,
+            editData: {
+                ...(prev.editData || {}),
+                season_id: sm.season_id,
+                team1_id: sm.team1_id,
+                team2_id: sm.team2_id,
+                team1_name: sm.team1_name,
+                team2_name: sm.team2_name,
+                week: sm.week || null,
+                date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
+                best_of: sm.best_of || 3,
+                scheduled_match_id: sm.id,
+                games: prev.editData?.games || [],
+            },
+        }))
+    }
+
+    const handleDiscordImagesConfirm = ({ images, text, queueItemIds }) => {
+        const mrId = activeCardId
+        if (!mrId) return
+
+        const newLiveImages = (images || []).map((img, i) => {
+            const byteString = atob(img.data)
+            const ab = new ArrayBuffer(byteString.length)
+            const ia = new Uint8Array(ab)
+            for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
+            const blob = new Blob([ab], { type: img.media_type || 'image/png' })
+            const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
+            return { id: `img_${Date.now()}_${i}`, name: file.name, file, preview: URL.createObjectURL(blob) }
+        })
+
+        if (!liveImagesRef.current[mrId]) liveImagesRef.current[mrId] = []
+        liveImagesRef.current[mrId].push(...newLiveImages)
+
+        updateReport(mrId, prev => ({
+            ...prev,
+            text: prev.text ? prev.text + '\n' + (text || '') : (text || ''),
+            images: [...prev.images, ...newLiveImages.map(img => ({ id: img.id, name: img.name }))],
+            discordQueueItemIds: [...(prev.discordQueueItemIds || []), ...queueItemIds],
+        }))
     }
 
     // ─── Helpers to update a report ───
@@ -126,52 +264,50 @@ export default function AdminDashboard() {
         }])
     }
 
-    // ─── Panel handlers ───
-    const handleScheduledMatchConfirm = (sm) => {
-        const mrId = activeCardId
-        if (!mrId) return
-        updateReport(mrId, prev => ({
-            ...prev,
-            editData: {
-                ...(prev.editData || {}),
-                season_id: sm.season_id,
-                team1_id: sm.team1_id,
-                team2_id: sm.team2_id,
-                team1_name: sm.team1_name,
-                team2_name: sm.team2_name,
-                week: sm.week || null,
-                date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
-                best_of: sm.best_of || 3,
-                scheduled_match_id: sm.id,
-                games: prev.editData?.games || [],
-            },
-        }))
-    }
+    // ─── Add Discord images to a report (called from inline picker) ───
+    const addDiscordImages = useCallback(async (mrId, selectedItemIds) => {
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'fetch-images', queue_item_ids: selectedItemIds }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
 
-    const handleDiscordImagesConfirm = ({ images, text, queueItemIds }) => {
-        const mrId = activeCardId
-        if (!mrId) return
+            const images = (data.images || []).filter(img => img.data)
+            if (!images.length) throw new Error('No images could be fetched')
 
-        const newLiveImages = (images || []).map((img, i) => {
-            const byteString = atob(img.data)
-            const ab = new ArrayBuffer(byteString.length)
-            const ia = new Uint8Array(ab)
-            for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
-            const blob = new Blob([ab], { type: img.media_type || 'image/png' })
-            const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
-            return { id: `img_${Date.now()}_${i}`, name: file.name, file, preview: URL.createObjectURL(blob) }
-        })
+            const newLiveImages = images.map((img, i) => {
+                const byteString = atob(img.data)
+                const ab = new ArrayBuffer(byteString.length)
+                const ia = new Uint8Array(ab)
+                for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
+                const blob = new Blob([ab], { type: img.media_type || 'image/png' })
+                const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
+                return { id: `img_${Date.now()}_${i}`, name: file.name, file, preview: URL.createObjectURL(blob) }
+            })
 
-        if (!liveImagesRef.current[mrId]) liveImagesRef.current[mrId] = []
-        liveImagesRef.current[mrId].push(...newLiveImages)
+            if (!liveImagesRef.current[mrId]) liveImagesRef.current[mrId] = []
+            liveImagesRef.current[mrId].push(...newLiveImages)
 
-        updateReport(mrId, prev => ({
-            ...prev,
-            text: prev.text ? prev.text + '\n' + (text || '') : (text || ''),
-            images: [...prev.images, ...newLiveImages.map(img => ({ id: img.id, name: img.name }))],
-            discordQueueItemIds: [...(prev.discordQueueItemIds || []), ...queueItemIds],
-        }))
-    }
+            const selectedItems = discordItems.filter(q => selectedItemIds.includes(q.id))
+            const texts = [...new Set(selectedItems.map(q => q.message_content).filter(Boolean))]
+            const text = texts.join('\n').trim()
+
+            updateReport(mrId, prev => ({
+                ...prev,
+                text: prev.text ? prev.text + '\n' + text : text,
+                images: [...prev.images, ...newLiveImages.map(img => ({ id: img.id, name: img.name }))],
+                discordQueueItemIds: [...(prev.discordQueueItemIds || []), ...selectedItemIds],
+            }))
+
+            await fetchDiscordQueue()
+            return { success: true }
+        } catch (err) {
+            return { success: false, error: err.message }
+        }
+    }, [discordItems, updateReport, fetchDiscordQueue])
 
     // ─── Add images to a report ───
     const addImages = useCallback((mrId, files) => {
@@ -449,7 +585,8 @@ export default function AdminDashboard() {
         submitted: matchReports.filter(m => m.status === 'submitted').length,
     }
 
-    // ─── Scheduled matches for sidebar ───
+    // ─── Season / scheduled matches ───
+    const selectedSeason = adminData?.seasons?.find(s => String(s.season_id) === String(selectedSeasonId)) || null
     const scheduledForSeason = (adminData?.scheduledMatches || []).filter(
         sm => String(sm.season_id) === String(selectedSeasonId)
     )
@@ -555,6 +692,28 @@ export default function AdminDashboard() {
                         </button>
                     )}
 
+                    {/* Floating panel toggles */}
+                    {selectedSeasonId && (
+                        <>
+                            <button onClick={() => setShowScheduledPanel(v => !v)}
+                                    className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                        showScheduledPanel
+                                            ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'
+                                            : 'bg-white/5 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                                    }`}>
+                                Schedule Panel
+                            </button>
+                            <button onClick={() => setShowDiscordPanel(v => !v)}
+                                    className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                        showDiscordPanel
+                                            ? 'bg-purple-500/15 border-purple-500/30 text-purple-400'
+                                            : 'bg-white/5 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                                    }`}>
+                                Discord Panel
+                            </button>
+                        </>
+                    )}
+
                     <div className="ml-auto flex items-center gap-3 text-xs">
                         {counts.total > 0 && <span className="text-[var(--color-text-secondary)]">{counts.total} total</span>}
                         {counts.review > 0 && <span className="text-yellow-400">{counts.review} review</span>}
@@ -590,9 +749,15 @@ export default function AdminDashboard() {
                         onSubmit={() => submitOne(mr)}
                         isSubmitting={!!submitting[mr.id]}
                         submitResult={submitResults[mr.id]}
-                        activeCardId={activeCardId}
+                        scheduledMatches={scheduledForSeason}
+                        linkedScheduledIds={linkedScheduledIds}
+                        discordItems={discordItems}
+                        discordPolling={discordPolling}
+                        selectedSeason={selectedSeason}
+                        onPollDiscord={pollDiscord}
+                        onAddDiscordImages={(selectedItemIds) => addDiscordImages(mr.id, selectedItemIds)}
+                        onSkipDiscordItems={skipDiscordItems}
                         onSetActiveCard={() => setActiveCardId(mr.id)}
-                        hasScheduledLink={!!mr.editData?.scheduled_match_id}
                     />
                 ))}
             </div>
@@ -615,15 +780,15 @@ export default function AdminDashboard() {
             )}
             </div>
 
-            {/* ─── Floating tool panels (always visible when season selected) ─── */}
+            {/* ─── Floating panels (toggled from action bar) ─── */}
             {selectedSeasonId && showScheduledPanel && (
                 <DraggablePanel
                     title="Scheduled Matches"
                     initialPosition={{ x: Math.max(0, window.innerWidth - 720), y: 120 }}
                     defaultWidth={340}
                     defaultHeight={360}
-                    minimized={!showScheduledPanel}
-                    onToggleMinimize={() => setShowScheduledPanel(v => !v)}
+                    minimized={false}
+                    onToggleMinimize={() => setShowScheduledPanel(false)}
                 >
                     <ScheduledMatchPanel
                         scheduledMatches={scheduledForSeason}
@@ -639,8 +804,8 @@ export default function AdminDashboard() {
                     initialPosition={{ x: Math.max(0, window.innerWidth - 370), y: 120 }}
                     defaultWidth={360}
                     defaultHeight={420}
-                    minimized={!showDiscordPanel}
-                    onToggleMinimize={() => setShowDiscordPanel(v => !v)}
+                    minimized={false}
+                    onToggleMinimize={() => setShowDiscordPanel(false)}
                 >
                     <DiscordImagesPanel
                         onConfirmSelection={handleDiscordImagesConfirm}
@@ -712,21 +877,30 @@ function MatchReportCard({
                              onAddImages, onRemoveImage, onRemove, onProcess, onRetry, onSubmit,
                              isSubmitting, submitResult,
                              confirmDelete, onConfirmRemove, onCancelRemove,
-                             activeCardId, onSetActiveCard, hasScheduledLink,
+                             scheduledMatches, linkedScheduledIds,
+                             discordItems, discordPolling, selectedSeason,
+                             onPollDiscord, onAddDiscordImages, onSkipDiscordItems,
+                             onSetActiveCard,
                          }) {
     const [expanded, setExpanded] = useState(true)
     const [pasteFlash, setPasteFlash] = useState(false)
+    const hasScheduledLink = !!report.editData?.scheduled_match_id
     // Match source: 'scheduled' or 'textbox'
     const [matchSource, setMatchSource] = useState(hasScheduledLink ? 'scheduled' : 'textbox')
     // Image source: 'paste' (default) or 'discord'
     const [imageSource, setImageSource] = useState('paste')
+    // Inline picker state
+    const [scheduleSearch, setScheduleSearch] = useState('')
+    const [discordSelectedImages, setDiscordSelectedImages] = useState({})
+    const [discordFetching, setDiscordFetching] = useState(false)
+    const [discordError, setDiscordError] = useState(null)
+    const [discordShowAll, setDiscordShowAll] = useState(false)
     const cardRef = useRef(null)
     const ed = report.editData
     const isSubmitted = report.status === 'submitted'
     const isReview = report.status === 'review'
     const isPending = report.status === 'pending'
     const isProcessing = report.status === 'processing'
-    const isActive = activeCardId === report.id
 
     // Ctrl+V paste handler for this card
     const handlePaste = useCallback((e) => {
@@ -754,6 +928,81 @@ function MatchReportCard({
 
     const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files) }
 
+    // ─── Inline scheduled match picker helpers ───
+    const handleLinkScheduled = (sm) => {
+        onUpdateEditData(prev => ({
+            ...(prev || {}),
+            season_id: sm.season_id,
+            team1_id: sm.team1_id,
+            team2_id: sm.team2_id,
+            team1_name: sm.team1_name,
+            team2_name: sm.team2_name,
+            week: sm.week || null,
+            date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
+            best_of: sm.best_of || 3,
+            scheduled_match_id: sm.id,
+            games: prev?.games || [],
+        }))
+    }
+
+    const filteredScheduled = useMemo(() => {
+        if (!scheduledMatches?.length) return []
+        const q = scheduleSearch.trim().toLowerCase()
+        if (!q) return scheduledMatches
+        return scheduledMatches.filter(sm =>
+            sm.team1_name?.toLowerCase().includes(q) ||
+            sm.team2_name?.toLowerCase().includes(q) ||
+            (sm.week && `w${sm.week}`.includes(q)) ||
+            (sm.week && `week ${sm.week}`.includes(q))
+        )
+    }, [scheduledMatches, scheduleSearch])
+
+    // ─── Inline Discord picker helpers ───
+    const filteredDiscordItems = useMemo(() => {
+        if (!discordItems?.length) return []
+        if (discordShowAll || !selectedSeason) return discordItems
+        return discordItems.filter(item =>
+            item.division_name === selectedSeason.division_name &&
+            item.league_name === selectedSeason.league_name
+        )
+    }, [discordItems, discordShowAll, selectedSeason])
+
+    const discordGroups = useMemo(() => groupDiscordItems(filteredDiscordItems), [filteredDiscordItems])
+
+    const discordSelectedIds = Object.keys(discordSelectedImages).filter(k => discordSelectedImages[k]).map(Number)
+    const discordSelectedCount = discordSelectedIds.length
+
+    const toggleDiscordImage = (id) => setDiscordSelectedImages(prev => ({ ...prev, [id]: !prev[id] }))
+    const toggleDiscordGroup = (group) => {
+        const allSelected = group.items.every(item => discordSelectedImages[item.id])
+        const next = { ...discordSelectedImages }
+        for (const item of group.items) next[item.id] = !allSelected
+        setDiscordSelectedImages(next)
+    }
+    const isDiscordGroupSelected = (group) => group.items.every(item => discordSelectedImages[item.id])
+    const isDiscordGroupPartial = (group) => group.items.some(item => discordSelectedImages[item.id]) && !isDiscordGroupSelected(group)
+
+    const handleLoadDiscordImages = async () => {
+        if (!discordSelectedCount) return
+        setDiscordFetching(true)
+        setDiscordError(null)
+        try {
+            const result = await onAddDiscordImages(discordSelectedIds)
+            if (!result.success) throw new Error(result.error)
+            setDiscordSelectedImages({})
+        } catch (err) {
+            setDiscordError(err.message)
+        } finally {
+            setDiscordFetching(false)
+        }
+    }
+
+    const handleSkipDiscordImages = async () => {
+        if (!discordSelectedCount) return
+        await onSkipDiscordItems(discordSelectedIds)
+        setDiscordSelectedImages({})
+    }
+
     // Display info
     const meta = report.result?.match_meta
     const team1 = adminData?.teams?.find(t => String(t.team_id) === String(ed?.team1_id))
@@ -774,6 +1023,7 @@ function MatchReportCard({
             ref={cardRef}
             tabIndex={-1}
             data-match-card
+            onClick={onSetActiveCard}
             className={`rounded-lg border outline-none transition-colors duration-300 ${
                 pasteFlash ? 'border-green-400/60' : statusStyle[report.status] || statusStyle.pending
             }`}
@@ -878,7 +1128,7 @@ function MatchReportCard({
             {/* ─── Body ─── */}
             {expanded && !isSubmitted && (
                 <div className="bg-[var(--color-bg)]">
-                    {/* PENDING / PROCESSING: 2 radio groups + content */}
+                    {/* PENDING / PROCESSING: 2 radio groups + inline pickers */}
                     {(isPending || isProcessing) && (
                         <div className="p-4 space-y-4">
                             {isPending && (
@@ -890,10 +1140,10 @@ function MatchReportCard({
                                             <RadioOption
                                                 label="Scheduled"
                                                 active={matchSource === 'scheduled'}
-                                                onClick={() => { setMatchSource('scheduled'); onSetActiveCard() }}
+                                                onClick={() => setMatchSource('scheduled')}
                                             />
                                             <RadioOption
-                                                label="By Textbox"
+                                                label="New Match"
                                                 active={matchSource === 'textbox'}
                                                 onClick={() => setMatchSource('textbox')}
                                             />
@@ -906,7 +1156,7 @@ function MatchReportCard({
                                             <RadioOption
                                                 label="Discord"
                                                 active={imageSource === 'discord'}
-                                                onClick={() => { setImageSource('discord'); onSetActiveCard() }}
+                                                onClick={() => setImageSource('discord')}
                                             />
                                             <RadioOption
                                                 label="Paste"
@@ -918,50 +1168,197 @@ function MatchReportCard({
                                 </div>
                             )}
 
-                            {/* Active card indicator */}
-                            {isPending && isActive && (matchSource === 'scheduled' || imageSource === 'discord') && (
-                                <div className="text-[10px] text-cyan-400/80 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                    Receiving from floating panels
-                                </div>
-                            )}
-
-                            {/* Linked scheduled match indicator */}
-                            {hasScheduledLink && (
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-medium">
-                                        Linked: {ed.team1_name || '?'} vs {ed.team2_name || '?'}
-                                        {ed.week && <span className="text-cyan-400/60 ml-1">W{ed.week}</span>}
-                                    </span>
-                                    {isPending && (
-                                        <button
-                                            onClick={() => { onUpdateEditData(null); setMatchSource('textbox') }}
-                                            className="text-[10px] text-[var(--color-text-secondary)] hover:text-red-400 transition"
-                                        >
-                                            Unlink
-                                        </button>
+                            {/* ─── Inline Scheduled Match Picker ─── */}
+                            {matchSource === 'scheduled' && isPending && (
+                                <div className="border border-cyan-500/20 rounded-lg overflow-hidden">
+                                    {hasScheduledLink ? (
+                                        <div className="px-3 py-2.5 flex items-center gap-2 bg-cyan-500/5">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-medium">
+                                                Linked: {ed?.team1_name || '?'} vs {ed?.team2_name || '?'}
+                                                {ed?.week && <span className="text-cyan-400/60 ml-1">W{ed.week}</span>}
+                                                {ed?.date && <span className="text-cyan-400/60 ml-1">{ed.date}</span>}
+                                            </span>
+                                            <button
+                                                onClick={() => onUpdateEditData({ scheduled_match_id: null, team1_id: null, team2_id: null, team1_name: null, team2_name: null, week: null, date: new Date().toISOString().split('T')[0], best_of: 3 })}
+                                                className="text-[10px] text-[var(--color-text-secondary)] hover:text-red-400 transition ml-auto"
+                                            >
+                                                Unlink
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={scheduleSearch}
+                                                    onChange={e => setScheduleSearch(e.target.value)}
+                                                    placeholder="Search by team name or week..."
+                                                    className="flex-1 bg-transparent text-xs text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-secondary)]/50"
+                                                />
+                                                <span className="text-[10px] text-[var(--color-text-secondary)]">{filteredScheduled.length} matches</span>
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                                                {filteredScheduled.length === 0 ? (
+                                                    <div className="px-3 py-4 text-center text-[10px] text-[var(--color-text-secondary)]">
+                                                        {scheduledMatches?.length ? 'No matches found' : 'No scheduled matches for this season'}
+                                                    </div>
+                                                ) : filteredScheduled.map(sm => {
+                                                    const isLinked = linkedScheduledIds?.has(sm.id)
+                                                    return (
+                                                        <div
+                                                            key={sm.id}
+                                                            onClick={() => !isLinked && handleLinkScheduled(sm)}
+                                                            className={`px-3 py-2 transition cursor-pointer ${
+                                                                isLinked ? 'opacity-40 cursor-default' : 'hover:bg-cyan-500/5'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team1_color || '#3b82f6' }} />
+                                                                <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team1_name}</span>
+                                                                <span className="text-[10px] text-[var(--color-text-secondary)]">vs</span>
+                                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team2_color || '#ef4444' }} />
+                                                                <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team2_name}</span>
+                                                                <span className="text-[10px] text-[var(--color-text-secondary)] ml-auto shrink-0">
+                                                                    {sm.scheduled_date && sm.scheduled_date.slice(0, 10)}
+                                                                    {sm.week && ` W${sm.week}`}
+                                                                    {` Bo${sm.best_of}`}
+                                                                </span>
+                                                                {isLinked && <span className="text-[10px] text-cyan-400/60 ml-1">In use</span>}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
 
-                            {/* Match text — shown for "By Textbox" match source */}
-                            {matchSource === 'textbox' && (
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                                        Match report text <span className="text-[10px] font-normal">(optional — helps AI match teams)</span>
-                                    </label>
-                                    <textarea
-                                        value={report.text}
-                                        onChange={e => onUpdateText(e.target.value)}
-                                        placeholder='e.g. "@Team Alpha vs @Team Beta — Alpha wins 2-1"'
-                                        className="w-full px-3 py-2 rounded-lg text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50 border"
-                                        style={{
-                                            backgroundColor: 'var(--color-card, #1e1e2e)',
-                                            color: 'var(--color-text, #e0e0e0)',
-                                            borderColor: 'var(--color-border, #333)',
-                                        }}
-                                        disabled={isProcessing}
-                                    />
+                            {/* ─── Inline Discord Image Picker ─── */}
+                            {imageSource === 'discord' && isPending && (
+                                <div className="border border-purple-500/20 rounded-lg overflow-hidden">
+                                    {/* Header */}
+                                    <div className="px-3 py-2 flex items-center gap-2 border-b border-white/5">
+                                        <span className="text-[10px] text-[var(--color-text-secondary)]">
+                                            {filteredDiscordItems.length} pending
+                                        </span>
+                                        {selectedSeason && (
+                                            <button
+                                                onClick={() => setDiscordShowAll(v => !v)}
+                                                className={`text-[10px] px-1.5 py-0.5 rounded transition ${
+                                                    discordShowAll
+                                                        ? 'bg-white/10 text-[var(--color-text)]'
+                                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                                                }`}
+                                            >
+                                                {discordShowAll ? 'All divisions' : selectedSeason.division_name}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={onPollDiscord}
+                                            disabled={discordPolling}
+                                            className="text-[10px] px-2 py-1 rounded-md bg-purple-600/80 hover:bg-purple-600 disabled:opacity-50 text-white transition ml-auto"
+                                        >
+                                            {discordPolling ? 'Fetching...' : 'Get Images'}
+                                        </button>
+                                    </div>
+
+                                    {discordError && (
+                                        <div className="px-3 py-1.5 text-[10px] text-red-400 bg-red-500/10 border-b border-white/5">
+                                            {discordError}
+                                        </div>
+                                    )}
+
+                                    {/* Groups */}
+                                    <div className="max-h-56 overflow-y-auto">
+                                        {discordGroups.length === 0 ? (
+                                            <div className="px-3 py-4 text-center">
+                                                <p className="text-[10px] text-[var(--color-text-secondary)]">No pending screenshots</p>
+                                                <Link to="/admin/discord" className="text-[10px] text-purple-400 hover:text-purple-300">
+                                                    Configure channels
+                                                </Link>
+                                            </div>
+                                        ) : discordGroups.map(group => (
+                                            <div key={group.id} className="border-b border-white/5 last:border-0">
+                                                <div
+                                                    className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-white/3"
+                                                    onClick={() => toggleDiscordGroup(group)}
+                                                >
+                                                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition ${
+                                                        isDiscordGroupSelected(group) ? 'bg-blue-600 border-blue-600' :
+                                                        isDiscordGroupPartial(group) ? 'bg-blue-600/40 border-blue-500' :
+                                                        'border-gray-500'
+                                                    }`}>
+                                                        {(isDiscordGroupSelected(group) || isDiscordGroupPartial(group)) && (
+                                                            <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                {isDiscordGroupPartial(group) ? <path d="M3 6h6" /> : <path d="M2 6l3 3 5-5" />}
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="text-[10px] text-[var(--color-text)] font-medium">{group.author_name || 'Unknown'}</span>
+                                                        <span className="text-[10px] text-[var(--color-text-secondary)] ml-1.5">{timeAgo(group.firstTs)}</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-purple-400 shrink-0">{group.division_name}</span>
+                                                </div>
+
+                                                {group.texts.size > 0 && (
+                                                    <div className="px-3 pb-1">
+                                                        <p className="text-[10px] text-[var(--color-text-secondary)] italic truncate">
+                                                            {[...group.texts].join(' | ')}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                                                    {group.items.map(item => (
+                                                        <div
+                                                            key={item.id}
+                                                            onClick={(e) => { e.stopPropagation(); toggleDiscordImage(item.id) }}
+                                                            className={`relative w-14 h-10 rounded overflow-hidden cursor-pointer border-2 transition ${
+                                                                discordSelectedImages[item.id]
+                                                                    ? 'border-blue-500 ring-1 ring-blue-500/30'
+                                                                    : 'border-transparent hover:border-white/20'
+                                                            }`}
+                                                        >
+                                                            <img
+                                                                src={item.attachment_url}
+                                                                alt=""
+                                                                className="w-full h-full object-cover"
+                                                                loading="lazy"
+                                                                onError={e => { e.target.style.display = 'none' }}
+                                                            />
+                                                            {discordSelectedImages[item.id] && (
+                                                                <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
+                                                                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                                        <path d="M2 6l3 3 5-5" />
+                                                                    </svg>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Footer with actions */}
+                                    <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between">
+                                        <div>
+                                            {discordSelectedCount > 0 && (
+                                                <button onClick={handleSkipDiscordImages} className="text-[10px] text-[var(--color-text-secondary)] hover:text-red-400 transition">
+                                                    Skip {discordSelectedCount}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={handleLoadDiscordImages}
+                                            disabled={!discordSelectedCount || discordFetching}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                                        >
+                                            {discordFetching ? 'Loading...' : `Load${discordSelectedCount ? ` ${discordSelectedCount}` : ''} Images`}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
@@ -982,13 +1379,6 @@ function MatchReportCard({
                                             Drop screenshots, click to browse, or <span className="text-[var(--color-accent)] font-medium">Ctrl+V</span> to paste
                                         </p>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Discord hint — shown for "Discord" image source when no images yet */}
-                            {imageSource === 'discord' && isPending && liveImages.length === 0 && (
-                                <div className="text-xs text-[var(--color-text-secondary)] bg-purple-500/5 border border-purple-500/10 rounded-lg px-3 py-2">
-                                    Select images from the <span className="font-semibold text-purple-400">Discord Images</span> panel and click "Add to Report"
                                 </div>
                             )}
 
