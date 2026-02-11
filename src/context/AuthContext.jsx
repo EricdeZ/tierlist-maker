@@ -78,7 +78,10 @@ export const AuthProvider = ({ children }) => {
             console.error('Discord OAuth not configured')
             return
         }
-        const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`
+        // Pass current path as state so callback can redirect back here
+        const returnPath = window.location.pathname + window.location.search
+        const state = encodeURIComponent(returnPath)
+        const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`
         window.location.href = url
     }, [])
 

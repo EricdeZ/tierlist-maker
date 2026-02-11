@@ -16,6 +16,7 @@ export const handler = async (event) => {
     }
 
     const code = event.queryStringParameters?.code
+    const returnPath = event.queryStringParameters?.state || '/'
     if (!code) {
         return redirectWithError('Missing authorization code')
     }
@@ -97,12 +98,13 @@ export const handler = async (event) => {
             }
         }
 
-        // 6. Sign JWT and redirect to frontend
+        // 6. Sign JWT and redirect to frontend (back to the page they were on)
         const jwt = signToken(user)
+        const separator = returnPath.includes('?') ? '&' : '?'
         return {
             statusCode: 302,
             headers: {
-                Location: `${FRONTEND_URL}/?auth_token=${jwt}`,
+                Location: `${FRONTEND_URL}${returnPath}${separator}auth_token=${jwt}`,
                 'Cache-Control': 'no-cache',
             },
             body: '',
