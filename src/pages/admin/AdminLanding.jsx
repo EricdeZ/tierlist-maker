@@ -76,8 +76,8 @@ const tools = [
         btnClass: 'bg-cyan-600 hover:bg-cyan-700',
     },
     {
-        title: 'Discord Queue',
-        description: 'Browse and process match screenshots automatically collected from Discord. Select screenshots, group them into matches, and send to Match Report for AI extraction.',
+        title: 'Discord Channels',
+        description: 'Configure Discord channel connections. Map Discord channels to divisions for automatic screenshot collection.',
         path: '/admin/discord',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

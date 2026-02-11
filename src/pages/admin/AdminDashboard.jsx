@@ -1,9 +1,12 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
+import DraggablePanel from '../../components/admin/DraggablePanel'
+import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
+import DiscordImagesPanel from '../../components/admin/DiscordImagesPanel'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
@@ -30,13 +33,16 @@ const uid = () => `mr_${_uid++}`
 // MAIN DASHBOARD
 // ═══════════════════════════════════════════════════
 export default function AdminDashboard() {
-    const location = useLocation()
     const [matchReports, setMatchReports] = useState(() => loadStorage())
-    const [processing, setProcessing] = useState(false)
     const [submitting, setSubmitting] = useState({}) // { [mrId]: true }
     const [submitResults, setSubmitResults] = useState({}) // { [mrId]: { success, error, data } }
     const [selected, setSelected] = useState({}) // checkboxes for bulk submit
     const [bulkSubmitting, setBulkSubmitting] = useState(false)
+
+    // Floating panel state
+    const [showScheduledPanel, setShowScheduledPanel] = useState(true)
+    const [showDiscordPanel, setShowDiscordPanel] = useState(true)
+    const [activeCardId, setActiveCardId] = useState(null) // card that receives panel actions
 
     // Live image refs (File objects can't go in localStorage)
     const liveImagesRef = useRef({}) // { [mrId]: [{ id, file, preview }] }
@@ -64,45 +70,6 @@ export default function AdminDashboard() {
 
     // Persist on change
     useEffect(() => { saveStorage(matchReports) }, [matchReports])
-
-    // ─── Handle pre-loaded images from Discord Queue ───
-    useEffect(() => {
-        if (!location.state?.discordImages) return
-
-        const { discordImages, discordText, discordQueueItemIds } = location.state
-
-        const id = uid()
-        const liveImages = discordImages.map((img, i) => {
-            const byteString = atob(img.data)
-            const ab = new ArrayBuffer(byteString.length)
-            const ia = new Uint8Array(ab)
-            for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
-            const blob = new Blob([ab], { type: img.media_type || 'image/png' })
-            const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
-            return {
-                id: `img_${Date.now()}_${i}`,
-                name: file.name,
-                file,
-                preview: URL.createObjectURL(blob),
-            }
-        })
-
-        liveImagesRef.current[id] = liveImages
-
-        setMatchReports(prev => [...prev, {
-            id,
-            text: discordText || '',
-            images: liveImages.map(img => ({ id: img.id, name: img.name })),
-            status: 'pending',
-            result: null,
-            editData: null,
-            error: null,
-            discordQueueItemIds: discordQueueItemIds || [],
-        }])
-
-        // Clear navigation state to prevent re-adding on re-render
-        window.history.replaceState({}, document.title)
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Persist selected season
     const handleSeasonChange = (id) => {
@@ -159,17 +126,14 @@ export default function AdminDashboard() {
         }])
     }
 
-    // ─── Add match report from scheduled match (pre-filled) ───
-    const addScheduledMatchReport = (sm) => {
-        const id = uid()
-        liveImagesRef.current[id] = []
-        setMatchReports(prev => [...prev, {
-            id,
-            text: '',
-            images: [],
-            status: 'review',
-            result: null,
+    // ─── Panel handlers ───
+    const handleScheduledMatchConfirm = (sm) => {
+        const mrId = activeCardId
+        if (!mrId) return
+        updateReport(mrId, prev => ({
+            ...prev,
             editData: {
+                ...(prev.editData || {}),
                 season_id: sm.season_id,
                 team1_id: sm.team1_id,
                 team2_id: sm.team2_id,
@@ -179,10 +143,34 @@ export default function AdminDashboard() {
                 date: sm.scheduled_date ? sm.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
                 best_of: sm.best_of || 3,
                 scheduled_match_id: sm.id,
-                games: [],
+                games: prev.editData?.games || [],
             },
-            error: null,
-        }])
+        }))
+    }
+
+    const handleDiscordImagesConfirm = ({ images, text, queueItemIds }) => {
+        const mrId = activeCardId
+        if (!mrId) return
+
+        const newLiveImages = (images || []).map((img, i) => {
+            const byteString = atob(img.data)
+            const ab = new ArrayBuffer(byteString.length)
+            const ia = new Uint8Array(ab)
+            for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j)
+            const blob = new Blob([ab], { type: img.media_type || 'image/png' })
+            const file = new File([blob], img.filename || `discord_${i}.jpg`, { type: img.media_type || 'image/png' })
+            return { id: `img_${Date.now()}_${i}`, name: file.name, file, preview: URL.createObjectURL(blob) }
+        })
+
+        if (!liveImagesRef.current[mrId]) liveImagesRef.current[mrId] = []
+        liveImagesRef.current[mrId].push(...newLiveImages)
+
+        updateReport(mrId, prev => ({
+            ...prev,
+            text: prev.text ? prev.text + '\n' + (text || '') : (text || ''),
+            images: [...prev.images, ...newLiveImages.map(img => ({ id: img.id, name: img.name }))],
+            discordQueueItemIds: [...(prev.discordQueueItemIds || []), ...queueItemIds],
+        }))
     }
 
     // ─── Add images to a report ───
@@ -291,6 +279,16 @@ export default function AdminDashboard() {
                 editData.season_id = selectedSeasonId
             }
 
+            // Preserve pre-linked scheduled match data through extraction
+            if (mr.editData?.scheduled_match_id) {
+                editData.scheduled_match_id = mr.editData.scheduled_match_id
+                editData.team1_id = mr.editData.team1_id || editData.team1_id
+                editData.team2_id = mr.editData.team2_id || editData.team2_id
+                editData.week = mr.editData.week || editData.week
+                editData.date = mr.editData.date || editData.date
+                editData.best_of = mr.editData.best_of || editData.best_of
+            }
+
             const allGamesOk = result.games?.every(g => g.success)
             const status = allGamesOk ? 'review' : 'error'
 
@@ -300,15 +298,7 @@ export default function AdminDashboard() {
         }
     }, [matchReports, updateReport, selectedSeasonId])
 
-    // ─── Process all pending ───
-    const processAll = async () => {
-        setProcessing(true)
-        const pending = matchReports.filter(mr => mr.status === 'pending' && mr.images.length > 0)
-        for (const mr of pending) {
-            await processOne(mr.id)
-        }
-        setProcessing(false)
-    }
+
 
     // ─── Submit one match to DB ───
     const submitOne = useCallback(async (mr) => {
@@ -510,58 +500,7 @@ export default function AdminDashboard() {
 
             {adminError && <ErrorBanner message={`Admin data: ${adminError}`} className="mb-4" />}
 
-            <div className="flex gap-6">
-            {/* ─── Scheduled matches sidebar ─── */}
-            {selectedSeasonId && scheduledForSeason.length > 0 && (
-                <div className="w-64 shrink-0">
-                    <div className="sticky top-4 bg-[var(--color-secondary)] border border-white/10 rounded-xl overflow-hidden">
-                        <div className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">Upcoming</h3>
-                            <span className="text-[10px] text-[var(--color-text-secondary)]">{scheduledForSeason.length} match{scheduledForSeason.length !== 1 ? 'es' : ''}</span>
-                        </div>
-                        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto divide-y divide-white/5">
-                            {scheduledForSeason.map(sm => {
-                                const isLinked = linkedScheduledIds.has(sm.id)
-                                return (
-                                    <div key={sm.id} className={`px-3 py-2.5 ${isLinked ? 'opacity-50' : ''}`}>
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team1_color || '#3b82f6' }} />
-                                            <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team1_name}</span>
-                                            <span className="text-[10px] text-[var(--color-text-secondary)]">vs</span>
-                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: sm.team2_color || '#ef4444' }} />
-                                            <span className="text-xs text-[var(--color-text)] font-medium truncate">{sm.team2_name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
-                                            {sm.scheduled_date && <span>{sm.scheduled_date.slice(0, 10)}</span>}
-                                            {sm.week && <span>W{sm.week}</span>}
-                                            <span>Bo{sm.best_of}</span>
-                                            {!isLinked && (
-                                                <button
-                                                    onClick={() => addScheduledMatchReport(sm)}
-                                                    className="ml-auto px-1.5 py-0.5 rounded text-cyan-400 hover:bg-cyan-500/15 font-semibold transition-colors"
-                                                >
-                                                    Report
-                                                </button>
-                                            )}
-                                            {isLinked && (
-                                                <span className="ml-auto text-cyan-400/60">In progress</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                        <div className="px-3 py-2 border-t border-white/10">
-                            <Link to="/admin/schedule" className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                                Manage Schedule &rarr;
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ─── Main content ─── */}
-            <div className="flex-1 min-w-0">
+            <div>
             {/* Action bar */}
             <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
@@ -586,20 +525,13 @@ export default function AdminDashboard() {
 
                     <button onClick={addMatchReport} disabled={!selectedSeasonId}
                             className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
-                        + New Match
+                        New Match Report
                     </button>
 
                     <button onClick={addManualMatch} disabled={!selectedSeasonId}
                             className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 text-[var(--color-text)] hover:bg-white/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--color-border)]">
-                        + Manual Entry
+                        Manual Match Report
                     </button>
-
-                    {counts.pending > 0 && (
-                        <button onClick={processAll} disabled={processing}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors">
-                            {processing ? 'Processing…' : `Extract ${counts.pending} Pending`}
-                        </button>
-                    )}
 
                     {reviewable.length > 0 && (
                         <>
@@ -658,6 +590,9 @@ export default function AdminDashboard() {
                         onSubmit={() => submitOne(mr)}
                         isSubmitting={!!submitting[mr.id]}
                         submitResult={submitResults[mr.id]}
+                        activeCardId={activeCardId}
+                        onSetActiveCard={() => setActiveCardId(mr.id)}
+                        hasScheduledLink={!!mr.editData?.scheduled_match_id}
                     />
                 ))}
             </div>
@@ -674,12 +609,45 @@ export default function AdminDashboard() {
                     </p>
                     <button onClick={addMatchReport} disabled={!selectedSeasonId}
                             className="px-6 py-3 rounded-xl font-semibold bg-[var(--color-accent)] text-[var(--color-bg)] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
-                        + New Match
+                        New Match Report
                     </button>
                 </div>
             )}
-            </div>{/* end main content */}
-            </div>{/* end flex row */}
+            </div>
+
+            {/* ─── Floating tool panels (always visible when season selected) ─── */}
+            {selectedSeasonId && showScheduledPanel && (
+                <DraggablePanel
+                    title="Scheduled Matches"
+                    initialPosition={{ x: Math.max(0, window.innerWidth - 720), y: 120 }}
+                    defaultWidth={340}
+                    defaultHeight={360}
+                    minimized={!showScheduledPanel}
+                    onToggleMinimize={() => setShowScheduledPanel(v => !v)}
+                >
+                    <ScheduledMatchPanel
+                        scheduledMatches={scheduledForSeason}
+                        linkedScheduledIds={linkedScheduledIds}
+                        onConfirm={handleScheduledMatchConfirm}
+                        hasTarget={!!activeCardId}
+                    />
+                </DraggablePanel>
+            )}
+            {selectedSeasonId && showDiscordPanel && (
+                <DraggablePanel
+                    title="Discord Images"
+                    initialPosition={{ x: Math.max(0, window.innerWidth - 370), y: 120 }}
+                    defaultWidth={360}
+                    defaultHeight={420}
+                    minimized={!showDiscordPanel}
+                    onToggleMinimize={() => setShowDiscordPanel(v => !v)}
+                >
+                    <DiscordImagesPanel
+                        onConfirmSelection={handleDiscordImagesConfirm}
+                        hasTarget={!!activeCardId}
+                    />
+                </DraggablePanel>
+            )}
         </div>
     )
 }
@@ -744,15 +712,21 @@ function MatchReportCard({
                              onAddImages, onRemoveImage, onRemove, onProcess, onRetry, onSubmit,
                              isSubmitting, submitResult,
                              confirmDelete, onConfirmRemove, onCancelRemove,
+                             activeCardId, onSetActiveCard, hasScheduledLink,
                          }) {
     const [expanded, setExpanded] = useState(true)
     const [pasteFlash, setPasteFlash] = useState(false)
+    // Match source: 'scheduled' or 'textbox'
+    const [matchSource, setMatchSource] = useState(hasScheduledLink ? 'scheduled' : 'textbox')
+    // Image source: 'paste' (default) or 'discord'
+    const [imageSource, setImageSource] = useState('paste')
     const cardRef = useRef(null)
     const ed = report.editData
     const isSubmitted = report.status === 'submitted'
     const isReview = report.status === 'review'
     const isPending = report.status === 'pending'
     const isProcessing = report.status === 'processing'
+    const isActive = activeCardId === report.id
 
     // Ctrl+V paste handler for this card
     const handlePaste = useCallback((e) => {
@@ -904,36 +878,101 @@ function MatchReportCard({
             {/* ─── Body ─── */}
             {expanded && !isSubmitted && (
                 <div className="bg-[var(--color-bg)]">
-                    {/* PENDING: text + screenshots input */}
+                    {/* PENDING / PROCESSING: 2 radio groups + content */}
                     {(isPending || isProcessing) && (
                         <div className="p-4 space-y-4">
-                            {/* Match text */}
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                                    Match report text (Discord message)
-                                </label>
-                                <textarea
-                                    value={report.text}
-                                    onChange={e => onUpdateText(e.target.value)}
-                                    placeholder='e.g. "@Team Alpha vs @Team Beta — Alpha wins 2-1"'
-                                    className="w-full px-3 py-2 rounded-lg text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50 border"
-                                    style={{
-                                        backgroundColor: 'var(--color-card, #1e1e2e)',
-                                        color: 'var(--color-text, #e0e0e0)',
-                                        borderColor: 'var(--color-border, #333)',
-                                    }}
-                                    disabled={isProcessing}
-                                />
-                            </div>
+                            {isPending && (
+                                <div className="space-y-3">
+                                    {/* Row 1: Match source */}
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] w-14 shrink-0">Match</span>
+                                        <div className="flex gap-1">
+                                            <RadioOption
+                                                label="Scheduled"
+                                                active={matchSource === 'scheduled'}
+                                                onClick={() => { setMatchSource('scheduled'); onSetActiveCard() }}
+                                            />
+                                            <RadioOption
+                                                label="By Textbox"
+                                                active={matchSource === 'textbox'}
+                                                onClick={() => setMatchSource('textbox')}
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* Row 2: Image source */}
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] w-14 shrink-0">Images</span>
+                                        <div className="flex gap-1">
+                                            <RadioOption
+                                                label="Discord"
+                                                active={imageSource === 'discord'}
+                                                onClick={() => { setImageSource('discord'); onSetActiveCard() }}
+                                            />
+                                            <RadioOption
+                                                label="Paste"
+                                                active={imageSource === 'paste'}
+                                                onClick={() => setImageSource('paste')}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
-                            {/* Image upload */}
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                                    DETAILS tab screenshots ({liveImages.length} game{liveImages.length !== 1 ? 's' : ''})
-                                </label>
-                                {isPending && (
+                            {/* Active card indicator */}
+                            {isPending && isActive && (matchSource === 'scheduled' || imageSource === 'discord') && (
+                                <div className="text-[10px] text-cyan-400/80 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                    Receiving from floating panels
+                                </div>
+                            )}
+
+                            {/* Linked scheduled match indicator */}
+                            {hasScheduledLink && (
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-medium">
+                                        Linked: {ed.team1_name || '?'} vs {ed.team2_name || '?'}
+                                        {ed.week && <span className="text-cyan-400/60 ml-1">W{ed.week}</span>}
+                                    </span>
+                                    {isPending && (
+                                        <button
+                                            onClick={() => { onUpdateEditData(null); setMatchSource('textbox') }}
+                                            className="text-[10px] text-[var(--color-text-secondary)] hover:text-red-400 transition"
+                                        >
+                                            Unlink
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Match text — shown for "By Textbox" match source */}
+                            {matchSource === 'textbox' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                                        Match report text <span className="text-[10px] font-normal">(optional — helps AI match teams)</span>
+                                    </label>
+                                    <textarea
+                                        value={report.text}
+                                        onChange={e => onUpdateText(e.target.value)}
+                                        placeholder='e.g. "@Team Alpha vs @Team Beta — Alpha wins 2-1"'
+                                        className="w-full px-3 py-2 rounded-lg text-sm resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50 border"
+                                        style={{
+                                            backgroundColor: 'var(--color-card, #1e1e2e)',
+                                            color: 'var(--color-text, #e0e0e0)',
+                                            borderColor: 'var(--color-border, #333)',
+                                        }}
+                                        disabled={isProcessing}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Paste/upload area — shown for "Paste" image source */}
+                            {imageSource === 'paste' && isPending && (
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                                        DETAILS tab screenshots ({liveImages.length} game{liveImages.length !== 1 ? 's' : ''})
+                                    </label>
                                     <div
-                                        className="border border-dashed border-[var(--color-border)] rounded-lg p-6 text-center hover:border-[var(--color-accent)]/40 transition-colors cursor-pointer mb-3"
+                                        className="border border-dashed border-[var(--color-border)] rounded-lg p-6 text-center hover:border-[var(--color-accent)]/40 transition-colors cursor-pointer"
                                         onDragOver={e => e.preventDefault()} onDrop={handleDrop}
                                         onClick={() => document.getElementById(`file-${report.id}`).click()}
                                     >
@@ -943,29 +982,38 @@ function MatchReportCard({
                                             Drop screenshots, click to browse, or <span className="text-[var(--color-accent)] font-medium">Ctrl+V</span> to paste
                                         </p>
                                     </div>
-                                )}
-                                {liveImages.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap">
-                                        {liveImages.map((img, idx) => (
-                                            <div key={img.id} className="relative group">
-                                                <img src={img.preview} alt={`Game ${idx+1}`}
-                                                     className="h-20 w-36 object-cover rounded-lg border border-[var(--color-border)]" />
-                                                <div className="absolute top-0.5 left-1 bg-black/70 text-white text-[10px] px-1 rounded">
-                                                    G{idx+1}
-                                                </div>
-                                                {isPending && (
-                                                    <button onClick={() => onRemoveImage(img.id)}
-                                                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        ✕
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
-                            {/* Process button */}
+                            {/* Discord hint — shown for "Discord" image source when no images yet */}
+                            {imageSource === 'discord' && isPending && liveImages.length === 0 && (
+                                <div className="text-xs text-[var(--color-text-secondary)] bg-purple-500/5 border border-purple-500/10 rounded-lg px-3 py-2">
+                                    Select images from the <span className="font-semibold text-purple-400">Discord Images</span> panel and click "Add to Report"
+                                </div>
+                            )}
+
+                            {/* Image thumbnails (always shown when images exist) */}
+                            {liveImages.length > 0 && (
+                                <div className="flex gap-2 flex-wrap">
+                                    {liveImages.map((img, idx) => (
+                                        <div key={img.id} className="relative group">
+                                            <img src={img.preview} alt={`Game ${idx+1}`}
+                                                 className="h-20 w-36 object-cover rounded-lg border border-[var(--color-border)]" />
+                                            <div className="absolute top-0.5 left-1 bg-black/70 text-white text-[10px] px-1 rounded">
+                                                G{idx+1}
+                                            </div>
+                                            {isPending && (
+                                                <button onClick={() => onRemoveImage(img.id)}
+                                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Per-card extract button */}
                             {isPending && liveImages.length > 0 && (
                                 <button onClick={onProcess}
                                         className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
@@ -1795,6 +1843,21 @@ function AliasLinkModal({ extractedName, adminData, seasonId, onSave, onClose })
 // ═══════════════════════════════════════════════════
 // SMALL COMPONENTS
 // ═══════════════════════════════════════════════════
+
+function RadioOption({ label, active, onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border ${
+                active
+                    ? 'bg-[var(--color-accent)]/15 border-[var(--color-accent)]/40 text-[var(--color-accent)]'
+                    : 'bg-white/5 border-white/10 text-[var(--color-text-secondary)] hover:border-white/20 hover:text-[var(--color-text)]'
+            }`}
+        >
+            {label}
+        </button>
+    )
+}
 
 function StatusBadge({ status }) {
     const styles = {
