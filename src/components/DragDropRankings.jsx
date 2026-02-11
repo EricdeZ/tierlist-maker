@@ -30,13 +30,13 @@ const roleImages = {
 }
 
 const STAT_TYPES = [
-    { key: 'none', label: 'No Stats' },
-    { key: 'kda', label: 'KDA' },
-    { key: 'killsPerGame', label: 'K/G' },
-    { key: 'deathsPerGame', label: 'D/G' },
-    { key: 'assistsPerGame', label: 'A/G' },
-    { key: 'damagePerGame', label: 'Dmg/G' },
-    { key: 'mitigationsPerGame', label: 'Mit/G' },
+    { key: 'none', label: 'No Stats', buttonLabel: 'No Stats' },
+    { key: 'kda', label: 'KDA', buttonLabel: 'KDA' },
+    { key: 'killsPerGame', label: 'K/G', buttonLabel: 'Kills / Game' },
+    { key: 'deathsPerGame', label: 'D/G', buttonLabel: 'Deaths / Game' },
+    { key: 'assistsPerGame', label: 'A/G', buttonLabel: 'Assists / Game' },
+    { key: 'damagePerGame', label: 'Dmg/G', buttonLabel: 'Damage / Game' },
+    { key: 'mitigationsPerGame', label: 'Mit/G', buttonLabel: 'Mitigations / Game' },
 ]
 
 const DragDropRankings = () => {
@@ -503,7 +503,7 @@ const DragDropRankings = () => {
                                     : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
                             }`}
                         >
-                            {st.label}
+                            {st.buttonLabel}
                         </button>
                     ))}
                 </div>
@@ -860,7 +860,7 @@ const DragDropRankings = () => {
                                             : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
                                     }`}
                                 >
-                                    {st.label}
+                                    {st.buttonLabel}
                                 </button>
                             ))}
                         </div>
@@ -1066,7 +1066,7 @@ const DragDropRankings = () => {
                                             : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
                                     }`}
                                 >
-                                    {st.label}
+                                    {st.buttonLabel}
                                 </button>
                             ))}
                         </div>
