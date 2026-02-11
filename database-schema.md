@@ -6,8 +6,8 @@
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| name | varchar | NO | |
-| slug | varchar | YES | |
+| name | varchar(255) | NO | |
+| slug | varchar(255) | YES | UNIQUE |
 | description | text | YES | |
 | discord_url | text | YES | |
 | color | varchar(7) | YES | |
@@ -18,22 +18,24 @@
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| league_id | integer | NO | FK → leagues.id |
-| name | varchar | NO | |
+| league_id | integer | NO | FK → leagues.id (CASCADE) |
+| name | varchar(255) | NO | |
 | tier | integer | YES | |
-| slug | varchar | YES | |
+| slug | varchar(255) | YES | |
 | description | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
+
+UNIQUE(league_id, slug)
 
 ### seasons
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| league_id | integer | NO | FK → leagues.id |
-| division_id | integer | NO | FK → divisions.id |
-| name | varchar | NO | |
-| slug | varchar | YES | |
+| league_id | integer | NO | FK → leagues.id (CASCADE) |
+| division_id | integer | NO | FK → divisions.id (CASCADE) |
+| name | varchar(255) | NO | |
+| slug | varchar(255) | YES | |
 | start_date | date | YES | |
 | end_date | date | YES | |
 | is_active | boolean | YES | true |
@@ -41,25 +43,30 @@
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
+UNIQUE(league_id, division_id, slug)
+
 ### teams
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| season_id | integer | NO | FK → seasons.id |
-| name | varchar | NO | |
-| color | varchar | NO | |
-| slug | varchar | YES | |
+| season_id | integer | NO | FK → seasons.id (CASCADE) |
+| name | varchar(255) | NO | |
+| color | varchar(50) | NO | |
+| slug | varchar(255) | YES | |
 | logo_url | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
+
+UNIQUE(season_id, slug)
 
 ### players
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| name | varchar | NO | |
-| slug | varchar | YES | |
+| name | varchar(255) | NO | |
+| slug | varchar(255) | YES | UNIQUE |
 | discord_name | varchar | YES | |
+| discord_id | varchar(32) | YES | |
 | tracker_url | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
@@ -68,35 +75,37 @@
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| player_id | integer | NO | FK → players.id |
-| alias | varchar | NO | |
+| player_id | integer | NO | FK → players.id (CASCADE) |
+| alias | varchar(255) | NO | |
 | created_at | timestamptz | YES | now() |
 
 ### league_players
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| player_id | integer | NO | FK → players.id |
-| team_id | integer | NO | FK → teams.id |
-| season_id | integer | NO | FK → seasons.id |
-| role | varchar | YES | |
-| secondary_role | varchar | YES | |
+| player_id | integer | NO | FK → players.id (CASCADE) |
+| team_id | integer | NO | FK → teams.id (CASCADE) |
+| season_id | integer | NO | FK → seasons.id (CASCADE) |
+| role | varchar(50) | YES | |
 | is_active | boolean | YES | true |
 | joined_date | date | YES | |
 | left_date | date | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
+| secondary_role | varchar | YES | |
+
+UNIQUE(player_id, team_id, season_id, role)
 
 ### matches
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| season_id | integer | NO | FK → seasons.id |
+| season_id | integer | NO | FK → seasons.id (CASCADE) |
 | date | date | NO | |
-| team1_id | integer | NO | FK → teams.id |
-| team2_id | integer | NO | FK → teams.id |
-| winner_team_id | integer | YES | FK → teams.id |
-| match_type | varchar | YES | 'regular' |
+| team1_id | integer | NO | FK → teams.id (RESTRICT) |
+| team2_id | integer | NO | FK → teams.id (RESTRICT) |
+| winner_team_id | integer | YES | FK → teams.id (SET NULL) |
+| match_type | varchar(50) | YES | 'regular' |
 | week | integer | YES | |
 | best_of | integer | YES | 1 |
 | is_completed | boolean | YES | false |
@@ -104,30 +113,34 @@
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
+CHECK (team1_id <> team2_id)
+
 ### games
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| match_id | integer | NO | FK → matches.id |
+| match_id | integer | NO | FK → matches.id (CASCADE) |
 | game_number | integer | NO | |
 | team1_score | integer | YES | 0 |
 | team2_score | integer | YES | 0 |
-| winner_team_id | integer | YES | FK → teams.id |
+| winner_team_id | integer | YES | FK → teams.id (SET NULL) |
 | duration_minutes | integer | YES | |
 | is_completed | boolean | YES | false |
-| is_forfeit | boolean | YES | false |
 | notes | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
+| is_forfeit | boolean | YES | false |
+
+UNIQUE(match_id, game_number)
 
 ### player_game_stats
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| game_id | integer | NO | FK → games.id |
-| league_player_id | integer | NO | FK → league_players.id |
-| team_side | integer | NO | (1 or 2) |
-| god_played | varchar | YES | |
+| game_id | integer | NO | FK → games.id (CASCADE) |
+| league_player_id | integer | NO | FK → league_players.id (CASCADE) |
+| team_side | integer | NO | |
+| god_played | varchar(100) | YES | |
 | kills | integer | YES | 0 |
 | deaths | integer | YES | 0 |
 | assists | integer | YES | 0 |
@@ -140,13 +153,28 @@
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
+UNIQUE(game_id, league_player_id)
+CHECK (team_side IN (1, 2))
+
 ### gods
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
-| name | text | NO | |
-| slug | text | NO | |
+| name | text | NO | UNIQUE |
+| slug | text | NO | UNIQUE |
 | image_url | text | NO | |
+
+### users
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| discord_id | varchar(32) | NO | UNIQUE |
+| discord_username | varchar(100) | YES | |
+| discord_avatar | varchar(255) | YES | |
+| role | varchar(10) | YES | 'user' |
+| linked_player_id | integer | YES | FK → players.id (SET NULL) |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
 ### roles
 | Column | Type | Nullable | Default |
@@ -167,7 +195,7 @@
 
 UNIQUE(role_id, permission_key)
 
-Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_manage`, `league_manage`, `user_manage`, `claim_manage`, `permission_manage`
+Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_manage`, `league_manage`, `user_manage`, `claim_manage`, `permission_manage`, `match_schedule`, `audit_log_view`
 
 ### user_roles
 | Column | Type | Nullable | Default |
@@ -178,6 +206,52 @@ Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_
 | league_id | integer | YES | FK → leagues.id (CASCADE), NULL = global |
 | granted_by | integer | YES | FK → users.id (SET NULL) |
 | created_at | timestamptz | YES | NOW() |
+
+### claim_requests
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| user_id | integer | NO | FK → users.id (CASCADE) |
+| player_id | integer | NO | FK → players.id (CASCADE) |
+| status | varchar(10) | YES | 'pending' |
+| message | text | YES | |
+| admin_note | text | YES | |
+| resolved_by | integer | YES | FK → users.id (NO ACTION) |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP |
+| resolved_at | timestamp | YES | |
+
+### audit_log
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| user_id | integer | YES | FK → users.id (SET NULL) |
+| username | varchar(100) | YES | |
+| action | varchar(100) | NO | |
+| endpoint | varchar(50) | NO | |
+| league_id | integer | YES | |
+| target_type | varchar(50) | YES | |
+| target_id | integer | YES | |
+| details | jsonb | YES | |
+| created_at | timestamptz | YES | now() |
+
+### scheduled_matches
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| season_id | integer | NO | FK → seasons.id (CASCADE) |
+| team1_id | integer | NO | FK → teams.id (CASCADE) |
+| team2_id | integer | NO | FK → teams.id (CASCADE) |
+| best_of | integer | NO | 1 |
+| scheduled_date | date | NO | |
+| week | integer | YES | |
+| status | varchar(20) | NO | 'scheduled' |
+| created_by | integer | YES | FK → users.id (SET NULL) |
+| created_at | timestamptz | YES | now() |
+| updated_at | timestamptz | YES | now() |
+| match_id | integer | YES | FK → matches.id (SET NULL) |
+
+CHECK (team1_id <> team2_id)
+CHECK (status IN ('scheduled', 'completed', 'cancelled'))
 
 ## Views
 
@@ -242,24 +316,32 @@ Denormalized view of team rosters with player details.
 
 ```
 leagues
-  └── divisions (league_id)
-       └── seasons (league_id, division_id)
-            ├── teams (season_id)
-            │    └── league_players (team_id, season_id)
-            │         └── player_game_stats (league_player_id)
-            └── matches (season_id, team1_id, team2_id)
-                 └── games (match_id)
-                      └── player_game_stats (game_id)
+  ├── divisions (league_id)
+  │    └── seasons (league_id, division_id)
+  │         ├── teams (season_id)
+  │         │    └── league_players (team_id, season_id)
+  │         │         └── player_game_stats (league_player_id)
+  │         ├── matches (season_id, team1_id, team2_id)
+  │         │    └── games (match_id)
+  │         │         └── player_game_stats (game_id)
+  │         └── scheduled_matches (season_id, team1_id, team2_id)
+  │              └── matches (match_id, optional link)
+  └── user_roles (league_id, optional scope)
 
 players
   ├── player_aliases (player_id)
-  └── league_players (player_id)
+  ├── league_players (player_id)
+  └── users (linked_player_id)
+
+users
+  ├── user_roles (user_id)
+  ├── claim_requests (user_id, resolved_by)
+  ├── audit_log (user_id)
+  └── scheduled_matches (created_by)
 
 gods (standalone lookup table)
 
 roles
-  └── role_permissions (role_id)
-
-users
-  └── user_roles (user_id, role_id, league_id?)
+  ├── role_permissions (role_id)
+  └── user_roles (role_id)
 ```
