@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
-import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered } from 'lucide-react'
+import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Search, Shield } from 'lucide-react'
 import smiteLogo from '../assets/smite2.png'
+import statsheetImg from '../assets/statsheet.png'
 
 // League logos
 import aglLogo from '../assets/leagues/agl.png'
@@ -66,37 +67,6 @@ const Homepage = () => {
         return () => { cancelled = true }
     }, [])
 
-    const [ishtarStats, setIshtarStats] = useState(null)
-
-    // Fetch Ishtar division player/team count once leagues are loaded
-    useEffect(() => {
-        if (!leagues.length) return
-        const bsl = leagues.find(l => l.slug === 'bsl' || l.slug === 'babylon-smite-league')
-        if (!bsl) return
-        const ishtar = bsl.divisions?.find(d => d.slug === 'ishtar')
-        if (!ishtar) return
-        const activeSeason = ishtar.seasons?.find(s => s.is_active)
-        if (!activeSeason) return
-
-        const fetchStats = async () => {
-            try {
-                const res = await fetch(`/.netlify/functions/standings?seasonId=${activeSeason.id}`)
-                const teams = await res.json()
-                const teamCount = teams.length || 0
-
-                // Get player count from rosters
-                const rosterRes = await fetch(`/.netlify/functions/players?seasonId=${activeSeason.id}`)
-                const players = await rosterRes.json()
-                const playerCount = players.length || 0
-
-                setIshtarStats({ teams: teamCount, players: playerCount })
-            } catch {
-                // Silently fail — banner still renders without stats
-            }
-        }
-        fetchStats()
-    }, [leagues])
-
     const mainLeagues = [...leagues]
         .filter(l => l.name?.toLowerCase() !== 'test league')
         .sort((a, b) => {
@@ -134,7 +104,7 @@ const Homepage = () => {
     return (
         <div className="min-h-screen overflow-hidden">
 
-            {/* Keyframe styles for fire animation */}
+            {/* Keyframe styles */}
             <style>{`
                 @keyframes fireFloat {
                     0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
@@ -150,18 +120,16 @@ const Homepage = () => {
                 }
                 @keyframes passionGlow {
                     0%, 100% { text-shadow: 0 0 20px rgba(248,197,106,0.3), 0 0 40px rgba(248,197,106,0.1); }
-                    50% { text-shadow: 0 0 30px rgba(248,197,106,0.6), 0 0 60px rgba(248,197,106,0.2), 0 0 80px rgba(248,197,106,0.1); }
+                    50% { text-shadow: 0 0 40px rgba(248,197,106,0.7), 0 0 80px rgba(248,197,106,0.3), 0 0 120px rgba(248,197,106,0.15); }
                 }
                 @keyframes passionSlideUp1 {
                     0% { opacity: 0; transform: translateY(30px); }
                     20% { opacity: 1; transform: translateY(0); }
-                    80% { opacity: 1; transform: translateY(0); }
                     100% { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes passionSlideUp2 {
                     0%, 25% { opacity: 0; transform: translateY(30px); }
                     45% { opacity: 1; transform: translateY(0); }
-                    80% { opacity: 1; transform: translateY(0); }
                     100% { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes passionSlideUp3 {
@@ -185,13 +153,22 @@ const Homepage = () => {
                     0%, 100% { transform: scale(1); }
                     50% { transform: scale(1.05); }
                 }
+                @keyframes borderGlow {
+                    0%, 100% { border-color: rgba(248,197,106,0.3); box-shadow: 0 0 30px rgba(248,197,106,0.05), inset 0 0 30px rgba(248,197,106,0.02); }
+                    50% { border-color: rgba(248,197,106,0.6); box-shadow: 0 0 60px rgba(248,197,106,0.15), inset 0 0 60px rgba(248,197,106,0.05); }
+                }
+                @keyframes heatWave {
+                    0%, 100% { opacity: 0.15; transform: scaleY(1); }
+                    50% { opacity: 0.25; transform: scaleY(1.1); }
+                }
             `}</style>
 
             {/* ─── HERO SECTION ─── */}
-            <section className="relative min-h-[85vh] flex items-center justify-center px-4">
+            <section className="relative min-h-[85vh] flex items-center px-4 py-20 overflow-hidden">
+                {/* Background effects */}
                 <div className="absolute inset-0 overflow-hidden">
                     <div
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-15"
+                        className="absolute top-1/3 left-1/3 w-[800px] h-[800px] rounded-full opacity-15"
                         style={{ background: 'radial-gradient(circle, var(--color-accent) 0%, transparent 70%)' }}
                     />
                     <div
@@ -215,413 +192,102 @@ const Homepage = () => {
                     />
                 </div>
 
-                <div className="relative z-10 text-center max-w-4xl mx-auto">
-                    <div className="mb-8">
-                        <img src={smiteLogo} alt="SMITE 2" className="h-28 sm:h-36 w-auto mx-auto drop-shadow-2xl" />
-                    </div>
+                <div className="relative z-10 max-w-7xl mx-auto w-full">
 
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-(--color-accent)/30 bg-(--color-accent)/5 mb-6">
-                        <span className="w-2 h-2 rounded-full bg-(--color-accent) animate-pulse" />
-                        <span className="text-sm font-semibold text-(--color-accent) uppercase tracking-wider">Community-Driven Competitive</span>
-                    </div>
+                    {/* Text content */}
+                    <div className="text-center lg:text-left lg:max-w-[44%] relative z-20">
+                        <div className="flex items-center gap-3 mb-6 justify-center lg:justify-start">
+                            <img src={smiteLogo} alt="SMITE 2" className="h-12 sm:h-14 w-auto drop-shadow-2xl" />
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-(--color-accent)/30 bg-(--color-accent)/5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-(--color-accent) animate-pulse" />
+                                <span className="text-xs font-semibold text-(--color-accent) uppercase tracking-wider">Live</span>
+                            </div>
+                        </div>
 
-                    <h1 className="font-heading text-5xl sm:text-7xl font-black text-(--color-text) mb-6 leading-[1.1] tracking-tight">
-                        The Battleground{' '}
-                        <span className="relative inline-block">
-                            <span
-                                className="bg-clip-text text-transparent"
-                                style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent), #fde68a, var(--color-accent))' }}
-                            >
-                                Lives On
+                        <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black text-(--color-text) mb-5 leading-[1.1] tracking-tight">
+                            The Battleground{' '}
+                            <span className="relative inline-block">
+                                <span
+                                    className="bg-clip-text text-transparent"
+                                    style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent), #fde68a, var(--color-accent))' }}
+                                >
+                                    Lives On
+                                </span>
+                                <span
+                                    className="absolute -bottom-1 left-0 right-0 h-1 rounded-full"
+                                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
+                                />
                             </span>
-                            <span
-                                className="absolute -bottom-1 left-0 right-0 h-1 rounded-full"
-                                style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
-                            />
-                        </span>
-                    </h1>
+                        </h1>
 
-                    <p className="text-lg sm:text-xl text-(--color-text-secondary) max-w-2xl mx-auto mb-10 leading-relaxed">
-                        When the SPL fell, the community answered with passion. Track stats, standings, and tierlists across the leagues keeping SMITE 2 esports alive.
-                    </p>
+                        <p className="text-base sm:text-lg text-(--color-text-secondary) max-w-lg mb-8 leading-relaxed mx-auto lg:mx-0">
+                            Stats, standings, and tools for the community leagues keeping SMITE 2 esports alive. Find your league and jump in.
+                        </p>
 
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        {hasActiveLeagues ? (
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                             <a
                                 href="#leagues"
-                                className="group relative px-8 py-3.5 rounded-xl font-heading font-bold text-lg overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-(--color-accent)/20"
+                                className="group relative inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-heading font-bold text-lg overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-(--color-accent)/20"
                                 style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)' }}
                             >
                                 <span className="relative z-10 text-(--color-primary)">Explore Leagues</span>
                             </a>
-                        ) : (
                             <a
-                                href="#leagues"
-                                className="group px-8 py-3.5 rounded-xl font-heading font-bold text-lg border-2 border-(--color-accent)/50 text-(--color-accent) hover:bg-(--color-accent)/10 transition-all duration-300"
+                                href="#about"
+                                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-heading font-bold text-base border border-white/10 text-(--color-text-secondary) hover:border-white/25 hover:text-(--color-text) transition-all duration-300"
                             >
-                                View Leagues
+                                Learn More
                             </a>
-                        )}
-                        <a
-                            href="#about"
-                            className="px-8 py-3.5 rounded-xl font-heading font-bold text-lg border border-white/10 text-(--color-text-secondary) hover:border-white/25 hover:text-(--color-text) transition-all duration-300"
-                        >
-                            Learn More
-                        </a>
+                        </div>
                     </div>
 
-                    <div className="mt-16 animate-bounce">
-                        <svg className="w-6 h-6 mx-auto text-(--color-text-secondary)/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                        </svg>
-                    </div>
-                </div>
-            </section>
-
-            {/* ─── BSL ISHTAR DIVISION BANNER ─── */}
-            <section className="py-16 px-4">
-                <div
-                    className="w-2/3 h-px mx-auto mb-16"
-                    style={{ background: `linear-gradient(90deg, transparent, ${leagues.find(l => l.slug === 'bsl' || l.slug === 'babylon-smite-league')?.color || 'var(--color-accent)'}40, transparent)` }}
-                />
-
-                <div className="max-w-5xl mx-auto">
-                    <Link
-                        to="/bsl/ishtar"
-                        className="group relative block overflow-hidden rounded-2xl border border-white/10 hover:border-(--color-accent)/40 transition-all duration-300 hover:shadow-lg hover:shadow-(--color-accent)/5 hover:-translate-y-1"
-                        style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                    {/* Screenshot — stacks on mobile, floats freely on desktop */}
+                    <div
+                        className="relative mt-10 lg:mt-0 lg:absolute lg:right-[-8%] lg:top-1/2 lg:-translate-y-[46%] lg:w-[60%] z-10"
+                        style={{ perspective: '1200px' }}
                     >
-                        {/* Top accent line */}
+                        {/* Glow behind */}
                         <div
-                            className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
-                        />
-
-                        {/* Background glow */}
-                        <div
-                            className="absolute top-0 right-0 w-72 h-72 opacity-10 group-hover:opacity-20 transition-opacity"
-                            style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                            className="absolute -inset-8 rounded-3xl opacity-25 blur-3xl"
+                            style={{ background: 'radial-gradient(ellipse at 60% 40%, var(--color-accent), transparent 65%)' }}
                         />
                         <div
-                            className="absolute bottom-0 left-0 w-48 h-48 opacity-5"
-                            style={{ background: 'radial-gradient(circle at bottom left, var(--color-accent), transparent 70%)' }}
-                        />
-
-                        <div className="relative z-10 p-6 sm:p-10">
-                            <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-10">
-
-                                {/* Left — Babylon logo */}
-                                <div className="flex-shrink-0">
-                                    <div
-                                        className="w-20 h-20 sm:w-28 sm:h-28 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden"
-                                        style={{ background: 'linear-gradient(135deg, var(--color-accent)/0.08, transparent)' }}
-                                    >
-                                        <img src={babylonLogo} alt="Babylon Smite League" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
-                                    </div>
-                                </div>
-
-                                {/* Center — Content */}
-                                <div className="flex-1 text-center md:text-left">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-(--color-accent)/5 border border-(--color-accent)/20 mb-3">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                        <span className="text-xs font-semibold text-(--color-accent) uppercase tracking-wider">Live Season</span>
-                                    </div>
-
-                                    <h2 className="font-heading text-2xl sm:text-3xl font-black text-(--color-text) mb-1.5 leading-tight">
-                                        Babylon Smite League
-                                    </h2>
-                                    <p className="text-base sm:text-lg font-semibold text-(--color-accent) mb-3">
-                                        Ishtar Division — First Tracked Season
-                                    </p>
-                                    <p className="text-sm text-(--color-text-secondary) max-w-lg leading-relaxed">
-                                        Follow every match, track player stats, and see live standings.
-                                        {ishtarStats ? ` Full performance analytics for ${ishtarStats.teams} teams and ${ishtarStats.players} players.` : ' Full performance analytics for every team and player.'}
-                                    </p>
-                                </div>
-
-                                {/* Right — CTA */}
-                                <div className="flex-shrink-0 flex flex-col items-center gap-3">
-                                    <div
-                                        className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-heading font-bold text-sm sm:text-base transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-lg group-hover:shadow-(--color-accent)/20"
-                                        style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)' }}
-                                    >
-                                        <span className="text-(--color-primary)">View Standings</span>
-                                        <svg className="w-4 h-4 text-(--color-primary) group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
-                                    </div>
-                                    {ishtarStats && (
-                                        <div className="flex items-center gap-3 text-xs text-(--color-text-secondary)/60">
-                                            <span>{ishtarStats.teams} Teams</span>
-                                            <span className="w-1 h-1 rounded-full bg-white/20" />
-                                            <span>{ishtarStats.players} Players</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-            </section>
-
-            {/* ─── STORY SECTION ─── */}
-            <section id="about" className="relative py-24 px-4">
-                <div
-                    className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px"
-                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
-                />
-
-                <div className="max-w-5xl mx-auto">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
-                        <div>
-                            <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">The Story</span>
-                            <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text) mb-6 leading-tight">
-                                Built by Passion,{' '}
-                                <span className="text-(--color-accent)">for Passion</span>
-                            </h2>
-                            <div className="space-y-4 text-(--color-text-secondary) leading-relaxed">
-                                <p>
-                                    When the SMITE Pro League was officially canceled, many feared competitive SMITE was done for good. But this community doesn't give up that easily.
-                                </p>
-                                <p>
-                                    Driven by pure passion, players, organizers, and casters came together to build something new. Multiple community leagues formed — fully structured seasons with divisions, playoffs, and the same fire that made competitive SMITE legendary.
-                                </p>
-                                <p>
-                                    <strong className="text-(--color-text)">SMITE 2 Companion</strong> is the hub that tracks it all. Every kill, every match, every clutch play — recorded and ranked. Because this much passion deserves to be seen.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="relative">
+                            className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60 lg:rounded-xl"
+                            style={{ transform: 'rotateY(-4deg) rotateX(2deg)' }}
+                        >
+                            <img
+                                src={statsheetImg}
+                                alt="Player stats dashboard"
+                                className="w-full h-auto block"
+                            />
+                            {/* Bottom fade */}
                             <div
-                                className="rounded-2xl border border-white/10 p-8 text-center relative overflow-hidden"
-                                style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
-                            >
-                                <div
-                                    className="absolute top-0 right-0 w-32 h-32 opacity-20"
-                                    style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
-                                />
-
-                                <div className="flex justify-center text-(--color-accent) mb-6"><Swords className="w-16 h-16" /></div>
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-white/5">
-                                        <span className="text-(--color-text-secondary) text-sm">Active Leagues</span>
-                                        <span className="font-heading font-bold text-(--color-accent) text-lg">{mainLeagues.length}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-white/5">
-                                        <span className="text-(--color-text-secondary) text-sm">Total Divisions</span>
-                                        <span className="font-heading font-bold text-(--color-accent) text-lg">
-                                            {mainLeagues.reduce((sum, l) => sum + (l.divisions?.length || 0), 0)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 flex justify-center gap-2">
-                                    {[deityImg, demigodImg, masterImg, obsidianImg, diamondImg].map((img, i) => (
-                                        <img key={i} src={img} alt="" className="w-9 h-9 object-contain opacity-70" />
-                                    ))}
-                                </div>
-                            </div>
+                                className="absolute inset-0 pointer-events-none"
+                                style={{ background: 'linear-gradient(to bottom, transparent 55%, var(--color-primary) 100%)' }}
+                            />
+                            {/* Left fade — blends into text on desktop */}
+                            <div
+                                className="absolute inset-0 pointer-events-none hidden lg:block"
+                                style={{ background: 'linear-gradient(to right, var(--color-primary), transparent 20%)' }}
+                            />
+                            {/* Right fade — bleeds off screen edge */}
+                            <div
+                                className="absolute inset-0 pointer-events-none"
+                                style={{ background: 'linear-gradient(to left, var(--color-primary), transparent 3%)' }}
+                            />
+                            {/* Top shine */}
+                            <div
+                                className="absolute top-0 left-0 right-0 h-px"
+                                style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)' }}
+                            />
                         </div>
                     </div>
+
                 </div>
             </section>
-
-            {/* ─── SHOUTOUT SECTION ─── */}
-            <section className="py-20 px-4">
-                <div
-                    className="w-2/3 h-px mx-auto mb-20"
-                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
-                />
-
-                <div className="max-w-4xl mx-auto text-center">
-                    <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Respect</span>
-                    <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text) mb-6">
-                        Powered by the Community
-                    </h2>
-                    <p className="text-(--color-text-secondary) text-lg leading-relaxed max-w-2xl mx-auto mb-10">
-                        None of this happens without the incredible people pouring their time, energy, and passion into keeping competitive SMITE alive. Massive shoutout to everyone behind these leagues.
-                    </p>
-
-                    <div className="grid sm:grid-cols-3 gap-6">
-                        {[
-                            {
-                                icon: <Mic className="w-8 h-8" />,
-                                title: 'Organizers & Admins',
-                                desc: 'The ones who handle scheduling, rules, disputes, and everything behind the scenes so the rest of us can compete.',
-                            },
-                            {
-                                icon: <Video className="w-8 h-8" />,
-                                title: 'Casters & Streamers',
-                                desc: 'Bringing every match to life with commentary, hype, and production — giving these games the spotlight they deserve.',
-                            },
-                            {
-                                icon: <Gamepad2 className="w-8 h-8" />,
-                                title: 'Players & Captains',
-                                desc: 'The ones showing up week after week, grinding scrims, and proving that the passion for competitive SMITE burns stronger than ever.',
-                            },
-                        ].map((group) => (
-                            <div
-                                key={group.title}
-                                className="rounded-xl border border-white/10 p-6 text-center"
-                                style={{ background: 'linear-gradient(to bottom, var(--color-secondary), var(--color-primary))' }}
-                            >
-                                <div className="flex justify-center text-(--color-accent) mb-4">{group.icon}</div>
-                                <h3 className="font-heading text-base font-bold text-(--color-text) mb-2">{group.title}</h3>
-                                <p className="text-sm text-(--color-text-secondary) leading-relaxed">{group.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* ─── FEATURES SECTION ─── */}
-            <section className="py-20 px-4">
-                <div className="max-w-6xl mx-auto">
-                    <div className="text-center mb-14">
-                        <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Everything You Need</span>
-                        <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
-                            Your Competitive Toolkit
-                        </h2>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        {[
-                            {
-                                icon: <Trophy className="w-8 h-8" />,
-                                title: 'Standings',
-                                desc: 'Live league standings with match and game records for every division.',
-                            },
-                            {
-                                icon: <BarChart3 className="w-8 h-8" />,
-                                title: 'Player Stats',
-                                desc: 'Full KDA, damage, win rates, and per-game breakdowns for every player.',
-                            },
-                            {
-                                icon: <Calendar className="w-8 h-8" />,
-                                title: 'Match History',
-                                desc: 'Complete schedule and results organized by week with team details.',
-                            },
-                            {
-                                icon: <Swords className="w-8 h-8" />,
-                                title: 'Tierlists',
-                                desc: 'Drag-and-drop player rankings by role. Save locally and export as images.',
-                            },
-                        ].map((feature) => (
-                            <div
-                                key={feature.title}
-                                className="group relative rounded-xl border border-white/10 p-6 transition-all duration-300 hover:border-(--color-accent)/30 hover:-translate-y-1"
-                                style={{ background: 'linear-gradient(to bottom, var(--color-secondary), var(--color-primary))' }}
-                            >
-                                <div
-                                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                    style={{ background: 'radial-gradient(circle at 50% 0%, var(--color-accent)/0.05, transparent 60%)' }}
-                                />
-                                <div className="relative z-10">
-                                    <div className="text-(--color-accent) mb-4">{feature.icon}</div>
-                                    <h3 className="font-heading text-lg font-bold text-(--color-text) mb-2 group-hover:text-(--color-accent) transition-colors">
-                                        {feature.title}
-                                    </h3>
-                                    <p className="text-sm text-(--color-text-secondary) leading-relaxed">{feature.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* ─── CLAIM YOUR PROFILE CTA ─── */}
-            {!authLoading && (
-                <section className="py-16 px-4">
-                    <div className="max-w-5xl mx-auto">
-                        <div className="grid sm:grid-cols-2 gap-5">
-                            {/* Claim Profile Card */}
-                            <div
-                                className="relative overflow-hidden rounded-2xl border border-[#5865F2]/30 p-6 sm:p-8"
-                                style={{ background: 'linear-gradient(135deg, #5865F2/0.08, var(--color-secondary))' }}
-                            >
-                                <div className="absolute top-0 right-0 w-32 h-32 opacity-10" style={{ background: 'radial-gradient(circle at top right, #5865F2, transparent 70%)' }} />
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-10 h-10 rounded-lg bg-[#5865F2]/20 flex items-center justify-center">
-                                            <User className="w-5 h-5 text-[#5865F2]" />
-                                        </div>
-                                        <h3 className="font-heading text-lg font-bold text-(--color-text)">Claim Your Profile</h3>
-                                    </div>
-                                    <p className="text-sm text-(--color-text-secondary) mb-5 leading-relaxed">
-                                        Link your Discord account to your player profile. Track your stats, view your match history, and represent yourself in the community.
-                                    </p>
-                                    {!user ? (
-                                        <button
-                                            onClick={login}
-                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
-                                        >
-                                            <DiscordIcon className="w-4 h-4" />
-                                            Login with Discord
-                                        </button>
-                                    ) : linkedPlayer ? (
-                                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
-                                            <User className="w-4 h-4" />
-                                            Linked to {linkedPlayer.name}
-                                        </span>
-                                    ) : (
-                                        <button
-                                            onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
-                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
-                                        >
-                                            <User className="w-4 h-4" />
-                                            Claim Your Profile
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Community Tier Lists Card */}
-                            <div
-                                className="relative overflow-hidden rounded-2xl border border-(--color-accent)/30 p-6 sm:p-8"
-                                style={{ background: 'linear-gradient(135deg, var(--color-accent)/0.08, var(--color-secondary))' }}
-                            >
-                                <div className="absolute top-0 right-0 w-32 h-32 opacity-10" style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }} />
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-10 h-10 rounded-lg bg-(--color-accent)/20 flex items-center justify-center">
-                                            <ListOrdered className="w-5 h-5 text-(--color-accent)" />
-                                        </div>
-                                        <h3 className="font-heading text-lg font-bold text-(--color-text)">Community Tier Lists</h3>
-                                    </div>
-                                    <p className="text-sm text-(--color-text-secondary) mb-5 leading-relaxed">
-                                        Rank players by role, save your tier lists, and share them with the community. Log in to keep your rankings across devices.
-                                    </p>
-                                    {!user ? (
-                                        <button
-                                            onClick={login}
-                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors"
-                                            style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)', color: 'var(--color-primary)' }}
-                                        >
-                                            <DiscordIcon className="w-4 h-4" />
-                                            Login to Save Rankings
-                                        </button>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-sm font-medium">
-                                            <ListOrdered className="w-4 h-4" />
-                                            Rankings save to your account
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {/* ─── LEAGUES SECTION ─── */}
             <section id="leagues" className="py-20 px-4">
-                <div
-                    className="w-2/3 h-px mx-auto mb-20"
-                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
-                />
-
                 <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-14">
                         <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Competition</span>
@@ -638,7 +304,7 @@ const Homepage = () => {
                             const isActive = divisions.some(d => d.seasons?.some(s => s.is_active))
 
                             return (
-                                <div key={league.id}>
+                                <div key={league.id} id={`league-${league.slug}`}>
                                     <div className="flex items-center gap-4 mb-6">
                                         {logo ? (
                                             <img src={logo} alt="" className={`h-12 w-12 object-contain rounded-lg ${!isActive ? 'opacity-40' : ''}`} />
@@ -773,69 +439,413 @@ const Homepage = () => {
                 </div>
             </section>
 
+            {/* ─── TOOLS SHOWCASE ─── */}
+            <section className="py-20 px-4">
+                <div
+                    className="w-2/3 h-px mx-auto mb-20"
+                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                />
+
+                <div className="max-w-5xl mx-auto">
+                    <div className="text-center mb-10">
+                        <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Tools</span>
+                        <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
+                            Sharpen Your Edge
+                        </h2>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-5">
+                        {/* Draft Simulator */}
+                        <Link
+                            to="/draft"
+                            className="group relative overflow-hidden rounded-2xl border border-white/10 hover:border-(--color-accent)/40 p-6 sm:p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-(--color-accent)/10"
+                            style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                        >
+                            <div
+                                className="absolute top-0 right-0 w-40 h-40 opacity-10 group-hover:opacity-20 transition-opacity"
+                                style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                            />
+                            <div
+                                className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
+                            />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 rounded-xl bg-(--color-accent)/10 flex items-center justify-center">
+                                        <Shield className="w-6 h-6 text-(--color-accent)" />
+                                    </div>
+                                    <h3 className="font-heading text-xl font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
+                                        Draft Simulator
+                                    </h3>
+                                </div>
+                                <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-5">
+                                    Practice pick/ban strategy with the full SMITE 2 god pool. Supports Regular, Fearless, and multi-game series formats.
+                                </p>
+                                <span
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-heading font-bold text-sm transition-all duration-300 group-hover:scale-[1.03]"
+                                    style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)', color: 'var(--color-primary)' }}
+                                >
+                                    Try It Out
+                                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </span>
+                            </div>
+                        </Link>
+
+                        {/* Tier Lists */}
+                        <div
+                            className="group relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8"
+                            style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                        >
+                            <div
+                                className="absolute top-0 right-0 w-40 h-40 opacity-10"
+                                style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                            />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 rounded-xl bg-(--color-accent)/10 flex items-center justify-center">
+                                        <ListOrdered className="w-6 h-6 text-(--color-accent)" />
+                                    </div>
+                                    <h3 className="font-heading text-xl font-bold text-(--color-text)">
+                                        Player Tier Lists
+                                    </h3>
+                                </div>
+                                <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-5">
+                                    Rank players by role with drag-and-drop. Export as shareable images and compare your rankings with the community.
+                                </p>
+                                <span className="inline-flex items-center gap-2 text-sm font-semibold text-(--color-accent)">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-(--color-accent)" />
+                                    Available in every division
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── PROFILE CTA ─── */}
+            {!authLoading && (
+                <section className="py-16 px-4">
+                    <div className="max-w-5xl mx-auto">
+                        <div
+                            className="relative overflow-hidden rounded-2xl border border-[#5865F2]/30 p-6 sm:p-10"
+                            style={{ background: 'linear-gradient(135deg, #5865F2/0.06, var(--color-secondary))' }}
+                        >
+                            <div className="absolute top-0 right-0 w-48 h-48 opacity-10" style={{ background: 'radial-gradient(circle at top right, #5865F2, transparent 70%)' }} />
+                            <div className="absolute bottom-0 left-0 w-32 h-32 opacity-5" style={{ background: 'radial-gradient(circle at bottom left, #5865F2, transparent 70%)' }} />
+
+                            <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6">
+                                <div className="w-14 h-14 rounded-xl bg-[#5865F2]/20 flex items-center justify-center shrink-0">
+                                    <User className="w-7 h-7 text-[#5865F2]" />
+                                </div>
+                                <div className="flex-1 text-center sm:text-left">
+                                    <h3 className="font-heading text-xl font-bold text-(--color-text) mb-1">
+                                        Track Your Stats Across Seasons
+                                    </h3>
+                                    <p className="text-sm text-(--color-text-secondary) leading-relaxed max-w-xl">
+                                        Link your Discord to claim your player profile. See your KDA, match history, and performance trends across every league and season — all in one place.
+                                    </p>
+                                </div>
+                                <div className="shrink-0">
+                                    {!user ? (
+                                        <button
+                                            onClick={login}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                        >
+                                            <DiscordIcon className="w-4 h-4" />
+                                            Login with Discord
+                                        </button>
+                                    ) : linkedPlayer ? (
+                                        <Link
+                                            to={`/profile/${linkedPlayer.slug}`}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                        >
+                                            <User className="w-4 h-4" />
+                                            View My Profile
+                                        </Link>
+                                    ) : (
+                                        <button
+                                            onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold transition-colors"
+                                        >
+                                            <User className="w-4 h-4" />
+                                            Claim Your Profile
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* ─── WHAT IS SMITECOMP.COM? ─── */}
+            <section className="py-20 px-4">
+                <div
+                    className="w-2/3 h-px mx-auto mb-20"
+                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                />
+
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-6">
+                        <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">The Platform</span>
+                        <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
+                            What is smitecomp.com?
+                        </h2>
+                    </div>
+                    <p className="text-(--color-text-secondary) text-lg leading-relaxed max-w-3xl mx-auto text-center mb-14">
+                        The companion app for community-run SMITE 2 leagues. Every stat, every match, every play — tracked, ranked, and shareable. Here's what you get:
+                    </p>
+
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {[
+                            {
+                                icon: <Trophy className="w-7 h-7" />,
+                                title: 'Live Standings',
+                                desc: 'Real-time league standings with match records, game differentials, and head-to-head breakdowns for every division.',
+                            },
+                            {
+                                icon: <BarChart3 className="w-7 h-7" />,
+                                title: 'Player Stats',
+                                desc: 'Full performance analytics — KDA, damage, mitigated, win rates, and per-game breakdowns for every player in every season.',
+                            },
+                            {
+                                icon: <Calendar className="w-7 h-7" />,
+                                title: 'Match History',
+                                desc: 'Complete schedule and results organized by week. See team compositions, individual performances, and game-by-game details.',
+                            },
+                            {
+                                icon: <ListOrdered className="w-7 h-7" />,
+                                title: 'Tier Lists',
+                                desc: 'Drag-and-drop player rankings by role. Export as shareable images and see how your takes stack up against the community.',
+                            },
+                            {
+                                icon: <Shield className="w-7 h-7" />,
+                                title: 'Draft Simulator',
+                                desc: 'Practice picks and bans with the full god pool. Supports Fearless draft, multi-game series, and all competitive formats.',
+                            },
+                            {
+                                icon: <User className="w-7 h-7" />,
+                                title: 'Player Profiles',
+                                desc: 'Claim your profile with Discord. Track your stats across seasons and leagues with a single cross-season profile page.',
+                            },
+                        ].map((feature) => (
+                            <div
+                                key={feature.title}
+                                className="group relative rounded-xl border border-white/10 p-6 transition-all duration-300 hover:border-(--color-accent)/30 hover:-translate-y-1"
+                                style={{ background: 'linear-gradient(to bottom, var(--color-secondary), var(--color-primary))' }}
+                            >
+                                <div
+                                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                    style={{ background: 'radial-gradient(circle at 50% 0%, var(--color-accent)/0.05, transparent 60%)' }}
+                                />
+                                <div className="relative z-10">
+                                    <div className="text-(--color-accent) mb-4">{feature.icon}</div>
+                                    <h3 className="font-heading text-lg font-bold text-(--color-text) mb-2 group-hover:text-(--color-accent) transition-colors">
+                                        {feature.title}
+                                    </h3>
+                                    <p className="text-sm text-(--color-text-secondary) leading-relaxed">{feature.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── STORY SECTION ─── */}
+            <section id="about" className="relative py-24 px-4">
+                <div
+                    className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px"
+                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                />
+
+                <div className="max-w-5xl mx-auto">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div>
+                            <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">The Story</span>
+                            <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text) mb-6 leading-tight">
+                                Built by Passion,{' '}
+                                <span className="text-(--color-accent)">for Passion</span>
+                            </h2>
+                            <div className="space-y-4 text-(--color-text-secondary) leading-relaxed">
+                                <p>
+                                    When the SMITE Pro League was officially canceled, many feared competitive SMITE was done for good. But this community doesn't give up that easily.
+                                </p>
+                                <p>
+                                    Driven by pure passion, players, organizers, and casters came together to build something new. Multiple community leagues formed — fully structured seasons with divisions, playoffs, and the same fire that made competitive SMITE legendary.
+                                </p>
+                                <p>
+                                    <strong className="text-(--color-text)">SMITE 2 Companion</strong> is the hub that tracks it all. Every kill, every match, every clutch play — recorded and ranked. Because this much passion deserves to be seen.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="relative">
+                            <div
+                                className="rounded-2xl border border-white/10 p-8 text-center relative overflow-hidden"
+                                style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                            >
+                                <div
+                                    className="absolute top-0 right-0 w-32 h-32 opacity-20"
+                                    style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                                />
+
+                                <div className="flex justify-center text-(--color-accent) mb-6"><Swords className="w-16 h-16" /></div>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-white/5">
+                                        <span className="text-(--color-text-secondary) text-sm">Active Leagues</span>
+                                        <span className="font-heading font-bold text-(--color-accent) text-lg">{mainLeagues.length}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-white/5">
+                                        <span className="text-(--color-text-secondary) text-sm">Total Divisions</span>
+                                        <span className="font-heading font-bold text-(--color-accent) text-lg">
+                                            {mainLeagues.reduce((sum, l) => sum + (l.divisions?.length || 0), 0)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex justify-center gap-2">
+                                    {[deityImg, demigodImg, masterImg, obsidianImg, diamondImg].map((img, i) => (
+                                        <img key={i} src={img} alt="" className="w-9 h-9 object-contain opacity-70" />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── SHOUTOUT SECTION ─── */}
+            <section className="py-20 px-4">
+                <div
+                    className="w-2/3 h-px mx-auto mb-20"
+                    style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent)/0.3, transparent)' }}
+                />
+
+                <div className="max-w-4xl mx-auto text-center">
+                    <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Respect</span>
+                    <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text) mb-6">
+                        Powered by the Community
+                    </h2>
+                    <p className="text-(--color-text-secondary) text-lg leading-relaxed max-w-2xl mx-auto mb-10">
+                        None of this happens without the incredible people pouring their time, energy, and passion into keeping competitive SMITE alive. Massive shoutout to everyone behind these leagues.
+                    </p>
+
+                    <div className="grid sm:grid-cols-3 gap-6">
+                        {[
+                            {
+                                icon: <Mic className="w-8 h-8" />,
+                                title: 'Organizers & Admins',
+                                desc: 'The ones who handle scheduling, rules, disputes, and everything behind the scenes so the rest of us can compete.',
+                            },
+                            {
+                                icon: <Video className="w-8 h-8" />,
+                                title: 'Casters & Streamers',
+                                desc: 'Bringing every match to life with commentary, hype, and production — giving these games the spotlight they deserve.',
+                            },
+                            {
+                                icon: <Gamepad2 className="w-8 h-8" />,
+                                title: 'Players & Captains',
+                                desc: 'The ones showing up week after week, grinding scrims, and proving that the passion for competitive SMITE burns stronger than ever.',
+                            },
+                        ].map((group) => (
+                            <div
+                                key={group.title}
+                                className="rounded-xl border border-white/10 p-6 text-center"
+                                style={{ background: 'linear-gradient(to bottom, var(--color-secondary), var(--color-primary))' }}
+                            >
+                                <div className="flex justify-center text-(--color-accent) mb-4">{group.icon}</div>
+                                <h3 className="font-heading text-base font-bold text-(--color-text) mb-2">{group.title}</h3>
+                                <p className="text-sm text-(--color-text-secondary) leading-relaxed">{group.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* ─── PASSION CTA ─── */}
             <section className="py-24 px-4">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-4xl mx-auto">
                     <div
-                        className="rounded-2xl border border-(--color-accent)/30 relative overflow-hidden"
-                        style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                        className="rounded-3xl border-2 relative overflow-hidden"
+                        style={{
+                            background: 'linear-gradient(180deg, var(--color-secondary), var(--color-primary) 40%, #1a0800)',
+                            animation: 'borderGlow 3s ease-in-out infinite',
+                        }}
                     >
-                        {/* Fire background effects */}
+                        {/* Layered fire background */}
                         <div
-                            className="absolute inset-0 opacity-20 pointer-events-none"
-                            style={{ background: 'radial-gradient(ellipse at 50% 100%, var(--color-accent), transparent 60%)' }}
+                            className="absolute inset-0 pointer-events-none"
+                            style={{ background: 'radial-gradient(ellipse at 50% 110%, var(--color-accent), transparent 55%)', animation: 'heatWave 3s ease-in-out infinite' }}
                         />
                         <div
-                            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-1/2 opacity-10 pointer-events-none"
-                            style={{ background: 'radial-gradient(ellipse at 50% 100%, #ef4444, transparent 70%)' }}
+                            className="absolute inset-0 pointer-events-none opacity-30"
+                            style={{ background: 'radial-gradient(ellipse at 50% 120%, #ef4444, transparent 50%)' }}
                         />
                         <div
-                            className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 -mt-32 opacity-20 pointer-events-none"
+                            className="absolute inset-0 pointer-events-none opacity-10"
+                            style={{ background: 'radial-gradient(ellipse at 30% 100%, #f97316, transparent 40%)' }}
+                        />
+                        <div
+                            className="absolute inset-0 pointer-events-none opacity-10"
+                            style={{ background: 'radial-gradient(ellipse at 70% 100%, #f97316, transparent 40%)' }}
+                        />
+                        <div
+                            className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 -mt-48 opacity-15 pointer-events-none"
                             style={{ background: 'radial-gradient(circle, var(--color-accent), transparent 60%)' }}
                         />
 
                         {/* Animated flame emojis */}
                         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                            {/* Left flames */}
-                            <span className="absolute bottom-8 left-[8%] text-4xl" style={{ animation: 'fireFloat 2s ease-in-out infinite' }}>🔥</span>
-                            <span className="absolute bottom-16 left-[15%] text-3xl" style={{ animation: 'fireFloat2 2.4s ease-in-out infinite 0.3s' }}>🔥</span>
-                            <span className="absolute bottom-4 left-[22%] text-2xl" style={{ animation: 'fireFloat3 1.8s ease-in-out infinite 0.8s' }}>🔥</span>
-                            <span className="absolute bottom-20 left-[5%] text-2xl opacity-60" style={{ animation: 'fireFloat 3s ease-in-out infinite 1.2s' }}>🔥</span>
+                            {/* Bottom row — dense */}
+                            <span className="absolute bottom-4 left-[5%] text-5xl" style={{ animation: 'fireFloat 2s ease-in-out infinite' }}>🔥</span>
+                            <span className="absolute bottom-3 left-[12%] text-4xl" style={{ animation: 'fireFloat2 2.4s ease-in-out infinite 0.3s' }}>🔥</span>
+                            <span className="absolute bottom-5 left-[20%] text-5xl" style={{ animation: 'fireFloat3 1.8s ease-in-out infinite 0.8s' }}>🔥</span>
+                            <span className="absolute bottom-2 left-[28%] text-3xl" style={{ animation: 'fireFloat 2.6s ease-in-out infinite 0.5s' }}>🔥</span>
+                            <span className="absolute bottom-4 left-[35%] text-6xl" style={{ animation: 'fireFloat2 2.1s ease-in-out infinite 0.2s' }}>🔥</span>
+                            <span className="absolute bottom-3 left-[45%] text-6xl" style={{ animation: 'fireFloat 1.9s ease-in-out infinite 0.4s' }}>🔥</span>
+                            <span className="absolute bottom-5 right-[35%] text-6xl" style={{ animation: 'fireFloat3 2.2s ease-in-out infinite 0.1s' }}>🔥</span>
+                            <span className="absolute bottom-2 right-[28%] text-3xl" style={{ animation: 'fireFloat2 2.7s ease-in-out infinite 0.9s' }}>🔥</span>
+                            <span className="absolute bottom-4 right-[20%] text-5xl" style={{ animation: 'fireFloat 2.3s ease-in-out infinite 0.6s' }}>🔥</span>
+                            <span className="absolute bottom-3 right-[12%] text-4xl" style={{ animation: 'fireFloat3 2s ease-in-out infinite 1.1s' }}>🔥</span>
+                            <span className="absolute bottom-5 right-[5%] text-5xl" style={{ animation: 'fireFloat2 2.5s ease-in-out infinite 0.7s' }}>🔥</span>
 
-                            {/* Right flames */}
-                            <span className="absolute bottom-8 right-[8%] text-4xl" style={{ animation: 'fireFloat2 2.2s ease-in-out infinite 0.5s' }}>🔥</span>
-                            <span className="absolute bottom-16 right-[15%] text-3xl" style={{ animation: 'fireFloat 2.6s ease-in-out infinite 0.2s' }}>🔥</span>
-                            <span className="absolute bottom-4 right-[22%] text-2xl" style={{ animation: 'fireFloat3 2s ease-in-out infinite 1s' }}>🔥</span>
-                            <span className="absolute bottom-20 right-[5%] text-2xl opacity-60" style={{ animation: 'fireFloat2 2.8s ease-in-out infinite 0.7s' }}>🔥</span>
+                            {/* Mid row */}
+                            <span className="absolute bottom-16 left-[8%] text-3xl opacity-70" style={{ animation: 'fireFloat 3s ease-in-out infinite 1.2s' }}>🔥</span>
+                            <span className="absolute bottom-20 left-[18%] text-2xl opacity-60" style={{ animation: 'fireFloat2 3.2s ease-in-out infinite 0.4s' }}>🔥</span>
+                            <span className="absolute bottom-14 left-[30%] text-3xl opacity-70" style={{ animation: 'fireFloat3 2.8s ease-in-out infinite 1.5s' }}>🔥</span>
+                            <span className="absolute bottom-18 right-[30%] text-3xl opacity-70" style={{ animation: 'fireFloat 2.9s ease-in-out infinite 0.8s' }}>🔥</span>
+                            <span className="absolute bottom-20 right-[18%] text-2xl opacity-60" style={{ animation: 'fireFloat2 3.1s ease-in-out infinite 1.3s' }}>🔥</span>
+                            <span className="absolute bottom-16 right-[8%] text-3xl opacity-70" style={{ animation: 'fireFloat3 3.3s ease-in-out infinite 0.6s' }}>🔥</span>
 
-                            {/* Top accent flames */}
-                            <span className="absolute top-6 left-[30%] text-xl opacity-40" style={{ animation: 'fireFloat 3.5s ease-in-out infinite 1.5s' }}>🔥</span>
-                            <span className="absolute top-6 right-[30%] text-xl opacity-40" style={{ animation: 'fireFloat2 3s ease-in-out infinite 0.9s' }}>🔥</span>
+                            {/* Top accent — faint */}
+                            <span className="absolute top-8 left-[25%] text-xl opacity-30" style={{ animation: 'fireFloat 3.5s ease-in-out infinite 1.5s' }}>🔥</span>
+                            <span className="absolute top-6 left-[45%] text-xl opacity-25" style={{ animation: 'fireFloat2 4s ease-in-out infinite 2s' }}>🔥</span>
+                            <span className="absolute top-8 right-[25%] text-xl opacity-30" style={{ animation: 'fireFloat3 3.8s ease-in-out infinite 0.9s' }}>🔥</span>
 
-                            {/* Center big flames */}
-                            <span className="absolute bottom-6 left-[42%] text-5xl" style={{ animation: 'fireFloat 2s ease-in-out infinite 0.4s' }}>🔥</span>
-                            <span className="absolute bottom-6 right-[42%] text-5xl" style={{ animation: 'fireFloat2 2.3s ease-in-out infinite 0.1s' }}>🔥</span>
-
-                            {/* Embers (small dots rising) */}
-                            <span className="absolute bottom-24 left-[35%] w-1.5 h-1.5 rounded-full bg-(--color-accent)" style={{ animation: 'ember 2s ease-out infinite' }} />
-                            <span className="absolute bottom-20 left-[50%] w-1 h-1 rounded-full bg-orange-400" style={{ animation: 'ember2 2.5s ease-out infinite 0.5s' }} />
-                            <span className="absolute bottom-28 right-[35%] w-1.5 h-1.5 rounded-full bg-(--color-accent)" style={{ animation: 'ember3 1.8s ease-out infinite 1s' }} />
-                            <span className="absolute bottom-16 right-[45%] w-1 h-1 rounded-full bg-orange-400" style={{ animation: 'ember 2.2s ease-out infinite 0.3s' }} />
-                            <span className="absolute bottom-32 left-[45%] w-1 h-1 rounded-full bg-yellow-300" style={{ animation: 'ember2 3s ease-out infinite 1.4s' }} />
-                            <span className="absolute bottom-24 right-[40%] w-1 h-1 rounded-full bg-yellow-300" style={{ animation: 'ember3 2.6s ease-out infinite 0.8s' }} />
+                            {/* Embers — more of them */}
+                            <span className="absolute bottom-24 left-[25%] w-2 h-2 rounded-full bg-(--color-accent)" style={{ animation: 'ember 2s ease-out infinite' }} />
+                            <span className="absolute bottom-20 left-[40%] w-1.5 h-1.5 rounded-full bg-orange-400" style={{ animation: 'ember2 2.5s ease-out infinite 0.5s' }} />
+                            <span className="absolute bottom-28 left-[55%] w-2 h-2 rounded-full bg-(--color-accent)" style={{ animation: 'ember3 1.8s ease-out infinite 1s' }} />
+                            <span className="absolute bottom-16 right-[40%] w-1.5 h-1.5 rounded-full bg-orange-400" style={{ animation: 'ember 2.2s ease-out infinite 0.3s' }} />
+                            <span className="absolute bottom-32 left-[35%] w-1 h-1 rounded-full bg-yellow-300" style={{ animation: 'ember2 3s ease-out infinite 1.4s' }} />
+                            <span className="absolute bottom-24 right-[35%] w-1 h-1 rounded-full bg-yellow-300" style={{ animation: 'ember3 2.6s ease-out infinite 0.8s' }} />
+                            <span className="absolute bottom-20 left-[15%] w-1.5 h-1.5 rounded-full bg-orange-300" style={{ animation: 'ember 1.9s ease-out infinite 0.6s' }} />
+                            <span className="absolute bottom-26 right-[15%] w-1.5 h-1.5 rounded-full bg-orange-300" style={{ animation: 'ember2 2.3s ease-out infinite 1.1s' }} />
+                            <span className="absolute bottom-18 left-[60%] w-1 h-1 rounded-full bg-yellow-200" style={{ animation: 'ember3 2.8s ease-out infinite 0.2s' }} />
+                            <span className="absolute bottom-30 right-[25%] w-1 h-1 rounded-full bg-yellow-200" style={{ animation: 'ember 3.2s ease-out infinite 1.7s' }} />
                         </div>
 
                         {/* Content */}
-                        <div className="relative z-10 p-10 sm:p-16 text-center">
-                            <div className="space-y-3 mb-8">
+                        <div className="relative z-10 p-12 sm:p-20 text-center">
+                            <div className="space-y-4 mb-10">
                                 <p
-                                    className="font-heading text-2xl sm:text-3xl font-black text-(--color-text) tracking-tight"
+                                    className="font-heading text-3xl sm:text-4xl font-black text-(--color-text) tracking-tight"
                                     style={{ animation: 'passionSlideUp1 1.5s ease-out forwards, passionGlow 3s ease-in-out infinite 1.5s' }}
                                 >
                                     Passion never stops
                                 </p>
                                 <p
-                                    className="font-heading text-2xl sm:text-3xl font-black tracking-tight"
+                                    className="font-heading text-3xl sm:text-4xl font-black tracking-tight"
                                     style={{
                                         animation: 'passionSlideUp2 1.5s ease-out forwards, passionGlow 3s ease-in-out infinite 2s',
                                         color: 'var(--color-accent)',
@@ -844,26 +854,28 @@ const Homepage = () => {
                                     Passion never dies
                                 </p>
                                 <p
-                                    className="font-heading text-3xl sm:text-5xl font-black tracking-tight"
+                                    className="font-heading text-4xl sm:text-6xl font-black tracking-tight pt-2"
                                     style={{
                                         animation: 'passionSlideUp3 1.5s ease-out forwards, firePulse 2s ease-in-out infinite 2.5s',
-                                        backgroundImage: 'linear-gradient(135deg, var(--color-accent), #fde68a, #f97316, var(--color-accent))',
+                                        backgroundImage: 'linear-gradient(135deg, var(--color-accent), #fde68a, #f97316, #ef4444, var(--color-accent))',
+                                        backgroundSize: '200% 200%',
                                         backgroundClip: 'text',
                                         WebkitBackgroundClip: 'text',
                                         color: 'transparent',
                                     }}
                                 >
-                                    🔥 Unlimited Passion 🔥
+                                    Unlimited Passion
                                 </p>
                             </div>
 
                             {hasActiveLeagues && (
                                 <a
                                     href="#leagues"
-                                    className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-heading font-bold text-lg text-(--color-primary) transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-(--color-accent)/25"
+                                    className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-heading font-bold text-lg text-(--color-primary) transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl hover:shadow-(--color-accent)/30"
                                     style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)' }}
                                 >
-                                    Get Started →
+                                    Get Started
+                                    <ChevronRight className="w-5 h-5" />
                                 </a>
                             )}
                         </div>
