@@ -332,6 +332,7 @@ export default async (request, context) => {
 
 export const config = {
     path: '/*',
+    onError: 'bypass',
     excludedPath: [
         '/.netlify/*',
         '/assets/*',
