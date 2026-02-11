@@ -10,13 +10,15 @@ const DEFAULT_KEY = 'tierlist-rankings'
  * Save rankings to localStorage
  * @param {Object} rankings - The rankings object to save
  * @param {string} [storageKey] - Optional custom storage key (e.g. scoped by division)
+ * @param {Object} [extra] - Optional extra fields to persist (e.g. selectedStat, playerStatOverrides)
  */
-export const saveRankingsToStorage = (rankings, storageKey = DEFAULT_KEY) => {
+export const saveRankingsToStorage = (rankings, storageKey = DEFAULT_KEY, extra = {}) => {
     try {
         const dataToSave = {
             rankings,
+            ...extra,
             timestamp: new Date().toISOString(),
-            version: '2.0'
+            version: '2.1'
         }
         localStorage.setItem(storageKey, JSON.stringify(dataToSave))
     } catch (error) {
@@ -42,7 +44,11 @@ export const loadRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
         const hasAllRoles = requiredRoles.every(role => Array.isArray(data.rankings[role]))
         if (!hasAllRoles) return null
 
-        return data.rankings
+        return {
+            rankings: data.rankings,
+            selectedStat: data.selectedStat || 'none',
+            playerStatOverrides: data.playerStatOverrides || {},
+        }
     } catch (error) {
         console.error('Failed to load rankings from localStorage:', error)
         return null

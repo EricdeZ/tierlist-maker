@@ -1,5 +1,5 @@
 // src/components/DragDropRankings.jsx - Refactored to use DivisionContext
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { exportRankingsAsImage } from '../utils/canvasExport'
@@ -10,6 +10,7 @@ import {
     clearRankingsFromStorage
 } from '../utils/localStorage'
 import { useDivision } from '../context/DivisionContext'
+import { usePlayerStats } from '../hooks/usePlayerStats'
 
 // Import role images
 import soloImage from '../assets/roles/solo.webp'
@@ -28,13 +29,28 @@ const roleImages = {
     'ADC': adcImage
 }
 
+const STAT_TYPES = [
+    { key: 'none', label: 'No Stats' },
+    { key: 'kda', label: 'KDA' },
+    { key: 'killsPerGame', label: 'K/G' },
+    { key: 'deathsPerGame', label: 'D/G' },
+    { key: 'assistsPerGame', label: 'A/G' },
+    { key: 'damagePerGame', label: 'Dmg/G' },
+    { key: 'mitigationsPerGame', label: 'Mit/G' },
+]
+
 const DragDropRankings = () => {
     // Use DivisionContext instead of hardcoded hook
-    const { teams: rawTeams, players: rawPlayers, league, loading, error } = useDivision()
+    const { teams: rawTeams, players: rawPlayers, league, division, season, loading, error } = useDivision()
     const { divisionSlug } = useParams()
+    const { data: playerStatsData } = usePlayerStats()
 
     const [isMobile, setIsMobile] = useState(false)
     const [mobileRole, setMobileRole] = useState('SOLO')
+    const [spotlightPlayer, setSpotlightPlayer] = useState(null)
+    const [spotlightPos, setSpotlightPos] = useState({ x: window.innerWidth - 260, y: 80 })
+    const [isDraggingSpotlight, setIsDraggingSpotlight] = useState(false)
+    const spotlightDragOffset = useRef({ x: 0, y: 0 })
 
     // Format teams to match the shape the component expects
     const teams = useMemo(() => {
@@ -59,20 +75,27 @@ const DragDropRankings = () => {
         })
     }, [rawTeams, rawPlayers])
 
+    // Build a lookup map from player name to stats
+    const statsMap = useMemo(() => {
+        const map = new Map()
+        for (const p of playerStatsData) {
+            map.set(p.name, p)
+        }
+        return map
+    }, [playerStatsData])
+
     // Scope localStorage key by division so rankings don't bleed across divisions
     const storageKey = divisionSlug ? `tierlist-rankings-${divisionSlug}` : 'tierlist-rankings'
 
-    // Initialize rankings with localStorage data if available
-    const [rankings, setRankings] = useState(() => {
-        const savedRankings = loadRankingsFromStorage(storageKey)
-        return savedRankings || {
-            SOLO: [],
-            JUNGLE: [],
-            MID: [],
-            SUPPORT: [],
-            ADC: []
-        }
-    })
+    // Load all saved state from localStorage in one read
+    const [savedData] = useState(() => loadRankingsFromStorage(storageKey))
+
+    const [rankings, setRankings] = useState(
+        savedData?.rankings || { SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] }
+    )
+    const [selectedStat, setSelectedStat] = useState(savedData?.selectedStat || 'none')
+    // Locked stats: when a player is placed, we snapshot the current selectedStat
+    const [lockedStats, setLockedStats] = useState(savedData?.playerStatOverrides || {})
 
     const [draggedItem, setDraggedItem] = useState(null)
     const [dragOverZone, setDragOverZone] = useState(null)
@@ -95,13 +118,16 @@ const DragDropRankings = () => {
         return () => window.removeEventListener('resize', checkScreenSize)
     }, [])
 
-    // Auto-save rankings to localStorage whenever rankings change
+    // Auto-save rankings to localStorage whenever rankings or stat prefs change
     useEffect(() => {
         const hasAnyRankings = Object.values(rankings).some(roleArray => roleArray.length > 0)
-        if (hasAnyRankings) {
-            saveRankingsToStorage(rankings, storageKey)
+        if (hasAnyRankings || selectedStat !== 'none') {
+            saveRankingsToStorage(rankings, storageKey, {
+                selectedStat,
+                playerStatOverrides: lockedStats,
+            })
         }
-    }, [rankings, storageKey])
+    }, [rankings, storageKey, selectedStat, lockedStats])
 
     // Cleanup drag state
     useEffect(() => {
@@ -135,6 +161,26 @@ const DragDropRankings = () => {
         window.addEventListener('dragover', onDragOver)
         return () => window.removeEventListener('dragover', onDragOver)
     }, [])
+
+    // Spotlight modal dragging
+    useEffect(() => {
+        if (!isDraggingSpotlight) return
+
+        const onMouseMove = (e) => {
+            setSpotlightPos({
+                x: Math.max(0, Math.min(window.innerWidth - 232, e.clientX - spotlightDragOffset.current.x)),
+                y: Math.max(0, Math.min(window.innerHeight - 100, e.clientY - spotlightDragOffset.current.y)),
+            })
+        }
+        const onMouseUp = () => setIsDraggingSpotlight(false)
+
+        window.addEventListener('mousemove', onMouseMove)
+        window.addEventListener('mouseup', onMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove)
+            window.removeEventListener('mouseup', onMouseUp)
+        }
+    }, [isDraggingSpotlight])
 
     // Measure floating panel height so we can pad the content to prevent overlap
     useEffect(() => {
@@ -184,6 +230,40 @@ const DragDropRankings = () => {
         return team ? team.name : 'Unknown Team'
     }
 
+    const getStatValue = useCallback((playerName, statType) => {
+        if (statType === 'none') return null
+        const stats = statsMap.get(playerName)
+        if (!stats) return null
+
+        switch (statType) {
+            case 'kda': return { value: stats.kda.toFixed(2), label: 'KDA' }
+            case 'killsPerGame': return { value: stats.avgStats.avgKills.toFixed(1), label: 'K/G' }
+            case 'deathsPerGame': return { value: stats.avgStats.avgDeaths.toFixed(1), label: 'D/G' }
+            case 'assistsPerGame': return { value: stats.avgStats.avgAssists.toFixed(1), label: 'A/G' }
+            case 'damagePerGame': return { value: Math.round(stats.avgStats.avgDamage).toLocaleString(), label: 'Dmg/G' }
+            case 'mitigationsPerGame': return { value: Math.round(stats.avgStats.avgMitigated).toLocaleString(), label: 'Mit/G' }
+            default: return null
+        }
+    }, [statsMap])
+
+    // Lock a player's stat at the current selectedStat when they're first placed
+    const lockPlayerStat = useCallback((playerName) => {
+        if (selectedStat !== 'none' && !lockedStats[playerName]) {
+            setLockedStats(prev => ({ ...prev, [playerName]: selectedStat }))
+        }
+    }, [selectedStat, lockedStats])
+
+    const unlockPlayerStat = useCallback((playerName) => {
+        setLockedStats(prev => {
+            const updated = { ...prev }
+            delete updated[playerName]
+            return updated
+        })
+    }, [])
+
+    // Compute set of all ranked players (used to hide from teams panel)
+    const rankedPlayers = useMemo(() => new Set(Object.values(rankings).flat()), [rankings])
+
     // Loading state
     if (loading) {
         return (
@@ -223,8 +303,9 @@ const DragDropRankings = () => {
         )
     }
 
-    // --- Drag & Drop handlers (unchanged) ---
+    // --- Drag & Drop handlers ---
     const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
+        setSpotlightPlayer(player)
         setDraggedItem({
             player,
             sourceTeam,
@@ -293,6 +374,8 @@ const DragDropRankings = () => {
                 })
             }
         } else if (!sourceRole && targetRole) {
+            // New placement from teams panel — lock the current stat
+            lockPlayerStat(player)
             setRankings(prev => {
                 const newList = [...prev[targetRole]]
                 const insertIndex = targetIndex !== null ? targetIndex : newList.length
@@ -305,21 +388,30 @@ const DragDropRankings = () => {
     }
 
     const removeFromRanking = (role, index) => {
+        const player = rankings[role][index]
         setRankings(prev => ({
             ...prev,
             [role]: prev[role].filter((_, i) => i !== index)
         }))
+        if (player) unlockPlayerStat(player)
     }
 
     const clearAllRankings = () => {
         setRankings({ SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] })
+        setLockedStats({})
         clearRankingsFromStorage(storageKey)
     }
 
     const exportAsImageHandler = async () => {
         setIsExporting(true)
         try {
-            exportRankingsAsImage(rankings, teams, 'player-rankings', `${league.name} Tierlist`)
+            const hasAnyStats = Object.keys(lockedStats).length > 0
+            const statInfo = hasAnyStats
+                ? { lockedStats, getStatValue }
+                : null
+            const title = `${league.slug.toUpperCase()} Tierlist`
+            const subtitle = division?.name ? `${division.name}${season ? ` \u2014 ${season.name}` : ''}` : undefined
+            exportRankingsAsImage(rankings, teams, 'player-rankings', title, statInfo, subtitle)
         } finally {
             setTimeout(() => setIsExporting(false), 1000)
         }
@@ -356,6 +448,7 @@ const DragDropRankings = () => {
     }
 
     const addToMobileRanking = (player) => {
+        lockPlayerStat(player)
         setRankings(prev => {
             // Prevent duplicates in the same role
             if (prev[mobileRole].includes(player)) return prev
@@ -371,10 +464,12 @@ const DragDropRankings = () => {
     }
 
     const removeFromMobileRanking = (role, index) => {
+        const player = rankings[role][index]
         setRankings(prev => ({
             ...prev,
             [role]: prev[role].filter((_, i) => i !== index)
         }))
+        if (player) unlockPlayerStat(player)
     }
 
     const moveMobileRanking = (role, index, direction) => {
@@ -389,13 +484,29 @@ const DragDropRankings = () => {
 
     if (isMobile) {
         const currentRanking = rankings[mobileRole] || []
-        const rankedPlayers = new Set(Object.values(rankings).flat())
 
         return (
             <div className="px-3 py-4">
-                <h2 className="text-lg font-bold text-(--color-text) mb-3 font-heading text-center">
+                <h2 className="text-lg font-bold text-(--color-text) mb-2 font-heading text-center">
                     {league.name} Tierlist
                 </h2>
+
+                {/* Stat selector */}
+                <div className="flex gap-1 mb-3 overflow-x-auto justify-center">
+                    {STAT_TYPES.map(st => (
+                        <button
+                            key={st.key}
+                            onClick={() => setSelectedStat(st.key)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex-shrink-0 transition-colors ${
+                                selectedStat === st.key
+                                    ? 'bg-(--color-accent) text-(--color-primary)'
+                                    : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
+                            }`}
+                        >
+                            {st.label}
+                        </button>
+                    ))}
+                </div>
 
                 {/* Role tabs */}
                 <div className="flex gap-1 mb-4 overflow-x-auto">
@@ -436,6 +547,8 @@ const DragDropRankings = () => {
                             {currentRanking.map((player, index) => {
                                 const teamColor = getPlayerTeamColor(player)
                                 const textColor = getContrastColor(teamColor)
+                                const locked = lockedStats[player]
+                                const stat = locked ? getStatValue(player, locked) : null
                                 return (
                                     <div
                                         key={`${mobileRole}-${player}-${index}`}
@@ -445,7 +558,15 @@ const DragDropRankings = () => {
                                         <span className="text-xs font-bold w-7 text-center flex-shrink-0 py-2 bg-black/10">
                                             {index + 1}
                                         </span>
-                                        <span className="text-sm font-medium flex-1 py-2">{player}</span>
+                                        <span className="text-sm font-medium flex-1 py-2 min-w-0 truncate">{player}</span>
+                                        {stat && (
+                                            <span
+                                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/20 flex-shrink-0"
+                                                style={{ color: textColor }}
+                                            >
+                                                {stat.value} {stat.label}
+                                            </span>
+                                        )}
                                         <div className="flex items-center flex-shrink-0">
                                             <button
                                                 onClick={() => moveMobileRanking(mobileRole, index, -1)}
@@ -486,7 +607,7 @@ const DragDropRankings = () => {
                     <div className="space-y-3">
                         {teams.map(team => {
                             const teamTextColor = getContrastColor(team.color)
-                            const availablePlayers = team.players.filter(p => !currentRanking.includes(p))
+                            const availablePlayers = team.players.filter(p => !rankedPlayers.has(p))
                             if (availablePlayers.length === 0) return null
 
                             return (
@@ -499,19 +620,18 @@ const DragDropRankings = () => {
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         {availablePlayers.map(player => {
-                                            const alreadyRanked = rankedPlayers.has(player) && !currentRanking.includes(player)
+                                            const previewStat = getStatValue(player, selectedStat)
                                             return (
                                                 <button
                                                     key={player}
                                                     onClick={() => addToMobileRanking(player)}
-                                                    className={`text-xs px-2.5 py-1.5 rounded font-medium transition-colors ${
-                                                        alreadyRanked
-                                                            ? 'opacity-40'
-                                                            : 'hover:opacity-80'
-                                                    }`}
+                                                    className="text-xs px-2.5 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5 hover:opacity-80"
                                                     style={{ backgroundColor: team.color, color: teamTextColor }}
                                                 >
-                                                    {player}
+                                                    <span>{player}</span>
+                                                    {previewStat && (
+                                                        <span className="text-[10px] opacity-75">{previewStat.value}</span>
+                                                    )}
                                                 </button>
                                             )
                                         })}
@@ -576,14 +696,19 @@ const DragDropRankings = () => {
             {/* Rankings Container */}
             <div ref={rankingsRef} className="rankings-container mb-6 bg-(--color-secondary) p-6 rounded-xl border border-white/10">
                 <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold text-(--color-text) mb-2 font-heading">
-                        {league.name} Tierlist
+                    <h2 className="text-2xl font-bold text-(--color-text) font-heading">
+                        {league.slug.toUpperCase()} Tierlist
                     </h2>
+                    <p className="text-sm text-(--color-text-secondary) mt-1">
+                        {division?.name}{season ? ` \u2014 ${season.name}` : ''}
+                    </p>
                 </div>
 
                 {/* Ranking Grid */}
-                <div className="grid grid-cols-5 gap-4 mb-8"
-                     style={{ paddingRight: teamsPanelOpen && teamsPanelPosition === 'right' ? '14rem' : undefined, transition: 'padding 0.2s' }}
+                <div className="grid grid-cols-5 gap-4 mb-4"
+                     style={{
+                         transition: 'padding 0.2s',
+                     }}
                 >
                     {roles.map(role => (
                         <div
@@ -609,6 +734,8 @@ const DragDropRankings = () => {
                                         draggedItem.sourceRole === role &&
                                         draggedItem.sourceIndex === index &&
                                         rankings[role][index] === player
+                                    const locked = lockedStats[player]
+                                    const stat = locked ? getStatValue(player, locked) : null
 
                                     return (
                                         <div key={`${role}-${player}-${index}`}>
@@ -625,12 +752,13 @@ const DragDropRankings = () => {
                                                 }}
                                             />
                                             <div
-                                                className={`p-3 rounded shadow cursor-move border group hover:shadow-md transition-all ${
+                                                className={`px-2.5 py-2 rounded shadow cursor-move border group hover:shadow-md transition-all ${
                                                     isDraggedItem && isOriginalPosition ? 'opacity-30' :
                                                         isDraggedItem && draggedItem.sourceRole !== role ? 'opacity-70 scale-95' : ''
                                                 }`}
                                                 style={{ backgroundColor: teamColor, borderColor: teamColor, color: textColor }}
                                                 draggable
+                                                onMouseDown={() => setSpotlightPlayer(player)}
                                                 onDragStart={(e) => handleDragStart(e, player, null, role, index)}
                                                 onDragEnd={handleDragEnd}
                                                 onDragOver={handleDragOver}
@@ -644,15 +772,22 @@ const DragDropRankings = () => {
                                                 }}
                                                 title={`${player} (${getPlayerTeamName(player)})`}
                                             >
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm font-medium">{player}</span>
-                                                    <button
-                                                        onClick={() => removeFromRanking(role, index)}
-                                                        className="opacity-0 group-hover:opacity-100 text-sm transition-opacity ml-2 flex-shrink-0"
-                                                        style={{ color: textColor }}
-                                                    >
-                                                        ✕
-                                                    </button>
+                                                <div className="flex justify-between items-center gap-1">
+                                                    <span className="text-sm font-medium truncate min-w-0">{player}</span>
+                                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                        {stat && (
+                                                            <span className="text-[10px] font-bold opacity-75 tabular-nums whitespace-nowrap">
+                                                                {stat.value} <span className="font-medium opacity-80">{stat.label}</span>
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => removeFromRanking(role, index)}
+                                                            className="opacity-0 group-hover:opacity-100 text-sm transition-opacity"
+                                                            style={{ color: textColor }}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -682,16 +817,10 @@ const DragDropRankings = () => {
                     ))}
                 </div>
 
-                {FEATURE_FLAGS.ENABLE_EXPORT_IMPORT && (
-                    <div className="export-controls flex justify-center gap-4">
-                        <button
-                            onClick={clearAllRankings}
-                            className="px-6 py-2 bg-white/10 text-(--color-text) rounded-lg hover:bg-white/20 transition-colors"
-                        >
-                            Clear All
-                        </button>
-                    </div>
-                )}
+                {/* Watermark */}
+                <div className="text-center">
+                    <span className="text-[11px] text-(--color-text-secondary)/30 font-medium tracking-wide">Created on smitecomp.com</span>
+                </div>
             </div>
 
             {/* Floating Teams Panel - Toggle Button (visible when panel is closed) */}
@@ -719,20 +848,48 @@ const DragDropRankings = () => {
                     }}
                 >
                     {/* Panel header */}
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5">
-                        <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
-                        <div className="flex gap-2">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5 gap-2">
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {STAT_TYPES.map(st => (
+                                <button
+                                    key={st.key}
+                                    onClick={() => setSelectedStat(st.key)}
+                                    className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                                        selectedStat === st.key
+                                            ? 'bg-(--color-accent) text-(--color-primary)'
+                                            : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
+                                    }`}
+                                >
+                                    {st.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex gap-1.5 flex-shrink-0">
                             <button
-                                onClick={() => setTeamsPanelPosition('right')}
+                                onClick={clearAllRankings}
                                 className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
                             >
-                                Dock Right →
+                                Clear
+                            </button>
+                            <button
+                                onClick={exportAsImageHandler}
+                                disabled={isExporting}
+                                className="px-2.5 py-1 rounded text-xs font-semibold transition-colors disabled:opacity-50"
+                                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-primary)' }}
+                            >
+                                {isExporting ? '...' : 'Export'}
+                            </button>
+                            <button
+                                onClick={() => setTeamsPanelPosition('right')}
+                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                            >
+                                Dock Right
                             </button>
                             <button
                                 onClick={() => setTeamsPanelOpen(false)}
-                                className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
                             >
-                                Hide ✕
+                                Hide
                             </button>
                         </div>
                     </div>
@@ -741,8 +898,10 @@ const DragDropRankings = () => {
                         <div className="flex gap-4" style={{ minWidth: 'fit-content' }}>
                             {teams.map(team => {
                                 const teamTextColor = getContrastColor(team.color)
+                                const available = team.players.filter(p => !rankedPlayers.has(p))
+                                if (available.length === 0) return null
                                 return (
-                                    <div key={team.id} className="flex-shrink-0 rounded-lg border border-white/10 p-3" style={{ width: '12rem', backgroundColor: 'var(--color-primary)' }}>
+                                    <div key={team.id} className="flex-shrink-0 rounded-lg border border-white/10 p-3" style={{ width: '14rem', backgroundColor: 'var(--color-primary)' }}>
                                         <h4
                                             className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate"
                                             style={{ backgroundColor: team.color, color: teamTextColor }}
@@ -751,23 +910,29 @@ const DragDropRankings = () => {
                                             {team.name}
                                         </h4>
                                         <div className="space-y-1">
-                                            {team.players.map((player, index) => {
+                                            {available.map((player, index) => {
                                                 const playerRole = getPlayerRole(player)
                                                 const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+                                                const previewStat = getStatValue(player, selectedStat)
 
                                                 return (
                                                     <div
                                                         key={`${team.id}-${player}-${index}`}
-                                                        className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between"
+                                                        className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between gap-1"
                                                         style={{ backgroundColor: team.color, color: teamTextColor }}
                                                         draggable
                                                         onDragStart={(e) => handleDragStart(e, player, team.id)}
                                                         onDragEnd={handleDragEnd}
                                                     >
-                                                        <span>{player}</span>
-                                                        {roleImage && (
-                                                            <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain flex-shrink-0" />
-                                                        )}
+                                                        <span className="truncate">{player}</span>
+                                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                                            {previewStat && (
+                                                                <span className="text-[10px] opacity-75">{previewStat.value}</span>
+                                                            )}
+                                                            {roleImage && (
+                                                                <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain" />
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )
                                             })}
@@ -780,6 +945,85 @@ const DragDropRankings = () => {
                 </div>
             )}
 
+            {/* Draggable Player Spotlight */}
+            {spotlightPlayer && (() => {
+                const sp = statsMap.get(spotlightPlayer)
+                if (!sp) return null
+                const teamColor = getPlayerTeamColor(spotlightPlayer)
+                const textColor = getContrastColor(teamColor)
+                const playerRole = getPlayerRole(spotlightPlayer)
+                const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+                const statRows = [
+                    { label: 'KDA', value: sp.kda.toFixed(2) },
+                    { label: 'K/G', value: sp.avgStats.avgKills.toFixed(1) },
+                    { label: 'D/G', value: sp.avgStats.avgDeaths.toFixed(1) },
+                    { label: 'A/G', value: sp.avgStats.avgAssists.toFixed(1) },
+                    { label: 'Dmg/G', value: Math.round(sp.avgStats.avgDamage).toLocaleString() },
+                    { label: 'Mit/G', value: Math.round(sp.avgStats.avgMitigated).toLocaleString() },
+                    { label: 'Games', value: sp.stats.gamesPlayed },
+                    { label: 'Win %', value: `${sp.winRate.toFixed(0)}%` },
+                ]
+                return (
+                    <div
+                        className="fixed z-30 rounded-xl border border-white/10 overflow-hidden shadow-xl select-none"
+                        style={{
+                            width: '14.5rem',
+                            backgroundColor: 'var(--color-secondary)',
+                            left: `${spotlightPos.x}px`,
+                            top: `${spotlightPos.y}px`,
+                        }}
+                    >
+                        {/* Drag handle + player header */}
+                        <div
+                            className="px-3 py-2.5 flex items-center gap-2"
+                            style={{
+                                backgroundColor: teamColor,
+                                color: textColor,
+                                cursor: isDraggingSpotlight ? 'grabbing' : 'grab',
+                            }}
+                            onMouseDown={(e) => {
+                                e.preventDefault()
+                                spotlightDragOffset.current = {
+                                    x: e.clientX - spotlightPos.x,
+                                    y: e.clientY - spotlightPos.y,
+                                }
+                                setIsDraggingSpotlight(true)
+                            }}
+                        >
+                            {/* Drag grip indicator */}
+                            <div className="flex flex-col gap-[2px] flex-shrink-0 opacity-40 mr-0.5">
+                                <div className="flex gap-[2px]"><span className="w-[3px] h-[3px] rounded-full bg-current" /><span className="w-[3px] h-[3px] rounded-full bg-current" /></div>
+                                <div className="flex gap-[2px]"><span className="w-[3px] h-[3px] rounded-full bg-current" /><span className="w-[3px] h-[3px] rounded-full bg-current" /></div>
+                                <div className="flex gap-[2px]"><span className="w-[3px] h-[3px] rounded-full bg-current" /><span className="w-[3px] h-[3px] rounded-full bg-current" /></div>
+                            </div>
+                            {roleImage && (
+                                <img src={roleImage} alt={playerRole} className="w-5 h-5 object-contain flex-shrink-0 opacity-80" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <div className="font-bold text-sm truncate">{spotlightPlayer}</div>
+                                <div className="text-[10px] opacity-75">{getPlayerTeamName(spotlightPlayer)}</div>
+                            </div>
+                            <button
+                                onClick={() => setSpotlightPlayer(null)}
+                                className="text-xs opacity-50 hover:opacity-100 transition-opacity flex-shrink-0"
+                                style={{ color: textColor }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        {/* Stats */}
+                        <div className="px-3 py-2">
+                            {statRows.map(row => (
+                                <div key={row.label} className="flex justify-between items-center py-1 border-b border-white/5 last:border-0">
+                                    <span className="text-[11px] text-(--color-text-secondary)">{row.label}</span>
+                                    <span className="text-[11px] font-bold text-(--color-text) tabular-nums">{row.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )
+            })()}
+
             {/* Floating Teams Panel - Right */}
             {teamsPanelOpen && teamsPanelPosition === 'right' && (
                 <div
@@ -791,22 +1035,55 @@ const DragDropRankings = () => {
                     }}
                 >
                     {/* Panel header */}
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-white/5 sticky top-0 z-10" style={{ backgroundColor: 'var(--color-secondary)' }}>
-                        <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
+                    <div className="px-3 py-2 border-b border-white/10 bg-white/5 sticky top-0 z-10 space-y-2" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setTeamsPanelPosition('bottom')}
+                                    className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                                    title="Dock to bottom"
+                                >
+                                    ↓
+                                </button>
+                                <button
+                                    onClick={() => setTeamsPanelOpen(false)}
+                                    className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
+                                    title="Hide panel"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                            {STAT_TYPES.map(st => (
+                                <button
+                                    key={st.key}
+                                    onClick={() => setSelectedStat(st.key)}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                                        selectedStat === st.key
+                                            ? 'bg-(--color-accent) text-(--color-primary)'
+                                            : 'bg-white/10 text-(--color-text-secondary) hover:bg-white/15'
+                                    }`}
+                                >
+                                    {st.label}
+                                </button>
+                            ))}
+                        </div>
                         <div className="flex gap-1">
                             <button
-                                onClick={() => setTeamsPanelPosition('bottom')}
-                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
-                                title="Dock to bottom"
+                                onClick={clearAllRankings}
+                                className="flex-1 px-2 py-1 rounded text-[10px] font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
                             >
-                                ↓
+                                Clear
                             </button>
                             <button
-                                onClick={() => setTeamsPanelOpen(false)}
-                                className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
-                                title="Hide panel"
+                                onClick={exportAsImageHandler}
+                                disabled={isExporting}
+                                className="flex-1 px-2 py-1 rounded text-[10px] font-semibold transition-colors disabled:opacity-50"
+                                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-primary)' }}
                             >
-                                ✕
+                                {isExporting ? '...' : 'Export'}
                             </button>
                         </div>
                     </div>
@@ -814,6 +1091,8 @@ const DragDropRankings = () => {
                     <div className="p-3 space-y-3">
                         {teams.map(team => {
                             const teamTextColor = getContrastColor(team.color)
+                            const available = team.players.filter(p => !rankedPlayers.has(p))
+                            if (available.length === 0) return null
                             return (
                                 <div key={team.id} className="rounded-lg border border-white/10 p-2" style={{ backgroundColor: 'var(--color-primary)' }}>
                                     <h4
@@ -824,23 +1103,29 @@ const DragDropRankings = () => {
                                         {team.name}
                                     </h4>
                                     <div className="space-y-1">
-                                        {team.players.map((player, index) => {
+                                        {available.map((player, index) => {
                                             const playerRole = getPlayerRole(player)
                                             const roleImage = playerRole ? roleImages[playerRole.toUpperCase()] : null
+                                            const previewStat = getStatValue(player, selectedStat)
 
                                             return (
                                                 <div
                                                     key={`${team.id}-${player}-${index}`}
-                                                    className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between"
+                                                    className="p-1.5 rounded cursor-move text-xs hover:opacity-80 transition-opacity flex items-center justify-between gap-1"
                                                     style={{ backgroundColor: team.color, color: teamTextColor }}
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, player, team.id)}
                                                     onDragEnd={handleDragEnd}
                                                 >
-                                                    <span>{player}</span>
-                                                    {roleImage && (
-                                                        <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain flex-shrink-0" />
-                                                    )}
+                                                    <span className="truncate">{player}</span>
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        {previewStat && (
+                                                            <span className="text-[10px] opacity-75">{previewStat.value}</span>
+                                                        )}
+                                                        {roleImage && (
+                                                            <img src={roleImage} alt={playerRole} className="w-4 h-4 object-contain" />
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )
                                         })}

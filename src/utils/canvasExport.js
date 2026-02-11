@@ -44,11 +44,13 @@ function truncateText(ctx, text, maxWidth) {
     return t + '...'
 }
 
-export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', leagueName = 'Player Rankings') => {
+export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', leagueName = 'Player Rankings', statInfo = null, subtitle = null) => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
 
     const scale = window.devicePixelRatio || 2
+
+    const hasStats = statInfo !== null
 
     // --- Layout constants ---
     const WIDTH = 1400
@@ -56,7 +58,7 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
     const TITLE_AREA = 90
     const COL_GAP = 12
     const COL_HEADER_H = 48
-    const CARD_H = 40
+    const CARD_H = hasStats ? 52 : 40
     const CARD_GAP = 8
     const CARD_PAD_X = 10
     const LEGEND_TOP_PAD = 30
@@ -112,10 +114,11 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
     ctx.textAlign = 'center'
     ctx.fillText(leagueName, WIDTH / 2, 48)
 
-    // Subtitle / date
+    // Subtitle (division — season, or fallback to date)
     ctx.fillStyle = TEXT_DIM
     ctx.font = `14px ${FONT_BODY}`
-    ctx.fillText(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }), WIDTH / 2, 72)
+    const subtitleText = subtitle || new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+    ctx.fillText(subtitleText, WIDTH / 2, 72)
 
     // --- Role Columns ---
     roles.forEach((role, ci) => {
@@ -170,6 +173,12 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
                 const teamColor = team ? team.color : '#6b7280'
                 const textColor = getContrastColor(teamColor)
 
+                // Get locked stat for this player if available
+                let playerStat = null
+                if (statInfo && statInfo.lockedStats[player]) {
+                    playerStat = statInfo.getStatValue(player, statInfo.lockedStats[player])
+                }
+
                 // Card background (team color)
                 ctx.fillStyle = teamColor
                 roundRect(ctx, cardX, cardY, cardW, CARD_H, 6)
@@ -189,7 +198,7 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
                 ctx.fillStyle = textColor
                 ctx.font = `bold 14px ${FONT_HEADING}`
                 ctx.textAlign = 'center'
-                ctx.fillText(String(pi + 1), cardX + badgeW / 2, cardY + CARD_H / 2 + 5)
+                ctx.fillText(String(pi + 1), cardX + badgeW / 2, cardY + (playerStat ? CARD_H / 2 : CARD_H / 2 + 5))
 
                 // Player name
                 ctx.fillStyle = textColor
@@ -197,7 +206,17 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
                 ctx.textAlign = 'left'
                 const nameMaxW = cardW - badgeW - 14
                 const displayName = truncateText(ctx, player, nameMaxW)
-                ctx.fillText(displayName, cardX + badgeW + 8, cardY + CARD_H / 2 + 5)
+                const nameY = playerStat ? cardY + 20 : cardY + CARD_H / 2 + 5
+                ctx.fillText(displayName, cardX + badgeW + 8, nameY)
+
+                // Stat line (below name)
+                if (playerStat) {
+                    ctx.fillStyle = textColor
+                    ctx.globalAlpha = 0.7
+                    ctx.font = `600 11px ${FONT_BODY}`
+                    ctx.fillText(`${playerStat.value} ${playerStat.label}`, cardX + badgeW + 8, nameY + 16)
+                    ctx.globalAlpha = 1.0
+                }
             })
         }
     })
@@ -249,7 +268,7 @@ export const exportRankingsAsImage = (rankings, teams, filename = 'rankings', le
     ctx.fillStyle = 'rgba(255,255,255,0.15)'
     ctx.font = `11px ${FONT_BODY}`
     ctx.textAlign = 'right'
-    ctx.fillText('SMITE 2 Companion', WIDTH - PADDING, HEIGHT - 14)
+    ctx.fillText('smitecomp.com', WIDTH - PADDING, HEIGHT - 14)
 
     // --- Export ---
     canvas.toBlob((blob) => {
