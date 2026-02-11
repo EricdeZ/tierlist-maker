@@ -1,4 +1,4 @@
-import { getDB, handleCors, headers } from './lib/db.js'
+import { getDB, handleCors, headers, getHeaders } from './lib/db.js'
 
 export const handler = async (event) => {
     const cors = handleCors(event)
@@ -41,7 +41,7 @@ export const handler = async (event) => {
             if (!match) {
                 return {
                     statusCode: 404,
-                    headers,
+                    headers: getHeaders(event),
                     body: JSON.stringify({ error: 'Match not found' }),
                 }
             }
@@ -151,7 +151,7 @@ export const handler = async (event) => {
 
             return {
                 statusCode: 200,
-                headers,
+                headers: getHeaders(event),
                 body: JSON.stringify({
                     ...match,
                     team1_game_wins: team1GameWins,

@@ -1,4 +1,4 @@
-import { getDB, headers, handleCors } from './lib/db.js'
+import { getDB, headers, getHeaders, handleCors } from './lib/db.js'
 
 export const handler = async (event) => {
     const cors = handleCors(event)
@@ -36,7 +36,7 @@ export const handler = async (event) => {
 
             return {
                 statusCode: 200,
-                headers,
+                headers: getHeaders(event),
                 body: JSON.stringify(standings),
             }
         }

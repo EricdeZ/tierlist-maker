@@ -9,7 +9,10 @@ const apiCall = async (endpoint, params = {}) => {
         }
     })
 
-    const response = await fetch(url)
+    const token = localStorage.getItem('auth_token')
+    const response = await fetch(url, {
+        ...(token && { headers: { Authorization: `Bearer ${token}` } }),
+    })
 
     if (!response.ok) {
         throw new Error(`API call failed: ${response.statusText}`)
