@@ -33,12 +33,13 @@ const DIVISION_SUB_PAGES = {
     teams: 'Teams',
 }
 
-const API_BASE = `${SITE_URL}/.netlify/functions`
+// API base is set dynamically from the request origin to avoid circular requests
+let apiBase = ''
 
 // ── Helpers ──
 
 async function apiFetch(endpoint, params = {}) {
-    const url = new URL(`${API_BASE}/${endpoint}`)
+    const url = new URL(`${apiBase}/.netlify/functions/${endpoint}`)
     for (const [k, v] of Object.entries(params)) {
         url.searchParams.set(k, v)
     }
@@ -300,6 +301,7 @@ function injectOGTags(html, tags) {
 export default async (request, context) => {
     const url = new URL(request.url)
     const path = url.pathname
+    apiBase = url.origin
 
     // Skip non-page requests
     if (path.match(/\.\w{2,5}$/) && !path.endsWith('.html')) {
