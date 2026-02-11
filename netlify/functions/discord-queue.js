@@ -2,7 +2,7 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
 import { requirePermission } from './lib/auth.js'
 import { logAudit } from './lib/audit.js'
-import { fetchMessage, pollChannel } from './lib/discord.js'
+import { fetchMessage, pollChannel, reactToMessage } from './lib/discord.js'
 
 export const config = {
     maxDuration: 60,
@@ -221,6 +221,14 @@ async function markUsed(sql, body, admin) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'queue_item_ids required' }) }
     }
 
+    // Get Discord channel/message IDs before updating, so we can react
+    const items = await sql`
+        SELECT DISTINCT dq.message_id, dc.channel_id as discord_channel_id
+        FROM discord_queue dq
+        JOIN discord_channels dc ON dq.channel_id = dc.id
+        WHERE dq.id = ANY(${queue_item_ids})
+    `
+
     await sql`
         UPDATE discord_queue
         SET status = 'used',
@@ -229,6 +237,11 @@ async function markUsed(sql, body, admin) {
             processed_at = NOW()
         WHERE id = ANY(${queue_item_ids})
     `
+
+    // React to original Discord messages with 🤖 (fire-and-forget)
+    for (const item of items) {
+        reactToMessage(item.discord_channel_id, item.message_id).catch(() => {})
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }

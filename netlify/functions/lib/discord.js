@@ -32,6 +32,21 @@ export async function fetchMessage(channelId, messageId) {
     return res.json()
 }
 
+/**
+ * React to a Discord message with an emoji. Fire-and-forget.
+ */
+export async function reactToMessage(channelId, messageId, emoji = '🤖') {
+    const encoded = encodeURIComponent(emoji)
+    const res = await fetch(
+        `${DISCORD_API}/channels/${channelId}/messages/${messageId}/reactions/${encoded}/@me`,
+        { method: 'PUT', headers: getDiscordHeaders() },
+    )
+    if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        console.error(`Discord react failed ${res.status}: ${text.slice(0, 200)}`)
+    }
+}
+
 function isImageAttachment(att) {
     return (
         att.content_type?.startsWith('image/') ||
