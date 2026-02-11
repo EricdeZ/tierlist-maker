@@ -82,6 +82,9 @@ async function submitMatch(sql, body) {
         }
     }
 
+    // Count forfeits toward game wins but not toward player stats
+    const hasForfeit = games.some(g => g.is_forfeit)
+
     // Determine match winner based on game wins
     const team1Wins = games.filter(g => String(g.winning_team_id) === String(team1_id)).length
     const team2Wins = games.filter(g => String(g.winning_team_id) === String(team2_id)).length
@@ -109,56 +112,61 @@ async function submitMatch(sql, body) {
             for (let i = 0; i < games.length; i++) {
                 const game = games[i]
 
+                const isForfeit = !!game.is_forfeit
+
                 const [gameRow] = await tx`
-                    INSERT INTO games (match_id, game_number, winner_team_id, is_completed)
-                    VALUES (${matchId}, ${i + 1}, ${game.winning_team_id}, true)
+                    INSERT INTO games (match_id, game_number, winner_team_id, is_completed, is_forfeit)
+                    VALUES (${matchId}, ${i + 1}, ${game.winning_team_id}, true, ${isForfeit})
                     RETURNING id
                 `
 
                 const gameId = gameRow.id
 
-                // Insert team 1 players (team_side = 1)
-                for (const player of (game.team1_players || [])) {
-                    const lpId = await resolveLeaguePlayerId(tx, player, team1_id, season_id, playerCache)
-                    if (!lpId) {
-                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 1`)
+                // Skip player stats entirely for forfeit games
+                if (!isForfeit) {
+                    // Insert team 1 players (team_side = 1)
+                    for (const player of (game.team1_players || [])) {
+                        const lpId = await resolveLeaguePlayerId(tx, player, team1_id, season_id, playerCache)
+                        if (!lpId) {
+                            throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 1`)
+                        }
+                        await tx`
+                            INSERT INTO player_game_stats (
+                                game_id, league_player_id, team_side,
+                                kills, deaths, assists, damage, mitigated, god_played,
+                                gpm, structure_damage, self_healing, ally_healing
+                            )
+                            VALUES (
+                                ${gameId}, ${lpId}, 1,
+                                ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
+                                ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
+                                ${player.gpm ?? null}, ${player.structure_damage ?? null},
+                                ${player.self_healing ?? null}, ${player.ally_healing ?? null}
+                            )
+                        `
                     }
-                    await tx`
-                        INSERT INTO player_game_stats (
-                            game_id, league_player_id, team_side,
-                            kills, deaths, assists, damage, mitigated, god_played,
-                            gpm, structure_damage, self_healing, ally_healing
-                        )
-                        VALUES (
-                            ${gameId}, ${lpId}, 1,
-                            ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
-                            ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'},
-                            ${player.gpm || 0}, ${player.structure_damage || 0},
-                            ${player.self_healing || 0}, ${player.ally_healing || 0}
-                        )
-                    `
-                }
 
-                // Insert team 2 players (team_side = 2)
-                for (const player of (game.team2_players || [])) {
-                    const lpId = await resolveLeaguePlayerId(tx, player, team2_id, season_id, playerCache)
-                    if (!lpId) {
-                        throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 2`)
+                    // Insert team 2 players (team_side = 2)
+                    for (const player of (game.team2_players || [])) {
+                        const lpId = await resolveLeaguePlayerId(tx, player, team2_id, season_id, playerCache)
+                        if (!lpId) {
+                            throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 2`)
+                        }
+                        await tx`
+                            INSERT INTO player_game_stats (
+                                game_id, league_player_id, team_side,
+                                kills, deaths, assists, damage, mitigated, god_played,
+                                gpm, structure_damage, self_healing, ally_healing
+                            )
+                            VALUES (
+                                ${gameId}, ${lpId}, 2,
+                                ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
+                                ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
+                                ${player.gpm ?? null}, ${player.structure_damage ?? null},
+                                ${player.self_healing ?? null}, ${player.ally_healing ?? null}
+                            )
+                        `
                     }
-                    await tx`
-                        INSERT INTO player_game_stats (
-                            game_id, league_player_id, team_side,
-                            kills, deaths, assists, damage, mitigated, god_played,
-                            gpm, structure_damage, self_healing, ally_healing
-                        )
-                        VALUES (
-                            ${gameId}, ${lpId}, 2,
-                            ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
-                            ${player.damage || 0}, ${player.mitigated || 0}, ${player.god_played || 'Unknown'},
-                            ${player.gpm || 0}, ${player.structure_damage || 0},
-                            ${player.self_healing || 0}, ${player.ally_healing || 0}
-                        )
-                    `
                 }
 
                 gameResults.push({ game_id: gameId, game_number: i + 1 })

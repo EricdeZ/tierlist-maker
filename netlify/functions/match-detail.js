@@ -53,6 +53,7 @@ export const handler = async (event) => {
                     g.game_number,
                     g.winner_team_id,
                     g.is_completed,
+                    COALESCE(g.is_forfeit, false) as is_forfeit,
                     tw.name as winner_name,
                     tw.color as winner_color
                 FROM games g

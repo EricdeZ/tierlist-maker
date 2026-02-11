@@ -348,10 +348,10 @@ const PlayerProfile = () => {
                                                     {game.assists}
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm text-(--color-text)">
-                                                    {formatNumber(game.damage)}
+                                                    {game.damage != null ? formatNumber(game.damage) : '—'}
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm text-(--color-text)">
-                                                    {formatNumber(game.mitigated)}
+                                                    {game.mitigated != null ? formatNumber(game.mitigated) : '—'}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
                                                     <Link to={`${basePath}/matches/${game.match_id}`} className="text-(--color-accent) hover:opacity-80 transition-opacity text-xs font-medium">

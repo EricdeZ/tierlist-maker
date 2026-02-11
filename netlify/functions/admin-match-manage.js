@@ -240,9 +240,9 @@ async function saveGame(sql, body) {
                     ) VALUES (
                         ${game_id}, ${p.league_player_id}, ${p.team_side},
                         ${p.kills || 0}, ${p.deaths || 0}, ${p.assists || 0},
-                        ${p.damage || 0}, ${p.mitigated || 0}, ${p.god_played || 'Unknown'},
-                        ${p.gpm || 0}, ${p.structure_damage || 0},
-                        ${p.self_healing || 0}, ${p.ally_healing || 0}
+                        ${p.damage || null}, ${p.mitigated || null}, ${p.god_played || 'Unknown'},
+                        ${p.gpm || null}, ${p.structure_damage || null},
+                        ${p.self_healing || null}, ${p.ally_healing || null}
                     )
                 `
             }

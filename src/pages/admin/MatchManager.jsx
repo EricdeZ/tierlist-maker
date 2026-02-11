@@ -186,12 +186,12 @@ export default function MatchManager() {
                 kills: p.kills || 0,
                 deaths: p.deaths || 0,
                 assists: p.assists || 0,
-                damage: p.damage || 0,
-                mitigated: p.mitigated || 0,
-                gpm: p.gpm || 0,
-                structure_damage: p.structure_damage || 0,
-                self_healing: p.self_healing || 0,
-                ally_healing: p.ally_healing || 0,
+                damage: p.damage || null,
+                mitigated: p.mitigated || null,
+                gpm: p.gpm || null,
+                structure_damage: p.structure_damage || null,
+                self_healing: p.self_healing || null,
+                ally_healing: p.ally_healing || null,
             }))
 
             await doAction({

@@ -94,6 +94,31 @@ export default function AdminDashboard() {
         }])
     }
 
+    // ─── Add manual match (no screenshots) ───
+    const addManualMatch = () => {
+        const id = uid()
+        liveImagesRef.current[id] = []
+        setMatchReports(prev => [...prev, {
+            id,
+            text: '',
+            images: [],
+            status: 'review',
+            result: null,
+            editData: {
+                season_id: selectedSeasonId,
+                team1_id: null,
+                team2_id: null,
+                team1_name: null,
+                team2_name: null,
+                week: null,
+                date: new Date().toISOString().split('T')[0],
+                best_of: 3,
+                games: [],
+            },
+            error: null,
+        }])
+    }
+
     // ─── Add images to a report ───
     const addImages = useCallback((mrId, files) => {
         const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -247,6 +272,16 @@ export default function AdminDashboard() {
                 date: ed.date || new Date().toISOString().split('T')[0],
                 best_of: ed.best_of || ed.games.length,
                 games: ed.games.map(g => {
+                    // Forfeit games: no player stats needed
+                    if (g.is_forfeit) {
+                        return {
+                            winning_team_id: g.winning_team_id,
+                            is_forfeit: true,
+                            team1_players: [],
+                            team2_players: [],
+                        }
+                    }
+
                     // Detect if teams swapped sides (SMITE 2 alternates Order/Chaos each game)
                     const rosterPlayers = adminData?.players || []
                     const leftTeamIds = g.left_players
@@ -263,21 +298,26 @@ export default function AdminDashboard() {
                     const team1Players = swapped ? g.right_players : g.left_players
                     const team2Players = swapped ? g.left_players : g.right_players
 
+                    // Send null for non-KDA stats when value is 0 or missing (partial stats)
+                    // This preserves the distinction between "0 damage" and "no data"
+                    const optionalStat = (v) => (v != null && v !== '' && v !== 0) ? parseInt(v) : null
+
                     const mapPlayer = p => ({
                         player_name: p.player_name,
                         god_played: p.god_played,
                         kills: p.kills || 0,
                         deaths: p.deaths || 0,
                         assists: p.assists || 0,
-                        damage: p.player_damage || 0,
-                        mitigated: p.mitigated || 0,
-                        structure_damage: p.structure_damage || 0,
-                        gpm: p.gpm || 0,
+                        damage: optionalStat(p.player_damage),
+                        mitigated: optionalStat(p.mitigated),
+                        structure_damage: optionalStat(p.structure_damage),
+                        gpm: optionalStat(p.gpm),
                         league_player_id: p.matched_lp_id || null,
                     })
 
                     return {
                         winning_team_id: g.winning_team_id,
+                        is_forfeit: false,
                         team1_players: team1Players.map(mapPlayer),
                         team2_players: team2Players.map(mapPlayer),
                     }
@@ -405,6 +445,11 @@ export default function AdminDashboard() {
                         + New Match
                     </button>
 
+                    <button onClick={addManualMatch} disabled={!selectedSeasonId}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 text-[var(--color-text)] hover:bg-white/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--color-border)]">
+                        + Manual Entry
+                    </button>
+
                     {counts.pending > 0 && (
                         <button onClick={processAll} disabled={processing}
                                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors">
@@ -523,6 +568,7 @@ function buildEditData(result) {
         return {
             game_index: idx,
             winning_team_id: gw?.winning_team_id || null,
+            is_forfeit: false,
             left_players: mapPlayers(game.data.left_players, 'left'),
             right_players: mapPlayers(game.data.right_players, 'right'),
         }
@@ -861,7 +907,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
 
             {/* ─── Game tabs ─── */}
             <div className="px-4 pt-3 border-t border-[var(--color-border)] mt-3">
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center">
                     {ed.games.map((game, idx) => (
                         <button key={idx} onClick={() => setActiveGame(idx)}
                                 className={`px-3 py-1.5 text-xs rounded-t transition-colors ${
@@ -870,13 +916,74 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
                                 }`}>
                             Game {idx + 1}
-                            {game.winning_team_id && (
+                            {game.is_forfeit && (
+                                <span className="ml-1.5 text-orange-400 font-bold">FF</span>
+                            )}
+                            {game.winning_team_id && !game.is_forfeit && (
                                 <span className={`ml-1.5 inline-block w-2 h-2 rounded-full ${
                                     game.winning_team_id === ed.team1_id ? 'bg-blue-400' : 'bg-red-400'
                                 }`} />
                             )}
                         </button>
                     ))}
+                    <button
+                        onClick={() => {
+                            const emptyPlayer = () => ({
+                                player_name: '', god_played: '', kills: 0, deaths: 0, assists: 0,
+                                player_damage: 0, mitigated: 0, structure_damage: 0, gpm: 0,
+                                matched_name: null, matched_lp_id: null, is_sub: false, sub_type: null,
+                            })
+                            onChange(prev => ({
+                                ...prev,
+                                games: [...prev.games, {
+                                    game_index: prev.games.length,
+                                    winning_team_id: null,
+                                    is_forfeit: false,
+                                    left_players: Array.from({ length: 5 }, emptyPlayer),
+                                    right_players: Array.from({ length: 5 }, emptyPlayer),
+                                }],
+                            }))
+                            setActiveGame(ed.games.length)
+                        }}
+                        className="px-2 py-1 text-[10px] rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 transition-colors ml-1"
+                        title="Add a game with player stats"
+                    >
+                        + Game
+                    </button>
+                    <button
+                        onClick={() => {
+                            onChange(prev => ({
+                                ...prev,
+                                games: [...prev.games, {
+                                    game_index: prev.games.length,
+                                    winning_team_id: null,
+                                    is_forfeit: true,
+                                    left_players: [],
+                                    right_players: [],
+                                }],
+                            }))
+                            setActiveGame(ed.games.length)
+                        }}
+                        className="px-2 py-1 text-[10px] rounded text-orange-400/70 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                        title="Add a forfeit game"
+                    >
+                        + FF
+                    </button>
+                    {ed.games.length > 1 && (
+                        <button
+                            onClick={() => {
+                                onChange(prev => ({
+                                    ...prev,
+                                    games: prev.games.filter((_, i) => i !== activeGame),
+                                }))
+                                setActiveGame(Math.max(0, activeGame - 1))
+                            }}
+                            className="px-2 py-1 text-[10px] rounded text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Remove this game"
+                        >
+                            Remove
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -931,7 +1038,7 @@ function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
 
     return (
         <div className="border-t border-[var(--color-border)]">
-            {/* Winner selector */}
+            {/* Winner selector + forfeit toggle */}
             <div className="px-4 py-3 flex items-center gap-4 bg-[var(--color-card)]/50">
                 <span className="text-xs text-[var(--color-text-secondary)] font-medium">Winner:</span>
                 <div className="flex gap-2">
@@ -946,33 +1053,54 @@ function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
                                 className="px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:text-red-400">Clear</button>
                     )}
                 </div>
+                <div className="ml-auto">
+                    <button
+                        onClick={() => onChange({ ...game, is_forfeit: !game.is_forfeit })}
+                        className={`px-3 py-1 text-xs rounded font-semibold transition-all ${
+                            game.is_forfeit
+                                ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-400/50'
+                                : 'bg-[var(--color-card)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:border-orange-400/50 hover:text-orange-400'
+                        }`}
+                    >
+                        FF
+                    </button>
+                </div>
             </div>
 
-            {/* Player tables */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-border)]">
-                <PlayerTable
-                    label={team1?.team_name || 'Team 1'}
-                    color={team1?.color || '#3b82f6'}
-                    players={game.left_players}
-                    allGamePlayers={[...game.left_players, ...game.right_players]}
-                    side="left"
-                    seasonId={seasonId}
-                    adminData={adminData}
-                    onUpdatePlayer={(idx, updates) => updatePlayer('left', idx, updates)}
-                    isWinner={game.winning_team_id === team1?.team_id}
-                />
-                <PlayerTable
-                    label={team2?.team_name || 'Team 2'}
-                    color={team2?.color || '#ef4444'}
-                    players={game.right_players}
-                    allGamePlayers={[...game.left_players, ...game.right_players]}
-                    side="right"
-                    seasonId={seasonId}
-                    adminData={adminData}
-                    onUpdatePlayer={(idx, updates) => updatePlayer('right', idx, updates)}
-                    isWinner={game.winning_team_id === team2?.team_id}
-                />
-            </div>
+            {/* Forfeit banner */}
+            {game.is_forfeit && (
+                <div className="px-4 py-2 bg-orange-500/10 border-t border-orange-500/20 text-orange-400 text-xs">
+                    Forfeit — no player stats will be recorded. This game won't affect individual player stats or winrates.
+                </div>
+            )}
+
+            {/* Player tables (hidden for forfeits) */}
+            {!game.is_forfeit && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-border)]">
+                    <PlayerTable
+                        label={team1?.team_name || 'Team 1'}
+                        color={team1?.color || '#3b82f6'}
+                        players={game.left_players}
+                        allGamePlayers={[...game.left_players, ...game.right_players]}
+                        side="left"
+                        seasonId={seasonId}
+                        adminData={adminData}
+                        onUpdatePlayer={(idx, updates) => updatePlayer('left', idx, updates)}
+                        isWinner={game.winning_team_id === team1?.team_id}
+                    />
+                    <PlayerTable
+                        label={team2?.team_name || 'Team 2'}
+                        color={team2?.color || '#ef4444'}
+                        players={game.right_players}
+                        allGamePlayers={[...game.left_players, ...game.right_players]}
+                        side="right"
+                        seasonId={seasonId}
+                        adminData={adminData}
+                        onUpdatePlayer={(idx, updates) => updatePlayer('right', idx, updates)}
+                        isWinner={game.winning_team_id === team2?.team_id}
+                    />
+                </div>
+            )}
         </div>
     )
 }

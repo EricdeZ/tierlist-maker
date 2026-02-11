@@ -68,13 +68,13 @@ export const handler = async (event) => {
                             COALESCE(SUM(pgs.kills), 0) as total_kills,
                             COALESCE(SUM(pgs.deaths), 0) as total_deaths,
                             COALESCE(SUM(pgs.assists), 0) as total_assists,
-                            COALESCE(SUM(pgs.damage), 0) as total_damage,
-                            COALESCE(SUM(pgs.mitigated), 0) as total_mitigated,
+                            COALESCE(SUM(NULLIF(pgs.damage, 0)), 0) as total_damage,
+                            COALESCE(SUM(NULLIF(pgs.mitigated, 0)), 0) as total_mitigated,
                             COALESCE(AVG(pgs.kills), 0) as avg_kills,
                             COALESCE(AVG(pgs.deaths), 0) as avg_deaths,
                             COALESCE(AVG(pgs.assists), 0) as avg_assists,
-                            COALESCE(AVG(pgs.damage), 0) as avg_damage,
-                            COALESCE(AVG(pgs.mitigated), 0) as avg_mitigated,
+                            COALESCE(AVG(NULLIF(pgs.damage, 0)), 0) as avg_damage,
+                            COALESCE(AVG(NULLIF(pgs.mitigated, 0)), 0) as avg_mitigated,
                             COUNT(DISTINCT pgs.game_id) FILTER (
                                 WHERE g.winner_team_id = CASE pgs.team_side
                                     WHEN 1 THEN m.team1_id
@@ -150,11 +150,11 @@ export const handler = async (event) => {
             `
 
             const [gameStats] = await sql`
-                SELECT 
+                SELECT
                     COALESCE(SUM(pgs.kills), 0) as total_kills,
                     COALESCE(SUM(pgs.deaths), 0) as total_deaths,
                     COALESCE(SUM(pgs.assists), 0) as total_assists,
-                    COALESCE(SUM(pgs.damage), 0) as total_damage
+                    COALESCE(SUM(NULLIF(pgs.damage, 0)), 0) as total_damage
                 FROM player_game_stats pgs
                 JOIN games g ON pgs.game_id = g.id
                 JOIN matches m ON g.match_id = m.id

@@ -225,7 +225,10 @@ const MatchDetail = () => {
                                     }`}
                                 >
                                     Game {game.game_number}
-                                    {winnerColor && (
+                                    {game.is_forfeit && (
+                                        <span className="text-xs font-bold text-orange-400">FF</span>
+                                    )}
+                                    {winnerColor && !game.is_forfeit && (
                                         <span
                                             className="w-2 h-2 rounded-full flex-shrink-0"
                                             style={{ backgroundColor: winnerColor }}
@@ -254,58 +257,75 @@ const MatchDetail = () => {
                                     />
                                     <span className="text-sm font-bold text-(--color-text)">
                                         {currentGame.winner_name} wins Game {currentGame.game_number}
+                                        {currentGame.is_forfeit && (
+                                            <span className="ml-2 text-orange-400 font-bold">
+                                                (Forfeit)
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
                             )}
 
-                            {/* Team stat comparison bar */}
-                            <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-4">
-                                <TeamComparisonBar
-                                    label="Kills"
-                                    val1={currentGame.team1_totals.kills}
-                                    val2={currentGame.team2_totals.kills}
-                                    color1={match.team1_color}
-                                    color2={match.team2_color}
-                                />
-                                <TeamComparisonBar
-                                    label="Damage"
-                                    val1={currentGame.team1_totals.damage}
-                                    val2={currentGame.team2_totals.damage}
-                                    color1={match.team1_color}
-                                    color2={match.team2_color}
-                                    format={formatNumber}
-                                />
-                                <TeamComparisonBar
-                                    label="Mitigated"
-                                    val1={currentGame.team1_totals.mitigated}
-                                    val2={currentGame.team2_totals.mitigated}
-                                    color1={match.team1_color}
-                                    color2={match.team2_color}
-                                    format={formatNumber}
-                                />
-                            </div>
+                            {/* Forfeit — no stats to show */}
+                            {currentGame.is_forfeit ? (
+                                <div className="bg-(--color-secondary) rounded-xl border border-orange-500/20 p-8 text-center">
+                                    <span className="text-2xl font-black text-orange-400/60">FF</span>
+                                    <p className="text-(--color-text-secondary) text-sm mt-2">
+                                        This game was a forfeit. No player stats recorded.
+                                    </p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Team stat comparison bar */}
+                                    <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-4">
+                                        <TeamComparisonBar
+                                            label="Kills"
+                                            val1={currentGame.team1_totals.kills}
+                                            val2={currentGame.team2_totals.kills}
+                                            color1={match.team1_color}
+                                            color2={match.team2_color}
+                                        />
+                                        <TeamComparisonBar
+                                            label="Damage"
+                                            val1={currentGame.team1_totals.damage}
+                                            val2={currentGame.team2_totals.damage}
+                                            color1={match.team1_color}
+                                            color2={match.team2_color}
+                                            format={formatNumber}
+                                        />
+                                        <TeamComparisonBar
+                                            label="Mitigated"
+                                            val1={currentGame.team1_totals.mitigated}
+                                            val2={currentGame.team2_totals.mitigated}
+                                            color1={match.team1_color}
+                                            color2={match.team2_color}
+                                            format={formatNumber}
+                                        />
+                                    </div>
 
-                            {/* Player stats tables — side by side on desktop, stacked on mobile */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <TeamGameStats
-                                    teamName={match.team1_name}
-                                    teamColor={match.team1_color}
-                                    teamSlug={match.team1_slug}
-                                    players={currentGame.team1_players}
-                                    isWinner={currentGame.winner_team_id === match.team1_id}
-                                    basePath={basePath}
-                                    formatNumber={formatNumber}
-                                />
-                                <TeamGameStats
-                                    teamName={match.team2_name}
-                                    teamColor={match.team2_color}
-                                    teamSlug={match.team2_slug}
-                                    players={currentGame.team2_players}
-                                    isWinner={currentGame.winner_team_id === match.team2_id}
-                                    basePath={basePath}
-                                    formatNumber={formatNumber}
-                                />
-                            </div>
+                                    {/* Player stats tables — side by side on desktop, stacked on mobile */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        <TeamGameStats
+                                            teamName={match.team1_name}
+                                            teamColor={match.team1_color}
+                                            teamSlug={match.team1_slug}
+                                            players={currentGame.team1_players}
+                                            isWinner={currentGame.winner_team_id === match.team1_id}
+                                            basePath={basePath}
+                                            formatNumber={formatNumber}
+                                        />
+                                        <TeamGameStats
+                                            teamName={match.team2_name}
+                                            teamColor={match.team2_color}
+                                            teamSlug={match.team2_slug}
+                                            players={currentGame.team2_players}
+                                            isWinner={currentGame.winner_team_id === match.team2_id}
+                                            basePath={basePath}
+                                            formatNumber={formatNumber}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </>
@@ -427,10 +447,10 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
                                         {player.assists}
                                     </td>
                                     <td className="px-3 py-2.5 text-center text-xs text-(--color-text) tabular-nums whitespace-nowrap">
-                                        {formatNumber(player.damage)}
+                                        {player.damage != null ? formatNumber(player.damage) : '—'}
                                     </td>
                                     <td className="px-3 py-2.5 text-center text-xs text-(--color-text-secondary) tabular-nums whitespace-nowrap">
-                                        {formatNumber(player.mitigated)}
+                                        {player.mitigated != null ? formatNumber(player.mitigated) : '—'}
                                     </td>
                                 </tr>
                             )

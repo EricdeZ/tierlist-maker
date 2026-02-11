@@ -115,6 +115,7 @@
 | winner_team_id | integer | YES | FK → teams.id |
 | duration_minutes | integer | YES | |
 | is_completed | boolean | YES | false |
+| is_forfeit | boolean | YES | false |
 | notes | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
