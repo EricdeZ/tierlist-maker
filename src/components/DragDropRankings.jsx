@@ -39,10 +39,11 @@ const STAT_TYPES = [
     { key: 'mitigationsPerGame', label: 'Mit/G', buttonLabel: 'Mitigations / Game' },
 ]
 
-const DragDropRankings = () => {
+const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     // Use DivisionContext instead of hardcoded hook
     const { teams: rawTeams, players: rawPlayers, league, division, season, loading, error } = useDivision()
-    const { divisionSlug } = useParams()
+    const { divisionSlug: routeSlug } = useParams()
+    const divisionSlug = propDivisionSlug || routeSlug
     const { data: playerStatsData } = usePlayerStats()
 
     const [isMobile, setIsMobile] = useState(false)
@@ -492,7 +493,7 @@ const DragDropRankings = () => {
                 </h2>
 
                 {/* Stat selector */}
-                <div className="flex gap-1 mb-3 overflow-x-auto justify-center">
+                <div className="flex gap-1 mb-3 overflow-x-auto">
                     {STAT_TYPES.map(st => (
                         <button
                             key={st.key}

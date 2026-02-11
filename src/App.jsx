@@ -32,6 +32,7 @@ import UserManager from "./pages/admin/UserManager.jsx";
 import ClaimManager from "./pages/admin/ClaimManager.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
+import TierListPage from "./pages/TierListPage.jsx";
 
 function App() {
     return (
@@ -56,6 +57,9 @@ function App() {
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />
+
+                            {/* Standalone tier list */}
+                            <Route path="tierlist" element={<TierListPage />} />
 
                             {/* Enhanced player profile (cross-season) */}
                             <Route path="profile/:playerSlug" element={<ProfilePage />} />
