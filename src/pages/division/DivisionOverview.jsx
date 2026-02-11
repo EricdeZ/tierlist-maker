@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect } from 'react'
 import { statsService } from '../../services/database'
 import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users, User } from 'lucide-react'
+import PageTitle from '../../components/PageTitle'
 
 import aglLogo from '../../assets/leagues/agl.png'
 import babylonLogo from '../../assets/leagues/babylon.png'
@@ -57,6 +58,7 @@ const DivisionOverview = () => {
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-8">
+            {division && <PageTitle title={`${division.name} - ${league?.name || ''}`} />}
             {/* ─── Hero Banner ─── */}
             <div className="relative overflow-hidden rounded-2xl border border-white/10 mb-10">
                 {/* Background glow */}

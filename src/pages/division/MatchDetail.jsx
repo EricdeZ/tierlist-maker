@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { matchService } from '../../services/database'
+import PageTitle from '../../components/PageTitle'
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
@@ -94,6 +95,7 @@ const MatchDetail = () => {
 
     return (
         <div className="max-w-6xl mx-auto py-8 px-4">
+            {match && <PageTitle title={`${match.team1_name} vs ${match.team2_name}`} />}
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-(--color-text-secondary) mb-6">
                 <Link to={`${basePath}/matches`} className="hover:text-(--color-accent) transition-colors">

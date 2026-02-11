@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
 import { statsService } from '../../services/database'
+import PageTitle from '../../components/PageTitle'
 import { UserCheck, User } from 'lucide-react'
 
 import soloImage from '../../assets/roles/solo.webp'
@@ -22,7 +23,7 @@ const roleImages = {
 
 const PlayerProfile = () => {
     const { leagueSlug, divisionSlug, playerSlug } = useParams()
-    const { players, teams, season } = useDivision()
+    const { players, teams, season, division } = useDivision()
     const { user, linkedPlayer, login, loading: authLoading } = useAuth()
 
     const [gameHistory, setGameHistory] = useState([])
@@ -102,6 +103,7 @@ const PlayerProfile = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
+            {player && <PageTitle title={`${player.name} - ${division?.name || ''}`} />}
             {/* Breadcrumb / back links */}
             <div className="flex items-center gap-2 text-sm text-(--color-text-secondary) mb-4">
                 <Link to={`${basePath}/stats`} className="hover:text-(--color-accent) transition-colors">

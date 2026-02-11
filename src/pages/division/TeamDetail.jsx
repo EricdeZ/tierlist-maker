@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { statsService, matchService } from '../../services/database'
+import PageTitle from '../../components/PageTitle'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -20,7 +21,7 @@ const roleImages = {
 
 const TeamDetail = () => {
     const { leagueSlug, divisionSlug, teamSlug } = useParams()
-    const { teams, players, season } = useDivision()
+    const { teams, players, season, division } = useDivision()
 
     const [rosterStats, setRosterStats] = useState([])
     const [matches, setMatches] = useState([])
@@ -111,6 +112,7 @@ const TeamDetail = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
+            {team && <PageTitle title={`${team.name} - ${division?.name || ''}`} />}
             {/* Back link */}
             <Link
                 to={`${basePath}/teams`}

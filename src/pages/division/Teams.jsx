@@ -1,6 +1,7 @@
 // src/pages/division/Teams.jsx
 import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
+import PageTitle from '../../components/PageTitle'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -18,7 +19,7 @@ const roleImages = {
 
 const Teams = () => {
     const { leagueSlug, divisionSlug } = useParams()
-    const { season, teams, players } = useDivision()
+    const { season, teams, players, division } = useDivision()
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
 
@@ -27,6 +28,7 @@ const Teams = () => {
 
     return (
         <div className="max-w-6xl mx-auto py-8 px-4">
+            {division && <PageTitle title={`Teams - ${division.name}`} />}
             <h1 className="font-heading text-3xl font-bold text-(--color-text) mb-2 text-center">
                 Teams
             </h1>

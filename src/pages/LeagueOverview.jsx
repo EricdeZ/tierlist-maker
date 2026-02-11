@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageCircle } from 'lucide-react'
+import PageTitle from '../components/PageTitle'
 
 import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
@@ -96,6 +97,7 @@ const LeagueOverview = () => {
 
     return (
         <div className="min-h-screen">
+            {league && <PageTitle title={league.name} />}
             {/* ─── HERO ─── */}
             <section className="relative overflow-hidden pt-12 pb-16 px-4">
                 <div

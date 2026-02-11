@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { profileService } from '../services/database'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
+import PageTitle from '../components/PageTitle'
 
 const ProfilePage = () => {
     const { playerSlug } = useParams()
@@ -110,6 +111,7 @@ const ProfilePage = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
+            {profileData && <PageTitle title={`${profileData.player.name} - Player Profile`} />}
             {/* Back button */}
             <button
                 onClick={() => navigate(-1)}

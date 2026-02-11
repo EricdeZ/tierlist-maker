@@ -3,6 +3,10 @@
   functions = "netlify/functions"
   environment = { SECRETS_SCAN_OMIT_KEYS = "DISCORD_CLIENT_ID,DISCORD_REDIRECT_URI" }
 
+[[edge_functions]]
+  path = "/*"
+  function = "og-tags"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

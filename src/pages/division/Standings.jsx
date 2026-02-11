@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { standingsService } from '../../services/database'
+import PageTitle from '../../components/PageTitle'
 
 const Standings = () => {
     const { leagueSlug, divisionSlug } = useParams()
-    const { season } = useDivision()
+    const { season, division } = useDivision()
     const [standings, setStandings] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -65,6 +66,7 @@ const Standings = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
+            {division && <PageTitle title={`Standings - ${division.name}`} />}
             <h1 className="font-heading text-3xl font-bold text-(--color-text) mb-2 text-center">
                 Standings
             </h1>

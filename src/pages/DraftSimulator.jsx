@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { godService } from '../services/database'
+import PageTitle from '../components/PageTitle'
 
 const DRAFT_SEQUENCE = [
     { type: 'ban', team: 'order' },
@@ -188,6 +189,7 @@ export default function DraftSimulator() {
 
     return (
         <div className="h-screen bg-(--color-primary) flex flex-col overflow-hidden">
+            <PageTitle title="Draft Simulator" />
             {/* Header */}
             <header className="flex items-center px-4 py-2.5 border-b border-white/10 flex-shrink-0">
                 <Link

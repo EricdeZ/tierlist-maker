@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import DivisionContext from '../context/DivisionContext'
 import DragDropRankings from '../components/DragDropRankings'
 import { leagueService, teamService, playerService } from '../services/database'
+import PageTitle from '../components/PageTitle'
 import { ChevronLeft, ChevronDown, Lock, Calendar } from 'lucide-react'
 
 // League logos
@@ -252,6 +253,7 @@ export default function TierListPage() {
 
     return (
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <PageTitle title="Player Tier Lists" />
             {/* League picker modal */}
             {showPicker && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

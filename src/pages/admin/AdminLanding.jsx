@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import smiteLogo from '../../assets/smite2.png'
+import PageTitle from '../../components/PageTitle'
 
 const tools = [
     {
@@ -107,6 +108,7 @@ const tools = [
 export default function AdminLanding() {
     return (
         <div className="max-w-4xl mx-auto py-12 px-4">
+            <PageTitle title="Admin" noindex />
             {/* Header */}
             <div className="mb-10 flex items-center justify-between">
                 <div className="flex items-center gap-4">
