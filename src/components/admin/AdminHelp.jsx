@@ -525,3 +525,107 @@ export function LeagueManagerHelp() {
         />
     )
 }
+
+// ─── Help content for Permission Manager ───
+export function PermissionManagerHelp() {
+    return (
+        <AdminHelp
+            pageTitle="Permission Manager"
+            sections={[
+                {
+                    title: 'Understanding Roles & Permissions',
+                    content: (
+                        <>
+                            <p>
+                                The permission system uses <strong>roles</strong> to group related permissions together.
+                                Instead of giving each user individual permissions, you create roles
+                                (like "League Manager" or "Claims Admin") and assign those roles to users.
+                            </p>
+                            <p className="mt-1">
+                                There are two built-in roles that cannot be deleted: <strong>Owner</strong>
+                                {' '}(full access including permission management) and <strong>Admin</strong>
+                                {' '}(full access to all tools except permission management).
+                            </p>
+                        </>
+                    ),
+                },
+                {
+                    title: 'League Scoping',
+                    content: (
+                        <>
+                            <p>
+                                When you assign a role to a user, you can choose a <strong>scope</strong>:
+                            </p>
+                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                <li><strong>All Leagues (Global)</strong> — the user can use that role's
+                                    permissions across all leagues</li>
+                                <li><strong>Specific League</strong> — the user can only use those permissions
+                                    for data in that one league</li>
+                            </ul>
+                            <p className="mt-1">
+                                For example, assigning "League Manager" scoped to BSL means that user can
+                                manage rosters, matches, and seasons <strong>only within BSL</strong>. They
+                                cannot touch SPL data.
+                            </p>
+                        </>
+                    ),
+                },
+                {
+                    title: 'Creating a Custom Role',
+                    content: (
+                        <p>
+                            Click <strong>"Create Role"</strong> to define a new role. Give it a descriptive
+                            name, then check the permissions you want it to grant. You can always edit
+                            permissions later by toggling the checkboxes on the role card.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Assigning Roles to Users',
+                    content: (
+                        <p>
+                            Switch to the <strong>"User Assignments"</strong> tab and click <strong>"Assign Role"</strong>.
+                            Search for the user, pick a role, and choose whether it applies globally or to a specific
+                            league. A user can have multiple role assignments — for example, "League Manager" for BSL
+                            <strong> and</strong> "League Manager" for SPL as separate assignments.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Permission Keys Reference',
+                    content: (
+                        <>
+                            <p>Here's what each permission controls:</p>
+                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                <li><strong>Match Report</strong> — Create match reports from screenshots</li>
+                                <li><strong>Roster Manage</strong> — Edit rosters, transfer/drop/add players</li>
+                                <li><strong>Match Manage</strong> — Edit or delete existing match data</li>
+                                <li><strong>Player Manage</strong> — Edit players, bulk enroll (global)</li>
+                                <li><strong>League Manage</strong> — Create/edit leagues, divisions, seasons, teams</li>
+                                <li><strong>User Manage</strong> — Manage Discord-authenticated users</li>
+                                <li><strong>Claim Manage</strong> — Review player claim requests</li>
+                                <li><strong>Permission Manage</strong> — This page (role & permission admin)</li>
+                            </ul>
+                        </>
+                    ),
+                },
+                {
+                    title: 'Safety Notes',
+                    content: (
+                        <>
+                            <p>
+                                The system prevents you from locking yourself out: the <strong>Owner</strong> role
+                                always retains the "Permission Manage" permission, and you cannot revoke the last
+                                Owner assignment.
+                            </p>
+                            <p className="mt-1">
+                                Deleting a role automatically removes all user assignments for that role.
+                                Users who lose their only role will lose admin access until reassigned.
+                            </p>
+                        </>
+                    ),
+                },
+            ]}
+        />
+    )
+}

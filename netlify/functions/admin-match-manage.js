@@ -1,12 +1,13 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'match_manage')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -36,13 +37,13 @@ export const handler = async (event) => {
 
             switch (body.action) {
                 case 'delete-match':
-                    return await deleteMatch(sql, body)
+                    return await deleteMatch(sql, body, admin)
                 case 'delete-game':
-                    return await deleteGame(sql, body)
+                    return await deleteGame(sql, body, admin)
                 case 'update-match':
-                    return await updateMatch(sql, body)
+                    return await updateMatch(sql, body, admin)
                 case 'save-game':
-                    return await saveGame(sql, body)
+                    return await saveGame(sql, body, admin)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -145,7 +146,7 @@ async function getMatchDetail(sql, matchId) {
 // ═══════════════════════════════════════════════════
 // POST: Delete entire match (cascade)
 // ═══════════════════════════════════════════════════
-async function deleteMatch(sql, body) {
+async function deleteMatch(sql, body, admin) {
     const { match_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
@@ -157,6 +158,8 @@ async function deleteMatch(sql, body) {
         await tx`DELETE FROM matches WHERE id = ${match_id}`
     })
 
+    await logAudit(sql, admin, { action: 'delete-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id })
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match deleted' }) }
 }
 
@@ -164,7 +167,7 @@ async function deleteMatch(sql, body) {
 // ═══════════════════════════════════════════════════
 // POST: Delete a single game (cascade stats, recalc winner)
 // ═══════════════════════════════════════════════════
-async function deleteGame(sql, body) {
+async function deleteGame(sql, body, admin) {
     const { game_id, match_id } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
@@ -186,6 +189,8 @@ async function deleteGame(sql, body) {
         await recalcMatchWinner(tx, match_id)
     })
 
+    await logAudit(sql, admin, { action: 'delete-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id } })
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game deleted' }) }
 }
 
@@ -193,7 +198,7 @@ async function deleteGame(sql, body) {
 // ═══════════════════════════════════════════════════
 // POST: Update match-level fields
 // ═══════════════════════════════════════════════════
-async function updateMatch(sql, body) {
+async function updateMatch(sql, body, admin) {
     const { match_id, date, week, team1_id, team2_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
@@ -208,6 +213,8 @@ async function updateMatch(sql, body) {
         WHERE id = ${match_id}
     `
 
+    await logAudit(sql, admin, { action: 'update-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id, details: { date, week, team1_id, team2_id } })
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match updated' }) }
 }
 
@@ -215,7 +222,7 @@ async function updateMatch(sql, body) {
 // ═══════════════════════════════════════════════════
 // POST: Save game (winner + all player stats)
 // ═══════════════════════════════════════════════════
-async function saveGame(sql, body) {
+async function saveGame(sql, body, admin) {
     const { game_id, match_id, winner_team_id, players } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
@@ -251,6 +258,8 @@ async function saveGame(sql, body) {
         // Recalculate match winner
         await recalcMatchWinner(tx, match_id)
     })
+
+    await logAudit(sql, admin, { action: 'save-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id, winner_team_id } })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game saved' }) }
 }

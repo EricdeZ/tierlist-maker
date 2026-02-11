@@ -1,7 +1,7 @@
 // netlify/functions/auth-me.js
 // Returns current authenticated user info
 import { getDB, headers } from './lib/db.js'
-import { requireAuth } from './lib/auth.js'
+import { requireAuth, getUserPermissions } from './lib/auth.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -36,6 +36,9 @@ export const handler = async (event) => {
         linkedPlayer = player || null
     }
 
+    // Fetch RBAC permissions
+    const permissions = await getUserPermissions(user.id)
+
     return {
         statusCode: 200,
         headers,
@@ -49,6 +52,7 @@ export const handler = async (event) => {
                 linked_player_id: user.linked_player_id,
             },
             linkedPlayer,
+            permissions,
         }),
     }
 }

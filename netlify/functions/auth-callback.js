@@ -74,6 +74,18 @@ export const handler = async (event) => {
             user.role = 'admin'
         }
 
+        // 4b. Bootstrap Owner RBAC role for the admin discord ID
+        if (ADMIN_DISCORD_ID && discordId === ADMIN_DISCORD_ID) {
+            const [ownerRole] = await sql`SELECT id FROM roles WHERE name = 'Owner' LIMIT 1`
+            if (ownerRole) {
+                await sql`
+                    INSERT INTO user_roles (user_id, role_id, league_id, granted_by)
+                    VALUES (${user.id}, ${ownerRole.id}, NULL, ${user.id})
+                    ON CONFLICT DO NOTHING
+                `
+            }
+        }
+
         // 5. Auto-match player profile if not already linked
         if (!user.linked_player_id) {
             // Try matching by discord_id first, then by discord_name

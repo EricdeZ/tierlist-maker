@@ -1,6 +1,7 @@
 /* global process */
 import { getDB, adminHeaders, headers } from './lib/db.js'
-import { requireAuth, requireAdmin } from './lib/auth.js'
+import { requireAuth, requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -152,10 +153,10 @@ async function submitClaim(sql, event, { player_id, message }) {
 
 /**
  * Approve or deny a claim request.
- * Requires admin.
+ * Requires claim_manage permission.
  */
 async function resolveClaim(sql, event, { claim_id, status, admin_note }) {
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'claim_manage')
     if (!admin) {
         return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -206,6 +207,8 @@ async function resolveClaim(sql, event, { claim_id, status, admin_note }) {
             `
         }
     }
+
+    await logAudit(sql, admin, { action: 'resolve-claim', endpoint: 'claim-manage', targetType: 'claim', targetId: claim_id, details: { status, admin_note, user_id: claim.user_id, player_id: claim.player_id } })
 
     return {
         statusCode: 200,

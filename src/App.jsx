@@ -30,6 +30,7 @@ import PlayerManager from "./pages/admin/PlayerManager.jsx";
 import LeagueManager from "./pages/admin/LeagueManager.jsx";
 import UserManager from "./pages/admin/UserManager.jsx";
 import ClaimManager from "./pages/admin/ClaimManager.jsx";
+import PermissionManager from "./pages/admin/PermissionManager.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
 import TierListPage from "./pages/TierListPage.jsx";
@@ -54,6 +55,7 @@ function App() {
                             <Route path="admin/leagues" element={<ProtectedRoute requireAdmin><LeagueManager /></ProtectedRoute>} />
                             <Route path="admin/users" element={<ProtectedRoute requireAdmin><UserManager /></ProtectedRoute>} />
                             <Route path="admin/claims" element={<ProtectedRoute requireAdmin><ClaimManager /></ProtectedRoute>} />
+                            <Route path="admin/permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

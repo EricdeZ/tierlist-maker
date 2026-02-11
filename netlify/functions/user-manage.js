@@ -1,13 +1,14 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'user_manage')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -46,9 +47,9 @@ export const handler = async (event) => {
             case 'set-role':
                 return await setRole(sql, admin, body)
             case 'link-player':
-                return await linkPlayer(sql, body)
+                return await linkPlayer(sql, admin, body)
             case 'unlink-player':
-                return await unlinkPlayer(sql, body)
+                return await unlinkPlayer(sql, admin, body)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
         }
@@ -87,6 +88,8 @@ async function setRole(sql, admin, { user_id, role }) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'User not found' }) }
     }
 
+    await logAudit(sql, admin, { action: 'set-role', endpoint: 'user-manage', targetType: 'user', targetId: user_id, details: { role, username: updated.discord_username } })
+
     return {
         statusCode: 200,
         headers,
@@ -99,7 +102,7 @@ async function setRole(sql, admin, { user_id, role }) {
  * Validates no other user is already linked to that player.
  * Backfills discord_id on the player record.
  */
-async function linkPlayer(sql, { user_id, player_id }) {
+async function linkPlayer(sql, admin, { user_id, player_id }) {
     if (!user_id || !player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'user_id and player_id required' }) }
     }
@@ -136,6 +139,8 @@ async function linkPlayer(sql, { user_id, player_id }) {
         WHERE id = ${player_id}
     `
 
+    await logAudit(sql, admin, { action: 'link-player', endpoint: 'user-manage', targetType: 'user', targetId: user_id, details: { player_id } })
+
     return {
         statusCode: 200,
         headers,
@@ -146,7 +151,7 @@ async function linkPlayer(sql, { user_id, player_id }) {
 /**
  * Admin unlinks a user from their player profile.
  */
-async function unlinkPlayer(sql, { user_id }) {
+async function unlinkPlayer(sql, admin, { user_id }) {
     if (!user_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'user_id required' }) }
     }
@@ -160,6 +165,8 @@ async function unlinkPlayer(sql, { user_id }) {
     if (!updated) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'User not found' }) }
     }
+
+    await logAudit(sql, admin, { action: 'unlink-player', endpoint: 'user-manage', targetType: 'user', targetId: user_id, details: { username: updated.discord_username } })
 
     return {
         statusCode: 200,

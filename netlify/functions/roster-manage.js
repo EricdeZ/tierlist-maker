@@ -1,13 +1,14 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'roster_manage')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -32,25 +33,25 @@ export const handler = async (event) => {
 
         switch (action) {
             case 'change-role':
-                return await changeRole(sql, body)
+                return await changeRole(sql, body, admin)
             case 'transfer-player':
-                return await transferPlayer(sql, body)
+                return await transferPlayer(sql, body, admin)
             case 'drop-player':
-                return await dropPlayer(sql, body)
+                return await dropPlayer(sql, body, admin)
             case 'add-player-to-team':
-                return await addPlayerToTeam(sql, body)
+                return await addPlayerToTeam(sql, body, admin)
             case 'create-and-add-player':
-                return await createAndAddPlayer(sql, body)
+                return await createAndAddPlayer(sql, body, admin)
             case 'reactivate-player':
-                return await reactivatePlayer(sql, body)
+                return await reactivatePlayer(sql, body, admin)
             case 'add-alias':
-                return await addAlias(sql, body)
+                return await addAlias(sql, body, admin)
             case 'remove-alias':
-                return await removeAlias(sql, body)
+                return await removeAlias(sql, body, admin)
             case 'merge-player':
-                return await mergePlayer(sql, body)
+                return await mergePlayer(sql, body, admin)
             case 'rename-player':
-                return await renamePlayer(sql, body)
+                return await renamePlayer(sql, body, admin)
             default:
                 return {
                     statusCode: 400,
@@ -71,7 +72,7 @@ export const handler = async (event) => {
 /**
  * Change a league_player's role
  */
-async function changeRole(sql, { league_player_id, role, secondary_role }) {
+async function changeRole(sql, { league_player_id, role, secondary_role }, admin) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
     }
@@ -99,6 +100,8 @@ async function changeRole(sql, { league_player_id, role, secondary_role }) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await logAudit(sql, admin, { action: 'change-role', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { role, secondary_role } })
+
     return {
         statusCode: 200,
         headers,
@@ -109,7 +112,7 @@ async function changeRole(sql, { league_player_id, role, secondary_role }) {
 /**
  * Transfer a player from one team to another within the same season
  */
-async function transferPlayer(sql, { league_player_id, new_team_id }) {
+async function transferPlayer(sql, { league_player_id, new_team_id }, admin) {
     if (!league_player_id || !new_team_id) {
         return {
             statusCode: 400,
@@ -145,6 +148,8 @@ async function transferPlayer(sql, { league_player_id, new_team_id }) {
         RETURNING id, team_id
     `
 
+    await logAudit(sql, admin, { action: 'transfer-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { new_team_id, team_name: team.name } })
+
     return {
         statusCode: 200,
         headers,
@@ -155,7 +160,7 @@ async function transferPlayer(sql, { league_player_id, new_team_id }) {
 /**
  * Drop (deactivate) a player from their roster
  */
-async function dropPlayer(sql, { league_player_id }) {
+async function dropPlayer(sql, { league_player_id }, admin) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
     }
@@ -171,6 +176,8 @@ async function dropPlayer(sql, { league_player_id }) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await logAudit(sql, admin, { action: 'drop-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+
     return {
         statusCode: 200,
         headers,
@@ -181,7 +188,7 @@ async function dropPlayer(sql, { league_player_id }) {
 /**
  * Reactivate a previously dropped player
  */
-async function reactivatePlayer(sql, { league_player_id }) {
+async function reactivatePlayer(sql, { league_player_id }, admin) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
     }
@@ -197,6 +204,8 @@ async function reactivatePlayer(sql, { league_player_id }) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await logAudit(sql, admin, { action: 'reactivate-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+
     return {
         statusCode: 200,
         headers,
@@ -208,7 +217,7 @@ async function reactivatePlayer(sql, { league_player_id }) {
  * Add an existing player (from the global players table) to a team for a specific season.
  * Creates a new league_players record.
  */
-async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }) {
+async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, admin) {
     if (!player_id || !team_id || !season_id) {
         return {
             statusCode: 400,
@@ -241,6 +250,8 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }) {
             WHERE id = ${existing.id}
             RETURNING id, team_id, role, is_active
         `
+        await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: existing.id, details: { player_id, team_id, season_id, reactivated: true } })
+
         return {
             statusCode: 200,
             headers,
@@ -255,6 +266,8 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }) {
         RETURNING id, team_id, role, is_active
     `
 
+    await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: newLp.id, details: { player_id, team_id, season_id } })
+
     return {
         statusCode: 200,
         headers,
@@ -265,7 +278,7 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }) {
 /**
  * Create a brand-new player in the global players table AND add them to a team.
  */
-async function createAndAddPlayer(sql, { name, team_id, season_id, role }) {
+async function createAndAddPlayer(sql, { name, team_id, season_id, role }, admin) {
     if (!name || !team_id || !season_id) {
         return {
             statusCode: 400,
@@ -317,6 +330,8 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role }) {
         return { player, league_player: lp }
     })
 
+    await logAudit(sql, admin, { action: 'create-and-add-player', endpoint: 'roster-manage', targetType: 'player', targetId: result.player.id, details: { name: result.player.name, team_id, season_id } })
+
     return {
         statusCode: 200,
         headers,
@@ -327,7 +342,7 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role }) {
 /**
  * Add an alias (old name) for a player
  */
-async function addAlias(sql, { player_id, alias }) {
+async function addAlias(sql, { player_id, alias }, admin) {
     if (!player_id || !alias?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and alias required' }) }
     }
@@ -350,6 +365,7 @@ async function addAlias(sql, { player_id, alias }) {
             VALUES (${player_id}, ${trimmed})
             RETURNING id, player_id, alias
         `
+        await logAudit(sql, admin, { action: 'add-alias', endpoint: 'roster-manage', targetType: 'player', targetId: player_id, details: { alias: trimmed } })
         return { statusCode: 200, headers, body: JSON.stringify({ success: true, alias: created }) }
     } catch (err) {
         if (err.code === '23505') {
@@ -362,16 +378,17 @@ async function addAlias(sql, { player_id, alias }) {
 /**
  * Remove an alias by its ID
  */
-async function removeAlias(sql, { alias_id }) {
+async function removeAlias(sql, { alias_id }, admin) {
     if (!alias_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'alias_id required' }) }
     }
     const [deleted] = await sql`
-        DELETE FROM player_aliases WHERE id = ${alias_id} RETURNING id, alias
+        DELETE FROM player_aliases WHERE id = ${alias_id} RETURNING id, player_id, alias
     `
     if (!deleted) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Alias not found' }) }
     }
+    await logAudit(sql, admin, { action: 'remove-alias', endpoint: 'roster-manage', targetType: 'player', targetId: deleted.player_id, details: { alias: deleted.alias } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted }) }
 }
 
@@ -379,7 +396,7 @@ async function removeAlias(sql, { alias_id }) {
  * Merge a duplicate player into the real player.
  * Reassigns all stats, saves old name as alias, deletes the duplicate.
  */
-async function mergePlayer(sql, { source_player_id, target_player_id }) {
+async function mergePlayer(sql, { source_player_id, target_player_id }, admin) {
     if (!source_player_id || !target_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'source_player_id and target_player_id required' }) }
     }
@@ -463,6 +480,8 @@ async function mergePlayer(sql, { source_player_id, target_player_id }) {
         }
     })
 
+    await logAudit(sql, admin, { action: 'merge-player', endpoint: 'roster-manage', targetType: 'player', targetId: target_player_id, details: { source_player_id, source_name: result.source_name, target_name: result.target_name } })
+
     return {
         statusCode: 200,
         headers,
@@ -474,7 +493,7 @@ async function mergePlayer(sql, { source_player_id, target_player_id }) {
  * Rename a player. Updates the global players table name + slug.
  * Optionally saves the old name as an alias.
  */
-async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }) {
+async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }, admin) {
     if (!player_id || !new_name?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and new_name required' }) }
     }
@@ -524,6 +543,8 @@ async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }) {
 
         return { old_name: oldName, new_name: updated.name, new_slug: updated.slug }
     })
+
+    await logAudit(sql, admin, { action: 'rename-player', endpoint: 'roster-manage', targetType: 'player', targetId: player_id, details: { old_name: result.old_name, new_name: result.new_name, save_old_as_alias } })
 
     return {
         statusCode: 200,

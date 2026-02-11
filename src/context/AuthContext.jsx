@@ -1,11 +1,12 @@
 // src/context/AuthContext.jsx
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null)
     const [linkedPlayer, setLinkedPlayer] = useState(null)
+    const [permissions, setPermissions] = useState({ global: [], byLeague: {} })
     const [loading, setLoading] = useState(true)
     const [token, setToken] = useState(() => localStorage.getItem('auth_token'))
 
@@ -37,6 +38,7 @@ export const AuthProvider = ({ children }) => {
         if (!token) {
             setUser(null)
             setLinkedPlayer(null)
+            setPermissions({ global: [], byLeague: {} })
             setLoading(false)
             return
         }
@@ -54,6 +56,7 @@ export const AuthProvider = ({ children }) => {
                     console.log('[AuthContext] auth-me response:', data)
                     setUser(data.user)
                     setLinkedPlayer(data.linkedPlayer)
+                    setPermissions(data.permissions || { global: [], byLeague: {} })
                 }
             } catch {
                 if (!cancelled) {
@@ -61,6 +64,7 @@ export const AuthProvider = ({ children }) => {
                     setToken(null)
                     setUser(null)
                     setLinkedPlayer(null)
+                    setPermissions({ global: [], byLeague: {} })
                 }
             } finally {
                 if (!cancelled) setLoading(false)
@@ -90,9 +94,26 @@ export const AuthProvider = ({ children }) => {
         setToken(null)
         setUser(null)
         setLinkedPlayer(null)
+        setPermissions({ global: [], byLeague: {} })
     }, [])
 
     const isAdmin = user?.role === 'admin'
+
+    // Check if user has a specific permission, optionally for a league
+    const hasPermission = useCallback((permissionKey, leagueId = null) => {
+        if (permissions.global.includes(permissionKey)) return true
+        if (leagueId) {
+            const leaguePerms = permissions.byLeague[String(leagueId)]
+            if (leaguePerms?.includes(permissionKey)) return true
+        }
+        return false
+    }, [permissions])
+
+    // True if user has any RBAC role assignment
+    const hasAnyPermission = useMemo(() =>
+        permissions.global.length > 0 ||
+        Object.values(permissions.byLeague).some(perms => perms.length > 0),
+    [permissions])
 
     // Get Discord avatar URL
     const avatarUrl = user?.discord_avatar
@@ -109,6 +130,9 @@ export const AuthProvider = ({ children }) => {
             logout,
             isAdmin,
             avatarUrl,
+            permissions,
+            hasPermission,
+            hasAnyPermission,
         }}>
             {children}
         </AuthContext.Provider>

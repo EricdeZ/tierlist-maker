@@ -1,13 +1,14 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'player_manage')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -111,9 +112,9 @@ export const handler = async (event) => {
 
         switch (body.action) {
             case 'update-player-info':
-                return await updatePlayerInfo(sql, body)
+                return await updatePlayerInfo(sql, body, admin)
             case 'bulk-enroll-season':
-                return await bulkEnrollSeason(sql, body)
+                return await bulkEnrollSeason(sql, body, admin)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
         }
@@ -130,7 +131,7 @@ export const handler = async (event) => {
 /**
  * Update a player's contact info (discord_name, tracker_url)
  */
-async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }) {
+async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }, admin) {
     if (!player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id required' }) }
     }
@@ -149,6 +150,8 @@ async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
     }
 
+    await logAudit(sql, admin, { action: 'update-player-info', endpoint: 'player-manage', targetType: 'player', targetId: player_id, details: { discord_name, tracker_url } })
+
     return {
         statusCode: 200,
         headers,
@@ -161,7 +164,7 @@ async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }) {
  * Creates league_players entries for each player_id in the target season/team.
  * Skips players who already have an active entry in that season.
  */
-async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }) {
+async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, admin) {
     if (!player_ids?.length || !season_id || !team_id) {
         return {
             statusCode: 400,
@@ -203,6 +206,8 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }) {
             results.details.push({ player_id: pid, status: 'enrolled' })
         }
     }
+
+    await logAudit(sql, admin, { action: 'bulk-enroll-season', endpoint: 'player-manage', targetType: 'season', targetId: season_id, details: { team_id, player_count: player_ids.length, enrolled: results.enrolled, skipped: results.skipped, reactivated: results.reactivated } })
 
     return {
         statusCode: 200,

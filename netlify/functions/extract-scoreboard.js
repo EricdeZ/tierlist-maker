@@ -1,6 +1,6 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
 
 // Netlify function config — Sonnet needs more time than the 10s default
 export const config = {
@@ -121,7 +121,7 @@ export const handler = async (event) => {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'match_report')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }

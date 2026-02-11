@@ -1,13 +1,14 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'match_report')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -27,11 +28,11 @@ export const handler = async (event) => {
             }
 
             if (body.action === 'submit-match') {
-                return await submitMatch(sql, body)
+                return await submitMatch(sql, body, admin)
             }
 
             if (body.action === 'batch-submit') {
-                return await batchSubmit(sql, body)
+                return await batchSubmit(sql, body, admin)
             }
 
             return {
@@ -60,7 +61,7 @@ export const handler = async (event) => {
  * Submit a single match with its games and player stats.
  * Expects pre-edited data from the admin dashboard.
  */
-async function submitMatch(sql, body) {
+async function submitMatch(sql, body, admin) {
     const { season_id, team1_id, team2_id, week, date, best_of, games } = body
 
     if (!season_id || !team1_id || !team2_id || !games?.length) {
@@ -175,6 +176,10 @@ async function submitMatch(sql, body) {
             return { match_id: matchId, games: gameResults }
         })
 
+        if (admin) {
+            await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length } })
+        }
+
         return {
             statusCode: 200,
             headers,
@@ -193,7 +198,7 @@ async function submitMatch(sql, body) {
 /**
  * Batch submit: submits multiple matches sequentially.
  */
-async function batchSubmit(sql, body) {
+async function batchSubmit(sql, body, admin) {
     const { matches } = body
     if (!matches?.length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'No matches provided' }) }
@@ -201,7 +206,7 @@ async function batchSubmit(sql, body) {
 
     const results = []
     for (const matchData of matches) {
-        const res = await submitMatch(sql, { ...matchData, action: 'submit-match' })
+        const res = await submitMatch(sql, { ...matchData, action: 'submit-match' }, admin)
         const data = JSON.parse(res.body)
         results.push({
             success: res.statusCode === 200,

@@ -148,6 +148,37 @@
 | slug | text | NO | |
 | image_url | text | NO | |
 
+### roles
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| name | varchar(100) | NO | UNIQUE |
+| description | text | YES | |
+| is_system | boolean | NO | false |
+| created_at | timestamptz | YES | NOW() |
+
+### role_permissions
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| role_id | integer | NO | FK → roles.id (CASCADE) |
+| permission_key | varchar(50) | NO | |
+| created_at | timestamptz | YES | NOW() |
+
+UNIQUE(role_id, permission_key)
+
+Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_manage`, `league_manage`, `user_manage`, `claim_manage`, `permission_manage`
+
+### user_roles
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| user_id | integer | NO | FK → users.id (CASCADE) |
+| role_id | integer | NO | FK → roles.id (CASCADE) |
+| league_id | integer | YES | FK → leagues.id (CASCADE), NULL = global |
+| granted_by | integer | YES | FK → users.id (SET NULL) |
+| created_at | timestamptz | YES | NOW() |
+
 ## Views
 
 ### season_hierarchy
@@ -225,4 +256,10 @@ players
   └── league_players (player_id)
 
 gods (standalone lookup table)
+
+roles
+  └── role_permissions (role_id)
+
+users
+  └── user_roles (user_id, role_id, league_id?)
 ```

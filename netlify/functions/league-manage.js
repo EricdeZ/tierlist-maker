@@ -1,13 +1,14 @@
 /* global process */
 import { getDB, adminHeaders as headers } from './lib/db.js'
-import { requireAdmin } from './lib/auth.js'
+import { requirePermission } from './lib/auth.js'
+import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requireAdmin(event)
+    const admin = await requirePermission(event, 'league_manage')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
@@ -74,23 +75,23 @@ export const handler = async (event) => {
 
         switch (body.action) {
             // League CRUD
-            case 'create-league':   return await createLeague(sql, body)
-            case 'update-league':   return await updateLeague(sql, body)
-            case 'delete-league':   return await deleteLeague(sql, body)
+            case 'create-league':   return await createLeague(sql, body, admin)
+            case 'update-league':   return await updateLeague(sql, body, admin)
+            case 'delete-league':   return await deleteLeague(sql, body, admin)
             // Division CRUD
-            case 'create-division': return await createDivision(sql, body)
-            case 'update-division': return await updateDivision(sql, body)
-            case 'delete-division': return await deleteDivision(sql, body)
+            case 'create-division': return await createDivision(sql, body, admin)
+            case 'update-division': return await updateDivision(sql, body, admin)
+            case 'delete-division': return await deleteDivision(sql, body, admin)
             // Season CRUD
-            case 'create-season':   return await createSeason(sql, body)
-            case 'update-season':   return await updateSeason(sql, body)
-            case 'toggle-season':   return await toggleSeason(sql, body)
-            case 'delete-season':   return await deleteSeason(sql, body)
+            case 'create-season':   return await createSeason(sql, body, admin)
+            case 'update-season':   return await updateSeason(sql, body, admin)
+            case 'toggle-season':   return await toggleSeason(sql, body, admin)
+            case 'delete-season':   return await deleteSeason(sql, body, admin)
             // Team CRUD
-            case 'create-team':     return await createTeam(sql, body)
-            case 'update-team':     return await updateTeam(sql, body)
-            case 'delete-team':     return await deleteTeam(sql, body)
-            case 'copy-teams':      return await copyTeams(sql, body)
+            case 'create-team':     return await createTeam(sql, body, admin)
+            case 'update-team':     return await updateTeam(sql, body, admin)
+            case 'delete-team':     return await deleteTeam(sql, body, admin)
+            case 'copy-teams':      return await copyTeams(sql, body, admin)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
         }
@@ -108,7 +109,7 @@ function slugify(str) {
 // LEAGUE CRUD
 // ═══════════════════════════════════════════════════
 
-async function createLeague(sql, { name, description, discord_url, color }) {
+async function createLeague(sql, { name, description, discord_url, color }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const slug = slugify(name.trim())
     const [row] = await sql`
@@ -116,10 +117,11 @@ async function createLeague(sql, { name, description, discord_url, color }) {
         VALUES (${name.trim()}, ${slug}, ${description || null}, ${discord_url || null}, ${color || null})
         RETURNING *
     `
+    await logAudit(sql, admin, { action: 'create-league', endpoint: 'league-manage', targetType: 'league', targetId: row.id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, league: row }) }
 }
 
-async function updateLeague(sql, { id, name, slug, description, discord_url, color }) {
+async function updateLeague(sql, { id, name, slug, description, discord_url, color }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE leagues SET
@@ -132,10 +134,11 @@ async function updateLeague(sql, { id, name, slug, description, discord_url, col
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'League not found' }) }
+    await logAudit(sql, admin, { action: 'update-league', endpoint: 'league-manage', leagueId: id, targetType: 'league', targetId: id, details: { name, slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, league: row }) }
 }
 
-async function deleteLeague(sql, { id }) {
+async function deleteLeague(sql, { id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     // Check for children
     const [hasDivs] = await sql`SELECT 1 FROM divisions WHERE league_id = ${id} LIMIT 1`
@@ -144,6 +147,7 @@ async function deleteLeague(sql, { id }) {
     }
     const [row] = await sql`DELETE FROM leagues WHERE id = ${id} RETURNING id, name`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'League not found' }) }
+    await logAudit(sql, admin, { action: 'delete-league', endpoint: 'league-manage', targetType: 'league', targetId: id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
 
@@ -151,7 +155,7 @@ async function deleteLeague(sql, { id }) {
 // DIVISION CRUD
 // ═══════════════════════════════════════════════════
 
-async function createDivision(sql, { league_id, name, tier, description }) {
+async function createDivision(sql, { league_id, name, tier, description }, admin) {
     if (!league_id || !name?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_id and name required' }) }
     }
@@ -161,10 +165,11 @@ async function createDivision(sql, { league_id, name, tier, description }) {
         VALUES (${league_id}, ${name.trim()}, ${tier || null}, ${slug}, ${description || null})
         RETURNING *
     `
+    await logAudit(sql, admin, { action: 'create-division', endpoint: 'league-manage', leagueId: league_id, targetType: 'division', targetId: row.id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, division: row }) }
 }
 
-async function updateDivision(sql, { id, name, tier, slug, description }) {
+async function updateDivision(sql, { id, name, tier, slug, description }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE divisions SET
@@ -176,17 +181,19 @@ async function updateDivision(sql, { id, name, tier, slug, description }) {
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Division not found' }) }
+    await logAudit(sql, admin, { action: 'update-division', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'division', targetId: id, details: { name, slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, division: row }) }
 }
 
-async function deleteDivision(sql, { id }) {
+async function deleteDivision(sql, { id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [hasSeasons] = await sql`SELECT 1 FROM seasons WHERE division_id = ${id} LIMIT 1`
     if (hasSeasons) {
         return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete division that has seasons. Remove seasons first.' }) }
     }
-    const [row] = await sql`DELETE FROM divisions WHERE id = ${id} RETURNING id, name`
+    const [row] = await sql`DELETE FROM divisions WHERE id = ${id} RETURNING id, name, league_id`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Division not found' }) }
+    await logAudit(sql, admin, { action: 'delete-division', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'division', targetId: id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
 
@@ -194,7 +201,7 @@ async function deleteDivision(sql, { id }) {
 // SEASON CRUD
 // ═══════════════════════════════════════════════════
 
-async function createSeason(sql, { league_id, division_id, name, start_date, end_date, description }) {
+async function createSeason(sql, { league_id, division_id, name, start_date, end_date, description }, admin) {
     if (!league_id || !division_id || !name?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_id, division_id, and name required' }) }
     }
@@ -204,10 +211,11 @@ async function createSeason(sql, { league_id, division_id, name, start_date, end
         VALUES (${league_id}, ${division_id}, ${name.trim()}, ${slug}, ${start_date || null}, ${end_date || null}, false, ${description || null})
         RETURNING *
     `
+    await logAudit(sql, admin, { action: 'create-season', endpoint: 'league-manage', leagueId: league_id, targetType: 'season', targetId: row.id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
 }
 
-async function updateSeason(sql, { id, name, slug, start_date, end_date, description }) {
+async function updateSeason(sql, { id, name, slug, start_date, end_date, description }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE seasons SET
@@ -220,22 +228,24 @@ async function updateSeason(sql, { id, name, slug, start_date, end_date, descrip
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found' }) }
+    await logAudit(sql, admin, { action: 'update-season', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'season', targetId: id, details: { name, slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
 }
 
-async function toggleSeason(sql, { id, is_active }) {
+async function toggleSeason(sql, { id, is_active }, admin) {
     if (!id || typeof is_active !== 'boolean') {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and is_active (boolean) required' }) }
     }
     const [row] = await sql`
         UPDATE seasons SET is_active = ${is_active}, updated_at = NOW()
-        WHERE id = ${id} RETURNING id, name, is_active
+        WHERE id = ${id} RETURNING id, name, is_active, league_id
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found' }) }
+    await logAudit(sql, admin, { action: 'toggle-season', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'season', targetId: id, details: { is_active, name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
 }
 
-async function deleteSeason(sql, { id }) {
+async function deleteSeason(sql, { id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     // Block if any team in this season has players or matches
     const [hasPlayers] = await sql`
@@ -253,8 +263,9 @@ async function deleteSeason(sql, { id }) {
     }
     // Delete empty teams first, then the season
     await sql`DELETE FROM teams WHERE season_id = ${id}`
-    const [row] = await sql`DELETE FROM seasons WHERE id = ${id} RETURNING id, name`
+    const [row] = await sql`DELETE FROM seasons WHERE id = ${id} RETURNING id, name, league_id`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found' }) }
+    await logAudit(sql, admin, { action: 'delete-season', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'season', targetId: id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
 
@@ -262,7 +273,7 @@ async function deleteSeason(sql, { id }) {
 // TEAM CRUD
 // ═══════════════════════════════════════════════════
 
-async function createTeam(sql, { season_id, name, color }) {
+async function createTeam(sql, { season_id, name, color }, admin) {
     if (!season_id || !name?.trim() || !color?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id, name, and color required' }) }
     }
@@ -272,10 +283,11 @@ async function createTeam(sql, { season_id, name, color }) {
         VALUES (${season_id}, ${name.trim()}, ${color.trim()}, ${slug})
         RETURNING *
     `
+    await logAudit(sql, admin, { action: 'create-team', endpoint: 'league-manage', targetType: 'team', targetId: row.id, details: { name: row.name, season_id } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, team: row }) }
 }
 
-async function updateTeam(sql, { id, name, color, slug }) {
+async function updateTeam(sql, { id, name, color, slug }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE teams SET
@@ -286,10 +298,11 @@ async function updateTeam(sql, { id, name, color, slug }) {
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found' }) }
+    await logAudit(sql, admin, { action: 'update-team', endpoint: 'league-manage', targetType: 'team', targetId: id, details: { name, color, slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, team: row }) }
 }
 
-async function copyTeams(sql, { source_season_id, target_season_id, team_ids }) {
+async function copyTeams(sql, { source_season_id, target_season_id, team_ids }, admin) {
     if (!source_season_id || !target_season_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'source_season_id and target_season_id required' }) }
     }
@@ -319,10 +332,11 @@ async function copyTeams(sql, { source_season_id, target_season_id, team_ids }) 
         `
         created.push(row)
     }
+    await logAudit(sql, admin, { action: 'copy-teams', endpoint: 'league-manage', targetType: 'season', targetId: target_season_id, details: { source_season_id, count: created.length } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, teams: created, count: created.length }) }
 }
 
-async function deleteTeam(sql, { id }) {
+async function deleteTeam(sql, { id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [hasPlayers] = await sql`SELECT 1 FROM league_players WHERE team_id = ${id} LIMIT 1`
     if (hasPlayers) {
@@ -334,5 +348,6 @@ async function deleteTeam(sql, { id }) {
     }
     const [row] = await sql`DELETE FROM teams WHERE id = ${id} RETURNING id, name`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found' }) }
+    await logAudit(sql, admin, { action: 'delete-team', endpoint: 'league-manage', targetType: 'team', targetId: id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }

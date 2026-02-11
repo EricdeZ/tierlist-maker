@@ -2,8 +2,8 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export default function ProtectedRoute({ children, requireAdmin = false }) {
-    const { user, loading, isAdmin } = useAuth()
+export default function ProtectedRoute({ children, requireAdmin = false, requiredPermission = null }) {
+    const { user, loading, isAdmin, hasPermission, hasAnyPermission } = useAuth()
 
     if (loading) {
         return (
@@ -20,7 +20,13 @@ export default function ProtectedRoute({ children, requireAdmin = false }) {
         return <Navigate to="/?login=required" replace />
     }
 
-    if (requireAdmin && !isAdmin) {
+    // Specific permission check (e.g. 'permission_manage')
+    if (requiredPermission && !hasPermission(requiredPermission)) {
+        return <Navigate to="/admin" replace />
+    }
+
+    // General admin check: legacy admin role OR any RBAC permission
+    if (requireAdmin && !isAdmin && !hasAnyPermission) {
         return <Navigate to="/" replace />
     }
 
