@@ -939,6 +939,16 @@ const Homepage = () => {
                 </div>
             </section>
 
+            {/* ─── COIN FLIP LINK ─── */}
+            <div className="text-center pb-8">
+                <Link
+                    to="/coinflip"
+                    className="text-sm text-(--color-text-secondary)/40 hover:text-(--color-accent) transition-colors"
+                >
+                    Flip coin
+                </Link>
+            </div>
+
             {/* ─── FOOTER ─── */}
             <footer className="py-8 px-4 border-t border-white/5">
                 <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">

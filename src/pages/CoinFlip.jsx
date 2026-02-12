@@ -95,7 +95,7 @@ export default function CoinFlip() {
             flipInterval.current = setInterval(() => {
                 frame = (frame + 1) % FLIP_FRAMES.length
                 setFlipFrame(frame)
-            }, 100)
+            }, 70)
         } else {
             clearInterval(flipInterval.current)
             setFlipFrame(0)
@@ -117,10 +117,10 @@ export default function CoinFlip() {
         void lift.offsetHeight
 
         // Launch: rise up + come towards camera
-        lift.style.transition = 'transform 0.5s cubic-bezier(0.2, 0, 0, 1)'
+        lift.style.transition = 'transform 0.35s cubic-bezier(0.2, 0, 0, 1)'
         lift.style.transform = 'translateY(-60px) translateZ(250px)'
         if (shadow) {
-            shadow.style.transition = 'all 0.5s cubic-bezier(0.2, 0, 0, 1)'
+            shadow.style.transition = 'all 0.35s cubic-bezier(0.2, 0, 0, 1)'
             shadow.style.opacity = '0.5'
             shadow.style.transform = 'scaleX(1.8) scaleY(1)'
         }
@@ -161,30 +161,30 @@ export default function CoinFlip() {
         setLanding(true)
 
         // Coin settles back down and away from camera
-        lift.style.transition = 'transform 0.9s cubic-bezier(0.2, 0, 0.3, 1)'
+        lift.style.transition = 'transform 0.65s cubic-bezier(0.2, 0, 0.3, 1)'
         lift.style.transform = 'translateY(0px) translateZ(0px)'
         if (shadow) {
-            shadow.style.transition = 'all 0.9s cubic-bezier(0.2, 0, 0.3, 1)'
+            shadow.style.transition = 'all 0.65s cubic-bezier(0.2, 0, 0.3, 1)'
             shadow.style.opacity = '0.15'
             shadow.style.transform = 'scaleX(1) scaleY(0.5)'
         }
 
         // Decelerate spin to land on correct face
-        inner.style.transition = 'transform 1s cubic-bezier(0.1, 0, 0.15, 1)'
+        inner.style.transition = 'transform 0.7s cubic-bezier(0.1, 0, 0.15, 1)'
         inner.style.transform = `rotateX(${target}deg)`
 
         // Bounce on landing
         setTimeout(() => {
             if (!lift) return
-            lift.style.transition = 'transform 0.15s ease-out'
+            lift.style.transition = 'transform 0.12s ease-out'
             lift.style.transform = 'translateY(-6px) translateZ(20px)'
             setTimeout(() => {
-                lift.style.transition = 'transform 0.2s ease-in'
+                lift.style.transition = 'transform 0.15s ease-in'
                 lift.style.transform = 'translateY(0px) translateZ(0px)'
-            }, 150)
-        }, 850)
+            }, 120)
+        }, 600)
 
-        setTimeout(() => setLanding(false), 1100)
+        setTimeout(() => setLanding(false), 800)
     }
 
     // Cleanup 3D animation on unmount
@@ -214,7 +214,7 @@ export default function CoinFlip() {
         // Fire API + minimum animation time in parallel
         const [data] = await Promise.all([
             coinflipService.flip(),
-            new Promise(resolve => setTimeout(resolve, 800)),
+            new Promise(resolve => setTimeout(resolve, 550)),
         ])
 
         if (data.error === 'insufficient_balance') {
@@ -264,8 +264,8 @@ export default function CoinFlip() {
 
         if (mode3d) {
             landOn3d(data.result)
-            // Reveal when the coin lands (matches the 1s spin deceleration)
-            setTimeout(revealResult, 1000)
+            // Reveal when the coin lands (matches the 0.7s spin deceleration)
+            setTimeout(revealResult, 700)
         } else {
             revealResult()
         }

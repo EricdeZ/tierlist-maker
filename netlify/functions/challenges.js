@@ -8,17 +8,20 @@ export const handler = async (event) => {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const user = await requireAuth(event)
-    if (!user) {
-        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
-    }
-
     const sql = getDB()
     const { action } = event.queryStringParameters || {}
 
     try {
         if (event.httpMethod === 'GET') {
+            // Auth is optional for GET — unauthenticated users see challenges without progress
+            const user = await requireAuth(event)
             return await listChallenges(sql, user)
+        }
+
+        // POST requires auth
+        const user = await requireAuth(event)
+        if (!user) {
+            return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
         }
 
         if (event.httpMethod === 'POST') {
@@ -42,6 +45,31 @@ export const handler = async (event) => {
 // GET: List all active challenges with user progress
 // ═══════════════════════════════════════════════════
 async function listChallenges(sql, user) {
+    // Unauthenticated: return challenges without user progress
+    if (!user) {
+        const challenges = await sql`
+            SELECT id, title, description, category, type, reward,
+                   target_value, stat_key, repeat_cooldown
+            FROM challenges
+            WHERE is_active = true
+            ORDER BY sort_order, category, id
+        `
+
+        const grouped = {}
+        for (const ch of challenges) {
+            if (!grouped[ch.category]) grouped[ch.category] = []
+            grouped[ch.category].push({
+                id: ch.id, title: ch.title, description: ch.description,
+                category: ch.category, type: ch.type, reward: ch.reward,
+                targetValue: ch.target_value, statKey: ch.stat_key,
+                currentValue: 0, completed: false, completedAt: null,
+                lastCompletedAt: null, canRepeat: false, claimable: false, progress: 0,
+            })
+        }
+
+        return { statusCode: 200, headers, body: JSON.stringify({ challenges: grouped, claimableCount: 0 }) }
+    }
+
     // Backfill: if user has a linked player, check for stale performance challenges
     // (challenges created after user already had enough stats → current_value stuck at 0)
     const PERF_KEYS = ['total_damage', 'total_kills', 'total_assists', 'total_mitigated', 'games_played', 'leagues_joined']

@@ -2,6 +2,7 @@
 // Discord OAuth2 callback handler
 import { getDB, headers } from './lib/db.js'
 import { signToken } from './lib/auth.js'
+import { pushChallengeProgress } from './lib/challenges.js'
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
@@ -86,7 +87,11 @@ export const handler = async (event) => {
             }
         }
 
-        // 5. Auto-match player profile if not already linked
+        // 5. Push discord_linked challenge progress (fire-and-forget)
+        pushChallengeProgress(sql, user.id, { discord_linked: 1 })
+            .catch(err => console.error('Challenge push (discord_linked) failed:', err))
+
+        // 6. Auto-match player profile if not already linked
         if (!user.linked_player_id) {
             // Try matching by discord_id first, then by discord_name
             const [matchedPlayer] = await sql`
@@ -110,7 +115,7 @@ export const handler = async (event) => {
             }
         }
 
-        // 6. Sign JWT and redirect to frontend (back to the page they were on)
+        // 7. Sign JWT and redirect to frontend (back to the page they were on)
         const jwt = signToken(user)
         const separator = returnPath.includes('?') ? '&' : '?'
         return {

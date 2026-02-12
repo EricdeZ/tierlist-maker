@@ -5,10 +5,22 @@ import { usePassion } from '../context/PassionContext'
 import { challengeService } from '../services/database'
 import passionCoin from '../assets/passion/passion.png'
 
-function selectFeaturedChallenge(challenges) {
+const DiscordIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z" />
+    </svg>
+)
+
+function selectFeaturedChallenge(challenges, isLoggedIn) {
     const all = Object.values(challenges).flat()
     const active = all.filter(ch => !ch.completed)
     if (active.length === 0) return null
+
+    // For unauthenticated users, prioritize the sign-in challenge
+    if (!isLoggedIn) {
+        const signIn = active.find(ch => ch.statKey === 'discord_linked')
+        if (signIn) return signIn
+    }
 
     // 1. Claimable — ready for immediate reward
     const claimable = active.filter(ch => ch.claimable)
@@ -33,25 +45,57 @@ function selectFeaturedChallenge(challenges) {
 }
 
 export default function ChallengeBanner() {
-    const { user } = useAuth()
+    const { user, login } = useAuth()
     const { claimableCount } = usePassion()
     const [challenge, setChallenge] = useState(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!user) { setLoading(false); return }
         challengeService.getAll()
             .then(data => {
-                const featured = selectFeaturedChallenge(data.challenges || {})
+                const featured = selectFeaturedChallenge(data.challenges || {}, !!user)
                 setChallenge(featured)
             })
             .catch(() => {})
             .finally(() => setLoading(false))
     }, [user])
 
-    if (loading || !user || !challenge) return null
+    if (loading || !challenge) return null
 
     const pct = Math.round(challenge.progress * 100)
+    const isSignInChallenge = !user && challenge.statKey === 'discord_linked'
+
+    // Unauthenticated + sign-in challenge: show login banner
+    if (isSignInChallenge) {
+        return (
+            <button
+                onClick={login}
+                className="group block w-full rounded-xl border border-[#5865F2]/25 bg-(--color-secondary) overflow-hidden transition-all hover:border-[#5865F2]/50 hover:-translate-y-0.5 cursor-pointer text-left"
+            >
+                <div className="flex items-center gap-4 p-4 sm:p-5">
+                    <div className="w-10 h-10 rounded-lg bg-[#5865F2]/15 flex items-center justify-center shrink-0">
+                        <DiscordIcon className="w-5 h-5 text-[#5865F2]" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                        <span className="text-xs font-bold text-[#5865F2] uppercase tracking-wider">
+                            Challenge
+                        </span>
+                        <div className="text-sm font-semibold text-(--color-text) truncate">{challenge.title}</div>
+                        <p className="text-xs text-(--color-text-secondary)/60 mt-0.5">{challenge.description}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-sm font-bold" style={{ color: '#f8c56a' }}>+{challenge.reward}</span>
+                        <img src={passionCoin} alt="" className="w-4 h-4" />
+                        <svg className="w-4 h-4 text-(--color-text-secondary)/40 group-hover:text-[#5865F2] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+            </button>
+        )
+    }
 
     return (
         <Link

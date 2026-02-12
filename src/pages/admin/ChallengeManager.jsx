@@ -8,6 +8,7 @@ import passionCoin from '../../assets/passion/passion.png'
 const CATEGORIES = ['engagement', 'league', 'performance', 'social']
 const TYPES = ['one_time', 'repeatable']
 const STAT_KEYS = [
+    { value: 'discord_linked', label: 'Discord Linked (sign in)' },
     { value: 'daily_logins', label: 'Daily Logins (count)' },
     { value: 'login_streak', label: 'Login Streak (current)' },
     { value: 'tier_lists_created', label: 'Tier Lists Created' },
