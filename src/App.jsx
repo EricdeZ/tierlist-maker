@@ -1,6 +1,7 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { PassionProvider } from './context/PassionContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
@@ -38,11 +39,17 @@ import BannedContentManager from "./pages/admin/BannedContentManager.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
 import TierListPage from "./pages/TierListPage.jsx";
+import PassionLeaderboard from "./pages/PassionLeaderboard.jsx";
+import Challenges from "./pages/Challenges.jsx";
+import CoinFlip from "./pages/CoinFlip.jsx";
+import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
+import DebugTools from "./pages/admin/DebugTools.jsx";
 
 function App() {
     return (
         <AuthProvider>
             <Router>
+            <PassionProvider>
                 <ScrollToTop />
                 <ErrorBoundary>
                     <Routes>
@@ -64,6 +71,13 @@ function App() {
                             <Route path="admin/schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
                             <Route path="admin/discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
                             <Route path="admin/banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />
+                            <Route path="admin/challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
+                            <Route path="admin/debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
+
+                            {/* Passion pages */}
+                            <Route path="leaderboard" element={<PassionLeaderboard />} />
+                            <Route path="challenges" element={<Challenges />} />
+                            <Route path="coinflip" element={<CoinFlip />} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />
@@ -95,6 +109,7 @@ function App() {
                         </Route>
                     </Routes>
                 </ErrorBoundary>
+            </PassionProvider>
             </Router>
         </AuthProvider>
     )

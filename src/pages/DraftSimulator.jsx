@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { godService, leagueService, bannedContentService } from '../services/database'
+import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
 import aspectIcon from '../assets/aspect.png'
 
@@ -48,6 +49,8 @@ const FORMATS = [
 const GAME_COUNTS = [1, 2, 3, 5, 7]
 
 export default function DraftSimulator() {
+    const { trackAction } = usePassion()
+    const hasTrackedAction = useRef(false)
     const [gods, setGods] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -201,6 +204,10 @@ export default function DraftSimulator() {
     const handleFinishSeries = () => {
         setCompletedGames(prev => [...prev, { orderPicks, chaosPicks, orderBans, chaosBans, orderAspects: new Set(orderAspects), chaosAspects: new Set(chaosAspects) }])
         setShowSummary(true)
+        if (!hasTrackedAction.current) {
+            hasTrackedAction.current = true
+            trackAction('draft_complete')
+        }
     }
 
     const handleFullReset = () => {

@@ -13,6 +13,7 @@ import babylonLogo from '../assets/leagues/babylon.png'
 import oslLogo from '../assets/leagues/osl.png'
 
 import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisionImages'
+import ChallengeBanner from '../components/ChallengeBanner'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -807,6 +808,13 @@ const Homepage = () => {
                             </div>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            {/* ─── CHALLENGE BANNER ─── */}
+            <section className="px-4 pb-4">
+                <div className="max-w-4xl mx-auto">
+                    <ChallengeBanner />
                 </div>
             </section>
 

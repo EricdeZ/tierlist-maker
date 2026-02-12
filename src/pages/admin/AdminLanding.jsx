@@ -112,6 +112,21 @@ const tools = [
         btnClass: 'bg-red-600 hover:bg-red-700',
     },
     {
+        title: 'Challenge Manager',
+        description: 'Create and manage Passion challenges. Define objectives like "Deal 50,000 damage" or "Log in 7 days in a row" that users complete to earn bonus Passion coins.',
+        path: '/admin/challenges',
+        permission: 'league_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0 1 16.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 0 1-2.77.896m0 0a6.023 6.023 0 0 1-2.77-.896" />
+            </svg>
+        ),
+        accent: 'from-yellow-500/20 to-yellow-600/5',
+        border: 'border-yellow-500/20 hover:border-yellow-500/40',
+        iconColor: 'text-yellow-400',
+        btnClass: 'bg-yellow-600 hover:bg-yellow-700',
+    },
+    {
         title: 'League Manager',
         description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
         path: '/admin/leagues',
@@ -190,6 +205,7 @@ const tools = [
 
 export default function AdminLanding() {
     const { permissions } = useAuth()
+    const isOwner = permissions.global.includes('permission_manage')
 
     // Check if user has permission globally or for any league
     const hasPermissionAnywhere = (key) => {
@@ -267,6 +283,29 @@ export default function AdminLanding() {
                     </div>
                 ))}
             </div>
+
+            {/* Debug link — Owner only */}
+            {isOwner && (
+                <div className="mt-12 border-t border-white/10 pt-8">
+                    <Link
+                        to="/admin/debug"
+                        className="flex items-center gap-3 px-5 py-4 rounded-xl bg-(--color-secondary) border border-red-500/20 hover:border-red-500/40 transition-colors"
+                    >
+                        <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743" />
+                        </svg>
+                        <div className="flex-1">
+                            <div className="text-sm font-bold text-red-400">Debug Tools</div>
+                            <div className="text-xs text-(--color-text-secondary)">
+                                Test animations, view passion state, reset data (Owner only)
+                            </div>
+                        </div>
+                        <svg className="w-4 h-4 text-(--color-text-secondary)/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </Link>
+                </div>
+            )}
         </div>
     )
 }

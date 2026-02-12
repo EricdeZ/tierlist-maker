@@ -4,6 +4,7 @@ import { Outlet, Link, useLocation, useParams } from 'react-router-dom'
 import { DivisionProvider, useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
 import UserMenu from '../UserMenu'
+import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
 import { getDivisionImage } from '../../utils/divisionImages'
 import { Home, User, Wrench, ChevronDown, ListOrdered, Swords } from 'lucide-react'
@@ -79,7 +80,7 @@ const DivisionNav = () => {
     const rankImg = getDivisionImage(leagueSlug, divisionSlug, division?.tier)
 
     // Find current active nav label for mobile display
-    const activeItem = navItems.find(item => isActive(item))
+
 
     return (
         <nav ref={menuRef} className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
@@ -106,7 +107,7 @@ const DivisionNav = () => {
                     </div>
 
                     {/* Desktop nav links */}
-                    <div className="hidden md:flex items-center gap-1 text-(--nav-text) ml-auto">
+                    <div className="hidden nav:flex items-center gap-1 text-(--nav-text) ml-auto">
                         {navItems.map((item) => (
                             <Link
                                 key={item.path}
@@ -181,17 +182,14 @@ const DivisionNav = () => {
                                     </div>
                                 )}
                             </div>
+                            {user && <PassionDisplay compact />}
                             <UserMenu compact />
                         </div>
                     </div>
 
-                    {/* Mobile: active page label + user menu + hamburger */}
-                    <div className="flex md:hidden items-center gap-2 ml-auto">
-                        {activeItem && (
-                            <span className="text-xs font-bold text-(--color-accent) uppercase tracking-wider">
-                                {activeItem.label}
-                            </span>
-                        )}
+                    {/* Mobile: user menu + hamburger */}
+                    <div className="flex nav:hidden items-center gap-2 ml-auto">
+                        {user && <PassionDisplay compact />}
                         <UserMenu compact />
                         <button
                             onClick={() => setMobileOpen(!mobileOpen)}
@@ -226,7 +224,7 @@ const DivisionNav = () => {
 
             {/* Mobile dropdown menu */}
             <div
-                className="md:hidden overflow-hidden transition-all duration-300 ease-in-out"
+                className="nav:hidden overflow-hidden transition-all duration-300 ease-in-out"
                 style={{
                     maxHeight: mobileOpen ? '600px' : '0px',
                     opacity: mobileOpen ? 1 : 0,
@@ -295,7 +293,7 @@ const DivisionNav = () => {
 
             {/* Backdrop overlay when menu is open */}
             {mobileOpen && (
-                <div className="fixed inset-0 -z-10 md:hidden" />
+                <div className="fixed inset-0 -z-10 nav:hidden" />
             )}
         </nav>
     )

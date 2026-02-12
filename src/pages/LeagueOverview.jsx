@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { leagueService } from '../services/database'
 import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageCircle, Home, User, Wrench, ListOrdered, Swords } from 'lucide-react'
 import UserMenu from '../components/UserMenu'
+import PassionDisplay from '../components/PassionDisplay'
 import PageTitle from '../components/PageTitle'
 import BannedContentBanner from '../components/BannedContentBanner'
 import smiteLogo from '../assets/smite2.png'
@@ -124,7 +125,7 @@ const LeagueOverview = () => {
                                 <img src={logo} alt="" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />
                             )}
                             <div className="text-xs sm:text-sm font-bold text-(--color-text)">
-                                {league.name}
+                                {leagueSlug.toUpperCase()}
                             </div>
                         </div>
 
@@ -190,6 +191,7 @@ const LeagueOverview = () => {
                                     </div>
                                 )}
                             </div>
+                            {user && <PassionDisplay />}
                             <UserMenu compact />
                         </div>
                     </div>

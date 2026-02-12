@@ -21,6 +21,31 @@ const apiCall = async (endpoint, params = {}) => {
     return response.json()
 }
 
+const apiPost = async (endpoint, params = {}, body = {}) => {
+    const url = new URL(`${API_BASE}/${endpoint}`, window.location.origin)
+    Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && params[key] !== null) {
+            url.searchParams.append(key, params[key])
+        }
+    })
+
+    const token = localStorage.getItem('auth_token')
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+        throw new Error(`API call failed: ${response.statusText}`)
+    }
+
+    return response.json()
+}
+
 export const leagueService = {
     async getAll() {
         return apiCall('leagues')
@@ -141,5 +166,76 @@ export const bannedContentService = {
     async getByLeague(leagueId) {
         return apiCall('banned-content', { leagueId })
     }
+}
+
+export const passionService = {
+    async getBalance() {
+        return apiCall('passion', { action: 'balance' })
+    },
+
+    async getLeaderboard(period = 'recent') {
+        return apiCall('passion', { action: 'leaderboard', period })
+    },
+
+    async getTransactions(limit = 50, offset = 0) {
+        return apiCall('passion', { action: 'transactions', limit, offset })
+    },
+
+    async claimDaily() {
+        return apiPost('passion', { action: 'claim-daily' })
+    },
+
+    async earn(type, referenceId = null) {
+        return apiPost('passion', { action: 'earn' }, { type, referenceId })
+    },
+}
+
+export const coinflipService = {
+    async flip() {
+        return apiPost('coinflip', { action: 'flip' })
+    },
+
+    async getLeaderboard() {
+        return apiCall('coinflip', { action: 'leaderboard' })
+    },
+
+    async getMyStats() {
+        return apiCall('coinflip', { action: 'my-stats' })
+    },
+}
+
+export const challengeService = {
+    async getAll() {
+        return apiCall('challenges')
+    },
+
+    async claim(challengeId) {
+        return apiPost('challenges', { action: 'claim' }, { challengeId })
+    },
+
+    // Admin methods
+    async adminGetAll() {
+        return apiCall('challenge-manage')
+    },
+
+    async create(data) {
+        return apiPost('challenge-manage', {}, { action: 'create', ...data })
+    },
+
+    async update(data) {
+        return apiPost('challenge-manage', {}, { action: 'update', ...data })
+    },
+
+    async toggle(id) {
+        return apiPost('challenge-manage', {}, { action: 'toggle', id })
+    },
+
+    async remove(id) {
+        return apiPost('challenge-manage', {}, { action: 'delete', id })
+    },
+
+    async resetMyChallenges() {
+        return apiPost('challenge-manage', {}, { action: 'reset-my-challenges' })
+    },
 }
 

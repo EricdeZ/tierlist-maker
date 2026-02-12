@@ -11,6 +11,7 @@ import {
 } from '../utils/localStorage'
 import { useDivision } from '../context/DivisionContext'
 import { usePlayerStats } from '../hooks/usePlayerStats'
+import { usePassion } from '../context/PassionContext'
 
 // Import role images
 import soloImage from '../assets/roles/solo.webp'
@@ -45,6 +46,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     const { divisionSlug: routeSlug } = useParams()
     const divisionSlug = propDivisionSlug || routeSlug
     const { data: playerStatsData } = usePlayerStats()
+    const { trackAction } = usePassion()
 
     const [isMobile, setIsMobile] = useState(false)
     const [mobileRole, setMobileRole] = useState('SOLO')
@@ -120,6 +122,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     }, [])
 
     // Auto-save rankings to localStorage whenever rankings or stat prefs change
+    const hasTrackedSave = useRef(false)
     useEffect(() => {
         const hasAnyRankings = Object.values(rankings).some(roleArray => roleArray.length > 0)
         if (hasAnyRankings || selectedStat !== 'none') {
@@ -127,8 +130,13 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                 selectedStat,
                 playerStatOverrides: lockedStats,
             })
+            // Track tier list save once per session for challenge progress
+            if (hasAnyRankings && !hasTrackedSave.current) {
+                hasTrackedSave.current = true
+                trackAction('tier_list_save', storageKey)
+            }
         }
-    }, [rankings, storageKey, selectedStat, lockedStats])
+    }, [rankings, storageKey, selectedStat, lockedStats, trackAction])
 
     // Cleanup drag state
     useEffect(() => {

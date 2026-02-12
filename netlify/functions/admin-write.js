@@ -2,6 +2,7 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
 import { requirePermission } from './lib/auth.js'
 import { logAudit } from './lib/audit.js'
+import { updateMatchChallenges } from './lib/challenges.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -192,6 +193,10 @@ async function submitMatch(sql, body, admin) {
         if (admin) {
             await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length, scheduled_match_id: scheduled_match_id || null } })
         }
+
+        // Push challenge progress for players in this match (fire-and-forget)
+        updateMatchChallenges(sql, result.match_id)
+            .catch(err => console.error('Match challenge update failed:', err))
 
         return {
             statusCode: 200,

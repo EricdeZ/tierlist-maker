@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { profileService } from '../services/database'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
 import PageTitle from '../components/PageTitle'
+import SimpleNav from '../components/layout/SimpleNav'
 
 const ProfilePage = () => {
     const { playerSlug } = useParams()
@@ -44,20 +45,25 @@ const ProfilePage = () => {
 
     if (loading) {
         return (
-            <div className="max-w-5xl mx-auto py-16 px-4">
-                <div className="flex items-center justify-center">
+            <>
+            <SimpleNav title="Profile" />
+            <div className="max-w-5xl mx-auto pt-24 pb-8 px-4">
+                <div className="flex items-center justify-center py-16">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-accent) mx-auto mb-4" />
                         <p className="text-(--color-text-secondary)">Loading profile...</p>
                     </div>
                 </div>
             </div>
+            </>
         )
     }
 
     if (error || !profileData) {
         return (
-            <div className="max-w-3xl mx-auto py-16 px-4 text-center">
+            <>
+            <SimpleNav title="Profile" />
+            <div className="max-w-3xl mx-auto pt-24 pb-8 px-4 text-center">
                 <h2 className="text-2xl font-bold text-(--color-text) mb-4">Player Not Found</h2>
                 <p className="text-(--color-text-secondary) mb-6">
                     {error || 'This player profile could not be loaded.'}
@@ -66,6 +72,7 @@ const ProfilePage = () => {
                     ← Back to Home
                 </Link>
             </div>
+            </>
         )
     }
 
@@ -110,16 +117,10 @@ const ProfilePage = () => {
         : null
 
     return (
-        <div className="max-w-5xl mx-auto py-8 px-4">
+        <>
+        <SimpleNav title={player.name} />
+        <div className="max-w-5xl mx-auto pt-24 pb-8 px-4">
             {profileData && <PageTitle title={`${profileData.player.name} - Player Profile`} />}
-            {/* Back button */}
-            <button
-                onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
-                className="flex items-center gap-1.5 text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors mb-4"
-            >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-            </button>
 
             {/* Profile Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
@@ -528,6 +529,7 @@ const ProfilePage = () => {
                 </>
             )}
         </div>
+        </>
     )
 }
 

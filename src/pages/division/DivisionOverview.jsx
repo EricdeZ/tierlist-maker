@@ -7,6 +7,7 @@ import { statsService } from '../../services/database'
 import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users, User } from 'lucide-react'
 import PageTitle from '../../components/PageTitle'
 import BannedContentBanner from '../../components/BannedContentBanner'
+import ChallengeBanner from '../../components/ChallengeBanner'
 
 import aglLogo from '../../assets/leagues/agl.png'
 import babylonLogo from '../../assets/leagues/babylon.png'
@@ -251,6 +252,11 @@ const DivisionOverview = () => {
                     </div>
                 </div>
             )}
+
+            {/* ─── Challenge Banner ─── */}
+            <div className="mb-10">
+                <ChallengeBanner />
+            </div>
 
             {/* ─── Claim Profile Banner ─── */}
             {!authLoading && !linkedPlayer && (
