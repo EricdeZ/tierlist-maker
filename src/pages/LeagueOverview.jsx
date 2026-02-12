@@ -8,11 +8,7 @@ import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
 import oslLogo from '../assets/leagues/osl.png'
 
-import deityImg from '../assets/ranks/deity.png'
-import demigodImg from '../assets/ranks/demigod.png'
-import masterImg from '../assets/ranks/master.png'
-import obsidianImg from '../assets/ranks/obsidian.png'
-import diamondImg from '../assets/ranks/diamond.png'
+import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -22,9 +18,6 @@ const LEAGUE_LOGOS = {
     'osl': oslLogo,
     'olympian-smite-league': oslLogo,
 }
-
-const RANK_IMAGES = { 1: deityImg, 2: demigodImg, 3: masterImg, 4: obsidianImg, 5: diamondImg }
-const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond' }
 
 const LeagueOverview = () => {
     const { leagueSlug } = useParams()
@@ -211,7 +204,7 @@ const LeagueOverview = () => {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             {divisions.map(division => {
-                                const rankImg = RANK_IMAGES[division.tier]
+                                const rankImg = getDivisionImage(leagueSlug, division.slug, division.tier)
                                 const rankLabel = RANK_LABELS[division.tier]
                                 const activeSeason = division.seasons?.find(s => s.is_active)
                                 const hasData = !!activeSeason

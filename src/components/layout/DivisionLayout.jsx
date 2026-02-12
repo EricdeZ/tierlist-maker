@@ -4,21 +4,7 @@ import { Outlet, Link, useLocation, useParams } from 'react-router-dom'
 import { DivisionProvider, useDivision } from '../../context/DivisionContext'
 import UserMenu from '../UserMenu'
 import smiteLogo from '../../assets/smite2.png'
-
-// Rank images keyed by division tier (1 = highest skill)
-import deityImg from '../../assets/ranks/deity.png'
-import demigodImg from '../../assets/ranks/demigod.png'
-import masterImg from '../../assets/ranks/master.png'
-import obsidianImg from '../../assets/ranks/obsidian.png'
-import diamondImg from '../../assets/ranks/diamond.png'
-
-const RANK_IMAGES = {
-    1: deityImg,
-    2: demigodImg,
-    3: masterImg,
-    4: obsidianImg,
-    5: diamondImg,
-}
+import { getDivisionImage } from '../../utils/divisionImages'
 
 const DivisionNav = () => {
     const { leagueSlug, divisionSlug } = useParams()
@@ -74,7 +60,7 @@ const DivisionNav = () => {
         return () => { document.body.style.overflow = '' }
     }, [mobileOpen])
 
-    const rankImg = division?.tier ? RANK_IMAGES[division.tier] : null
+    const rankImg = getDivisionImage(leagueSlug, divisionSlug, division?.tier)
 
     // Find current active nav label for mobile display
     const activeItem = navItems.find(item => isActive(item))

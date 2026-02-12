@@ -12,15 +12,7 @@ import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
 import oslLogo from '../assets/leagues/osl.png'
 
-// Rank images
-import deityImg from '../assets/ranks/deity.png'
-import demigodImg from '../assets/ranks/demigod.png'
-import masterImg from '../assets/ranks/master.png'
-import obsidianImg from '../assets/ranks/obsidian.png'
-import diamondImg from '../assets/ranks/diamond.png'
-
-const RANK_IMAGES = { 1: deityImg, 2: demigodImg, 3: masterImg, 4: obsidianImg, 5: diamondImg }
-const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond' }
+import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisionImages'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -416,7 +408,7 @@ const Homepage = () => {
                                     {divisions.length > 0 && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {divisions.map(division => {
-                                                const rankImg = RANK_IMAGES[division.tier]
+                                                const rankImg = getDivisionImage(league.slug, division.slug, division.tier)
                                                 const rankLabel = RANK_LABELS[division.tier]
                                                 const activeSeason = division.seasons?.find(s => s.is_active)
                                                 const divActive = !!activeSeason
@@ -760,7 +752,7 @@ const Homepage = () => {
                                 </div>
 
                                 <div className="mt-6 flex justify-center gap-2">
-                                    {[deityImg, demigodImg, masterImg, obsidianImg, diamondImg].map((img, i) => (
+                                    {ALL_RANK_IMAGES.map((img, i) => (
                                         <img key={i} src={img} alt="" className="w-9 h-9 object-contain opacity-70" />
                                     ))}
                                 </div>

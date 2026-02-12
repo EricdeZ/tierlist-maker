@@ -11,11 +11,7 @@ import aglLogo from '../../assets/leagues/agl.png'
 import babylonLogo from '../../assets/leagues/babylon.png'
 import oslLogo from '../../assets/leagues/osl.png'
 
-import deityImg from '../../assets/ranks/deity.png'
-import demigodImg from '../../assets/ranks/demigod.png'
-import masterImg from '../../assets/ranks/master.png'
-import obsidianImg from '../../assets/ranks/obsidian.png'
-import diamondImg from '../../assets/ranks/diamond.png'
+import { getDivisionImage } from '../../utils/divisionImages'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -24,14 +20,6 @@ const LEAGUE_LOGOS = {
     'babylon-smite-league': babylonLogo,
     'osl': oslLogo,
     'olympian-smite-league': oslLogo,
-}
-
-const RANK_IMAGES = {
-    1: deityImg,
-    2: demigodImg,
-    3: masterImg,
-    4: obsidianImg,
-    5: diamondImg,
 }
 
 const DivisionOverview = () => {
@@ -50,7 +38,7 @@ const DivisionOverview = () => {
     }, [season])
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
-    const rankImg = division?.tier ? RANK_IMAGES[division.tier] : null
+    const rankImg = getDivisionImage(leagueSlug, divisionSlug, division?.tier)
     const leagueLogo = league?.slug ? LEAGUE_LOGOS[league.slug] : null
     const leagueColor = league?.color || 'var(--color-accent)'
 

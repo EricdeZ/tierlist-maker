@@ -12,12 +12,7 @@ import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
 import oslLogo from '../assets/leagues/osl.png'
 
-// Rank images (division tier icons)
-import deityImg from '../assets/ranks/deity.png'
-import demigodImg from '../assets/ranks/demigod.png'
-import masterImg from '../assets/ranks/master.png'
-import obsidianImg from '../assets/ranks/obsidian.png'
-import diamondImg from '../assets/ranks/diamond.png'
+import { getDivisionImage } from '../utils/divisionImages'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -27,8 +22,6 @@ const LEAGUE_LOGOS = {
     'osl': oslLogo,
     'olympian-smite-league': oslLogo,
 }
-
-const RANK_IMAGES = { 1: deityImg, 2: demigodImg, 3: masterImg, 4: obsidianImg, 5: diamondImg }
 
 // Custom dropdown component with icon support
 function FancySelect({ value, onChange, options, placeholder, renderOption, renderSelected, disabled }) {
@@ -233,7 +226,7 @@ export default function TierListPage() {
     const divisionOptions = activeDivisions.map(d => ({
         value: d.slug,
         label: d.name,
-        rankImg: RANK_IMAGES[d.tier],
+        rankImg: getDivisionImage(selectedLeagueSlug, d.slug, d.tier),
         tier: d.tier,
     }))
 
