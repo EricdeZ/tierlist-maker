@@ -193,7 +193,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
 
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setTeamsPanelHeight(entry.contentRect.height)
+                setTeamsPanelHeight(entry.target.offsetHeight)
             }
         })
 
@@ -665,8 +665,8 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     }
 
     // Dynamic bottom padding based on measured panel height
-    const bottomPadding = teamsPanelOpen && teamsPanelPosition === 'bottom' && teamsPanelHeight > 0
-        ? `${teamsPanelHeight + 16}px`
+    const bottomPadding = teamsPanelOpen && teamsPanelPosition === 'bottom'
+        ? `${Math.max(teamsPanelHeight, 200) + 16}px`
         : undefined
 
     return (
