@@ -78,7 +78,11 @@ export async function pollChannel(sql, channel) {
         }
 
         for (const msg of messages) {
-            const images = (msg.attachments || []).filter(isImageAttachment)
+            // Collect images from direct attachments + forwarded message snapshots
+            const directImages = (msg.attachments || []).filter(isImageAttachment)
+            const snapshotImages = (msg.message_snapshots || [])
+                .flatMap(s => (s.message?.attachments || []).filter(isImageAttachment))
+            const images = [...directImages, ...snapshotImages]
             for (const att of images) {
                 const result = await sql`
                     INSERT INTO discord_queue (
