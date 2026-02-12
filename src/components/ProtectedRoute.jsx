@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ProtectedRoute({ children, requireAdmin = false, requiredPermission = null }) {
-    const { user, loading, isAdmin, hasPermission, hasAnyPermission } = useAuth()
+    const { user, loading, isAdmin, hasPermission, hasAnyPermission, permissions } = useAuth()
 
     if (loading) {
         return (
@@ -20,9 +20,15 @@ export default function ProtectedRoute({ children, requireAdmin = false, require
         return <Navigate to="/?login=required" replace />
     }
 
-    // Specific permission check (e.g. 'permission_manage')
-    if (requiredPermission && !hasPermission(requiredPermission)) {
-        return <Navigate to="/admin" replace />
+    // Specific permission check — allow if user has it globally or for any league
+    if (requiredPermission) {
+        const hasGlobal = hasPermission(requiredPermission)
+        const hasForAnyLeague = Object.values(permissions.byLeague).some(
+            perms => perms.includes(requiredPermission)
+        )
+        if (!hasGlobal && !hasForAnyLeague) {
+            return <Navigate to="/admin" replace />
+        }
     }
 
     // General admin check: legacy admin role OR any RBAC permission

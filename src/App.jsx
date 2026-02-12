@@ -51,17 +51,17 @@ function App() {
 
                             {/* Admin pages (protected) */}
                             <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLanding /></ProtectedRoute>} />
-                            <Route path="admin/matchreport" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
-                            <Route path="admin/rosters" element={<ProtectedRoute requireAdmin><RosterManager /></ProtectedRoute>} />
-                            <Route path="admin/matches" element={<ProtectedRoute requireAdmin><MatchManager /></ProtectedRoute>} />
-                            <Route path="admin/players" element={<ProtectedRoute requireAdmin><PlayerManager /></ProtectedRoute>} />
-                            <Route path="admin/leagues" element={<ProtectedRoute requireAdmin><LeagueManager /></ProtectedRoute>} />
-                            <Route path="admin/users" element={<ProtectedRoute requireAdmin><UserManager /></ProtectedRoute>} />
-                            <Route path="admin/claims" element={<ProtectedRoute requireAdmin><ClaimManager /></ProtectedRoute>} />
+                            <Route path="admin/matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
+                            <Route path="admin/rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
+                            <Route path="admin/matches" element={<ProtectedRoute requiredPermission="match_manage"><MatchManager /></ProtectedRoute>} />
+                            <Route path="admin/players" element={<ProtectedRoute requiredPermission="player_manage"><PlayerManager /></ProtectedRoute>} />
+                            <Route path="admin/leagues" element={<ProtectedRoute requiredPermission="league_manage"><LeagueManager /></ProtectedRoute>} />
+                            <Route path="admin/users" element={<ProtectedRoute requiredPermission="user_manage"><UserManager /></ProtectedRoute>} />
+                            <Route path="admin/claims" element={<ProtectedRoute requiredPermission="claim_manage"><ClaimManager /></ProtectedRoute>} />
                             <Route path="admin/permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
                             <Route path="admin/auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
-                            <Route path="admin/schedule" element={<ProtectedRoute requireAdmin><ScheduleManager /></ProtectedRoute>} />
-                            <Route path="admin/discord" element={<ProtectedRoute requireAdmin><DiscordQueue /></ProtectedRoute>} />
+                            <Route path="admin/schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
+                            <Route path="admin/discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

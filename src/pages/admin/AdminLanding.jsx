@@ -1,6 +1,7 @@
 // src/pages/admin/AdminLanding.jsx
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 import smiteLogo from '../../assets/smite2.png'
 import PageTitle from '../../components/PageTitle'
 
@@ -9,6 +10,7 @@ const tools = [
         title: 'Match Report',
         description: 'Add new match results from screenshots. Paste match text and DETAILS tab screenshots, then let AI extract the scoreboard data for review and submission.',
         path: '/admin/matchreport',
+        permission: 'match_report',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -23,6 +25,7 @@ const tools = [
         title: 'Roster Manager',
         description: 'Manage team rosters with drag-and-drop. Transfer players between teams, change roles, rename players, manage aliases, and merge duplicates.',
         path: '/admin/rosters',
+        permission: 'roster_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -37,6 +40,7 @@ const tools = [
         title: 'Player Manager',
         description: 'View all players across leagues and seasons. Edit Discord names and tracker links, bulk-enroll players into new seasons, export data to CSV, and track season history.',
         path: '/admin/players',
+        permission: 'player_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
@@ -51,6 +55,7 @@ const tools = [
         title: 'Match Manager',
         description: 'Edit or delete existing match data. Update dates, weeks, teams, game results, and individual player stats for any previously submitted match.',
         path: '/admin/matches',
+        permission: 'match_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
@@ -65,6 +70,7 @@ const tools = [
         title: 'Schedule Manager',
         description: 'Create and manage match schedules. Set dates, weeks, and matchups for upcoming games. Track match status from scheduled through completion.',
         path: '/admin/schedule',
+        permission: 'match_schedule',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
@@ -79,6 +85,7 @@ const tools = [
         title: 'Discord Channels',
         description: 'Configure Discord channel connections. Map Discord channels to divisions for automatic screenshot collection.',
         path: '/admin/discord',
+        permission: 'match_report',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
@@ -93,6 +100,7 @@ const tools = [
         title: 'League Manager',
         description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
         path: '/admin/leagues',
+        permission: 'league_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
@@ -107,6 +115,7 @@ const tools = [
         title: 'User Manager',
         description: 'Manage Discord-authenticated users. Promote or demote admins, and manually link or unlink player profiles.',
         path: '/admin/users',
+        permission: 'user_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
@@ -121,6 +130,7 @@ const tools = [
         title: 'Claim Requests',
         description: 'Review and resolve player profile claim requests. Approve or deny users who want to link their Discord account to a player profile.',
         path: '/admin/claims',
+        permission: 'claim_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -135,6 +145,7 @@ const tools = [
         title: 'Permission Manager',
         description: 'Create custom roles, assign granular permissions, and control who can access what. Scope permissions by league for fine-grained access control.',
         path: '/admin/permissions',
+        permission: 'permission_manage',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
@@ -149,6 +160,7 @@ const tools = [
         title: 'Audit Log',
         description: 'View a chronological log of all admin actions. Filter by user, endpoint, action, and date range to track changes and investigate issues.',
         path: '/admin/auditlog',
+        permission: 'audit_log_view',
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -162,6 +174,16 @@ const tools = [
 ]
 
 export default function AdminLanding() {
+    const { permissions } = useAuth()
+
+    // Check if user has permission globally or for any league
+    const hasPermissionAnywhere = (key) => {
+        if (permissions.global.includes(key)) return true
+        return Object.values(permissions.byLeague).some(perms => perms.includes(key))
+    }
+
+    const visibleTools = tools.filter(tool => hasPermissionAnywhere(tool.permission))
+
     return (
         <div className="max-w-4xl mx-auto py-12 px-4">
             <PageTitle title="Admin" noindex />
@@ -189,7 +211,7 @@ export default function AdminLanding() {
 
             {/* Tool cards */}
             <div className="grid gap-6">
-                {tools.map(tool => (
+                {visibleTools.map(tool => (
                     <div
                         key={tool.path}
                         className={`relative overflow-hidden rounded-xl border bg-gradient-to-r ${tool.accent} ${tool.border} transition-colors`}
