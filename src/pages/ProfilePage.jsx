@@ -114,7 +114,7 @@ const ProfilePage = () => {
             {profileData && <PageTitle title={`${profileData.player.name} - Player Profile`} />}
             {/* Back button */}
             <button
-                onClick={() => navigate(-1)}
+                onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
                 className="flex items-center gap-1.5 text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors mb-4"
             >
                 <ArrowLeft className="w-4 h-4" />
