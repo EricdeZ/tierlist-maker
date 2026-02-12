@@ -1,5 +1,5 @@
 // src/pages/admin/RosterManager.jsx
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { RosterManagerHelp } from '../../components/admin/AdminHelp'
@@ -59,6 +59,10 @@ export default function RosterManager() {
 
     // Merge modal
     const [showMerge, setShowMerge] = useState(false)
+
+    // Player pool panel
+    const [showPool, setShowPool] = useState(false)
+    const [poolSearch, setPoolSearch] = useState('')
 
     // ─── Fetch admin data ───
     const fetchData = useCallback(async () => {
@@ -144,7 +148,7 @@ export default function RosterManager() {
         const activePlayers = seasonPlayers.filter(
             p => String(p.team_id) === String(team.team_id) && p.is_active !== false
         )
-        return { ...team, players: activePlayers }
+        return { ...team, players: activePlayers.sort((a, b) => a.name.localeCompare(b.name)) }
     })
 
     // Dropped players (inactive in this season) — need a separate query or derive from data
@@ -153,6 +157,31 @@ export default function RosterManager() {
 
     // Global players for "add player" search
     const globalPlayers = adminData?.globalPlayers || []
+
+    // All player IDs rostered (non-sub) in any season of this league
+    const leagueRosteredPlayerIds = useMemo(() => {
+        if (!selectedSeason || !adminData) return new Set()
+        const leagueId = selectedSeason.league_id
+        const leagueSeasonIds = new Set(
+            seasons.filter(s => String(s.league_id) === String(leagueId)).map(s => s.season_id)
+        )
+        return new Set(
+            (adminData.players || [])
+                .filter(p => leagueSeasonIds.has(p.season_id) && p.role?.toLowerCase() !== 'sub')
+                .map(p => p.player_id)
+        )
+    }, [selectedSeason, adminData, seasons])
+
+    // Pool players: unrostered in current league (all divisions)
+    const poolPlayers = useMemo(() => {
+        // Also exclude players in pending 'add' changes
+        const pendingAddIds = new Set(
+            pendingChanges.filter(c => c.type === 'add').map(c => c.player_id)
+        )
+        return globalPlayers
+            .filter(p => !leagueRosteredPlayerIds.has(p.player_id) && !pendingAddIds.has(p.player_id))
+            .sort((a, b) => a.name.localeCompare(b.name))
+    }, [leagueRosteredPlayerIds, globalPlayers, pendingChanges])
 
     // ─── Sync local rosters from server data ───
     useEffect(() => {
@@ -194,12 +223,55 @@ export default function RosterManager() {
         return () => document.removeEventListener('dragover', handleDragOverScroll)
     }, [draggedPlayer])
 
+    // ─── Helper: add player to team as pending change ───
+    const addPlayerToTeamPending = (player, targetTeamId, role) => {
+        const targetTeam = seasonTeams.find(t => String(t.team_id) === String(targetTeamId))
+        const effectiveRole = role || player.main_role || 'fill'
+
+        setPendingChanges(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: 'add',
+            player_id: player.player_id,
+            player_name: player.name,
+            team_id: parseInt(targetTeamId),
+            role: effectiveRole,
+            description: `Add ${player.name} to ${targetTeam?.team_name}`,
+        }])
+
+        // Optimistically add to localRosters
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            const team = next.find(t => String(t.team_id) === String(targetTeamId))
+            if (team) {
+                team.players.push({
+                    league_player_id: `pending-${player.player_id}`,
+                    player_id: player.player_id,
+                    name: player.name,
+                    slug: player.slug,
+                    team_id: parseInt(targetTeamId),
+                    role: effectiveRole,
+                    main_role: player.main_role,
+                    secondary_role: player.secondary_role,
+                    is_pending: true,
+                })
+                team.players.sort((a, b) => a.name.localeCompare(b.name))
+            }
+            return next
+        })
+    }
+
     // ─── Drag & Drop handlers ───
     const handleDragStart = (e, player, fromTeamId) => {
         setDraggedPlayer({ ...player, fromTeamId })
         e.dataTransfer.effectAllowed = 'move'
         // For Firefox compatibility
-        e.dataTransfer.setData('text/plain', player.league_player_id)
+        e.dataTransfer.setData('text/plain', player.league_player_id || player.player_id)
+    }
+
+    const handlePoolDragStart = (e, player) => {
+        setDraggedPlayer({ ...player, fromPool: true })
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', `pool-${player.player_id}`)
     }
 
     const handleDragOver = (e) => {
@@ -224,6 +296,14 @@ export default function RosterManager() {
         setDragOverPlayer(null)
 
         if (!draggedPlayer) return
+
+        // Pool drop: add player to team
+        if (draggedPlayer.fromPool) {
+            addPlayerToTeamPending(draggedPlayer, targetTeamId)
+            setDraggedPlayer(null)
+            return
+        }
+
         if (String(draggedPlayer.team_id) === String(targetTeamId)) {
             setDraggedPlayer(null)
             return
@@ -251,6 +331,7 @@ export default function RosterManager() {
                     const [moved] = fromTeam.players.splice(idx, 1)
                     moved.team_id = targetTeamId
                     toTeam.players.push(moved)
+                    toTeam.players.sort((a, b) => a.name.localeCompare(b.name))
                 }
             }
             return next
@@ -259,9 +340,18 @@ export default function RosterManager() {
         setDraggedPlayer(null)
     }
 
-    // ─── Drop on player (swap) ───
+    // ─── Drop on player (swap, or pool add) ───
     const handleDropOnPlayer = (targetPlayer) => {
         if (!draggedPlayer) return
+
+        // Pool drop onto a player row → add to that player's team
+        if (draggedPlayer.fromPool) {
+            addPlayerToTeamPending(draggedPlayer, targetPlayer.team_id)
+            setDraggedPlayer(null)
+            setDragOverPlayer(null)
+            return
+        }
+
         if (draggedPlayer.league_player_id === targetPlayer.league_player_id) return
         if (String(draggedPlayer.team_id) === String(targetPlayer.team_id)) return
 
@@ -301,6 +391,8 @@ export default function RosterManager() {
                     playerB.team_id = draggedPlayer.fromTeamId
                     teamA.players[idxA] = playerB
                     teamB.players[idxB] = playerA
+                    teamA.players.sort((a, b) => a.name.localeCompare(b.name))
+                    teamB.players.sort((a, b) => a.name.localeCompare(b.name))
                 }
             }
             return next
@@ -337,6 +429,18 @@ export default function RosterManager() {
         })
     }
 
+    // ─── Remove pending add ───
+    const handleRemovePendingAdd = (playerId, playerName) => {
+        setPendingChanges(prev => prev.filter(c => !(c.type === 'add' && c.player_id === playerId)))
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            for (const team of next) {
+                team.players = team.players.filter(p => p.league_player_id !== `pending-${playerId}`)
+            }
+            return next
+        })
+    }
+
     // ─── Drop player ───
     const handleDropPlayer = (leaguePlayerId, playerName, teamName) => {
         setConfirmModal({
@@ -367,9 +471,14 @@ export default function RosterManager() {
 
         for (const change of pendingChanges) {
             try {
-                const payload = change.type === 'transfer'
-                    ? { action: 'transfer-player', league_player_id: change.league_player_id, new_team_id: change.new_team_id }
-                    : { action: 'change-role', league_player_id: change.league_player_id, role: change.role }
+                let payload
+                if (change.type === 'transfer') {
+                    payload = { action: 'transfer-player', league_player_id: change.league_player_id, new_team_id: change.new_team_id }
+                } else if (change.type === 'add') {
+                    payload = { action: 'add-player-to-team', player_id: change.player_id, team_id: change.team_id, season_id: parseInt(selectedSeasonId), role: change.role }
+                } else {
+                    payload = { action: 'change-role', league_player_id: change.league_player_id, role: change.role }
+                }
 
                 const res = await fetch(`${API}/roster-manage`, {
                     method: 'POST',
@@ -494,34 +603,24 @@ export default function RosterManager() {
                     teamColor={addModal.teamColor}
                     seasonId={selectedSeasonId}
                     globalPlayers={globalPlayers}
-                    seasonPlayers={seasonPlayers}
+                    leagueRosteredPlayerIds={leagueRosteredPlayerIds}
+                    pendingChanges={pendingChanges}
                     onClose={() => setAddModal(null)}
-                    onAddExisting={async (playerId, role) => {
-                        try {
-                            await rosterAction(`add_${playerId}`, {
-                                action: 'add-player-to-team',
-                                player_id: playerId,
-                                team_id: addModal.teamId,
-                                season_id: parseInt(selectedSeasonId),
-                                role,
-                            })
-                            showToast('success', `Player added to ${addModal.teamName}`)
-                            setAddModal(null)
-                        } catch {
-                            // Error already toasted
-                        }
+                    onAddExisting={(player, role) => {
+                        addPlayerToTeamPending(player, addModal.teamId, role)
                     }}
                     onCreateNew={async (name, role) => {
                         try {
-                            await rosterAction(`create_${name}`, {
+                            const data = await rosterAction(`create_${name}`, {
                                 action: 'create-and-add-player',
                                 name,
                                 team_id: addModal.teamId,
                                 season_id: parseInt(selectedSeasonId),
                                 role,
+                                main_role: role?.toLowerCase(),
                             })
                             showToast('success', `${name} created and added to ${addModal.teamName}`)
-                            setAddModal(null)
+                            return data
                         } catch {
                             // Error already toasted
                         }
@@ -604,6 +703,18 @@ export default function RosterManager() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {selectedSeasonId && (
+                        <button
+                            onClick={() => setShowPool(!showPool)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-colors border ${
+                                showPool
+                                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/30'
+                                    : 'bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 border-white/10'
+                            }`}
+                        >
+                            Player Pool{poolPlayers.length > 0 ? ` (${poolPlayers.length})` : ''}
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowMerge(true)}
                         className="px-3 py-1.5 rounded-lg text-xs bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 transition-colors border border-white/10"
@@ -708,6 +819,7 @@ export default function RosterManager() {
                             onSetDragOverPlayer={setDragOverPlayer}
                             onRoleChange={handleRoleChange}
                             onDropPlayer={handleDropPlayer}
+                            onRemovePendingAdd={handleRemovePendingAdd}
                             onManageAliases={(playerId, playerName) => setAliasModal({ playerId, playerName })}
                             onRenamePlayer={(playerId, playerName) => setRenameModal({ playerId, playerName })}
                             onAddPlayer={() => setAddModal({
@@ -757,6 +869,20 @@ export default function RosterManager() {
                 </div>
             )}
 
+            {/* Player Pool Panel */}
+            {showPool && selectedSeasonId && (
+                <PlayerPoolPanel
+                    allPlayers={globalPlayers}
+                    leagueRosteredPlayerIds={leagueRosteredPlayerIds}
+                    pendingChanges={pendingChanges}
+                    search={poolSearch}
+                    onSearchChange={setPoolSearch}
+                    onDragStart={handlePoolDragStart}
+                    onDragEnd={handleDragEnd}
+                    onClose={() => setShowPool(false)}
+                />
+            )}
+
             {/* Inline keyframes for toast animation */}
             <style>{`
                 @keyframes slideIn {
@@ -776,7 +902,7 @@ function TeamCard({
     team, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
     onDropOnPlayer, onSetDragOverPlayer,
-    onRoleChange, onDropPlayer, onManageAliases, onRenamePlayer, onAddPlayer,
+    onRoleChange, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
 }) {
     const isValidTarget = hasDraggedPlayer && !isSameTeam
 
@@ -833,6 +959,7 @@ function TeamCard({
                         onSetDragOverPlayer={onSetDragOverPlayer}
                         onRoleChange={onRoleChange}
                         onDropPlayer={onDropPlayer}
+                        onRemovePendingAdd={onRemovePendingAdd}
                         onManageAliases={onManageAliases}
                         onRenamePlayer={onRenamePlayer}
                     />
@@ -869,9 +996,10 @@ function TeamCard({
 // ═══════════════════════════════════════════════════
 // PLAYER ROW (inside team card)
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onDropPlayer, onManageAliases, onRenamePlayer }) {
+function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
+    const isPending = player.is_pending
 
     useEffect(() => {
         if (!showActions) return
@@ -886,12 +1014,13 @@ function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasD
 
     return (
         <div
-            className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${
+            className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all ${
+                isPending ? 'border border-dashed border-green-500/30 bg-green-500/5' :
                 isLoading ? 'opacity-50 pointer-events-none' :
                 isDragOverTarget && hasDraggedPlayer ? 'bg-blue-500/15 ring-1 ring-blue-400/40' :
                 'hover:bg-white/5'
-            }`}
-            draggable={!isLoading}
+            } ${isPending ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+            draggable={!isLoading && !isPending}
             onDragStart={(e) => onDragStart(e, player, teamId)}
             onDragEnd={onDragEnd}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move' }}
@@ -945,33 +1074,47 @@ function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasD
                             borderColor: 'rgba(255,255,255,0.1)',
                         }}
                     >
-                        <button
-                            onClick={() => {
-                                setShowActions(false)
-                                onRenamePlayer(player.player_id, player.name)
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors flex items-center gap-2"
-                        >
-                            <span>✏</span> Rename
-                        </button>
-                        <button
-                            onClick={() => {
-                                setShowActions(false)
-                                onManageAliases(player.player_id, player.name)
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors flex items-center gap-2"
-                        >
-                            <span>↔</span> Manage Aliases
-                        </button>
-                        <button
-                            onClick={() => {
-                                setShowActions(false)
-                                onDropPlayer(player.league_player_id, player.name, teamName)
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
-                        >
-                            <span>🚫</span> Drop from Roster
-                        </button>
+                        {isPending ? (
+                            <button
+                                onClick={() => {
+                                    setShowActions(false)
+                                    onRemovePendingAdd(player.player_id, player.name)
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                            >
+                                <span>✕</span> Remove
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        setShowActions(false)
+                                        onRenamePlayer(player.player_id, player.name)
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors flex items-center gap-2"
+                                >
+                                    <span>✏</span> Rename
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowActions(false)
+                                        onManageAliases(player.player_id, player.name)
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors flex items-center gap-2"
+                                >
+                                    <span>↔</span> Manage Aliases
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowActions(false)
+                                        onDropPlayer(player.league_player_id, player.name, teamName)
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                                >
+                                    <span>🚫</span> Drop from Roster
+                                </button>
+                            </>
+                        )}
                     </div>
                 )}
             </div>
@@ -1063,48 +1206,60 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
 // ═══════════════════════════════════════════════════
 // ADD PLAYER MODAL
 // ═══════════════════════════════════════════════════
-function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPlayers, onClose, onAddExisting, onCreateNew, opLoading }) {
+function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, leagueRosteredPlayerIds, pendingChanges, onClose, onAddExisting, onCreateNew, opLoading }) {
     const [mode, setMode] = useState('search') // 'search' | 'create'
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedRole, setSelectedRole] = useState('Fill')
     const [newPlayerName, setNewPlayerName] = useState('')
     const [error, setError] = useState(null)
+    const [addedIds, setAddedIds] = useState(new Set()) // Track players added in this session
     const inputRef = useRef(null)
 
     useEffect(() => {
         inputRef.current?.focus()
     }, [mode])
 
-    // Players already on a roster this season
-    const rosteredPlayerIds = new Set(seasonPlayers.map(p => p.player_id))
+    // Players already in pending add changes
+    const pendingAddIds = new Set(
+        (pendingChanges || []).filter(c => c.type === 'add').map(c => c.player_id)
+    )
 
-    // Filter global players
+    // Filter global players — only show free agents (not on any team in this league)
     const searchResults = searchQuery.trim().length >= 2
         ? globalPlayers
             .filter(p => {
                 const q = searchQuery.trim().toLowerCase()
-                return p.name.toLowerCase().includes(q)
+                const nameMatch = p.name.toLowerCase().includes(q) || (p.discord_name && p.discord_name.toLowerCase().includes(q))
+                return nameMatch && !leagueRosteredPlayerIds.has(p.player_id)
             })
             .map(p => ({
                 ...p,
-                is_rostered: rosteredPlayerIds.has(p.player_id),
-                roster_info: seasonPlayers.find(sp => sp.player_id === p.player_id),
+                is_pending_add: pendingAddIds.has(p.player_id),
+                is_just_added: addedIds.has(p.player_id),
             }))
             .slice(0, 15)
         : []
 
     const isAnyLoading = Object.values(opLoading).some(Boolean)
 
-    const handleAddExisting = (player) => {
-        if (player.is_rostered) {
-            setError(`${player.name} is already on a roster this season. Use the transfer drag-and-drop instead.`)
-            return
+    const handleSelectPlayer = (player) => {
+        if (player.main_role) {
+            const match = ROLES.find(r => r.toLowerCase() === player.main_role.toLowerCase())
+            if (match) setSelectedRole(match)
         }
-        setError(null)
-        onAddExisting(player.player_id, selectedRole)
     }
 
-    const handleCreateNew = () => {
+    const handleAddExisting = (player) => {
+        if (player.is_pending_add || player.is_just_added) return
+        setError(null)
+        onAddExisting(player, selectedRole)
+        setAddedIds(prev => new Set([...prev, player.player_id]))
+        setSearchQuery('')
+        // Re-focus search input after a tick (state needs to update first)
+        setTimeout(() => inputRef.current?.focus(), 0)
+    }
+
+    const handleCreateNew = async () => {
         const trimmed = newPlayerName.trim()
         if (!trimmed) {
             setError('Please enter a player name.')
@@ -1115,7 +1270,8 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPl
             return
         }
         setError(null)
-        onCreateNew(trimmed, selectedRole)
+        await onCreateNew(trimmed, selectedRole)
+        setNewPlayerName('')
     }
 
     return (
@@ -1131,6 +1287,11 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPl
                         <h3 className="text-base font-bold text-[var(--color-text)]">
                             Add Player to {teamName}
                         </h3>
+                        {addedIds.size > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-semibold">
+                                {addedIds.size} queued
+                            </span>
+                        )}
                     </div>
                     <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-lg">✕</button>
                 </div>
@@ -1197,6 +1358,15 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPl
                             type="text"
                             value={searchQuery}
                             onChange={e => { setSearchQuery(e.target.value); setError(null) }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    const addable = searchResults.filter(p => !p.is_pending_add && !p.is_just_added)
+                                    if (addable.length === 1) {
+                                        handleSelectPlayer(addable[0])
+                                        handleAddExisting(addable[0])
+                                    }
+                                }
+                            }}
                             placeholder="Search by player name..."
                             className="w-full rounded-lg px-3 py-2.5 text-sm border focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50"
                             style={{
@@ -1210,33 +1380,44 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPl
                             <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-white/10">
                                 {searchResults.length === 0 ? (
                                     <div className="px-3 py-4 text-center text-xs text-[var(--color-text-secondary)]">
-                                        No players found for "{searchQuery}". Try the "Create New" tab.
+                                        No free agents found for "{searchQuery}". Try the "Create New" tab.
                                     </div>
                                 ) : (
-                                    searchResults.map(player => (
-                                        <button
-                                            key={player.player_id}
-                                            onClick={() => handleAddExisting(player)}
-                                            disabled={isAnyLoading}
-                                            className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors border-b border-white/5 last:border-b-0 ${
-                                                player.is_rostered
-                                                    ? 'opacity-40 cursor-not-allowed'
-                                                    : 'hover:bg-[var(--color-accent)]/10 cursor-pointer'
-                                            }`}
-                                        >
-                                            <div>
-                                                <span className="text-[var(--color-text)]">{player.name}</span>
-                                                {player.is_rostered && (
-                                                    <span className="ml-2 text-[10px] text-yellow-400/80">
-                                                        (on {player.roster_info?.team_name || 'a team'})
-                                                    </span>
+                                    searchResults.map(player => {
+                                        const isAdded = player.is_just_added || player.is_pending_add
+                                        return (
+                                            <button
+                                                key={player.player_id}
+                                                onClick={() => handleAddExisting(player)}
+                                                onMouseEnter={() => !isAdded && handleSelectPlayer(player)}
+                                                disabled={isAnyLoading || isAdded}
+                                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors border-b border-white/5 last:border-b-0 ${
+                                                    isAdded
+                                                        ? 'opacity-60 cursor-default'
+                                                        : 'hover:bg-[var(--color-accent)]/10 cursor-pointer'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="min-w-0">
+                                                        <span className="text-[var(--color-text)] block truncate">{player.name}</span>
+                                                        {player.discord_name && (
+                                                            <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60 block truncate">{player.discord_name}</span>
+                                                        )}
+                                                    </div>
+                                                    {player.main_role && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--color-text-secondary)] shrink-0">
+                                                            {player.main_role}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {isAdded ? (
+                                                    <span className="text-[10px] text-green-400 font-semibold shrink-0">✓ Added</span>
+                                                ) : (
+                                                    <span className="text-[10px] text-[var(--color-accent)] font-semibold shrink-0">+ ADD</span>
                                                 )}
-                                            </div>
-                                            {!player.is_rostered && (
-                                                <span className="text-[10px] text-[var(--color-accent)] font-semibold shrink-0">+ ADD</span>
-                                            )}
-                                        </button>
-                                    ))
+                                            </button>
+                                        )
+                                    })
                                 )}
                             </div>
                         )}
@@ -1279,6 +1460,290 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, seasonPl
                         </button>
                     </div>
                 )}
+
+                {/* Queued players list */}
+                {addedIds.size > 0 && (
+                    <div className="border-t border-white/10">
+                        <div className="px-5 pt-3 pb-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                                Queued ({addedIds.size})
+                            </span>
+                        </div>
+                        <div className="px-5 pb-3 flex flex-wrap gap-1.5">
+                            {[...addedIds].map(pid => {
+                                const p = globalPlayers.find(g => g.player_id === pid)
+                                return p ? (
+                                    <span
+                                        key={pid}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-[11px] text-green-400"
+                                    >
+                                        <span className="text-green-400/70">✓</span>
+                                        {p.name}
+                                    </span>
+                                ) : null
+                            })}
+                        </div>
+                        <div className="px-5 pb-3 flex justify-end">
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-primary)] hover:opacity-90 transition-opacity"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// PLAYER POOL PANEL (floating, draggable, resizable)
+// ═══════════════════════════════════════════════════
+function PlayerPoolPanel({ allPlayers, leagueRosteredPlayerIds, pendingChanges, search, onSearchChange, onDragStart, onDragEnd, onClose }) {
+    const inputRef = useRef(null)
+    const panelRef = useRef(null)
+    const [pos, setPos] = useState({ x: window.innerWidth - 300, y: 80 })
+    const [size, setSize] = useState({ w: 280, h: 500 })
+    const [sortBy, setSortBy] = useState('name') // 'name' | 'discord'
+    const [freeAgentOnly, setFreeAgentOnly] = useState(true)
+    const dragState = useRef(null)
+    const resizeState = useRef(null)
+
+    useEffect(() => { inputRef.current?.focus() }, [])
+
+    // Clamp position to keep panel visible on window resize
+    useEffect(() => {
+        const handleResize = () => {
+            setPos(prev => ({
+                x: Math.min(prev.x, window.innerWidth - 60),
+                y: Math.max(0, Math.min(prev.y, window.innerHeight - 60)),
+            }))
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    // Title bar drag to move
+    const onMoveStart = (e) => {
+        if (e.target.closest('button') || e.target.closest('input')) return
+        e.preventDefault()
+        dragState.current = { startX: e.clientX - pos.x, startY: e.clientY - pos.y }
+
+        const onMove = (ev) => {
+            if (!dragState.current) return
+            const nx = Math.max(0, Math.min(ev.clientX - dragState.current.startX, window.innerWidth - 60))
+            const ny = Math.max(0, Math.min(ev.clientY - dragState.current.startY, window.innerHeight - 60))
+            setPos({ x: nx, y: ny })
+        }
+        const onUp = () => {
+            dragState.current = null
+            document.removeEventListener('mousemove', onMove)
+            document.removeEventListener('mouseup', onUp)
+        }
+        document.addEventListener('mousemove', onMove)
+        document.addEventListener('mouseup', onUp)
+    }
+
+    // Corner resize
+    const onResizeStart = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        resizeState.current = { startX: e.clientX, startY: e.clientY, startW: size.w, startH: size.h }
+
+        const onMove = (ev) => {
+            if (!resizeState.current) return
+            const dw = ev.clientX - resizeState.current.startX
+            const dh = ev.clientY - resizeState.current.startY
+            setSize({
+                w: Math.max(220, Math.min(resizeState.current.startW + dw, 600)),
+                h: Math.max(300, Math.min(resizeState.current.startH + dh, window.innerHeight - pos.y - 20)),
+            })
+        }
+        const onUp = () => {
+            resizeState.current = null
+            document.removeEventListener('mousemove', onMove)
+            document.removeEventListener('mouseup', onUp)
+        }
+        document.addEventListener('mousemove', onMove)
+        document.addEventListener('mouseup', onUp)
+    }
+
+    const roleColors = {
+        solo: 'bg-amber-500/20 text-amber-400',
+        jungle: 'bg-green-500/20 text-green-400',
+        mid: 'bg-blue-500/20 text-blue-400',
+        support: 'bg-purple-500/20 text-purple-400',
+        adc: 'bg-red-500/20 text-red-400',
+        sub: 'bg-gray-500/20 text-gray-400',
+        fill: 'bg-gray-500/20 text-gray-400',
+    }
+
+    const filtered = useMemo(() => {
+        const pendingAddIds = new Set(
+            (pendingChanges || []).filter(c => c.type === 'add').map(c => c.player_id)
+        )
+        let base = allPlayers.filter(p => {
+            if (pendingAddIds.has(p.player_id)) return false
+            if (freeAgentOnly && leagueRosteredPlayerIds.has(p.player_id)) return false
+            return true
+        })
+        const list = search.trim().length >= 2
+            ? base.filter(p => {
+                const q = search.trim().toLowerCase()
+                return p.name.toLowerCase().includes(q) || (p.discord_name && p.discord_name.toLowerCase().includes(q))
+            })
+            : base
+        if (sortBy === 'discord') {
+            list.sort((a, b) => {
+                // Players with discord names first, then alphabetically
+                if (a.discord_name && !b.discord_name) return -1
+                if (!a.discord_name && b.discord_name) return 1
+                if (a.discord_name && b.discord_name) return a.discord_name.localeCompare(b.discord_name)
+                return a.name.localeCompare(b.name)
+            })
+        } else {
+            list.sort((a, b) => a.name.localeCompare(b.name))
+        }
+        return list
+    }, [allPlayers, leagueRosteredPlayerIds, pendingChanges, freeAgentOnly, search, sortBy])
+
+    return (
+        <div
+            ref={panelRef}
+            className="fixed z-40 rounded-xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+            style={{
+                backgroundColor: 'var(--color-secondary)',
+                left: pos.x,
+                top: pos.y,
+                width: size.w,
+                height: size.h,
+            }}
+        >
+            {/* Draggable header */}
+            <div
+                className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0 cursor-move select-none"
+                onMouseDown={onMoveStart}
+            >
+                <div className="flex items-center gap-2">
+                    {/* Drag grip */}
+                    <div className="flex gap-[3px] opacity-40">
+                        <div className="flex flex-col gap-[3px]">
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                        </div>
+                        <div className="flex flex-col gap-[3px]">
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                        </div>
+                    </div>
+                    <h3 className="text-sm font-bold text-[var(--color-text)]">
+                        Player Pool
+                        <span className="ml-1.5 text-xs font-normal text-[var(--color-text-secondary)]">
+                            ({filtered.length})
+                        </span>
+                    </h3>
+                </div>
+                <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-lg leading-none">
+                    ✕
+                </button>
+            </div>
+
+            {/* Search + sort */}
+            <div className="px-3 py-2 border-b border-white/10 shrink-0 space-y-1.5">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={search}
+                    onChange={e => onSearchChange(e.target.value)}
+                    placeholder="Search players..."
+                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/50"
+                    style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                />
+                <div className="flex items-center gap-1">
+                    {[['name', 'Name'], ['discord', 'Discord']].map(([key, label]) => (
+                        <button
+                            key={key}
+                            onClick={() => setSortBy(key)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                                sortBy === key
+                                    ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
+                                    : 'bg-white/5 text-[var(--color-text-secondary)] hover:bg-white/10'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                    <div className="ml-auto">
+                        <button
+                            onClick={() => setFreeAgentOnly(prev => !prev)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                                freeAgentOnly
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-white/5 text-[var(--color-text-secondary)] hover:bg-white/10'
+                            }`}
+                        >
+                            FA Only
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Player list */}
+            <div className="flex-1 overflow-y-auto px-2 py-1 min-h-0">
+                {filtered.length === 0 ? (
+                    <p className="text-center text-xs text-[var(--color-text-secondary)] py-8 opacity-60">
+                        {search.trim().length >= 2 ? 'No players found' : 'No unrostered players'}
+                    </p>
+                ) : filtered.map(player => (
+                    <div
+                        key={player.player_id}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-grab active:cursor-grabbing hover:bg-white/5 transition-colors group"
+                        draggable
+                        onDragStart={(e) => onDragStart(e, player)}
+                        onDragEnd={onDragEnd}
+                    >
+                        {/* Drag handle */}
+                        <div className="w-3 flex flex-col items-center gap-[2px] opacity-0 group-hover:opacity-40 transition-opacity shrink-0">
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                            <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                            <span className="text-xs text-[var(--color-text)] truncate block">{player.name}</span>
+                            {player.discord_name && (
+                                <span className="text-[10px] text-[var(--color-text-secondary)] truncate block opacity-60">{player.discord_name}</span>
+                            )}
+                        </div>
+
+                        {player.main_role && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${roleColors[player.main_role.toLowerCase()] || roleColors.fill}`}>
+                                {player.main_role}
+                            </span>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {/* Hint + resize handle */}
+            <div className="px-3 py-1.5 border-t border-white/10 shrink-0 flex items-center justify-between">
+                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    Drag players onto team cards
+                </p>
+                {/* Resize grip (bottom-right) */}
+                <div
+                    className="w-4 h-4 cursor-se-resize flex items-end justify-end opacity-40 hover:opacity-70 transition-opacity"
+                    onMouseDown={onResizeStart}
+                >
+                    <svg width="10" height="10" viewBox="0 0 10 10" className="text-[var(--color-text)]">
+                        <path d="M9 1v8H1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        <path d="M9 5v4H5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                </div>
             </div>
         </div>
     )
