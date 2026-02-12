@@ -27,7 +27,7 @@ export default function PlayerManager() {
     const [showEnroll, setShowEnroll] = useState(false)
     const [enrollSeasonId, setEnrollSeasonId] = useState('')
     const [enrollTeamId, setEnrollTeamId] = useState('')
-    const [enrollRole, setEnrollRole] = useState('fill')
+    const [enrollRole, setEnrollRole] = useState('')
     const [enrolling, setEnrolling] = useState(false)
 
     // Edit modal
@@ -222,7 +222,7 @@ export default function PlayerManager() {
                     player_ids: [...selected],
                     season_id: parseInt(enrollSeasonId),
                     team_id: parseInt(enrollTeamId),
-                    role: enrollRole,
+                    role: enrollRole || null,
                 }),
             })
             const result = await res.json()
@@ -251,6 +251,8 @@ export default function PlayerManager() {
                     player_id: editPlayer.id,
                     discord_name: editPlayer.discord_name || null,
                     tracker_url: editPlayer.tracker_url || null,
+                    main_role: editPlayer.main_role || null,
+                    secondary_role: editPlayer.secondary_role || null,
                 }),
             })
             const result = await res.json()
@@ -507,7 +509,7 @@ export default function PlayerManager() {
                                     isExpanded={expandedId === p.id}
                                     onToggleSelect={() => toggleSelect(p.id)}
                                     onToggleExpand={() => setExpandedId(prev => prev === p.id ? null : p.id)}
-                                    onEdit={() => setEditPlayer({ id: p.id, name: p.name, discord_name: p.discord_name || '', tracker_url: p.tracker_url || '' })}
+                                    onEdit={() => setEditPlayer({ id: p.id, name: p.name, discord_name: p.discord_name || '', tracker_url: p.tracker_url || '', main_role: p.main_role || '', secondary_role: p.secondary_role || '' })}
                                 />
                             ))}
                         </tbody>
@@ -568,6 +570,7 @@ export default function PlayerManager() {
                                     className="w-full rounded-lg px-3 py-2 text-sm border"
                                     style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
                                 >
+                                    <option value="">Use Player Defaults</option>
                                     {['fill', 'solo', 'jungle', 'mid', 'support', 'adc', 'sub'].map(r => (
                                         <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
                                     ))}
@@ -655,6 +658,14 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                             }
                         </button>
                         <span className="font-medium text-[var(--color-text)]">{p.name}</span>
+                        {p.main_role && (
+                            <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-medium opacity-60 ${roleColors[p.main_role.toLowerCase()] || roleColors.fill}`}
+                                title={`Default: ${p.main_role}${p.secondary_role ? ` / ${p.secondary_role}` : ''}`}
+                            >
+                                {p.main_role}{p.secondary_role ? `/${p.secondary_role}` : ''}
+                            </span>
+                        )}
                         {p.isFreeAgent && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 font-medium">FA</span>
                         )}
@@ -814,6 +825,36 @@ function EditInfoModal({ player, onChange, onSave, onClose, saving }) {
                             className="w-full rounded-lg px-3 py-2 text-sm border"
                             style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
                         />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Main Role</label>
+                            <select
+                                value={player.main_role}
+                                onChange={e => onChange({ ...player, main_role: e.target.value })}
+                                className="w-full rounded-lg px-3 py-2 text-sm border"
+                                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                            >
+                                <option value="">None</option>
+                                {['Solo', 'Jungle', 'Mid', 'Support', 'ADC'].map(r => (
+                                    <option key={r} value={r.toLowerCase()}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Secondary Role</label>
+                            <select
+                                value={player.secondary_role}
+                                onChange={e => onChange({ ...player, secondary_role: e.target.value })}
+                                className="w-full rounded-lg px-3 py-2 text-sm border"
+                                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                            >
+                                <option value="">None</option>
+                                {['Solo', 'Jungle', 'Mid', 'Support', 'ADC'].map(r => (
+                                    <option key={r} value={r.toLowerCase()}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 

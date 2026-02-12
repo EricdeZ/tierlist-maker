@@ -22,6 +22,7 @@ export const handler = async (event) => {
             const players = await sql`
                 SELECT
                     p.id, p.name, p.slug, p.discord_name, p.tracker_url,
+                    p.main_role, p.secondary_role,
                     p.created_at
                 FROM players p
                 ORDER BY LOWER(p.name)
@@ -131,7 +132,7 @@ export const handler = async (event) => {
 /**
  * Update a player's contact info (discord_name, tracker_url)
  */
-async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }, admin) {
+async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url, main_role, secondary_role }, admin) {
     if (!player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id required' }) }
     }
@@ -141,16 +142,18 @@ async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url }, a
         SET
             discord_name = ${discord_name ?? null},
             tracker_url = ${tracker_url ?? null},
+            main_role = ${main_role ?? null},
+            secondary_role = ${secondary_role ?? null},
             updated_at = NOW()
         WHERE id = ${player_id}
-        RETURNING id, name, discord_name, tracker_url
+        RETURNING id, name, discord_name, tracker_url, main_role, secondary_role
     `
 
     if (!updated) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
     }
 
-    await logAudit(sql, admin, { action: 'update-player-info', endpoint: 'player-manage', targetType: 'player', targetId: player_id, details: { discord_name, tracker_url } })
+    await logAudit(sql, admin, { action: 'update-player-info', endpoint: 'player-manage', targetType: 'player', targetId: player_id, details: { discord_name, tracker_url, main_role, secondary_role } })
 
     return {
         statusCode: 200,
@@ -175,7 +178,14 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
 
     const results = { enrolled: 0, skipped: 0, reactivated: 0, details: [] }
 
+    // Look up default roles for all players being enrolled
+    const playerDefaults = role ? {} : Object.fromEntries(
+        (await sql`SELECT id, main_role FROM players WHERE id = ANY(${player_ids})`).map(p => [p.id, p.main_role])
+    )
+
     for (const pid of player_ids) {
+        const effectiveRole = role || playerDefaults[pid] || 'fill'
+
         // Check if player already has a league_player in this season
         const [existing] = await sql`
             SELECT id, team_id, is_active FROM league_players
@@ -192,7 +202,7 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
             // Reactivate inactive entry
             await sql`
                 UPDATE league_players
-                SET team_id = ${team_id}, role = ${role || 'fill'}, is_active = true, updated_at = NOW()
+                SET team_id = ${team_id}, role = ${effectiveRole}, is_active = true, updated_at = NOW()
                 WHERE id = ${existing.id}
             `
             results.reactivated++
@@ -200,7 +210,7 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
         } else {
             await sql`
                 INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
-                VALUES (${pid}, ${team_id}, ${season_id}, ${role || 'fill'}, true)
+                VALUES (${pid}, ${team_id}, ${season_id}, ${effectiveRole}, true)
             `
             results.enrolled++
             results.details.push({ player_id: pid, status: 'enrolled' })

@@ -2,16 +2,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useParams } from 'react-router-dom'
 import { DivisionProvider, useDivision } from '../../context/DivisionContext'
+import { useAuth } from '../../context/AuthContext'
 import UserMenu from '../UserMenu'
 import smiteLogo from '../../assets/smite2.png'
 import { getDivisionImage } from '../../utils/divisionImages'
+import { Home, User, Wrench, ChevronDown, ListOrdered, Swords } from 'lucide-react'
 
 const DivisionNav = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const location = useLocation()
     const { league, division, loading } = useDivision()
+    const { user, linkedPlayer } = useAuth()
     const [mobileOpen, setMobileOpen] = useState(false)
+    const [toolsOpen, setToolsOpen] = useState(false)
     const menuRef = useRef(null)
+    const toolsRef = useRef(null)
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
 
@@ -29,9 +34,10 @@ const DivisionNav = () => {
         return location.pathname.startsWith(item.path)
     }
 
-    // Close mobile menu on route change
+    // Close menus on route change
     useEffect(() => {
         setMobileOpen(false)
+        setToolsOpen(false)
     }, [location.pathname])
 
     // Close on click outside
@@ -49,6 +55,16 @@ const DivisionNav = () => {
             document.removeEventListener('touchstart', handleClickOutside)
         }
     }, [mobileOpen])
+
+    // Close tools dropdown on click outside
+    useEffect(() => {
+        if (!toolsOpen) return
+        const handle = (e) => {
+            if (toolsRef.current && !toolsRef.current.contains(e.target)) setToolsOpen(false)
+        }
+        document.addEventListener('mousedown', handle)
+        return () => document.removeEventListener('mousedown', handle)
+    }, [toolsOpen])
 
     // Prevent body scroll when menu open
     useEffect(() => {
@@ -104,7 +120,67 @@ const DivisionNav = () => {
                                 {item.label}
                             </Link>
                         ))}
-                        <div className="border-l border-white/10 ml-2 pl-2">
+                        <div className="border-l border-white/10 ml-2 pl-2 flex items-center gap-1">
+                            <Link
+                                to="/"
+                                title="Home"
+                                className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                            >
+                                <Home className="w-4 h-4" />
+                            </Link>
+                            {user && (
+                                linkedPlayer ? (
+                                    <Link
+                                        to={`/profile/${linkedPlayer.slug}`}
+                                        title="My Profile"
+                                        className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                                    >
+                                        <User className="w-4 h-4" />
+                                    </Link>
+                                ) : (
+                                    <button
+                                        onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
+                                        title="Claim Your Profile"
+                                        className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                                    >
+                                        <User className="w-4 h-4" />
+                                    </button>
+                                )
+                            )}
+                            <div ref={toolsRef} className="relative">
+                                <button
+                                    onClick={() => setToolsOpen(!toolsOpen)}
+                                    title="Tools"
+                                    className={`p-2 rounded-lg flex items-center gap-0.5 transition-all duration-200 ${
+                                        toolsOpen ? 'text-(--color-accent) bg-white/10' : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10'
+                                    }`}
+                                >
+                                    <Wrench className="w-4 h-4" />
+                                    <ChevronDown className={`w-3 h-3 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {toolsOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+                                        <div className="py-1">
+                                            <Link
+                                                to="/tierlist"
+                                                onClick={() => setToolsOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                                            >
+                                                <ListOrdered className="w-4 h-4 text-(--color-text-secondary)" />
+                                                Tier List
+                                            </Link>
+                                            <Link
+                                                to="/draft"
+                                                onClick={() => setToolsOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                                            >
+                                                <Swords className="w-4 h-4 text-(--color-text-secondary)" />
+                                                Draft Simulator
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             <UserMenu compact />
                         </div>
                     </div>
@@ -152,7 +228,7 @@ const DivisionNav = () => {
             <div
                 className="md:hidden overflow-hidden transition-all duration-300 ease-in-out"
                 style={{
-                    maxHeight: mobileOpen ? '400px' : '0px',
+                    maxHeight: mobileOpen ? '600px' : '0px',
                     opacity: mobileOpen ? 1 : 0,
                 }}
             >
@@ -174,8 +250,38 @@ const DivisionNav = () => {
                         </Link>
                     ))}
 
-                    {/* Home link in mobile menu */}
+                    {/* Tools section in mobile menu */}
                     <div className="border-t border-white/5 mt-1 pt-1">
+                        <div className="px-4 py-2 text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-widest">
+                            Tools
+                        </div>
+                        <Link
+                            to="/tierlist"
+                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-white/20" />
+                            Tier List
+                        </Link>
+                        <Link
+                            to="/draft"
+                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-white/20" />
+                            Draft Simulator
+                        </Link>
+                    </div>
+
+                    {/* Profile + Home links in mobile menu */}
+                    <div className="border-t border-white/5 mt-1 pt-1">
+                        {user && linkedPlayer && (
+                            <Link
+                                to={`/profile/${linkedPlayer.slug}`}
+                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-white/20" />
+                                My Profile
+                            </Link>
+                        )}
                         <Link
                             to="/"
                             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"

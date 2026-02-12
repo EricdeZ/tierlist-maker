@@ -68,6 +68,8 @@ UNIQUE(season_id, slug)
 | discord_name | varchar | YES | |
 | discord_id | varchar(32) | YES | |
 | tracker_url | text | YES | |
+| main_role | varchar(50) | YES | |
+| secondary_role | varchar(50) | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 

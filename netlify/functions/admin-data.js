@@ -65,7 +65,7 @@ export const handler = async (event) => {
 
         // Also get global players (not on active rosters) for sub matching
         const globalPlayers = await sql`
-            SELECT id as player_id, name, slug
+            SELECT id as player_id, name, slug, main_role, secondary_role, discord_name
             FROM players
             ORDER BY name
         `

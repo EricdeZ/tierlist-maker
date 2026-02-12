@@ -67,7 +67,7 @@ const DivisionOverview = () => {
                         <img
                             src={leagueLogo}
                             alt=""
-                            className="h-20 w-20 sm:h-24 sm:w-24 object-contain rounded-2xl border border-white/10 bg-(--color-secondary) p-3 shrink-0"
+                            className="h-24 w-24 sm:h-28 sm:w-28 object-contain shrink-0"
                         />
                     ) : (
                         <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-(--color-secondary) border border-white/10 flex items-center justify-center shrink-0">

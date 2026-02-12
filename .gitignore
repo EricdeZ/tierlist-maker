@@ -147,3 +147,4 @@ claude_images
 *.csv
 bash.exe.stackdump
 deno.lock
+/.claude/settings.local.json

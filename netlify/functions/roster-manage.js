@@ -226,6 +226,13 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
         }
     }
 
+    // Fall back to player's default role if none specified
+    let effectiveRole = role
+    if (!effectiveRole) {
+        const [player] = await sql`SELECT main_role FROM players WHERE id = ${player_id}`
+        effectiveRole = player?.main_role || 'fill'
+    }
+
     // Check if player already has an active league_player entry for this season
     const [existing] = await sql`
         SELECT id, team_id, is_active FROM league_players
@@ -246,7 +253,7 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
         // Reactivate and move to new team
         const [updated] = await sql`
             UPDATE league_players
-            SET team_id = ${team_id}, role = ${role || 'fill'}, is_active = true, updated_at = NOW()
+            SET team_id = ${team_id}, role = ${effectiveRole}, is_active = true, updated_at = NOW()
             WHERE id = ${existing.id}
             RETURNING id, team_id, role, is_active
         `
@@ -262,7 +269,7 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
     // Create new league_players entry
     const [newLp] = await sql`
         INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
-        VALUES (${player_id}, ${team_id}, ${season_id}, ${role || 'fill'}, true)
+        VALUES (${player_id}, ${team_id}, ${season_id}, ${effectiveRole}, true)
         RETURNING id, team_id, role, is_active
     `
 
@@ -278,7 +285,7 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
 /**
  * Create a brand-new player in the global players table AND add them to a team.
  */
-async function createAndAddPlayer(sql, { name, team_id, season_id, role }, admin) {
+async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_role, secondary_role }, admin) {
     if (!name || !team_id || !season_id) {
         return {
             statusCode: 400,
@@ -316,14 +323,18 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role }, admin
         }
     }
 
+    const effectiveRole = role || main_role || 'fill'
+
     const result = await sql.begin(async (tx) => {
         const [player] = await tx`
-            INSERT INTO players (name, slug) VALUES (${trimmed}, ${slug}) RETURNING id, name, slug
+            INSERT INTO players (name, slug, main_role, secondary_role)
+            VALUES (${trimmed}, ${slug}, ${main_role ?? null}, ${secondary_role ?? null})
+            RETURNING id, name, slug, main_role, secondary_role
         `
 
         const [lp] = await tx`
             INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
-            VALUES (${player.id}, ${team_id}, ${season_id}, ${role || 'fill'}, true)
+            VALUES (${player.id}, ${team_id}, ${season_id}, ${effectiveRole}, true)
             RETURNING id, team_id, role, is_active
         `
 

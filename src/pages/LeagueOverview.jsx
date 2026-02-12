@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { leagueService } from '../services/database'
-import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageCircle } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageCircle, Home, User, Wrench, ListOrdered, Swords } from 'lucide-react'
+import UserMenu from '../components/UserMenu'
 import PageTitle from '../components/PageTitle'
+import smiteLogo from '../assets/smite2.png'
 
 import aglLogo from '../assets/leagues/agl.png'
 import babylonLogo from '../assets/leagues/babylon.png'
@@ -21,10 +24,23 @@ const LEAGUE_LOGOS = {
 
 const LeagueOverview = () => {
     const { leagueSlug } = useParams()
+    const { user, linkedPlayer } = useAuth()
     const [league, setLeague] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [expanded, setExpanded] = useState({})
+    const [toolsOpen, setToolsOpen] = useState(false)
+    const toolsRef = useRef(null)
+
+    // Close tools dropdown on click outside
+    useEffect(() => {
+        if (!toolsOpen) return
+        const handle = (e) => {
+            if (toolsRef.current && !toolsRef.current.contains(e.target)) setToolsOpen(false)
+        }
+        document.addEventListener('mousedown', handle)
+        return () => document.removeEventListener('mousedown', handle)
+    }, [toolsOpen])
 
     useEffect(() => {
         let cancelled = false
@@ -91,8 +107,96 @@ const LeagueOverview = () => {
     return (
         <div className="min-h-screen">
             {league && <PageTitle title={league.name} />}
+
+            {/* ─── NAVBAR ─── */}
+            <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
+                <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-4 py-2 shadow-lg border border-white/10">
+                    <div className="flex items-center gap-3 sm:gap-6">
+                        {/* Logo → homepage */}
+                        <Link to="/" className="flex items-center gap-3 flex-shrink-0">
+                            <img src={smiteLogo} alt="SMITE 2" className="h-8 sm:h-10 w-auto" />
+                        </Link>
+
+                        {/* League badge */}
+                        <div className="flex items-center gap-2 flex-shrink-0 border-l border-white/10 pl-3 sm:pl-4">
+                            {logo && (
+                                <img src={logo} alt="" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />
+                            )}
+                            <div className="text-xs sm:text-sm font-bold text-(--color-text)">
+                                {league.name}
+                            </div>
+                        </div>
+
+                        {/* Right side: Home, Profile, Tools, UserMenu */}
+                        <div className="flex items-center gap-1 ml-auto">
+                            <Link
+                                to="/"
+                                title="Home"
+                                className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                            >
+                                <Home className="w-4 h-4" />
+                            </Link>
+                            {user && (
+                                linkedPlayer ? (
+                                    <Link
+                                        to={`/profile/${linkedPlayer.slug}`}
+                                        title="My Profile"
+                                        className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                                    >
+                                        <User className="w-4 h-4" />
+                                    </Link>
+                                ) : (
+                                    <button
+                                        onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))}
+                                        title="Claim Your Profile"
+                                        className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                                    >
+                                        <User className="w-4 h-4" />
+                                    </button>
+                                )
+                            )}
+                            <div ref={toolsRef} className="relative">
+                                <button
+                                    onClick={() => setToolsOpen(!toolsOpen)}
+                                    title="Tools"
+                                    className={`p-2 rounded-lg flex items-center gap-0.5 transition-all duration-200 ${
+                                        toolsOpen ? 'text-(--color-accent) bg-white/10' : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10'
+                                    }`}
+                                >
+                                    <Wrench className="w-4 h-4" />
+                                    <ChevronDown className={`w-3 h-3 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {toolsOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+                                        <div className="py-1">
+                                            <Link
+                                                to="/tierlist"
+                                                onClick={() => setToolsOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                                            >
+                                                <ListOrdered className="w-4 h-4 text-(--color-text-secondary)" />
+                                                Tier List
+                                            </Link>
+                                            <Link
+                                                to="/draft"
+                                                onClick={() => setToolsOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                                            >
+                                                <Swords className="w-4 h-4 text-(--color-text-secondary)" />
+                                                Draft Simulator
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <UserMenu compact />
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
             {/* ─── HERO ─── */}
-            <section className="relative overflow-hidden pt-12 pb-16 px-4">
+            <section className="relative overflow-hidden pt-24 pb-16 px-4">
                 <div
                     className="absolute inset-0 pointer-events-none"
                     style={{ background: `radial-gradient(ellipse at 50% 0%, ${leagueColor}10, transparent 60%)` }}
@@ -112,7 +216,7 @@ const LeagueOverview = () => {
                             <img
                                 src={logo}
                                 alt=""
-                                className="h-24 w-24 object-contain rounded-2xl border border-white/10 bg-(--color-secondary) p-3"
+                                className="h-28 w-28 object-contain"
                             />
                         ) : (
                             <div className="h-24 w-24 rounded-2xl bg-(--color-secondary) border border-white/10 flex items-center justify-center text-4xl">
