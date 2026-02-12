@@ -137,3 +137,9 @@ export const godService = {
     }
 }
 
+export const bannedContentService = {
+    async getByLeague(leagueId) {
+        return apiCall('banned-content', { leagueId })
+    }
+}
+

@@ -34,6 +34,7 @@ import PermissionManager from "./pages/admin/PermissionManager.jsx";
 import AuditLog from "./pages/admin/AuditLog.jsx";
 import ScheduleManager from "./pages/admin/ScheduleManager.jsx";
 import DiscordQueue from "./pages/admin/DiscordQueue.jsx";
+import BannedContentManager from "./pages/admin/BannedContentManager.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
 import TierListPage from "./pages/TierListPage.jsx";
@@ -62,6 +63,7 @@ function App() {
                             <Route path="admin/auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
                             <Route path="admin/schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
                             <Route path="admin/discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
+                            <Route path="admin/banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

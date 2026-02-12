@@ -5,6 +5,7 @@ import { leagueService } from '../services/database'
 import { ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, Trophy, MessageCircle, Home, User, Wrench, ListOrdered, Swords } from 'lucide-react'
 import UserMenu from '../components/UserMenu'
 import PageTitle from '../components/PageTitle'
+import BannedContentBanner from '../components/BannedContentBanner'
 import smiteLogo from '../assets/smite2.png'
 
 import aglLogo from '../assets/leagues/agl.png'
@@ -283,6 +284,15 @@ const LeagueOverview = () => {
                     </div>
                 </div>
             </section>
+
+            {/* ─── Banned Content ─── */}
+            {league && (
+                <section className="px-4 pb-6">
+                    <div className="max-w-5xl mx-auto">
+                        <BannedContentBanner leagueId={league.id} accentColor={leagueColor} />
+                    </div>
+                </section>
+            )}
 
             {/* ─── DIVISIONS ─── */}
             <section className="px-4 pb-20">

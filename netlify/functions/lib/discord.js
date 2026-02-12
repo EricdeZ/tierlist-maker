@@ -122,3 +122,71 @@ export async function pollChannel(sql, channel) {
 
     return { totalMessages, newImages }
 }
+
+/**
+ * Sync a single banned-content message from Discord.
+ * Fetches the message, parses it, and upserts into banned_content.
+ */
+export async function syncBanList(sql, config) {
+    const msg = await fetchMessage(config.channel_id, config.message_id)
+    const parsed = parseBanListText(msg.content || '')
+
+    await sql`
+        INSERT INTO banned_content (league_id, channel_id, message_id, raw_content, parsed_data, last_synced_at)
+        VALUES (${config.league_id}, ${config.channel_id}, ${config.message_id}, ${msg.content}, ${sql.json(parsed)}, NOW())
+        ON CONFLICT (league_id) DO UPDATE SET
+            raw_content = EXCLUDED.raw_content,
+            parsed_data = EXCLUDED.parsed_data,
+            last_synced_at = NOW(),
+            updated_at = NOW()
+    `
+}
+
+// Inline parser (same logic as src/utils/banListParser.js, kept here to avoid cross-directory imports)
+const KNOWN_HEADERS = [
+    'item bans', 'relic bans', 'god bans', 'aspect bans',
+    'bug abuse', 'pick at your own risk', 'skin bans', 'notes',
+]
+
+function stripMarkdown(text) {
+    return text
+        .replace(/\*\*\__(.*?)__\*\*/g, '$1')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/__(.*?)__/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/~~(.*?)~~/g, '$1')
+        .replace(/`(.*?)`/g, '$1')
+}
+
+function parseBanListText(text) {
+    if (!text) return { title: null, updated: null, sections: [] }
+
+    const lines = text.split('\n').map(l => l.trim())
+    const sections = []
+    let title = null
+    let updated = null
+    let currentSection = null
+
+    for (const rawLine of lines) {
+        if (!rawLine) continue
+        const line = stripMarkdown(rawLine).trim()
+        if (!line) continue
+        if (/^updated\s+\d/i.test(line)) {
+            updated = line.replace(/^updated\s+/i, '').trim()
+            continue
+        }
+        const lower = line.replace(/:$/, '').trim().toLowerCase()
+        if (line.endsWith(':') || KNOWN_HEADERS.includes(lower)) {
+            currentSection = { name: line.replace(/:$/, '').trim(), items: [] }
+            sections.push(currentSection)
+            continue
+        }
+        if (!currentSection) {
+            if (!title) title = line
+            continue
+        }
+        currentSection.items.push(line)
+    }
+
+    return { title, updated, sections }
+}

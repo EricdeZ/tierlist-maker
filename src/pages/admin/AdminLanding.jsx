@@ -97,6 +97,21 @@ const tools = [
         btnClass: 'bg-purple-600 hover:bg-purple-700',
     },
     {
+        title: 'Banned Content',
+        description: 'Configure Discord channels for league ban lists. Sync gods, items, relics, and other banned content from Discord messages. Auto-syncs hourly.',
+        path: '/admin/banned-content',
+        permission: 'league_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+        ),
+        accent: 'from-red-500/20 to-red-600/5',
+        border: 'border-red-500/20 hover:border-red-500/40',
+        iconColor: 'text-red-400',
+        btnClass: 'bg-red-600 hover:bg-red-700',
+    },
+    {
         title: 'League Manager',
         description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
         path: '/admin/leagues',

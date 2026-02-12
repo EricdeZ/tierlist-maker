@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { statsService } from '../../services/database'
 import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users, User } from 'lucide-react'
 import PageTitle from '../../components/PageTitle'
+import BannedContentBanner from '../../components/BannedContentBanner'
 
 import aglLogo from '../../assets/leagues/agl.png'
 import babylonLogo from '../../assets/leagues/babylon.png'
@@ -199,6 +200,13 @@ const DivisionOverview = () => {
                     <ChevronRight className="absolute top-6 right-5 w-5 h-5 transition-all group-hover:translate-x-1" style={{ color: leagueColor }} />
                 </Link>
             </div>
+
+            {/* ─── Banned Content ─── */}
+            {league && (
+                <div className="mb-10">
+                    <BannedContentBanner leagueId={league.id} accentColor={leagueColor} />
+                </div>
+            )}
 
             {/* ─── Teams Preview ─── */}
             {teams && teams.length > 0 && (

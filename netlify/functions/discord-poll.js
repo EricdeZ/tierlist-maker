@@ -1,6 +1,6 @@
 /* global process */
 import { getDB } from './lib/db.js'
-import { pollChannel } from './lib/discord.js'
+import { pollChannel, syncBanList } from './lib/discord.js'
 
 export const config = {
     schedule: '@hourly',
@@ -29,6 +29,20 @@ export default async () => {
         } catch (err) {
             console.error(`discord-poll: error polling ${channel.channel_name || channel.channel_id}:`, err.message)
             results.push({ channelId: channel.channel_id, error: err.message })
+        }
+    }
+
+    // ─── Sync banned content lists ───
+    const banConfigs = await sql`
+        SELECT * FROM banned_content
+        WHERE channel_id IS NOT NULL AND message_id IS NOT NULL
+    `
+    for (const config of banConfigs) {
+        try {
+            await syncBanList(sql, config)
+            console.log(`discord-poll: synced ban list for league ${config.league_id}`)
+        } catch (err) {
+            console.error(`discord-poll: error syncing ban list for league ${config.league_id}:`, err.message)
         }
     }
 
