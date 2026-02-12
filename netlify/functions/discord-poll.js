@@ -35,7 +35,7 @@ export default async () => {
     // ─── Sync banned content lists ───
     const banConfigs = await sql`
         SELECT * FROM banned_content
-        WHERE channel_id IS NOT NULL AND message_id IS NOT NULL
+        WHERE channel_id IS NOT NULL
     `
     for (const config of banConfigs) {
         try {

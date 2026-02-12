@@ -45,8 +45,8 @@ export default function BannedContentManager() {
     useEffect(() => { loadData() }, [loadData])
 
     const handleConfigure = async () => {
-        if (!form.league_id || !form.channel_id || !form.message_id) {
-            showToast('error', 'All fields are required')
+        if (!form.league_id || !form.channel_id) {
+            showToast('error', 'League and Channel ID are required')
             return
         }
         setSaving(true)
@@ -58,7 +58,7 @@ export default function BannedContentManager() {
                     action: 'configure',
                     league_id: parseInt(form.league_id),
                     channel_id: form.channel_id.trim(),
-                    message_id: form.message_id.trim(),
+                    ...(form.message_id.trim() && { message_id: form.message_id.trim() }),
                 }),
             })
             const data = await res.json()
@@ -251,14 +251,20 @@ export default function BannedContentManager() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Discord Message ID</label>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Discord Message ID <span className="text-gray-500 font-normal">(optional)</span>
+                                </label>
                                 <input
                                     type="text"
                                     value={form.message_id}
                                     onChange={e => setForm({ ...form, message_id: e.target.value })}
-                                    placeholder="Right-click message → Copy Message ID"
+                                    placeholder="Leave blank to auto-detect from channel"
                                     className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 placeholder:text-gray-600"
                                 />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    If left blank, the most recent ban list message in the channel will be used automatically.
+                                    This also handles leagues that delete and re-post their ban list.
+                                </p>
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button

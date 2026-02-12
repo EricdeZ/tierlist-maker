@@ -124,17 +124,50 @@ export async function pollChannel(sql, channel) {
 }
 
 /**
+ * Find the most recent message in a channel that parses as a valid ban list.
+ * Returns the Discord message object, or null if none found.
+ */
+async function findBanListMessage(channelId) {
+    // Without 'after', Discord returns the most recent messages (newest first)
+    const messages = await fetchChannelMessages(channelId, null, 50)
+    for (const msg of messages) {
+        const parsed = parseBanListText(msg.content || '')
+        if (parsed.sections.length > 0) return msg
+    }
+    return null
+}
+
+/**
  * Sync a single banned-content message from Discord.
- * Fetches the message, parses it, and upserts into banned_content.
+ * Tries the stored message_id first; if it fails (deleted), scans the channel
+ * for the most recent message that looks like a ban list.
  */
 export async function syncBanList(sql, config) {
-    const msg = await fetchMessage(config.channel_id, config.message_id)
+    let msg
+
+    // Try fetching the stored message first
+    if (config.message_id) {
+        try {
+            msg = await fetchMessage(config.channel_id, config.message_id)
+        } catch {
+            // Message was likely deleted — fall through to channel scan
+            console.log(`syncBanList: stored message ${config.message_id} not found, scanning channel`)
+        }
+    }
+
+    // If no message found (no message_id stored, or fetch failed), scan the channel
+    if (!msg) {
+        msg = await findBanListMessage(config.channel_id)
+        if (!msg) throw new Error('No ban list message found in channel')
+    }
+
     const parsed = parseBanListText(msg.content || '')
 
     await sql`
         INSERT INTO banned_content (league_id, channel_id, message_id, raw_content, parsed_data, last_synced_at)
-        VALUES (${config.league_id}, ${config.channel_id}, ${config.message_id}, ${msg.content}, ${sql.json(parsed)}, NOW())
+        VALUES (${config.league_id}, ${config.channel_id}, ${msg.id}, ${msg.content}, ${sql.json(parsed)}, NOW())
         ON CONFLICT (league_id) DO UPDATE SET
+            message_id = EXCLUDED.message_id,
             raw_content = EXCLUDED.raw_content,
             parsed_data = EXCLUDED.parsed_data,
             last_synced_at = NOW(),

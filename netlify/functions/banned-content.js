@@ -79,20 +79,21 @@ export const handler = async (event) => {
 async function configure(sql, body, admin) {
     const { league_id, channel_id, message_id } = body
 
-    if (!league_id || !channel_id || !message_id) {
-        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'league_id, channel_id, and message_id required' }) }
+    if (!league_id || !channel_id) {
+        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'league_id and channel_id required' }) }
     }
 
-    // Verify message exists by fetching it
-    let msg
-    try {
-        msg = await fetchMessage(channel_id, message_id)
-    } catch (err) {
-        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Failed to fetch Discord message: ${err.message}` }) }
+    // If message_id provided, verify it exists
+    if (message_id) {
+        try {
+            await fetchMessage(channel_id, message_id)
+        } catch (err) {
+            return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Failed to fetch Discord message: ${err.message}` }) }
+        }
     }
 
-    // Sync immediately
-    await syncBanList(sql, { league_id, channel_id, message_id })
+    // Sync immediately (will auto-detect message if message_id not provided)
+    await syncBanList(sql, { league_id, channel_id, message_id: message_id || null })
 
     await logAudit(sql, admin, {
         action: 'configure-banned-content', endpoint: 'banned-content',
@@ -112,8 +113,8 @@ async function sync(sql, body, admin) {
     const { league_id } = body
 
     const configs = league_id
-        ? await sql`SELECT * FROM banned_content WHERE league_id = ${league_id} AND channel_id IS NOT NULL AND message_id IS NOT NULL`
-        : await sql`SELECT * FROM banned_content WHERE channel_id IS NOT NULL AND message_id IS NOT NULL`
+        ? await sql`SELECT * FROM banned_content WHERE league_id = ${league_id} AND channel_id IS NOT NULL`
+        : await sql`SELECT * FROM banned_content WHERE channel_id IS NOT NULL`
 
     const results = []
     for (const config of configs) {
