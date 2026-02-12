@@ -17,7 +17,7 @@ const FLIP_FRAMES = [flip1, flip2, flip3, passionCoin]
 
 export default function CoinFlip() {
     const { user } = useAuth()
-    const { balance, refreshBalance } = usePassion()
+    const { balance, refreshBalance, loading: passionLoading } = usePassion()
 
     const [flipping, setFlipping] = useState(false)
     const [lastResult, setLastResult] = useState(null)       // 'heads' | 'tails' | null
@@ -34,7 +34,25 @@ export default function CoinFlip() {
     const [resultDelta, setResultDelta] = useState(null)     // +1 or -1
     const [shake, setShake] = useState(false)
     const [streakBroken, setStreakBroken] = useState(null)    // streak value that was broken
+    const [mode3d, setMode3d] = useState(() => localStorage.getItem('coinflip_3d') !== 'false')
+    const [landing, setLanding] = useState(false)             // 3D landing phase
+
+    // Refs for 2D frame cycling
     const flipInterval = useRef(null)
+
+    // Refs for 3D JS-driven rotation
+    const coinInnerRef = useRef(null)
+    const coinLiftRef = useRef(null)
+    const coinShadowRef = useRef(null)
+    const rotationRef = useRef(0)
+    const spinRafRef = useRef(null)
+    const spinStartRef = useRef(0)
+
+    const toggleMode = () => {
+        const next = !mode3d
+        setMode3d(next)
+        localStorage.setItem('coinflip_3d', String(next))
+    }
 
     // Load leaderboard
     const loadLeaderboard = useCallback(() => {
@@ -63,16 +81,16 @@ export default function CoinFlip() {
 
     useEffect(() => { loadLeaderboard() }, [loadLeaderboard])
 
-    // Sync local balance from passion context
+    // Sync local balance from passion context (unless mid-flip where we track locally)
     useEffect(() => {
-        if (localBalance === null && balance !== undefined) {
+        if (!flipping && !landing && balance !== undefined) {
             setLocalBalance(balance)
         }
-    }, [balance, localBalance])
+    }, [balance, flipping, landing])
 
-    // Coin flip animation
+    // 2D: Coin flip frame animation
     useEffect(() => {
-        if (flipping) {
+        if (!mode3d && flipping) {
             let frame = 0
             flipInterval.current = setInterval(() => {
                 frame = (frame + 1) % FLIP_FRAMES.length
@@ -83,7 +101,96 @@ export default function CoinFlip() {
             setFlipFrame(0)
         }
         return () => clearInterval(flipInterval.current)
-    }, [flipping])
+    }, [flipping, mode3d])
+
+    // 3D: start epic vertical flip — coin launches up towards the camera
+    const startSpin3d = () => {
+        const inner = coinInnerRef.current
+        const lift = coinLiftRef.current
+        const shadow = coinShadowRef.current
+        if (!inner || !lift) return
+
+        // Reset
+        inner.style.transition = 'none'
+        lift.style.transition = 'none'
+        // Force reflow so transition:none takes effect
+        void lift.offsetHeight
+
+        // Launch: rise up + come towards camera
+        lift.style.transition = 'transform 0.5s cubic-bezier(0.2, 0, 0, 1)'
+        lift.style.transform = 'translateY(-60px) translateZ(250px)'
+        if (shadow) {
+            shadow.style.transition = 'all 0.5s cubic-bezier(0.2, 0, 0, 1)'
+            shadow.style.opacity = '0.5'
+            shadow.style.transform = 'scaleX(1.8) scaleY(1)'
+        }
+
+        // Spin on X axis (vertical flip) using rAF for smooth 60fps
+        spinStartRef.current = performance.now()
+        const spin = (now) => {
+            const elapsed = now - spinStartRef.current
+            // Accelerate over first 300ms, then constant speed
+            const accel = Math.min(elapsed / 300, 1)
+            const speed = accel * 22 // degrees per frame at max speed
+            rotationRef.current += speed
+            inner.style.transform = `rotateX(${rotationRef.current}deg)`
+            spinRafRef.current = requestAnimationFrame(spin)
+        }
+        spinRafRef.current = requestAnimationFrame(spin)
+    }
+
+    // 3D: dramatic landing — decelerate, settle back, bounce
+    const landOn3d = (result) => {
+        cancelAnimationFrame(spinRafRef.current)
+        const inner = coinInnerRef.current
+        const lift = coinLiftRef.current
+        const shadow = coinShadowRef.current
+        if (!inner || !lift) return
+
+        const current = rotationRef.current
+        // At least 720deg more for a satisfying deceleration arc
+        const minTarget = current + 720
+        let target
+        if (result === 'heads') {
+            target = Math.ceil(minTarget / 360) * 360
+        } else {
+            target = Math.ceil((minTarget - 180) / 360) * 360 + 180
+        }
+
+        rotationRef.current = target
+        setLanding(true)
+
+        // Coin settles back down and away from camera
+        lift.style.transition = 'transform 0.9s cubic-bezier(0.2, 0, 0.3, 1)'
+        lift.style.transform = 'translateY(0px) translateZ(0px)'
+        if (shadow) {
+            shadow.style.transition = 'all 0.9s cubic-bezier(0.2, 0, 0.3, 1)'
+            shadow.style.opacity = '0.15'
+            shadow.style.transform = 'scaleX(1) scaleY(0.5)'
+        }
+
+        // Decelerate spin to land on correct face
+        inner.style.transition = 'transform 1s cubic-bezier(0.1, 0, 0.15, 1)'
+        inner.style.transform = `rotateX(${target}deg)`
+
+        // Bounce on landing
+        setTimeout(() => {
+            if (!lift) return
+            lift.style.transition = 'transform 0.15s ease-out'
+            lift.style.transform = 'translateY(-6px) translateZ(20px)'
+            setTimeout(() => {
+                lift.style.transition = 'transform 0.2s ease-in'
+                lift.style.transform = 'translateY(0px) translateZ(0px)'
+            }, 150)
+        }, 850)
+
+        setTimeout(() => setLanding(false), 1100)
+    }
+
+    // Cleanup 3D animation on unmount
+    useEffect(() => {
+        return () => cancelAnimationFrame(spinRafRef.current)
+    }, [])
 
     const displayBalance = localBalance !== null ? localBalance : balance
 
@@ -97,6 +204,11 @@ export default function CoinFlip() {
         setShake(false)
         setStreakBroken(null)
 
+        // Start the appropriate animation immediately
+        if (mode3d) {
+            startSpin3d()
+        }
+
         const prevStreak = currentStreak
 
         // Fire API + minimum animation time in parallel
@@ -106,58 +218,71 @@ export default function CoinFlip() {
         ])
 
         if (data.error === 'insufficient_balance') {
+            if (mode3d) cancelAnimationFrame(spinRafRef.current)
             setFlipping(false)
             setLocalBalance(data.balance)
             return
         }
 
-        setFlipping(false)
-        setLastResult(data.result)
+        // Reveal the result — in 3D, delay until landing animation finishes
+        const revealResult = () => {
+            setFlipping(false)
+            setLastResult(data.result)
 
-        if (data.result === 'heads') {
-            setResultDelta(+1)
-            setCurrentStreak(data.currentStreak)
-            setBestStreak(data.bestStreak)
-            setTotalFlips(data.totalFlips)
-            setTotalHeads(data.totalHeads)
-            setLocalBalance(data.balance)
+            if (data.result === 'heads') {
+                setResultDelta(+1)
+                setCurrentStreak(data.currentStreak)
+                setBestStreak(data.bestStreak)
+                setTotalFlips(data.totalFlips)
+                setTotalHeads(data.totalHeads)
+                setLocalBalance(data.balance)
 
-            // Explosion on milestone streaks
-            if (data.currentStreak > 0 && data.currentStreak % 5 === 0) {
-                setShowExplosion(true)
-                setTimeout(() => setShowExplosion(false), 1200)
+                // Explosion on milestone streaks
+                if (data.currentStreak > 0 && data.currentStreak % 5 === 0) {
+                    setShowExplosion(true)
+                    setTimeout(() => setShowExplosion(false), 1200)
+                }
+
+                // Refresh leaderboard (might have new best)
+                loadLeaderboard()
+            } else {
+                setResultDelta(-1)
+                setShake(true)
+                if (prevStreak >= 3) {
+                    setStreakBroken(prevStreak)
+                }
+                setCurrentStreak(data.currentStreak)
+                setBestStreak(data.bestStreak)
+                setTotalFlips(data.totalFlips)
+                setTotalHeads(data.totalHeads)
+                setLocalBalance(data.balance)
+                setTimeout(() => setShake(false), 600)
             }
 
-            // Refresh leaderboard (might have new best)
-            loadLeaderboard()
-        } else {
-            setResultDelta(-1)
-            setShake(true)
-            if (prevStreak >= 3) {
-                setStreakBroken(prevStreak)
-            }
-            setCurrentStreak(data.currentStreak)
-            setBestStreak(data.bestStreak)
-            setTotalFlips(data.totalFlips)
-            setTotalHeads(data.totalHeads)
-            setLocalBalance(data.balance)
-            setTimeout(() => setShake(false), 600)
+            refreshBalance()
         }
 
-        // Sync passion context balance
-        refreshBalance()
+        if (mode3d) {
+            landOn3d(data.result)
+            // Reveal when the coin lands (matches the 1s spin deceleration)
+            setTimeout(revealResult, 1000)
+        } else {
+            revealResult()
+        }
     }
 
-    const canFlip = user && !flipping && displayBalance >= 1
+    const canFlip = user && !flipping && !landing && displayBalance >= 1
 
-    // Determine coin image to show
+    // 2D: determine coin image to show
     let coinImage = passionCoin
-    if (flipping) {
-        coinImage = FLIP_FRAMES[flipFrame]
-    } else if (lastResult === 'heads') {
-        coinImage = passionCoin
-    } else if (lastResult === 'tails') {
-        coinImage = passionTails
+    if (!mode3d) {
+        if (flipping) {
+            coinImage = FLIP_FRAMES[flipFrame]
+        } else if (lastResult === 'heads') {
+            coinImage = passionCoin
+        } else if (lastResult === 'tails') {
+            coinImage = passionTails
+        }
     }
 
     return (
@@ -172,9 +297,23 @@ export default function CoinFlip() {
                     <div className="lg:col-span-2 flex flex-col items-center">
                         <div className="w-full max-w-sm bg-(--color-secondary) rounded-2xl border border-white/[0.08] p-6 sm:p-8 flex flex-col items-center">
 
-                            <h1 className="text-2xl sm:text-3xl font-bold font-heading mb-1 text-center">
-                                Coin Flip
-                            </h1>
+                            <div className="flex items-center justify-between w-full mb-1">
+                                <h1 className="text-2xl sm:text-3xl font-bold font-heading text-center flex-1">
+                                    Coin Flip
+                                </h1>
+                                {/* 2D / 3D toggle */}
+                                <button
+                                    onClick={toggleMode}
+                                    className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border transition-all cursor-pointer shrink-0"
+                                    style={{
+                                        background: mode3d ? 'rgba(248,197,106,0.15)' : 'rgba(255,255,255,0.05)',
+                                        borderColor: mode3d ? 'rgba(248,197,106,0.3)' : 'rgba(255,255,255,0.1)',
+                                        color: mode3d ? '#f8c56a' : 'rgba(255,255,255,0.4)',
+                                    }}
+                                >
+                                    {mode3d ? '3D' : '2D'}
+                                </button>
+                            </div>
                             <p className="text-xs text-(--color-text-secondary)/50 mb-6 text-center">
                                 Flip heads to win — how far can you go?
                             </p>
@@ -190,7 +329,7 @@ export default function CoinFlip() {
                                         Each flip costs 1 Passion — heads wins +1, tails loses -1
                                     </p>
                                 </div>
-                            ) : statsLoading ? (
+                            ) : statsLoading || passionLoading ? (
                                 <div className="py-12">
                                     <div className="w-40 h-40 rounded-full bg-white/5 animate-pulse mx-auto" />
                                 </div>
@@ -199,17 +338,55 @@ export default function CoinFlip() {
                                     {/* Coin */}
                                     <div className="relative mb-6">
                                         <div className={`relative transition-transform duration-200 ${shake ? 'animate-shake' : ''}`}>
-                                            <img
-                                                src={coinImage}
-                                                alt="Passion Coin"
-                                                className={`w-40 h-40 sm:w-52 sm:h-52 object-contain transition-all duration-300 ${
-                                                    lastResult === 'heads' && !flipping
-                                                        ? 'drop-shadow-[0_0_20px_rgba(74,222,128,0.4)]'
-                                                        : lastResult === 'tails' && !flipping
-                                                            ? 'drop-shadow-[0_0_20px_rgba(248,113,113,0.4)]'
-                                                            : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.2)]'
-                                                }`}
-                                            />
+                                            {mode3d ? (
+                                                /* ═══ 3D Coin — vertical flip with depth ═══ */
+                                                <div className="flex flex-col items-center">
+                                                    <div className="coin-3d-scene w-40 h-40 sm:w-52 sm:h-52">
+                                                        <div ref={coinLiftRef} className="coin-3d-lift w-full h-full">
+                                                            <div ref={coinInnerRef} className="coin-3d-inner w-full h-full">
+                                                                {/* Front face (heads) */}
+                                                                <div className="coin-3d-face coin-3d-front">
+                                                                    <img src={passionCoin} alt="Heads"
+                                                                        className={`w-full h-full object-contain transition-[filter] duration-300 ${
+                                                                            lastResult === 'heads' && !flipping && !landing
+                                                                                ? 'drop-shadow-[0_0_24px_rgba(74,222,128,0.5)]'
+                                                                                : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.3)]'
+                                                                        }`}
+                                                                    />
+                                                                </div>
+                                                                {/* Back face (tails) — rotated on X axis for vertical flip */}
+                                                                <div className="coin-3d-face coin-3d-back-x">
+                                                                    <img src={passionTails} alt="Tails"
+                                                                        className={`w-full h-full object-contain transition-[filter] duration-300 ${
+                                                                            lastResult === 'tails' && !flipping && !landing
+                                                                                ? 'drop-shadow-[0_0_24px_rgba(248,113,113,0.5)]'
+                                                                                : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.3)]'
+                                                                        }`}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {/* Shadow beneath the coin */}
+                                                    <div
+                                                        ref={coinShadowRef}
+                                                        className="coin-3d-shadow"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                /* ═══ 2D Coin ═══ */
+                                                <img
+                                                    src={coinImage}
+                                                    alt="Passion Coin"
+                                                    className={`w-40 h-40 sm:w-52 sm:h-52 object-contain transition-all duration-300 ${
+                                                        lastResult === 'heads' && !flipping
+                                                            ? 'drop-shadow-[0_0_20px_rgba(74,222,128,0.4)]'
+                                                            : lastResult === 'tails' && !flipping
+                                                                ? 'drop-shadow-[0_0_20px_rgba(248,113,113,0.4)]'
+                                                                : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.2)]'
+                                                    }`}
+                                                />
+                                            )}
                                             {showExplosion && (
                                                 <img src={passionsplosion} alt=""
                                                     className="absolute inset-0 w-full h-full object-contain animate-explosion pointer-events-none" />
@@ -406,6 +583,50 @@ export default function CoinFlip() {
             </div>
 
             <style>{`
+                /* ═══ 3D Coin — epic vertical flip ═══ */
+                .coin-3d-scene {
+                    perspective: 600px;
+                    perspective-origin: 50% 50%;
+                }
+                .coin-3d-lift {
+                    transform-style: preserve-3d;
+                    transform: translateY(0) translateZ(0);
+                }
+                .coin-3d-inner {
+                    position: relative;
+                    transform-style: preserve-3d;
+                    transform: rotateX(0deg);
+                }
+                .coin-3d-face {
+                    position: absolute;
+                    inset: 0;
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .coin-3d-back-x {
+                    position: absolute;
+                    inset: 0;
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transform: rotateX(180deg);
+                }
+                .coin-3d-shadow {
+                    width: 120px;
+                    height: 16px;
+                    margin-top: 8px;
+                    border-radius: 50%;
+                    background: radial-gradient(ellipse, rgba(248,197,106,0.15) 0%, transparent 70%);
+                    opacity: 0.15;
+                    transform: scaleX(1) scaleY(0.5);
+                }
+
+                /* ═══ Shared animations ═══ */
                 @keyframes card-enter {
                     0% { opacity: 0; transform: translateY(12px); }
                     100% { opacity: 1; transform: translateY(0); }
