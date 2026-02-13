@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { passionService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
 import { getRank } from '../config/ranks'
@@ -163,9 +164,15 @@ export default function PassionLeaderboard() {
                                                     </div>
 
                                                     {/* Name */}
-                                                    <span className={`font-bold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-[140px] text-center ${isMe ? 'text-(--color-accent)' : ''}`}>
-                                                        {entry.discordUsername}
-                                                    </span>
+                                                    {entry.playerSlug ? (
+                                                        <Link to={`/profile/${entry.playerSlug}`} className={`font-bold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-[140px] text-center hover:underline ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                            {entry.discordUsername}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className={`font-bold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-[140px] text-center ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                            {entry.discordUsername}
+                                                        </span>
+                                                    )}
 
                                                     {/* Passion earned */}
                                                     <div className="flex items-center gap-1 mt-1">
@@ -234,10 +241,17 @@ export default function PassionLeaderboard() {
 
                                             {/* Name + rank */}
                                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                <span className={`font-medium text-sm truncate ${isMe ? 'text-(--color-accent)' : ''}`}>
-                                                    {entry.discordUsername}
-                                                    {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
-                                                </span>
+                                                {entry.playerSlug ? (
+                                                    <Link to={`/profile/${entry.playerSlug}`} className={`font-medium text-sm truncate hover:underline ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                        {entry.discordUsername}
+                                                        {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
+                                                    </Link>
+                                                ) : (
+                                                    <span className={`font-medium text-sm truncate ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                        {entry.discordUsername}
+                                                        {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
+                                                    </span>
+                                                )}
                                                 <RankBadge rank={entryRank} size="sm" />
                                             </div>
 

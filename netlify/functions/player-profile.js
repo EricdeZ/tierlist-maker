@@ -33,6 +33,14 @@ export const handler = async (event) => {
             return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
         }
 
+        // Fetch passion rank data (if claimed user exists)
+        const [passionRow] = player.is_claimed ? await sql`
+            SELECT pb.balance, pb.total_earned
+            FROM passion_balances pb
+            JOIN users u ON u.id = pb.user_id
+            WHERE u.linked_player_id = ${player.id}
+        ` : [null]
+
         // 2, 3, 4, 5 in parallel
         const [leagueBreakdowns, seasonHistory, gameHistory, badges] = await Promise.all([
             // Per-league aggregate stats
@@ -74,6 +82,7 @@ export const handler = async (event) => {
                     s.start_date,
                     d.name AS division_name,
                     d.slug AS division_slug,
+                    d.tier AS division_tier,
                     l.id AS league_id,
                     l.name AS league_name,
                     l.slug AS league_slug,
@@ -103,7 +112,7 @@ export const handler = async (event) => {
                 LEFT JOIN matches m ON g.match_id = m.id
                 WHERE lp.player_id = ${player.id}
                 GROUP BY s.id, s.name, s.slug, s.is_active, s.start_date,
-                         d.name, d.slug,
+                         d.name, d.slug, d.tier,
                          l.id, l.name, l.slug, l.color,
                          t.name, t.color, t.slug,
                          lp.role, lp.secondary_role
@@ -140,7 +149,10 @@ export const handler = async (event) => {
                     l.name AS league_name,
                     l.slug AS league_slug,
                     l.color AS league_color,
-                    d.slug AS division_slug
+                    d.name AS division_name,
+                    d.slug AS division_slug,
+                    d.tier AS division_tier,
+                    s.name AS season_name
                 FROM player_game_stats pgs
                 JOIN league_players lp ON pgs.league_player_id = lp.id
                 JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
@@ -192,6 +204,8 @@ export const handler = async (event) => {
                     discord_id: player.claimed_discord_id,
                     discord_username: player.claimed_discord_username,
                     discord_avatar: player.claimed_discord_avatar,
+                    passion_balance: passionRow?.balance ?? null,
+                    total_earned: passionRow?.total_earned ?? null,
                 },
                 allTimeStats,
                 leagueBreakdowns,

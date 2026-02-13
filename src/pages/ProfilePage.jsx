@@ -4,8 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import { profileService } from '../services/database'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
 import { getTierColor } from '../config/challengeTiers'
+import { getRank, formatRank } from '../config/ranks'
+import { getDivisionImage } from '../utils/divisionImages'
+import { getLeagueLogo } from '../utils/leagueImages'
+import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
 import SimpleNav from '../components/layout/SimpleNav'
+import passionCoin from '../assets/passion/passion.png'
 
 const ProfilePage = () => {
     const { playerSlug } = useParams()
@@ -142,42 +147,59 @@ const ProfilePage = () => {
                     )}
 
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1 flex-wrap">
-                            <h1 className="font-heading text-3xl font-bold text-(--color-text)">
-                                {player.name}
-                            </h1>
-                            {player.is_claimed && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
-                                    <UserCheck className="w-3.5 h-3.5" />
-                                    Verified
-                                </span>
-                            )}
-                            {isOwnProfile && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium">
-                                    Your Profile
-                                </span>
-                            )}
-                        </div>
+                        <h1 className="font-heading text-3xl font-bold text-(--color-text) mb-1">
+                            {player.name}
+                        </h1>
                         {player.discord_username && (
                             <p className="text-sm text-(--color-text-secondary)">@{player.discord_username}</p>
                         )}
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        {player.tracker_url && (
-                            <a
-                                href={player.tracker_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-sm bg-(--color-accent) text-(--color-primary) px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
-                            >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                                Tracker
-                            </a>
-                        )}
-                    </div>
+                    {/* Rank */}
+                    {player.total_earned != null && (
+                        <Link to="/challenges" className="flex flex-col items-center gap-1 flex-shrink-0 hover:opacity-80 transition-opacity">
+                            <RankBadge totalEarned={player.total_earned} size="lg" />
+                            <span className="text-xs font-semibold text-(--color-text-secondary)">
+                                {formatRank(getRank(player.total_earned))}
+                            </span>
+                        </Link>
+                    )}
                 </div>
+            </div>
+
+            {/* Profile Tags */}
+            <div className="flex items-center gap-2 mb-6">
+                {player.is_claimed && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
+                        <UserCheck className="w-3.5 h-3.5" />
+                        Verified
+                    </span>
+                )}
+                {isOwnProfile && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium">
+                        Your Profile
+                    </span>
+                )}
+                {player.tracker_url && (
+                    <a
+                        href={player.tracker_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium hover:bg-(--color-accent)/20 transition-colors"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Tracker
+                    </a>
+                )}
+                {player.passion_balance != null && (
+                    <Link
+                        to="/challenges"
+                        className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-bold hover:bg-(--color-accent)/20 transition-colors"
+                    >
+                        <img src={passionCoin} alt="" className="w-4 h-4" />
+                        {new Intl.NumberFormat().format(player.passion_balance)}
+                    </Link>
+                )}
             </div>
 
             {/* Badges */}
@@ -343,15 +365,12 @@ const ProfilePage = () => {
                             <table className="min-w-full divide-y divide-white/10">
                                 <thead className="bg-white/5">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">League</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Division</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Season</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Team</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Games</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">W-L</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">KDA</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider"></th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Season</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Team</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Games</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">W-L</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">KDA</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -364,32 +383,40 @@ const ProfilePage = () => {
                                         const sKda = sDeaths === 0
                                             ? sKills + (sAssists / 2)
                                             : (sKills + (sAssists / 2)) / sDeaths
+                                        const divImg = getDivisionImage(season.league_slug, season.division_slug, season.division_tier)
+                                        const leagueLogo = getLeagueLogo(season.league_slug)
+                                        const seasonNum = season.season_name?.match(/\d+/)?.[0]
+                                        const seasonPath = `/${season.league_slug}/${season.division_slug}/players/${player.slug}`
 
                                         return (
-                                            <tr key={season.season_id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <div className="flex items-center gap-2">
-                                                        {season.league_color && (
+                                            <tr key={season.season_id} className={`${index % 2 === 0 ? '' : 'bg-white/[0.02]'} group cursor-pointer hover:bg-white/[0.04] transition-colors`} onClick={() => navigate(seasonPath)}>
+                                                <td className="px-3 py-3 whitespace-nowrap">
+                                                    <div
+                                                        className="inline-flex items-center gap-1.5"
+                                                        title={`${season.league_name} · ${season.division_name} · ${season.season_name}`}
+                                                    >
+                                                        {leagueLogo ? (
+                                                            <img src={leagueLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
+                                                        ) : season.league_color && (
                                                             <div
                                                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                                                 style={{ backgroundColor: season.league_color }}
                                                             />
                                                         )}
-                                                        <span className="text-sm text-(--color-text)">{season.league_name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-(--color-text) whitespace-nowrap">
-                                                    {season.division_name}
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <div className="flex items-center gap-1.5">
+                                                        {divImg ? (
+                                                            <img src={divImg} alt={season.division_name || ''} className="w-5 h-5 object-contain" />
+                                                        ) : season.division_name && (
+                                                            <span className="text-xs font-medium text-(--color-text)">{season.division_name}</span>
+                                                        )}
+                                                        {seasonNum && (
+                                                            <span className="text-xs font-medium text-(--color-text-secondary)">S{seasonNum}</span>
+                                                        )}
                                                         {season.is_active && (
                                                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
                                                         )}
-                                                        <span className="text-sm text-(--color-text)">{season.season_name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                <td className="px-3 py-3 whitespace-nowrap">
                                                     {season.team_name ? (
                                                         <div className="flex items-center gap-2">
                                                             <div
@@ -402,16 +429,16 @@ const ProfilePage = () => {
                                                         <span className="text-sm text-(--color-text-secondary)">—</span>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 text-center text-sm text-(--color-text)">
+                                                <td className="px-3 py-3 text-center text-sm text-(--color-text)">
                                                     {season.role || '—'}
                                                 </td>
-                                                <td className="px-4 py-3 text-center text-sm text-(--color-text)">
+                                                <td className="px-3 py-3 text-center text-sm text-(--color-text)">
                                                     {sGames}
                                                 </td>
-                                                <td className="px-4 py-3 text-center text-sm text-(--color-text)">
+                                                <td className="px-3 py-3 text-center text-sm text-(--color-text)">
                                                     {sGames > 0 ? `${sWins}-${sGames - sWins}` : '—'}
                                                 </td>
-                                                <td className="px-4 py-3 text-center text-sm font-medium">
+                                                <td className="px-3 py-3 text-center text-sm font-medium">
                                                     <span className={
                                                         sGames === 0 ? 'text-(--color-text-secondary)' :
                                                         sKda >= 2 ? 'text-green-400' :
@@ -419,14 +446,6 @@ const ProfilePage = () => {
                                                     }>
                                                         {sGames > 0 ? sKda.toFixed(2) : '—'}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right whitespace-nowrap">
-                                                    <Link
-                                                        to={`/${season.league_slug}/${season.division_slug}/players/${player.slug}`}
-                                                        className="text-(--color-accent) hover:opacity-80 transition-opacity text-xs font-medium"
-                                                    >
-                                                        View Season →
-                                                    </Link>
                                                 </td>
                                             </tr>
                                         )
@@ -451,7 +470,7 @@ const ProfilePage = () => {
                                     <tr>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Date</th>
                                         {!selectedLeague && (
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">League</th>
+                                            <th className="px-2 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Season</th>
                                         )}
                                         <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Opponent</th>
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase"></th>
@@ -463,7 +482,6 @@ const ProfilePage = () => {
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">A</th>
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">Dmg</th>
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">Mit</th>
-                                        <th className="pl-2 pr-3 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -472,28 +490,41 @@ const ProfilePage = () => {
                                         const opponent = game.player_team_id === game.team1_id
                                             ? { name: game.team2_name, color: game.team2_color, slug: game.team2_slug }
                                             : { name: game.team1_name, color: game.team1_color, slug: game.team1_slug }
+                                        const divImg = getDivisionImage(game.league_slug, game.division_slug, game.division_tier)
+                                        const leagueLogo = getLeagueLogo(game.league_slug)
+                                        const seasonNum = game.season_name?.match(/\d+/)?.[0]
+                                        const matchPath = `/${game.league_slug}/${game.division_slug}/matches/${game.match_id}`
 
                                         return (
-                                            <tr key={game.game_id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                                <td className="px-3 py-2.5 text-sm whitespace-nowrap">
-                                                    <Link
-                                                        to={`/${game.league_slug}/${game.division_slug}/matches/${game.match_id}`}
-                                                        className="text-(--color-text-secondary) hover:text-(--color-accent) transition-colors"
-                                                    >
-                                                        {formatDate(game.date)}
-                                                    </Link>
+                                            <tr key={game.game_id} className={`${index % 2 === 0 ? '' : 'bg-white/[0.02]'} group cursor-pointer hover:bg-white/[0.04] transition-colors`} onClick={() => navigate(matchPath)}>
+                                                <td className="px-3 py-2.5 text-sm whitespace-nowrap text-(--color-text-secondary) group-hover:text-(--color-accent) transition-colors">
+                                                    {formatDate(game.date)}
                                                 </td>
                                                 {!selectedLeague && (
-                                                    <td className="px-3 py-2.5 whitespace-nowrap">
-                                                        <div className="flex items-center gap-1.5">
-                                                            {game.league_color && (
+                                                    <td className="px-2 py-2.5 whitespace-nowrap">
+                                                        <Link
+                                                            to={`/${game.league_slug}/${game.division_slug}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                                                            title={`${game.league_name} · ${game.division_name} · ${game.season_name}`}
+                                                        >
+                                                            {leagueLogo ? (
+                                                                <img src={leagueLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
+                                                            ) : game.league_color && (
                                                                 <div
-                                                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                                                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                                                     style={{ backgroundColor: game.league_color }}
                                                                 />
                                                             )}
-                                                            <span className="text-xs text-(--color-text-secondary)">{game.league_name}</span>
-                                                        </div>
+                                                            {divImg ? (
+                                                                <img src={divImg} alt={game.division_name || ''} className="w-5 h-5 object-contain" />
+                                                            ) : game.division_name && (
+                                                                <span className="text-xs font-medium text-(--color-text)">{game.division_name}</span>
+                                                            )}
+                                                            {seasonNum && (
+                                                                <span className="text-xs font-medium text-(--color-text-secondary)">S{seasonNum}</span>
+                                                            )}
+                                                        </Link>
                                                     </td>
                                                 )}
                                                 <td className="px-3 py-2.5 whitespace-nowrap">
@@ -535,14 +566,6 @@ const ProfilePage = () => {
                                                 </td>
                                                 <td className="px-2 py-2.5 text-center text-sm text-(--color-text)">
                                                     {game.mitigated != null ? formatNumber(game.mitigated) : '—'}
-                                                </td>
-                                                <td className="pl-2 pr-3 py-2.5 text-sm text-right whitespace-nowrap">
-                                                    <Link
-                                                        to={`/${game.league_slug}/${game.division_slug}/matches/${game.match_id}`}
-                                                        className="text-(--color-accent) hover:opacity-80 transition-opacity text-xs font-medium"
-                                                    >
-                                                        Match →
-                                                    </Link>
                                                 </td>
                                             </tr>
                                         )

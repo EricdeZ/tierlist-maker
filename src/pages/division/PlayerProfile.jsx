@@ -3,9 +3,12 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
-import { statsService } from '../../services/database'
+import { statsService, profileService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
-import { UserCheck, User } from 'lucide-react'
+import RankBadge from '../../components/RankBadge'
+import { getRank, formatRank } from '../../config/ranks'
+import { UserCheck, User, ExternalLink } from 'lucide-react'
+import passionCoin from '../../assets/passion/passion.png'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -28,6 +31,8 @@ const PlayerProfile = () => {
 
     const [gameHistory, setGameHistory] = useState([])
     const [playerStats, setPlayerStats] = useState(null)
+    const [totalEarned, setTotalEarned] = useState(null)
+    const [passionBalance, setPassionBalance] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
@@ -44,9 +49,10 @@ const PlayerProfile = () => {
             setLoading(true)
             setError(null)
             try {
-                const [games, allStats] = await Promise.all([
+                const [games, allStats, profileData] = await Promise.all([
                     statsService.getPlayerGameStats(season.id, player.id),
                     statsService.getPlayerStats(season.id),
+                    profileService.getPlayerProfile(player.slug).catch(() => null),
                 ])
                 if (cancelled) return
 
@@ -55,6 +61,8 @@ const PlayerProfile = () => {
                 // Find this player's aggregate stats
                 const stats = Array.isArray(allStats) ? allStats.find(s => s.id === player.id) : null
                 setPlayerStats(stats || null)
+                setTotalEarned(profileData?.player?.total_earned ?? null)
+                setPassionBalance(profileData?.player?.passion_balance ?? null)
             } catch (err) {
                 if (!cancelled) setError(err.message)
             } finally {
@@ -129,7 +137,7 @@ const PlayerProfile = () => {
                             <div className="w-3 h-12 rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: team.color }} />
                         </Link>
                     )}
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                         {roleImg && (
                             <img src={roleImg} alt={player.role} className="w-10 h-10 object-contain" />
                         )}
@@ -153,66 +161,84 @@ const PlayerProfile = () => {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <Link
-                            to={`/profile/${player.slug}`}
-                            className="text-sm bg-white/10 text-(--color-text) px-4 py-2 rounded-lg font-semibold hover:bg-white/15 transition-colors"
-                        >
-                            Full Profile
+
+                    {/* Rank */}
+                    {totalEarned != null && (
+                        <Link to="/challenges" className="flex flex-col items-center gap-1 flex-shrink-0 hover:opacity-80 transition-opacity">
+                            <RankBadge totalEarned={totalEarned} size="lg" />
+                            <span className="text-xs font-semibold text-(--color-text-secondary)">
+                                {formatRank(getRank(totalEarned))}
+                            </span>
                         </Link>
-                        {player.tracker_url && (
-                            <a
-                                href={player.tracker_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm bg-(--color-accent) text-(--color-primary) px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity"
-                            >
-                                View Tracker ↗
-                            </a>
-                        )}
-
-                        {/* Claim / Profile badge */}
-                        {!authLoading && (() => {
-                            const isOwnProfile = linkedPlayer && linkedPlayer.id === player.id
-                            if (isOwnProfile) {
-                                return (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
-                                        <UserCheck className="w-4 h-4" />
-                                        Your Profile
-                                    </span>
-                                )
-                            }
-
-                            // Don't show claim button if another user already claimed this player
-                            // (we don't have that info yet, but we can check if current user has no link)
-                            if (!user) {
-                                return (
-                                    <button
-                                        onClick={login}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors"
-                                    >
-                                        <User className="w-4 h-4" />
-                                        Claim Profile
-                                    </button>
-                                )
-                            }
-
-                            if (!linkedPlayer) {
-                                return (
-                                    <button
-                                        onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal', { detail: { playerId: player.id, playerName: player.name } }))}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors"
-                                    >
-                                        <User className="w-4 h-4" />
-                                        Claim This Profile
-                                    </button>
-                                )
-                            }
-
-                            return null
-                        })()}
-                    </div>
+                    )}
                 </div>
+            </div>
+
+            {/* Profile Tags */}
+            <div className="flex items-center gap-2 mb-6">
+                <Link
+                    to={`/profile/${player.slug}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-(--color-text) text-xs font-medium hover:bg-white/10 transition-colors"
+                >
+                    Full Profile
+                </Link>
+                {!authLoading && (() => {
+                    const isOwnProfile = linkedPlayer && linkedPlayer.id === player.id
+                    if (isOwnProfile) {
+                        return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
+                                <UserCheck className="w-3.5 h-3.5" />
+                                Your Profile
+                            </span>
+                        )
+                    }
+
+                    if (!user) {
+                        return (
+                            <button
+                                onClick={login}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-medium transition-colors"
+                            >
+                                <User className="w-3.5 h-3.5" />
+                                Claim Profile
+                            </button>
+                        )
+                    }
+
+                    if (!linkedPlayer) {
+                        return (
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal', { detail: { playerId: player.id, playerName: player.name } }))}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-medium transition-colors"
+                            >
+                                <User className="w-3.5 h-3.5" />
+                                Claim This Profile
+                            </button>
+                        )
+                    }
+
+                    return null
+                })()}
+                {player.tracker_url && (
+                    <a
+                        href={player.tracker_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium hover:bg-(--color-accent)/20 transition-colors"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Tracker
+                    </a>
+                )}
+                {passionBalance != null && (
+                    <Link
+                        to="/challenges"
+                        className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-bold hover:bg-(--color-accent)/20 transition-colors"
+                    >
+                        <img src={passionCoin} alt="" className="w-4 h-4" />
+                        {new Intl.NumberFormat().format(passionBalance)}
+                    </Link>
+                )}
             </div>
 
             {loading ? (

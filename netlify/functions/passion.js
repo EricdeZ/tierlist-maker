@@ -131,13 +131,15 @@ async function getLeaderboard(sql, period) {
             SELECT pt.user_id,
                    SUM(pt.amount)::integer as recent_earned,
                    pb.total_earned, pb.current_streak,
-                   u.discord_username, u.discord_avatar, u.discord_id
+                   u.discord_username, u.discord_avatar, u.discord_id,
+                   p.slug AS player_slug
             FROM passion_transactions pt
             JOIN users u ON u.id = pt.user_id
             LEFT JOIN passion_balances pb ON pb.user_id = pt.user_id
+            LEFT JOIN players p ON p.id = u.linked_player_id
             WHERE pt.amount > 0 AND pt.created_at >= NOW() - INTERVAL '14 days'
             GROUP BY pt.user_id, pb.total_earned, pb.current_streak,
-                     u.discord_username, u.discord_avatar, u.discord_id
+                     u.discord_username, u.discord_avatar, u.discord_id, p.slug
             ORDER BY recent_earned DESC
             LIMIT 50
         `
@@ -150,6 +152,7 @@ async function getLeaderboard(sql, period) {
                 discordUsername: row.discord_username,
                 discordAvatar: row.discord_avatar,
                 discordId: row.discord_id,
+                playerSlug: row.player_slug || null,
                 totalEarned: row.total_earned || 0,
                 recentEarned: row.recent_earned,
                 currentStreak: row.current_streak || 0,
@@ -163,9 +166,11 @@ async function getLeaderboard(sql, period) {
     // Lifetime (default)
     const rows = await sql`
         SELECT pb.user_id, pb.total_earned, pb.current_streak,
-               u.discord_username, u.discord_avatar, u.discord_id
+               u.discord_username, u.discord_avatar, u.discord_id,
+               p.slug AS player_slug
         FROM passion_balances pb
         JOIN users u ON u.id = pb.user_id
+        LEFT JOIN players p ON p.id = u.linked_player_id
         WHERE pb.total_earned > 0
         ORDER BY pb.total_earned DESC
         LIMIT 50
@@ -179,6 +184,7 @@ async function getLeaderboard(sql, period) {
             discordUsername: row.discord_username,
             discordAvatar: row.discord_avatar,
             discordId: row.discord_id,
+            playerSlug: row.player_slug || null,
             totalEarned: row.total_earned,
             currentStreak: row.current_streak,
             rank: { name: rank.name, division: rank.division, display: formatRank(rank) },
