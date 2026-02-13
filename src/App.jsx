@@ -42,6 +42,7 @@ import TierListPage from "./pages/TierListPage.jsx";
 import PassionLeaderboard from "./pages/PassionLeaderboard.jsx";
 import Challenges from "./pages/Challenges.jsx";
 import CoinFlip from "./pages/CoinFlip.jsx";
+import PassionShop from "./pages/PassionShop.jsx";
 import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
 import DebugTools from "./pages/admin/DebugTools.jsx";
 
@@ -78,6 +79,7 @@ function App() {
                             <Route path="leaderboard" element={<PassionLeaderboard />} />
                             <Route path="challenges" element={<Challenges />} />
                             <Route path="coinflip" element={<CoinFlip />} />
+                            <Route path="shop" element={<PassionShop />} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

@@ -376,6 +376,14 @@ export default function PassionDisplay() {
                                     className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                     Coin Flip
                                 </Link>
+                                <Link to="/shop" onClick={() => setOpen(false)}
+                                    className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                    Passion Shop
+                                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                        style={{ background: 'rgba(248,197,106,0.15)', color: '#f8c56a' }}>
+                                        Soon
+                                    </span>
+                                </Link>
                             </div>
                         </div>
                     )}

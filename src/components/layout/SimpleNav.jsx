@@ -5,7 +5,7 @@ import { leagueService } from '../../services/database'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
-import { Home, User, Wrench, ChevronDown, ListOrdered, Swords, Trophy, Coins } from 'lucide-react'
+import { Home, User, Wrench, ChevronDown, ListOrdered, Swords, Trophy, Coins, ShoppingBag } from 'lucide-react'
 
 export default function SimpleNav({ title }) {
     const { user, linkedPlayer } = useAuth()
@@ -189,6 +189,14 @@ export default function SimpleNav({ title }) {
                                             <Coins className="w-4 h-4 text-(--color-text-secondary)" />
                                             Coin Flip
                                         </Link>
+                                        <Link
+                                            to="/shop"
+                                            onClick={() => setToolsOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                                        >
+                                            <ShoppingBag className="w-4 h-4 text-(--color-text-secondary)" />
+                                            Passion Shop
+                                        </Link>
                                     </div>
                                 </div>
                             )}
@@ -293,6 +301,13 @@ export default function SimpleNav({ title }) {
                         >
                             <Coins className="w-4 h-4" />
                             Coin Flip
+                        </Link>
+                        <Link
+                            to="/shop"
+                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                        >
+                            <ShoppingBag className="w-4 h-4" />
+                            Passion Shop
                         </Link>
                     </div>
                 </div>
