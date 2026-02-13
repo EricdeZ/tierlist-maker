@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { usePlayerStats } from '../hooks/usePlayerStats'
 import { useDivision } from '../context/DivisionContext'
 import { ChevronRight } from 'lucide-react'
+import PlayerSearch from './PlayerSearch'
 
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
@@ -201,16 +202,13 @@ const PlayerList = () => {
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label htmlFor="search" className="block text-sm font-medium text-(--color-text-secondary) mb-1">
-                            Search Players
-                        </label>
-                        <input
-                            id="search"
-                            type="text"
-                            placeholder="Search by name..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-3 py-2 bg-(--color-primary) border border-white/10 rounded-md text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent)/50"
+                        <PlayerSearch
+                            players={processedPlayers || []}
+                            playerSlugMap={playerSlugMap}
+                            basePath={basePath}
+                            roleImages={roleImages}
+                            searchTerm={searchTerm}
+                            onSearchChange={setSearchTerm}
                         />
                     </div>
                     <div>
