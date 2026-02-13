@@ -17,6 +17,7 @@ export default function ClaimProfileModal() {
     const [message, setMessage] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState(null) // { success, error }
+    const [loadError, setLoadError] = useState(null)
     const modalRef = useRef(null)
 
     // Listen for custom event to open modal
@@ -28,6 +29,7 @@ export default function ClaimProfileModal() {
             setSearch('')
             setMessage('')
             setResult(null)
+            setLoadError(null)
             setOpen(true)
         }
         window.addEventListener('open-claim-modal', handler)
@@ -40,13 +42,18 @@ export default function ClaimProfileModal() {
 
         const fetchPlayers = async () => {
             setLoading(true)
+            setLoadError(null)
             try {
                 const res = await fetch(`${API_BASE}/claim-manage?list=players`, { headers: getAuthHeaders() })
-                if (!res.ok) throw new Error('Failed to load players')
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    throw new Error(err.error || `Failed to load players (${res.status})`)
+                }
                 const data = await res.json()
                 setPlayers(data.players || [])
-            } catch {
+            } catch (err) {
                 setPlayers([])
+                setLoadError(err.message)
             } finally {
                 setLoading(false)
             }
@@ -147,9 +154,9 @@ export default function ClaimProfileModal() {
                                 Select the player profile that belongs to you. An admin will review and approve your claim.
                             </p>
 
-                            {result?.error && (
+                            {(result?.error || loadError) && (
                                 <div className="mb-4 p-3 rounded-lg bg-red-900/20 border border-red-500/20 text-sm text-red-400">
-                                    {result.error}
+                                    {result?.error || loadError}
                                 </div>
                             )}
 
@@ -170,6 +177,8 @@ export default function ClaimProfileModal() {
                                     <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10 mb-4">
                                         {loading ? (
                                             <div className="p-4 text-center text-sm text-(--color-text-secondary)">Loading players...</div>
+                                        ) : loadError ? (
+                                            <div className="p-4 text-center text-sm text-red-400">Failed to load players</div>
                                         ) : filteredPlayers.length === 0 ? (
                                             <div className="p-4 text-center text-sm text-(--color-text-secondary)">No players found</div>
                                         ) : (
