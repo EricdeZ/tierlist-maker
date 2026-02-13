@@ -88,6 +88,7 @@ async function handleFlip(sql, user) {
             UPDATE coinflip_streaks SET
                 current_streak = current_streak + 1,
                 best_streak = GREATEST(best_streak, current_streak + 1),
+                best_streak_at = CASE WHEN current_streak + 1 > best_streak THEN NOW() ELSE best_streak_at END,
                 total_flips = total_flips + 1,
                 total_heads = total_heads + 1,
                 last_flip_at = NOW(),
@@ -184,7 +185,7 @@ async function getLeaderboard(sql) {
         JOIN users u ON u.id = cs.user_id
         LEFT JOIN passion_balances pb ON pb.user_id = cs.user_id
         WHERE cs.best_streak > 0
-        ORDER BY cs.best_streak DESC, cs.total_heads DESC
+        ORDER BY cs.best_streak DESC, cs.best_streak_at DESC NULLS LAST, cs.total_heads DESC
         LIMIT 25
     `
 

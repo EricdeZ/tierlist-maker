@@ -17,7 +17,7 @@ const FLIP_FRAMES = [flip1, flip2, flip3, passionCoin]
 
 export default function CoinFlip() {
     const { user, login } = useAuth()
-    const { balance, refreshBalance, loading: passionLoading } = usePassion()
+    const { balance, refreshBalance, canClaimDaily, claimDaily, currentStreak: passionStreak, loading: passionLoading } = usePassion()
 
     const [flipping, setFlipping] = useState(false)
     const [lastResult, setLastResult] = useState(null)       // 'heads' | 'tails' | null
@@ -35,6 +35,8 @@ export default function CoinFlip() {
     const [shake, setShake] = useState(false)
     const [streakBroken, setStreakBroken] = useState(null)    // streak value that was broken
     const [mode3d, setMode3d] = useState(() => localStorage.getItem('coinflip_3d') !== 'false')
+    const [claimingDaily, setClaimingDaily] = useState(false)
+    const [dailyClaimResult, setDailyClaimResult] = useState(null)
     const [landing, setLanding] = useState(false)             // 3D landing phase
 
     // Refs for 2D frame cycling
@@ -52,6 +54,15 @@ export default function CoinFlip() {
         const next = !mode3d
         setMode3d(next)
         localStorage.setItem('coinflip_3d', String(next))
+    }
+
+    const handleClaimDaily = async () => {
+        setClaimingDaily(true)
+        const result = await claimDaily()
+        setClaimingDaily(false)
+        if (result && !result.alreadyClaimed) {
+            setDailyClaimResult(result)
+        }
     }
 
     // Load leaderboard
@@ -453,6 +464,27 @@ export default function CoinFlip() {
                                         </span>
                                         <span className="text-xs text-(--color-text-secondary)/40">available</span>
                                     </div>
+
+                                    {/* Daily claim */}
+                                    {canClaimDaily && !dailyClaimResult && (
+                                        <button
+                                            onClick={handleClaimDaily}
+                                            disabled={claimingDaily}
+                                            className="w-full max-w-[200px] mb-3 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 hover:opacity-90 active:scale-95 cursor-pointer"
+                                            style={{ background: 'linear-gradient(135deg, #c4922e, #f8c56a)', color: '#0a0f1a' }}
+                                        >
+                                            {claimingDaily ? 'Claiming...' : `Claim Daily Passion (${passionStreak}d streak)`}
+                                        </button>
+                                    )}
+                                    {dailyClaimResult && (
+                                        <div className="text-center mb-3 text-xs">
+                                            <span style={{ color: '#f8c56a' }} className="font-bold">+{dailyClaimResult.earned}</span>
+                                            <span className="text-(--color-text-secondary) ml-1">daily claimed!</span>
+                                            {dailyClaimResult.streakBonus > 0 && (
+                                                <span className="text-(--color-text-secondary)/60 ml-1">(+{dailyClaimResult.streakBonus} streak bonus)</span>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Flip button */}
                                     <button

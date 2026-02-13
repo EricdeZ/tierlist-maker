@@ -269,7 +269,7 @@ export default function PassionDisplay() {
                 <div ref={menuRef} className="relative">
                     <button
                         onClick={() => { setOpen(!open); setClaimResult(null) }}
-                        className="flex items-center gap-1.5 rounded-lg hover:bg-white/10 transition-colors px-2 py-1"
+                        className="relative flex items-center gap-1.5 rounded-lg hover:bg-white/10 transition-colors px-2 py-1"
                     >
                         <RankBadge rank={rank} size="sm" />
                         <img id="passion-balance-coin" src={claiming ? FLIP_FRAMES[flipFrame] : passionCoin} alt="Passion"
@@ -277,6 +277,12 @@ export default function PassionDisplay() {
                         <span className="text-sm font-semibold text-(--color-accent) tabular-nums min-w-[2ch]">
                             {displayBalance}
                         </span>
+                        {canClaimDaily && !claimResult && (
+                            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#f8c56a' }} />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: '#f8c56a' }} />
+                            </span>
+                        )}
                     </button>
 
                     {open && (
