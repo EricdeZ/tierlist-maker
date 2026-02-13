@@ -14,6 +14,7 @@ import flip3 from '../assets/passion/flipping3.png'
 import passionsplosion from '../assets/passion/passionsplosion.png'
 
 const FLIP_FRAMES = [flip1, flip2, flip3, passionCoin]
+const FLIP_CYCLE_2D = [passionCoin, flip1, flip2, flip3, passionTails, flip3, flip2, flip1]
 
 export default function CoinFlip() {
     const { user, login } = useAuth()
@@ -39,8 +40,8 @@ export default function CoinFlip() {
     const [dailyClaimResult, setDailyClaimResult] = useState(null)
     const [landing, setLanding] = useState(false)             // 3D landing phase
 
-    // Refs for 2D frame cycling
-    const flipInterval = useRef(null)
+    // Ref for 2D frame cycling (rAF)
+    const flip2dRafRef = useRef(null)
 
     // Refs for 3D JS-driven rotation
     const coinInnerRef = useRef(null)
@@ -99,20 +100,38 @@ export default function CoinFlip() {
         }
     }, [balance, flipping, landing])
 
-    // 2D: Coin flip frame animation
-    useEffect(() => {
-        if (!mode3d && flipping) {
-            let frame = 0
-            flipInterval.current = setInterval(() => {
-                frame = (frame + 1) % FLIP_FRAMES.length
+    // 2D: variable-speed frame cycling via rAF (accelerate → peak → decelerate)
+    const start2dFlip = () => {
+        const startTime = performance.now()
+        let lastFrameTime = startTime
+        let frame = 0
+        setFlipFrame(0)
+
+        const cycle = (now) => {
+            const elapsed = now - startTime
+            const sinceLastFrame = now - lastFrameTime
+
+            let interval
+            if (elapsed < 250) {
+                interval = 130 - (elapsed / 250) * 75   // 130→55ms (accelerating)
+            } else if (elapsed < 700) {
+                interval = 55                            // peak speed
+            } else {
+                const t = Math.min((elapsed - 700) / 350, 1)
+                interval = 55 + t * 140                  // 55→195ms (decelerating)
+            }
+
+            if (sinceLastFrame >= interval) {
+                frame = (frame + 1) % FLIP_CYCLE_2D.length
                 setFlipFrame(frame)
-            }, 70)
-        } else {
-            clearInterval(flipInterval.current)
-            setFlipFrame(0)
+                lastFrameTime = now
+            }
+
+            flip2dRafRef.current = requestAnimationFrame(cycle)
         }
-        return () => clearInterval(flipInterval.current)
-    }, [flipping, mode3d])
+
+        flip2dRafRef.current = requestAnimationFrame(cycle)
+    }
 
     // 3D: start epic vertical flip — coin launches up towards the camera
     const startSpin3d = () => {
@@ -198,9 +217,12 @@ export default function CoinFlip() {
         setTimeout(() => setLanding(false), 800)
     }
 
-    // Cleanup 3D animation on unmount
+    // Cleanup animations on unmount
     useEffect(() => {
-        return () => cancelAnimationFrame(spinRafRef.current)
+        return () => {
+            cancelAnimationFrame(spinRafRef.current)
+            cancelAnimationFrame(flip2dRafRef.current)
+        }
     }, [])
 
     const displayBalance = localBalance !== null ? localBalance : balance
@@ -218,6 +240,8 @@ export default function CoinFlip() {
         // Start the appropriate animation immediately
         if (mode3d) {
             startSpin3d()
+        } else {
+            start2dFlip()
         }
 
         const prevStreak = currentStreak
@@ -225,11 +249,12 @@ export default function CoinFlip() {
         // Fire API + minimum animation time in parallel
         const [data] = await Promise.all([
             coinflipService.flip(),
-            new Promise(resolve => setTimeout(resolve, 550)),
+            new Promise(resolve => setTimeout(resolve, mode3d ? 550 : 900)),
         ])
 
         if (data.error === 'insufficient_balance') {
             if (mode3d) cancelAnimationFrame(spinRafRef.current)
+            else cancelAnimationFrame(flip2dRafRef.current)
             setFlipping(false)
             setLocalBalance(data.balance)
             return
@@ -278,7 +303,13 @@ export default function CoinFlip() {
             // Reveal when the coin lands (matches the 0.7s spin deceleration)
             setTimeout(revealResult, 700)
         } else {
-            revealResult()
+            // Stop frame cycling, begin landing phase
+            cancelAnimationFrame(flip2dRafRef.current)
+            setLanding(true)
+            setTimeout(() => {
+                revealResult()
+                setTimeout(() => setLanding(false), 400)
+            }, 50)
         }
     }
 
@@ -288,7 +319,7 @@ export default function CoinFlip() {
     let coinImage = passionCoin
     if (!mode3d) {
         if (flipping) {
-            coinImage = FLIP_FRAMES[flipFrame]
+            coinImage = FLIP_CYCLE_2D[flipFrame % FLIP_CYCLE_2D.length]
         } else if (lastResult === 'heads') {
             coinImage = passionCoin
         } else if (lastResult === 'tails') {
@@ -396,17 +427,19 @@ export default function CoinFlip() {
                                                 </div>
                                             ) : (
                                                 /* ═══ 2D Coin ═══ */
-                                                <img
-                                                    src={coinImage}
-                                                    alt="Passion Coin"
-                                                    className={`w-40 h-40 sm:w-52 sm:h-52 object-contain transition-all duration-300 ${
-                                                        lastResult === 'heads' && !flipping
-                                                            ? 'drop-shadow-[0_0_20px_rgba(74,222,128,0.4)]'
-                                                            : lastResult === 'tails' && !flipping
-                                                                ? 'drop-shadow-[0_0_20px_rgba(248,113,113,0.4)]'
-                                                                : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.2)]'
-                                                    }`}
-                                                />
+                                                <div className={flipping || landing ? 'animate-coin-2d-flip' : ''}>
+                                                    <img
+                                                        src={coinImage}
+                                                        alt="Passion Coin"
+                                                        className={`w-40 h-40 sm:w-52 sm:h-52 object-contain transition-[filter] duration-300 ${
+                                                            lastResult === 'heads' && !flipping
+                                                                ? 'drop-shadow-[0_0_20px_rgba(74,222,128,0.4)]'
+                                                                : lastResult === 'tails' && !flipping
+                                                                    ? 'drop-shadow-[0_0_20px_rgba(248,113,113,0.4)]'
+                                                                    : 'drop-shadow-[0_0_12px_rgba(248,197,106,0.2)]'
+                                                        }`}
+                                                    />
+                                                </div>
                                             )}
                                             {showExplosion && (
                                                 <img src={passionsplosion} alt=""
@@ -666,6 +699,25 @@ export default function CoinFlip() {
                     background: radial-gradient(ellipse, rgba(248,197,106,0.15) 0%, transparent 70%);
                     opacity: 0.15;
                     transform: scaleX(1) scaleY(0.5);
+                }
+
+                /* ═══ 2D Coin — arc with bounce ═══ */
+                @keyframes coin-2d-flip {
+                    0%   { transform: translateY(0) scale(1); filter: brightness(1); }
+                    12%  { transform: translateY(-50px) scale(1.1); }
+                    25%  { transform: translateY(-80px) scale(1.18); filter: brightness(1.12); }
+                    38%  { transform: translateY(-88px) scale(1.2); filter: brightness(1.15); }
+                    52%  { transform: translateY(-78px) scale(1.16); filter: brightness(1.1); }
+                    66%  { transform: translateY(-40px) scale(1.08); filter: brightness(1.05); }
+                    78%  { transform: translateY(-5px) scale(1); filter: brightness(1); }
+                    84%  { transform: translateY(0) scale(0.98); }
+                    89%  { transform: translateY(-10px) scale(1.03); }
+                    94%  { transform: translateY(0) scale(1); }
+                    97%  { transform: translateY(-3px) scale(1.01); }
+                    100% { transform: translateY(0) scale(1); filter: brightness(1); }
+                }
+                .animate-coin-2d-flip {
+                    animation: coin-2d-flip 1.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
                 }
 
                 /* ═══ Shared animations ═══ */
