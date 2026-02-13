@@ -164,8 +164,8 @@ function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCou
             <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="flex gap-1.5 overflow-x-auto py-1 tier-filter-scroll"
-                style={{ flexWrap: canScroll ? 'nowrap' : 'wrap' }}
+                className="flex gap-1.5 overflow-x-auto py-1 tier-filter-scroll sm:flex-wrap"
+                style={canScroll ? { paddingRight: '2.5rem' } : undefined}
             >
                 <button
                     onClick={() => setActiveTier('all')}
@@ -206,15 +206,15 @@ function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCou
                 )}
             </div>
 
-            {/* Fade + arrow hint */}
+            {/* Fade + wiggle arrow hint */}
             {canScroll && !atEnd && (
                 <button
                     onClick={scrollRight}
-                    className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-end cursor-pointer"
-                    style={{ background: 'linear-gradient(to right, transparent, var(--color-primary) 70%)' }}
+                    className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-end cursor-pointer"
+                    style={{ background: 'linear-gradient(to right, transparent, var(--color-primary) 60%)' }}
                     aria-label="Scroll for more tiers"
                 >
-                    <svg className="w-4 h-4 text-(--color-text-secondary)/70 animate-pulse mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-4 h-4 text-(--color-text-secondary) tier-arrow-wiggle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                 </button>
@@ -364,6 +364,14 @@ export default function Challenges() {
                 }
                 .tier-filter-scroll::-webkit-scrollbar {
                     display: none;
+                }
+                @keyframes tier-arrow-wiggle {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(3px); }
+                    75% { transform: translateX(-1px); }
+                }
+                .tier-arrow-wiggle {
+                    animation: tier-arrow-wiggle 1.2s ease-in-out infinite;
                 }
                 @keyframes card-enter {
                     0% { opacity: 0; transform: translateY(16px); }
