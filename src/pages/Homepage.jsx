@@ -361,9 +361,18 @@ const Homepage = () => {
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-3 flex-wrap">
-                                                <h3 className={`font-heading text-2xl font-bold ${isActive ? 'text-(--color-text)' : 'text-(--color-text)/40'}`}>
-                                                    {league.name}
-                                                </h3>
+                                                {isActive ? (
+                                                    <Link
+                                                        to={`/${league.slug}`}
+                                                        className="font-heading text-2xl font-bold text-(--color-text) hover:text-(--color-accent) transition-colors"
+                                                    >
+                                                        {league.name}
+                                                    </Link>
+                                                ) : (
+                                                    <h3 className="font-heading text-2xl font-bold text-(--color-text)/40">
+                                                        {league.name}
+                                                    </h3>
+                                                )}
                                                 {isActive ? (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
                                                         <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />

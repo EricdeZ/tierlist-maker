@@ -126,6 +126,16 @@ export default function SimpleNav({ title }) {
                                                     {l.name}
                                                 </Link>
                                             ))}
+                                            <div className="border-t border-white/5 mt-1 pt-1">
+                                                <Link
+                                                    to="/#leagues"
+                                                    onClick={() => setLeaguesOpen(false)}
+                                                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text-secondary) hover:text-(--color-text) hover:bg-white/5 transition-colors"
+                                                >
+                                                    <ChevronDown className="w-4 h-4" />
+                                                    Browse All
+                                                </Link>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -273,6 +283,13 @@ export default function SimpleNav({ title }) {
                                     {l.name}
                                 </Link>
                             ))}
+                            <Link
+                                to="/#leagues"
+                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--color-text-secondary) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                            >
+                                <ChevronDown className="w-4 h-4" />
+                                Browse All
+                            </Link>
                         </div>
                     )}
 

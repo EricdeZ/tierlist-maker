@@ -4,7 +4,7 @@ import { useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect } from 'react'
 import { statsService } from '../../services/database'
-import { Trophy, Calendar, BarChart3, ChevronRight, MessageCircle, Users, User } from 'lucide-react'
+import { Trophy, Calendar, BarChart3, ChevronRight, ChevronLeft, MessageCircle, Users, User } from 'lucide-react'
 import PageTitle from '../../components/PageTitle'
 import BannedContentBanner from '../../components/BannedContentBanner'
 import ChallengeBanner from '../../components/ChallengeBanner'
@@ -80,9 +80,13 @@ const DivisionOverview = () => {
 
                     {/* Division info */}
                     <div className="flex-1 text-center sm:text-left">
-                        <p className="text-sm text-(--color-text-secondary) uppercase tracking-wider mb-1">
+                        <Link
+                            to="/#leagues"
+                            className="inline-flex items-center gap-1 text-sm text-(--color-text-secondary) uppercase tracking-wider mb-1 hover:text-(--color-accent) transition-colors group/league"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5 opacity-0 -ml-4 group-hover/league:opacity-100 group-hover/league:ml-0 transition-all duration-200" />
                             {league?.name}
-                        </p>
+                        </Link>
                         <div className="flex items-center justify-center sm:justify-start gap-3 mb-2">
                             {rankImg && (
                                 <img src={rankImg} alt="" className="h-10 w-10 object-contain" />
