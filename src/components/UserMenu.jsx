@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { LogOut, Shield, User, UserCheck } from 'lucide-react'
 
 export default function UserMenu({ compact = false }) {
-    const { user, linkedPlayer, login, logout, isAdmin, avatarUrl } = useAuth()
+    const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, avatarUrl } = useAuth()
     const [open, setOpen] = useState(false)
     const menuRef = useRef(null)
 
@@ -64,7 +64,7 @@ export default function UserMenu({ compact = false }) {
                     <div className="px-4 py-3 border-b border-white/10">
                         <div className="text-sm font-medium text-(--color-text)">{user.discord_username}</div>
                         <div className="text-xs text-(--color-text-secondary)">
-                            {isAdmin ? 'Admin' : 'Player'}
+                            {isAdmin ? 'Admin' : hasAnyPermission ? 'Staff' : 'Player'}
                             {linkedPlayer && ` \u2022 ${linkedPlayer.name}`}
                         </div>
                     </div>
@@ -94,7 +94,7 @@ export default function UserMenu({ compact = false }) {
                             </button>
                         )}
 
-                        {isAdmin && (
+                        {(isAdmin || hasAnyPermission) && (
                             <Link
                                 to="/admin"
                                 onClick={() => setOpen(false)}
