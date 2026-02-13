@@ -1,6 +1,6 @@
 // src/components/DragDropRankings.jsx - Refactored to use DivisionContext
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { exportRankingsAsImage } from '../utils/canvasExport'
 import { getContrastColor } from '../utils/colorContrast'
@@ -65,6 +65,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                 .filter(p => p.team_id === team.id)
                 .map(p => ({
                     name: p.name,
+                    slug: p.slug,
                     role: p.role,
                     secondary_role: p.secondary_role
                 }))
@@ -105,6 +106,8 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     const [dragOverZone, setDragOverZone] = useState(null)
     const [dragOverIndex, setDragOverIndex] = useState(null)
     const [isExporting, setIsExporting] = useState(false)
+    const [applyAllOpen, setApplyAllOpen] = useState(false)
+    const applyAllRef = useRef(null)
     const [teamsPanelOpen, setTeamsPanelOpen] = useState(true)
     const [teamsPanelPosition, setTeamsPanelPosition] = useState('bottom') // 'bottom' | 'right'
     const [teamsPanelHeight, setTeamsPanelHeight] = useState(0)
@@ -255,6 +258,82 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
             default: return null
         }
     }, [statsMap])
+
+    const getNumericStatValue = useCallback((playerName, statType) => {
+        const stats = statsMap.get(playerName)
+        if (!stats) return -Infinity
+        switch (statType) {
+            case 'kda': return stats.kda
+            case 'killsPerGame': return stats.avgStats.avgKills
+            case 'deathsPerGame': return stats.avgStats.avgDeaths
+            case 'assistsPerGame': return stats.avgStats.avgAssists
+            case 'damagePerGame': return stats.avgStats.avgDamage
+            case 'mitigationsPerGame': return stats.avgStats.avgMitigated
+            default: return -Infinity
+        }
+    }, [statsMap])
+
+    // Build a lookup from player name → slug for profile links
+    const playerSlugMap = useMemo(() => {
+        const map = new Map()
+        if (!teams) return map
+        for (const team of teams) {
+            for (const p of team.playersWithRoles || []) {
+                if (p.slug) map.set(p.name, p.slug)
+            }
+        }
+        return map
+    }, [teams])
+
+    const applyAllByStat = useCallback((statType) => {
+        if (!teams || statType === 'none') return
+
+        // Gather all players grouped by their primary role
+        const byRole = { SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] }
+        for (const team of teams) {
+            for (const p of team.playersWithRoles || []) {
+                const role = p.role?.toUpperCase()
+                if (role && byRole[role]) {
+                    byRole[role].push(p.name)
+                }
+            }
+        }
+
+        // Sort each role group by the stat (deaths ascending, everything else descending)
+        const ascending = statType === 'deathsPerGame'
+        for (const role of roles) {
+            byRole[role].sort((a, b) => {
+                const va = getNumericStatValue(a, statType)
+                const vb = getNumericStatValue(b, statType)
+                return ascending ? va - vb : vb - va
+            })
+        }
+
+        // Lock all players to this stat
+        const newLocked = {}
+        for (const role of roles) {
+            for (const name of byRole[role]) {
+                newLocked[name] = statType
+            }
+        }
+
+        setRankings(byRole)
+        setSelectedStat(statType)
+        setLockedStats(newLocked)
+        setApplyAllOpen(false)
+    }, [teams, getNumericStatValue])
+
+    // Close apply-all dropdown on outside click
+    useEffect(() => {
+        if (!applyAllOpen) return
+        const handleClick = (e) => {
+            if (applyAllRef.current && !applyAllRef.current.contains(e.target)) {
+                setApplyAllOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [applyAllOpen])
 
     // Lock a player's stat at the current selectedStat when they're first placed
     const lockPlayerStat = useCallback((playerName) => {
@@ -876,6 +955,30 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                             ))}
                         </div>
                         <div className="flex gap-1.5 flex-shrink-0">
+                            <div ref={applyAllRef} className="relative">
+                                <button
+                                    onClick={() => setApplyAllOpen(prev => !prev)}
+                                    className="px-2.5 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                                >
+                                    Apply All
+                                </button>
+                                {applyAllOpen && (
+                                    <div className="absolute bottom-full mb-1 right-0 bg-(--color-primary) border border-white/15 rounded-lg shadow-xl overflow-hidden min-w-36 z-50">
+                                        <div className="px-3 py-1.5 text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-wider border-b border-white/10">
+                                            Sort all by stat
+                                        </div>
+                                        {STAT_TYPES.filter(st => st.key !== 'none').map(st => (
+                                            <button
+                                                key={st.key}
+                                                onClick={() => applyAllByStat(st.key)}
+                                                className="w-full text-left px-3 py-2 text-xs text-(--color-text) hover:bg-white/10 transition-colors"
+                                            >
+                                                {st.buttonLabel}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={clearAllRankings}
                                 className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
@@ -1032,6 +1135,19 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                 </div>
                             ))}
                         </div>
+                        {/* Profile link */}
+                        {playerSlugMap.get(spotlightPlayer) && (
+                            <div className="px-3 pb-2">
+                                <Link
+                                    to={`/${league.slug}/${division?.slug}/players/${playerSlugMap.get(spotlightPlayer)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block text-center text-[11px] font-semibold py-1.5 rounded bg-white/10 text-(--color-accent) hover:bg-white/15 transition-colors"
+                                >
+                                    View Profile
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 )
             })()}
@@ -1081,6 +1197,30 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                     {st.buttonLabel}
                                 </button>
                             ))}
+                        </div>
+                        <div className="relative" ref={applyAllRef}>
+                            <button
+                                onClick={() => setApplyAllOpen(prev => !prev)}
+                                className="w-full px-2 py-1 rounded text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                            >
+                                Apply All
+                            </button>
+                            {applyAllOpen && (
+                                <div className="absolute top-full mt-1 left-0 right-0 bg-(--color-primary) border border-white/15 rounded-lg shadow-xl overflow-hidden z-50">
+                                    <div className="px-2 py-1 text-[9px] font-bold text-(--color-text-secondary) uppercase tracking-wider border-b border-white/10">
+                                        Sort all by stat
+                                    </div>
+                                    {STAT_TYPES.filter(st => st.key !== 'none').map(st => (
+                                        <button
+                                            key={st.key}
+                                            onClick={() => applyAllByStat(st.key)}
+                                            className="w-full text-left px-2 py-1.5 text-[10px] text-(--color-text) hover:bg-white/10 transition-colors"
+                                        >
+                                            {st.buttonLabel}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="flex gap-1">
                             <button
