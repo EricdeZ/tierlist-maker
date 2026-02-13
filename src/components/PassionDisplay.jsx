@@ -266,7 +266,7 @@ export default function PassionDisplay() {
                     </button>
 
                     {open && (
-                        <div className="absolute right-0 top-full mt-2 w-72 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+                        <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-14 sm:top-full mt-0 sm:mt-2 w-auto sm:w-72 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
                             {/* Rank & Balance header */}
                             <div className="px-4 py-3 border-b border-white/10">
                                 <div className="flex items-center gap-3">
