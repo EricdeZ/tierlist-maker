@@ -323,17 +323,48 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
         setApplyAllOpen(false)
     }, [teams, getNumericStatValue])
 
-    // Close apply-all dropdown on outside click
+    const [applyPlacedOpen, setApplyPlacedOpen] = useState(false)
+    const applyPlacedRef = useRef(null)
+
+    const applyToPlacedByStat = useCallback((statType) => {
+        if (statType === 'none') return
+
+        const ascending = statType === 'deathsPerGame'
+        const newRankings = {}
+        const newLocked = { ...lockedStats }
+
+        for (const role of roles) {
+            const sorted = [...(rankings[role] || [])].sort((a, b) => {
+                const va = getNumericStatValue(a, statType)
+                const vb = getNumericStatValue(b, statType)
+                return ascending ? va - vb : vb - va
+            })
+            newRankings[role] = sorted
+            for (const name of sorted) {
+                newLocked[name] = statType
+            }
+        }
+
+        setRankings(newRankings)
+        setSelectedStat(statType)
+        setLockedStats(newLocked)
+        setApplyPlacedOpen(false)
+    }, [rankings, lockedStats, getNumericStatValue])
+
+    // Close apply-all / apply-placed dropdowns on outside click
     useEffect(() => {
-        if (!applyAllOpen) return
+        if (!applyAllOpen && !applyPlacedOpen) return
         const handleClick = (e) => {
-            if (applyAllRef.current && !applyAllRef.current.contains(e.target)) {
+            if (applyAllOpen && applyAllRef.current && !applyAllRef.current.contains(e.target)) {
                 setApplyAllOpen(false)
+            }
+            if (applyPlacedOpen && applyPlacedRef.current && !applyPlacedRef.current.contains(e.target)) {
+                setApplyPlacedOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClick)
         return () => document.removeEventListener('mousedown', handleClick)
-    }, [applyAllOpen])
+    }, [applyAllOpen, applyPlacedOpen])
 
     // Lock a player's stat at the current selectedStat when they're first placed
     const lockPlayerStat = useCallback((playerName) => {
@@ -979,6 +1010,30 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                     </div>
                                 )}
                             </div>
+                            <div ref={applyPlacedRef} className="relative">
+                                <button
+                                    onClick={() => setApplyPlacedOpen(prev => !prev)}
+                                    className="px-2.5 py-1 rounded text-xs font-semibold bg-blue-600/60 text-white hover:bg-blue-500/60 transition-colors"
+                                >
+                                    Re-sort Placed
+                                </button>
+                                {applyPlacedOpen && (
+                                    <div className="absolute bottom-full mb-1 right-0 bg-(--color-primary) border border-white/15 rounded-lg shadow-xl overflow-hidden min-w-36 z-50">
+                                        <div className="px-3 py-1.5 text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-wider border-b border-white/10">
+                                            Re-sort placed by
+                                        </div>
+                                        {STAT_TYPES.filter(st => st.key !== 'none').map(st => (
+                                            <button
+                                                key={st.key}
+                                                onClick={() => applyToPlacedByStat(st.key)}
+                                                className="w-full text-left px-3 py-2 text-xs text-(--color-text) hover:bg-white/10 transition-colors"
+                                            >
+                                                {st.buttonLabel}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={clearAllRankings}
                                 className="px-2.5 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
@@ -1214,6 +1269,30 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                         <button
                                             key={st.key}
                                             onClick={() => applyAllByStat(st.key)}
+                                            className="w-full text-left px-2 py-1.5 text-[10px] text-(--color-text) hover:bg-white/10 transition-colors"
+                                        >
+                                            {st.buttonLabel}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="relative" ref={applyPlacedRef}>
+                            <button
+                                onClick={() => setApplyPlacedOpen(prev => !prev)}
+                                className="w-full px-2 py-1 rounded text-[10px] font-semibold bg-blue-600/60 text-white hover:bg-blue-500/60 transition-colors"
+                            >
+                                Re-sort Placed
+                            </button>
+                            {applyPlacedOpen && (
+                                <div className="absolute top-full mt-1 left-0 right-0 bg-(--color-primary) border border-white/15 rounded-lg shadow-xl overflow-hidden z-50">
+                                    <div className="px-2 py-1 text-[9px] font-bold text-(--color-text-secondary) uppercase tracking-wider border-b border-white/10">
+                                        Re-sort placed by
+                                    </div>
+                                    {STAT_TYPES.filter(st => st.key !== 'none').map(st => (
+                                        <button
+                                            key={st.key}
+                                            onClick={() => applyToPlacedByStat(st.key)}
                                             className="w-full text-left px-2 py-1.5 text-[10px] text-(--color-text) hover:bg-white/10 transition-colors"
                                         >
                                             {st.buttonLabel}
