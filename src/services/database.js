@@ -239,3 +239,29 @@ export const challengeService = {
     },
 }
 
+export const predictionsService = {
+    async getUpcoming(filters = {}) {
+        return apiCall('predictions', { action: 'upcoming', ...filters })
+    },
+
+    async getMyPredictions(filters = {}) {
+        return apiCall('predictions', { action: 'my-predictions', ...filters })
+    },
+
+    async getLeaderboard(seasonId) {
+        return apiCall('predictions', { action: 'leaderboard', seasonId })
+    },
+
+    async predict(data) {
+        return apiPost('predictions', { action: 'predict' }, data)
+    },
+
+    async lockToggle(scheduledMatchId, locked) {
+        return apiPost('predictions', { action: 'lock-toggle' }, { scheduledMatchId, locked })
+    },
+
+    async getMatchupDetail(scheduledMatchId) {
+        return apiCall('predictions', { action: 'matchup-detail', scheduledMatchId })
+    },
+}
+

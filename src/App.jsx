@@ -46,6 +46,8 @@ import CoinFlip from "./pages/CoinFlip.jsx";
 import PassionShop from "./pages/PassionShop.jsx";
 import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
 import DebugTools from "./pages/admin/DebugTools.jsx";
+import Predictions from "./pages/Predictions.jsx";
+import MatchupDetail from "./pages/MatchupDetail.jsx";
 
 function App() {
     return (
@@ -81,6 +83,8 @@ function App() {
                             <Route path="challenges" element={<Challenges />} />
                             <Route path="coinflip" element={<CoinFlip />} />
                             <Route path="shop" element={<PassionShop />} />
+                            <Route path="predictions" element={<Predictions />} />
+                            <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

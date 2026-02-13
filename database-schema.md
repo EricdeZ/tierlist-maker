@@ -252,8 +252,29 @@ Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_
 | updated_at | timestamptz | YES | now() |
 | match_id | integer | YES | FK → matches.id (SET NULL) |
 
+| predictions_locked | boolean | NO | false |
+
 CHECK (team1_id <> team2_id)
 CHECK (status IN ('scheduled', 'completed', 'cancelled'))
+
+### predictions
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| user_id | integer | NO | FK → users.id (CASCADE) |
+| scheduled_match_id | integer | NO | FK → scheduled_matches.id (CASCADE) |
+| predicted_team_id | integer | NO | FK → teams.id (CASCADE) |
+| wager_amount | integer | NO | 0 |
+| payout_multiplier | numeric(5,2) | YES | |
+| payout_amount | integer | YES | |
+| status | varchar(20) | NO | 'pending' |
+| created_at | timestamptz | NO | NOW() |
+| resolved_at | timestamptz | YES | |
+
+UNIQUE(user_id, scheduled_match_id)
+CHECK (status IN ('pending', 'won', 'lost', 'refunded'))
+INDEX idx_predictions_match ON (scheduled_match_id)
+INDEX idx_predictions_user ON (user_id, status)
 
 ### discord_channels
 | Column | Type | Nullable | Default |

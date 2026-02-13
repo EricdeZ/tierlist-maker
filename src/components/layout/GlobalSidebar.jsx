@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles
+    ChevronDown, UserCheck, LogOut, Sparkles, Target
 } from 'lucide-react'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
@@ -383,6 +383,13 @@ export default function GlobalSidebar() {
                                 </span>
                             )}
                         >
+                            <SidebarLink
+                                to="/predictions"
+                                icon={Target}
+                                active={isActive('/predictions')}
+                            >
+                                Predictions
+                            </SidebarLink>
                             <SidebarLink
                                 to="/challenges"
                                 icon={Sparkles}

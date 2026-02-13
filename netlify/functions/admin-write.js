@@ -3,6 +3,7 @@ import { getDB, adminHeaders as headers } from './lib/db.js'
 import { requirePermission } from './lib/auth.js'
 import { logAudit } from './lib/audit.js'
 import { updateMatchChallenges } from './lib/challenges.js'
+import { resolvePredictions } from './lib/predictions.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -197,6 +198,12 @@ async function submitMatch(sql, body, admin) {
         // Push challenge progress for players in this match (fire-and-forget)
         updateMatchChallenges(sql, result.match_id)
             .catch(err => console.error('Match challenge update failed:', err))
+
+        // Resolve predictions for this scheduled match (fire-and-forget)
+        if (scheduled_match_id && winnerTeamId) {
+            resolvePredictions(sql, scheduled_match_id, winnerTeamId)
+                .catch(err => console.error('Prediction resolution failed:', err))
+        }
 
         return {
             statusCode: 200,

@@ -1,6 +1,7 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
 import { requirePermission } from './lib/auth.js'
 import { logAudit } from './lib/audit.js'
+import { refundPredictions } from './lib/predictions.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -176,6 +177,12 @@ async function updateStatus(sql, body, admin) {
         UPDATE scheduled_matches SET status = ${status}, updated_at = NOW()
         WHERE id = ${id}
     `
+
+    // Refund prediction wagers if match is cancelled
+    if (status === 'cancelled') {
+        refundPredictions(sql, id)
+            .catch(err => console.error('Prediction refund failed:', err))
+    }
 
     await logAudit(sql, admin, {
         action: 'update-scheduled-match-status', endpoint: 'schedule-manage',
