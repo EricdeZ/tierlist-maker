@@ -11,8 +11,24 @@ export const handler = async (event) => {
     const sql = getDB()
 
     try {
-        // ─── GET: List claims ───
+        // ─── GET: List claims or player search ───
         if (event.httpMethod === 'GET') {
+            const { list } = event.queryStringParameters || {}
+
+            // Lightweight player list for claim search (any authenticated user)
+            if (list === 'players') {
+                const user = await requireAuth(event)
+                if (!user) {
+                    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
+                }
+                const players = await sql`
+                    SELECT id, name, discord_name
+                    FROM players
+                    ORDER BY LOWER(name)
+                `
+                return { statusCode: 200, headers, body: JSON.stringify({ players }) }
+            }
+
             const user = await requireAuth(event)
             if (!user) {
                 return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }

@@ -41,7 +41,7 @@ export default function ClaimProfileModal() {
         const fetchPlayers = async () => {
             setLoading(true)
             try {
-                const res = await fetch(`${API_BASE}/player-manage`, { headers: getAuthHeaders() })
+                const res = await fetch(`${API_BASE}/claim-manage?list=players`, { headers: getAuthHeaders() })
                 if (!res.ok) throw new Error('Failed to load players')
                 const data = await res.json()
                 setPlayers(data.players || [])
