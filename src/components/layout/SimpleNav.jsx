@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useSidebar } from '../../context/SidebarContext'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
-import { Home, User, Wrench, ChevronDown, ListOrdered, Swords, Trophy, Coins, ShoppingBag } from 'lucide-react'
+import { Home, User, Wrench, ChevronDown, ListOrdered, Swords, Trophy, Coins, ShoppingBag, ChevronRight } from 'lucide-react'
 
 export default function SimpleNav({ title }) {
     const { user, linkedPlayer } = useAuth()
+    const { toggle: toggleSidebar } = useSidebar()
     const location = useLocation()
     const [toolsOpen, setToolsOpen] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -57,6 +59,15 @@ export default function SimpleNav({ title }) {
         <nav ref={menuRef} className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
             <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-4 py-2 shadow-lg border border-white/10">
                 <div className="flex items-center gap-3 sm:gap-6">
+                    {/* Inline sidebar trigger — visible below 1400px */}
+                    <button
+                        onClick={toggleSidebar}
+                        className="sidebar:hidden flex items-center justify-center w-8 h-8 rounded-lg text-(--color-accent) hover:bg-white/10 transition-colors cursor-pointer border border-(--color-accent)/25"
+                        aria-label="Open menu"
+                    >
+                        <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+                    </button>
+
                     <Link to="/" className="flex items-center gap-3 flex-shrink-0">
                         <img src={smiteLogo} alt="SMITE 2" className="h-8 sm:h-10 w-auto" />
                     </Link>

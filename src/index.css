@@ -2,6 +2,7 @@
 
 @theme {
   --breakpoint-nav: 75rem;
+  --breakpoint-sidebar: 87.5rem;
 }
 
 :root {
@@ -104,4 +105,25 @@ h1, h2, h3, h4, h5, h6 {
 .panel-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Sidebar trigger wiggle animation */
+@keyframes sidebar-wiggle {
+    0%, 65%, 100% { transform: translateX(0); }
+    70% { transform: translateX(4px); }
+    75% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+    85% { transform: translateX(-2px); }
+    90% { transform: translateX(2px); }
+    95% { transform: translateX(0); }
+}
+@keyframes sidebar-trigger-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(248, 197, 106, 0.4); }
+    50% { box-shadow: 0 0 12px 4px rgba(248, 197, 106, 0.15); }
+}
+.sidebar-trigger-wiggle {
+    animation: sidebar-wiggle 3s ease-in-out infinite;
+}
+.sidebar-trigger-glow {
+    animation: sidebar-wiggle 3s ease-in-out infinite, sidebar-trigger-pulse 3s ease-in-out infinite;
 }
