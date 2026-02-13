@@ -2,6 +2,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -56,7 +57,8 @@ const Teams = () => {
                                 className="block group"
                             >
                                 <div className="h-2" style={{ backgroundColor: team.color }} />
-                                <div className="px-4 pt-4 pb-2">
+                                <div className="px-4 pt-4 pb-2 flex items-center gap-3">
+                                    <TeamLogo slug={team.slug} name={team.name} size={36} />
                                     <h3 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                         {team.name}
                                     </h3>

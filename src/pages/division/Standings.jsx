@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { standingsService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 const Standings = () => {
     const { leagueSlug, divisionSlug } = useParams()
@@ -128,6 +129,7 @@ const Standings = () => {
                                                 to={`${basePath}/teams/${team.slug}`}
                                                 className="flex items-center gap-3 group"
                                             >
+                                                <TeamLogo slug={team.slug} name={team.name} size={24} />
                                                 <div
                                                     className="w-3 h-3 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: team.color }}

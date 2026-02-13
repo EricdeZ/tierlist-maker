@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const SEASON_KEY = 'smite2_admin_season'
@@ -438,9 +439,11 @@ export default function ScheduleManager() {
 
                                         {/* Teams */}
                                         <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <TeamLogo slug={m.team1_slug} name={m.team1_name} size={18} />
                                             <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />
                                             <span className="text-sm text-[var(--color-text)]">{m.team1_name}</span>
                                             <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
+                                            <TeamLogo slug={m.team2_slug} name={m.team2_name} size={18} />
                                             <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team2_color || '#ef4444' }} />
                                             <span className="text-sm text-[var(--color-text)]">{m.team2_name}</span>
                                         </div>

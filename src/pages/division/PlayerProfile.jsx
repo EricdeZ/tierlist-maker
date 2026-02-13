@@ -8,6 +8,7 @@ import PageTitle from '../../components/PageTitle'
 import RankBadge from '../../components/RankBadge'
 import { getRank, formatRank } from '../../config/ranks'
 import { UserCheck, User, ExternalLink } from 'lucide-react'
+import TeamLogo from '../../components/TeamLogo'
 import passionCoin from '../../assets/passion/passion.png'
 
 import soloImage from '../../assets/roles/solo.webp'
@@ -133,7 +134,8 @@ const PlayerProfile = () => {
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <div className="flex items-center gap-4">
                     {team && (
-                        <Link to={`${basePath}/teams/${team.slug}`}>
+                        <Link to={`${basePath}/teams/${team.slug}`} className="flex items-center gap-2">
+                            <TeamLogo slug={team.slug} name={team.name} size={40} />
                             <div className="w-3 h-12 rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: team.color }} />
                         </Link>
                     )}
@@ -349,6 +351,7 @@ const PlayerProfile = () => {
                                                         to={`${basePath}/teams/${opponent.slug}`}
                                                         className="flex items-center gap-2 group"
                                                     >
+                                                        <TeamLogo slug={opponent.slug} name={opponent.name} size={18} />
                                                         <div
                                                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                                             style={{ backgroundColor: opponent.color }}

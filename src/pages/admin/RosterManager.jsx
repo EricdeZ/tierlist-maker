@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { RosterManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
+import TeamLogo from '../../components/TeamLogo'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 const STORAGE_KEY = 'smite2_roster_admin'
@@ -927,6 +928,7 @@ function TeamCard({
             {/* Team header */}
             <div className="px-4 pt-3 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                    <TeamLogo slug={team.team_slug} name={team.team_name} size={22} />
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                     <h3 className="font-heading text-base font-bold text-[var(--color-text)]">
                         {team.team_name}

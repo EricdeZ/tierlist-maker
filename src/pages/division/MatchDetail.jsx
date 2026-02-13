@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
@@ -138,6 +139,7 @@ const MatchDetail = () => {
                                 {match.team1_name}
                             </span>
                             <div className="w-4 h-12 rounded flex-shrink-0" style={{ backgroundColor: match.team1_color }} />
+                            <TeamLogo slug={match.team1_slug} name={match.team1_name} size={48} />
                         </Link>
 
                         {/* Score */}
@@ -162,6 +164,7 @@ const MatchDetail = () => {
                             to={`${basePath}/teams/${match.team2_slug}`}
                             className={`flex-1 flex items-center gap-4 group transition-opacity ${team1Won && match.is_completed ? 'opacity-50' : ''}`}
                         >
+                            <TeamLogo slug={match.team2_slug} name={match.team2_name} size={48} />
                             <div className="w-4 h-12 rounded flex-shrink-0" style={{ backgroundColor: match.team2_color }} />
                             <span className="text-xl font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                 {match.team2_name}
@@ -176,6 +179,7 @@ const MatchDetail = () => {
                                 to={`${basePath}/teams/${match.team1_slug}`}
                                 className={`flex items-center gap-3 group ${team2Won && match.is_completed ? 'opacity-50' : ''}`}
                             >
+                                <TeamLogo slug={match.team1_slug} name={match.team1_name} size={32} />
                                 <div className="w-3 h-10 rounded" style={{ backgroundColor: match.team1_color }} />
                                 <span className="text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                     {match.team1_name}
@@ -192,6 +196,7 @@ const MatchDetail = () => {
                                 to={`${basePath}/teams/${match.team2_slug}`}
                                 className={`flex items-center gap-3 group ${team1Won && match.is_completed ? 'opacity-50' : ''}`}
                             >
+                                <TeamLogo slug={match.team2_slug} name={match.team2_name} size={32} />
                                 <div className="w-3 h-10 rounded" style={{ backgroundColor: match.team2_color }} />
                                 <span className="text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
                                     {match.team2_name}
@@ -392,6 +397,7 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
         <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
             {/* Team header */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+                <TeamLogo slug={teamSlug} name={teamName} size={20} />
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
                 <Link
                     to={`${basePath}/teams/${teamSlug}`}

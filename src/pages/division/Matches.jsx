@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 const Matches = () => {
     const { leagueSlug, divisionSlug } = useParams()
@@ -143,6 +144,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                 <div
                     className={`flex-1 flex items-center gap-3 px-5 py-4 ${team1Won ? '' : isCompleted ? 'opacity-50' : ''}`}
                 >
+                    <TeamLogo slug={match.team1_slug} name={match.team1_name} size={24} />
                     <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: match.team1_color }}
@@ -192,6 +194,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: match.team2_color }}
                     />
+                    <TeamLogo slug={match.team2_slug} name={match.team2_name} size={24} />
                 </div>
 
                 {/* View arrow for completed matches */}
@@ -246,6 +249,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                                     : 'border border-transparent'
                         }`}
                     >
+                        <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} />
                         <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: match.team1_color }}
@@ -275,6 +279,7 @@ const MatchCard = ({ match, formatDate, basePath }) => {
                                     : 'border border-transparent'
                         }`}
                     >
+                        <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} />
                         <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: match.team2_color }}

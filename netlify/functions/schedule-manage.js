@@ -44,8 +44,8 @@ export const handler = async (event) => {
                     SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                            sm.best_of, sm.scheduled_date, sm.week, sm.status,
                            sm.created_at, sm.updated_at,
-                           t1.name as team1_name, t1.color as team1_color,
-                           t2.name as team2_name, t2.color as team2_color
+                           t1.name as team1_name, t1.color as team1_color, t1.slug as team1_slug,
+                           t2.name as team2_name, t2.color as team2_color, t2.slug as team2_slug
                     FROM scheduled_matches sm
                     JOIN teams t1 ON sm.team1_id = t1.id
                     JOIN teams t2 ON sm.team2_id = t2.id

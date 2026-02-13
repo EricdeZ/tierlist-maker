@@ -14,6 +14,7 @@ import babylonLogo from '../../assets/leagues/babylon.png'
 import oslLogo from '../../assets/leagues/osl.png'
 
 import { getDivisionImage } from '../../utils/divisionImages'
+import TeamLogo from '../../components/TeamLogo'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -235,6 +236,7 @@ const DivisionOverview = () => {
                                     />
                                     {/* Content */}
                                     <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
+                                        <TeamLogo slug={team.slug} name={team.name} size={28} />
                                         <div className="flex-1 min-w-0">
                                             <div className="font-heading text-sm font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
                                                 {team.name}

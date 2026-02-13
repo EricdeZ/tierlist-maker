@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { statsService, matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
+import TeamLogo from '../../components/TeamLogo'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -124,6 +125,7 @@ const TeamDetail = () => {
             {/* Team Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <div className="flex items-center gap-4">
+                    <TeamLogo slug={team.slug} name={team.name} size={56} />
                     <div className="w-4 h-14 rounded" style={{ backgroundColor: team.color }} />
                     <div className="flex-1">
                         <h1 className="font-heading text-3xl font-bold text-(--color-text)">
@@ -251,8 +253,8 @@ const TeamDetail = () => {
                             {matches.map(match => {
                                 const isTeam1 = match.team1_id === team.id
                                 const opponent = isTeam1
-                                    ? { name: match.team2_name, color: match.team2_color, slug: match.team2_slug }
-                                    : { name: match.team1_name, color: match.team1_color, slug: match.team1_slug }
+                                    ? { name: match.team2_name, color: match.team2_color, slug: match.team2_slug, teamSlug: match.team2_slug }
+                                    : { name: match.team1_name, color: match.team1_color, slug: match.team1_slug, teamSlug: match.team1_slug }
                                 const isWin = match.winner_team_id === team.id
                                 const matchLink = match.is_completed ? `${basePath}/matches/${match.id}` : null
 
@@ -287,6 +289,7 @@ const TeamDetail = () => {
                                         <div className="flex-1 flex items-center gap-3">
                                             <span className="text-sm text-(--color-text-secondary)">vs</span>
                                             <div className="flex items-center gap-2">
+                                                <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
                                                 <div
                                                     className="w-3 h-3 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: opponent.color }}

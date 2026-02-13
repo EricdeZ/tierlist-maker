@@ -12,6 +12,7 @@ import {
 import { useDivision } from '../context/DivisionContext'
 import { usePlayerStats } from '../hooks/usePlayerStats'
 import { usePassion } from '../context/PassionContext'
+import TeamLogo from './TeamLogo'
 
 // Import role images
 import soloImage from '../assets/roles/solo.webp'
@@ -622,9 +623,10 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                             return (
                                 <div key={team.id}>
                                     <div
-                                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded mb-1"
+                                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded mb-1 flex items-center gap-1.5"
                                         style={{ backgroundColor: team.color, color: teamTextColor }}
                                     >
+                                        <TeamLogo slug={team.id} name={team.name} size={14} />
                                         {team.name}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
@@ -912,10 +914,11 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                 return (
                                     <div key={team.id} className="flex-shrink-0 rounded-lg border border-white/10 p-3" style={{ width: '14rem', backgroundColor: 'var(--color-primary)' }}>
                                         <h4
-                                            className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate"
+                                            className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate flex items-center justify-center gap-1.5"
                                             style={{ backgroundColor: team.color, color: teamTextColor }}
                                             title={team.name}
                                         >
+                                            <TeamLogo slug={team.id} name={team.name} size={16} />
                                             {team.name}
                                         </h4>
                                         <div className="space-y-1">
@@ -1105,10 +1108,11 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                             return (
                                 <div key={team.id} className="rounded-lg border border-white/10 p-2" style={{ backgroundColor: 'var(--color-primary)' }}>
                                     <h4
-                                        className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate"
+                                        className="text-xs font-bold text-center py-1.5 px-2 rounded mb-2 truncate flex items-center justify-center gap-1.5"
                                         style={{ backgroundColor: team.color, color: teamTextColor }}
                                         title={team.name}
                                     >
+                                        <TeamLogo slug={team.id} name={team.name} size={16} />
                                         {team.name}
                                     </h4>
                                     <div className="space-y-1">

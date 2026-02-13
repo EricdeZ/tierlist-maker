@@ -54,7 +54,7 @@ export const handler = async (event) => {
             SELECT 
                 p.id as player_id, p.name, p.slug,
                 lp.id as league_player_id, lp.team_id, lp.season_id, lp.role,
-                t.name as team_name, t.color as team_color
+                t.name as team_name, t.color as team_color, t.slug as team_slug
             FROM league_players lp
             JOIN players p ON lp.player_id = p.id
             LEFT JOIN teams t ON lp.team_id = t.id

@@ -5,6 +5,7 @@ import { usePlayerStats } from '../hooks/usePlayerStats'
 import { useDivision } from '../context/DivisionContext'
 import { ChevronRight } from 'lucide-react'
 import PlayerSearch from './PlayerSearch'
+import TeamLogo from './TeamLogo'
 
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
@@ -382,6 +383,7 @@ const PlayerList = () => {
                                                     backgroundColor: `${player.team.color}15`,
                                                 }}
                                             >
+                                                <TeamLogo slug={tSlug} name={player.team.name} size={14} />
                                                 <span
                                                     className="w-2 h-2 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: player.team.color }}
