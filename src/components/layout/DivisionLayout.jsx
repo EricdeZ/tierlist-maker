@@ -7,7 +7,8 @@ import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Home, User, Wrench, ChevronDown, ListOrdered, Swords } from 'lucide-react'
+import { getLeagueLogo } from '../../utils/leagueImages'
+import { Home, User, Wrench, ChevronDown, ListOrdered, Swords, Trophy } from 'lucide-react'
 
 const DivisionNav = () => {
     const { leagueSlug, divisionSlug } = useParams()
@@ -78,6 +79,7 @@ const DivisionNav = () => {
     }, [mobileOpen])
 
     const rankImg = getDivisionImage(leagueSlug, divisionSlug, division?.tier)
+    const leagueLogo = getLeagueLogo(leagueSlug)
 
     // Find current active nav label for mobile display
 
@@ -91,8 +93,13 @@ const DivisionNav = () => {
                         <img src={smiteLogo} alt="SMITE 2" className="h-8 sm:h-10 w-auto" />
                     </Link>
 
-                    {/* Division badge */}
+                    {/* League logo + Division badge */}
                     <div className="flex items-center gap-2 flex-shrink-0 border-l border-white/10 pl-3 sm:pl-4">
+                        {leagueLogo && (
+                            <Link to={`/${leagueSlug}`} className="hidden nav:flex flex-shrink-0">
+                                <img src={leagueLogo} alt={league?.name || leagueSlug} className="h-8 w-8 object-contain" />
+                            </Link>
+                        )}
                         {rankImg && (
                             <img src={rankImg} alt="" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />
                         )}
@@ -128,6 +135,13 @@ const DivisionNav = () => {
                                 className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
                             >
                                 <Home className="w-4 h-4" />
+                            </Link>
+                            <Link
+                                to="/#leagues"
+                                title="Browse Leagues"
+                                className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                            >
+                                <Trophy className="w-4 h-4" />
                             </Link>
                             {user && (
                                 linkedPlayer ? (
@@ -280,6 +294,13 @@ const DivisionNav = () => {
                                 My Profile
                             </Link>
                         )}
+                        <Link
+                            to="/#leagues"
+                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-white/20" />
+                            Browse Leagues
+                        </Link>
                         <Link
                             to="/"
                             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"

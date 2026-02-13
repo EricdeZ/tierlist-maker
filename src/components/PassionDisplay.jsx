@@ -246,38 +246,18 @@ export default function PassionDisplay() {
 
             {/* ═══ Navbar Widgets ═══ */}
             <div className="flex items-center gap-1">
-                {/* Challenge icon — separate from passion counter */}
-                <Link
-                    to="/challenges"
-                    className="relative p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                    title="Challenges"
-                >
-                    <svg className={`w-5 h-5 ${claimableCount > 0 ? 'text-(--color-accent)' : 'text-(--color-text-secondary)/60'}`}
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                        <path strokeLinecap="round" strokeLinejoin="round"
-                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                    {claimableCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
-                            style={{ background: '#f8c56a', color: '#0a0f1a' }}>
-                            {claimableCount}
-                        </span>
-                    )}
-                </Link>
-
                 {/* Passion counter */}
                 <div ref={menuRef} className="relative">
                     <button
                         onClick={() => { setOpen(!open); setClaimResult(null) }}
                         className="relative flex items-center gap-1.5 rounded-lg hover:bg-white/10 transition-colors px-2 py-1"
                     >
-                        <RankBadge rank={rank} size="sm" />
                         <img id="passion-balance-coin" src={claiming ? FLIP_FRAMES[flipFrame] : passionCoin} alt="Passion"
                             className={`w-5 h-5 ${claiming ? 'animate-pulse' : ''}`} />
                         <span className="text-sm font-semibold text-(--color-accent) tabular-nums min-w-[2ch]">
                             {displayBalance}
                         </span>
-                        {canClaimDaily && !claimResult && (
+                        {(canClaimDaily && !claimResult || claimableCount > 0) && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#f8c56a' }} />
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: '#f8c56a' }} />

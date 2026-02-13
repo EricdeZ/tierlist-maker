@@ -176,6 +176,7 @@ const TeamDetail = () => {
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">KDA</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Win Rate</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Damage</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Mitigated</th>
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -224,12 +225,15 @@ const TeamDetail = () => {
                                             <td className="px-4 py-3 text-center text-sm text-(--color-text)">
                                                 {formatNumber(parseInt(player.total_damage) || 0)}
                                             </td>
+                                            <td className="px-4 py-3 text-center text-sm text-(--color-text)">
+                                                {formatNumber(parseInt(player.total_mitigated) || 0)}
+                                            </td>
                                         </tr>
                                     )
                                 })}
                                 {rosterStats.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-8 text-center text-(--color-text-secondary)">
+                                        <td colSpan={8} className="px-4 py-8 text-center text-(--color-text-secondary)">
                                             No player stats available yet.
                                         </td>
                                     </tr>
