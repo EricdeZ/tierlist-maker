@@ -1,28 +1,65 @@
+import { useState, useEffect, useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useSidebar } from '../../context/SidebarContext'
 
 export default function SidebarTrigger({ hideOnSmall = false }) {
     const { isOpen, toggle } = useSidebar()
+    const [expanded, setExpanded] = useState(false)
+    const hasFired = useRef(false)
+
+    // One-time expand after scrolling past the hero
+    useEffect(() => {
+        const onScroll = () => {
+            if (hasFired.current || isOpen) return
+            if (window.scrollY > window.innerHeight * 0.7) {
+                hasFired.current = true
+                setExpanded(true)
+                setTimeout(() => setExpanded(false), 3500)
+            }
+        }
+        window.addEventListener('scroll', onScroll, { passive: true })
+        return () => window.removeEventListener('scroll', onScroll)
+    }, [isOpen])
+
+    // Cancel if user opens sidebar first
+    useEffect(() => {
+        if (isOpen) {
+            hasFired.current = true
+            setExpanded(false)
+        }
+    }, [isOpen])
 
     return (
         <button
             onClick={toggle}
-            className={`fixed top-3 left-3 z-[55] w-10 h-10 items-center justify-center
+            className={`fixed top-3 left-3 z-[55] h-10 items-center gap-2 overflow-hidden
                 rounded-xl border border-(--color-accent)/30
-                text-(--color-accent) hover:text-(--color-accent) hover:border-(--color-accent)/60
-                transition-all duration-300 cursor-pointer
+                text-(--color-accent) hover:border-(--color-accent)/60
+                transition-all duration-500 ease-in-out cursor-pointer
                 ${hideOnSmall ? 'hidden sidebar:flex' : 'flex'}
-                ${!isOpen ? 'sidebar-trigger-wiggle sidebar-trigger-glow' : 'bg-(--color-primary)/80 backdrop-blur-sm'}
+                ${!isOpen && !expanded ? 'sidebar-trigger-wiggle sidebar-trigger-glow' : ''}
+                ${isOpen ? 'bg-(--color-primary)/80 backdrop-blur-sm' : ''}
             `}
-            style={!isOpen ? {
-                background: 'linear-gradient(135deg, rgba(248,197,106,0.15), rgba(248,197,106,0.05))',
-            } : undefined}
+            style={{
+                width: expanded ? '160px' : '40px',
+                ...(!isOpen ? {
+                    background: expanded
+                        ? 'linear-gradient(135deg, rgba(248,197,106,0.2), rgba(248,197,106,0.08))'
+                        : 'linear-gradient(135deg, rgba(248,197,106,0.15), rgba(248,197,106,0.05))',
+                } : {}),
+            }}
             aria-label={isOpen ? 'Close menu' : 'Open menu'}
         >
             <ChevronRight
-                className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 shrink-0 ml-[9px] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
                 strokeWidth={2.5}
             />
+            <span
+                className="text-xs font-semibold whitespace-nowrap transition-opacity duration-500"
+                style={{ opacity: expanded ? 1 : 0 }}
+            >
+                Show Sidebar
+            </span>
         </button>
     )
 }

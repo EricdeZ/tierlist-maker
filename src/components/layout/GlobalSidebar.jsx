@@ -73,7 +73,6 @@ export default function GlobalSidebar() {
     const [leagues, setLeagues] = useState([])
     const [leaguesLoading, setLeaguesLoading] = useState(false)
     const hasFetchedLeagues = useRef(false)
-
     // Close on route change
     useEffect(() => {
         close()
