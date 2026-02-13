@@ -126,6 +126,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     }, [])
 
     // Auto-save rankings to localStorage whenever rankings or stat prefs change
+    const isInitialMount = useRef(true)
     const hasTrackedSave = useRef(false)
     useEffect(() => {
         const hasAnyRankings = Object.values(rankings).some(roleArray => roleArray.length > 0)
@@ -134,12 +135,13 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                 selectedStat,
                 playerStatOverrides: lockedStats,
             })
-            // Track tier list save once per session for challenge progress
-            if (hasAnyRankings && !hasTrackedSave.current) {
+            // Track tier list save for challenge progress (skip initial cache load)
+            if (hasAnyRankings && !hasTrackedSave.current && !isInitialMount.current) {
                 hasTrackedSave.current = true
                 trackAction('tier_list_save', storageKey)
             }
         }
+        isInitialMount.current = false
     }, [rankings, storageKey, selectedStat, lockedStats, trackAction])
 
     // Cleanup drag state

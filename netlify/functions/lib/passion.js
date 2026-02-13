@@ -7,8 +7,8 @@
 export const EARNING_RULES = {
     daily_login:    { amount: 10, cooldownMs: null },      // controlled by calendar day, not cooldown
     streak_bonus:   { perDay: 2, cap: 20 },                // +2 per consecutive day, max +20
-    tier_list_save: { amount: 0, cooldownMs: 3 * 24 * 60 * 60 * 1000 }, // tracking only, once per 3 days
-    draft_complete: { amount: 0, cooldownMs: 3 * 24 * 60 * 60 * 1000 }, // tracking only, once per 3 days
+    tier_list_save: { amount: 0, cooldownMs: 24 * 60 * 60 * 1000 }, // tracking only, once per day
+    draft_complete: { amount: 0, cooldownMs: 24 * 60 * 60 * 1000 }, // tracking only, once per day
 }
 
 // Rank thresholds (server-side copy without images)
