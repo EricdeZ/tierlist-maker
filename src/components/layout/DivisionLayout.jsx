@@ -137,7 +137,7 @@ const DivisionNav = () => {
                                 <Home className="w-4 h-4" />
                             </Link>
                             <Link
-                                to="/#leagues"
+                                to="/leagues"
                                 title="Browse Leagues"
                                 className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
                             >
@@ -295,7 +295,7 @@ const DivisionNav = () => {
                             </Link>
                         )}
                         <Link
-                            to="/#leagues"
+                            to="/leagues"
                             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
                         >
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-white/20" />

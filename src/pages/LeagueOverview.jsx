@@ -207,7 +207,7 @@ const LeagueOverview = () => {
 
                 <div className="max-w-5xl mx-auto relative z-10">
                     <Link
-                        to="/"
+                        to="/leagues"
                         className="inline-flex items-center gap-1.5 text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors mb-8"
                     >
                         <ArrowLeft className="w-4 h-4" />
@@ -454,7 +454,7 @@ const LeagueOverview = () => {
             <section className="px-4 pb-16">
                 <div className="max-w-5xl mx-auto text-center">
                     <Link
-                        to="/"
+                        to="/leagues"
                         className="inline-flex items-center gap-2 text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />

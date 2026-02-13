@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { leagueService } from '../../services/database'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
@@ -11,24 +10,14 @@ export default function SimpleNav({ title }) {
     const { user, linkedPlayer } = useAuth()
     const location = useLocation()
     const [toolsOpen, setToolsOpen] = useState(false)
-    const [leaguesOpen, setLeaguesOpen] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
-    const [leagues, setLeagues] = useState([])
     const toolsRef = useRef(null)
-    const leaguesRef = useRef(null)
     const menuRef = useRef(null)
-
-    useEffect(() => {
-        leagueService.getAll()
-            .then(data => setLeagues(data.filter(l => l.name?.toLowerCase() !== 'test league')))
-            .catch(() => {})
-    }, [])
 
     // Close menus on route change
     useEffect(() => {
         setMobileOpen(false)
         setToolsOpen(false)
-        setLeaguesOpen(false)
     }, [location.pathname])
 
     useEffect(() => {
@@ -39,15 +28,6 @@ export default function SimpleNav({ title }) {
         document.addEventListener('mousedown', handle)
         return () => document.removeEventListener('mousedown', handle)
     }, [toolsOpen])
-
-    useEffect(() => {
-        if (!leaguesOpen) return
-        const handle = (e) => {
-            if (leaguesRef.current && !leaguesRef.current.contains(e.target)) setLeaguesOpen(false)
-        }
-        document.addEventListener('mousedown', handle)
-        return () => document.removeEventListener('mousedown', handle)
-    }, [leaguesOpen])
 
     // Close mobile menu on click outside
     useEffect(() => {
@@ -99,48 +79,13 @@ export default function SimpleNav({ title }) {
                             <Home className="w-4 h-4" />
                         </Link>
 
-                        {/* Leagues dropdown */}
-                        {leagues.length > 0 && (
-                            <div ref={leaguesRef} className="relative">
-                                <button
-                                    onClick={() => { setLeaguesOpen(!leaguesOpen); setToolsOpen(false) }}
-                                    title="Leagues"
-                                    className={`p-2 rounded-lg flex items-center gap-0.5 transition-all duration-200 ${
-                                        leaguesOpen ? 'text-(--color-accent) bg-white/10' : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10'
-                                    }`}
-                                >
-                                    <Trophy className="w-4 h-4" />
-                                    <ChevronDown className={`w-3 h-3 transition-transform ${leaguesOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {leaguesOpen && (
-                                    <div className="absolute right-0 top-full mt-2 w-56 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
-                                        <div className="py-1">
-                                            {leagues.map(l => (
-                                                <Link
-                                                    key={l.id}
-                                                    to={`/${l.slug}`}
-                                                    onClick={() => setLeaguesOpen(false)}
-                                                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
-                                                >
-                                                    <Trophy className="w-4 h-4 text-(--color-text-secondary)" />
-                                                    {l.name}
-                                                </Link>
-                                            ))}
-                                            <div className="border-t border-white/5 mt-1 pt-1">
-                                                <Link
-                                                    to="/#leagues"
-                                                    onClick={() => setLeaguesOpen(false)}
-                                                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text-secondary) hover:text-(--color-text) hover:bg-white/5 transition-colors"
-                                                >
-                                                    <ChevronDown className="w-4 h-4" />
-                                                    Browse All
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <Link
+                            to="/leagues"
+                            title="Leagues"
+                            className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200"
+                        >
+                            <Trophy className="w-4 h-4" />
+                        </Link>
 
                         {user && (
                             linkedPlayer ? (
@@ -267,31 +212,13 @@ export default function SimpleNav({ title }) {
                         </Link>
                     )}
 
-                    {/* Leagues */}
-                    {leagues.length > 0 && (
-                        <div className="border-t border-white/5 mt-1 pt-1">
-                            <div className="px-4 py-2 text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-widest">
-                                Leagues
-                            </div>
-                            {leagues.map(l => (
-                                <Link
-                                    key={l.id}
-                                    to={`/${l.slug}`}
-                                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                                >
-                                    <Trophy className="w-4 h-4" />
-                                    {l.name}
-                                </Link>
-                            ))}
-                            <Link
-                                to="/#leagues"
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--color-text-secondary) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                            >
-                                <ChevronDown className="w-4 h-4" />
-                                Browse All
-                            </Link>
-                        </div>
-                    )}
+                    <Link
+                        to="/leagues"
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
+                    >
+                        <Trophy className="w-4 h-4" />
+                        Leagues
+                    </Link>
 
                     {/* Tools */}
                     <div className="border-t border-white/5 mt-1 pt-1">

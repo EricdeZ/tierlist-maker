@@ -20,6 +20,7 @@ import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
 import LeagueOverview from "./pages/LeagueOverview.jsx";
+import LeaguesBrowse from "./pages/LeaguesBrowse.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // Admin
@@ -89,6 +90,9 @@ function App() {
 
                             {/* Enhanced player profile (cross-season) */}
                             <Route path="profile/:playerSlug" element={<ProfilePage />} />
+
+                            {/* All leagues browse page */}
+                            <Route path="leagues" element={<LeaguesBrowse />} />
 
                             {/* League overview page */}
                             <Route path=":leagueSlug" element={<LeagueOverview />} />
