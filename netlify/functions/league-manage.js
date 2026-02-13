@@ -2,6 +2,7 @@
 import { getDB, adminHeaders as headers } from './lib/db.js'
 import { requirePermission } from './lib/auth.js'
 import { logAudit } from './lib/audit.js'
+import { getPerformanceStats, pushChallengeProgress } from './lib/challenges.js'
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -86,6 +87,7 @@ export const handler = async (event) => {
             case 'create-season':   return await createSeason(sql, body, admin)
             case 'update-season':   return await updateSeason(sql, body, admin)
             case 'toggle-season':   return await toggleSeason(sql, body, admin)
+            case 'end-season':      return await endSeason(sql, body, admin, event)
             case 'delete-season':   return await deleteSeason(sql, body, admin)
             // Team CRUD
             case 'create-team':     return await createTeam(sql, body, admin)
@@ -242,7 +244,63 @@ async function toggleSeason(sql, { id, is_active }, admin) {
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found' }) }
     await logAudit(sql, admin, { action: 'toggle-season', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'season', targetId: id, details: { is_active, name: row.name } })
+
+    // When a season is closed, re-evaluate challenges for all players in that season
+    if (!is_active) {
+        reevaluateSeasonChallenges(sql, id)
+            .catch(err => console.error('Season challenge re-evaluation failed:', err))
+    }
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
+}
+
+async function endSeason(sql, { id }, admin, event) {
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+
+    // Owner-only: requires permission_manage
+    const owner = await requirePermission(event, 'permission_manage')
+    if (!owner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Only the Owner can end a season' }) }
+    }
+
+    const [row] = await sql`
+        UPDATE seasons
+        SET is_active = false,
+            end_date = CURRENT_DATE,
+            updated_at = NOW()
+        WHERE id = ${id} AND is_active = true
+        RETURNING id, name, is_active, league_id, end_date
+    `
+    if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Season not found or already ended' }) }
+
+    await logAudit(sql, admin, { action: 'end-season', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'season', targetId: id, details: { name: row.name, end_date: row.end_date } })
+
+    // Re-evaluate season-based challenges for all players in this season
+    reevaluateSeasonChallenges(sql, id)
+        .catch(err => console.error('Season end challenge re-evaluation failed:', err))
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
+}
+
+/**
+ * Re-evaluate season-based challenges for all players in a just-closed season.
+ * Fire-and-forget — errors are logged but won't break the toggle response.
+ */
+async function reevaluateSeasonChallenges(sql, seasonId) {
+    const users = await sql`
+        SELECT DISTINCT u.id as user_id, u.linked_player_id
+        FROM users u
+        JOIN league_players lp ON lp.player_id = u.linked_player_id
+        WHERE lp.season_id = ${seasonId} AND u.linked_player_id IS NOT NULL
+    `
+    for (const u of users) {
+        try {
+            const stats = await getPerformanceStats(sql, u.linked_player_id)
+            await pushChallengeProgress(sql, u.user_id, stats)
+        } catch (err) {
+            console.error(`Season close challenge update failed for user ${u.user_id}:`, err)
+        }
+    }
 }
 
 async function deleteSeason(sql, { id }, admin) {

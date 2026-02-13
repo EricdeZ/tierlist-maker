@@ -100,7 +100,7 @@ export async function getPerformanceStats(sql, playerId) {
             JOIN league_players lp ON pgs.league_player_id = lp.id
             WHERE lp.player_id = ${playerId}
         `,
-        // Per-season stats (min 5 games) for best win rate and avg damage
+        // Per-season stats (min 5 games, completed seasons only) for best win rate and avg damage
         sql`
             SELECT
                 lp.season_id,
@@ -116,7 +116,8 @@ export async function getPerformanceStats(sql, playerId) {
             JOIN league_players lp ON pgs.league_player_id = lp.id
             JOIN games g ON pgs.game_id = g.id
             JOIN matches m ON g.match_id = m.id
-            WHERE lp.player_id = ${playerId}
+            JOIN seasons s ON lp.season_id = s.id
+            WHERE lp.player_id = ${playerId} AND s.is_active = false
             GROUP BY lp.season_id
             HAVING COUNT(DISTINCT pgs.game_id) >= 5
         `,

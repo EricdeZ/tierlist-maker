@@ -1,13 +1,16 @@
 // src/pages/admin/LeagueManager.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle } from 'lucide-react'
+import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
+import { useAuth } from '../../context/AuthContext'
 
 const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
 
 export default function LeagueManager() {
+    const { hasPermission } = useAuth()
+    const isOwner = hasPermission('permission_manage')
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -96,6 +99,22 @@ export default function LeagueManager() {
             showToast('success', `Season ${!currentActive ? 'activated' : 'deactivated'}`)
             fetchData()
         } catch (e) { showToast('error', e.message) }
+    }
+
+    // ─── End season (Owner only) ───
+    const handleEndSeason = (id, name) => {
+        setConfirmModal({
+            title: 'End Season',
+            message: `End "${name}"? This will close the season, set end date to today, and award season-based challenges. This cannot be undone.`,
+            onConfirm: async () => {
+                setConfirmModal(null)
+                try {
+                    await doAction({ action: 'end-season', id })
+                    showToast('success', `Season "${name}" ended — challenges awarded`)
+                    fetchData()
+                } catch (e) { showToast('error', e.message) }
+            },
+        })
     }
 
     // ─── Delete ───
@@ -485,6 +504,15 @@ export default function LeagueManager() {
                                                                                     )}
                                                                                 </div>
                                                                                 <div className="flex items-center gap-1">
+                                                                                    {isOwner && season.is_active && (
+                                                                                        <button
+                                                                                            onClick={() => handleEndSeason(season.id, season.name)}
+                                                                                            className="p-1 rounded transition-colors text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                                                                                            title="End Season"
+                                                                                        >
+                                                                                            <Flag className="w-3.5 h-3.5" />
+                                                                                        </button>
+                                                                                    )}
                                                                                     <button
                                                                                         onClick={() => handleToggleSeason(season.id, season.is_active)}
                                                                                         className={`p-1 rounded transition-colors ${season.is_active ? 'text-green-400 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-500 hover:text-green-400 hover:bg-green-500/10'}`}
