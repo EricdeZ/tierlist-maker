@@ -835,6 +835,7 @@ function buildEditData(result) {
             const sub = pm?.unmatched?.find(x => x.extracted_name === p.player_name && x.side === side)
             return {
                 ...p,
+                original_name: p.player_name,
                 matched_name: m?.db_player?.name || null,
                 matched_lp_id: m?.db_player?.league_player_id || null,
                 match_source: m?.match_source || null,
@@ -1484,7 +1485,56 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
     const updateGame = (gameIdx, gameUpdater) => {
         onChange(prev => {
             const games = [...prev.games]
-            games[gameIdx] = typeof gameUpdater === 'function' ? gameUpdater(games[gameIdx]) : { ...games[gameIdx], ...gameUpdater }
+            const oldGame = games[gameIdx]
+            games[gameIdx] = typeof gameUpdater === 'function' ? gameUpdater(oldGame) : { ...oldGame, ...gameUpdater }
+            const newGame = games[gameIdx]
+
+            // Propagate newly-matched players to the same player in other games
+            const propagate = (oldPlayers, newPlayers) => {
+                if (!oldPlayers || !newPlayers) return
+                newPlayers.forEach((np, i) => {
+                    const op = oldPlayers[i]
+                    if (!op || op.matched_lp_id || !np.matched_lp_id) return
+                    // This player was just matched — find same extracted name in other games
+                    const origName = (op.original_name || op.player_name || '').toLowerCase()
+                    if (!origName) return
+                    for (let gIdx = 0; gIdx < games.length; gIdx++) {
+                        if (gIdx === gameIdx) continue
+                        const g = games[gIdx]
+                        if (!g) continue
+                        const updatePlayers = (players) => {
+                            if (!players) return players
+                            let changed = false
+                            const updated = players.map(p => {
+                                const pOrig = (p.original_name || p.player_name || '').toLowerCase()
+                                if (pOrig === origName && !p.matched_lp_id) {
+                                    changed = true
+                                    return {
+                                        ...p,
+                                        player_name: np.player_name,
+                                        matched_name: np.matched_name,
+                                        matched_lp_id: np.matched_lp_id,
+                                        match_source: np.match_source || null,
+                                        matched_alias: np.matched_alias || null,
+                                        is_sub: false,
+                                        sub_type: null,
+                                    }
+                                }
+                                return p
+                            })
+                            return changed ? updated : players
+                        }
+                        games[gIdx] = {
+                            ...g,
+                            left_players: updatePlayers(g.left_players),
+                            right_players: updatePlayers(g.right_players),
+                        }
+                    }
+                })
+            }
+            propagate(oldGame.left_players, newGame.left_players)
+            propagate(oldGame.right_players, newGame.right_players)
+
             return { ...prev, games }
         })
     }
@@ -1613,7 +1663,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                     <button
                         onClick={() => {
                             const emptyPlayer = () => ({
-                                player_name: '', god_played: '', kills: 0, deaths: 0, assists: 0,
+                                player_name: '', original_name: '', god_played: '', kills: 0, deaths: 0, assists: 0,
                                 player_damage: 0, mitigated: 0, structure_damage: 0, gpm: 0,
                                 matched_name: null, matched_lp_id: null, is_sub: false, sub_type: null,
                             })
@@ -1840,9 +1890,8 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
 function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange }) {
     const [showSearch, setShowSearch] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
-    const [aliasSaved, setAliasSaved] = useState(false)
     const [showAliasModal, setShowAliasModal] = useState(false)
-    const [originalExtractedName] = useState(player.player_name)
+    const originalExtractedName = player.original_name || player.player_name
     const searchRef = useRef(null)
     const inputRef = useRef(null)
 
@@ -1983,7 +2032,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     {isMatched && player.matched_name && player.matched_name !== player.player_name && !showSearch && (
                         <div className="text-[10px] text-[var(--color-text-secondary)] pl-3 truncate">→ {player.matched_name}</div>
                     )}
-                    {player.is_sub && !showSearch && !aliasSaved && (
+                    {player.is_sub && !isMatched && !showSearch && (
                         <>
                             <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">
                                 {player.sub_type === 'new' ? 'NEW SUB' : 'SUB'}
@@ -2002,12 +2051,6 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     {player.match_source === 'alias' && isMatched && !showSearch && (
                         <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold">
                             via alias{player.matched_alias ? `: "${player.matched_alias}"` : ''}
-                        </span>
-                    )}
-
-                    {aliasSaved && !showSearch && (
-                        <span className="text-[9px] ml-1 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold">
-                            Alias Saved
                         </span>
                     )}
 
@@ -2077,10 +2120,11 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                             player_name: selectedPlayer.name,
                             matched_name: selectedPlayer.name,
                             matched_lp_id: selectedPlayer.league_player_id,
+                            match_source: 'alias',
+                            matched_alias: originalExtractedName,
                             is_sub: false,
                             sub_type: null,
                         })
-                        setAliasSaved(true)
                         setShowAliasModal(false)
                     }}
                     onClose={() => setShowAliasModal(false)}
