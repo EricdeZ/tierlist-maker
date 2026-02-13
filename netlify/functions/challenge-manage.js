@@ -20,9 +20,9 @@ export const handler = async (event) => {
             const challenges = await sql`
                 SELECT id, title, description, category, type, reward,
                        target_value, stat_key, repeat_cooldown, is_active,
-                       sort_order, created_at
+                       sort_order, tier, gives_badge, badge_label, created_at
                 FROM challenges
-                ORDER BY sort_order, category, id
+                ORDER BY sort_order, id
             `
             return { statusCode: 200, headers, body: JSON.stringify({ challenges }) }
         }
@@ -62,7 +62,7 @@ export const handler = async (event) => {
 // Create a challenge
 // ═══════════════════════════════════════════════════
 async function createChallenge(sql, body, admin) {
-    const { title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order } = body
+    const { title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label } = body
 
     if (!title || !stat_key || !target_value) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'title, stat_key, and target_value are required' }) }
@@ -70,9 +70,10 @@ async function createChallenge(sql, body, admin) {
 
     const validCategories = ['engagement', 'league', 'performance', 'social']
     const validTypes = ['one_time', 'repeatable']
+    const validTiers = ['daily', 'clay', 'amber', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'obsidian', 'master', 'demigod', 'deity']
 
     const [created] = await sql`
-        INSERT INTO challenges (title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order)
+        INSERT INTO challenges (title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label)
         VALUES (
             ${title},
             ${description || null},
@@ -82,7 +83,10 @@ async function createChallenge(sql, body, admin) {
             ${target_value},
             ${stat_key},
             ${repeat_cooldown || null},
-            ${sort_order || 0}
+            ${sort_order || 0},
+            ${validTiers.includes(tier) ? tier : 'daily'},
+            ${gives_badge || false},
+            ${badge_label || null}
         )
         RETURNING id
     `
@@ -90,7 +94,7 @@ async function createChallenge(sql, body, admin) {
     await logAudit(sql, admin, {
         action: 'create-challenge', endpoint: 'challenge-manage',
         targetType: 'challenge', targetId: created.id,
-        details: { title, category, type, reward, target_value, stat_key },
+        details: { title, category, type, reward, target_value, stat_key, tier, gives_badge },
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: created.id }) }
@@ -101,7 +105,7 @@ async function createChallenge(sql, body, admin) {
 // Update a challenge
 // ═══════════════════════════════════════════════════
 async function updateChallenge(sql, body, admin) {
-    const { id, title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order } = body
+    const { id, title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label } = body
 
     if (!id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
@@ -117,14 +121,17 @@ async function updateChallenge(sql, body, admin) {
             target_value = COALESCE(${target_value || null}, target_value),
             stat_key = COALESCE(${stat_key || null}, stat_key),
             repeat_cooldown = ${repeat_cooldown !== undefined ? (repeat_cooldown || null) : sql`repeat_cooldown`},
-            sort_order = COALESCE(${sort_order !== undefined ? sort_order : null}, sort_order)
+            sort_order = COALESCE(${sort_order !== undefined ? sort_order : null}, sort_order),
+            tier = COALESCE(${tier || null}, tier),
+            gives_badge = ${gives_badge !== undefined ? gives_badge : sql`gives_badge`},
+            badge_label = ${badge_label !== undefined ? (badge_label || null) : sql`badge_label`}
         WHERE id = ${id}
     `
 
     await logAudit(sql, admin, {
         action: 'update-challenge', endpoint: 'challenge-manage',
         targetType: 'challenge', targetId: id,
-        details: { title, category, type, reward, target_value, stat_key },
+        details: { title, category, type, reward, target_value, stat_key, tier, gives_badge },
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }

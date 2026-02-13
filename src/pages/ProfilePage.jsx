@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { profileService } from '../services/database'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
+import { getTierColor } from '../config/challengeTiers'
 import PageTitle from '../components/PageTitle'
 import SimpleNav from '../components/layout/SimpleNav'
 
@@ -178,6 +179,30 @@ const ProfilePage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Badges */}
+            {profileData.badges?.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                    {profileData.badges.map((badge, i) => {
+                        const color = getTierColor(badge.tier)
+                        return (
+                            <div
+                                key={i}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold"
+                                style={{
+                                    borderColor: `${color}60`,
+                                    color: color,
+                                    backgroundColor: `${color}15`,
+                                }}
+                                title={`${badge.title} — ${badge.completed_at ? new Date(badge.completed_at).toLocaleDateString() : ''}`}
+                            >
+                                <span>&#9733;</span>
+                                {badge.badge_label}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
 
             {/* Claim CTA Banner */}
             {!player.is_claimed && !authLoading && (

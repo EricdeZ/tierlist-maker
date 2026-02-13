@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import PageTitle from '../components/PageTitle'
 import SimpleNav from '../components/layout/SimpleNav'
 import RankBanner from '../components/RankBanner'
+import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../config/challengeTiers'
 import passionCoin from '../assets/passion/passion.png'
 
 const DiscordIcon = ({ className }) => (
@@ -12,14 +13,6 @@ const DiscordIcon = ({ className }) => (
         <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z" />
     </svg>
 )
-
-// ─── Category border colors ───────────────────────
-const CATEGORY_BORDERS = {
-    engagement:  'border-l-blue-400',
-    league:      'border-l-emerald-400',
-    performance: 'border-l-orange-400',
-    social:      'border-l-purple-400',
-}
 
 // ─── Flying coins — straight line to passion balance ───
 function spawnFlyingCoins(sourceEl, coinSrc) {
@@ -40,7 +33,6 @@ function spawnFlyingCoins(sourceEl, coinSrc) {
         coin.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px;z-index:9999;pointer-events:none;will-change:transform;`
         document.body.appendChild(coin)
 
-        // Spread out start positions around the button
         const spreadX = (Math.random() - 0.5) * 100
         const spreadY = (Math.random() - 0.5) * 40
         const startX = sx + spreadX
@@ -72,7 +64,30 @@ function spawnFlyingCoins(sourceEl, coinSrc) {
 
 
 // ─── Smart challenge grouping and sorting ──────────
-function buildDisplayList(challenges) {
+function buildDisplayList(challenges, activeTier) {
+    // "Completed" view: all completed challenges across every tier
+    if (activeTier === 'completed') {
+        return Object.values(challenges).flat()
+            .filter(ch => ch.completed)
+            .sort((a, b) => {
+                const da = a.completedAt ? new Date(a.completedAt) : 0
+                const db = b.completedAt ? new Date(b.completedAt) : 0
+                return db - da
+            })
+    }
+
+    // When filtering by a specific tier, show incomplete + claimable only
+    if (activeTier !== 'all') {
+        const tierChallenges = (challenges[activeTier] || []).filter(ch => !ch.completed || ch.claimable)
+        return [...tierChallenges].sort((a, b) => {
+            if (a.claimable && !b.claimable) return -1
+            if (!a.claimable && b.claimable) return 1
+            if (a.progress !== b.progress) return b.progress - a.progress
+            return a.targetValue - b.targetValue
+        })
+    }
+
+    // "All" view: use smart grouping by stat_key chains, hide completed
     const flat = Object.values(challenges).flat()
 
     const groups = {}
@@ -87,23 +102,20 @@ function buildDisplayList(challenges) {
         tiers.sort((a, b) => a.targetValue - b.targetValue)
         let shownNext = false
         for (const ch of tiers) {
-            if (ch.completed) {
-                display.push(ch)
-            } else if (!shownNext) {
+            if (ch.completed) continue
+            if (!shownNext) {
                 display.push(ch)
                 shownNext = true
             }
         }
     }
 
+    // Also include claimable challenges that are technically "completed" but not yet claimed
+    for (const ch of flat) {
+        if (ch.claimable && !display.find(d => d.id === ch.id)) display.push(ch)
+    }
+
     display.sort((a, b) => {
-        if (a.completed && !b.completed) return -1
-        if (!a.completed && b.completed) return 1
-        if (a.completed && b.completed) {
-            const da = a.completedAt ? new Date(a.completedAt) : 0
-            const db = b.completedAt ? new Date(b.completedAt) : 0
-            return db - da
-        }
         if (a.claimable && !b.claimable) return -1
         if (!a.claimable && b.claimable) return 1
         if (a.progress !== b.progress) return b.progress - a.progress
@@ -124,6 +136,7 @@ export default function Challenges() {
     const [loading, setLoading] = useState(true)
     const [claimingId, setClaimingId] = useState(null)
     const [justClaimed, setJustClaimed] = useState({})
+    const [activeTier, setActiveTier] = useState('all')
 
     const loadChallenges = useCallback(() => {
         return challengeService.getAll()
@@ -138,7 +151,16 @@ export default function Challenges() {
         if (challengeNotifications.length > 0) loadChallenges()
     }, [challengeNotifications.length, loadChallenges])
 
-    const displayList = useMemo(() => buildDisplayList(challengeData), [challengeData])
+    const displayList = useMemo(() => buildDisplayList(challengeData, activeTier), [challengeData, activeTier])
+
+    // Count how many tiers have challenges (for showing filter)
+    const availableTiers = useMemo(() => {
+        return CHALLENGE_TIERS.filter(t => challengeData[t.key]?.length > 0)
+    }, [challengeData])
+
+    const completedCount = useMemo(() => {
+        return Object.values(challengeData).flat().filter(ch => ch.completed).length
+    }, [challengeData])
 
     const handleClaim = async (challengeId, buttonEl) => {
         setClaimingId(challengeId)
@@ -173,12 +195,54 @@ export default function Challenges() {
                 <RankBanner />
 
                 {/* Page header */}
-                <div className="mt-8 mb-6">
+                <div className="mt-8 mb-4">
                     <h1 className="text-2xl sm:text-3xl font-bold font-heading">Challenges</h1>
                     <p className="text-sm text-(--color-text-secondary)/70 mt-1">
                         Complete challenges to earn Passion and rank up
                     </p>
                 </div>
+
+                {/* Tier filter pills */}
+                {!loading && availableTiers.length > 1 && (
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 mb-6 scrollbar-hide">
+                        <button
+                            onClick={() => setActiveTier('all')}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                                activeTier === 'all'
+                                    ? 'bg-(--color-accent) text-(--color-primary)'
+                                    : 'bg-white/[0.06] text-(--color-text-secondary)/70 hover:bg-white/10'
+                            }`}
+                        >
+                            All
+                        </button>
+                        {availableTiers.map(tier => (
+                            <button
+                                key={tier.key}
+                                onClick={() => setActiveTier(tier.key)}
+                                className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                                style={
+                                    activeTier === tier.key
+                                        ? { backgroundColor: tier.color, color: '#0a0f1a' }
+                                        : { backgroundColor: 'rgba(255,255,255,0.04)', color: `${tier.color}cc` }
+                                }
+                            >
+                                {tier.label}
+                            </button>
+                        ))}
+                        {completedCount > 0 && (
+                            <button
+                                onClick={() => setActiveTier('completed')}
+                                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                                    activeTier === 'completed'
+                                        ? 'bg-green-500/80 text-(--color-primary)'
+                                        : 'bg-white/[0.06] text-green-400/70 hover:bg-white/10'
+                                }`}
+                            >
+                                Completed ({completedCount})
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Sign-in prompt for unauthenticated users */}
                 {!authLoading && !user && (
@@ -205,7 +269,9 @@ export default function Challenges() {
                     </div>
                 ) : displayList.length === 0 ? (
                     <div className="text-center py-16 text-(--color-text-secondary)/50">
-                        No challenges available yet.
+                        {activeTier === 'completed' ? 'No completed challenges yet.' :
+                         activeTier !== 'all' ? `No ${getTierLabel(activeTier)} challenges yet.` :
+                         'No challenges available yet.'}
                     </div>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -218,6 +284,7 @@ export default function Challenges() {
                                 justClaimed={justClaimed[ch.id]}
                                 onClaim={handleClaim}
                                 isLoggedIn={!!user}
+                                showTierBadge={activeTier === 'all'}
                             />
                         ))}
                     </div>
@@ -250,22 +317,24 @@ export default function Challenges() {
 // ═══════════════════════════════════════════════════
 // Challenge Card
 // ═══════════════════════════════════════════════════
-function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim, isLoggedIn }) {
+function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim, isLoggedIn, showTierBadge }) {
     const pct = Math.round(ch.progress * 100)
-    const borderClass = CATEGORY_BORDERS[ch.category] || CATEGORY_BORDERS.engagement
+    const tierColor = getTierColor(ch.tier)
     const isClaiming = claimingId === ch.id
     const isClaimable = isLoggedIn && ch.claimable && !justClaimed && !ch.completed
 
     return (
         <div
             className={`
-                relative rounded-xl border-l-[3px] ${borderClass}
+                relative rounded-xl
                 bg-(--color-secondary) border border-white/[0.06]
                 overflow-hidden transition-all duration-300
-                ${ch.completed ? 'opacity-50' : ''}
+                ${ch.completed && !ch.claimable ? 'opacity-60' : ''}
                 ${isClaimable ? 'border-r-(--color-accent)/25 border-t-(--color-accent)/25 border-b-(--color-accent)/25' : ''}
             `}
             style={{
+                borderLeftWidth: '3px',
+                borderLeftColor: tierColor,
                 animation: `card-enter 0.4s ease-out ${index * 0.06}s both`,
                 ...(justClaimed ? { animation: `claim-glow 1.2s ease-out` } : {}),
             }}
@@ -285,12 +354,27 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
             <div className="relative p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3 mb-1">
                     <div className="min-w-0">
-                        <h3 className="font-bold text-sm sm:text-base font-heading leading-tight">{ch.title}</h3>
-                        <p className="text-xs text-(--color-text-secondary)/60 mt-0.5 leading-relaxed">{ch.description}</p>
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <h3 className="font-bold text-sm sm:text-base font-heading leading-tight">{ch.title}</h3>
+                            {ch.givesBadge && (
+                                <span className="text-xs" title="Earns a profile badge">&#9733;</span>
+                            )}
+                        </div>
+                        <p className="text-xs text-(--color-text-secondary)/60 leading-relaxed">{ch.description}</p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                        <span className="text-sm font-bold" style={{ color: '#f8c56a' }}>+{ch.reward}</span>
-                        <img src={passionCoin} alt="" className="w-4 h-4" />
+                    <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                        {showTierBadge && (
+                            <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: `${tierColor}20`, color: tierColor }}
+                            >
+                                {getTierLabel(ch.tier)}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-1">
+                            <span className="text-sm font-bold" style={{ color: '#f8c56a' }}>+{ch.reward}</span>
+                            <img src={passionCoin} alt="" className="w-4 h-4" />
+                        </div>
                     </div>
                 </div>
 
@@ -316,7 +400,7 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                                 width: `${pct}%`,
                                 background: ch.completed
                                     ? 'rgba(74, 222, 128, 0.5)'
-                                    : 'linear-gradient(90deg, #d4a04a, #f8c56a)',
+                                    : `linear-gradient(90deg, ${tierColor}99, ${tierColor})`,
                                 animation: 'progress-fill 0.8s ease-out',
                             }}
                         />

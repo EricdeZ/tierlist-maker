@@ -49,19 +49,21 @@ async function listChallenges(sql, user) {
     if (!user) {
         const challenges = await sql`
             SELECT id, title, description, category, type, reward,
-                   target_value, stat_key, repeat_cooldown
+                   target_value, stat_key, repeat_cooldown,
+                   tier, gives_badge, badge_label
             FROM challenges
             WHERE is_active = true
-            ORDER BY sort_order, category, id
+            ORDER BY sort_order, id
         `
 
         const grouped = {}
         for (const ch of challenges) {
-            if (!grouped[ch.category]) grouped[ch.category] = []
-            grouped[ch.category].push({
+            if (!grouped[ch.tier]) grouped[ch.tier] = []
+            grouped[ch.tier].push({
                 id: ch.id, title: ch.title, description: ch.description,
                 category: ch.category, type: ch.type, reward: ch.reward,
                 targetValue: ch.target_value, statKey: ch.stat_key,
+                tier: ch.tier, givesBadge: ch.gives_badge, badgeLabel: ch.badge_label,
                 currentValue: 0, completed: false, completedAt: null,
                 lastCompletedAt: null, canRepeat: false, claimable: false, progress: 0,
             })
@@ -72,7 +74,14 @@ async function listChallenges(sql, user) {
 
     // Backfill: if user has a linked player, check for stale performance challenges
     // (challenges created after user already had enough stats → current_value stuck at 0)
-    const PERF_KEYS = ['total_damage', 'total_kills', 'total_assists', 'total_mitigated', 'games_played', 'leagues_joined']
+    const PERF_KEYS = [
+        'total_damage', 'total_kills', 'total_assists', 'total_mitigated',
+        'games_played', 'leagues_joined',
+        'best_kills_game', 'best_deaths_game', 'best_assists_game',
+        'best_damage_game', 'best_mitigated_game',
+        'best_season_win_rate', 'best_season_avg_damage',
+        'games_in_tier_1', 'total_wins',
+    ]
     try {
         const [userRow] = await sql`SELECT linked_player_id FROM users WHERE id = ${user.id}`
         if (userRow?.linked_player_id) {
@@ -97,21 +106,22 @@ async function listChallenges(sql, user) {
     const challenges = await sql`
         SELECT c.id, c.title, c.description, c.category, c.type, c.reward,
                c.target_value, c.stat_key, c.repeat_cooldown,
+               c.tier, c.gives_badge, c.badge_label,
                COALESCE(uc.current_value, 0) as current_value,
                COALESCE(uc.completed, false) as completed,
                uc.completed_at, uc.last_completed_at
         FROM challenges c
         LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${user.id}
         WHERE c.is_active = true
-        ORDER BY c.sort_order, c.category, c.id
+        ORDER BY c.sort_order, c.id
     `
 
-    // Group by category
+    // Group by tier
     const grouped = {}
     let claimableCount = 0
 
     for (const ch of challenges) {
-        if (!grouped[ch.category]) grouped[ch.category] = []
+        if (!grouped[ch.tier]) grouped[ch.tier] = []
 
         const claimable = !ch.completed && Number(ch.current_value) >= Number(ch.target_value)
 
@@ -123,7 +133,7 @@ async function listChallenges(sql, user) {
 
         if (claimable) claimableCount++
 
-        grouped[ch.category].push({
+        grouped[ch.tier].push({
             id: ch.id,
             title: ch.title,
             description: ch.description,
@@ -132,6 +142,9 @@ async function listChallenges(sql, user) {
             reward: ch.reward,
             targetValue: ch.target_value,
             statKey: ch.stat_key,
+            tier: ch.tier,
+            givesBadge: ch.gives_badge,
+            badgeLabel: ch.badge_label,
             currentValue: ch.current_value,
             completed: ch.completed,
             completedAt: ch.completed_at,
@@ -159,7 +172,8 @@ async function claimChallenge(sql, user, event) {
 
     // Get challenge
     const [challenge] = await sql`
-        SELECT id, title, reward, target_value, type FROM challenges
+        SELECT id, title, reward, target_value, type, gives_badge, badge_label
+        FROM challenges
         WHERE id = ${challengeId} AND is_active = true
     `
     if (!challenge) {
@@ -229,6 +243,7 @@ async function claimChallenge(sql, user, event) {
             rank: { name: newRank.name, division: newRank.division, display: formatRank(newRank) },
             rankedUp,
             claimableCount: parseInt(claimableCount),
+            badge: challenge.gives_badge ? { label: challenge.badge_label } : null,
         }),
     }
 }

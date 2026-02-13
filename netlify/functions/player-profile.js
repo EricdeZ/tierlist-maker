@@ -33,8 +33,8 @@ export const handler = async (event) => {
             return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
         }
 
-        // 2, 3, 4 in parallel
-        const [leagueBreakdowns, seasonHistory, gameHistory] = await Promise.all([
+        // 2, 3, 4, 5 in parallel
+        const [leagueBreakdowns, seasonHistory, gameHistory, badges] = await Promise.all([
             // Per-league aggregate stats
             sql`
                 SELECT
@@ -153,6 +153,18 @@ export const handler = async (event) => {
                 WHERE lp.player_id = ${player.id}
                 ORDER BY m.date DESC, g.game_number DESC
             `,
+            // Completed badge challenges for this player's linked user
+            player.is_claimed ? sql`
+                SELECT c.badge_label, c.tier, c.title, uc.completed_at
+                FROM user_challenges uc
+                JOIN challenges c ON c.id = uc.challenge_id
+                JOIN users u ON u.id = uc.user_id
+                WHERE u.linked_player_id = ${player.id}
+                  AND uc.completed = true
+                  AND c.gives_badge = true
+                  AND c.is_active = true
+                ORDER BY uc.completed_at DESC
+            ` : [],
         ])
 
         // Compute allTimeStats from leagueBreakdowns
@@ -185,6 +197,7 @@ export const handler = async (event) => {
                 leagueBreakdowns,
                 seasonHistory,
                 gameHistory,
+                badges,
             }),
         }
     } catch (error) {

@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { challengeService } from '../../services/database'
+import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../../config/challengeTiers'
 import PageTitle from '../../components/PageTitle'
 import passionCoin from '../../assets/passion/passion.png'
 
 const CATEGORIES = ['engagement', 'league', 'performance', 'social']
 const TYPES = ['one_time', 'repeatable']
+const TIERS = CHALLENGE_TIERS.map(t => t.key)
 const STAT_KEYS = [
     { value: 'discord_linked', label: 'Discord Linked (sign in)' },
     { value: 'daily_logins', label: 'Daily Logins (count)' },
@@ -16,10 +18,19 @@ const STAT_KEYS = [
     { value: 'total_earned', label: 'Total Passion Earned' },
     { value: 'games_played', label: 'Games Played' },
     { value: 'leagues_joined', label: 'Leagues Joined' },
-    { value: 'total_kills', label: 'Total Kills' },
-    { value: 'total_assists', label: 'Total Assists' },
-    { value: 'total_damage', label: 'Total Damage Dealt' },
-    { value: 'total_mitigated', label: 'Total Damage Mitigated' },
+    { value: 'total_kills', label: 'Total Kills (career)' },
+    { value: 'total_assists', label: 'Total Assists (career)' },
+    { value: 'total_damage', label: 'Total Damage (career)' },
+    { value: 'total_mitigated', label: 'Total Mitigated (career)' },
+    { value: 'total_wins', label: 'Total Wins (career)' },
+    { value: 'best_kills_game', label: 'Best Kills (single game)' },
+    { value: 'best_deaths_game', label: 'Best Deaths (single game)' },
+    { value: 'best_assists_game', label: 'Best Assists (single game)' },
+    { value: 'best_damage_game', label: 'Best Damage (single game)' },
+    { value: 'best_mitigated_game', label: 'Best Mitigated (single game)' },
+    { value: 'best_season_win_rate', label: 'Best Season Win Rate % (min 5 games)' },
+    { value: 'best_season_avg_damage', label: 'Best Season Avg Damage (min 5 games)' },
+    { value: 'games_in_tier_1', label: 'Games in Tier 1 Division' },
 ]
 
 const EMPTY_FORM = {
@@ -32,6 +43,9 @@ const EMPTY_FORM = {
     stat_key: 'daily_logins',
     repeat_cooldown: '',
     sort_order: 0,
+    tier: 'daily',
+    gives_badge: false,
+    badge_label: '',
 }
 
 export default function ChallengeManager() {
@@ -74,6 +88,9 @@ export default function ChallengeManager() {
             stat_key: ch.stat_key,
             repeat_cooldown: ch.repeat_cooldown || '',
             sort_order: ch.sort_order,
+            tier: ch.tier || 'daily',
+            gives_badge: ch.gives_badge || false,
+            badge_label: ch.badge_label || '',
         })
         setEditingId(ch.id)
         setError(null)
@@ -130,7 +147,7 @@ export default function ChallengeManager() {
             <PageTitle title="Challenge Manager" />
 
             {/* Header */}
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <Link to="/admin" className="text-(--color-text-secondary) hover:text-(--color-text)">
@@ -152,55 +169,69 @@ export default function ChallengeManager() {
                     </div>
                 ) : (
                     <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-white/10 text-xs text-(--color-text-secondary) uppercase tracking-wider">
-                                    <th className="px-4 py-3 text-left">Title</th>
-                                    <th className="px-4 py-3 text-left hidden md:table-cell">Category</th>
-                                    <th className="px-4 py-3 text-left hidden md:table-cell">Stat</th>
-                                    <th className="px-4 py-3 text-center">Target</th>
-                                    <th className="px-4 py-3 text-center">Reward</th>
-                                    <th className="px-4 py-3 text-center">Type</th>
-                                    <th className="px-4 py-3 text-center">Active</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {challenges.map(ch => (
-                                    <tr key={ch.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${!ch.is_active ? 'opacity-50' : ''}`}>
-                                        <td className="px-4 py-3 font-medium">{ch.title}</td>
-                                        <td className="px-4 py-3 hidden md:table-cell capitalize text-(--color-text-secondary)">{ch.category}</td>
-                                        <td className="px-4 py-3 hidden md:table-cell text-(--color-text-secondary) font-mono text-xs">{ch.stat_key}</td>
-                                        <td className="px-4 py-3 text-center tabular-nums">{ch.target_value.toLocaleString()}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
-                                                <span className="text-(--color-accent) font-bold">{ch.reward}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${ch.type === 'repeatable' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-(--color-text-secondary)'}`}>
-                                                {ch.type === 'repeatable' ? 'Repeat' : 'Once'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button onClick={() => handleToggle(ch.id)}
-                                                className={`w-8 h-5 rounded-full transition-colors ${ch.is_active ? 'bg-green-500' : 'bg-white/20'}`}>
-                                                <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${ch.is_active ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button onClick={() => openEdit(ch)}
-                                                    className="text-xs text-blue-400 hover:text-blue-300">Edit</button>
-                                                <button onClick={() => handleDelete(ch.id)}
-                                                    className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                                            </div>
-                                        </td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-white/10 text-xs text-(--color-text-secondary) uppercase tracking-wider">
+                                        <th className="px-4 py-3 text-left">Title</th>
+                                        <th className="px-4 py-3 text-center">Tier</th>
+                                        <th className="px-4 py-3 text-left hidden lg:table-cell">Stat</th>
+                                        <th className="px-4 py-3 text-center">Target</th>
+                                        <th className="px-4 py-3 text-center">Reward</th>
+                                        <th className="px-4 py-3 text-center hidden md:table-cell">Badge</th>
+                                        <th className="px-4 py-3 text-center">Active</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {challenges.map(ch => (
+                                        <tr key={ch.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${!ch.is_active ? 'opacity-50' : ''}`}>
+                                            <td className="px-4 py-3 font-medium">
+                                                <div>{ch.title}</div>
+                                                <div className="text-xs text-(--color-text-secondary) capitalize">{ch.category}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span
+                                                    className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                                    style={{ backgroundColor: `${getTierColor(ch.tier)}20`, color: getTierColor(ch.tier) }}
+                                                >
+                                                    {getTierLabel(ch.tier)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 hidden lg:table-cell text-(--color-text-secondary) font-mono text-xs">{ch.stat_key}</td>
+                                            <td className="px-4 py-3 text-center tabular-nums">{ch.target_value.toLocaleString()}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
+                                                    <span className="text-(--color-accent) font-bold">{ch.reward}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center hidden md:table-cell">
+                                                {ch.gives_badge ? (
+                                                    <span className="text-xs" title={ch.badge_label}>&#9733;</span>
+                                                ) : (
+                                                    <span className="text-(--color-text-secondary)/30">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button onClick={() => handleToggle(ch.id)}
+                                                    className={`w-8 h-5 rounded-full transition-colors ${ch.is_active ? 'bg-green-500' : 'bg-white/20'}`}>
+                                                    <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${ch.is_active ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button onClick={() => openEdit(ch)}
+                                                        className="text-xs text-blue-400 hover:text-blue-300">Edit</button>
+                                                    <button onClick={() => handleDelete(ch.id)}
+                                                        className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
@@ -235,7 +266,16 @@ export default function ChallengeManager() {
                                     placeholder="e.g., Deal 50,000 total damage across all games" />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs text-(--color-text-secondary) mb-1">Tier</label>
+                                    <select value={form.tier} onChange={e => setField('tier', e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50">
+                                        {TIERS.map(t => (
+                                            <option key={t} value={t} className="bg-gray-900">{getTierLabel(t)}</option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="block text-xs text-(--color-text-secondary) mb-1">Category</label>
                                     <select value={form.category} onChange={e => setField('category', e.target.value)}
@@ -279,6 +319,28 @@ export default function ChallengeManager() {
                                     <input type="number" value={form.sort_order} onChange={e => setField('sort_order', parseInt(e.target.value) || 0)}
                                         className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50" />
                                 </div>
+                            </div>
+
+                            {/* Badge settings */}
+                            <div className="border-t border-white/10 pt-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.gives_badge}
+                                        onChange={e => setField('gives_badge', e.target.checked)}
+                                        className="rounded accent-(--color-accent)"
+                                    />
+                                    <span className="text-sm">Grants a profile badge</span>
+                                </label>
+
+                                {form.gives_badge && (
+                                    <div className="mt-3">
+                                        <label className="block text-xs text-(--color-text-secondary) mb-1">Badge Label (shown on profile)</label>
+                                        <input value={form.badge_label} onChange={e => setField('badge_label', e.target.value)}
+                                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50"
+                                            placeholder="e.g., World Ender" />
+                                    </div>
+                                )}
                             </div>
 
                             {form.type === 'repeatable' && (

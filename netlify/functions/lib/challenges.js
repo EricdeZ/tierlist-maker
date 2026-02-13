@@ -57,29 +57,106 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
 
 /**
  * Get performance stats for a player (by player_id, not user_id).
+ * Returns career aggregates, per-game bests, season bests, and division data.
  */
 export async function getPerformanceStats(sql, playerId) {
-    const [gameStats] = await sql`
-        SELECT
-            COALESCE(SUM(pgs.kills), 0)::integer as total_kills,
-            COALESCE(SUM(pgs.deaths), 0)::integer as total_deaths,
-            COALESCE(SUM(pgs.assists), 0)::integer as total_assists,
-            COALESCE(SUM(pgs.damage), 0)::integer as total_damage,
-            COALESCE(SUM(pgs.mitigated), 0)::integer as total_mitigated,
-            COUNT(pgs.id)::integer as games_played
-        FROM player_game_stats pgs
-        JOIN league_players lp ON pgs.league_player_id = lp.id
-        WHERE lp.player_id = ${playerId}
-    `
+    const [
+        [gameStats],
+        [leagueCount],
+        [perGameBests],
+        seasonStats,
+        [tier1Games],
+        [winStats],
+    ] = await Promise.all([
+        // Career aggregates
+        sql`
+            SELECT
+                COALESCE(SUM(pgs.kills), 0)::integer as total_kills,
+                COALESCE(SUM(pgs.deaths), 0)::integer as total_deaths,
+                COALESCE(SUM(pgs.assists), 0)::integer as total_assists,
+                COALESCE(SUM(pgs.damage), 0)::integer as total_damage,
+                COALESCE(SUM(pgs.mitigated), 0)::integer as total_mitigated,
+                COUNT(pgs.id)::integer as games_played
+            FROM player_game_stats pgs
+            JOIN league_players lp ON pgs.league_player_id = lp.id
+            WHERE lp.player_id = ${playerId}
+        `,
+        // League count
+        sql`
+            SELECT COUNT(DISTINCT s.league_id)::integer as count
+            FROM league_players lp
+            JOIN seasons s ON lp.season_id = s.id
+            WHERE lp.player_id = ${playerId}
+        `,
+        // Per-game bests (MAX of each stat across all games)
+        sql`
+            SELECT
+                COALESCE(MAX(pgs.kills), 0)::integer as best_kills_game,
+                COALESCE(MAX(pgs.deaths), 0)::integer as best_deaths_game,
+                COALESCE(MAX(pgs.assists), 0)::integer as best_assists_game,
+                COALESCE(MAX(pgs.damage), 0)::integer as best_damage_game,
+                COALESCE(MAX(pgs.mitigated), 0)::integer as best_mitigated_game
+            FROM player_game_stats pgs
+            JOIN league_players lp ON pgs.league_player_id = lp.id
+            WHERE lp.player_id = ${playerId}
+        `,
+        // Per-season stats (min 5 games) for best win rate and avg damage
+        sql`
+            SELECT
+                lp.season_id,
+                COUNT(DISTINCT pgs.game_id)::integer as games,
+                COUNT(DISTINCT pgs.game_id) FILTER (
+                    WHERE g.winner_team_id = CASE pgs.team_side
+                        WHEN 1 THEN m.team1_id
+                        WHEN 2 THEN m.team2_id
+                    END
+                )::integer as wins,
+                COALESCE(AVG(pgs.damage), 0)::integer as avg_damage
+            FROM player_game_stats pgs
+            JOIN league_players lp ON pgs.league_player_id = lp.id
+            JOIN games g ON pgs.game_id = g.id
+            JOIN matches m ON g.match_id = m.id
+            WHERE lp.player_id = ${playerId}
+            GROUP BY lp.season_id
+            HAVING COUNT(DISTINCT pgs.game_id) >= 5
+        `,
+        // Games in Tier 1 divisions
+        sql`
+            SELECT COUNT(DISTINCT pgs.game_id)::integer as count
+            FROM player_game_stats pgs
+            JOIN league_players lp ON pgs.league_player_id = lp.id
+            JOIN seasons s ON lp.season_id = s.id
+            JOIN divisions d ON s.division_id = d.id
+            WHERE lp.player_id = ${playerId} AND d.tier = 1
+        `,
+        // Total career wins
+        sql`
+            SELECT COUNT(DISTINCT pgs.game_id)::integer as count
+            FROM player_game_stats pgs
+            JOIN league_players lp ON pgs.league_player_id = lp.id
+            JOIN games g ON pgs.game_id = g.id
+            JOIN matches m ON g.match_id = m.id
+            WHERE lp.player_id = ${playerId}
+              AND g.winner_team_id = CASE pgs.team_side
+                  WHEN 1 THEN m.team1_id
+                  WHEN 2 THEN m.team2_id
+              END
+        `,
+    ])
 
-    const [leagueCount] = await sql`
-        SELECT COUNT(DISTINCT s.league_id)::integer as count
-        FROM league_players lp
-        JOIN seasons s ON lp.season_id = s.id
-        WHERE lp.player_id = ${playerId}
-    `
+    // Compute best season win rate and avg damage across qualifying seasons
+    let bestSeasonWinRate = 0
+    let bestSeasonAvgDamage = 0
+    for (const s of seasonStats) {
+        if (s.games >= 5) {
+            const winRate = Math.round((s.wins / s.games) * 100)
+            if (winRate > bestSeasonWinRate) bestSeasonWinRate = winRate
+            if (s.avg_damage > bestSeasonAvgDamage) bestSeasonAvgDamage = s.avg_damage
+        }
+    }
 
     return {
+        // Career aggregates
         total_kills: Number(gameStats.total_kills),
         total_deaths: Number(gameStats.total_deaths),
         total_assists: Number(gameStats.total_assists),
@@ -87,6 +164,18 @@ export async function getPerformanceStats(sql, playerId) {
         total_mitigated: Number(gameStats.total_mitigated),
         games_played: Number(gameStats.games_played),
         leagues_joined: Number(leagueCount.count),
+        // Per-game bests
+        best_kills_game: Number(perGameBests.best_kills_game),
+        best_deaths_game: Number(perGameBests.best_deaths_game),
+        best_assists_game: Number(perGameBests.best_assists_game),
+        best_damage_game: Number(perGameBests.best_damage_game),
+        best_mitigated_game: Number(perGameBests.best_mitigated_game),
+        // Season bests
+        best_season_win_rate: bestSeasonWinRate,
+        best_season_avg_damage: bestSeasonAvgDamage,
+        // Division & win stats
+        games_in_tier_1: Number(tier1Games.count),
+        total_wins: Number(winStats.count),
     }
 }
 
