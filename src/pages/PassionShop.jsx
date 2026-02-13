@@ -36,11 +36,11 @@ const VAULT_ITEMS = [
         tier: 'legendary',
     },
     {
-        id: 'highlight-reel',
-        name: 'Season Highlight Feature',
-        description: 'Your best plays featured in the official end-of-season recap video.',
-        tier: 'mythic',
-        tag: 'Seasonal',
+        id: 'daily-boost',
+        name: 'Daily Passion Boost',
+        description: '2x daily login rewards for an entire week. Stack the coins while the boost lasts.',
+        tier: 'legendary',
+        tag: 'Consumable',
     },
 ]
 
@@ -64,6 +64,18 @@ const COLLECTION_ITEMS = [
         tier: 'epic',
     },
     {
+        id: 'profile-title',
+        name: 'Profile Title',
+        description: 'A custom line under your name — "The Relentless", "God of Solo Lane", whatever you want.',
+        tier: 'epic',
+    },
+    {
+        id: 'tierlist-themes',
+        name: 'Tier List Themes',
+        description: 'Custom color schemes for your tier list exports. Fire, ice, cosmic, and more.',
+        tier: 'epic',
+    },
+    {
         id: 'profile-banner',
         name: 'Profile Banner',
         description: 'Upload a custom banner for your profile page.',
@@ -76,22 +88,17 @@ const COLLECTION_ITEMS = [
         tier: 'rare',
     },
     {
-        id: 'emotes',
-        name: 'Emote Packs',
-        description: 'Premium reaction emotes. New packs regularly.',
+        id: 'coin-skins',
+        name: 'Coinflip Skins',
+        description: 'Different coin designs for the flip game. Gold, silver, holographic, and more.',
         tier: 'rare',
     },
     {
-        id: 'shoutout',
-        name: 'Shoutcaster Mention',
-        description: 'A personal shoutout during a community broadcast.',
-        tier: 'legendary',
-    },
-    {
-        id: 'early-access',
-        name: 'Early Access',
-        description: 'Beta tools and upcoming features before anyone else.',
-        tier: 'epic',
+        id: 'streak-shield',
+        name: 'Streak Shield',
+        description: 'One-time use. Protects your daily login streak from breaking if you miss a day.',
+        tier: 'rare',
+        tag: 'Consumable',
     },
 ]
 
