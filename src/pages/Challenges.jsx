@@ -312,16 +312,21 @@ export default function Challenges() {
 
                 {/* Sign-in prompt for unauthenticated users */}
                 {!authLoading && !user && (
-                    <div className="mb-6 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 p-5 text-center">
-                        <p className="text-sm text-(--color-text-secondary) mb-3">
-                            Sign in with Discord to track your progress, complete challenges, and earn Passion
-                        </p>
+                    <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-xl border border-(--color-accent)/15 bg-(--color-accent)/[0.04]">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <img src={passionCoin} alt="" className="w-8 h-8 shrink-0 opacity-60" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-(--color-text)">Show your Passion!</p>
+                                <p className="text-xs text-(--color-text-secondary)/50">Log in to track progress, complete challenges, and earn Passion</p>
+                            </div>
+                        </div>
                         <button
                             onClick={login}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs text-white transition-all hover:opacity-90 active:scale-95 cursor-pointer shrink-0"
+                            style={{ backgroundColor: '#5865F2' }}
                         >
                             <DiscordIcon className="w-4 h-4" />
-                            Login with Discord
+                            Log in with Discord
                         </button>
                     </div>
                 )}
