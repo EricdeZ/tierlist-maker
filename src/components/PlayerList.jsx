@@ -150,10 +150,7 @@ const PlayerList = () => {
 
     const formatNumber = (num) => new Intl.NumberFormat().format(Math.round(num))
 
-    const uniqueRoles = useMemo(() => {
-        if (!processedPlayers) return []
-        return [...new Set(processedPlayers.map(p => p.role).filter(Boolean))]
-    }, [processedPlayers])
+    const uniqueRoles = ['SOLO', 'JUNGLE', 'MID', 'SUPPORT', 'ADC']
 
     const uniqueTeams = useMemo(() => {
         if (!processedPlayers) return []
