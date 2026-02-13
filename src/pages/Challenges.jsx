@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { challengeService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
 import { useAuth } from '../context/AuthContext'
 import PageTitle from '../components/PageTitle'
 import SimpleNav from '../components/layout/SimpleNav'
 import RankBanner from '../components/RankBanner'
-import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../config/challengeTiers'
+import { CHALLENGE_TIERS, TIER_MAP, getTierColor, getTierLabel } from '../config/challengeTiers'
 import passionCoin from '../assets/passion/passion.png'
 
 const DiscordIcon = ({ className }) => (
@@ -127,6 +127,104 @@ function buildDisplayList(challenges, activeTier) {
 
 
 // ═══════════════════════════════════════════════════
+// Tier Filter Bar — horizontal scroll with fade hint
+// ═══════════════════════════════════════════════════
+function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCount }) {
+    const scrollRef = useRef(null)
+    const [canScroll, setCanScroll] = useState(false)
+    const [atEnd, setAtEnd] = useState(false)
+
+    const checkOverflow = useCallback(() => {
+        const el = scrollRef.current
+        if (!el) return
+        const overflows = el.scrollWidth > el.clientWidth + 2
+        setCanScroll(overflows)
+        setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
+    }, [])
+
+    useEffect(() => {
+        checkOverflow()
+        const ro = new ResizeObserver(checkOverflow)
+        if (scrollRef.current) ro.observe(scrollRef.current)
+        return () => ro.disconnect()
+    }, [checkOverflow, availableTiers])
+
+    const handleScroll = () => {
+        const el = scrollRef.current
+        if (!el) return
+        setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
+    }
+
+    const scrollRight = () => {
+        scrollRef.current?.scrollBy({ left: 160, behavior: 'smooth' })
+    }
+
+    return (
+        <div className="relative mb-6">
+            <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                className="flex gap-1.5 overflow-x-auto py-1 tier-filter-scroll"
+                style={{ flexWrap: canScroll ? 'nowrap' : 'wrap' }}
+            >
+                <button
+                    onClick={() => setActiveTier('all')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        activeTier === 'all'
+                            ? 'bg-(--color-accent) text-(--color-primary)'
+                            : 'bg-white/[0.06] text-(--color-text-secondary)/70 hover:bg-white/10'
+                    }`}
+                >
+                    All
+                </button>
+                {availableTiers.map(tier => (
+                    <button
+                        key={tier.key}
+                        onClick={() => setActiveTier(tier.key)}
+                        className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1.5"
+                        style={
+                            activeTier === tier.key
+                                ? { backgroundColor: tier.color, color: '#0a0f1a' }
+                                : { backgroundColor: 'rgba(255,255,255,0.04)', color: `${tier.color}cc` }
+                        }
+                    >
+                        {tier.image && <img src={tier.image} alt="" className="w-4 h-4 object-contain" />}
+                        {tier.label}
+                    </button>
+                ))}
+                {completedCount > 0 && (
+                    <button
+                        onClick={() => setActiveTier('completed')}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                            activeTier === 'completed'
+                                ? 'bg-green-500/80 text-(--color-primary)'
+                                : 'bg-white/[0.06] text-green-400/70 hover:bg-white/10'
+                        }`}
+                    >
+                        Completed ({completedCount})
+                    </button>
+                )}
+            </div>
+
+            {/* Fade + arrow hint */}
+            {canScroll && !atEnd && (
+                <button
+                    onClick={scrollRight}
+                    className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-end cursor-pointer"
+                    style={{ background: 'linear-gradient(to right, transparent, var(--color-primary) 70%)' }}
+                    aria-label="Scroll for more tiers"
+                >
+                    <svg className="w-4 h-4 text-(--color-text-secondary)/70 animate-pulse mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
 // Main Challenges Page
 // ═══════════════════════════════════════════════════
 export default function Challenges() {
@@ -204,44 +302,12 @@ export default function Challenges() {
 
                 {/* Tier filter pills */}
                 {!loading && availableTiers.length > 1 && (
-                    <div className="flex gap-1.5 overflow-x-auto pb-1 mb-6 scrollbar-hide">
-                        <button
-                            onClick={() => setActiveTier('all')}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
-                                activeTier === 'all'
-                                    ? 'bg-(--color-accent) text-(--color-primary)'
-                                    : 'bg-white/[0.06] text-(--color-text-secondary)/70 hover:bg-white/10'
-                            }`}
-                        >
-                            All
-                        </button>
-                        {availableTiers.map(tier => (
-                            <button
-                                key={tier.key}
-                                onClick={() => setActiveTier(tier.key)}
-                                className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0"
-                                style={
-                                    activeTier === tier.key
-                                        ? { backgroundColor: tier.color, color: '#0a0f1a' }
-                                        : { backgroundColor: 'rgba(255,255,255,0.04)', color: `${tier.color}cc` }
-                                }
-                            >
-                                {tier.label}
-                            </button>
-                        ))}
-                        {completedCount > 0 && (
-                            <button
-                                onClick={() => setActiveTier('completed')}
-                                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
-                                    activeTier === 'completed'
-                                        ? 'bg-green-500/80 text-(--color-primary)'
-                                        : 'bg-white/[0.06] text-green-400/70 hover:bg-white/10'
-                                }`}
-                            >
-                                Completed ({completedCount})
-                            </button>
-                        )}
-                    </div>
+                    <TierFilterBar
+                        availableTiers={availableTiers}
+                        activeTier={activeTier}
+                        setActiveTier={setActiveTier}
+                        completedCount={completedCount}
+                    />
                 )}
 
                 {/* Sign-in prompt for unauthenticated users */}
@@ -292,6 +358,13 @@ export default function Challenges() {
             </div>
 
             <style>{`
+                .tier-filter-scroll {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
+                .tier-filter-scroll::-webkit-scrollbar {
+                    display: none;
+                }
                 @keyframes card-enter {
                     0% { opacity: 0; transform: translateY(16px); }
                     100% { opacity: 1; transform: translateY(0); }
@@ -365,9 +438,10 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                     <div className="flex items-center gap-2 shrink-0 mt-0.5">
                         {showTierBadge && (
                             <span
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
                                 style={{ backgroundColor: `${tierColor}20`, color: tierColor }}
                             >
+                                {TIER_MAP[ch.tier]?.image && <img src={TIER_MAP[ch.tier].image} alt="" className="w-3.5 h-3.5 object-contain" />}
                                 {getTierLabel(ch.tier)}
                             </span>
                         )}

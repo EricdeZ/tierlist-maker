@@ -125,6 +125,7 @@ export default function ChallengeBanner() {
                         )}
                     </div>
                     <div className="text-sm font-semibold text-(--color-text) truncate">{challenge.title}</div>
+                    <p className="text-xs text-(--color-text-secondary)/60 mt-0.5 line-clamp-1">{challenge.description}</p>
                     <div className="flex items-center gap-3 mt-1.5">
                         <div className="flex-1 h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
                             <div
