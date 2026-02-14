@@ -55,10 +55,38 @@ export const handler = async (event, context) => {
                     ORDER BY d.tier
                 `
 
+                // Get team/player stats per division (active seasons only)
+                const divisionStats = await sql`
+                    SELECT
+                        d.id as division_id,
+                        COUNT(DISTINCT t.id)::int as team_count,
+                        COUNT(DISTINCT lp.id)::int as player_count,
+                        COALESCE(
+                            json_agg(
+                                DISTINCT jsonb_build_object('slug', t.slug, 'name', t.name)
+                            ) FILTER (WHERE t.id IS NOT NULL),
+                            '[]'::json
+                        ) as teams
+                    FROM divisions d
+                    INNER JOIN seasons s ON s.division_id = d.id AND s.is_active = true
+                    LEFT JOIN teams t ON t.season_id = s.id
+                    LEFT JOIN league_players lp ON lp.team_id = t.id AND lp.season_id = s.id AND lp.is_active = true
+                    WHERE d.league_id = ${league.id}
+                    GROUP BY d.id
+                `
+
+                const statsMap = Object.fromEntries(divisionStats.map(s => [s.division_id, s]))
+                const enrichedDivisions = divisions.map(d => ({
+                    ...d,
+                    team_count: statsMap[d.id]?.team_count || 0,
+                    player_count: statsMap[d.id]?.player_count || 0,
+                    teams: statsMap[d.id]?.teams || [],
+                }))
+
                 return {
                     statusCode: 200,
                     headers: getHeaders(event),
-                    body: JSON.stringify({ ...league, divisions }),
+                    body: JSON.stringify({ ...league, divisions: enrichedDivisions }),
                 }
             }
 
