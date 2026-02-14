@@ -48,26 +48,26 @@ export const DivisionProvider = ({ children }) => {
                 const season = validSeasons.find(s => s.is_active)
                     || (hasAnyPermission && validSeasons[0])
 
-                if (!season) {
-                    throw new Error(`No seasons found for division "${division.name}"`)
+                // Step 4: Load teams + players if a season exists
+                let teams = []
+                let players = []
+                if (season) {
+                    ;[teams, players] = await Promise.all([
+                        teamService.getAllBySeason(season.id),
+                        playerService.getAllBySeason(season.id),
+                    ])
+                    if (cancelled) return
                 }
-
-                // Step 4: Load teams + players for this season in parallel
-                const [teams, players] = await Promise.all([
-                    teamService.getAllBySeason(season.id),
-                    playerService.getAllBySeason(season.id),
-                ])
-                if (cancelled) return
 
                 setState({
                     league,
                     division,
-                    season: {
+                    season: season ? {
                         ...season,
                         division_id: division.id,
                         division_name: division.name,
                         division_slug: division.slug,
-                    },
+                    } : null,
                     teams,
                     players,
                     loading: false,

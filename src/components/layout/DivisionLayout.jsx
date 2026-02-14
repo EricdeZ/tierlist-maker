@@ -332,7 +332,7 @@ const DivisionNav = () => {
 }
 
 const DivisionContent = () => {
-    const { loading, error } = useDivision()
+    const { loading, error, season, division } = useDivision()
 
     if (error) {
         return (
@@ -362,6 +362,21 @@ const DivisionContent = () => {
                         <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-accent) mx-auto mb-4" />
                             <p className="text-(--color-text-secondary)">Loading division data...</p>
+                        </div>
+                    </div>
+                ) : !season ? (
+                    <div className="flex items-center justify-center p-16">
+                        <div className="max-w-md text-center">
+                            <h2 className="text-xl font-bold text-(--color-text) mb-2">No Seasons Yet</h2>
+                            <p className="text-(--color-text-secondary) mb-6">
+                                {division?.name || 'This division'} doesn't have any seasons configured yet.
+                            </p>
+                            <Link
+                                to="/"
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-(--color-accent) text-(--color-primary) rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                            >
+                                ← Back to Home
+                            </Link>
                         </div>
                     </div>
                 ) : (
