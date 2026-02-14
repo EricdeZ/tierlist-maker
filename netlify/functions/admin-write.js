@@ -175,21 +175,24 @@ async function submitMatch(sql, body, admin) {
                 gameResults.push({ game_id: gameId, game_number: i + 1 })
             }
 
-            return { match_id: matchId, games: gameResults }
-        })
-
-        // Link scheduled match if provided
-        if (scheduled_match_id) {
-            try {
-                await sql`
-                    UPDATE scheduled_matches
-                    SET status = 'completed', match_id = ${result.match_id}, updated_at = NOW()
+            // Link scheduled match inside the transaction to prevent double-linking
+            if (scheduled_match_id) {
+                const [locked] = await tx`
+                    SELECT id FROM scheduled_matches
                     WHERE id = ${scheduled_match_id} AND status = 'scheduled'
+                    FOR UPDATE
                 `
-            } catch (e) {
-                console.error('Failed to update scheduled match:', e)
+                if (locked) {
+                    await tx`
+                        UPDATE scheduled_matches
+                        SET status = 'completed', match_id = ${matchId}, updated_at = NOW()
+                        WHERE id = ${scheduled_match_id} AND status = 'scheduled'
+                    `
+                }
             }
-        }
+
+            return { match_id: matchId, games: gameResults, scheduled_linked: !!scheduled_match_id }
+        })
 
         if (admin) {
             await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length, scheduled_match_id: scheduled_match_id || null } })
