@@ -14,16 +14,15 @@ export const handler = async (event) => {
     const sql = getDB()
 
     try {
-        // Fetch all active seasons with their league/division/team info
+        // Fetch all seasons with their league/division/team info
         const seasons = await sql`
-            SELECT 
+            SELECT
                 s.id as season_id, s.name as season_name, s.is_active,
                 d.id as division_id, d.name as division_name, d.slug as division_slug,
                 l.id as league_id, l.name as league_name, l.slug as league_slug
             FROM seasons s
             JOIN divisions d ON s.division_id = d.id
             JOIN leagues l ON d.league_id = l.id
-            WHERE s.is_active = true
             ORDER BY l.name, d.name, s.name
         `
 
@@ -32,34 +31,30 @@ export const handler = async (event) => {
                 t.id as team_id, t.name as team_name, t.slug as team_slug, t.color,
                 t.season_id
             FROM teams t
-            JOIN seasons s ON t.season_id = s.id
-            WHERE s.is_active = true
             ORDER BY t.name
         `
 
         const matches = await sql`
-            SELECT 
+            SELECT
                 m.id, m.season_id, m.team1_id, m.team2_id, m.winner_team_id,
                 m.date, m.week, m.best_of, m.is_completed,
                 t1.name as team1_name, t2.name as team2_name
             FROM matches m
             JOIN teams t1 ON m.team1_id = t1.id
             JOIN teams t2 ON m.team2_id = t2.id
-            WHERE m.season_id IN (SELECT id FROM seasons WHERE is_active = true)
             ORDER BY m.date DESC
         `
 
-        // All players across all active seasons (for player name search)
+        // All players across all seasons (for player name search)
         const players = await sql`
-            SELECT 
+            SELECT
                 p.id as player_id, p.name, p.slug,
                 lp.id as league_player_id, lp.team_id, lp.season_id, lp.role,
                 t.name as team_name, t.color as team_color, t.slug as team_slug
             FROM league_players lp
             JOIN players p ON lp.player_id = p.id
             LEFT JOIN teams t ON lp.team_id = t.id
-            JOIN seasons s ON lp.season_id = s.id
-            WHERE s.is_active = true AND lp.is_active = true
+            WHERE lp.is_active = true
             ORDER BY p.name
         `
 
@@ -93,8 +88,7 @@ export const handler = async (event) => {
             FROM scheduled_matches sm
             JOIN teams t1 ON sm.team1_id = t1.id
             JOIN teams t2 ON sm.team2_id = t2.id
-            WHERE sm.season_id IN (SELECT id FROM seasons WHERE is_active = true)
-              AND sm.status = 'scheduled'
+            WHERE sm.status = 'scheduled'
             ORDER BY sm.scheduled_date ASC
         `
 
