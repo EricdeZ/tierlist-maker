@@ -465,7 +465,7 @@ const LeagueOverview = () => {
                     >
                         {[
                             { icon: <Shield className="w-6 h-6" />, label: 'Divisions', value: activeDivisions.length },
-                            { icon: <Users className="w-6 h-6" />, label: 'Teams', value: totalTeams },
+                            { icon: <Users className="w-6 h-6" />, label: 'Orgs', value: uniqueTeams.length },
                             { icon: <User className="w-6 h-6" />, label: 'Players', value: totalPlayers },
                         ].map(stat => (
                             <div key={stat.label} className="text-center">
@@ -495,7 +495,7 @@ const LeagueOverview = () => {
                                 Competing
                             </span>
                             <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
-                                {totalTeams} Teams Battling It Out
+                                {uniqueTeams.length} Orgs Battling It Out
                             </h2>
                         </div>
 
@@ -503,18 +503,10 @@ const LeagueOverview = () => {
                             {uniqueTeams.map((team) => (
                                 <div
                                     key={team.slug}
-                                    className="group flex flex-col items-center gap-2"
+                                    className="group"
                                     title={team.name}
                                 >
-                                    <div
-                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center transition-all duration-300 group-hover:border-white/25 group-hover:scale-110 group-hover:bg-white/10"
-                                        style={{ boxShadow: `0 0 0 0 ${leagueColor}00` }}
-                                    >
-                                        <TeamLogo slug={team.slug} name={team.name} size={36} className="transition-transform duration-300 group-hover:scale-110" />
-                                    </div>
-                                    <span className="text-[10px] sm:text-xs text-(--color-text-secondary) text-center max-w-[80px] truncate opacity-60 group-hover:opacity-100 transition-opacity">
-                                        {team.name}
-                                    </span>
+                                    <TeamLogo slug={team.slug} name={team.name} size={48} className="transition-transform duration-300 group-hover:scale-110" />
                                 </div>
                             ))}
                         </div>
