@@ -30,20 +30,23 @@ export const handler = async (event, context) => {
 
                 // Get divisions and seasons for this league
                 const divisions = await sql`
-                    SELECT 
+                    SELECT
                         d.id,
                         d.name,
                         d.tier,
                         d.slug,
-                        json_agg(
-                            json_build_object(
-                                'id', s.id,
-                                'name', s.name,
-                                'slug', s.slug,
-                                'is_active', s.is_active,
-                                'start_date', s.start_date,
-                                'end_date', s.end_date
-                            ) ORDER BY s.start_date DESC
+                        COALESCE(
+                            json_agg(
+                                json_build_object(
+                                    'id', s.id,
+                                    'name', s.name,
+                                    'slug', s.slug,
+                                    'is_active', s.is_active,
+                                    'start_date', s.start_date,
+                                    'end_date', s.end_date
+                                ) ORDER BY s.start_date DESC
+                            ) FILTER (WHERE s.id IS NOT NULL),
+                            '[]'::json
                         ) as seasons
                     FROM divisions d
                     LEFT JOIN seasons s ON s.division_id = d.id

@@ -44,8 +44,9 @@ export const DivisionProvider = ({ children }) => {
                 }
 
                 // Step 3: Find active season (admins can also see inactive seasons)
-                const season = division.seasons?.find(s => s.is_active)
-                    || (hasAnyPermission && division.seasons?.[0])
+                const validSeasons = division.seasons?.filter(s => s.id) || []
+                const season = validSeasons.find(s => s.is_active)
+                    || (hasAnyPermission && validSeasons[0])
 
                 if (!season) {
                     throw new Error(`No seasons found for division "${division.name}"`)
