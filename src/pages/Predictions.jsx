@@ -4,7 +4,7 @@ import { predictionsService, leagueService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import TeamLogo from '../components/TeamLogo'
 import RankBadge from '../components/RankBadge'
 import passionCoin from '../assets/passion/passion.png'
@@ -487,7 +487,7 @@ export default function Predictions() {
     if (!hasAnyPermission) {
         return (
             <div className="min-h-screen bg-(--color-primary)">
-                <SimpleNav title="Predictions" />
+                <Navbar title="Predictions" />
                 <div className="max-w-md mx-auto py-24 px-4 text-center">
                     <Lock className="w-12 h-12 mx-auto mb-4 text-(--color-text-secondary)" />
                     <h1 className="font-heading text-2xl font-bold text-(--color-text) mb-2">Predictions Unavailable</h1>
@@ -501,7 +501,7 @@ export default function Predictions() {
 
     return (
         <div className="min-h-screen text-white relative">
-            <SimpleNav title="Predictions" />
+            <Navbar title="Predictions" />
             <PageTitle title="Match Predictions" />
             <CoinBackground />
             <CoinFlipOverlay open={coinFlipOpen} onClose={() => setCoinFlipOpen(false)} />

@@ -4,7 +4,7 @@ import { predictionsService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import TeamLogo from '../components/TeamLogo'
 import passionCoin from '../assets/passion/passion.png'
 import passionTilted from '../assets/passion/passiontilted.png'
@@ -220,7 +220,7 @@ export default function MatchupDetail() {
     if (!hasAnyPermission) {
         return (
             <div className="min-h-screen bg-(--color-primary)">
-                <SimpleNav title="Matchup Detail" />
+                <Navbar title="Matchup Detail" />
                 <div className="max-w-md mx-auto py-24 px-4 text-center">
                     <Lock className="w-12 h-12 mx-auto mb-4 text-(--color-text-secondary)" />
                     <h1 className="font-heading text-2xl font-bold text-(--color-text) mb-2">Predictions Unavailable</h1>
@@ -265,7 +265,7 @@ export default function MatchupDetail() {
     if (loading) {
         return (
             <div className="min-h-screen text-white relative">
-                <SimpleNav title="Matchup" />
+                <Navbar title="Matchup" />
                 <div className="fixed inset-0 z-0" aria-hidden>
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #111830 0%, #161e38 35%, #1a2240 55%, #151d34 100%)' }} />
                 </div>
@@ -280,7 +280,7 @@ export default function MatchupDetail() {
     if (error || !data) {
         return (
             <div className="min-h-screen text-white relative">
-                <SimpleNav title="Matchup" />
+                <Navbar title="Matchup" />
                 <div className="fixed inset-0 z-0" aria-hidden>
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #111830 0%, #161e38 35%, #1a2240 55%, #151d34 100%)' }} />
                 </div>
@@ -343,7 +343,7 @@ export default function MatchupDetail() {
 
     return (
         <div className="min-h-screen text-white relative">
-            <SimpleNav title="Matchup" />
+            <Navbar title="Matchup" />
             <PageTitle title={`${t1.name} vs ${t2.name}`} />
             <CoinBackground />
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { siteConfigService } from '../services/database'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import { Tv } from 'lucide-react'
 
 export default function FeaturedStream() {
@@ -36,7 +36,7 @@ export default function FeaturedStream() {
     return (
         <>
             <PageTitle title="Featured Stream" />
-            <SimpleNav title="Featured Stream" />
+            <Navbar title="Featured Stream" />
 
             <div className="pt-24 pb-12 px-4 max-w-6xl mx-auto">
                 {loading ? (

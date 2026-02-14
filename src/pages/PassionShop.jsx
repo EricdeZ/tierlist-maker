@@ -5,7 +5,7 @@ import { usePassion } from '../context/PassionContext'
 import { formatRank } from '../config/ranks'
 import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import passionRain from '../assets/passion/passionrain.jpg'
 
@@ -273,7 +273,7 @@ export default function PassionShop() {
 
     return (
         <div className="min-h-screen text-white" style={{ background: '#060a14' }}>
-            <SimpleNav title="Passion Shop" />
+            <Navbar title="Passion Shop" />
             <PageTitle title="Passion Shop" />
 
             {/* ═══ HERO ═══ */}

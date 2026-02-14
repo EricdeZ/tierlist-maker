@@ -5,7 +5,7 @@ import { coinflipService } from '../services/database'
 import { getRank } from '../config/ranks'
 import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import passionTails from '../assets/passion/passiontails.png'
 import flip1 from '../assets/passion/flipping1.png'
@@ -329,7 +329,7 @@ export default function CoinFlip() {
 
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
-            <SimpleNav title="Coin Flip" />
+            <Navbar title="Coin Flip" />
             <PageTitle title="Coin Flip" />
 
             <div className="max-w-6xl mx-auto px-4 pt-24 pb-8">

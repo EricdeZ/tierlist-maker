@@ -1,18 +1,15 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useSidebar } from '../context/SidebarContext'
 import { leagueService } from '../services/database'
 import {
-    ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, User, Trophy,
-    MessageCircle, Home, Wrench, ListOrdered, Swords, Shield, BarChart3, Star
+    ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, User,
+    MessageCircle, Shield, BarChart3, Star
 } from 'lucide-react'
-import UserMenu from '../components/UserMenu'
-import PassionDisplay from '../components/PassionDisplay'
+import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
 import BannedContentBanner from '../components/BannedContentBanner'
 import TeamLogo from '../components/TeamLogo'
-import smiteLogo from '../assets/smite2.png'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
 
@@ -26,15 +23,12 @@ const DiscordIcon = ({ className }) => (
 
 const LeagueOverview = () => {
     const { leagueSlug } = useParams()
-    const { user, linkedPlayer, hasAnyPermission } = useAuth()
-    const { toggle: toggleSidebar } = useSidebar()
+    const { hasAnyPermission } = useAuth()
     const canPreview = hasAnyPermission
     const [league, setLeague] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [expanded, setExpanded] = useState({})
-    const [toolsOpen, setToolsOpen] = useState(false)
-    const toolsRef = useRef(null)
 
     // Mouse-tracking hero gradient
     const heroRef = useRef(null)
@@ -168,16 +162,6 @@ const LeagueOverview = () => {
         }
     }, [league, leagueSlug])
 
-    // Close tools dropdown on click outside
-    useEffect(() => {
-        if (!toolsOpen) return
-        const handle = (e) => {
-            if (toolsRef.current && !toolsRef.current.contains(e.target)) setToolsOpen(false)
-        }
-        document.addEventListener('mousedown', handle)
-        return () => document.removeEventListener('mousedown', handle)
-    }, [toolsOpen])
-
     useEffect(() => {
         let cancelled = false
 
@@ -269,69 +253,12 @@ const LeagueOverview = () => {
             `}</style>
 
             {/* ─── NAVBAR ─── */}
-            <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
-                <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-4 py-2 shadow-lg border border-white/10">
-                    <div className="flex items-center gap-3 sm:gap-6">
-                        <button
-                            onClick={toggleSidebar}
-                            className="sidebar:hidden flex items-center justify-center w-8 h-8 rounded-lg text-(--color-accent) hover:bg-white/10 transition-colors cursor-pointer border border-(--color-accent)/25"
-                            aria-label="Open menu"
-                        >
-                            <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-                        </button>
-                        <Link to="/" className="flex items-center gap-3 flex-shrink-0">
-                            <img src={smiteLogo} alt="SMITE 2" className="h-8 sm:h-10 w-auto" />
-                        </Link>
-                        <div className="flex items-center gap-2 flex-shrink-0 border-l border-white/10 pl-3 sm:pl-4">
-                            {logo && <img src={logo} alt="" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />}
-                            <div className="text-xs sm:text-sm font-bold text-(--color-text)">{league.name}</div>
-                        </div>
-                        <div className="flex items-center gap-1 ml-auto">
-                            <Link to="/" title="Home" className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200">
-                                <Home className="w-4 h-4" />
-                            </Link>
-                            <Link to="/leagues" title="Browse Leagues" className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200">
-                                <Trophy className="w-4 h-4" />
-                            </Link>
-                            {user && (
-                                linkedPlayer ? (
-                                    <Link to={`/profile/${linkedPlayer.slug}`} title="My Profile" className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200">
-                                        <User className="w-4 h-4" />
-                                    </Link>
-                                ) : (
-                                    <button onClick={() => window.dispatchEvent(new CustomEvent('open-claim-modal'))} title="Claim Your Profile" className="p-2 rounded-lg text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10 transition-all duration-200">
-                                        <User className="w-4 h-4" />
-                                    </button>
-                                )
-                            )}
-                            <div ref={toolsRef} className="relative">
-                                <button
-                                    onClick={() => setToolsOpen(!toolsOpen)}
-                                    title="Tools"
-                                    className={`p-2 rounded-lg flex items-center gap-0.5 transition-all duration-200 ${toolsOpen ? 'text-(--color-accent) bg-white/10' : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/10'}`}
-                                >
-                                    <Wrench className="w-4 h-4" />
-                                    <ChevronDown className={`w-3 h-3 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {toolsOpen && (
-                                    <div className="absolute right-0 top-full mt-2 w-48 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
-                                        <div className="py-1">
-                                            <Link to="/tierlist" onClick={() => setToolsOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                                <ListOrdered className="w-4 h-4 text-(--color-text-secondary)" /> Tier List
-                                            </Link>
-                                            <Link to="/draft" onClick={() => setToolsOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                                <Swords className="w-4 h-4 text-(--color-text-secondary)" /> Draft Simulator
-                                            </Link>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            {user && <PassionDisplay />}
-                            <UserMenu compact />
-                        </div>
-                    </div>
-                </div>
-            </nav>
+            <Navbar branding={
+                <>
+                    {logo && <img src={logo} alt="" className="h-6 w-6 sm:h-7 sm:w-7 object-contain" />}
+                    <div className="hidden min-[800px]:block text-sm font-bold text-(--color-text)">{league.name}</div>
+                </>
+            } />
 
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* ─── HERO SECTION ─── Full viewport, immersive             */}

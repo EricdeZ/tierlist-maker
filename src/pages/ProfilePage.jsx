@@ -9,7 +9,7 @@ import { getDivisionImage } from '../utils/divisionImages'
 import { getLeagueLogo } from '../utils/leagueImages'
 import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 
 const ProfilePage = () => {
@@ -52,7 +52,7 @@ const ProfilePage = () => {
     if (loading) {
         return (
             <>
-            <SimpleNav title="Profile" />
+            <Navbar title="Profile" />
             <div className="max-w-5xl mx-auto pt-24 pb-8 px-4">
                 <div className="flex items-center justify-center py-16">
                     <div className="text-center">
@@ -68,7 +68,7 @@ const ProfilePage = () => {
     if (error || !profileData) {
         return (
             <>
-            <SimpleNav title="Profile" />
+            <Navbar title="Profile" />
             <div className="max-w-3xl mx-auto pt-24 pb-8 px-4 text-center">
                 <h2 className="text-2xl font-bold text-(--color-text) mb-4">Player Not Found</h2>
                 <p className="text-(--color-text-secondary) mb-6">
@@ -124,7 +124,7 @@ const ProfilePage = () => {
 
     return (
         <>
-        <SimpleNav title={player.name} />
+        <Navbar title={player.name} />
         <div className="max-w-5xl mx-auto pt-24 pb-8 px-4">
             {profileData && <PageTitle title={`${profileData.player.name} - Player Profile`} />}
 

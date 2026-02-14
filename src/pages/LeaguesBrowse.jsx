@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { Trophy, ChevronRight, Calendar, MessageCircle, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
@@ -50,7 +50,7 @@ const LeaguesBrowse = () => {
     if (loading) {
         return (
             <div className="min-h-screen">
-                <SimpleNav title="Leagues" />
+                <Navbar title="Leagues" />
                 <div className="pt-24 flex items-center justify-center">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-accent) mx-auto mb-4" />
@@ -64,7 +64,7 @@ const LeaguesBrowse = () => {
     if (error) {
         return (
             <div className="min-h-screen">
-                <SimpleNav title="Leagues" />
+                <Navbar title="Leagues" />
                 <div className="pt-24 flex items-center justify-center px-4">
                     <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-8 text-center max-w-md">
                         <h2 className="text-2xl font-bold text-red-400 mb-3">Error</h2>
@@ -78,7 +78,7 @@ const LeaguesBrowse = () => {
     return (
         <div className="min-h-screen">
             <PageTitle title="Leagues" />
-            <SimpleNav title="Leagues" />
+            <Navbar title="Leagues" />
 
             {/* Hero */}
             <section className="pt-24 pb-12 px-4">

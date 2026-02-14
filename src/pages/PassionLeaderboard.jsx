@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { getRank } from '../config/ranks'
 import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import passionrain from '../assets/passion/passionrain.jpg'
 
@@ -44,7 +44,7 @@ export default function PassionLeaderboard() {
 
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
-            <SimpleNav title="Leaderboard" />
+            <Navbar title="Leaderboard" />
             <PageTitle title="Passion Leaderboard" />
 
             <div className="max-w-4xl mx-auto px-4 pt-24 pb-8">

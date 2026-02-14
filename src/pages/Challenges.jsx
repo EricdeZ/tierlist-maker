@@ -3,7 +3,7 @@ import { challengeService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
 import { useAuth } from '../context/AuthContext'
 import PageTitle from '../components/PageTitle'
-import SimpleNav from '../components/layout/SimpleNav'
+import Navbar from '../components/layout/Navbar'
 import RankBanner from '../components/RankBanner'
 import { CHALLENGE_TIERS, TIER_MAP, getTierColor, getTierLabel } from '../config/challengeTiers'
 import passionCoin from '../assets/passion/passion.png'
@@ -284,7 +284,7 @@ export default function Challenges() {
 
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
-            <SimpleNav title="Challenges" />
+            <Navbar title="Challenges" />
             <PageTitle title="Challenges" />
 
             <div className="max-w-5xl mx-auto px-4 pt-24 pb-8">
