@@ -26,7 +26,8 @@ const LEAGUE_LOGOS = {
 
 const LeagueOverview = () => {
     const { leagueSlug } = useParams()
-    const { user, linkedPlayer } = useAuth()
+    const { user, linkedPlayer, hasAnyPermission } = useAuth()
+    const canPreview = hasAnyPermission
     const [league, setLeague] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -102,7 +103,7 @@ const LeagueOverview = () => {
 
     const divisions = league.divisions || []
     const logo = LEAGUE_LOGOS[league.slug]
-    const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active))
+    const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview))
     const totalSeasons = divisions.reduce((sum, d) => sum + (d.seasons?.length || 0), 0)
     const leagueColor = league.color || 'var(--color-accent)'
 
@@ -322,7 +323,7 @@ const LeagueOverview = () => {
                             {divisions.map(division => {
                                 const rankImg = getDivisionImage(leagueSlug, division.slug, division.tier)
                                 const rankLabel = RANK_LABELS[division.tier]
-                                const activeSeason = division.seasons?.find(s => s.is_active)
+                                const activeSeason = division.seasons?.find(s => s.is_active || canPreview)
                                 const hasData = !!activeSeason
                                 const isExpanded = expanded[division.id]
                                 const seasons = division.seasons || []

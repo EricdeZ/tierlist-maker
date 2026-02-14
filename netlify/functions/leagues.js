@@ -46,7 +46,7 @@ export const handler = async (event, context) => {
                             ) ORDER BY s.start_date DESC
                         ) as seasons
                     FROM divisions d
-                    LEFT JOIN seasons s ON s.division_id = d.id AND s.is_active = true
+                    LEFT JOIN seasons s ON s.division_id = d.id
                     WHERE d.league_id = ${league.id}
                     GROUP BY d.id, d.name, d.tier, d.slug
                     ORDER BY d.tier

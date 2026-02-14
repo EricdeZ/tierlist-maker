@@ -31,7 +31,8 @@ const DiscordIcon = ({ className }) => (
 )
 
 const Homepage = () => {
-    const { user, linkedPlayer, login, loading: authLoading } = useAuth()
+    const { user, linkedPlayer, login, loading: authLoading, hasAnyPermission } = useAuth()
+    const canPreview = hasAnyPermission
     const [leagues, setLeagues] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -85,12 +86,12 @@ const Homepage = () => {
     const mainLeagues = [...leagues]
         .filter(l => l.name?.toLowerCase() !== 'test league')
         .sort((a, b) => {
-            const aActive = a.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
-            const bActive = b.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
+            const aActive = a.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview)) ? 0 : 1
+            const bActive = b.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview)) ? 0 : 1
             return aActive - bActive
         })
     const hasActiveLeagues = mainLeagues.some(l =>
-        l.divisions?.some(d => d.seasons?.some(s => s.is_active))
+        l.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview))
     )
 
     if (loading) {
@@ -347,7 +348,7 @@ const Homepage = () => {
                             const divisions = league.divisions || []
                             const logo = LEAGUE_LOGOS[league.slug]
                             const leagueColor = league.color || 'var(--color-accent)'
-                            const isActive = divisions.some(d => d.seasons?.some(s => s.is_active))
+                            const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview))
 
                             return (
                                 <div key={league.id} id={`league-${league.slug}`}>
@@ -420,7 +421,7 @@ const Homepage = () => {
                                             {divisions.map(division => {
                                                 const rankImg = getDivisionImage(league.slug, division.slug, division.tier)
                                                 const rankLabel = RANK_LABELS[division.tier]
-                                                const activeSeason = division.seasons?.find(s => s.is_active)
+                                                const activeSeason = division.seasons?.find(s => s.is_active || canPreview)
                                                 const divActive = !!activeSeason
 
                                                 if (divActive) {

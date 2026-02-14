@@ -6,6 +6,7 @@ import DragDropRankings from '../components/DragDropRankings'
 import { leagueService, teamService, playerService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import { ChevronLeft, ChevronDown, Lock, Calendar } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 // League logos
 import aglLogo from '../assets/leagues/agl.png'
@@ -79,6 +80,8 @@ function FancySelect({ value, onChange, options, placeholder, renderOption, rend
 }
 
 export default function TierListPage() {
+    const { hasAnyPermission } = useAuth()
+    const canPreview = hasAnyPermission
     const [leagues, setLeagues] = useState([])
     const [leaguesLoading, setLeaguesLoading] = useState(true)
     const [showPicker, setShowPicker] = useState(true)
@@ -115,7 +118,7 @@ export default function TierListPage() {
     }, [])
 
     const hasActiveSeason = (league) =>
-        league.divisions?.some(d => d.seasons?.some(s => s.is_active))
+        league.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview))
 
     const activeLeagues = useMemo(
         () => leagues.filter(hasActiveSeason),
@@ -134,7 +137,7 @@ export default function TierListPage() {
     )
 
     const activeDivisions = useMemo(
-        () => selectedLeague?.divisions?.filter(d => d.seasons?.some(s => s.is_active)) || [],
+        () => selectedLeague?.divisions?.filter(d => d.seasons?.some(s => s.is_active || canPreview)) || [],
         [selectedLeague]
     )
 
@@ -152,7 +155,7 @@ export default function TierListPage() {
     )
 
     const activeSeasons = useMemo(
-        () => selectedDivision?.seasons?.filter(s => s.is_active) || [],
+        () => selectedDivision?.seasons?.filter(s => s.is_active || canPreview) || [],
         [selectedDivision]
     )
 

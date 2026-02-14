@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { Trophy, ChevronRight, Calendar, MessageCircle, Users } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import SimpleNav from '../components/layout/SimpleNav'
 import PageTitle from '../components/PageTitle'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
 
 const LeaguesBrowse = () => {
+    const { hasAnyPermission } = useAuth()
+    const canPreview = hasAnyPermission
     const [leagues, setLeagues] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -39,8 +42,8 @@ const LeaguesBrowse = () => {
     const mainLeagues = [...leagues]
         .filter(l => l.name?.toLowerCase() !== 'test league')
         .sort((a, b) => {
-            const aActive = a.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
-            const bActive = b.divisions?.some(d => d.seasons?.some(s => s.is_active)) ? 0 : 1
+            const aActive = a.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview)) ? 0 : 1
+            const bActive = b.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview)) ? 0 : 1
             return aActive - bActive
         })
 
@@ -97,8 +100,8 @@ const LeaguesBrowse = () => {
                         const divisions = league.divisions || []
                         const logo = getLeagueLogo(league.slug)
                         const leagueColor = league.color || 'var(--color-accent)'
-                        const isActive = divisions.some(d => d.seasons?.some(s => s.is_active))
-                        const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active))
+                        const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview))
+                        const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview))
                         const totalSeasons = divisions.reduce((sum, d) => sum + (d.seasons?.length || 0), 0)
 
                         return (
@@ -193,7 +196,7 @@ const LeaguesBrowse = () => {
                                             {divisions.map(division => {
                                                 const rankImg = getDivisionImage(league.slug, division.slug, division.tier)
                                                 const rankLabel = RANK_LABELS[division.tier]
-                                                const activeSeason = division.seasons?.find(s => s.is_active)
+                                                const activeSeason = division.seasons?.find(s => s.is_active || canPreview)
                                                 const divActive = !!activeSeason
 
                                                 if (divActive) {

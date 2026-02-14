@@ -2,11 +2,13 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { leagueService, teamService, playerService } from '../services/database'
+import { useAuth } from './AuthContext'
 
 const DivisionContext = createContext(null)
 
 export const DivisionProvider = ({ children }) => {
     const { leagueSlug, divisionSlug } = useParams()
+    const { hasAnyPermission } = useAuth()
 
     const [state, setState] = useState({
         league: null,
@@ -41,8 +43,9 @@ export const DivisionProvider = ({ children }) => {
                     throw new Error(`Division "${divisionSlug}" not found in ${league.name}`)
                 }
 
-                // Step 3: Find active season for this division
+                // Step 3: Find active season (admins can also see inactive seasons)
                 const season = division.seasons?.find(s => s.is_active)
+                    || (hasAnyPermission && division.seasons?.[0])
 
                 if (!season) {
                     throw new Error(`No seasons found for division "${division.name}"`)
@@ -83,7 +86,7 @@ export const DivisionProvider = ({ children }) => {
 
         loadData()
         return () => { cancelled = true }
-    }, [leagueSlug, divisionSlug])
+    }, [leagueSlug, divisionSlug, hasAnyPermission])
 
     return (
         <DivisionContext.Provider value={state}>
