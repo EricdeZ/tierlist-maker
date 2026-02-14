@@ -8,7 +8,7 @@ const DivisionContext = createContext(null)
 
 export const DivisionProvider = ({ children }) => {
     const { leagueSlug, divisionSlug } = useParams()
-    const { hasAnyPermission } = useAuth()
+    const { hasAnyPermission, loading: authLoading } = useAuth()
 
     const [state, setState] = useState({
         league: null,
@@ -21,7 +21,7 @@ export const DivisionProvider = ({ children }) => {
     })
 
     useEffect(() => {
-        if (!leagueSlug || !divisionSlug) return
+        if (!leagueSlug || !divisionSlug || authLoading) return
 
         let cancelled = false
 
@@ -87,7 +87,7 @@ export const DivisionProvider = ({ children }) => {
 
         loadData()
         return () => { cancelled = true }
-    }, [leagueSlug, divisionSlug, hasAnyPermission])
+    }, [leagueSlug, divisionSlug, hasAnyPermission, authLoading])
 
     return (
         <DivisionContext.Provider value={state}>
