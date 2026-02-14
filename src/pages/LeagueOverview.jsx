@@ -38,6 +38,11 @@ const LeagueOverview = () => {
     const heroRef = useRef(null)
     const [heroLight, setHeroLight] = useState({ x: 50, y: 50, active: false })
 
+    // Physics-based floating symbols
+    const symbolsRef = useRef(null)
+    const particlesRef = useRef(null)
+    const rafRef = useRef(null)
+
     const handleHeroMove = useCallback((e) => {
         const el = heroRef.current
         if (!el) return
@@ -52,6 +57,76 @@ const LeagueOverview = () => {
     const handleHeroLeave = useCallback(() => {
         setHeroLight(prev => ({ ...prev, active: false }))
     }, [])
+
+    // Initialize and animate floating symbol particles
+    useEffect(() => {
+        const container = symbolsRef.current
+        if (!container) return
+
+        const els = container.querySelectorAll('[data-particle]')
+        if (els.length === 0) return
+
+        // Initialize particles with random positions, velocities, sizes
+        particlesRef.current = Array.from(els).map(() => {
+            const baseSize = 0.6 + Math.random() * 0.9 // 0.6x to 1.5x scale
+            const speed = 12 + Math.random() * 28 // px per second
+            const angle = Math.random() * Math.PI * 2
+            return {
+                x: 5 + Math.random() * 90, // % position
+                y: 5 + Math.random() * 90,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                scale: baseSize,
+                rotation: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 20, // degrees per second
+                opacity: 0.06 + Math.random() * 0.08,
+            }
+        })
+
+        let lastTime = performance.now()
+
+        const animate = (now) => {
+            const dt = Math.min((now - lastTime) / 1000, 0.05) // cap delta to avoid jumps
+            lastTime = now
+
+            const rect = container.getBoundingClientRect()
+            if (rect.width === 0 || rect.height === 0) {
+                rafRef.current = requestAnimationFrame(animate)
+                return
+            }
+
+            particlesRef.current.forEach((p, i) => {
+                const el = els[i]
+                if (!el) return
+
+                // Move
+                p.x += (p.vx / rect.width) * 100 * dt
+                p.y += (p.vy / rect.height) * 100 * dt
+                p.rotation += p.rotSpeed * dt
+
+                // Bounce off edges
+                const margin = 2
+                if (p.x < margin) { p.x = margin; p.vx = Math.abs(p.vx) }
+                if (p.x > 98 - margin) { p.x = 98 - margin; p.vx = -Math.abs(p.vx) }
+                if (p.y < margin) { p.y = margin; p.vy = Math.abs(p.vy) }
+                if (p.y > 98 - margin) { p.y = 98 - margin; p.vy = -Math.abs(p.vy) }
+
+                // Apply transform
+                el.style.left = `${p.x}%`
+                el.style.top = `${p.y}%`
+                el.style.transform = `translate(-50%, -50%) scale(${p.scale}) rotate(${p.rotation}deg)`
+                el.style.opacity = p.opacity
+            })
+
+            rafRef.current = requestAnimationFrame(animate)
+        }
+
+        rafRef.current = requestAnimationFrame(animate)
+
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        }
+    }, [league]) // re-init when league data loads
 
     // Close tools dropdown on click outside
     useEffect(() => {
@@ -128,6 +203,9 @@ const LeagueOverview = () => {
     const allTeams = activeDivisions.flatMap(d => d.teams || [])
     // Unique teams only (same team might appear in data)
     const uniqueTeams = allTeams.filter((t, i, arr) => arr.findIndex(x => x.slug === t.slug) === i)
+    // All teams across every division (for background particles even when inactive)
+    const allLeagueTeams = divisions.flatMap(d => d.teams || [])
+        .filter((t, i, arr) => arr.findIndex(x => x.slug === t.slug) === i)
 
     return (
         <div className="min-h-screen overflow-hidden">
@@ -277,65 +355,36 @@ const LeagueOverview = () => {
                     }}
                 />
 
-                {/* BG Layer 6: Floating division rank badges */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {divisions.map((div, i) => {
+                {/* BG Layers 6+7: Physics-based floating symbols (division badges + team logos) */}
+                <div ref={symbolsRef} className="absolute inset-0 pointer-events-none overflow-hidden">
+                    {/* Division rank badges */}
+                    {divisions.map((div) => {
                         const img = getDivisionImage(leagueSlug, div.slug, div.tier)
                         if (!img) return null
-                        const positions = [
-                            { top: '12%', left: '6%', rotate: -15, delay: 0 },
-                            { top: '18%', right: '8%', rotate: 12, delay: 0.4 },
-                            { bottom: '20%', left: '4%', rotate: 8, delay: 0.8 },
-                            { bottom: '15%', right: '6%', rotate: -10, delay: 1.2 },
-                            { top: '45%', left: '2%', rotate: 5, delay: 0.2 },
-                            { top: '40%', right: '3%', rotate: -8, delay: 0.6 },
-                        ]
-                        const pos = positions[i % positions.length]
                         return (
                             <img
-                                key={div.id}
+                                key={`div-${div.id}`}
+                                data-particle
                                 src={img}
                                 alt=""
-                                className="absolute w-14 h-14 sm:w-20 sm:h-20 object-contain opacity-[0.10]"
-                                style={{
-                                    ...pos,
-                                    transform: `rotate(${pos.rotate}deg)`,
-                                    animation: `leagueFloat 4s ease-in-out infinite ${pos.delay}s`,
-                                }}
+                                className="absolute w-16 h-16 sm:w-24 sm:h-24 object-contain will-change-transform"
                             />
                         )
                     })}
+                    {/* Team logos (from all divisions, even inactive) */}
+                    {allLeagueTeams.slice(0, 14).map((team, i) => {
+                        const size = 28 + (i % 5) * 10 // 28–68px variety
+                        return (
+                            <div
+                                key={`team-${team.slug}`}
+                                data-particle
+                                className="absolute will-change-transform"
+                            >
+                                <TeamLogo slug={team.slug} name={team.name} size={size} />
+                            </div>
+                        )
+                    })}
                 </div>
-
-                {/* BG Layer 7: Floating team logos — visible, animated */}
-                {uniqueTeams.length > 0 && (
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        {uniqueTeams.slice(0, 16).map((team, i) => {
-                            const count = Math.min(uniqueTeams.length, 16)
-                            const angle = (i / count) * Math.PI * 2
-                            const radiusX = 35 + (i % 3) * 10
-                            const radiusY = 28 + (i % 4) * 8
-                            const x = 50 + Math.cos(angle) * radiusX
-                            const y = 50 + Math.sin(angle) * radiusY
-                            const size = 36 + (i % 3) * 10
-                            const duration = 4 + (i % 4) * 0.8
-                            return (
-                                <div
-                                    key={team.slug}
-                                    className="absolute opacity-[0.09]"
-                                    style={{
-                                        top: `${y}%`,
-                                        left: `${x}%`,
-                                        transform: `translate(-50%, -50%) rotate(${-8 + (i * 11) % 20}deg)`,
-                                        animation: `leagueFloat ${duration}s ease-in-out infinite ${i * 0.25}s`,
-                                    }}
-                                >
-                                    <TeamLogo slug={team.slug} name={team.name} size={size} />
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
 
                 {/* Hero content */}
                 <div className="relative z-10 text-center max-w-4xl mx-auto" style={{ animation: 'slideUp 0.6s ease-out' }}>
@@ -465,7 +514,7 @@ const LeagueOverview = () => {
                     >
                         {[
                             { icon: <Shield className="w-6 h-6" />, label: 'Divisions', value: activeDivisions.length },
-                            { icon: <Users className="w-6 h-6" />, label: 'Orgs', value: uniqueTeams.length },
+                            { icon: <Users className="w-6 h-6" />, label: 'Teams', value: totalTeams },
                             { icon: <User className="w-6 h-6" />, label: 'Players', value: totalPlayers },
                         ].map(stat => (
                             <div key={stat.label} className="text-center">
