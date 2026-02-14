@@ -1244,20 +1244,16 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, leagueRo
 
     const isAnyLoading = Object.values(opLoading).some(Boolean)
 
-    const handleSelectPlayer = (player) => {
-        if (player.main_role) {
-            const match = ROLES.find(r => r.toLowerCase() === player.main_role.toLowerCase())
-            if (match) setSelectedRole(match)
-        }
-    }
-
     const handleAddExisting = (player) => {
         if (player.is_pending_add || player.is_just_added) return
         setError(null)
-        onAddExisting(player, selectedRole)
+        // Pass null for role — backend/pending logic uses player.main_role
+        // Only pass selectedRole if the player has no default role
+        const role = player.main_role ? null : selectedRole
+        onAddExisting(player, role)
         setAddedIds(prev => new Set([...prev, player.player_id]))
         setSearchQuery('')
-        // Re-focus search input after a tick (state needs to update first)
+        setSelectedRole('Fill')
         setTimeout(() => inputRef.current?.focus(), 0)
     }
 
@@ -1330,27 +1326,29 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, leagueRo
                     </div>
                 )}
 
-                {/* Role selector (shared) */}
-                <div className="px-5 pt-4 pb-2">
-                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-                        Role
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                        {ROLES.map(r => (
-                            <button
-                                key={r}
-                                onClick={() => setSelectedRole(r)}
-                                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                                    selectedRole === r
-                                        ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] ring-1 ring-[var(--color-accent)]/30'
-                                        : 'bg-white/5 text-[var(--color-text-secondary)] hover:bg-white/10'
-                                }`}
-                            >
-                                {r}
-                            </button>
-                        ))}
+                {/* Role selector — only for create mode, or search results with no default role */}
+                {(mode === 'create' || (mode === 'search' && searchResults.some(p => !p.main_role))) && (
+                    <div className="px-5 pt-4 pb-2">
+                        <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+                            Role
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {ROLES.map(r => (
+                                <button
+                                    key={r}
+                                    onClick={() => setSelectedRole(r)}
+                                    className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                                        selectedRole === r
+                                            ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] ring-1 ring-[var(--color-accent)]/30'
+                                            : 'bg-white/5 text-[var(--color-text-secondary)] hover:bg-white/10'
+                                    }`}
+                                >
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Search mode */}
                 {mode === 'search' && (
@@ -1364,7 +1362,6 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, leagueRo
                                 if (e.key === 'Enter') {
                                     const addable = searchResults.filter(p => !p.is_pending_add && !p.is_just_added)
                                     if (addable.length === 1) {
-                                        handleSelectPlayer(addable[0])
                                         handleAddExisting(addable[0])
                                     }
                                 }
@@ -1391,7 +1388,6 @@ function AddPlayerModal({ teamName, teamColor, seasonId, globalPlayers, leagueRo
                                             <button
                                                 key={player.player_id}
                                                 onClick={() => handleAddExisting(player)}
-                                                onMouseEnter={() => !isAdded && handleSelectPlayer(player)}
                                                 disabled={isAnyLoading || isAdded}
                                                 className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors border-b border-white/5 last:border-b-0 ${
                                                     isAdded
