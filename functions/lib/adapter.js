@@ -1,0 +1,55 @@
+/**
+ * Wraps a Netlify-style handler for Cloudflare Pages Functions.
+ * Converts CF Request → Netlify event shape, calls handler, converts response back.
+ */
+export function adapt(handler) {
+    return async function onRequest(context) {
+        const { request, env } = context
+
+        // Populate process.env from Cloudflare env bindings
+        for (const [key, value] of Object.entries(env)) {
+            if (typeof value === 'string') {
+                process.env[key] = value
+            }
+        }
+
+        const url = new URL(request.url)
+
+        // Build query string parameters
+        const queryStringParameters = {}
+        for (const [key, value] of url.searchParams) {
+            queryStringParameters[key] = value
+        }
+
+        // Read body for POST/PUT/PATCH
+        let body = null
+        if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
+            body = await request.text()
+        }
+
+        // Build lowercase headers map (Netlify provides lowercase keys)
+        const headers = {}
+        for (const [key, value] of request.headers) {
+            headers[key.toLowerCase()] = value
+        }
+
+        // Construct Netlify-compatible event
+        const event = {
+            httpMethod: request.method,
+            headers,
+            queryStringParameters,
+            body,
+            path: url.pathname,
+            rawUrl: request.url,
+        }
+
+        // Call the original Netlify handler
+        const result = await handler(event)
+
+        // Convert Netlify response → CF Response
+        return new Response(result.body || '', {
+            status: result.statusCode || 200,
+            headers: result.headers || {},
+        })
+    }
+}

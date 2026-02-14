@@ -1,7 +1,7 @@
 // src/services/adminApi.js
 // Authenticated fetch helper for admin endpoints
 
-const API_BASE = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 /**
  * Fetch wrapper that attaches the auth token from localStorage.

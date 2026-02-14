@@ -6,7 +6,7 @@ import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function LeagueManager() {
     const { hasPermission } = useAuth()

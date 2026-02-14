@@ -9,7 +9,7 @@ import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
 import DiscordImagesPanel from '../../components/admin/DiscordImagesPanel'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 const STORAGE_KEY = 'smite2_admin_pending'
 
 // ─── Persistence helpers ───

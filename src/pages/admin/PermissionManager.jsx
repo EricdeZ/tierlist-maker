@@ -7,7 +7,7 @@ import { PermissionManagerHelp } from '../../components/admin/AdminHelp'
 import smiteLogo from '../../assets/smite2.png'
 import PageTitle from '../../components/PageTitle'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function PermissionManager() {
     const [roles, setRoles] = useState([])

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 function groupItems(items) {
     const sorted = [...items].sort((a, b) => new Date(a.message_timestamp) - new Date(b.message_timestamp))

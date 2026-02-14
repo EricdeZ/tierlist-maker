@@ -6,7 +6,7 @@ import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 const SEASON_KEY = 'smite2_admin_season'
 
 const STATUS_STYLES = {

@@ -6,7 +6,7 @@ import { getAuthHeaders } from '../../services/adminApi'
 import smiteLogo from '../../assets/smite2.png'
 import PageTitle from '../../components/PageTitle'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 const ENDPOINT_COLORS = {
     'admin-write':        'bg-blue-500/20 text-blue-300',

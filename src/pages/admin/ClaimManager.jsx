@@ -5,7 +5,7 @@ import { Home, Shield, UserCheck, Check, X, ChevronDown, ChevronRight } from 'lu
 import { getAuthHeaders } from '../../services/adminApi'
 import smiteLogo from '../../assets/smite2.png'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function ClaimManager() {
     const [claims, setClaims] = useState([])

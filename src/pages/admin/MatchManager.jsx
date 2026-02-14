@@ -5,7 +5,7 @@ import { Home } from 'lucide-react'
 import { MatchManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 const SEASON_KEY = 'smite2_admin_season'
 
 export default function MatchManager() {

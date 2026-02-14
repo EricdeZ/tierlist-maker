@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
 
         const fetchUser = async () => {
             try {
-                const res = await fetch('/.netlify/functions/auth-me', {
+                const res = await fetch('/api/auth-me', {
                     headers: { Authorization: `Bearer ${token}` },
                 })
                 if (!res.ok) throw new Error('Invalid token')

@@ -5,7 +5,7 @@ import { Home, RefreshCw } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function BannedContentManager() {
     const [configs, setConfigs] = useState([])

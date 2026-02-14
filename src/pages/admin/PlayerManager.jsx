@@ -5,7 +5,7 @@ import { Home, ExternalLink, Download, Search, X, ChevronDown, ChevronRight, Che
 import { PlayerManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function PlayerManager() {
     const [data, setData] = useState(null)

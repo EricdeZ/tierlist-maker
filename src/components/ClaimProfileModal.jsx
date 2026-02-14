@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { X, Search, User, Send } from 'lucide-react'
 import { getAuthHeaders } from '../services/adminApi'
 
-const API_BASE = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 export default function ClaimProfileModal() {
     const { user, linkedPlayer } = useAuth()

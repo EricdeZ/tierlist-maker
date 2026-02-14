@@ -5,7 +5,7 @@ import { Home, Shield, User, UserX, Link2, Unlink } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi'
 import smiteLogo from '../../assets/smite2.png'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function UserManager() {
     const [users, setUsers] = useState([])

@@ -6,7 +6,7 @@ import { RosterManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import TeamLogo from '../../components/TeamLogo'
 
-const API = import.meta.env.VITE_API_URL || '/.netlify/functions'
+const API = import.meta.env.VITE_API_URL || '/api'
 const STORAGE_KEY = 'smite2_roster_admin'
 
 const ROLES = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC', 'Sub', 'Fill']

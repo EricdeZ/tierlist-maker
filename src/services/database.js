@@ -1,5 +1,5 @@
 // src/services/database.js
-const API_BASE = '/.netlify/functions'
+const API_BASE = '/api'
 
 const apiCall = async (endpoint, params = {}) => {
     const url = new URL(`${API_BASE}/${endpoint}`, window.location.origin)

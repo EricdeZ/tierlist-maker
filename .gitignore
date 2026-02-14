@@ -142,6 +142,10 @@ Icon
 # Local Netlify folder
 .netlify
 
+# Cloudflare
+.dev.vars
+.wrangler
+
 claude_images
 /pick_and_ban_images/
 *.csv
