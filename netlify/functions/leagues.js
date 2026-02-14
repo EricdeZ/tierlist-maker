@@ -55,7 +55,7 @@ export const handler = async (event, context) => {
                     ORDER BY d.tier
                 `
 
-                // Get team/player stats per division (active seasons only)
+                // Get team/player stats per division (active season preferred, falls back to most recent)
                 const divisionStats = await sql`
                     SELECT
                         d.id as division_id,
@@ -68,9 +68,15 @@ export const handler = async (event, context) => {
                             '[]'::json
                         ) as teams
                     FROM divisions d
-                    INNER JOIN seasons s ON s.division_id = d.id AND s.is_active = true
-                    LEFT JOIN teams t ON t.season_id = s.id
-                    LEFT JOIN league_players lp ON lp.team_id = t.id AND lp.season_id = s.id AND lp.is_active = true
+                    INNER JOIN LATERAL (
+                        SELECT s.id
+                        FROM seasons s
+                        WHERE s.division_id = d.id
+                        ORDER BY s.is_active DESC, s.start_date DESC NULLS LAST
+                        LIMIT 1
+                    ) best_season ON true
+                    LEFT JOIN teams t ON t.season_id = best_season.id
+                    LEFT JOIN league_players lp ON lp.team_id = t.id AND lp.season_id = best_season.id AND lp.is_active = true
                     WHERE d.league_id = ${league.id}
                     GROUP BY d.id
                 `
