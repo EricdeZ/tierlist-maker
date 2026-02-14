@@ -232,34 +232,39 @@ const LeagueOverview = () => {
                 onMouseLeave={handleHeroLeave}
                 className="relative min-h-[80vh] flex items-center justify-center px-4 overflow-hidden"
             >
-                {/* BG Layer 1: Animated gradient base */}
+                {/* BG Layer 1: Painted gradient blobs — like Predictions */}
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 90% 50% at 50% 8%, ${leagueColor}30, transparent 65%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 70% 50% at 85% 30%, ${leagueColor}18, transparent 55%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 60% 45% at 15% 50%, ${leagueColor}15, transparent 55%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 80% 40% at 50% 90%, ${leagueColor}14, transparent 55%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 50% 35% at 70% 65%, ${leagueColor}0c, transparent 50%)` }} />
+
+                {/* BG Layer 2: Slow-drifting shimmer */}
                 <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
-                        background: `
-                            radial-gradient(ellipse at 30% 20%, ${leagueColor}18, transparent 50%),
-                            radial-gradient(ellipse at 70% 80%, ${leagueColor}10, transparent 50%),
-                            radial-gradient(ellipse at 50% 50%, ${leagueColor}08, transparent 70%)
-                        `,
-                    }}
-                />
-
-                {/* BG Layer 2: Slow-moving gradient shimmer */}
-                <div
-                    className="absolute inset-0 pointer-events-none opacity-60"
-                    style={{
-                        background: `linear-gradient(135deg, transparent 20%, ${leagueColor}08 40%, transparent 60%, ${leagueColor}05 80%, transparent)`,
+                        background: `linear-gradient(135deg, transparent 15%, ${leagueColor}12 35%, transparent 50%, ${leagueColor}0a 70%, transparent 85%)`,
                         backgroundSize: '200% 200%',
-                        animation: 'gradientShift 12s ease-in-out infinite',
+                        animation: 'gradientShift 10s ease-in-out infinite',
                     }}
                 />
 
-                {/* BG Layer 3: Mouse-tracking light */}
+                {/* BG Layer 3: Mouse-tracking paint blob — large, prominent */}
                 <div
-                    className="absolute inset-0 pointer-events-none transition-opacity duration-700"
+                    className="absolute inset-0 pointer-events-none"
                     style={{
-                        background: `radial-gradient(800px circle at ${heroLight.x}% ${heroLight.y}%, ${leagueColor}20, transparent 50%)`,
-                        opacity: heroLight.active ? 1 : 0,
+                        background: `radial-gradient(600px circle at ${heroLight.x}% ${heroLight.y}%, ${leagueColor}35, transparent 60%)`,
+                        opacity: heroLight.active ? 1 : 0.3,
+                        transition: 'opacity 0.5s ease, background 0.15s ease',
+                    }}
+                />
+                {/* Secondary paint blob — offset, different size for depth */}
+                <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                        background: `radial-gradient(400px circle at ${Math.min(100, heroLight.x + 8)}% ${Math.min(100, heroLight.y + 5)}%, ${leagueColor}20, transparent 55%)`,
+                        opacity: heroLight.active ? 0.8 : 0,
+                        transition: 'opacity 0.7s ease, background 0.2s ease',
                     }}
                 />
 
@@ -270,16 +275,6 @@ const LeagueOverview = () => {
                         backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
                         backgroundSize: '60px 60px',
                     }}
-                />
-
-                {/* BG Layer 5: Decorative accent lines */}
-                <div
-                    className="absolute top-0 left-1/4 w-px h-full opacity-[0.06] rotate-12 origin-top pointer-events-none"
-                    style={{ background: `linear-gradient(to bottom, transparent, ${leagueColor}, transparent)` }}
-                />
-                <div
-                    className="absolute top-0 right-1/3 w-px h-full opacity-[0.04] -rotate-6 origin-top pointer-events-none"
-                    style={{ background: `linear-gradient(to bottom, transparent, ${leagueColor}, transparent)` }}
                 />
 
                 {/* BG Layer 6: Floating division rank badges */}
@@ -301,7 +296,7 @@ const LeagueOverview = () => {
                                 key={div.id}
                                 src={img}
                                 alt=""
-                                className="absolute w-12 h-12 sm:w-16 sm:h-16 object-contain opacity-[0.07]"
+                                className="absolute w-14 h-14 sm:w-20 sm:h-20 object-contain opacity-[0.10]"
                                 style={{
                                     ...pos,
                                     transform: `rotate(${pos.rotate}deg)`,
@@ -312,27 +307,30 @@ const LeagueOverview = () => {
                     })}
                 </div>
 
-                {/* BG Layer 7: Floating team logos scattered */}
+                {/* BG Layer 7: Floating team logos — visible, animated */}
                 {uniqueTeams.length > 0 && (
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        {uniqueTeams.slice(0, 12).map((team, i) => {
-                            const angle = (i / Math.min(uniqueTeams.length, 12)) * Math.PI * 2
-                            const radiusX = 38 + (i % 3) * 8
-                            const radiusY = 32 + (i % 2) * 10
+                        {uniqueTeams.slice(0, 16).map((team, i) => {
+                            const count = Math.min(uniqueTeams.length, 16)
+                            const angle = (i / count) * Math.PI * 2
+                            const radiusX = 35 + (i % 3) * 10
+                            const radiusY = 28 + (i % 4) * 8
                             const x = 50 + Math.cos(angle) * radiusX
                             const y = 50 + Math.sin(angle) * radiusY
+                            const size = 36 + (i % 3) * 10
+                            const duration = 4 + (i % 4) * 0.8
                             return (
                                 <div
                                     key={team.slug}
-                                    className="absolute opacity-[0.05]"
+                                    className="absolute opacity-[0.09]"
                                     style={{
                                         top: `${y}%`,
                                         left: `${x}%`,
-                                        transform: `translate(-50%, -50%) rotate(${-10 + i * 7}deg)`,
-                                        animation: `leagueFloat ${3.5 + (i % 3) * 0.5}s ease-in-out infinite ${i * 0.3}s`,
+                                        transform: `translate(-50%, -50%) rotate(${-8 + (i * 11) % 20}deg)`,
+                                        animation: `leagueFloat ${duration}s ease-in-out infinite ${i * 0.25}s`,
                                     }}
                                 >
-                                    <TeamLogo slug={team.slug} name={team.name} size={40} />
+                                    <TeamLogo slug={team.slug} name={team.name} size={size} />
                                 </div>
                             )
                         })}
