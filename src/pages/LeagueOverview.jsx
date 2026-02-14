@@ -16,6 +16,8 @@ import smiteLogo from '../assets/smite2.png'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
 
+const teamImages = import.meta.glob('../assets/teams/*.webp', { eager: true, import: 'default' })
+
 const DiscordIcon = ({ className }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
         <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
@@ -38,10 +40,8 @@ const LeagueOverview = () => {
     const heroRef = useRef(null)
     const [heroLight, setHeroLight] = useState({ x: 50, y: 50, active: false })
 
-    // Physics-based floating symbols
-    const symbolsRef = useRef(null)
-    const particlesRef = useRef(null)
-    const rafRef = useRef(null)
+    // Canvas-based floating symbols (single layer, no per-element compositing)
+    const canvasRef = useRef(null)
 
     const handleHeroMove = useCallback((e) => {
         const el = heroRef.current
@@ -58,75 +58,115 @@ const LeagueOverview = () => {
         setHeroLight(prev => ({ ...prev, active: false }))
     }, [])
 
-    // Initialize and animate floating symbol particles
+    // Canvas-based floating symbols — single layer, ~20fps, paused off-screen
     useEffect(() => {
-        const container = symbolsRef.current
-        if (!container) return
+        const canvas = canvasRef.current
+        if (!canvas || !league) return
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-        const els = container.querySelectorAll('[data-particle]')
-        if (els.length === 0) return
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
 
-        // Initialize particles with random positions, velocities, sizes
-        particlesRef.current = Array.from(els).map(() => {
-            const baseSize = 0.6 + Math.random() * 0.9 // 0.6x to 1.5x scale
-            const speed = 12 + Math.random() * 28 // px per second
-            const angle = Math.random() * Math.PI * 2
-            return {
-                x: 5 + Math.random() * 90, // % position
-                y: 5 + Math.random() * 90,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                scale: baseSize,
-                rotation: Math.random() * 360,
-                rotSpeed: (Math.random() - 0.5) * 20, // degrees per second
-                opacity: 0.06 + Math.random() * 0.08,
+        // Collect image URLs for particles
+        const divs = league.divisions || []
+        const allDivTeams = divs.flatMap(d => d.teams || [])
+            .filter((t, i, arr) => arr.findIndex(x => x.slug === t.slug) === i)
+        const imgUrls = []
+        divs.forEach(d => {
+            const src = getDivisionImage(leagueSlug, d.slug, d.tier)
+            if (src) imgUrls.push(src)
+        })
+        allDivTeams.slice(0, 14).forEach(t => {
+            const src = teamImages[`../assets/teams/${t.slug}.webp`]
+            if (src) imgUrls.push(src)
+        })
+        if (imgUrls.length === 0) return
+
+        // Load all images, then start animation
+        let cancelled = false
+        const loadImages = () => Promise.all(imgUrls.map(src => new Promise(resolve => {
+            const img = new Image()
+            img.onload = () => resolve(img)
+            img.onerror = () => resolve(null)
+            img.src = src
+        })))
+
+        loadImages().then(loaded => {
+            if (cancelled) return
+            const images = loaded.filter(Boolean)
+            if (images.length === 0) return
+
+            // Size canvas to container
+            const resize = () => {
+                const parent = canvas.parentElement
+                if (!parent) return
+                canvas.width = parent.offsetWidth
+                canvas.height = parent.offsetHeight
+            }
+            resize()
+            window.addEventListener('resize', resize)
+
+            // Create particles
+            const particles = images.map(img => {
+                const size = 30 + Math.random() * 40 // 30-70px
+                const speed = 12 + Math.random() * 28
+                const angle = Math.random() * Math.PI * 2
+                return {
+                    img,
+                    size,
+                    x: size + Math.random() * (canvas.width - size * 2),
+                    y: size + Math.random() * (canvas.height - size * 2),
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.35,
+                    opacity: 0.06 + Math.random() * 0.08,
+                }
+            })
+
+            let visible = true
+            const observer = new IntersectionObserver(([e]) => { visible = e.isIntersecting }, { threshold: 0 })
+            observer.observe(canvas)
+
+            const INTERVAL = 50 // 20fps
+            const dt = INTERVAL / 1000
+            const intervalId = setInterval(() => {
+                if (!visible || canvas.width === 0) return
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                const margin = 10
+                particles.forEach(p => {
+                    p.x += p.vx * dt
+                    p.y += p.vy * dt
+                    p.rotation += p.rotSpeed * dt
+
+                    if (p.x < margin) { p.x = margin; p.vx = Math.abs(p.vx) }
+                    if (p.x > canvas.width - margin) { p.x = canvas.width - margin; p.vx = -Math.abs(p.vx) }
+                    if (p.y < margin) { p.y = margin; p.vy = Math.abs(p.vy) }
+                    if (p.y > canvas.height - margin) { p.y = canvas.height - margin; p.vy = -Math.abs(p.vy) }
+
+                    ctx.save()
+                    ctx.globalAlpha = p.opacity
+                    ctx.translate(p.x, p.y)
+                    ctx.rotate(p.rotation)
+                    ctx.drawImage(p.img, -p.size / 2, -p.size / 2, p.size, p.size)
+                    ctx.restore()
+                })
+            }, INTERVAL)
+
+            // Store cleanup refs
+            canvas._cleanup = () => {
+                clearInterval(intervalId)
+                observer.disconnect()
+                window.removeEventListener('resize', resize)
             }
         })
 
-        let lastTime = performance.now()
-
-        const animate = (now) => {
-            const dt = Math.min((now - lastTime) / 1000, 0.05) // cap delta to avoid jumps
-            lastTime = now
-
-            const rect = container.getBoundingClientRect()
-            if (rect.width === 0 || rect.height === 0) {
-                rafRef.current = requestAnimationFrame(animate)
-                return
-            }
-
-            particlesRef.current.forEach((p, i) => {
-                const el = els[i]
-                if (!el) return
-
-                // Move
-                p.x += (p.vx / rect.width) * 100 * dt
-                p.y += (p.vy / rect.height) * 100 * dt
-                p.rotation += p.rotSpeed * dt
-
-                // Bounce off edges
-                const margin = 2
-                if (p.x < margin) { p.x = margin; p.vx = Math.abs(p.vx) }
-                if (p.x > 98 - margin) { p.x = 98 - margin; p.vx = -Math.abs(p.vx) }
-                if (p.y < margin) { p.y = margin; p.vy = Math.abs(p.vy) }
-                if (p.y > 98 - margin) { p.y = 98 - margin; p.vy = -Math.abs(p.vy) }
-
-                // Apply transform
-                el.style.left = `${p.x}%`
-                el.style.top = `${p.y}%`
-                el.style.transform = `translate(-50%, -50%) scale(${p.scale}) rotate(${p.rotation}deg)`
-                el.style.opacity = p.opacity
-            })
-
-            rafRef.current = requestAnimationFrame(animate)
-        }
-
-        rafRef.current = requestAnimationFrame(animate)
-
         return () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current)
+            cancelled = true
+            if (canvas._cleanup) canvas._cleanup()
         }
-    }, [league]) // re-init when league data loads
+    }, [league, leagueSlug])
 
     // Close tools dropdown on click outside
     useEffect(() => {
@@ -203,9 +243,6 @@ const LeagueOverview = () => {
     const allTeams = activeDivisions.flatMap(d => d.teams || [])
     // Unique teams only (same team might appear in data)
     const uniqueTeams = allTeams.filter((t, i, arr) => arr.findIndex(x => x.slug === t.slug) === i)
-    // All teams across every division (for background particles even when inactive)
-    const allLeagueTeams = divisions.flatMap(d => d.teams || [])
-        .filter((t, i, arr) => arr.findIndex(x => x.slug === t.slug) === i)
 
     return (
         <div className="min-h-screen overflow-hidden">
@@ -221,14 +258,9 @@ const LeagueOverview = () => {
                     0%, 100% { opacity: 0.15; }
                     50% { opacity: 0.25; }
                 }
-                @keyframes leagueGlow {
-                    0%, 100% { box-shadow: 0 0 30px ${leagueColor}15, 0 0 60px ${leagueColor}05; }
-                    50% { box-shadow: 0 0 50px ${leagueColor}25, 0 0 100px ${leagueColor}10; }
-                }
-                @keyframes gradientShift {
-                    0% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                    100% { background-position: 0% 50%; }
+                @keyframes slideIn {
+                    from { opacity: 0; transform: scale(0.97); }
+                    to { opacity: 1; transform: scale(1); }
                 }
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px); }
@@ -317,13 +349,11 @@ const LeagueOverview = () => {
                 <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 80% 40% at 50% 90%, ${leagueColor}14, transparent 55%)` }} />
                 <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 50% 35% at 70% 65%, ${leagueColor}0c, transparent 50%)` }} />
 
-                {/* BG Layer 2: Slow-drifting shimmer */}
+                {/* BG Layer 2: Static shimmer accent */}
                 <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
                         background: `linear-gradient(135deg, transparent 15%, ${leagueColor}12 35%, transparent 50%, ${leagueColor}0a 70%, transparent 85%)`,
-                        backgroundSize: '200% 200%',
-                        animation: 'gradientShift 10s ease-in-out infinite',
                     }}
                 />
 
@@ -355,36 +385,8 @@ const LeagueOverview = () => {
                     }}
                 />
 
-                {/* BG Layers 6+7: Physics-based floating symbols (division badges + team logos) */}
-                <div ref={symbolsRef} className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {/* Division rank badges */}
-                    {divisions.map((div) => {
-                        const img = getDivisionImage(leagueSlug, div.slug, div.tier)
-                        if (!img) return null
-                        return (
-                            <img
-                                key={`div-${div.id}`}
-                                data-particle
-                                src={img}
-                                alt=""
-                                className="absolute w-16 h-16 sm:w-24 sm:h-24 object-contain will-change-transform"
-                            />
-                        )
-                    })}
-                    {/* Team logos (from all divisions, even inactive) */}
-                    {allLeagueTeams.slice(0, 14).map((team, i) => {
-                        const size = 28 + (i % 5) * 10 // 28–68px variety
-                        return (
-                            <div
-                                key={`team-${team.slug}`}
-                                data-particle
-                                className="absolute will-change-transform"
-                            >
-                                <TeamLogo slug={team.slug} name={team.name} size={size} />
-                            </div>
-                        )
-                    })}
-                </div>
+                {/* Floating symbols — single canvas, no per-element GPU layers */}
+                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
                 {/* Hero content */}
                 <div className="relative z-10 text-center max-w-4xl mx-auto" style={{ animation: 'slideUp 0.6s ease-out' }}>
@@ -422,7 +424,7 @@ const LeagueOverview = () => {
                                 className="h-32 w-32 rounded-3xl border border-white/10 flex items-center justify-center"
                                 style={{
                                     background: `linear-gradient(135deg, ${leagueColor}15, ${leagueColor}05)`,
-                                    animation: 'leagueGlow 3s ease-in-out infinite',
+                                    boxShadow: `0 0 30px ${leagueColor}15, 0 0 60px ${leagueColor}05`,
                                 }}
                             >
                                 <Trophy className="w-16 h-16" style={{ color: leagueColor }} />
@@ -506,10 +508,10 @@ const LeagueOverview = () => {
             <section className="px-4 -mt-8 relative z-10 pb-16">
                 <div className="max-w-4xl mx-auto">
                     <div
-                        className="grid grid-cols-3 gap-4 sm:gap-6 rounded-2xl border border-white/10 p-6 sm:p-8 backdrop-blur-sm"
+                        className="grid grid-cols-3 gap-4 sm:gap-6 rounded-2xl border border-white/10 p-6 sm:p-8"
                         style={{
                             background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))',
-                            animation: 'leagueGlow 4s ease-in-out infinite',
+                            boxShadow: `0 0 40px ${leagueColor}12, 0 0 80px ${leagueColor}06`,
                         }}
                     >
                         {[
