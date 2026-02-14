@@ -48,6 +48,7 @@ import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
 import DebugTools from "./pages/admin/DebugTools.jsx";
 import Predictions from "./pages/Predictions.jsx";
 import MatchupDetail from "./pages/MatchupDetail.jsx";
+import FeaturedStream from "./pages/FeaturedStream.jsx";
 
 function App() {
     return (
@@ -85,6 +86,9 @@ function App() {
                             <Route path="shop" element={<PassionShop />} />
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
+
+                            {/* Featured stream */}
+                            <Route path="twitch" element={<FeaturedStream />} />
 
                             {/* Draft simulator */}
                             <Route path="draft" element={<DraftSimulator />} />

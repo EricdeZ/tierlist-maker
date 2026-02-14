@@ -148,14 +148,6 @@ export default function SimpleNav({ title }) {
                                             Draft Simulator
                                         </Link>
                                         <Link
-                                            to="/predictions"
-                                            onClick={() => setToolsOpen(false)}
-                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
-                                        >
-                                            <Trophy className="w-4 h-4 text-(--color-text-secondary)" />
-                                            Predictions
-                                        </Link>
-                                        <Link
                                             to="/coinflip"
                                             onClick={() => setToolsOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
@@ -257,13 +249,6 @@ export default function SimpleNav({ title }) {
                         >
                             <Swords className="w-4 h-4" />
                             Draft Simulator
-                        </Link>
-                        <Link
-                            to="/predictions"
-                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                        >
-                            <Trophy className="w-4 h-4" />
-                            Predictions
                         </Link>
                         <Link
                             to="/coinflip"

@@ -365,12 +365,12 @@ const ProfilePage = () => {
                             <table className="min-w-full divide-y divide-white/10">
                                 <thead className="bg-white/5">
                                     <tr>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Season</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Team</th>
-                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
-                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Games</th>
-                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">W-L</th>
-                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">KDA</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[120px]">Season</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[120px]">Team</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[70px]">Role</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[70px]">Games</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[70px]">W-L</th>
+                                        <th className="px-3 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider min-w-[70px]">KDA</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -470,7 +470,7 @@ const ProfilePage = () => {
                                     <tr>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Date</th>
                                         {!selectedLeague && (
-                                            <th className="px-2 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Season</th>
+                                            <th className="px-2 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase min-w-[120px]">Season</th>
                                         )}
                                         <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Opponent</th>
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase"></th>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePassion } from '../../context/PassionContext'
 import { useAuth } from '../../context/AuthContext'
-import { challengeService } from '../../services/database'
+import { challengeService, predictionsService } from '../../services/database'
 import { RANK_THRESHOLDS, formatRank } from '../../config/ranks'
 import RankBadge from '../../components/RankBadge'
 import PageTitle from '../../components/PageTitle'
@@ -18,6 +18,8 @@ export default function DebugTools() {
     const [selectedRankIdx, setSelectedRankIdx] = useState(RANK_THRESHOLDS.length - 1)
     const [resetting, setResetting] = useState(false)
     const [resetResult, setResetResult] = useState(null)
+    const [refunding, setRefunding] = useState(false)
+    const [refundResult, setRefundResult] = useState(null)
 
     const selectedRank = RANK_THRESHOLDS[selectedRankIdx]
 
@@ -139,6 +141,42 @@ export default function DebugTools() {
                 {resetResult && (
                     <div className={`mt-3 text-xs p-2 rounded-lg ${resetResult.error ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
                         {resetResult.error ? `Error: ${resetResult.error}` : 'Done. All passion data reset to zero.'}
+                    </div>
+                )}
+
+                {/* Refund All Predictions */}
+                <div className="flex items-center justify-between mt-5 pt-5 border-t border-white/10">
+                    <div>
+                        <div className="text-sm font-medium text-(--color-text)">Refund All Predictions</div>
+                        <div className="text-xs text-(--color-text-secondary) mt-0.5">
+                            Refunds all pending prediction wagers and marks them as refunded.
+                        </div>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            if (!confirm('Refund ALL pending predictions across all matches? Wagers will be returned to users.')) return
+                            setRefunding(true)
+                            setRefundResult(null)
+                            try {
+                                const res = await predictionsService.refundAll()
+                                setRefundResult(res)
+                            } catch (err) {
+                                setRefundResult({ error: err.message })
+                            } finally {
+                                setRefunding(false)
+                            }
+                        }}
+                        disabled={refunding}
+                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shrink-0"
+                    >
+                        {refunding ? 'Refunding...' : 'Refund All Predictions'}
+                    </button>
+                </div>
+                {refundResult && (
+                    <div className={`mt-3 text-xs p-2 rounded-lg ${refundResult.error ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {refundResult.error
+                            ? `Error: ${refundResult.error}`
+                            : `Done. Refunded ${refundResult.matchesRefunded} match(es).`}
                     </div>
                 )}
             </section>

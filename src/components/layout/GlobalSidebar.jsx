@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Target
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv
 } from 'lucide-react'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
@@ -65,10 +65,11 @@ function SidebarLink({ to, icon: Icon, children, onClick, badge, active }) {
 }
 
 export default function GlobalSidebar() {
-    const { isOpen, close } = useSidebar()
+    const { isOpen, open, close } = useSidebar()
     const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, avatarUrl } = useAuth()
     const passion = usePassion()
     const location = useLocation()
+    const sidebarRef = useRef(null)
 
     const [leagues, setLeagues] = useState([])
     const [leaguesLoading, setLeaguesLoading] = useState(false)
@@ -97,6 +98,67 @@ export default function GlobalSidebar() {
         document.addEventListener('keydown', handleKey)
         return () => document.removeEventListener('keydown', handleKey)
     }, [isOpen, close])
+
+    // Swipe gesture: right-to-open from left edge, left-to-close on sidebar
+    useEffect(() => {
+        const EDGE_ZONE = 30 // px from left edge to start swipe-to-open
+        const SWIPE_THRESHOLD = 60 // px minimum distance to trigger
+        let touchStartX = null
+        let touchStartY = null
+        let isEdgeSwipe = false
+
+        const onTouchStart = (e) => {
+            const touch = e.touches[0]
+            touchStartX = touch.clientX
+            touchStartY = touch.clientY
+
+            if (!isOpen && touch.clientX <= EDGE_ZONE) {
+                isEdgeSwipe = true
+            } else if (isOpen && sidebarRef.current?.contains(e.target)) {
+                isEdgeSwipe = true
+            } else {
+                isEdgeSwipe = false
+            }
+        }
+
+        const onTouchEnd = (e) => {
+            if (!isEdgeSwipe || touchStartX === null) {
+                touchStartX = null
+                touchStartY = null
+                isEdgeSwipe = false
+                return
+            }
+
+            const touch = e.changedTouches[0]
+            const dx = touch.clientX - touchStartX
+            const dy = Math.abs(touch.clientY - touchStartY)
+
+            // Ignore if vertical scroll is dominant
+            if (dy > Math.abs(dx)) {
+                touchStartX = null
+                touchStartY = null
+                isEdgeSwipe = false
+                return
+            }
+
+            if (!isOpen && dx >= SWIPE_THRESHOLD) {
+                open()
+            } else if (isOpen && dx <= -SWIPE_THRESHOLD) {
+                close()
+            }
+
+            touchStartX = null
+            touchStartY = null
+            isEdgeSwipe = false
+        }
+
+        document.addEventListener('touchstart', onTouchStart, { passive: true })
+        document.addEventListener('touchend', onTouchEnd, { passive: true })
+        return () => {
+            document.removeEventListener('touchstart', onTouchStart)
+            document.removeEventListener('touchend', onTouchEnd)
+        }
+    }, [isOpen, open, close])
 
     // Lazy-fetch leagues on first open
     useEffect(() => {
@@ -153,6 +215,7 @@ export default function GlobalSidebar() {
 
             {/* Sidebar Panel */}
             <div
+                ref={sidebarRef}
                 className={`fixed inset-y-0 left-0 z-[60] w-80 max-w-[85vw]
                     bg-(--color-secondary) border-r border-white/10 shadow-2xl shadow-black/50
                     transform transition-transform duration-300 ease-in-out
@@ -384,13 +447,6 @@ export default function GlobalSidebar() {
                             )}
                         >
                             <SidebarLink
-                                to="/predictions"
-                                icon={Target}
-                                active={isActive('/predictions')}
-                            >
-                                Predictions
-                            </SidebarLink>
-                            <SidebarLink
                                 to="/challenges"
                                 icon={Sparkles}
                                 active={isActive('/challenges')}
@@ -428,6 +484,9 @@ export default function GlobalSidebar() {
                             </SidebarLink>
                             <SidebarLink to="/draft" active={isActive('/draft')}>
                                 Draft Simulator
+                            </SidebarLink>
+                            <SidebarLink to="/twitch" icon={Tv} active={isActive('/twitch')}>
+                                Featured Stream
                             </SidebarLink>
                         </SidebarSection>
 

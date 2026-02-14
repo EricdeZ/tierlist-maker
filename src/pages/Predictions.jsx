@@ -350,10 +350,11 @@ function WagerBar({ teamName, passion, onSubmit, onCancel, submitting, submitErr
 // Main component
 // ═══════════════════════════════════════════════════
 export default function Predictions() {
-    const { user, login } = useAuth()
+    const { user, login, hasAnyPermission } = useAuth()
     const passion = usePassion()
     const [searchParams] = useSearchParams()
     const [entered, setEntered] = useState(false)
+
     const [coinFlipOpen, setCoinFlipOpen] = useState(false)
 
     const [activeTab, setActiveTab] = useState('upcoming')
@@ -481,6 +482,22 @@ export default function Predictions() {
         { key: 'my-predictions', label: 'Portfolio', icon: TrendingUp },
         { key: 'leaderboard', label: 'Rankings', icon: Flame },
     ]
+
+    // Predictions disabled for non-admin users
+    if (!hasAnyPermission) {
+        return (
+            <div className="min-h-screen bg-(--color-primary)">
+                <SimpleNav title="Predictions" />
+                <div className="max-w-md mx-auto py-24 px-4 text-center">
+                    <Lock className="w-12 h-12 mx-auto mb-4 text-(--color-text-secondary)" />
+                    <h1 className="font-heading text-2xl font-bold text-(--color-text) mb-2">Predictions Unavailable</h1>
+                    <p className="text-sm text-(--color-text-secondary)">
+                        Match predictions are currently disabled.
+                    </p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen text-white relative">

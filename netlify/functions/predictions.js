@@ -1,6 +1,7 @@
 import { getDB, headers, getHeaders } from './lib/db.js'
 import { requireAuth, requirePermission } from './lib/auth.js'
 import { grantPassion } from './lib/passion.js'
+import { refundPredictions } from './lib/predictions.js'
 import { logAudit } from './lib/audit.js'
 
 export const handler = async (event) => {
@@ -42,6 +43,8 @@ export const handler = async (event) => {
                     return await submitPrediction(sql, user, body)
                 case 'lock-toggle':
                     return await lockToggle(sql, event, user, body)
+                case 'refund-all':
+                    return await refundAllPending(sql, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -823,5 +826,45 @@ async function getMatchupDetail(sql, event, params) {
             },
             recentForm: { team1: mapRecent(recentT1, t1Id), team2: mapRecent(recentT2, t2Id) },
         }),
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// POST: Admin refund ALL pending predictions (debug)
+// ═══════════════════════════════════════════════════
+async function refundAllPending(sql, event) {
+    const admin = await requirePermission(event, 'permission_manage')
+    if (!admin) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized — Owner only' }) }
+    }
+
+    // Get all distinct scheduled_match_ids that have pending predictions
+    const matchIds = await sql`
+        SELECT DISTINCT scheduled_match_id FROM predictions WHERE status = 'pending'
+    `
+
+    let totalRefunded = 0
+    for (const { scheduled_match_id } of matchIds) {
+        await refundPredictions(sql, scheduled_match_id)
+        totalRefunded++
+    }
+
+    // Count how many individual predictions were refunded
+    const [{ count }] = await sql`
+        SELECT COUNT(*)::integer as count FROM predictions WHERE status = 'refunded'
+    `
+
+    await logAudit(sql, admin, {
+        action: 'refund-all-predictions',
+        endpoint: 'predictions',
+        targetType: 'system',
+        details: { matchesAffected: totalRefunded },
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, matchesRefunded: totalRefunded, totalRefunded: count }),
     }
 }

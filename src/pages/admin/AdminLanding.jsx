@@ -4,6 +4,7 @@ import { Home } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import smiteLogo from '../../assets/smite2.png'
 import PageTitle from '../../components/PageTitle'
+import FeaturedStreamAdmin from '../../components/admin/FeaturedStreamAdmin'
 
 const tools = [
     {
@@ -283,6 +284,13 @@ export default function AdminLanding() {
                     </div>
                 ))}
             </div>
+
+            {/* Featured Stream config */}
+            {hasPermissionAnywhere('league_manage') && (
+                <div className="mt-8">
+                    <FeaturedStreamAdmin />
+                </div>
+            )}
 
             {/* Debug link — Owner only */}
             {isOwner && (

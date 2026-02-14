@@ -182,8 +182,9 @@ function WagerBar({ teamName, passion, onSubmit, onCancel, submitting, submitErr
 // ═══════════════════════════════════════════════════
 export default function MatchupDetail() {
     const { scheduledMatchId } = useParams()
-    const { user, login } = useAuth()
+    const { user, login, hasAnyPermission } = useAuth()
     const passion = usePassion()
+
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -214,6 +215,22 @@ export default function MatchupDetail() {
     }, [scheduledMatchId])
 
     useEffect(() => { loadData() }, [loadData])
+
+    // Predictions disabled for non-admin users
+    if (!hasAnyPermission) {
+        return (
+            <div className="min-h-screen bg-(--color-primary)">
+                <SimpleNav title="Matchup Detail" />
+                <div className="max-w-md mx-auto py-24 px-4 text-center">
+                    <Lock className="w-12 h-12 mx-auto mb-4 text-(--color-text-secondary)" />
+                    <h1 className="font-heading text-2xl font-bold text-(--color-text) mb-2">Predictions Unavailable</h1>
+                    <p className="text-sm text-(--color-text-secondary)">
+                        Match predictions are currently disabled.
+                    </p>
+                </div>
+            </div>
+        )
+    }
 
     const handleTeamClick = (teamId) => {
         if (!data) return
