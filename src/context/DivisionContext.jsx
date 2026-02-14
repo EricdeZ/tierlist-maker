@@ -42,8 +42,7 @@ export const DivisionProvider = ({ children }) => {
                 }
 
                 // Step 3: Find active season for this division
-                const activeSeason = division.seasons?.find(s => s.is_active)
-                const season = activeSeason || division.seasons?.[0]
+                const season = division.seasons?.find(s => s.is_active)
 
                 if (!season) {
                     throw new Error(`No seasons found for division "${division.name}"`)

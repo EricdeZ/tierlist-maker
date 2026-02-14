@@ -27,14 +27,11 @@ export const handler = async (event) => {
                     FROM seasons s
                     JOIN divisions d ON s.division_id = d.id
                     JOIN leagues l ON d.league_id = l.id
-                    WHERE s.is_active = true
                     ORDER BY l.name, d.name, s.name
                 `,
                 sql`
                     SELECT t.id as team_id, t.name as team_name, t.color, t.season_id
                     FROM teams t
-                    JOIN seasons s ON t.season_id = s.id
-                    WHERE s.is_active = true
                     ORDER BY t.name
                 `,
             ])

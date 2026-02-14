@@ -81,21 +81,7 @@ export const seasonService = {
             }
         }
 
-        // If no active season, return the most recent season
-        for (const division of league.divisions) {
-            if (division.seasons && division.seasons.length > 0) {
-                const latestSeason = division.seasons[0] // Already ordered by start_date DESC
-                return {
-                    ...latestSeason,
-                    division_id: division.id,
-                    division_name: division.name,
-                    league_id: league.id,
-                    league_name: league.name
-                }
-            }
-        }
-
-        throw new Error('No seasons found for league')
+        throw new Error('No active season found for league')
     }
 }
 
@@ -239,6 +225,12 @@ export const challengeService = {
     },
 }
 
+export const siteConfigService = {
+    async get(keys) {
+        return apiCall('site-config', { keys: keys.join(',') })
+    },
+}
+
 export const predictionsService = {
     async getUpcoming(filters = {}) {
         return apiCall('predictions', { action: 'upcoming', ...filters })
@@ -262,6 +254,10 @@ export const predictionsService = {
 
     async getMatchupDetail(scheduledMatchId) {
         return apiCall('predictions', { action: 'matchup-detail', scheduledMatchId })
+    },
+
+    async refundAll() {
+        return apiPost('predictions', { action: 'refund-all' })
     },
 }
 
