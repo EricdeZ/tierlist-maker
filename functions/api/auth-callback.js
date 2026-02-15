@@ -29,9 +29,11 @@ const handler = async (event) => {
         returnPath = rawState
     }
 
-    // Derive redirect_uri from the frontend origin (matches what the frontend sent to Discord)
-    // Falls back to env var for production where state might be a plain path
-    const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${FRONTEND_URL}/api/auth-callback`
+    // Derive redirect_uri from the state origin so it matches what the frontend sent to Discord.
+    // Only fall back to env var when state was a legacy plain path (no origin).
+    const DISCORD_REDIRECT_URI = (FRONTEND_URL !== FALLBACK_URL)
+        ? `${FRONTEND_URL}/api/auth-callback`
+        : (process.env.DISCORD_REDIRECT_URI || `${FALLBACK_URL}/api/auth-callback`)
     if (!code) {
         return redirectWithError(FRONTEND_URL, 'Missing authorization code')
     }

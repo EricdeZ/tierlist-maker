@@ -79,11 +79,12 @@ export const AuthProvider = ({ children }) => {
 
     const login = useCallback(() => {
         const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID
-        const redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI
-        if (!clientId || !redirectUri) {
+        if (!clientId) {
             console.error('Discord OAuth not configured')
             return
         }
+        // Derive redirect_uri from current origin so it always matches the callback
+        const redirectUri = `${window.location.origin}/api/auth-callback`
         // Pass origin + path as state so callback redirects back to the correct host
         const returnPath = window.location.pathname + window.location.search
         const state = encodeURIComponent(window.location.origin + returnPath)
