@@ -96,7 +96,7 @@ const MatchDetail = () => {
 
     return (
         <div className="max-w-6xl mx-auto py-8 px-4">
-            {match && <PageTitle title={`${match.team1_name} vs ${match.team2_name}`} />}
+            {match && <PageTitle title={`${match.team1_name} vs ${match.team2_name}`} description={`${match.team1_name} vs ${match.team2_name} match details. Game-by-game stats, player performances, KDA, damage, and mitigated.`} />}
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-(--color-text-secondary) mb-6">
                 <Link to={`${basePath}/matches`} className="hover:text-(--color-accent) transition-colors">

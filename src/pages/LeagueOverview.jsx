@@ -230,7 +230,7 @@ const LeagueOverview = () => {
 
     return (
         <div className="min-h-screen overflow-hidden">
-            {league && <PageTitle title={league.name} />}
+            {league && <PageTitle title={`${league.name} - SMITE 2 Competitive League`} description={`${league.name} – ${league.divisions?.length || 0} divisions of competitive SMITE 2. View standings, stats, match history, and player rankings.`} />}
 
             {/* Keyframe animations */}
             <style>{`

@@ -344,7 +344,7 @@ export default function MatchupDetail() {
     return (
         <div className="min-h-screen text-white relative">
             <Navbar title="Matchup" />
-            <PageTitle title={`${t1.name} vs ${t2.name}`} />
+            <PageTitle title={`${t1.name} vs ${t2.name}`} noindex />
             <CoinBackground />
 
             {/* Full-page gradient background */}

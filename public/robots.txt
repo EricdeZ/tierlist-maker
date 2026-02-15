@@ -2,5 +2,8 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /admin/
+Disallow: /predictions
+Disallow: /matchup/
+Disallow: /coinflip
 
-Sitemap: https://smitecomp.com/sitemap.xml
+Sitemap: https://smitecomp.com/api/sitemap.xml

@@ -112,7 +112,7 @@ const PlayerProfile = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
-            {player && <PageTitle title={`${player.name} - ${division?.name || ''}`} />}
+            {player && <PageTitle title={`${player.name} - ${division?.name || ''}`} description={`${player.name}'s stats in the ${division?.name || ''} division. KDA, damage, win rate, and game-by-game performance.`} />}
             {/* Breadcrumb / back links */}
             <div className="flex items-center gap-2 text-sm text-(--color-text-secondary) mb-4">
                 <Link to={`${basePath}/stats`} className="hover:text-(--color-accent) transition-colors">

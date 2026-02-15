@@ -67,7 +67,7 @@ const Standings = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
-            {division && <PageTitle title={`Standings - ${division.name}`} />}
+            {division && <PageTitle title={`Standings - ${division.name}`} description={`Live standings for the ${division.name} division. Win/loss records, game differentials, and team rankings updated after every match.`} />}
             <h1 className="font-heading text-3xl font-bold text-(--color-text) mb-2 text-center">
                 Standings
             </h1>

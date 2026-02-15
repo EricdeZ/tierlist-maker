@@ -249,7 +249,7 @@ export default function TierListPage() {
 
     return (
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <PageTitle title="Player Tier Lists" />
+            <PageTitle title="SMITE 2 Player Tier List Maker" description="Create and share SMITE 2 player tier lists. Drag-and-drop players by role, export as images, and compare your rankings with the community." />
             {/* League picker modal */}
             {showPicker && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

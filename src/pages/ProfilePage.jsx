@@ -126,7 +126,7 @@ const ProfilePage = () => {
         <>
         <Navbar title={player.name} />
         <div className="max-w-5xl mx-auto pt-24 pb-8 px-4">
-            {profileData && <PageTitle title={`${profileData.player.name} - Player Profile`} />}
+            {profileData && <PageTitle title={`${profileData.player.name} - SMITE 2 Player Profile & Stats`} description={`${profileData.player.name}'s competitive SMITE 2 profile. ${profileData.allTimeStats?.games_played || 0} games played across ${profileData.leagueBreakdowns?.length || 0} league${(profileData.leagueBreakdowns?.length || 0) !== 1 ? 's' : ''}. Full match history, KDA, damage, and career stats.`} />}
 
             {/* Profile Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">

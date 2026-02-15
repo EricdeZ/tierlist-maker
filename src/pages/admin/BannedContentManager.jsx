@@ -122,7 +122,7 @@ export default function BannedContentManager() {
 
     return (
         <div className="min-h-screen bg-gray-950 text-gray-100">
-            <PageTitle title="Banned Content Manager" />
+            <PageTitle title="Banned Content Manager" noindex />
 
             {/* Toast */}
             {toast && (

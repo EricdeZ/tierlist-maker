@@ -113,7 +113,7 @@ const TeamDetail = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
-            {team && <PageTitle title={`${team.name} - ${division?.name || ''}`} />}
+            {team && <PageTitle title={`${team.name} - ${division?.name || ''}`} description={`${team.name} roster, match history, and stats in the ${division?.name || ''} division. View player performances and team record.`} />}
             {/* Back link */}
             <Link
                 to={`${basePath}/teams`}

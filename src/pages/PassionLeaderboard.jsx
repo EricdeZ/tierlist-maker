@@ -45,7 +45,7 @@ export default function PassionLeaderboard() {
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
             <Navbar title="Leaderboard" />
-            <PageTitle title="Passion Leaderboard" />
+            <PageTitle title="Passion Coin Leaderboard" description="See who has earned the most Passion Coins on SMITE 2 Companion. Climb the ranks from Clay to Deity and prove your dedication." />
 
             <div className="max-w-4xl mx-auto px-4 pt-24 pb-8">
 

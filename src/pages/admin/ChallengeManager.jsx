@@ -144,7 +144,7 @@ export default function ChallengeManager() {
 
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text) p-4 sm:p-8">
-            <PageTitle title="Challenge Manager" />
+            <PageTitle title="Challenge Manager" noindex />
 
             {/* Header */}
             <div className="max-w-6xl mx-auto">

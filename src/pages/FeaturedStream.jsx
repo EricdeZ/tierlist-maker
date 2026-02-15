@@ -35,7 +35,7 @@ export default function FeaturedStream() {
 
     return (
         <>
-            <PageTitle title="Featured Stream" />
+            <PageTitle title="Featured SMITE 2 Stream" description="Watch featured SMITE 2 competitive streams live. Catch community league matches, caster commentary, and competitive gameplay." />
             <Navbar title="Featured Stream" />
 
             <div className="pt-24 pb-12 px-4 max-w-6xl mx-auto">

@@ -274,7 +274,7 @@ export default function PassionShop() {
     return (
         <div className="min-h-screen text-white" style={{ background: '#060a14' }}>
             <Navbar title="Passion Shop" />
-            <PageTitle title="Passion Shop" />
+            <PageTitle title="Passion Shop" description="Spend your Passion Coins in the SMITE 2 Companion shop. Unlock cosmetics and rewards." />
 
             {/* ═══ HERO ═══ */}
             <section className="relative min-h-[55vh] sm:min-h-[60vh] flex items-end overflow-hidden">

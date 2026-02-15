@@ -246,7 +246,7 @@ export default function DraftSimulator() {
 
     return (
         <div className="h-screen bg-(--color-primary) flex flex-col overflow-hidden">
-            <PageTitle title="Draft Simulator" />
+            <PageTitle title="SMITE 2 Draft Simulator - Practice Picks & Bans" description="Free SMITE 2 draft simulator. Practice pick/ban strategy with every god. Supports Regular, Fearless, and multi-game series formats." />
             {/* Header */}
             <header className="flex items-center px-4 py-2.5 border-b border-white/10 flex-shrink-0">
                 <Link

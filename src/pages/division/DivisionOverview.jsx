@@ -121,7 +121,7 @@ const DivisionOverview = () => {
 
     return (
         <div>
-            {division && <PageTitle title={`${division.name} - ${league?.name || ''}`} />}
+            {division && <PageTitle title={`${division.name} - ${league?.name || ''}`} description={`${division.name} division of ${league?.name || 'SMITE 2 league'}${season ? ` – ${season.name}` : ''}. Live standings, match results, player stats, and rankings.`} />}
 
             {/* Keyframe animations */}
             <style>{`

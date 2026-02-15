@@ -330,7 +330,7 @@ export default function CoinFlip() {
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
             <Navbar title="Coin Flip" />
-            <PageTitle title="Coin Flip" />
+            <PageTitle title="Coin Flip" noindex />
 
             <div className="max-w-6xl mx-auto px-4 pt-24 pb-8">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

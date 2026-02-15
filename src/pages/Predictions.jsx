@@ -502,7 +502,7 @@ export default function Predictions() {
     return (
         <div className="min-h-screen text-white relative">
             <Navbar title="Predictions" />
-            <PageTitle title="Match Predictions" />
+            <PageTitle title="Match Predictions" noindex />
             <CoinBackground />
             <CoinFlipOverlay open={coinFlipOpen} onClose={() => setCoinFlipOpen(false)} />
 

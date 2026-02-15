@@ -8,7 +8,7 @@ const Stats = () => {
 
     return (
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            {division && <PageTitle title={`Stats - ${division.name}`} />}
+            {division && <PageTitle title={`Stats - ${division.name}`} description={`Player statistics for the ${division.name} division. KDA, damage, mitigated, win rates, and per-game performance analytics.`} />}
             <PlayerList />
         </div>
     )

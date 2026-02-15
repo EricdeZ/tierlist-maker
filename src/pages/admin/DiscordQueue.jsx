@@ -123,7 +123,7 @@ export default function DiscordQueue() {
 
     return (
         <div className="min-h-screen bg-gray-950 text-gray-100">
-            <PageTitle title="Discord Channels" />
+            <PageTitle title="Discord Channels" noindex />
 
             {/* Header */}
             <div className="bg-gray-900/80 border-b border-gray-800 px-4 py-3">

@@ -77,7 +77,7 @@ const LeaguesBrowse = () => {
 
     return (
         <div className="min-h-screen">
-            <PageTitle title="Leagues" />
+            <PageTitle title="All SMITE 2 Leagues" description="Browse every tracked SMITE 2 competitive league. View divisions, seasons, standings, and player stats across all community-run SMITE 2 leagues." />
             <Navbar title="Leagues" />
 
             {/* Hero */}

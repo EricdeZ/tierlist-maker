@@ -14,6 +14,7 @@ import oslLogo from '../assets/leagues/osl.png'
 
 import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisionImages'
 import ChallengeBanner from '../components/ChallengeBanner'
+import PageTitle from '../components/PageTitle'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -119,6 +120,7 @@ const Homepage = () => {
 
     return (
         <div className="min-h-screen overflow-hidden">
+            <PageTitle title="Stats, Standings & Tools for Competitive SMITE 2" description="The ultimate SMITE 2 competitive companion. Live standings, player stats, match history, tier lists, and draft simulator for community SMITE 2 leagues." />
 
             {/* Keyframe styles */}
             <style>{`
