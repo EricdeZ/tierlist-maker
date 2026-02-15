@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"wrangler pages dev --proxy=5173\"",
     "dev": "vite",
-    "dev:full": "wrangler pages dev --proxy=5173",
+    "dev:api": "wrangler pages dev --proxy=5173",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "wrangler pages dev dist"
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
