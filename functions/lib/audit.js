@@ -1,4 +1,3 @@
-// netlify/functions/lib/audit.js
 // Fire-and-forget audit logging for admin actions.
 
 /**

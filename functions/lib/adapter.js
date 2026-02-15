@@ -1,6 +1,6 @@
 /**
- * Wraps a Netlify-style handler for Cloudflare Pages Functions.
- * Converts CF Request → Netlify event shape, calls handler, converts response back.
+ * Adapter for Cloudflare Pages Functions.
+ * Converts CF Request → simplified event shape, calls handler, converts response back.
  */
 export function adapt(handler) {
     return async function onRequest(context) {
@@ -27,13 +27,13 @@ export function adapt(handler) {
             body = await request.text()
         }
 
-        // Build lowercase headers map (Netlify provides lowercase keys)
+        // Build lowercase headers map
         const headers = {}
         for (const [key, value] of request.headers) {
             headers[key.toLowerCase()] = value
         }
 
-        // Construct Netlify-compatible event
+        // Construct event object for handler
         const event = {
             httpMethod: request.method,
             headers,
@@ -43,10 +43,8 @@ export function adapt(handler) {
             rawUrl: request.url,
         }
 
-        // Call the original Netlify handler
         const result = await handler(event)
 
-        // Convert Netlify response → CF Response
         return new Response(result.body || '', {
             status: result.statusCode || 200,
             headers: result.headers || {},

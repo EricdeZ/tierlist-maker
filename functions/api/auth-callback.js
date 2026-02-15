@@ -1,5 +1,4 @@
 import { adapt } from '../lib/adapter.js'
-// netlify/functions/auth-callback.js
 // Discord OAuth2 callback handler
 import { getDB, headers } from '../lib/db.js'
 import { signToken } from '../lib/auth.js'

@@ -1,4 +1,3 @@
-// netlify/functions/lib/predictions.js
 // Shared helpers for the predictions system.
 
 import { grantPassion } from './passion.js'

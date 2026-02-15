@@ -357,7 +357,7 @@ export default function AdminDashboard() {
 
     // ─── Compress & convert image to base64 ───
     // Resizes to max 1400px wide (plenty for scoreboard OCR) and uses JPEG 0.85
-    // This prevents "Stream body too big" crashes in Netlify CLI dev proxy
+    // Keeps request payload small for serverless function limits
     const compressImage = (file, maxWidth = 1400, quality = 0.85) => new Promise((resolve, reject) => {
         const img = new Image()
         const url = URL.createObjectURL(file)

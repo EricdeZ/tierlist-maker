@@ -1,4 +1,3 @@
-// netlify/functions/lib/passion.js
 // Shared helpers for the passion coin system.
 
 // ═══════════════════════════════════════════════════

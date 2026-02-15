@@ -1,5 +1,4 @@
 import { adapt } from '../lib/adapter.js'
-// netlify/functions/auth-me.js
 // Returns current authenticated user info
 import { getDB, headers } from '../lib/db.js'
 import { requireAuth, getUserPermissions } from '../lib/auth.js'

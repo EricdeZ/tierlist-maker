@@ -2,7 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 
-// Netlify function config — Sonnet needs more time than the 10s default
+// Note: Sonnet needs more time than the default timeout for scoreboard extraction
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 

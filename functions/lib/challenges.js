@@ -1,4 +1,3 @@
-// netlify/functions/lib/challenges.js
 // Push-based challenge progress updates.
 // Called from endpoints when underlying stats change.
 
