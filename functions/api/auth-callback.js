@@ -7,18 +7,33 @@ import { pushChallengeProgress } from '../lib/challenges.js'
 const handler = async (event) => {
     const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
     const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
-    const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI
     const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID
-    const FRONTEND_URL = process.env.URL || 'http://localhost:8788'
+    const FALLBACK_URL = process.env.URL || 'http://localhost:8788'
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
     const code = event.queryStringParameters?.code
-    const returnPath = event.queryStringParameters?.state || '/'
+    const rawState = event.queryStringParameters?.state || '/'
+
+    // State may be a full URL (origin + path) or just a path (legacy)
+    let FRONTEND_URL = FALLBACK_URL
+    let returnPath = '/'
+    try {
+        const parsed = new URL(rawState)
+        FRONTEND_URL = parsed.origin
+        returnPath = parsed.pathname + parsed.search
+    } catch {
+        // Legacy: state is just a path
+        returnPath = rawState
+    }
+
+    // Derive redirect_uri from the frontend origin (matches what the frontend sent to Discord)
+    // Falls back to env var for production where state might be a plain path
+    const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${FRONTEND_URL}/api/auth-callback`
     if (!code) {
-        return redirectWithError('Missing authorization code')
+        return redirectWithError(FRONTEND_URL, 'Missing authorization code')
     }
 
     try {
@@ -38,7 +53,8 @@ const handler = async (event) => {
         if (!tokenRes.ok) {
             const err = await tokenRes.text()
             console.error('Discord token exchange failed:', err)
-            return redirectWithError('Discord authentication failed')
+            console.error('redirect_uri used:', DISCORD_REDIRECT_URI)
+            return redirectWithError(FRONTEND_URL, `Discord token exchange failed: ${err}`)
         }
 
         const tokenData = await tokenRes.json()
@@ -49,7 +65,7 @@ const handler = async (event) => {
         })
 
         if (!userRes.ok) {
-            return redirectWithError('Failed to fetch Discord profile')
+            return redirectWithError(FRONTEND_URL, 'Failed to fetch Discord profile')
         }
 
         const discordUser = await userRes.json()
@@ -128,12 +144,11 @@ const handler = async (event) => {
 
     } catch (err) {
         console.error('Auth callback error:', err)
-        return redirectWithError('Authentication failed')
+        return redirectWithError(FRONTEND_URL, 'Authentication failed')
     }
 }
 
-function redirectWithError(message) {
-    const frontendUrl = process.env.URL || 'http://localhost:8788'
+function redirectWithError(frontendUrl, message) {
     return {
         statusCode: 302,
         headers: {

@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
         const authError = params.get('auth_error')
 
         if (urlToken) {
+            console.log('[Auth] Token received from OAuth redirect')
             localStorage.setItem('auth_token', urlToken)
             setToken(urlToken)
             // Clean URL
@@ -26,7 +27,8 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (authError) {
-            console.error('Auth error:', authError)
+            console.error('Auth error:', decodeURIComponent(authError))
+            alert(`Login failed: ${decodeURIComponent(authError)}`)
             params.delete('auth_error')
             const clean = params.toString()
             window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
@@ -82,9 +84,9 @@ export const AuthProvider = ({ children }) => {
             console.error('Discord OAuth not configured')
             return
         }
-        // Pass current path as state so callback can redirect back here
+        // Pass origin + path as state so callback redirects back to the correct host
         const returnPath = window.location.pathname + window.location.search
-        const state = encodeURIComponent(returnPath)
+        const state = encodeURIComponent(window.location.origin + returnPath)
         const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`
         window.location.href = url
     }, [])

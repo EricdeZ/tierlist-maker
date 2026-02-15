@@ -31,8 +31,9 @@ export default function Navbar({ title, branding, tabs }) {
     const toolsRef = useRef(null)
     const menuRef = useRef(null)
 
-    // Breakpoint prefix: wider when tabs need space
-    const bp = tabs ? 'nav' : 'sm'
+    // Breakpoint classes — must be full literal strings so Tailwind can scan them
+    const bpShow = tabs ? 'nav:flex' : 'sm:flex'
+    const bpHide = tabs ? 'nav:hidden' : 'sm:hidden'
 
     const isActive = (item) => {
         if (item.exact) return location.pathname === item.path
@@ -95,7 +96,7 @@ export default function Navbar({ title, branding, tabs }) {
 
                     {/* Title (hidden on mobile — redundant with page heading) */}
                     {title && (
-                        <div className={`hidden ${bp}:flex items-center border-l border-white/10 pl-3 sm:pl-4`}>
+                        <div className={`hidden ${bpShow} items-center border-l border-white/10 pl-3 sm:pl-4`}>
                             <span className="text-xs sm:text-sm font-bold text-(--color-text)">{title}</span>
                         </div>
                     )}
@@ -108,7 +109,7 @@ export default function Navbar({ title, branding, tabs }) {
                     )}
 
                     {/* ── Desktop: tabs + icon bar ── */}
-                    <div className={`hidden ${bp}:flex items-center gap-1 ml-auto`}>
+                    <div className={`hidden ${bpShow} items-center gap-1 ml-auto`}>
                         {/* Tab links */}
                         {tabs && (
                             <>
@@ -201,7 +202,7 @@ export default function Navbar({ title, branding, tabs }) {
                     </div>
 
                     {/* ── Mobile: passion + user + hamburger ── */}
-                    <div className={`flex ${bp}:hidden items-center gap-2 ml-auto`}>
+                    <div className={`flex ${bpHide} items-center gap-2 ml-auto`}>
                         {user && <PassionDisplay compact />}
                         <UserMenu compact />
                         <button
@@ -230,7 +231,7 @@ export default function Navbar({ title, branding, tabs }) {
 
             {/* ── Mobile dropdown menu ── */}
             <div
-                className={`${bp}:hidden overflow-hidden transition-all duration-300 ease-in-out`}
+                className={`${bpHide} overflow-hidden transition-all duration-300 ease-in-out`}
                 style={{ maxHeight: mobileOpen ? '600px' : '0px', opacity: mobileOpen ? 1 : 0 }}
             >
                 <div className="mt-2 bg-(--color-primary)/90 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl p-2">
@@ -300,7 +301,7 @@ export default function Navbar({ title, branding, tabs }) {
 
             {/* Backdrop overlay when menu is open */}
             {mobileOpen && (
-                <div className={`fixed inset-0 -z-10 ${bp}:hidden`} />
+                <div className={`fixed inset-0 -z-10 ${bpHide}`} />
             )}
         </nav>
     )
