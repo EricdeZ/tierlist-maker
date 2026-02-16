@@ -24,6 +24,7 @@ import LeaguesBrowse from "./pages/LeaguesBrowse.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // Admin
+import AdminLayout from './components/layout/AdminLayout'
 import AdminLanding from "./pages/admin/AdminLanding.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import RosterManager from "./pages/admin/RosterManager.jsx";
@@ -36,6 +37,7 @@ import PermissionManager from "./pages/admin/PermissionManager.jsx";
 import AuditLog from "./pages/admin/AuditLog.jsx";
 import ScheduleManager from "./pages/admin/ScheduleManager.jsx";
 import DiscordQueue from "./pages/admin/DiscordQueue.jsx";
+import DiscordReview from "./pages/admin/DiscordReview.jsx";
 import BannedContentManager from "./pages/admin/BannedContentManager.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import DraftSimulator from "./pages/DraftSimulator.jsx";
@@ -62,22 +64,25 @@ function App() {
                             {/* Homepage — league & division selector */}
                             <Route index element={<Homepage />} />
 
-                            {/* Admin pages (protected) */}
-                            <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLanding /></ProtectedRoute>} />
-                            <Route path="admin/matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
-                            <Route path="admin/rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
-                            <Route path="admin/matches" element={<ProtectedRoute requiredPermission="match_manage"><MatchManager /></ProtectedRoute>} />
-                            <Route path="admin/players" element={<ProtectedRoute requiredPermission="player_manage"><PlayerManager /></ProtectedRoute>} />
-                            <Route path="admin/leagues" element={<ProtectedRoute requiredPermission="league_manage"><LeagueManager /></ProtectedRoute>} />
-                            <Route path="admin/users" element={<ProtectedRoute requiredPermission="user_manage"><UserManager /></ProtectedRoute>} />
-                            <Route path="admin/claims" element={<ProtectedRoute requiredPermission="claim_manage"><ClaimManager /></ProtectedRoute>} />
-                            <Route path="admin/permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
-                            <Route path="admin/auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
-                            <Route path="admin/schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
-                            <Route path="admin/discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
-                            <Route path="admin/banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />
-                            <Route path="admin/challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
-                            <Route path="admin/debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
+                            {/* Admin pages (nested under AdminLayout with shared navbar) */}
+                            <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLayout /></ProtectedRoute>}>
+                                <Route index element={<AdminLanding />} />
+                                <Route path="matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
+                                <Route path="rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
+                                <Route path="matches" element={<ProtectedRoute requiredPermission="match_manage"><MatchManager /></ProtectedRoute>} />
+                                <Route path="players" element={<ProtectedRoute requiredPermission="player_manage"><PlayerManager /></ProtectedRoute>} />
+                                <Route path="leagues" element={<ProtectedRoute requiredPermission="league_manage"><LeagueManager /></ProtectedRoute>} />
+                                <Route path="users" element={<ProtectedRoute requiredPermission="user_manage"><UserManager /></ProtectedRoute>} />
+                                <Route path="claims" element={<ProtectedRoute requiredPermission="claim_manage"><ClaimManager /></ProtectedRoute>} />
+                                <Route path="permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
+                                <Route path="auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
+                                <Route path="schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
+                                <Route path="discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
+                                <Route path="discord-review" element={<ProtectedRoute requiredPermission="match_report"><DiscordReview /></ProtectedRoute>} />
+                                <Route path="banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />
+                                <Route path="challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
+                                <Route path="debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
+                            </Route>
 
                             {/* Passion pages */}
                             <Route path="leaderboard" element={<PassionLeaderboard />} />

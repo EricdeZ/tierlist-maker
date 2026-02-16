@@ -226,8 +226,8 @@ const ProfilePage = () => {
                 </div>
             )}
 
-            {/* Claim CTA Banner */}
-            {!player.is_claimed && !authLoading && (
+            {/* Claim CTA Banner — hide if profile already claimed or current user already has a linked player */}
+            {!player.is_claimed && !authLoading && !linkedPlayer && (
                 <div
                     className="relative overflow-hidden rounded-xl border border-[#5865F2]/30 p-5 mb-6"
                     style={{ background: 'linear-gradient(135deg, rgba(88, 101, 242, 0.08), var(--color-secondary))' }}

@@ -1,7 +1,6 @@
 // src/pages/admin/BannedContentManager.jsx
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Home, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 
@@ -133,17 +132,12 @@ export default function BannedContentManager() {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-gray-900/80 border-b border-gray-800 px-4 py-3">
-                <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link to="/admin" className="text-gray-400 hover:text-gray-200 transition">
-                            <Home className="w-5 h-5" />
-                        </Link>
-                        <div>
-                            <h1 className="text-lg font-semibold">Banned Content</h1>
-                            <p className="text-xs text-gray-500">Sync ban lists from Discord channels</p>
-                        </div>
+            <div className="max-w-5xl mx-auto p-4 space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-lg font-semibold">Banned Content</h1>
+                        <p className="text-xs text-gray-500">Sync ban lists from Discord channels</p>
                     </div>
                     <div className="flex gap-2">
                         {configs.length > 0 && (
@@ -164,9 +158,6 @@ export default function BannedContentManager() {
                         </button>
                     </div>
                 </div>
-            </div>
-
-            <div className="max-w-5xl mx-auto p-4 space-y-4">
                 {/* Configured leagues */}
                 {configs.map(config => (
                     <div key={config.id} className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">

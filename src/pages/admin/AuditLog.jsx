@@ -82,25 +82,11 @@ export default function AuditLog() {
     const hasFilters = endpoint || username || action || dateFrom || dateTo
 
     return (
-        <div className="max-w-6xl mx-auto py-12 px-4">
+        <div className="max-w-6xl mx-auto pb-8 px-4">
             <PageTitle title="Audit Log" noindex />
-            {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <img src={smiteLogo} alt="" className="h-10 w-auto" />
-                    <div>
-                        <h1 className="font-heading text-2xl font-bold text-(--color-text)">Audit Log</h1>
-                        <p className="text-(--color-text-secondary) text-sm">Track all admin actions across the system</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Link to="/admin" className="p-2 rounded-lg text-(--color-text-secondary) hover:text-(--color-accent) hover:bg-white/5 transition-colors" title="Admin">
-                        <Shield className="w-5 h-5" />
-                    </Link>
-                    <Link to="/" className="p-2 rounded-lg text-(--color-text-secondary) hover:text-(--color-accent) hover:bg-white/5 transition-colors" title="Home">
-                        <Home className="w-5 h-5" />
-                    </Link>
-                </div>
+            <div className="mb-8">
+                <h1 className="font-heading text-2xl font-bold text-(--color-text)">Audit Log</h1>
+                <p className="text-(--color-text-secondary) text-sm">Track all admin actions across the system</p>
             </div>
 
             {/* Filters */}

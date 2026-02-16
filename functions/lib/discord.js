@@ -47,6 +47,86 @@ export async function reactToMessage(channelId, messageId, emoji = '🤖') {
     }
 }
 
+/**
+ * Fetch all roles for a guild.
+ * Returns array of { id, name, color, position }.
+ */
+export async function fetchGuildRoles(guildId) {
+    const res = await fetch(
+        `${DISCORD_API}/guilds/${guildId}/roles`,
+        { headers: getDiscordHeaders() },
+    )
+    if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Discord API ${res.status}: ${text.slice(0, 200)}`)
+    }
+    return res.json()
+}
+
+/**
+ * Fetch guild members with pagination.
+ * Returns array of member objects with user.id and roles[].
+ * Requires GUILD_MEMBERS privileged intent.
+ */
+export async function fetchGuildMembers(guildId, limit = 1000) {
+    const allMembers = []
+    let afterId = '0'
+
+    while (allMembers.length < limit) {
+        const batchSize = Math.min(1000, limit - allMembers.length)
+        const url = new URL(`${DISCORD_API}/guilds/${guildId}/members`)
+        url.searchParams.set('limit', String(batchSize))
+        url.searchParams.set('after', afterId)
+
+        const res = await fetch(url, { headers: getDiscordHeaders() })
+        if (!res.ok) {
+            const text = await res.text().catch(() => '')
+            throw new Error(`Discord API ${res.status}: ${text.slice(0, 200)}`)
+        }
+
+        const batch = await res.json()
+        if (!batch.length) break
+
+        allMembers.push(...batch)
+        afterId = batch[batch.length - 1].user.id
+
+        if (batch.length < batchSize) break // no more pages
+    }
+
+    return allMembers
+}
+
+/**
+ * Replace Discord role mentions (<@&ROLE_ID>) with readable @RoleName.
+ * @param {string} content - Raw message content
+ * @param {Map<string, string>} rolesMap - Map of roleId → roleName
+ * @returns {string} Content with resolved role mentions
+ */
+export function resolveRoleMentions(content, rolesMap) {
+    if (!content || !rolesMap) return content
+    return content.replace(/<@&(\d+)>/g, (match, roleId) => {
+        const name = rolesMap.get(roleId)
+        return name ? `@${name}` : match
+    })
+}
+
+/**
+ * Send a message to a Discord webhook.
+ * @param {string} webhookUrl - Full Discord webhook URL
+ * @param {object} options - { content, embeds }
+ */
+export async function sendWebhook(webhookUrl, { content, embeds }) {
+    const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, embeds }),
+    })
+    if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        console.error(`Discord webhook failed ${res.status}: ${text.slice(0, 200)}`)
+    }
+}
+
 function isImageAttachment(att) {
     return (
         att.content_type?.startsWith('image/') ||
@@ -57,13 +137,17 @@ function isImageAttachment(att) {
 /**
  * Poll a single Discord channel for new image-containing messages.
  * Inserts new attachments into discord_queue with ON CONFLICT DO NOTHING.
- * Returns { totalMessages, newImages }.
+ * @param {object} sql - Database connection
+ * @param {object} channel - discord_channels row
+ * @param {Map<string, string>} [guildRoles] - Optional Map of roleId → roleName for mention resolution
+ * @returns {{ totalMessages: number, newImages: number, newItemIds: number[] }}
  */
-export async function pollChannel(sql, channel) {
+export async function pollChannel(sql, channel, guildRoles) {
     let afterId = channel.last_message_id
     let highestId = afterId
     let totalMessages = 0
     let newImages = 0
+    const newItemIds = []
 
     // Discord "after" returns messages with id > afterId, sorted ascending (oldest first).
     // We paginate by taking the last (newest) id from each batch as the new afterId.
@@ -78,6 +162,12 @@ export async function pollChannel(sql, channel) {
         }
 
         for (const msg of messages) {
+            // Resolve role mentions in message content if guild roles provided
+            const resolvedContent = resolveRoleMentions(
+                (msg.content || '').substring(0, 2000),
+                guildRoles,
+            )
+
             // Collect images from direct attachments + forwarded message snapshots
             const directImages = (msg.attachments || []).filter(isImageAttachment)
             const snapshotImages = (msg.message_snapshots || [])
@@ -95,14 +185,17 @@ export async function pollChannel(sql, channel) {
                         ${channel.id}, ${msg.id}, ${att.id},
                         ${att.filename}, ${att.url},
                         ${att.size || null}, ${att.width || null}, ${att.height || null},
-                        ${(msg.content || '').substring(0, 2000)},
+                        ${resolvedContent},
                         ${msg.author?.id || null}, ${msg.author?.username || null},
                         ${msg.timestamp}
                     )
                     ON CONFLICT (message_id, attachment_id) DO NOTHING
                     RETURNING id
                 `
-                if (result.length) newImages++
+                if (result.length) {
+                    newImages++
+                    newItemIds.push(result[0].id)
+                }
             }
         }
 
@@ -120,7 +213,7 @@ export async function pollChannel(sql, channel) {
         `
     }
 
-    return { totalMessages, newImages }
+    return { totalMessages, newImages, newItemIds }
 }
 
 /**

@@ -1,7 +1,6 @@
 // src/pages/admin/LeagueManager.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Home, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
@@ -222,7 +221,7 @@ export default function LeagueManager() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto pb-8 px-4">
             {/* Toast */}
             {toast && (
                 <div className={`fixed top-4 right-4 z-[100] max-w-sm px-4 py-3 rounded-lg shadow-xl border text-sm font-medium ${
@@ -344,24 +343,11 @@ export default function LeagueManager() {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
-                        <Link to="/admin" className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
-                    </p>
-                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">League Manager</h1>
-                    <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-                        {leagues.length} league{leagues.length !== 1 ? 's' : ''} · {data.divisions.length} division{data.divisions.length !== 1 ? 's' : ''} · {data.seasons.length} season{data.seasons.length !== 1 ? 's' : ''}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">← Dashboard</Link>
-                    <Link to="/admin/rosters" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">Rosters</Link>
-                    <Link to="/admin/players" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">Players</Link>
-                    <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
-                        <Home className="w-4 h-4" />
-                    </Link>
-                </div>
+            <div className="mb-6">
+                <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">League Manager</h1>
+                <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+                    {leagues.length} league{leagues.length !== 1 ? 's' : ''} · {data.divisions.length} division{data.divisions.length !== 1 ? 's' : ''} · {data.seasons.length} season{data.seasons.length !== 1 ? 's' : ''}
+                </p>
             </div>
 
             <LeagueManagerHelp />

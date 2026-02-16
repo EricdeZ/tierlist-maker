@@ -39,15 +39,11 @@ export default function DebugTools() {
     }
 
     return (
-        <div className="max-w-3xl mx-auto py-12 px-4">
+        <div className="max-w-3xl mx-auto pb-8 px-4">
             <PageTitle title="Debug Tools" noindex />
 
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8">
                 <h1 className="font-heading text-2xl font-bold text-(--color-text)">Debug Tools</h1>
-                <Link to="/admin"
-                    className="text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors">
-                    Back to Admin
-                </Link>
             </div>
 
             {/* Rank-Up Animation Trigger */}

@@ -214,7 +214,7 @@ export default function ScheduleManager() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto pb-8 px-4">
             <PageTitle title="Schedule Manager" noindex />
 
             {/* Toast */}
@@ -252,31 +252,11 @@ export default function ScheduleManager() {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
-                        <Link to="/admin" className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
-                    </p>
-                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Schedule Manager</h1>
-                    <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-                        Create and manage match schedules for upcoming games
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        &larr; Dashboard
-                    </Link>
-                    <Link to="/admin/matchreport" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Match Report
-                    </Link>
-                    <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Match Manager
-                    </Link>
-                    <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
-                        <Home className="w-4 h-4" />
-                    </Link>
-                </div>
+            <div className="mb-6">
+                <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Schedule Manager</h1>
+                <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+                    Create and manage match schedules for upcoming games
+                </p>
             </div>
 
             {/* Season Selector */}

@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Home } from 'lucide-react'
 import { challengeService } from '../../services/database'
 import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../../config/challengeTiers'
 import PageTitle from '../../components/PageTitle'
@@ -146,15 +144,9 @@ export default function ChallengeManager() {
         <div className="min-h-screen bg-(--color-primary) text-(--color-text) p-4 sm:p-8">
             <PageTitle title="Challenge Manager" noindex />
 
-            {/* Header */}
             <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <Link to="/admin" className="text-(--color-text-secondary) hover:text-(--color-text)">
-                            <Home className="w-5 h-5" />
-                        </Link>
-                        <h1 className="text-2xl font-bold">Challenge Manager</h1>
-                    </div>
+                    <h1 className="text-2xl font-bold">Challenge Manager</h1>
                     <button onClick={openCreate}
                         className="px-4 py-2 rounded-lg bg-(--color-accent) hover:opacity-90 text-(--color-primary) font-bold text-sm transition-colors">
                         + New Challenge

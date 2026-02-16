@@ -54,6 +54,7 @@ UNIQUE(league_id, division_id, slug)
 | color | varchar(50) | NO | |
 | slug | varchar(255) | YES | |
 | logo_url | text | YES | |
+| discord_role_id | varchar(32) | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
@@ -288,6 +289,7 @@ INDEX idx_predictions_user ON (user_id, status)
 | is_active | boolean | NO | true |
 | last_message_id | varchar(32) | YES | |
 | last_polled_at | timestamptz | YES | |
+| notification_webhook_url | text | YES | |
 | created_by | integer | YES | FK → users.id (SET NULL) |
 | created_at | timestamptz | YES | NOW() |
 | updated_at | timestamptz | YES | NOW() |
@@ -309,6 +311,7 @@ INDEX idx_predictions_user ON (user_id, status)
 | author_name | varchar(100) | YES | |
 | message_timestamp | timestamptz | NO | |
 | status | varchar(20) | NO | 'pending' |
+| suggested_match_id | integer | YES | FK → scheduled_matches.id (SET NULL) |
 | used_in_match_id | integer | YES | FK → matches.id (SET NULL) |
 | processed_by | integer | YES | FK → users.id (SET NULL) |
 | processed_at | timestamptz | YES | |

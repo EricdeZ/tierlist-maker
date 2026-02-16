@@ -89,6 +89,10 @@ export default function AdminDashboard() {
     const [discordItems, setDiscordItems] = useState([])
     const [discordPolling, setDiscordPolling] = useState(false)
 
+    // Ready to Report state
+    const [readyMatches, setReadyMatches] = useState([])
+    const [readyMatchLoading, setReadyMatchLoading] = useState(false)
+
     // Floating panel state
     const [showScheduledPanel, setShowScheduledPanel] = useState(false)
     const [showDiscordPanel, setShowDiscordPanel] = useState(false)
@@ -140,6 +144,71 @@ export default function AdminDashboard() {
     }, [])
 
     useEffect(() => { fetchDiscordQueue() }, [fetchDiscordQueue])
+
+    // ─── Ready to Report matches ───
+    const fetchReadyMatches = useCallback(async () => {
+        try {
+            const res = await fetch(`${API}/discord-queue?action=ready-matches`, { headers: getAuthHeaders() })
+            if (!res.ok) return
+            const data = await res.json()
+            setReadyMatches(data.matches || [])
+        } catch { /* silent */ }
+    }, [])
+
+    useEffect(() => { fetchReadyMatches() }, [fetchReadyMatches])
+
+    const startReadyReport = useCallback(async (readyMatch) => {
+        setReadyMatchLoading(true)
+        try {
+            // 1. Fetch queue items for this match
+            const queueRes = await fetch(
+                `${API}/discord-queue?action=queue&suggestedMatchId=${readyMatch.id}`,
+                { headers: getAuthHeaders() },
+            )
+            const queueData = await queueRes.json()
+            const queueItems = queueData.items || []
+            if (!queueItems.length) return
+
+            // 2. Create match report with scheduled match pre-linked
+            const mrId = uid()
+            liveImagesRef.current[mrId] = []
+
+            const texts = [...new Set(queueItems.map(q => q.message_content).filter(Boolean))]
+
+            setMatchReports(prev => [...prev, {
+                id: mrId,
+                text: texts.join('\n').trim(),
+                images: [],
+                status: 'pending',
+                result: null,
+                editData: {
+                    season_id: readyMatch.season_id,
+                    team1_id: readyMatch.team1_id,
+                    team2_id: readyMatch.team2_id,
+                    team1_name: readyMatch.team1_name,
+                    team2_name: readyMatch.team2_name,
+                    week: readyMatch.week || null,
+                    date: readyMatch.scheduled_date ? readyMatch.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
+                    best_of: readyMatch.best_of || 3,
+                    scheduled_match_id: readyMatch.id,
+                    games: [],
+                },
+                error: null,
+                discordQueueItemIds: queueItems.map(q => q.id),
+                // Store queue items for image selection step
+                _readyQueueItems: queueItems,
+            }])
+
+            // Auto-select season if not already
+            if (!selectedSeasonId) handleSeasonChange(String(readyMatch.season_id))
+
+            fetchReadyMatches()
+        } catch (err) {
+            console.error('startReadyReport error:', err)
+        } finally {
+            setReadyMatchLoading(false)
+        }
+    }, [selectedSeasonId, fetchReadyMatches])
 
     const pollDiscord = useCallback(async () => {
         setDiscordPolling(true)
@@ -596,46 +665,65 @@ export default function AdminDashboard() {
     )
 
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
-                        <Link to="/admin" className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
-                    </p>
-                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Match Report</h1>
-                    <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-                        Paste match text + DETAILS screenshots → AI extracts → Review & submit
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Link to="/admin" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        ← Dashboard
-                    </Link>
-                    <Link to="/admin/schedule" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Schedule
-                    </Link>
-                    <Link to="/admin/matches" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Match Manager
-                    </Link>
-                    <Link to="/admin/rosters" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Rosters
-                    </Link>
-                    <Link to="/admin/players" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Players
-                    </Link>
-                    <Link to="/admin/leagues" className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Leagues
-                    </Link>
-                    <Link to="/" className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
-                        <Home className="w-4 h-4" />
-                    </Link>
-                </div>
+        <div className="max-w-7xl mx-auto pb-8 px-4">
+            <div className="mb-6">
+                <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Match Report</h1>
+                <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+                    Paste match text + DETAILS screenshots → AI extracts → Review & submit
+                </p>
             </div>
 
             <MatchReportHelp />
 
             {adminError && <ErrorBanner message={`Admin data: ${adminError}`} className="mb-4" />}
+
+            {/* ═══ Ready to Report ═══ */}
+            {readyMatches.length > 0 && (
+                <div className="mb-6">
+                    <h2 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                        Ready to Report
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {readyMatches.map(rm => (
+                            <div key={rm.id} className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                                        <span className="text-xs text-[var(--color-text-secondary)]">
+                                            {rm.screenshot_count} screenshot{rm.screenshot_count !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Week {rm.week}</span>}
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team1_color }} />
+                                    <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team1_name}</span>
+                                    <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
+                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team2_color }} />
+                                    <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team2_name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-[var(--color-text-secondary)]">
+                                        {rm.division_name} &middot; {new Date(rm.scheduled_date).toLocaleDateString()}
+                                    </span>
+                                    <button
+                                        onClick={() => startReadyReport(rm)}
+                                        disabled={readyMatchLoading}
+                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
+                                    >
+                                        Report Match
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-2 px-1">
+                        <p className="text-[10px] text-[var(--color-text-secondary)] italic">
+                            Auto-matched from Discord screenshots. Click to start reporting — select only DETAILS page screenshots for AI extraction.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div>
             {/* Action bar */}
@@ -1132,7 +1220,22 @@ function MatchReportCard({
                     {/* PENDING / PROCESSING: 2 radio groups + inline pickers */}
                     {(isPending || isProcessing) && (
                         <div className="p-4 space-y-4">
-                            {isPending && (
+                            {/* ─── Ready Report: Image Selection Step ─── */}
+                            {isPending && report._readyQueueItems?.length > 0 && liveImages.length === 0 && (
+                                <ReadyReportImageSelector
+                                    queueItems={report._readyQueueItems}
+                                    onLoadImages={async (selectedItemIds) => {
+                                        // Fetch selected images and add to report
+                                        const result = await onAddDiscordImages(selectedItemIds)
+                                        if (result?.success) {
+                                            // Trigger extraction automatically
+                                            setTimeout(() => onProcess(), 100)
+                                        }
+                                        return result
+                                    }}
+                                />
+                            )}
+                            {isPending && !(report._readyQueueItems?.length > 0 && liveImages.length === 0) && (
                                 <div className="space-y-3">
                                     {/* Row 1: Match source */}
                                     <div className="flex items-center gap-3">
@@ -2275,6 +2378,116 @@ function AliasLinkModal({ extractedName, adminData, seasonId, onSave, onClose })
 
 
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// READY REPORT IMAGE SELECTOR
+// ═══════════════════════════════════════════════════
+function ReadyReportImageSelector({ queueItems, onLoadImages }) {
+    const [selected, setSelected] = useState({})
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
+
+    const toggle = (id) => setSelected(prev => ({ ...prev, [id]: !prev[id] }))
+    const selectAll = () => {
+        const allSelected = queueItems.every(q => selected[q.id])
+        const next = {}
+        queueItems.forEach(q => { next[q.id] = !allSelected })
+        setSelected(next)
+    }
+
+    const selectedIds = Object.keys(selected).filter(k => selected[k]).map(Number)
+    const selectedCount = selectedIds.length
+
+    const handleExtract = async () => {
+        if (!selectedCount) return
+        setLoading(true)
+        setError(null)
+        try {
+            const result = await onLoadImages(selectedIds)
+            if (!result?.success) throw new Error(result?.error || 'Failed to load images')
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="border border-green-500/20 rounded-lg overflow-hidden">
+            {/* Disclaimer */}
+            <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/20">
+                <p className="text-xs text-amber-300 font-medium">
+                    Select only DETAILS page screenshots for AI extraction.
+                </p>
+                <p className="text-[10px] text-amber-300/70 mt-0.5">
+                    Overview and lobby screenshots will waste AI processing. Each game has a Details tab — select those.
+                </p>
+            </div>
+
+            {/* Image grid */}
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                        {queueItems.length} screenshot{queueItems.length !== 1 ? 's' : ''} matched
+                    </span>
+                    <button
+                        onClick={selectAll}
+                        className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition"
+                    >
+                        {queueItems.every(q => selected[q.id]) ? 'Deselect All' : 'Select All'}
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                    {queueItems.map(item => (
+                        <div
+                            key={item.id}
+                            onClick={() => toggle(item.id)}
+                            className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+                                selected[item.id]
+                                    ? 'border-green-500 ring-1 ring-green-500/30'
+                                    : 'border-transparent hover:border-white/20'
+                            }`}
+                        >
+                            <img
+                                src={`${API}/discord-image?queueId=${item.id}`}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={e => { e.target.style.display = 'none' }}
+                            />
+                            {selected[item.id] && (
+                                <div className="absolute inset-0 bg-green-600/30 flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M2 6l3 3 5-5" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {error && (
+                <div className="px-3 py-2 text-xs text-red-400 bg-red-500/10 border-t border-red-500/20">
+                    {error}
+                </div>
+            )}
+
+            {/* Action footer */}
+            <div className="px-3 py-2.5 border-t border-white/10 flex items-center justify-end">
+                <button
+                    onClick={handleExtract}
+                    disabled={!selectedCount || loading}
+                    className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                    {loading ? 'Loading...' : `Extract ${selectedCount || ''} Screenshot${selectedCount !== 1 ? 's' : ''}`}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+
 // SMALL COMPONENTS
 // ═══════════════════════════════════════════════════
 

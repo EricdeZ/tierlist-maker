@@ -226,7 +226,7 @@ export default function DiscordImagesPanel({ onConfirmSelection, hasTarget }) {
                                     }`}
                                 >
                                     <img
-                                        src={item.attachment_url}
+                                        src={`${API}/discord-image?queueId=${item.id}`}
                                         alt=""
                                         className="w-full h-full object-cover"
                                         loading="lazy"

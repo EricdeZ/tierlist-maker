@@ -15,7 +15,7 @@ const AppLayout = () => {
     // League and division pages render their own navbar with UserMenu,
     // so hide the global one. Known top-level routes that need the global menu:
     const firstSegment = location.pathname.split('/')[1]
-    const knownRoutes = ['', 'admin']
+    const knownRoutes = ['']
     const hasOwnNav = firstSegment && !knownRoutes.includes(firstSegment)
 
     return (

@@ -1,8 +1,6 @@
 // src/pages/admin/AdminLanding.jsx
 import { Link } from 'react-router-dom'
-import { Home } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import smiteLogo from '../../assets/smite2.png'
 import PageTitle from '../../components/PageTitle'
 import FeaturedStreamAdmin from '../../components/admin/FeaturedStreamAdmin'
 
@@ -83,8 +81,8 @@ const tools = [
         btnClass: 'bg-cyan-600 hover:bg-cyan-700',
     },
     {
-        title: 'Discord Channels',
-        description: 'Configure Discord channel connections. Map Discord channels to divisions for automatic screenshot collection.',
+        title: 'Discord Configuration',
+        description: 'Configure Discord channel connections, map team roles, and set up webhook notifications for automatic screenshot collection and matching.',
         path: '/admin/discord',
         permission: 'match_report',
         icon: (
@@ -96,6 +94,21 @@ const tools = [
         border: 'border-purple-500/20 hover:border-purple-500/40',
         iconColor: 'text-purple-400',
         btnClass: 'bg-purple-600 hover:bg-purple-700',
+    },
+    {
+        title: 'Discord Review',
+        description: 'Review auto-matched screenshots, manage unmatched items, monitor player Discord sync status, and view recent Discord activity.',
+        path: '/admin/discord-review',
+        permission: 'match_report',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+            </svg>
+        ),
+        accent: 'from-teal-500/20 to-teal-600/5',
+        border: 'border-teal-500/20 hover:border-teal-500/40',
+        iconColor: 'text-teal-400',
+        btnClass: 'bg-teal-600 hover:bg-teal-700',
     },
     {
         title: 'Banned Content',
@@ -217,29 +230,8 @@ export default function AdminLanding() {
     const visibleTools = tools.filter(tool => hasPermissionAnywhere(tool.permission))
 
     return (
-        <div className="max-w-4xl mx-auto py-12 px-4">
+        <div className="max-w-4xl mx-auto pb-8 px-4">
             <PageTitle title="Admin" noindex />
-            {/* Header */}
-            <div className="mb-10 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <img src={smiteLogo} alt="SMITE 2" className="h-12 w-auto" />
-                    <div>
-                        <h1 className="font-heading text-3xl font-bold text-[var(--color-text)]">
-                            SMITE 2 Comp Admin Dashboard
-                        </h1>
-                        <p className="text-[var(--color-text-secondary)] mt-1">
-                            Manage matches, rosters, and league data.
-                        </p>
-                    </div>
-                </div>
-                <Link
-                    to="/"
-                    className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors"
-                    title="Home"
-                >
-                    <Home className="w-5 h-5" />
-                </Link>
-            </div>
 
             {/* Tool cards */}
             <div className="grid gap-6">

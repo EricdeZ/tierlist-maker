@@ -542,7 +542,7 @@ export default function RosterManager() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4">
+        <div className="max-w-7xl mx-auto pb-8 px-4">
             {/* Toast */}
             {toast && (
                 <div
@@ -690,12 +690,8 @@ export default function RosterManager() {
                 />
             )}
 
-            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
-                        <Link to="/admin" onClick={guardNavigation} className="hover:text-[var(--color-accent)] transition-colors">Admin</Link>
-                    </p>
                     <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">
                         Roster Manager
                     </h1>
@@ -722,24 +718,6 @@ export default function RosterManager() {
                     >
                         Merge Players
                     </button>
-                    <Link to="/admin" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        ← Dashboard
-                    </Link>
-                    <Link to="/admin/matchreport" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Match Report
-                    </Link>
-                    <Link to="/admin/matches" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Match Manager
-                    </Link>
-                    <Link to="/admin/players" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Players
-                    </Link>
-                    <Link to="/admin/leagues" onClick={guardNavigation} className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
-                        Leagues
-                    </Link>
-                    <Link to="/" onClick={guardNavigation} className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors" title="Home">
-                        <Home className="w-4 h-4" />
-                    </Link>
                 </div>
             </div>
 
