@@ -10,20 +10,26 @@ const handler = async (event, context) => {
     try {
         if (event.httpMethod === 'GET' && seasonId) {
             const teams = await sql`
-                SELECT 
+                SELECT
                     t.id,
                     t.season_id,
                     t.name,
                     t.color,
                     t.slug,
+                    t.organization_id,
+                    o.name as org_name,
+                    o.slug as org_slug,
+                    o.color as org_color,
                     COUNT(lp.id) as player_count
                 FROM teams t
-                LEFT JOIN league_players lp 
-                    ON t.id = lp.team_id 
+                LEFT JOIN league_players lp
+                    ON t.id = lp.team_id
                     AND lp.is_active = true
                     AND LOWER(lp.role) != 'sub'
+                LEFT JOIN organizations o ON t.organization_id = o.id
                 WHERE t.season_id = ${seasonId}
-                GROUP BY t.id, t.season_id, t.name, t.color, t.slug
+                GROUP BY t.id, t.season_id, t.name, t.color, t.slug,
+                         t.organization_id, o.name, o.slug, o.color
                 ORDER BY t.name
             `
 

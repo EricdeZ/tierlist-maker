@@ -5,6 +5,7 @@ import { useDivision } from '../../context/DivisionContext'
 import { statsService, matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
+import { Building2 } from 'lucide-react'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -146,6 +147,16 @@ const TeamDetail = () => {
                         </div>
                     )}
                 </div>
+                {team.org_slug && (
+                    <Link
+                        to={`/org/${team.org_slug}`}
+                        className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
+                        style={{ color: team.org_color || 'var(--color-accent)' }}
+                    >
+                        <Building2 className="w-4 h-4" />
+                        {team.org_name}
+                    </Link>
+                )}
             </div>
 
             {loading ? (

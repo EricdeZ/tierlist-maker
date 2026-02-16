@@ -53,6 +53,8 @@ import Predictions from "./pages/Predictions.jsx";
 import MatchupDetail from "./pages/MatchupDetail.jsx";
 import FeaturedStream from "./pages/FeaturedStream.jsx"
 import AGLSignup from "./pages/AGLSignup.jsx";
+import OrgPage from "./pages/OrgPage.jsx";
+import OrgManager from "./pages/admin/OrgManager.jsx";
 
 function App() {
     return (
@@ -85,6 +87,7 @@ function App() {
                                 <Route path="challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
                                 <Route path="debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
                                 <Route path="data-reports" element={<ProtectedRoute requiredPermission="league_manage"><DataReportManager /></ProtectedRoute>} />
+                                <Route path="orgs" element={<ProtectedRoute requiredPermission="league_manage"><OrgManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Passion pages */}
@@ -109,6 +112,9 @@ function App() {
 
                             {/* AGL signup page */}
                             <Route path="agl/signup" element={<AGLSignup />} />
+
+                            {/* Organization page */}
+                            <Route path="org/:orgSlug" element={<OrgPage />} />
 
                             {/* All leagues browse page */}
                             <Route path="leagues" element={<LeaguesBrowse />} />

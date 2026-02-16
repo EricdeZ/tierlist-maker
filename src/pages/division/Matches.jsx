@@ -508,13 +508,13 @@ const Matches = () => {
         return { upcomingWeeks: uw, resultsWeeks: rw, upcomingCount: uCount, resultsCount: rCount }
     }, [matches])
 
-    // Default to upcoming if there are any, otherwise results
+    // Default to results
     useEffect(() => {
         if (activeSection !== null) return
         if (!loading && matches.length > 0) {
-            setActiveSection(upcomingCount > 0 ? 'upcoming' : 'results')
+            setActiveSection('results')
         }
-    }, [loading, matches, upcomingCount, activeSection])
+    }, [loading, matches, activeSection])
 
     if (loading) {
         return (

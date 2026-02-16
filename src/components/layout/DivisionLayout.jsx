@@ -13,7 +13,6 @@ const DivisionContent = () => {
 
     const navItems = [
         { path: basePath, label: 'Overview', exact: true },
-        { path: `${basePath}/standings`, label: 'Standings' },
         { path: `${basePath}/matches`, label: 'Matches' },
         { path: `${basePath}/stats`, label: 'Stats' },
         { path: `${basePath}/rankings`, label: 'Rankings' },

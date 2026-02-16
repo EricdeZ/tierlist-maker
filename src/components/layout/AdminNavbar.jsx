@@ -21,6 +21,7 @@ const morePages = [
     { path: '/admin/rosters',        label: 'Rosters',         permission: 'roster_manage' },
     { path: '/admin/players',        label: 'Players',         permission: 'player_manage' },
     { path: '/admin/leagues',        label: 'Leagues',         permission: 'league_manage' },
+    { path: '/admin/orgs',           label: 'Organizations',   permission: 'league_manage' },
     { path: '/admin/challenges',     label: 'Challenges',      permission: 'league_manage' },
     { path: '/admin/banned-content', label: 'Banned Content',  permission: 'league_manage' },
     { path: '/admin/users',          label: 'Users',           permission: 'user_manage' },

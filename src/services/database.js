@@ -235,6 +235,41 @@ export const siteConfigService = {
     },
 }
 
+export const orgService = {
+    async getBySlug(slug) {
+        return apiCall('orgs', { slug })
+    },
+
+    async getAll() {
+        return apiCall('orgs')
+    },
+
+    // Admin methods
+    async adminGetAll() {
+        return apiCall('org-manage')
+    },
+
+    async create(data) {
+        return apiPost('org-manage', {}, { action: 'create', ...data })
+    },
+
+    async update(data) {
+        return apiPost('org-manage', {}, { action: 'update', ...data })
+    },
+
+    async remove(id) {
+        return apiPost('org-manage', {}, { action: 'delete', id })
+    },
+
+    async assignTeam(team_id, org_id) {
+        return apiPost('org-manage', {}, { action: 'assign-team', team_id, org_id })
+    },
+
+    async unassignTeam(team_id) {
+        return apiPost('org-manage', {}, { action: 'unassign-team', team_id })
+    },
+}
+
 export const predictionsService = {
     async getUpcoming(filters = {}) {
         return apiCall('predictions', { action: 'upcoming', ...filters })

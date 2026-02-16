@@ -26,7 +26,7 @@ const LEAGUE_LOGOS = {
 }
 
 /* ─── Player Stats Ticker ─── */
-const PlayerTicker = ({ players, leagueColor, basePath }) => {
+const PlayerTicker = ({ players, allPlayers, leagueColor, basePath }) => {
     if (!players || players.length === 0) return null
 
     // Build ticker items from player data (DB returns strings)
@@ -35,7 +35,8 @@ const PlayerTicker = ({ players, leagueColor, basePath }) => {
         const d = Number(p.avg_deaths) || 0
         const a = Number(p.avg_assists) || 0
         const kda = d > 0 ? ((k + a / 2) / d).toFixed(1) : (k + a / 2).toFixed(1)
-        return { name: p.name, team: p.team_name, kda, kills: k.toFixed(1), deaths: d.toFixed(1), assists: a.toFixed(1) }
+        const playerInfo = allPlayers?.find(pl => pl.id === p.id)
+        return { name: p.name, slug: playerInfo?.slug, team: p.team_name, kda, kills: k.toFixed(1), deaths: d.toFixed(1), assists: a.toFixed(1) }
     })
 
     // Duplicate for seamless loop
@@ -46,7 +47,13 @@ const PlayerTicker = ({ players, leagueColor, basePath }) => {
             <div className="flex gap-8 animate-[ticker_60s_linear_infinite] w-max hover:[animation-play-state:paused]">
                 {track.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 shrink-0 text-[11px] tracking-wide uppercase">
-                        <span className="font-bold text-(--color-text)">{p.name}</span>
+                        {p.slug ? (
+                            <Link to={`${basePath}/players/${p.slug}`} className="font-bold text-(--color-text) hover:text-(--color-accent) transition-colors">
+                                {p.name}
+                            </Link>
+                        ) : (
+                            <span className="font-bold text-(--color-text)">{p.name}</span>
+                        )}
                         <span className="text-(--color-text-secondary)/50 text-[10px]">{p.team}</span>
                         <span className="font-bold tabular-nums" style={{ color: leagueColor }}>{p.kda}</span>
                         <span className="text-(--color-text-secondary)/30 tabular-nums">
@@ -288,7 +295,7 @@ const DivisionOverview = () => {
             {/* ─── Player Stats Ticker ─── Full-width stock ticker */}
             {tickerPlayers.length > 0 && (
                 <div className="border-b border-white/5 bg-black/30 backdrop-blur-sm">
-                    <PlayerTicker players={tickerPlayers} leagueColor={leagueColor} basePath={basePath} />
+                    <PlayerTicker players={tickerPlayers} allPlayers={players} leagueColor={leagueColor} basePath={basePath} />
                 </div>
             )}
 
@@ -354,21 +361,7 @@ const DivisionOverview = () => {
             </Link>
 
             {/* ─── Feature Cards ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                <Link
-                    to={`${basePath}/standings`}
-                    className="group relative overflow-hidden rounded-xl border border-white/10 bg-(--color-secondary) p-5 hover:border-white/20 transition-all duration-300 hover:-translate-y-0.5"
-                >
-                    <Trophy className="w-7 h-7 mb-2.5" style={{ color: leagueColor }} />
-                    <h3 className="font-heading text-lg font-bold text-(--color-text) mb-1 group-hover:text-(--color-accent) transition-colors">
-                        Standings
-                    </h3>
-                    <p className="text-xs text-(--color-text-secondary)">
-                        Division standings and team records.
-                    </p>
-                    <ChevronRight className="absolute top-5 right-4 w-4 h-4 text-(--color-text-secondary) group-hover:text-(--color-accent) transition-all group-hover:translate-x-1" />
-                </Link>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
                 <Link
                     to={`${basePath}/matches`}
                     className="group relative overflow-hidden rounded-xl border border-white/10 bg-(--color-secondary) p-5 hover:border-white/20 transition-all duration-300 hover:-translate-y-0.5"
