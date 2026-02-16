@@ -644,7 +644,8 @@ async function getMatchReview(sql) {
                    'id', dq.id,
                    'author_name', dq.author_name,
                    'attachment_filename', dq.attachment_filename,
-                   'message_timestamp', dq.message_timestamp
+                   'message_timestamp', dq.message_timestamp,
+                   'match_confidence', dq.match_confidence
                ) ORDER BY dq.message_timestamp) as items
         FROM discord_queue dq
         JOIN scheduled_matches sm ON dq.suggested_match_id = sm.id

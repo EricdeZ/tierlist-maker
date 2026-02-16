@@ -49,9 +49,20 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
     // Build lookup maps
     const teamsByRoleId = new Map()  // discord_role_id → team
     const teamsByName = new Map()    // lowercase team name → team
+    const teamsBySlug = new Map()    // slug → team
+    const teamsByWord = new Map()    // significant word → team[] (for fuzzy matching)
+    const STOP_WORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or', 'team'])
     for (const team of teams) {
         if (team.discord_role_id) teamsByRoleId.set(team.discord_role_id, team)
         teamsByName.set(team.name.toLowerCase(), team)
+        if (team.slug) teamsBySlug.set(team.slug.toLowerCase(), team)
+        // Index individual words from team name (3+ chars, not stop words)
+        for (const word of team.name.toLowerCase().split(/\s+/)) {
+            if (word.length >= 3 && !STOP_WORDS.has(word)) {
+                if (!teamsByWord.has(word)) teamsByWord.set(word, [])
+                teamsByWord.get(word).push(team)
+            }
+        }
     }
 
     // Build member → team role lookup
@@ -121,12 +132,27 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             }
         }
 
-        // Strategy 2: Message text mentions team names
+        // Strategy 2: Fuzzy match message text for team names
         if (group.message_content) {
             const textLower = group.message_content.toLowerCase()
+            // 2a. Exact full team name match
             for (const [name, team] of teamsByName) {
                 if (textLower.includes(name)) {
                     matchedTeamIds.add(team.id)
+                }
+            }
+            // 2b. Slug match (e.g. "solar-scarabs" in text)
+            for (const [slug, team] of teamsBySlug) {
+                if (textLower.includes(slug)) {
+                    matchedTeamIds.add(team.id)
+                }
+            }
+            // 2c. Individual word match from team names (3+ char significant words)
+            // Only match if the word uniquely identifies one team (skip ambiguous words)
+            const messageWords = new Set(textLower.split(/[^a-z0-9]+/).filter(w => w.length >= 3))
+            for (const [word, wordTeams] of teamsByWord) {
+                if (messageWords.has(word) && wordTeams.length === 1) {
+                    matchedTeamIds.add(wordTeams[0].id)
                 }
             }
         }
@@ -134,7 +160,25 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
         if (!matchedTeamIds.size && !scheduledMatches.length) continue
 
         // Strategy 3: Find matching scheduled match
+        // Key insight: screenshots are posted AFTER a match is played, so prefer
+        // matches scheduled before the message timestamp over future ones.
         const msgDate = new Date(group.message_timestamp)
+
+        // Score a scheduled match by date proximity, biased toward past matches.
+        // Lower score = better match.
+        const dateScore = (sm) => {
+            const schedDate = new Date(sm.scheduled_date)
+            const diffMs = msgDate - schedDate  // positive = match is in the past
+            const daysDiff = Math.abs(diffMs) / (1000 * 60 * 60 * 24)
+            if (diffMs >= 0) {
+                // Match is in the past (already played) — use actual day difference
+                return daysDiff
+            } else {
+                // Match is in the future — heavily penalize (3x) so past matches win
+                return daysDiff * 3
+            }
+        }
+
         const candidates = scheduledMatches.filter(sm => {
             // At least one identified team must be in this match
             if (matchedTeamIds.size > 0) {
@@ -142,15 +186,23 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
                 if (!hasTeam) return false
             }
 
-            // Date proximity: within 2 days
+            // Date proximity: within 7 days (using raw abs diff for the filter)
             const schedDate = new Date(sm.scheduled_date)
             const daysDiff = Math.abs(msgDate - schedDate) / (1000 * 60 * 60 * 24)
             return daysDiff <= 7
         })
 
         let bestMatch = null
-        if (candidates.length === 1) {
+        let confidence = 'low'
+
+        if (candidates.length === 1 && matchedTeamIds.size > 0) {
             bestMatch = candidates[0]
+            // Both teams identified → high; one team + single candidate → medium
+            const bothTeams = matchedTeamIds.has(bestMatch.team1_id) && matchedTeamIds.has(bestMatch.team2_id)
+            confidence = bothTeams ? 'high' : 'medium'
+        } else if (candidates.length === 1) {
+            bestMatch = candidates[0]
+            confidence = 'low'
         } else if (candidates.length > 1 && matchedTeamIds.size > 0) {
             // Prefer match where both teams are identified
             const bothTeamsMatch = candidates.find(sm =>
@@ -158,13 +210,14 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             )
             if (bothTeamsMatch) {
                 bestMatch = bothTeamsMatch
+                confidence = 'high'
             } else {
-                // Pick closest date
-                bestMatch = candidates.reduce((best, sm) => {
-                    const bestDiff = Math.abs(msgDate - new Date(best.scheduled_date))
-                    const smDiff = Math.abs(msgDate - new Date(sm.scheduled_date))
-                    return smDiff < bestDiff ? sm : best
-                })
+                // Pick best score (past-biased date proximity)
+                bestMatch = candidates.reduce((best, sm) =>
+                    dateScore(sm) < dateScore(best) ? sm : best
+                )
+                // Multiple candidates, only one team matched → low confidence
+                confidence = 'low'
             }
         } else if (candidates.length === 0 && matchedTeamIds.size === 0) {
             // No team identified and no date match — try all scheduled matches for this season
@@ -176,13 +229,15 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             })
             if (dateMatches.length === 1) {
                 bestMatch = dateMatches[0]
+                confidence = 'low'
             }
         }
 
         if (bestMatch) {
             await sql`
                 UPDATE discord_queue
-                SET suggested_match_id = ${bestMatch.id}
+                SET suggested_match_id = ${bestMatch.id},
+                    match_confidence = ${confidence}
                 WHERE id = ANY(${group.itemIds})
                   AND suggested_match_id IS NULL
             `

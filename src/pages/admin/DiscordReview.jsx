@@ -474,15 +474,33 @@ function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggle
 
 
 function MatchedGroup({ group, unlinkFromMatch }) {
-    const [expanded, setExpanded] = useState(false)
+    // Derive group confidence from items (lowest confidence wins)
+    const confidenceRank = { high: 2, medium: 1, low: 0 }
+    const groupConfidence = (group.items || []).reduce((worst, item) => {
+        const c = item.match_confidence || 'low'
+        return (confidenceRank[c] ?? 0) < (confidenceRank[worst] ?? 0) ? c : worst
+    }, 'high')
+
+    const confidenceStyles = {
+        high: { dot: 'bg-green-500', badge: 'bg-green-500/20 text-green-400', label: 'High confidence' },
+        medium: { dot: 'bg-amber-500', badge: 'bg-amber-500/20 text-amber-400', label: 'Needs review' },
+        low: { dot: 'bg-red-500', badge: 'bg-red-500/20 text-red-400', label: 'Low confidence' },
+    }
+    const conf = confidenceStyles[groupConfidence] || confidenceStyles.low
+    // Auto-expand low confidence matches so admins notice them immediately
+    const [expanded, setExpanded] = useState(groupConfidence === 'low')
 
     return (
-        <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg overflow-hidden">
+        <div className={`bg-[var(--color-card)] border rounded-lg overflow-hidden ${
+            groupConfidence === 'low' ? 'border-red-500/40' :
+            groupConfidence === 'medium' ? 'border-amber-500/30' :
+            'border-[var(--color-border)]'
+        }`}>
             <div
                 onClick={() => setExpanded(!expanded)}
                 className="flex items-center gap-3 p-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
             >
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${conf.dot}`} />
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.team1_color }} />
                     <span className="text-sm font-semibold text-[var(--color-text)] truncate">{group.team1_name}</span>
@@ -494,6 +512,9 @@ function MatchedGroup({ group, unlinkFromMatch }) {
                 {group.week && <span className="text-xs text-[var(--color-text-secondary)]">W{group.week}</span>}
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">
                     {group.screenshot_count} screenshot{group.screenshot_count !== 1 ? 's' : ''}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${conf.badge}`}>
+                    {conf.label}
                 </span>
                 <svg
                     className={`w-4 h-4 text-[var(--color-text-secondary)] transition-transform ${expanded ? 'rotate-180' : ''}`}
