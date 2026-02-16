@@ -51,7 +51,8 @@ import DebugTools from "./pages/admin/DebugTools.jsx";
 import DataReportManager from "./pages/admin/DataReportManager.jsx";
 import Predictions from "./pages/Predictions.jsx";
 import MatchupDetail from "./pages/MatchupDetail.jsx";
-import FeaturedStream from "./pages/FeaturedStream.jsx";
+import FeaturedStream from "./pages/FeaturedStream.jsx"
+import AGLSignup from "./pages/AGLSignup.jsx";
 
 function App() {
     return (
@@ -105,6 +106,9 @@ function App() {
 
                             {/* Enhanced player profile (cross-season) */}
                             <Route path="profile/:playerSlug" element={<ProfilePage />} />
+
+                            {/* AGL signup page */}
+                            <Route path="agl/signup" element={<AGLSignup />} />
 
                             {/* All leagues browse page */}
                             <Route path="leagues" element={<LeaguesBrowse />} />
