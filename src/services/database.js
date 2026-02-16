@@ -223,6 +223,10 @@ export const challengeService = {
     async resetMyChallenges() {
         return apiPost('challenge-manage', {}, { action: 'reset-my-challenges' })
     },
+
+    async recalcAll() {
+        return apiPost('challenge-manage', {}, { action: 'recalc-all' })
+    },
 }
 
 export const siteConfigService = {

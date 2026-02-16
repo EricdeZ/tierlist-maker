@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { getPerformanceStats, recalcMatchChallenges } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -46,6 +47,8 @@ const handler = async (event) => {
                     return await deleteChallenge(sql, body, admin)
                 case 'reset-my-challenges':
                     return await resetMyChallenges(sql, admin)
+                case 'recalc-all':
+                    return await recalcAllChallenges(sql, admin, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -214,6 +217,38 @@ async function resetMyChallenges(sql, admin) {
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══════════════════════════════════════════════════
+// Recalculate ALL challenge progress for ALL users (Owner only)
+// ═══════════════════════════════════════════════════
+async function recalcAllChallenges(sql, admin, event) {
+    // Owner-only: require permission_manage
+    const owner = await requirePermission(event, 'permission_manage')
+    if (!owner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Owner only' }) }
+    }
+
+    // Find all users with linked players
+    const users = await sql`
+        SELECT id as user_id, linked_player_id
+        FROM users
+        WHERE linked_player_id IS NOT NULL
+    `
+
+    if (users.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, updated: 0 }) }
+    }
+
+    // Recalculate using the same function that handles revocations
+    await recalcMatchChallenges(sql, users)
+
+    await logAudit(sql, admin, {
+        action: 'recalc-all-challenges', endpoint: 'challenge-manage',
+        details: { usersProcessed: users.length },
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, updated: users.length }) }
 }
 
 export const onRequest = adapt(handler)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { challengeService } from '../../services/database'
 import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../../config/challengeTiers'
+import { useAuth } from '../../context/AuthContext'
 import PageTitle from '../../components/PageTitle'
 import passionCoin from '../../assets/passion/passion.png'
 
@@ -47,6 +48,8 @@ const EMPTY_FORM = {
 }
 
 export default function ChallengeManager() {
+    const { hasPermission } = useAuth()
+    const isOwner = hasPermission('permission_manage')
     const [challenges, setChallenges] = useState([])
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
@@ -54,6 +57,8 @@ export default function ChallengeManager() {
     const [form, setForm] = useState(EMPTY_FORM)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState(null)
+    const [recalcing, setRecalcing] = useState(false)
+    const [recalcResult, setRecalcResult] = useState(null)
 
     const loadChallenges = async () => {
         try {
@@ -138,6 +143,20 @@ export default function ChallengeManager() {
         }
     }
 
+    const handleRecalcAll = async () => {
+        if (!confirm('Recalculate all challenge progress for every user? This may take a moment.')) return
+        setRecalcing(true)
+        setRecalcResult(null)
+        try {
+            const result = await challengeService.recalcAll()
+            setRecalcResult(`Recalculated challenges for ${result.updated} users`)
+        } catch (err) {
+            setRecalcResult(`Error: ${err.message}`)
+        } finally {
+            setRecalcing(false)
+        }
+    }
+
     const setField = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
     return (
@@ -147,11 +166,24 @@ export default function ChallengeManager() {
             <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-2xl font-bold">Challenge Manager</h1>
-                    <button onClick={openCreate}
-                        className="px-4 py-2 rounded-lg bg-(--color-accent) hover:opacity-90 text-(--color-primary) font-bold text-sm transition-colors">
-                        + New Challenge
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {isOwner && (
+                            <button onClick={handleRecalcAll} disabled={recalcing}
+                                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm transition-colors disabled:opacity-50">
+                                {recalcing ? 'Recalculating...' : 'Recalc All Progress'}
+                            </button>
+                        )}
+                        <button onClick={openCreate}
+                            className="px-4 py-2 rounded-lg bg-(--color-accent) hover:opacity-90 text-(--color-primary) font-bold text-sm transition-colors">
+                            + New Challenge
+                        </button>
+                    </div>
                 </div>
+                {recalcResult && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${recalcResult.startsWith('Error') ? 'bg-red-500/10 border border-red-500/30 text-red-400' : 'bg-green-500/10 border border-green-500/30 text-green-400'}`}>
+                        {recalcResult}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="text-center py-12 text-(--color-text-secondary)">Loading...</div>
