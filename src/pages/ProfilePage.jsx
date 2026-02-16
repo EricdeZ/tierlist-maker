@@ -205,24 +205,9 @@ const ProfilePage = () => {
             {/* Badges */}
             {profileData.badges?.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-6">
-                    {profileData.badges.map((badge, i) => {
-                        const color = getTierColor(badge.tier)
-                        return (
-                            <div
-                                key={i}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold"
-                                style={{
-                                    borderColor: `${color}60`,
-                                    color: color,
-                                    backgroundColor: `${color}15`,
-                                }}
-                                title={`${badge.title} — ${badge.completed_at ? new Date(badge.completed_at).toLocaleDateString() : ''}`}
-                            >
-                                <span>&#9733;</span>
-                                {badge.badge_label}
-                            </div>
-                        )
-                    })}
+                    {profileData.badges.map((badge, i) => (
+                        <BadgePill key={i} badge={badge} />
+                    ))}
                 </div>
             )}
 
@@ -578,6 +563,32 @@ const ProfilePage = () => {
             )}
         </div>
         </>
+    )
+}
+
+function BadgePill({ badge }) {
+    const [expanded, setExpanded] = useState(false)
+    const color = getTierColor(badge.tier)
+
+    return (
+        <button
+            onClick={() => setExpanded(e => !e)}
+            className="inline-flex items-center gap-1.5 rounded-full border text-xs font-bold cursor-pointer transition-all"
+            style={{
+                borderColor: `${color}60`,
+                color: color,
+                backgroundColor: `${color}${expanded ? '20' : '15'}`,
+                padding: expanded ? '6px 12px' : '6px 12px',
+            }}
+        >
+            <span>&#9733;</span>
+            <span>{badge.badge_label}</span>
+            {expanded && (
+                <span className="text-[10px] font-normal opacity-70 ml-1">
+                    — {badge.title}{badge.completed_at ? ` (${new Date(badge.completed_at).toLocaleDateString()})` : ''}
+                </span>
+            )}
+        </button>
     )
 }
 
