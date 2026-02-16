@@ -42,11 +42,10 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
         }
     }
 
-    if (upsertRows.length > 0) {
+    for (const [challengeId, currentValue] of upsertRows) {
         await sql`
             INSERT INTO user_challenges (user_id, challenge_id, current_value)
-            SELECT ${userId}, v.challenge_id::integer, v.current_value::integer
-            FROM (VALUES ${sql(upsertRows)}) AS v(challenge_id, current_value)
+            VALUES (${userId}, ${challengeId}, ${currentValue})
             ON CONFLICT (user_id, challenge_id)
             DO UPDATE SET current_value = EXCLUDED.current_value
         `
@@ -263,11 +262,10 @@ export async function recalcMatchChallenges(sql, affectedUsers) {
             }
 
             // Update current_value for all challenges (completed or not)
-            if (upsertRows.length > 0) {
+            for (const [challengeId, currentValue] of upsertRows) {
                 await sql`
                     INSERT INTO user_challenges (user_id, challenge_id, current_value)
-                    SELECT ${au.user_id}, v.challenge_id::integer, v.current_value::integer
-                    FROM (VALUES ${sql(upsertRows)}) AS v(challenge_id, current_value)
+                    VALUES (${au.user_id}, ${challengeId}, ${currentValue})
                     ON CONFLICT (user_id, challenge_id)
                     DO UPDATE SET current_value = EXCLUDED.current_value
                 `
