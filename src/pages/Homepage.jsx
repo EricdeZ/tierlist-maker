@@ -14,6 +14,7 @@ import oslLogo from '../assets/leagues/osl.png'
 
 import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisionImages'
 import ChallengeBanner from '../components/ChallengeBanner'
+import PassionPromoBanner from '../components/PassionPromoBanner'
 import PageTitle from '../components/PageTitle'
 
 const LEAGUE_LOGOS = {
@@ -496,6 +497,9 @@ const Homepage = () => {
                     </div>
                 </div>
             </section>
+
+            {/* ─── PASSION PROMO BANNER ─── */}
+            <PassionPromoBanner />
 
             {/* ─── TOOLS & PROFILE ─── */}
             <section className="py-20 px-4">
