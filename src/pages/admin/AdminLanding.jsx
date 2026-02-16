@@ -186,6 +186,21 @@ const tools = [
         btnClass: 'bg-teal-600 hover:bg-teal-700',
     },
     {
+        title: 'Data Reports',
+        description: 'Review user-reported data issues on matches. Resolve or dismiss reports for wrong scores, incorrect stats, wrong gods, and missing data.',
+        path: '/admin/data-reports',
+        permission: 'league_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+            </svg>
+        ),
+        accent: 'from-orange-500/20 to-orange-600/5',
+        border: 'border-orange-500/20 hover:border-orange-500/40',
+        iconColor: 'text-orange-400',
+        btnClass: 'bg-orange-600 hover:bg-orange-700',
+    },
+    {
         title: 'Permission Manager',
         description: 'Create custom roles, assign granular permissions, and control who can access what. Scope permissions by league for fine-grained access control.',
         path: '/admin/permissions',

@@ -6,11 +6,11 @@ import { useAuth } from '../../context/AuthContext'
 import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
-import { Flag } from 'lucide-react'
+import { Flag, Pencil } from 'lucide-react'
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
-    const { user } = useAuth()
+    const { user, permissions } = useAuth()
     const { season } = useDivision()
     const [match, setMatch] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -131,6 +131,15 @@ const MatchDetail = () => {
                             >
                                 <Flag className="w-3.5 h-3.5" />
                             </button>
+                        )}
+                        {user && (permissions.global.includes('match_manage') || Object.values(permissions.byLeague).some(p => p.includes('match_manage'))) && (
+                            <Link
+                                to="/admin/matches"
+                                className="p-1 rounded text-(--color-text-secondary)/40 hover:text-(--color-accent) hover:bg-(--color-accent)/10 transition-colors"
+                                title="Manage match"
+                            >
+                                <Pencil className="w-3.5 h-3.5" />
+                            </Link>
                         )}
                         {match.is_completed ? (
                             <span className="px-2 py-0.5 rounded-full bg-white/10 font-bold uppercase tracking-wider">Final</span>
