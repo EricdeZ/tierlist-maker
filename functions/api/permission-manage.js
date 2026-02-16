@@ -235,9 +235,8 @@ async function setRolePermissions(sql, { role_id, permissions }, admin) {
     // Replace permissions in a transaction
     await transaction(async (tx) => {
         await tx`DELETE FROM role_permissions WHERE role_id = ${role_id}`
-        if (permissions.length > 0) {
-            const rows = permissions.map(key => ({ role_id, permission_key: key }))
-            await tx`INSERT INTO role_permissions ${tx(rows, 'role_id', 'permission_key')}`
+        for (const key of permissions) {
+            await tx`INSERT INTO role_permissions (role_id, permission_key) VALUES (${role_id}, ${key})`
         }
     })
 
