@@ -1,6 +1,8 @@
 // Push-based challenge progress updates.
 // Called from endpoints when underlying stats change.
 
+import { revokePassion } from './passion.js'
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -181,14 +183,15 @@ export async function getPerformanceStats(sql, playerId) {
 
 
 /**
- * After a match is submitted, find all users who have linked players
- * that participated in the match, and push their performance challenge progress.
+ * Find all users with linked players who participated in a given match.
+ * Must be called BEFORE match/game deletion since the join chain breaks after.
  *
- * Fire-and-forget — errors are logged but won't break the caller.
+ * @param {object} sql - postgres connection
+ * @param {number} matchId
+ * @returns {Promise<Array<{user_id: number, linked_player_id: number}>>}
  */
-export async function updateMatchChallenges(sql, matchId) {
-    // Find users with linked players who played in this match
-    const affectedUsers = await sql`
+export async function getMatchAffectedUsers(sql, matchId) {
+    return await sql`
         SELECT DISTINCT u.id as user_id, u.linked_player_id
         FROM users u
         JOIN league_players lp ON lp.player_id = u.linked_player_id
@@ -196,6 +199,15 @@ export async function updateMatchChallenges(sql, matchId) {
         JOIN games g ON g.id = pgs.game_id
         WHERE g.match_id = ${matchId} AND u.linked_player_id IS NOT NULL
     `
+}
+
+
+/**
+ * After a match is submitted, push performance challenge progress for affected users.
+ * Fire-and-forget — errors are logged but won't break the caller.
+ */
+export async function updateMatchChallenges(sql, matchId) {
+    const affectedUsers = await getMatchAffectedUsers(sql, matchId)
 
     for (const au of affectedUsers) {
         try {
@@ -203,6 +215,78 @@ export async function updateMatchChallenges(sql, matchId) {
             await pushChallengeProgress(sql, au.user_id, stats)
         } catch (err) {
             console.error(`Challenge update failed for user ${au.user_id}:`, err)
+        }
+    }
+}
+
+
+/**
+ * Recalculate challenge progress for a list of affected users, including
+ * revocation of completed challenges that no longer qualify.
+ *
+ * Called after match deletion/editing when stats may have decreased.
+ * Unlike pushChallengeProgress, this checks completed challenges too.
+ *
+ * @param {object} sql - postgres connection
+ * @param {Array<{user_id: number, linked_player_id: number}>} affectedUsers
+ */
+export async function recalcMatchChallenges(sql, affectedUsers) {
+    for (const au of affectedUsers) {
+        try {
+            const stats = await getPerformanceStats(sql, au.linked_player_id)
+            const statKeys = Object.keys(stats)
+            if (statKeys.length === 0) continue
+
+            // Get ALL challenges including completed ones
+            const challenges = await sql`
+                SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
+                       COALESCE(uc.current_value, 0)::integer as old_value,
+                       COALESCE(uc.completed, false) as completed
+                FROM challenges c
+                LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${au.user_id}
+                WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+            `
+
+            if (challenges.length === 0) continue
+
+            const upsertRows = []
+            const revocations = []
+
+            for (const ch of challenges) {
+                const newValue = Number(stats[ch.stat_key] || 0)
+                upsertRows.push([ch.id, newValue])
+
+                // Completed but no longer qualifies — needs revocation
+                if (ch.completed && newValue < Number(ch.target_value)) {
+                    revocations.push(ch)
+                }
+            }
+
+            // Update current_value for all challenges (completed or not)
+            if (upsertRows.length > 0) {
+                await sql`
+                    INSERT INTO user_challenges (user_id, challenge_id, current_value)
+                    SELECT ${au.user_id}, v.challenge_id::integer, v.current_value::integer
+                    FROM (VALUES ${sql(upsertRows)}) AS v(challenge_id, current_value)
+                    ON CONFLICT (user_id, challenge_id)
+                    DO UPDATE SET current_value = EXCLUDED.current_value
+                `
+            }
+
+            // Revoke challenges that no longer qualify
+            for (const ch of revocations) {
+                await sql`
+                    UPDATE user_challenges SET
+                        completed = false,
+                        completed_at = NULL,
+                        last_completed_at = NULL
+                    WHERE user_id = ${au.user_id} AND challenge_id = ${ch.id}
+                `
+                await revokePassion(sql, au.user_id, ch.reward,
+                    `Challenge revoked: ${ch.title}`, String(ch.id))
+            }
+        } catch (err) {
+            console.error(`Challenge recalc failed for user ${au.user_id}:`, err)
         }
     }
 }

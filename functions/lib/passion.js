@@ -122,6 +122,44 @@ export async function grantPassion(sql, userId, type, amount, description, refer
 }
 
 // ═══════════════════════════════════════════════════
+// Core helper: revoke passion (reduces total_earned)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Revoke previously granted passion. Unlike grantPassion with a negative amount
+ * (which increases total_spent), this decreases total_earned so the user's rank
+ * adjusts correctly.
+ *
+ * @param {object} sql - postgres connection
+ * @param {number} userId
+ * @param {number} amount - positive number to revoke
+ * @param {string} description
+ * @param {string|null} referenceId
+ * @returns {{ balance, totalEarned, totalSpent }} updated balances
+ */
+export async function revokePassion(sql, userId, amount, description, referenceId = null) {
+    await sql`
+        INSERT INTO passion_transactions (user_id, amount, type, description, reference_id)
+        VALUES (${userId}, ${-amount}, ${'challenge_revoked'}, ${description}, ${referenceId})
+    `
+
+    const [updated] = await sql`
+        UPDATE passion_balances SET
+            balance = GREATEST(balance - ${amount}, 0),
+            total_earned = GREATEST(total_earned - ${amount}, 0),
+            updated_at = NOW()
+        WHERE user_id = ${userId}
+        RETURNING balance, total_earned, total_spent
+    `
+
+    return {
+        balance: updated.balance,
+        totalEarned: updated.total_earned,
+        totalSpent: updated.total_spent,
+    }
+}
+
+// ═══════════════════════════════════════════════════
 // Cooldown checker
 // ═══════════════════════════════════════════════════
 

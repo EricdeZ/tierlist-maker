@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -153,6 +154,9 @@ async function deleteMatch(sql, body, admin) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
     }
 
+    // Capture affected users BEFORE deletion (join chain breaks after)
+    const affectedUsers = await getMatchAffectedUsers(sql, match_id)
+
     await transaction(async (tx) => {
         // Reset any linked scheduled_match back to 'scheduled' before deleting
         await tx`
@@ -167,6 +171,10 @@ async function deleteMatch(sql, body, admin) {
 
     await logAudit(sql, admin, { action: 'delete-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id })
 
+    // Recalculate challenge progress and revoke if needed (fire-and-forget)
+    recalcMatchChallenges(sql, affectedUsers)
+        .catch(err => console.error('Challenge recalc after match delete failed:', err))
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match deleted' }) }
 }
 
@@ -179,6 +187,9 @@ async function deleteGame(sql, body, admin) {
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
     }
+
+    // Capture affected users BEFORE deletion (players in deleted game may not be in remaining games)
+    const affectedUsers = await getMatchAffectedUsers(sql, match_id)
 
     await transaction(async (tx) => {
         await tx`DELETE FROM player_game_stats WHERE game_id = ${game_id}`
@@ -197,6 +208,10 @@ async function deleteGame(sql, body, admin) {
     })
 
     await logAudit(sql, admin, { action: 'delete-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id } })
+
+    // Recalculate challenge progress and revoke if needed (fire-and-forget)
+    recalcMatchChallenges(sql, affectedUsers)
+        .catch(err => console.error('Challenge recalc after game delete failed:', err))
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game deleted' }) }
 }
@@ -267,6 +282,11 @@ async function saveGame(sql, body, admin) {
     })
 
     await logAudit(sql, admin, { action: 'save-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id, winner_team_id } })
+
+    // Recalculate challenge progress and revoke if needed (fire-and-forget)
+    getMatchAffectedUsers(sql, match_id)
+        .then(users => recalcMatchChallenges(sql, users))
+        .catch(err => console.error('Challenge recalc after game save failed:', err))
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game saved' }) }
 }
