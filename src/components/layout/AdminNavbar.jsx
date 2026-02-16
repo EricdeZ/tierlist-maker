@@ -5,6 +5,7 @@ import { useSidebar } from '../../context/SidebarContext'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
+import ReporterBell from '../ReporterBell'
 import { Home, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react'
 
 const primaryTabs = [
@@ -24,6 +25,7 @@ const morePages = [
     { path: '/admin/banned-content', label: 'Banned Content',  permission: 'league_manage' },
     { path: '/admin/users',          label: 'Users',           permission: 'user_manage' },
     { path: '/admin/claims',         label: 'Claims',          permission: 'claim_manage' },
+    { path: '/admin/data-reports',   label: 'Data Reports',    permission: 'league_manage' },
     { path: '/admin/permissions',    label: 'Permissions',     permission: 'permission_manage' },
     { path: '/admin/auditlog',       label: 'Audit Log',       permission: 'audit_log_view' },
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },
@@ -193,6 +195,7 @@ export default function AdminNavbar() {
                             >
                                 <Home className="w-4 h-4" />
                             </Link>
+                            <ReporterBell />
                             {user && <PassionDisplay />}
                             <UserMenu compact />
                         </div>
@@ -200,6 +203,7 @@ export default function AdminNavbar() {
 
                     {/* ── Mobile: passion + user + hamburger ── */}
                     <div className="flex md:hidden items-center gap-2 ml-auto">
+                        <ReporterBell />
                         {user && <PassionDisplay compact />}
                         <UserMenu compact />
                         <button

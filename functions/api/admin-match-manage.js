@@ -154,6 +154,12 @@ async function deleteMatch(sql, body, admin) {
     }
 
     await transaction(async (tx) => {
+        // Reset any linked scheduled_match back to 'scheduled' before deleting
+        await tx`
+            UPDATE scheduled_matches
+            SET status = 'scheduled', match_id = NULL, updated_at = NOW()
+            WHERE match_id = ${match_id}
+        `
         await tx`DELETE FROM player_game_stats WHERE game_id IN (SELECT id FROM games WHERE match_id = ${match_id})`
         await tx`DELETE FROM games WHERE match_id = ${match_id}`
         await tx`DELETE FROM matches WHERE id = ${match_id}`

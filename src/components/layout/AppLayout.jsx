@@ -5,6 +5,7 @@ import { SidebarProvider } from '../../context/SidebarContext'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import ClaimProfileModal from '../ClaimProfileModal'
+import ReportDataIssueModal from '../ReportDataIssueModal'
 import SidebarTrigger from './SidebarTrigger'
 import GlobalSidebar from './GlobalSidebar'
 
@@ -32,6 +33,7 @@ const AppLayout = () => {
                 )}
                 <Outlet />
                 <ClaimProfileModal />
+                <ReportDataIssueModal />
             </div>
         </SidebarProvider>
     )

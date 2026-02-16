@@ -2,12 +2,15 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
+import { useAuth } from '../../context/AuthContext'
 import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
+import { Flag } from 'lucide-react'
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
+    const { user } = useAuth()
     const { season } = useDivision()
     const [match, setMatch] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -118,6 +121,17 @@ const MatchDetail = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         {match.best_of > 1 && <span>Best of {match.best_of}</span>}
+                        {user && match.is_completed && (
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-report-modal', {
+                                    detail: { matchId: match.id, team1Name: match.team1_name, team2Name: match.team2_name },
+                                }))}
+                                className="p-1 rounded text-(--color-text-secondary)/40 hover:text-orange-400 hover:bg-orange-400/10 transition-colors cursor-pointer"
+                                title="Report a data issue"
+                            >
+                                <Flag className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                         {match.is_completed ? (
                             <span className="px-2 py-0.5 rounded-full bg-white/10 font-bold uppercase tracking-wider">Final</span>
                         ) : (

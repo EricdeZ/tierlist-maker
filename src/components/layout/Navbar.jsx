@@ -5,6 +5,7 @@ import { useSidebar } from '../../context/SidebarContext'
 import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
+import ReporterBell from '../ReporterBell'
 import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag } from 'lucide-react'
 
 const tools = [
@@ -196,6 +197,7 @@ export default function Navbar({ title, branding, tabs }) {
                                     </div>
                                 )}
                             </div>
+                            <ReporterBell />
                             {user && <PassionDisplay />}
                             <UserMenu compact />
                         </div>
@@ -203,6 +205,7 @@ export default function Navbar({ title, branding, tabs }) {
 
                     {/* ── Mobile: passion + user + hamburger ── */}
                     <div className={`flex ${bpHide} items-center gap-2 ml-auto`}>
+                        <ReporterBell />
                         {user && <PassionDisplay compact />}
                         <UserMenu compact />
                         <button

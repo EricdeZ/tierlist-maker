@@ -48,6 +48,7 @@ import CoinFlip from "./pages/CoinFlip.jsx";
 import PassionShop from "./pages/PassionShop.jsx";
 import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
 import DebugTools from "./pages/admin/DebugTools.jsx";
+import DataReportManager from "./pages/admin/DataReportManager.jsx";
 import Predictions from "./pages/Predictions.jsx";
 import MatchupDetail from "./pages/MatchupDetail.jsx";
 import FeaturedStream from "./pages/FeaturedStream.jsx";
@@ -82,6 +83,7 @@ function App() {
                                 <Route path="banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />
                                 <Route path="challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
                                 <Route path="debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
+                                <Route path="data-reports" element={<ProtectedRoute requiredPermission="league_manage"><DataReportManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Passion pages */}
