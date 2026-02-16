@@ -16,7 +16,13 @@ const DiscordIcon = ({ className }) => (
 
 // ─── Flying coins — straight line to passion balance ───
 function spawnFlyingCoins(sourceEl, coinSrc) {
-    const target = document.getElementById('passion-balance-coin')
+    // Two PassionDisplay instances exist (desktop + mobile); pick the visible one
+    const targets = document.querySelectorAll('#passion-balance-coin')
+    let target = null
+    for (const el of targets) {
+        const r = el.getBoundingClientRect()
+        if (r.width > 0 && r.height > 0) { target = el; break }
+    }
     if (!sourceEl || !target) return
 
     const sr = sourceEl.getBoundingClientRect()
