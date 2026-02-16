@@ -349,10 +349,10 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
    Section Toggle (Upcoming / Results tabs)
    ═══════════════════════════════════════════════════════════════════════════ */
 const SectionToggle = ({ active, onChange, upcomingCount, resultsCount, leagueColor }) => (
-    <div className="flex items-center bg-white/[0.03] rounded-xl p-1 border border-white/[0.06]">
+    <div className="flex items-center bg-white/[0.03] rounded-xl p-1 border border-white/[0.06] overflow-hidden">
         <button
             onClick={() => onChange('upcoming')}
-            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            className={`relative flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 active === 'upcoming'
                     ? 'text-(--color-text) shadow-lg'
                     : 'text-(--color-text-secondary)/50 hover:text-(--color-text-secondary)'
@@ -375,7 +375,7 @@ const SectionToggle = ({ active, onChange, upcomingCount, resultsCount, leagueCo
         </button>
         <button
             onClick={() => onChange('results')}
-            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            className={`relative flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 active === 'results'
                     ? 'text-(--color-text) shadow-lg'
                     : 'text-(--color-text-secondary)/50 hover:text-(--color-text-secondary)'
@@ -620,7 +620,7 @@ const Matches = () => {
                 ) : (
                     <>
                         {/* Section Toggle */}
-                        <div className="max-w-xs mx-auto mb-6">
+                        <div className="max-w-sm mx-auto mb-6">
                             <SectionToggle
                                 active={activeSection || 'upcoming'}
                                 onChange={setActiveSection}
