@@ -1,6 +1,7 @@
 // src/pages/admin/DiscordReview.jsx — Auto-match review dashboard
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { RefreshCw, Zap } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 
@@ -27,6 +28,10 @@ export default function DiscordReview() {
     const [selectedItems, setSelectedItems] = useState(new Set())
     const [assignMatchId, setAssignMatchId] = useState('')
     const [assigning, setAssigning] = useState(false)
+
+    // Poll/Match state
+    const [polling, setPolling] = useState(false)
+    const [matching, setMatching] = useState(false)
 
     const showToast = useCallback((type, message) => {
         const id = Date.now()
@@ -72,6 +77,47 @@ export default function DiscordReview() {
             showToast('error', err.message)
         }
     }, [showToast])
+
+    // Poll Discord channels for new screenshots
+    const handlePollNow = useCallback(async () => {
+        setPolling(true)
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'poll-now' }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error)
+            const newImages = data.results?.reduce((s, r) => s + (r.newImages || 0), 0) || 0
+            showToast('success', `Polled ${data.results?.length || 0} channel(s) — ${newImages} new image(s)`)
+            await Promise.all([fetchReview(), fetchActivity()])
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setPolling(false)
+        }
+    }, [showToast, fetchReview, fetchActivity])
+
+    // Re-run auto-matching on unmatched items
+    const handleMatchNow = useCallback(async () => {
+        setMatching(true)
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'match-now' }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error)
+            showToast('success', `Matched ${data.matched} of ${data.total} item(s)`)
+            await Promise.all([fetchReview(), fetchActivity()])
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setMatching(false)
+        }
+    }, [showToast, fetchReview, fetchActivity])
 
     useEffect(() => {
         setLoading(true)
@@ -175,13 +221,33 @@ export default function DiscordReview() {
             <PageTitle title="Discord Review" noindex />
 
             {/* Header */}
-            <div className="mb-6">
-                <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">
-                    Discord Review Dashboard
-                </h1>
-                <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-                    Review auto-matched screenshots, member sync status, and recent activity
-                </p>
+            <div className="flex items-start justify-between mb-6">
+                <div>
+                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">
+                        Discord Review Dashboard
+                    </h1>
+                    <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+                        Review auto-matched screenshots, member sync status, and recent activity
+                    </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                    <button
+                        onClick={handlePollNow}
+                        disabled={polling || matching}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border-hover)] transition disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${polling ? 'animate-spin' : ''}`} />
+                        Poll Now
+                    </button>
+                    <button
+                        onClick={handleMatchNow}
+                        disabled={polling || matching || unmatched.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition disabled:opacity-50"
+                    >
+                        <Zap className={`w-3.5 h-3.5 ${matching ? 'animate-pulse' : ''}`} />
+                        Match Now
+                    </button>
+                </div>
             </div>
 
             {/* Toast */}
@@ -354,7 +420,7 @@ function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggle
                                         className="shrink-0"
                                     />
                                     <img
-                                        src={`${API}/discord-image?queueId=${item.id}`}
+                                        src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
                                         alt=""
                                         className="w-12 h-12 rounded object-cover shrink-0 bg-black/30"
                                         loading="lazy"
@@ -442,7 +508,7 @@ function MatchedGroup({ group, unlinkFromMatch }) {
                     {group.items.map(item => (
                         <div key={item.id} className="flex items-center gap-3 text-sm">
                             <img
-                                src={`${API}/discord-image?queueId=${item.id}`}
+                                src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
                                 alt=""
                                 className="w-10 h-10 rounded object-cover shrink-0 bg-black/30"
                                 loading="lazy"

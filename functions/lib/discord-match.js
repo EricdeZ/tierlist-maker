@@ -2,7 +2,7 @@
  * Auto-match Discord queue items to scheduled matches.
  *
  * Strategy (priority order):
- * 1. Author's team role → identify one team
+ * 1. Author's team (Discord role OR player DB record) → identify one team
  * 2. Message text → parse for team name mentions
  * 3. Scheduled match lookup → match team(s) + division + date proximity
  */
@@ -65,6 +65,25 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
         }
     }
 
+    // Build author → team lookup from player database records
+    // Matches even when the author doesn't have the Discord team role
+    const authorIds = [...new Set(items.map(i => i.author_id).filter(Boolean))]
+    const teamsByIdMap = new Map(teams.map(t => [t.id, t]))
+    const playerTeamMap = new Map() // discord user id → team
+    if (authorIds.length) {
+        const playerTeams = await sql`
+            SELECT p.discord_id, lp.team_id
+            FROM players p
+            JOIN league_players lp ON lp.player_id = p.id
+            WHERE p.discord_id = ANY(${authorIds})
+              AND lp.team_id = ANY(${teams.map(t => t.id)})
+        `
+        for (const row of playerTeams) {
+            const team = teamsByIdMap.get(row.team_id)
+            if (team) playerTeamMap.set(row.discord_id, team)
+        }
+    }
+
     // 3. Get scheduled matches for this season
     const scheduledMatches = await sql`
         SELECT sm.id, sm.team1_id, sm.team2_id, sm.scheduled_date, sm.week, sm.best_of,
@@ -93,9 +112,13 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
     for (const [, group] of itemsByMessage) {
         let matchedTeamIds = new Set()
 
-        // Strategy 1: Author's team role
-        if (group.author_id && memberTeamMap.has(group.author_id)) {
-            matchedTeamIds.add(memberTeamMap.get(group.author_id).id)
+        // Strategy 1: Author's team (Discord role OR player record)
+        if (group.author_id) {
+            if (memberTeamMap.has(group.author_id)) {
+                matchedTeamIds.add(memberTeamMap.get(group.author_id).id)
+            } else if (playerTeamMap.has(group.author_id)) {
+                matchedTeamIds.add(playerTeamMap.get(group.author_id).id)
+            }
         }
 
         // Strategy 2: Message text mentions team names

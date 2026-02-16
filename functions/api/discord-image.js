@@ -13,12 +13,18 @@ const handler = async (event) => {
         return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
     }
 
+    // Support token via query param (for <img> tags that can't send headers)
+    const params = event.queryStringParameters || {}
+    if (params.token && !event.headers.authorization) {
+        event.headers.authorization = `Bearer ${params.token}`
+    }
+
     const admin = await requirePermission(event, 'match_report')
     if (!admin) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
-    const { queueId } = event.queryStringParameters || {}
+    const { queueId } = params
     if (!queueId) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'queueId required' }) }
     }

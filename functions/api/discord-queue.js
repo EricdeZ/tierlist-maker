@@ -55,6 +55,7 @@ const handler = async (event) => {
                 case 'map-team-role':          return await mapTeamRole(sql, body, admin)
                 case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin)
                 case 'skip-channel-pending':   return await skipChannelPending(sql, body, admin)
+                case 'match-now':              return await matchNow(sql, admin)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -542,6 +543,74 @@ async function pollNow(sql, admin) {
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, results }) }
+}
+
+// ═══════════════════════════════════════════════════
+// POST: Re-run auto-matching on all unmatched pending items
+// ═══════════════════════════════════════════════════
+async function matchNow(sql, admin) {
+    // Get all pending unmatched items grouped by channel
+    const items = await sql`
+        SELECT dq.id, dq.channel_id
+        FROM discord_queue dq
+        WHERE dq.status = 'pending' AND dq.suggested_match_id IS NULL
+    `
+
+    if (!items.length) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, matched: 0, message: 'No unmatched items' }) }
+    }
+
+    // Group item IDs by channel
+    const byChannel = {}
+    for (const item of items) {
+        if (!byChannel[item.channel_id]) byChannel[item.channel_id] = []
+        byChannel[item.channel_id].push(item.id)
+    }
+
+    // Get channel info for each channel
+    const channelIds = Object.keys(byChannel).map(Number)
+    const channels = await sql`
+        SELECT dc.*, d.name as division_name
+        FROM discord_channels dc
+        JOIN divisions d ON dc.division_id = d.id
+        WHERE dc.id = ANY(${channelIds})
+    `
+
+    // Fetch guild members once per unique guild
+    const guildMembers = {}
+    const uniqueGuildIds = [...new Set(channels.map(c => c.guild_id))]
+    for (const guildId of uniqueGuildIds) {
+        try {
+            guildMembers[guildId] = await fetchGuildMembers(guildId)
+        } catch {
+            guildMembers[guildId] = []
+        }
+    }
+
+    let totalMatched = 0
+    for (const channel of channels) {
+        const itemIds = byChannel[channel.id]
+        if (!itemIds?.length) continue
+
+        try {
+            await autoMatchQueueItems(sql, itemIds, channel, guildMembers[channel.guild_id] || [])
+            // Count how many got matched
+            const [{ count }] = await sql`
+                SELECT COUNT(*)::int as count FROM discord_queue
+                WHERE id = ANY(${itemIds}) AND suggested_match_id IS NOT NULL
+            `
+            totalMatched += count
+        } catch (err) {
+            console.error(`match-now: channel ${channel.id} failed:`, err.message)
+        }
+    }
+
+    logAudit(sql, admin, {
+        action: 'discord-match-now', endpoint: 'discord-queue',
+        details: { unmatched: items.length, matched: totalMatched },
+    }).catch(() => {})
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, total: items.length, matched: totalMatched }) }
 }
 
 // ═══════════════════════════════════════════════════

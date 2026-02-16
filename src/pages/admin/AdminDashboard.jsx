@@ -7,6 +7,7 @@ import { MatchReportHelp } from '../../components/admin/AdminHelp'
 import DraggablePanel from '../../components/admin/DraggablePanel'
 import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
 import DiscordImagesPanel from '../../components/admin/DiscordImagesPanel'
+import FloatingImageViewer from '../../components/admin/FloatingImageViewer'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/api'
@@ -973,6 +974,7 @@ function MatchReportCard({
                          }) {
     const [expanded, setExpanded] = useState(true)
     const [pasteFlash, setPasteFlash] = useState(false)
+    const [showImageViewer, setShowImageViewer] = useState(false)
     const hasScheduledLink = !!report.editData?.scheduled_match_id
     // Match source: 'scheduled' or 'textbox'
     const [matchSource, setMatchSource] = useState(hasScheduledLink ? 'scheduled' : 'textbox')
@@ -1171,10 +1173,22 @@ function MatchReportCard({
                         </>
                     )}
                     {isReview && (
-                        <button onClick={onSubmit} disabled={isSubmitting}
-                                className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition-colors">
-                            {isSubmitting ? 'Submitting…' : 'Submit'}
-                        </button>
+                        <>
+                            {(liveImages.length > 0 || report.discordQueueItemIds?.length > 0) && (
+                                <button onClick={() => setShowImageViewer(v => !v)}
+                                        className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                                            showImageViewer
+                                                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                                                : 'bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10'
+                                        }`}>
+                                    {showImageViewer ? 'Hide' : 'View'} Screenshots
+                                </button>
+                            )}
+                            <button onClick={onSubmit} disabled={isSubmitting}
+                                    className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition-colors">
+                                {isSubmitting ? 'Submitting…' : 'Submit'}
+                            </button>
+                        </>
                     )}
                     <button onClick={() => setExpanded(!expanded)}
                             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
@@ -1426,7 +1440,7 @@ function MatchReportCard({
                                                             }`}
                                                         >
                                                             <img
-                                                                src={item.attachment_url}
+                                                                src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                                 loading="lazy"
@@ -1532,6 +1546,16 @@ function MatchReportCard({
                         />
                     )}
                 </div>
+            )}
+
+            {/* Floating screenshot viewer (portalled to body) */}
+            {showImageViewer && (liveImages.length > 0 || report.discordQueueItemIds?.length > 0) && ReactDOM.createPortal(
+                <FloatingImageViewer
+                    images={liveImages}
+                    queueItemIds={report.discordQueueItemIds || []}
+                    onClose={() => setShowImageViewer(false)}
+                />,
+                document.body,
             )}
         </div>
     )
@@ -2449,7 +2473,7 @@ function ReadyReportImageSelector({ queueItems, onLoadImages }) {
                             }`}
                         >
                             <img
-                                src={`${API}/discord-image?queueId=${item.id}`}
+                                src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
                                 alt=""
                                 className="w-full h-full object-cover"
                                 loading="lazy"

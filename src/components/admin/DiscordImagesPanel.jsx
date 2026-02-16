@@ -226,7 +226,7 @@ export default function DiscordImagesPanel({ onConfirmSelection, hasTarget }) {
                                     }`}
                                 >
                                     <img
-                                        src={`${API}/discord-image?queueId=${item.id}`}
+                                        src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
                                         alt=""
                                         className="w-full h-full object-cover"
                                         loading="lazy"
