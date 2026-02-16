@@ -292,16 +292,29 @@ const TeamDetail = () => {
                                         {/* Opponent */}
                                         <div className="flex-1 flex items-center gap-3">
                                             <span className="text-sm text-(--color-text-secondary)">vs</span>
-                                            <div className="flex items-center gap-2">
-                                                <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
-                                                <div
-                                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: opponent.color }}
-                                                />
-                                                <span className="text-sm font-semibold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
-                                                    {opponent.name}
-                                                </span>
-                                            </div>
+                                            {!match.is_completed ? (
+                                                <Link to={`${basePath}/teams/${opponent.teamSlug}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
+                                                    <div
+                                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: opponent.color }}
+                                                    />
+                                                    <span className="text-sm font-semibold text-(--color-accent) transition-colors">
+                                                        {opponent.name}
+                                                    </span>
+                                                </Link>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
+                                                    <div
+                                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: opponent.color }}
+                                                    />
+                                                    <span className="text-sm font-semibold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
+                                                        {opponent.name}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Meta */}
