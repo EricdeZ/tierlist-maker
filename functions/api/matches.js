@@ -9,8 +9,9 @@ const handler = async (event, context) => {
 
     try {
         if (event.httpMethod === 'GET' && seasonId) {
-            const matches = await sql`
-                SELECT 
+            // Completed matches from matches table
+            const completed = await sql`
+                SELECT
                     m.id,
                     m.season_id,
                     m.date,
@@ -38,13 +39,47 @@ const handler = async (event, context) => {
                 LEFT JOIN teams tw ON m.winner_team_id = tw.id
                 LEFT JOIN games g ON m.id = g.match_id
                 WHERE m.season_id = ${seasonId}
-                GROUP BY m.id, m.season_id, m.date, m.team1_id, m.team2_id, m.winner_team_id, 
-                         m.match_type, m.week, m.best_of, m.is_completed, 
+                GROUP BY m.id, m.season_id, m.date, m.team1_id, m.team2_id, m.winner_team_id,
+                         m.match_type, m.week, m.best_of, m.is_completed,
                          m.created_at, m.updated_at, t1.id, t1.name, t1.color, t1.slug,
                          t2.id, t2.name, t2.color, t2.slug, tw.name, tw.color
                 ORDER BY m.date DESC
                 ${limit ? sql`LIMIT ${parseInt(limit)}` : sql``}
             `
+
+            // Scheduled (upcoming) matches — not yet played
+            const scheduled = limit ? [] : await sql`
+                SELECT
+                    sm.id,
+                    sm.season_id,
+                    sm.scheduled_date as date,
+                    sm.team1_id,
+                    sm.team2_id,
+                    NULL as winner_team_id,
+                    'regular' as match_type,
+                    sm.week,
+                    sm.best_of,
+                    false as is_completed,
+                    sm.created_at,
+                    sm.created_at as updated_at,
+                    t1.name as team1_name,
+                    t1.color as team1_color,
+                    t1.slug as team1_slug,
+                    t2.name as team2_name,
+                    t2.color as team2_color,
+                    t2.slug as team2_slug,
+                    NULL as winner_name,
+                    NULL as winner_color,
+                    0 as games_count
+                FROM scheduled_matches sm
+                JOIN teams t1 ON sm.team1_id = t1.id
+                JOIN teams t2 ON sm.team2_id = t2.id
+                WHERE sm.season_id = ${seasonId}
+                  AND sm.status = 'scheduled'
+                ORDER BY sm.scheduled_date ASC
+            `
+
+            const matches = [...completed, ...scheduled]
 
             return {
                 statusCode: 200,
