@@ -2,7 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
-import { getPerformanceStats, pushChallengeProgress } from '../lib/challenges.js'
+import { invalidatePerformanceChallenges } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -293,14 +293,9 @@ async function reevaluateSeasonChallenges(sql, seasonId) {
         JOIN league_players lp ON lp.player_id = u.linked_player_id
         WHERE lp.season_id = ${seasonId} AND u.linked_player_id IS NOT NULL
     `
-    for (const u of users) {
-        try {
-            const stats = await getPerformanceStats(sql, u.linked_player_id)
-            await pushChallengeProgress(sql, u.user_id, stats)
-        } catch (err) {
-            console.error(`Season close challenge update failed for user ${u.user_id}:`, err)
-        }
-    }
+    if (users.length === 0) return
+    const userIds = users.map(u => u.user_id)
+    await invalidatePerformanceChallenges(sql, userIds, false)
 }
 
 async function deleteSeason(sql, { id }, admin) {

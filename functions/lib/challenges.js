@@ -3,6 +3,16 @@
 
 import { revokePassion } from './passion.js'
 
+// Performance stat keys that map to challenges
+export const PERF_KEYS = [
+    'total_damage', 'total_kills', 'total_assists', 'total_mitigated',
+    'games_played', 'leagues_joined',
+    'best_kills_game', 'best_deaths_game', 'best_assists_game',
+    'best_damage_game', 'best_mitigated_game',
+    'best_season_win_rate', 'best_season_avg_damage',
+    'games_in_tier_1', 'total_wins',
+]
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -42,10 +52,12 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
         }
     }
 
-    for (const [challengeId, currentValue] of upsertRows) {
+    if (upsertRows.length > 0) {
+        const challengeIds = upsertRows.map(r => r[0])
+        const currentValues = upsertRows.map(r => r[1])
         await sql`
             INSERT INTO user_challenges (user_id, challenge_id, current_value)
-            VALUES (${userId}, ${challengeId}, ${currentValue})
+            SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
             ON CONFLICT (user_id, challenge_id)
             DO UPDATE SET current_value = EXCLUDED.current_value
         `
@@ -202,89 +214,141 @@ export async function getMatchAffectedUsers(sql, matchId) {
 
 
 /**
- * After a match is submitted, push performance challenge progress for affected users.
- * Fire-and-forget — errors are logged but won't break the caller.
+ * Invalidate performance challenge progress for a list of user IDs.
+ * Sets current_value = -1 as a sentinel so the next challenges page load
+ * triggers a full recalc for that user (just 1 user at a time, safe budget).
+ *
+ * @param {object} sql
+ * @param {number[]} userIds
+ * @param {boolean} includeCompleted - true for delete/edit (may need revocations)
  */
-export async function updateMatchChallenges(sql, matchId) {
-    const affectedUsers = await getMatchAffectedUsers(sql, matchId)
+export async function invalidatePerformanceChallenges(sql, userIds, includeCompleted) {
+    if (userIds.length === 0) return
 
-    for (const au of affectedUsers) {
-        try {
-            const stats = await getPerformanceStats(sql, au.linked_player_id)
-            await pushChallengeProgress(sql, au.user_id, stats)
-        } catch (err) {
-            console.error(`Challenge update failed for user ${au.user_id}:`, err)
-        }
+    if (includeCompleted) {
+        await sql`
+            UPDATE user_challenges uc SET current_value = -1
+            FROM challenges c
+            WHERE uc.challenge_id = c.id
+              AND uc.user_id = ANY(${userIds})
+              AND c.is_active = true
+              AND c.stat_key = ANY(${PERF_KEYS})
+        `
+    } else {
+        await sql`
+            UPDATE user_challenges uc SET current_value = -1
+            FROM challenges c
+            WHERE uc.challenge_id = c.id
+              AND uc.user_id = ANY(${userIds})
+              AND c.is_active = true
+              AND c.stat_key = ANY(${PERF_KEYS})
+              AND uc.completed = false
+        `
     }
 }
 
 
 /**
- * Recalculate challenge progress for a list of affected users, including
- * revocation of completed challenges that no longer qualify.
+ * Full recalc for a single user. Called lazily on challenges page load
+ * when invalidated data is detected (current_value = -1 or NULL).
+ * Handles both progress updates and revocations with batched queries.
  *
- * Called after match deletion/editing when stats may have decreased.
- * Unlike pushChallengeProgress, this checks completed challenges too.
- *
- * @param {object} sql - postgres connection
- * @param {Array<{user_id: number, linked_player_id: number}>} affectedUsers
+ * Query budget: 6 (stats) + 1 (challenges) + 1 (upsert) + 3 (revocations) = 11 max
  */
-export async function recalcMatchChallenges(sql, affectedUsers) {
-    for (const au of affectedUsers) {
-        try {
-            const stats = await getPerformanceStats(sql, au.linked_player_id)
-            const statKeys = Object.keys(stats)
-            if (statKeys.length === 0) continue
+export async function recalcSingleUserChallenges(sql, userId, playerId) {
+    const stats = await getPerformanceStats(sql, playerId)
+    const statKeys = Object.keys(stats)
+    if (statKeys.length === 0) return
 
-            // Get ALL challenges including completed ones
-            const challenges = await sql`
-                SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
-                       COALESCE(uc.current_value, 0)::integer as old_value,
-                       COALESCE(uc.completed, false) as completed
-                FROM challenges c
-                LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${au.user_id}
-                WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
-            `
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
+               COALESCE(uc.current_value, 0)::integer as old_value,
+               COALESCE(uc.completed, false) as completed
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+    `
 
-            if (challenges.length === 0) continue
+    if (challenges.length === 0) return
 
-            const upsertRows = []
-            const revocations = []
+    const upsertRows = []
+    const revocations = []
 
-            for (const ch of challenges) {
-                const newValue = Number(stats[ch.stat_key] || 0)
-                upsertRows.push([ch.id, newValue])
+    for (const ch of challenges) {
+        const newValue = Number(stats[ch.stat_key] || 0)
+        upsertRows.push([ch.id, newValue])
 
-                // Completed but no longer qualifies — needs revocation
-                if (ch.completed && newValue < Number(ch.target_value)) {
-                    revocations.push(ch)
-                }
-            }
-
-            // Update current_value for all challenges (completed or not)
-            for (const [challengeId, currentValue] of upsertRows) {
-                await sql`
-                    INSERT INTO user_challenges (user_id, challenge_id, current_value)
-                    VALUES (${au.user_id}, ${challengeId}, ${currentValue})
-                    ON CONFLICT (user_id, challenge_id)
-                    DO UPDATE SET current_value = EXCLUDED.current_value
-                `
-            }
-
-            // Revoke challenges that no longer qualify
-            for (const ch of revocations) {
-                await sql`
-                    UPDATE user_challenges SET
-                        completed = false,
-                        completed_at = NULL,
-                        last_completed_at = NULL
-                    WHERE user_id = ${au.user_id} AND challenge_id = ${ch.id}
-                `
-                await revokePassion(sql, au.user_id, ch.reward,
-                    `Challenge revoked: ${ch.title}`, String(ch.id))
-            }
-        } catch (err) {
-            console.error(`Challenge recalc failed for user ${au.user_id}:`, err)
+        if (ch.completed && newValue < Number(ch.target_value)) {
+            revocations.push(ch)
         }
     }
+
+    // Batch upsert all current_values
+    if (upsertRows.length > 0) {
+        const challengeIds = upsertRows.map(r => r[0])
+        const currentValues = upsertRows.map(r => r[1])
+        await sql`
+            INSERT INTO user_challenges (user_id, challenge_id, current_value)
+            SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+            ON CONFLICT (user_id, challenge_id)
+            DO UPDATE SET current_value = EXCLUDED.current_value
+        `
+    }
+
+    // Batch revocations (3 queries for any number of revocations)
+    if (revocations.length > 0) {
+        const revokeIds = revocations.map(r => r.id)
+        await sql`
+            UPDATE user_challenges SET
+                completed = false,
+                completed_at = NULL,
+                last_completed_at = NULL
+            WHERE user_id = ${userId} AND challenge_id = ANY(${revokeIds})
+        `
+
+        const amounts = revocations.map(r => -r.reward)
+        const descriptions = revocations.map(r => `Challenge revoked: ${r.title}`)
+        const refIds = revocations.map(r => String(r.id))
+        await sql`
+            INSERT INTO passion_transactions (user_id, amount, type, description, reference_id)
+            SELECT ${userId}, unnest(${amounts}::int[]), 'challenge_revoked',
+                   unnest(${descriptions}::text[]), unnest(${refIds}::text[])
+        `
+
+        const totalRevoked = revocations.reduce((sum, r) => sum + r.reward, 0)
+        await sql`
+            UPDATE passion_balances SET
+                balance = GREATEST(balance - ${totalRevoked}, 0),
+                total_earned = GREATEST(total_earned - ${totalRevoked}, 0),
+                updated_at = NOW()
+            WHERE user_id = ${userId}
+        `
+    }
+}
+
+
+/**
+ * After a match is submitted, invalidate performance challenge progress
+ * for affected users. Actual recalc happens lazily on their next page load.
+ * Only 2 queries — safe for any number of players.
+ */
+export async function updateMatchChallenges(sql, matchId) {
+    const affectedUsers = await getMatchAffectedUsers(sql, matchId)
+    if (affectedUsers.length === 0) return
+
+    const userIds = affectedUsers.map(u => u.user_id)
+    await invalidatePerformanceChallenges(sql, userIds, false)
+}
+
+
+/**
+ * After match deletion/editing, invalidate ALL performance challenge progress
+ * (including completed) for affected users. Revocations handled lazily on page load.
+ * Only 1 query (caller already has affectedUsers) — safe for any number of players.
+ */
+export async function recalcMatchChallenges(sql, affectedUsers) {
+    if (affectedUsers.length === 0) return
+
+    const userIds = affectedUsers.map(u => u.user_id)
+    await invalidatePerformanceChallenges(sql, userIds, true)
 }
