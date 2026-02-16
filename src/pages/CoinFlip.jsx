@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { coinflipService } from '../services/database'
@@ -631,10 +632,17 @@ export default function CoinFlip() {
 
                                                 {/* Name + rank */}
                                                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                    <span className={`font-medium text-sm truncate ${isMe ? 'text-(--color-accent)' : ''}`}>
-                                                        {entry.discordUsername}
-                                                        {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
-                                                    </span>
+                                                    {entry.playerSlug ? (
+                                                        <Link to={`/profile/${entry.playerSlug}`} className={`font-medium text-sm truncate hover:text-(--color-accent) transition-colors ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                            {entry.discordUsername}
+                                                            {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className={`font-medium text-sm truncate ${isMe ? 'text-(--color-accent)' : ''}`}>
+                                                            {entry.discordUsername}
+                                                            {isMe && <span className="text-xs text-(--color-text-secondary)/50 ml-1">(you)</span>}
+                                                        </span>
+                                                    )}
                                                     <RankBadge rank={entryRank} size="sm" />
                                                 </div>
 

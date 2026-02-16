@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { godService, leagueService, bannedContentService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
+import Navbar from '../components/layout/Navbar'
 import aspectIcon from '../assets/aspect.png'
 
 const DRAFT_SEQUENCE = [
@@ -226,17 +226,23 @@ export default function DraftSimulator() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-(--color-primary) flex items-center justify-center">
-                <div className="text-(--color-text-secondary) text-lg">Loading gods...</div>
-            </div>
+            <>
+                <Navbar title="Draft Simulator" />
+                <div className="min-h-screen bg-(--color-primary) flex items-center justify-center">
+                    <div className="text-(--color-text-secondary) text-lg">Loading gods...</div>
+                </div>
+            </>
         )
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-(--color-primary) flex items-center justify-center">
-                <div className="text-red-400 text-lg">{error}</div>
-            </div>
+            <>
+                <Navbar title="Draft Simulator" />
+                <div className="min-h-screen bg-(--color-primary) flex items-center justify-center">
+                    <div className="text-red-400 text-lg">{error}</div>
+                </div>
+            </>
         )
     }
 
@@ -245,25 +251,9 @@ export default function DraftSimulator() {
     const isBanPhase = currentAction?.type === 'ban'
 
     return (
-        <div className="h-screen bg-(--color-primary) flex flex-col overflow-hidden">
+        <div className="h-screen bg-(--color-primary) flex flex-col overflow-hidden pt-20">
+            <Navbar title="Draft Simulator" />
             <PageTitle title="SMITE 2 Draft Simulator - Practice Picks & Bans" description="Free SMITE 2 draft simulator. Practice pick/ban strategy with every god. Supports Regular, Fearless, and multi-game series formats." />
-            {/* Header */}
-            <header className="flex items-center px-4 py-2.5 border-b border-white/10 flex-shrink-0">
-                <Link
-                    to="/"
-                    className="flex items-center gap-1.5 text-(--color-text-secondary) hover:text-(--color-text) transition-colors text-sm"
-                >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    <span className="hidden sm:inline">Home</span>
-                </Link>
-                <div className="flex-1 text-center">
-                    <span className="text-(--color-accent) font-heading font-bold text-base sm:text-lg">SMITE 2 Companion</span>
-                </div>
-                {/* Invisible spacer to balance the back button */}
-                <div className="w-12 sm:w-16" />
-            </header>
 
             {/* Pre-start setup (full center) */}
             {!draftStarted && (

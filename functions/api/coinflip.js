@@ -181,10 +181,12 @@ async function getLeaderboard(sql) {
     const rows = await sql`
         SELECT cs.user_id, cs.best_streak, cs.total_flips, cs.total_heads,
                u.discord_username, u.discord_avatar, u.discord_id,
-               COALESCE(pb.total_earned, 0) as total_earned
+               COALESCE(pb.total_earned, 0) as total_earned,
+               p.slug as player_slug
         FROM coinflip_streaks cs
         JOIN users u ON u.id = cs.user_id
         LEFT JOIN passion_balances pb ON pb.user_id = cs.user_id
+        LEFT JOIN players p ON p.id = u.linked_player_id
         WHERE cs.best_streak > 0
         ORDER BY cs.best_streak DESC, cs.best_streak_at DESC NULLS LAST, cs.total_heads DESC
         LIMIT 25
@@ -202,6 +204,7 @@ async function getLeaderboard(sql) {
             totalFlips: row.total_flips,
             totalHeads: row.total_heads,
             totalEarned: row.total_earned || 0,
+            playerSlug: row.player_slug || null,
             rank: { name: rank.name, division: rank.division, display: formatRank(rank) },
         }
     })

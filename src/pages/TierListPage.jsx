@@ -5,7 +5,8 @@ import DivisionContext from '../context/DivisionContext'
 import DragDropRankings from '../components/DragDropRankings'
 import { leagueService, teamService, playerService } from '../services/database'
 import PageTitle from '../components/PageTitle'
-import { ChevronLeft, ChevronDown, Lock, Calendar } from 'lucide-react'
+import Navbar from '../components/layout/Navbar'
+import { ChevronDown, Lock, Calendar } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 // League logos
@@ -241,14 +242,19 @@ export default function TierListPage() {
 
     if (leaguesLoading) {
         return (
-            <div className="max-w-7xl mx-auto py-16 px-4 text-center">
-                <div className="w-8 h-8 border-2 border-(--color-accent) border-t-transparent rounded-full animate-spin mx-auto" />
-            </div>
+            <>
+                <Navbar title="Tier Lists" />
+                <div className="max-w-7xl mx-auto pt-24 pb-16 px-4 text-center">
+                    <div className="w-8 h-8 border-2 border-(--color-accent) border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+            </>
         )
     }
 
     return (
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <>
+        <Navbar title="Tier Lists" />
+        <div className="max-w-7xl mx-auto pt-24 pb-6 px-4 sm:px-6 lg:px-8">
             <PageTitle title="SMITE 2 Player Tier List Maker" description="Create and share SMITE 2 player tier lists. Drag-and-drop players by role, export as images, and compare your rankings with the community." />
             {/* League picker modal */}
             {showPicker && (
@@ -304,19 +310,6 @@ export default function TierListPage() {
                     </div>
                 </div>
             )}
-
-            {/* Back link */}
-            <Link
-                to="/"
-                className="inline-flex items-center gap-1 text-sm text-(--color-text-secondary) hover:text-(--color-text) transition-colors mb-4"
-            >
-                <ChevronLeft className="w-4 h-4" />
-                Home
-            </Link>
-
-            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-(--color-text) mb-6">
-                Player Tier Lists
-            </h1>
 
             {/* Selector bar */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -434,5 +427,6 @@ export default function TierListPage() {
                 </div>
             )}
         </div>
+        </>
     )
 }
