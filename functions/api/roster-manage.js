@@ -460,14 +460,16 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin) {
             }
         }
 
-        // Save the source name as an alias for the target (ignore if already exists)
-        try {
-            await tx`
-                INSERT INTO player_aliases (player_id, alias)
-                VALUES (${target_player_id}, ${source.name})
-            `
-        } catch (err) {
-            if (err.code !== '23505') throw err // ignore unique violation
+        // Save the source name as an alias for the target (skip if same name)
+        if (source.name.toLowerCase() !== target.name.toLowerCase()) {
+            try {
+                await tx`
+                    INSERT INTO player_aliases (player_id, alias)
+                    VALUES (${target_player_id}, ${source.name})
+                `
+            } catch (err) {
+                if (err.code !== '23505') throw err // ignore unique violation
+            }
         }
 
         // Move any existing aliases from source to target
