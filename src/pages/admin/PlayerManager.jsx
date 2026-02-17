@@ -876,7 +876,7 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                                             <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: r.team_color || '#666' }} />
                                             <span className="text-[var(--color-text)]">{r.team_name}</span>
                                             <span className="text-[var(--color-text-secondary)]">·</span>
-                                            <span className="text-[var(--color-text-secondary)]">{r.league_name} {r.season_name}</span>
+                                            <span className="text-[var(--color-text-secondary)]">{r.league_name} {r.division_name} {r.season_name}</span>
                                             {r.role && <span className="text-[var(--color-text-secondary)]">({r.role})</span>}
                                             <span className="text-[var(--color-text-secondary)] tabular-nums">{p.gameCountMap[r.league_player_id] || 0}g</span>
                                             {!r.is_active && <span className="text-red-400/60 text-[10px]">dropped</span>}
