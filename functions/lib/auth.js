@@ -69,7 +69,7 @@ export async function requireAuth(event) {
  * Verify JWT and check that the user has a specific permission,
  * optionally scoped to a league.
  */
-export async function requirePermission(event, permissionKey, leagueId = null) {
+export async function requirePermission(event, permissionKey, leagueId = undefined) {
     const payload = await verifyAuth(event)
     if (!payload) return null
 
@@ -80,12 +80,19 @@ export async function requirePermission(event, permissionKey, leagueId = null) {
     `
     if (!user) return null
 
+    // undefined = any scope (gate check), null = global only, number = global or that league
+    const leagueFilter = leagueId === undefined
+        ? sql``
+        : leagueId === null
+            ? sql`AND ur.league_id IS NULL`
+            : sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})`
+
     const [hasPermission] = await sql`
         SELECT 1 FROM user_roles ur
         JOIN role_permissions rp ON rp.role_id = ur.role_id
         WHERE ur.user_id = ${user.id}
           AND rp.permission_key = ${permissionKey}
-          ${leagueId ? sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})` : sql``}
+          ${leagueFilter}
         LIMIT 1
     `
 
@@ -97,7 +104,7 @@ export async function requirePermission(event, permissionKey, leagueId = null) {
  * Try multiple permission keys in order. Returns { user, permissionKey }
  * for the first match, or null if none matched.
  */
-export async function requireAnyPermission(event, permissionKeys, leagueId = null) {
+export async function requireAnyPermission(event, permissionKeys, leagueId = undefined) {
     const payload = await verifyAuth(event)
     if (!payload) return null
 
@@ -108,13 +115,19 @@ export async function requireAnyPermission(event, permissionKeys, leagueId = nul
     `
     if (!user) return null
 
+    const leagueFilter = leagueId === undefined
+        ? sql``
+        : leagueId === null
+            ? sql`AND ur.league_id IS NULL`
+            : sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})`
+
     for (const permissionKey of permissionKeys) {
         const [has] = await sql`
             SELECT 1 FROM user_roles ur
             JOIN role_permissions rp ON rp.role_id = ur.role_id
             WHERE ur.user_id = ${user.id}
               AND rp.permission_key = ${permissionKey}
-              ${leagueId ? sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})` : sql``}
+              ${leagueFilter}
             LIMIT 1
         `
         if (has) return { user, permissionKey }
