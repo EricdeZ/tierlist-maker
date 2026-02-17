@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { profileService } from '../services/database'
+import { profileService, godService } from '../services/database'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
 import { getTierColor } from '../config/challengeTiers'
 import { getRank, formatRank } from '../config/ranks'
@@ -18,6 +18,7 @@ const ProfilePage = () => {
     const { user, linkedPlayer, login, loading: authLoading } = useAuth()
 
     const [profileData, setProfileData] = useState(null)
+    const [gods, setGods] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [selectedLeague, setSelectedLeague] = useState(null) // null = all leagues
@@ -31,8 +32,14 @@ const ProfilePage = () => {
             setLoading(true)
             setError(null)
             try {
-                const data = await profileService.getPlayerProfile(playerSlug)
-                if (!cancelled) setProfileData(data)
+                const [data, godsList] = await Promise.all([
+                    profileService.getPlayerProfile(playerSlug),
+                    godService.getAll().catch(() => []),
+                ])
+                if (!cancelled) {
+                    setProfileData(data)
+                    setGods(Array.isArray(godsList) ? godsList : [])
+                }
             } catch (err) {
                 if (!cancelled) setError(err.message)
             } finally {
@@ -332,6 +339,9 @@ const ProfilePage = () => {
                             </div>
                         ))}
                     </div>
+
+                    {/* God Pool */}
+                    <GodPool godStats={aggregateGodStats(filteredGames, gods)} />
                 </>
             ) : (
                 <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-8 text-center mb-8">
@@ -563,6 +573,75 @@ const ProfilePage = () => {
             )}
         </div>
         </>
+    )
+}
+
+function aggregateGodStats(games, godsList) {
+    const godMap = {}
+    for (const game of games) {
+        const name = game.god_played
+        if (!name || name === 'Unknown') continue
+        if (!godMap[name]) {
+            const godInfo = godsList.find(g => g.name.toLowerCase() === name.toLowerCase())
+            godMap[name] = {
+                name, imageUrl: godInfo?.image_url || null,
+                games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, damage: 0, mitigated: 0,
+            }
+        }
+        const g = godMap[name]
+        g.games++
+        if (game.winner_team_id === game.player_team_id) g.wins++
+        g.kills += parseInt(game.kills) || 0
+        g.deaths += parseInt(game.deaths) || 0
+        g.assists += parseInt(game.assists) || 0
+        g.damage += parseInt(game.damage) || 0
+        g.mitigated += parseInt(game.mitigated) || 0
+    }
+    return Object.values(godMap)
+        .map(g => ({
+            ...g,
+            winRate: g.games > 0 ? (g.wins / g.games) * 100 : 0,
+            kda: g.deaths === 0
+                ? g.kills + (g.assists / 2)
+                : (g.kills + (g.assists / 2)) / g.deaths,
+            avgDamage: g.games > 0 ? g.damage / g.games : 0,
+        }))
+        .sort((a, b) => b.games - a.games)
+}
+
+function GodPool({ godStats }) {
+    if (!godStats || godStats.length === 0) return null
+    const formatNum = (num) => new Intl.NumberFormat().format(Math.round(num))
+    return (
+        <div className="mb-6">
+            <h3 className="text-sm font-semibold text-(--color-text-secondary) uppercase tracking-wider mb-3">
+                God Pool <span className="text-(--color-text-secondary)/60">({godStats.length})</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {godStats.map(god => (
+                    <div key={god.name} className="flex items-center gap-3 bg-(--color-secondary) rounded-lg border border-white/10 p-3">
+                        {god.imageUrl ? (
+                            <img src={god.imageUrl} alt={god.name} className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                        ) : (
+                            <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-xs text-(--color-text-secondary) flex-shrink-0">?</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-(--color-text) truncate">{god.name}</span>
+                                <span className="text-xs text-(--color-text-secondary) flex-shrink-0">{god.games}G</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-(--color-text-secondary)">
+                                <span className={god.winRate >= 50 ? 'text-green-400' : 'text-red-400'}>
+                                    {god.winRate.toFixed(0)}% WR
+                                </span>
+                                <span>{god.kda.toFixed(1)} KDA</span>
+                                <span>{formatNum(god.avgDamage)} dmg</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     )
 }
 
