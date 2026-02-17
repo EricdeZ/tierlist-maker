@@ -1,7 +1,7 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import ReactDOM from 'react-dom'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
 import DraggablePanel from '../../components/admin/DraggablePanel'
@@ -157,14 +157,6 @@ export default function AdminDashboard() {
     }, [])
 
     useEffect(() => { fetchReadyMatches() }, [fetchReadyMatches])
-
-    // Scroll to hash anchor (e.g. #ready-to-report) after ready matches load
-    const location = useLocation()
-    useEffect(() => {
-        if (!location.hash || readyMatches.length === 0) return
-        const el = document.getElementById(location.hash.slice(1))
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, [location.hash, readyMatches])
 
     const startReadyReport = useCallback(async (readyMatch) => {
         setReadyMatchLoading(true)

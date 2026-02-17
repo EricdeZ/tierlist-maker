@@ -100,7 +100,7 @@ export default function ReporterBell() {
                     <button
                         onClick={() => {
                             setOpen(false)
-                            navigate(count > 0 ? '/admin#ready-to-report' : '/admin')
+                            navigate(count > 0 ? '/admin/matchreport' : '/admin')
                         }}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/10 text-xs font-semibold text-(--color-accent) hover:bg-white/5 transition-colors w-full"
                     >

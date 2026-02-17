@@ -344,7 +344,7 @@ const Homepage = () => {
                 <section className="px-4 -mt-6 mb-2 relative z-20">
                     <div className="max-w-4xl mx-auto">
                         <Link
-                            to="/admin#ready-to-report"
+                            to="/admin/matchreport"
                             className="group block rounded-xl border border-(--color-accent)/30 overflow-hidden transition-all duration-300 hover:border-(--color-accent)/50 hover:shadow-lg hover:shadow-(--color-accent)/10 hover:-translate-y-0.5"
                             style={{ background: 'linear-gradient(135deg, rgba(248,197,106,0.08), rgba(248,197,106,0.02))' }}
                         >
