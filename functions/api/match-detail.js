@@ -16,6 +16,7 @@ const handler = async (event) => {
                     m.id,
                     m.season_id,
                     m.date,
+                    m.reported_by,
                     m.team1_id,
                     m.team2_id,
                     m.winner_team_id,

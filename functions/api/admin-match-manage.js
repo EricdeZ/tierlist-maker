@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requireAnyPermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
 
@@ -9,10 +9,12 @@ const handler = async (event) => {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requirePermission(event, 'match_manage')
-    if (!admin) {
+    const authResult = await requireAnyPermission(event, ['match_manage', 'match_manage_own'])
+    if (!authResult) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
+    const admin = authResult.user
+    const isOwnOnly = authResult.permissionKey === 'match_manage_own'
 
     const sql = getDB()
 
@@ -22,10 +24,10 @@ const handler = async (event) => {
             const { seasonId, matchId } = event.queryStringParameters || {}
 
             if (matchId) {
-                return await getMatchDetail(sql, matchId)
+                return await getMatchDetail(sql, matchId, admin, isOwnOnly)
             }
             if (seasonId) {
-                return await listMatches(sql, seasonId)
+                return await listMatches(sql, seasonId, admin, isOwnOnly)
             }
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId or matchId required' }) }
         }
@@ -39,13 +41,13 @@ const handler = async (event) => {
 
             switch (body.action) {
                 case 'delete-match':
-                    return await deleteMatch(sql, body, admin)
+                    return await deleteMatch(sql, body, admin, isOwnOnly)
                 case 'delete-game':
-                    return await deleteGame(sql, body, admin)
+                    return await deleteGame(sql, body, admin, isOwnOnly)
                 case 'update-match':
-                    return await updateMatch(sql, body, admin)
+                    return await updateMatch(sql, body, admin, isOwnOnly)
                 case 'save-game':
-                    return await saveGame(sql, body, admin)
+                    return await saveGame(sql, body, admin, isOwnOnly)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -62,18 +64,21 @@ const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 // GET: List matches for a season
 // ═══════════════════════════════════════════════════
-async function listMatches(sql, seasonId) {
+async function listMatches(sql, seasonId, admin, isOwnOnly) {
     const matches = await sql`
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
-            m.team1_id, m.team2_id, m.winner_team_id,
+            m.team1_id, m.team2_id, m.winner_team_id, m.reported_by,
+            u.discord_username as reported_by_username,
             t1.name as team1_name, t1.color as team1_color,
             t2.name as team2_name, t2.color as team2_color,
             (SELECT count(*) FROM games g WHERE g.match_id = m.id) as game_count
         FROM matches m
         JOIN teams t1 ON m.team1_id = t1.id
         JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN users u ON m.reported_by = u.id
         WHERE m.season_id = ${seasonId}
+            ${isOwnOnly ? sql`AND m.reported_by = ${admin.id}` : sql``}
         ORDER BY m.date DESC, m.id DESC
     `
 
@@ -84,11 +89,11 @@ async function listMatches(sql, seasonId) {
 // ═══════════════════════════════════════════════════
 // GET: Full match detail with all stats
 // ═══════════════════════════════════════════════════
-async function getMatchDetail(sql, matchId) {
+async function getMatchDetail(sql, matchId, admin, isOwnOnly) {
     const [match] = await sql`
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
-            m.team1_id, m.team2_id, m.winner_team_id,
+            m.team1_id, m.team2_id, m.winner_team_id, m.reported_by,
             t1.name as team1_name, t1.color as team1_color,
             t2.name as team2_name, t2.color as team2_color
         FROM matches m
@@ -99,6 +104,10 @@ async function getMatchDetail(sql, matchId) {
 
     if (!match) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Match not found' }) }
+    }
+
+    if (isOwnOnly && match.reported_by !== admin.id) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'You can only manage matches you reported' }) }
     }
 
     const games = await sql`
@@ -146,12 +155,28 @@ async function getMatchDetail(sql, matchId) {
 
 
 // ═══════════════════════════════════════════════════
+// Helper: check match ownership for match_manage_own
+// ═══════════════════════════════════════════════════
+async function checkOwnership(sql, matchId, userId) {
+    const [match] = await sql`SELECT reported_by FROM matches WHERE id = ${matchId}`
+    if (!match) return 'Match not found'
+    if (match.reported_by !== userId) return 'You can only manage matches you reported'
+    return null
+}
+
+
+// ═══════════════════════════════════════════════════
 // POST: Delete entire match (cascade)
 // ═══════════════════════════════════════════════════
-async function deleteMatch(sql, body, admin) {
+async function deleteMatch(sql, body, admin, isOwnOnly) {
     const { match_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
+    }
+
+    if (isOwnOnly) {
+        const err = await checkOwnership(sql, match_id, admin.id)
+        if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
     // Capture affected users BEFORE deletion (join chain breaks after)
@@ -182,10 +207,15 @@ async function deleteMatch(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Delete a single game (cascade stats, recalc winner)
 // ═══════════════════════════════════════════════════
-async function deleteGame(sql, body, admin) {
+async function deleteGame(sql, body, admin, isOwnOnly) {
     const { game_id, match_id } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
+    }
+
+    if (isOwnOnly) {
+        const err = await checkOwnership(sql, match_id, admin.id)
+        if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
     // Capture affected users BEFORE deletion (players in deleted game may not be in remaining games)
@@ -220,10 +250,15 @@ async function deleteGame(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Update match-level fields
 // ═══════════════════════════════════════════════════
-async function updateMatch(sql, body, admin) {
+async function updateMatch(sql, body, admin, isOwnOnly) {
     const { match_id, date, week, team1_id, team2_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
+    }
+
+    if (isOwnOnly) {
+        const err = await checkOwnership(sql, match_id, admin.id)
+        if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
     await sql`
@@ -244,10 +279,15 @@ async function updateMatch(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Save game (winner + all player stats)
 // ═══════════════════════════════════════════════════
-async function saveGame(sql, body, admin) {
+async function saveGame(sql, body, admin, isOwnOnly) {
     const { game_id, match_id, winner_team_id, players } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
+    }
+
+    if (isOwnOnly) {
+        const err = await checkOwnership(sql, match_id, admin.id)
+        if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
     await transaction(async (tx) => {

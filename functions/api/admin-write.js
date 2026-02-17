@@ -103,8 +103,8 @@ async function submitMatch(sql, body, admin) {
 
             // 1. Create the match
             const [match] = await tx`
-                INSERT INTO matches (season_id, team1_id, team2_id, date, week, best_of, match_type, winner_team_id, is_completed)
-                VALUES (${season_id}, ${team1_id}, ${team2_id}, ${date || new Date().toISOString().split('T')[0]}, ${week || null}, ${best_of || games.length}, 'regular', ${winnerTeamId}, true)
+                INSERT INTO matches (season_id, team1_id, team2_id, date, week, best_of, match_type, winner_team_id, is_completed, reported_by)
+                VALUES (${season_id}, ${team1_id}, ${team2_id}, ${date || new Date().toISOString().split('T')[0]}, ${week || null}, ${best_of || games.length}, 'regular', ${winnerTeamId}, true, ${admin.id})
                 RETURNING id
             `
 

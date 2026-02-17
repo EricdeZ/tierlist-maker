@@ -132,9 +132,13 @@ const MatchDetail = () => {
                                 <Flag className="w-3.5 h-3.5" />
                             </button>
                         )}
-                        {user && (permissions.global.includes('match_manage') || Object.values(permissions.byLeague).some(p => p.includes('match_manage'))) && (
+                        {user && (() => {
+                            const hasPerm = (key) => permissions.global.includes(key) || Object.values(permissions.byLeague).some(p => p.includes(key))
+                            if (hasPerm('match_manage')) return true
+                            return hasPerm('match_manage_own') && match.reported_by === user.id
+                        })() && (
                             <Link
-                                to="/admin/matches"
+                                to={`/admin/matches/${match.id}`}
                                 className="p-1 rounded text-(--color-text-secondary)/40 hover:text-(--color-accent) hover:bg-(--color-accent)/10 transition-colors"
                                 title="Manage match"
                             >

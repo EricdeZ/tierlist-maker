@@ -22,11 +22,12 @@ export default function ProtectedRoute({ children, requireAdmin = false, require
 
     // Specific permission check — allow if user has it globally or for any league
     if (requiredPermission) {
-        const hasGlobal = hasPermission(requiredPermission)
-        const hasForAnyLeague = Object.values(permissions.byLeague).some(
-            perms => perms.includes(requiredPermission)
-        )
-        if (!hasGlobal && !hasForAnyLeague) {
+        const keys = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
+        const hasAny = keys.some(key => {
+            if (hasPermission(key)) return true
+            return Object.values(permissions.byLeague).some(perms => perms.includes(key))
+        })
+        if (!hasAny) {
             return <Navigate to="/admin" replace />
         }
     }

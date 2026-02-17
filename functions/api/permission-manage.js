@@ -8,6 +8,7 @@ const PERMISSION_KEYS = [
     { key: 'match_report',      label: 'Match Report',      description: 'Create match reports from screenshots', scopeable: true },
     { key: 'roster_manage',     label: 'Roster Manage',     description: 'Edit rosters, transfer/drop/add players', scopeable: true },
     { key: 'match_manage',      label: 'Match Manage',      description: 'Edit or delete existing match data', scopeable: true },
+    { key: 'match_manage_own',  label: 'Match Manage (Own)', description: 'Edit or delete only matches you reported', scopeable: true },
     { key: 'match_schedule',    label: 'Match Schedule',    description: 'Create and manage match schedules', scopeable: true },
     { key: 'player_manage',     label: 'Player Manage',     description: 'Edit players, bulk enroll', scopeable: false },
     { key: 'league_manage',     label: 'League Manage',     description: 'Create/edit leagues, divisions, seasons, teams', scopeable: true },

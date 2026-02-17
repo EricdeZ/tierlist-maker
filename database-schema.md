@@ -113,6 +113,7 @@ UNIQUE(player_id, team_id, season_id, role)
 | best_of | integer | YES | 1 |
 | is_completed | boolean | YES | false |
 | notes | text | YES | |
+| reported_by | integer | YES | FK → users.id (SET NULL) |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 

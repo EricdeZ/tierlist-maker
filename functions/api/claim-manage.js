@@ -34,8 +34,9 @@ const handler = async (event) => {
                 return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
             }
 
-            if (user.role === 'admin') {
-                // Admin sees all claims with user + player info
+            const canManageClaims = await requirePermission(event, 'claim_manage')
+            if (canManageClaims) {
+                // Users with claim_manage see all claims with user + player info
                 const claims = await sql`
                     SELECT
                         cr.id, cr.user_id, cr.player_id, cr.status,

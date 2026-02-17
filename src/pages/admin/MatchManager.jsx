@@ -1,6 +1,6 @@
 // src/pages/admin/MatchManager.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
@@ -9,6 +9,8 @@ const API = import.meta.env.VITE_API_URL || '/api'
 const SEASON_KEY = 'smite2_admin_season'
 
 export default function MatchManager() {
+    const { matchId: urlMatchId } = useParams()
+    const navigate = useNavigate()
     const [adminData, setAdminData] = useState(null)
     const [adminLoading, setAdminLoading] = useState(true)
     const [selectedSeasonId, setSelectedSeasonId] = useState(() => {
@@ -71,6 +73,28 @@ export default function MatchManager() {
         if (selectedSeasonId) fetchMatches(selectedSeasonId)
     }, [selectedSeasonId, fetchMatches])
 
+    // ─── Deep-link: auto-expand match from URL param ───
+    const deepLinkHandled = useRef(false)
+    useEffect(() => {
+        if (!urlMatchId || !adminData || deepLinkHandled.current) return
+        deepLinkHandled.current = true
+        const id = parseInt(urlMatchId)
+        if (!id) return
+        ;(async () => {
+            try {
+                const res = await fetch(`${API}/admin-match-manage?matchId=${id}`, { headers: getAuthHeaders() })
+                if (!res.ok) return
+                const data = await res.json()
+                if (data.season_id && data.season_id !== selectedSeasonId) {
+                    handleSeasonChange(data.season_id)
+                }
+                setExpandedMatchId(id)
+                setMatchDetail(data)
+                setEditData(JSON.parse(JSON.stringify(data)))
+            } catch {}
+        })()
+    }, [urlMatchId, adminData])
+
     // ─── Fetch match detail ───
     const fetchDetail = useCallback(async (matchId) => {
         setDetailLoading(true)
@@ -93,11 +117,13 @@ export default function MatchManager() {
             setExpandedMatchId(null)
             setMatchDetail(null)
             setEditData(null)
+            navigate('/admin/matches', { replace: true })
         } else {
             setExpandedMatchId(matchId)
             fetchDetail(matchId)
+            navigate(`/admin/matches/${matchId}`, { replace: true })
         }
-    }, [expandedMatchId, fetchDetail])
+    }, [expandedMatchId, fetchDetail, navigate])
 
     // ─── Toast ───
     const showToast = useCallback((type, message) => {
@@ -318,7 +344,7 @@ export default function MatchManager() {
             ) : (
                 <div className="space-y-2">
                     {matches.map(m => (
-                        <div key={m.id} className="border border-[var(--color-border)] rounded-lg">
+                        <div key={m.id} ref={expandedMatchId === m.id ? (el) => { if (el && urlMatchId) el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } : undefined} className="border border-[var(--color-border)] rounded-lg">
                             {/* Match row */}
                             <button
                                 onClick={() => toggleMatch(m.id)}

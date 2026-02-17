@@ -94,6 +94,36 @@ export async function requirePermission(event, permissionKey, leagueId = null) {
 }
 
 /**
+ * Try multiple permission keys in order. Returns { user, permissionKey }
+ * for the first match, or null if none matched.
+ */
+export async function requireAnyPermission(event, permissionKeys, leagueId = null) {
+    const payload = await verifyAuth(event)
+    if (!payload) return null
+
+    const sql = getDB()
+    const [user] = await sql`
+        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
+        FROM users WHERE id = ${payload.userId}
+    `
+    if (!user) return null
+
+    for (const permissionKey of permissionKeys) {
+        const [has] = await sql`
+            SELECT 1 FROM user_roles ur
+            JOIN role_permissions rp ON rp.role_id = ur.role_id
+            WHERE ur.user_id = ${user.id}
+              AND rp.permission_key = ${permissionKey}
+              AND (ur.league_id IS NULL ${leagueId ? sql`OR ur.league_id = ${leagueId}` : sql``})
+            LIMIT 1
+        `
+        if (has) return { user, permissionKey }
+    }
+
+    return null
+}
+
+/**
  * Get all effective permissions for a user.
  * Returns { global: [...keys], byLeague: { leagueId: [...keys] } }
  */

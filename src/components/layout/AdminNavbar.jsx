@@ -17,7 +17,7 @@ const primaryTabs = [
 
 const morePages = [
     { path: '/admin/discord-review', label: 'Discord Review',  permission: 'match_report' },
-    { path: '/admin/matches',        label: 'Match Manager',   permission: 'match_manage' },
+    { path: '/admin/matches',        label: 'Match Manager',   permission: ['match_manage', 'match_manage_own'] },
     { path: '/admin/rosters',        label: 'Rosters',         permission: 'roster_manage' },
     { path: '/admin/players',        label: 'Players',         permission: 'player_manage' },
     { path: '/admin/leagues',        label: 'Leagues',         permission: 'league_manage' },
@@ -43,8 +43,11 @@ export default function AdminNavbar() {
 
     const hasPermissionAnywhere = (key) => {
         if (!key) return true
-        if (permissions.global.includes(key)) return true
-        return Object.values(permissions.byLeague).some(perms => perms.includes(key))
+        const keys = Array.isArray(key) ? key : [key]
+        return keys.some(k => {
+            if (permissions.global.includes(k)) return true
+            return Object.values(permissions.byLeague).some(perms => perms.includes(k))
+        })
     }
 
     const isActive = (item) => {

@@ -73,7 +73,8 @@ function App() {
                                 <Route index element={<AdminLanding />} />
                                 <Route path="matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
                                 <Route path="rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
-                                <Route path="matches" element={<ProtectedRoute requiredPermission="match_manage"><MatchManager /></ProtectedRoute>} />
+                                <Route path="matches" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
+                                <Route path="matches/:matchId" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
                                 <Route path="players" element={<ProtectedRoute requiredPermission="player_manage"><PlayerManager /></ProtectedRoute>} />
                                 <Route path="leagues" element={<ProtectedRoute requiredPermission="league_manage"><LeagueManager /></ProtectedRoute>} />
                                 <Route path="users" element={<ProtectedRoute requiredPermission="user_manage"><UserManager /></ProtectedRoute>} />
