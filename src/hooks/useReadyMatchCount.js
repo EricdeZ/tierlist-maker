@@ -7,7 +7,7 @@ const POLL_INTERVAL = 60_000
 
 export function useReadyMatchCount() {
     const { user, permissions } = useAuth()
-    const [count, setCount] = useState(0)
+    const [matches, setMatches] = useState([])
 
     const hasReportPermission = useMemo(() => {
         if (!user) return false
@@ -24,13 +24,13 @@ export function useReadyMatchCount() {
             )
             if (!res.ok) return
             const data = await res.json()
-            setCount(data.matches?.length ?? 0)
+            setMatches(data.matches ?? [])
         } catch { /* silent */ }
     }, [hasReportPermission])
 
     useEffect(() => {
         if (!hasReportPermission) {
-            setCount(0)
+            setMatches([])
             return
         }
         fetchCount()
@@ -38,5 +38,5 @@ export function useReadyMatchCount() {
         return () => clearInterval(interval)
     }, [hasReportPermission, fetchCount])
 
-    return { count, hasReportPermission }
+    return { count: matches.length, matches, hasReportPermission }
 }

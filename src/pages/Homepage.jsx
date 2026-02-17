@@ -3,9 +3,10 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
-import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Shield } from 'lucide-react'
+import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Shield, Sparkles, ArrowRight, Gem, DollarSign, Bell, Camera } from 'lucide-react'
 import smiteLogo from '../assets/smite2.png'
 import statsheetImg from '../assets/statsheet.png'
+import diamondsImg from '../assets/diamonds.png'
 
 // League logos
 import aglLogo from '../assets/leagues/agl.png'
@@ -16,6 +17,7 @@ import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisio
 import ChallengeBanner from '../components/ChallengeBanner'
 import PassionPromoBanner from '../components/PassionPromoBanner'
 import PageTitle from '../components/PageTitle'
+import { useReadyMatchCount } from '../hooks/useReadyMatchCount'
 
 const LEAGUE_LOGOS = {
     'agl': aglLogo,
@@ -35,6 +37,7 @@ const DiscordIcon = ({ className }) => (
 const Homepage = () => {
     const { user, linkedPlayer, login, loading: authLoading, hasAnyPermission } = useAuth()
     const canPreview = hasAnyPermission
+    const { count: readyCount, matches: readyMatches, hasReportPermission } = useReadyMatchCount()
     const [leagues, setLeagues] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -336,6 +339,57 @@ const Homepage = () => {
                 </div>
             </section>
 
+            {/* ─── REPORTER NOTIFICATION ─── */}
+            {hasReportPermission && readyCount > 0 && (
+                <section className="px-4 -mt-6 mb-2 relative z-20">
+                    <div className="max-w-4xl mx-auto">
+                        <Link
+                            to="/admin"
+                            className="group block rounded-xl border border-(--color-accent)/30 overflow-hidden transition-all duration-300 hover:border-(--color-accent)/50 hover:shadow-lg hover:shadow-(--color-accent)/10 hover:-translate-y-0.5"
+                            style={{ background: 'linear-gradient(135deg, rgba(248,197,106,0.08), rgba(248,197,106,0.02))' }}
+                        >
+                            <div className="px-5 py-4 flex items-center gap-4">
+                                <div className="relative shrink-0">
+                                    <div className="w-10 h-10 rounded-lg bg-(--color-accent)/15 flex items-center justify-center">
+                                        <Bell className="w-5 h-5 text-(--color-accent)" />
+                                    </div>
+                                    <span
+                                        className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                                        style={{ background: '#f8c56a', color: '#0a0f1a' }}
+                                    >
+                                        {readyCount}
+                                    </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-sm font-bold text-(--color-text) mb-0.5">
+                                        {readyCount} match{readyCount !== 1 ? 'es' : ''} ready to report
+                                    </h3>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                        {readyMatches.slice(0, 3).map(m => (
+                                            <span key={m.id} className="inline-flex items-center gap-1.5 text-xs text-(--color-text-secondary)">
+                                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: m.team1_color || 'var(--color-accent)' }} />
+                                                {m.team1_name} vs {m.team2_name}
+                                                <Camera className="w-3 h-3 text-(--color-text-secondary)/50" />
+                                                <span className="text-(--color-text-secondary)/60">{m.screenshot_count}</span>
+                                            </span>
+                                        ))}
+                                        {readyMatches.length > 3 && (
+                                            <span className="text-xs text-(--color-text-secondary)/50">
+                                                +{readyMatches.length - 3} more
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-(--color-accent) group-hover:gap-2 transition-all">
+                                    <span className="hidden sm:inline">Report Now</span>
+                                    <ChevronRight className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </Link>
+                    </div>
+                </section>
+            )}
+
             {/* ─── LEAGUES SECTION ─── */}
             <section id="leagues" className="py-20 px-4">
                 <div className="max-w-6xl mx-auto">
@@ -419,6 +473,90 @@ const Homepage = () => {
                                         </div>
                                     </div>
 
+                                    {/* AGL Signup Promo Banner */}
+                                    {league.slug === 'agl' && (
+                                        <Link
+                                            to="/agl/signup"
+                                            className="group relative block mb-5 overflow-hidden rounded-2xl transition-all duration-500 hover:shadow-2xl hover:shadow-[#F57C20]/15 hover:-translate-y-0.5"
+                                            style={{ background: 'linear-gradient(135deg, #1a0a00 0%, #2a1200 40%, #1a0800 100%)' }}
+                                        >
+                                            {/* Animated gradient border */}
+                                            <div className="absolute inset-0 rounded-2xl p-px" style={{
+                                                background: 'linear-gradient(135deg, #F57C20, #FFB347, #F57C20, #E8941A)',
+                                                mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                                maskComposite: 'exclude',
+                                                WebkitMaskComposite: 'xor',
+                                                opacity: 0.4,
+                                            }} />
+                                            {/* Inner glow effects */}
+                                            <div className="absolute top-0 right-0 w-72 h-72 opacity-15 blur-3xl pointer-events-none" style={{
+                                                background: 'radial-gradient(circle, #F57C20, transparent 70%)',
+                                            }} />
+                                            <div className="absolute bottom-0 left-0 w-56 h-56 opacity-10 blur-3xl pointer-events-none" style={{
+                                                background: 'radial-gradient(circle, #FFB347, transparent 70%)',
+                                            }} />
+                                            {/* Top accent line */}
+                                            <div className="absolute top-0 left-0 right-0 h-px" style={{
+                                                background: 'linear-gradient(90deg, transparent 10%, #F57C20 50%, transparent 90%)',
+                                                opacity: 0.6,
+                                            }} />
+
+                                            <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center gap-4 sm:gap-5">
+                                                {/* Diamond image */}
+                                                <div className="shrink-0 hidden sm:block">
+                                                    <img
+                                                        src={diamondsImg}
+                                                        alt=""
+                                                        className="w-14 h-14 object-contain drop-shadow-lg group-hover:scale-110 transition-transform duration-500"
+                                                        style={{ filter: 'drop-shadow(0 0 12px rgba(245,124,32,0.3))' }}
+                                                    />
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F57C20]/70 mb-1 block">
+                                                        Albion Giants League
+                                                    </span>
+                                                    <h4 className="font-heading text-lg sm:text-xl font-black text-white mb-2 leading-tight">
+                                                        Season Signups
+                                                    </h4>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                                                            style={{
+                                                                background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05))',
+                                                                color: '#4ade80',
+                                                                border: '1px solid rgba(34,197,94,0.25)',
+                                                            }}
+                                                        >
+                                                            <DollarSign className="w-3 h-3" />
+                                                            Cash Prizes
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                                                            style={{
+                                                                background: 'linear-gradient(135deg, rgba(147,197,253,0.15), rgba(147,197,253,0.05))',
+                                                                color: '#93c5fd',
+                                                                border: '1px solid rgba(147,197,253,0.25)',
+                                                            }}
+                                                        >
+                                                            <Gem className="w-3 h-3" />
+                                                            Diamond Prizes
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* CTA arrow */}
+                                                <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, #F57C20, #E8941A)',
+                                                        boxShadow: '0 4px 20px rgba(245,124,32,0.3)',
+                                                    }}
+                                                >
+                                                    <ArrowRight className="w-4.5 h-4.5 text-white group-hover:translate-x-0.5 transition-transform duration-300" />
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    )}
+
                                     {divisions.length > 0 && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {divisions.map(division => {
@@ -491,6 +629,7 @@ const Homepage = () => {
                                             })}
                                         </div>
                                     )}
+
                                 </div>
                             )
                         })}
