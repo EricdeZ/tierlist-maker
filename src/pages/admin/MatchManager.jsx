@@ -692,7 +692,7 @@ function PlayerSwap({ player, adminData, onChange }) {
                                 }}>
                             {r.team_color && <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: r.team_color }} />}
                             <span>{r.name}</span>
-                            {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role}</span>}
+                            {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role === 'Sub' ? 'Rule 0-Sub' : r.role}</span>}
                             {r.team_name && <span className="text-[var(--color-text-secondary)] ml-auto text-[10px]">{r.team_name}</span>}
                         </button>
                     ))}

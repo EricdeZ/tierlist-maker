@@ -247,7 +247,7 @@ export function RosterManagerHelp() {
                     title: 'Change Roles',
                     content: (
                         <p>
-                            Click on a player's <strong>role badge</strong> (Solo, Jungle, Mid, Support, ADC, Sub, Fill) to open
+                            Click on a player's <strong>role badge</strong> (Solo, Jungle, Mid, Support, ADC, Rule 0-Sub, Fill) to open
                             a dropdown and assign a different role. The change is staged locally until you save.
                         </p>
                     ),

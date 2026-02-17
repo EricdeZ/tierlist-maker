@@ -488,7 +488,7 @@ export default function PlayerManager() {
                     >
                         <option value="all">All Roles</option>
                         {['Solo', 'Jungle', 'Mid', 'Support', 'ADC', 'Sub', 'Fill'].map(r => (
-                            <option key={r} value={r}>{r}</option>
+                            <option key={r} value={r}>{r === 'Sub' ? 'Rule 0-Sub' : r}</option>
                         ))}
                     </select>
 
@@ -642,7 +642,7 @@ export default function PlayerManager() {
                                 >
                                     <option value="">Use Player Defaults</option>
                                     {['fill', 'solo', 'jungle', 'mid', 'support', 'adc', 'sub'].map(r => (
-                                        <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                        <option key={r} value={r}>{r === 'sub' ? 'Rule 0-Sub' : r.charAt(0).toUpperCase() + r.slice(1)}</option>
                                     ))}
                                 </select>
                             </div>
@@ -877,7 +877,7 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                                             <span className="text-[var(--color-text)]">{r.team_name}</span>
                                             <span className="text-[var(--color-text-secondary)]">·</span>
                                             <span className="text-[var(--color-text-secondary)]">{r.league_name} {r.division_name} {r.season_name}</span>
-                                            {r.role && <span className="text-[var(--color-text-secondary)]">({r.role})</span>}
+                                            {r.role && <span className="text-[var(--color-text-secondary)]">({r.role === 'Sub' ? 'Rule 0-Sub' : r.role})</span>}
                                             <span className="text-[var(--color-text-secondary)] tabular-nums">{p.gameCountMap[r.league_player_id] || 0}g</span>
                                             {!r.is_active && <span className="text-red-400/60 text-[10px]">dropped</span>}
                                         </div>

@@ -2269,7 +2269,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                                         }}>
                                     {r.team_color && <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: r.team_color }} />}
                                     <span className="text-[var(--color-text)]">{r.name}</span>
-                                    {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role}</span>}
+                                    {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role === 'Sub' ? 'Rule 0-Sub' : r.role}</span>}
                                     {r.team_name && <span className="text-[var(--color-text-secondary)] ml-auto text-[10px]">{r.team_name}</span>}
                                     {r.source === 'global' && <span className="text-yellow-400/60 ml-auto text-[10px]">global</span>}
                                     {r.source === 'alias' && <span className="text-blue-400/60 ml-auto text-[10px]">alias: {r.alias_matched}</span>}
@@ -2423,7 +2423,7 @@ function AliasLinkModal({ extractedName, adminData, seasonId, onSave, onClose })
                                         onClick={() => { setSelectedPlayer(r); setSearchQuery(r.name) }}>
                                     {r.team_color && <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: r.team_color }} />}
                                     <span className="text-[var(--color-text)]">{r.name}</span>
-                                    {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role}</span>}
+                                    {r.role && <span className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{r.role === 'Sub' ? 'Rule 0-Sub' : r.role}</span>}
                                     {r.team_name && <span className="text-[var(--color-text-secondary)] ml-auto text-[10px]">{r.team_name}</span>}
                                     {r.source === 'global' && <span className="text-yellow-400/60 ml-auto text-[10px]">global</span>}
                                 </button>

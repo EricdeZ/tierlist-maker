@@ -10,6 +10,7 @@ const API = import.meta.env.VITE_API_URL || '/api'
 const STORAGE_KEY = 'smite2_roster_admin'
 
 const ROLES = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC', 'Sub', 'Fill']
+const ROLE_LABELS = { Sub: 'Rule 0-Sub' }
 
 // ─── Persistence ───
 function loadState() {
@@ -1146,7 +1147,7 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                 className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 transition-opacity hover:opacity-80 ${colorClass}`}
                 title="Click to change role"
             >
-                {role || 'Fill'}
+                {ROLE_LABELS[role] || role || 'Fill'}
             </button>
 
             {editing && (
@@ -1172,7 +1173,7 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5'
                             }`}
                         >
-                            <span>{r}</span>
+                            <span>{ROLE_LABELS[r] || r}</span>
                             {r.toLowerCase() === roleLower && <span>✓</span>}
                         </button>
                     ))}
