@@ -132,22 +132,31 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             }
         }
 
-        // Strategy 2: Fuzzy match message text for team names
+        // Strategy 2: Parse message text for team identification
         if (group.message_content) {
             const textLower = group.message_content.toLowerCase()
-            // 2a. Exact full team name match
+
+            // 2a. Parse Discord role mentions (<@&ROLE_ID>) and match to teams directly
+            const roleMentionRegex = /<@&(\d+)>/g
+            let roleMatch
+            while ((roleMatch = roleMentionRegex.exec(group.message_content)) !== null) {
+                const team = teamsByRoleId.get(roleMatch[1])
+                if (team) matchedTeamIds.add(team.id)
+            }
+
+            // 2b. Exact full team name match
             for (const [name, team] of teamsByName) {
                 if (textLower.includes(name)) {
                     matchedTeamIds.add(team.id)
                 }
             }
-            // 2b. Slug match (e.g. "solar-scarabs" in text)
+            // 2c. Slug match (e.g. "solar-scarabs" in text)
             for (const [slug, team] of teamsBySlug) {
                 if (textLower.includes(slug)) {
                     matchedTeamIds.add(team.id)
                 }
             }
-            // 2c. Individual word match from team names (3+ char significant words)
+            // 2d. Individual word match from team names (3+ char significant words)
             // Only match if the word uniquely identifies one team (skip ambiguous words)
             const messageWords = new Set(textLower.split(/[^a-z0-9]+/).filter(w => w.length >= 3))
             for (const [word, wordTeams] of teamsByWord) {

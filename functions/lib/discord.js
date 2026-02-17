@@ -149,6 +149,23 @@ export async function pollChannel(sql, channel, guildRoles) {
     let newImages = 0
     const newItemIds = []
 
+    // Build fallback role→name map from team discord_role_ids for this division
+    // Used when guild roles fetch fails (guildRoles is empty)
+    let teamRoleFallback = null
+    if (!guildRoles || guildRoles.size === 0) {
+        const teamRoles = await sql`
+            SELECT t.discord_role_id, t.name
+            FROM teams t
+            JOIN seasons s ON t.season_id = s.id
+            WHERE s.division_id = ${channel.division_id} AND s.is_active = true
+              AND t.discord_role_id IS NOT NULL
+        `
+        if (teamRoles.length) {
+            teamRoleFallback = new Map(teamRoles.map(r => [r.discord_role_id, r.name]))
+        }
+    }
+    const roleMap = (guildRoles && guildRoles.size > 0) ? guildRoles : teamRoleFallback
+
     // Discord "after" returns messages with id > afterId, sorted ascending (oldest first).
     // We paginate by taking the last (newest) id from each batch as the new afterId.
     while (totalMessages < 500) {
@@ -162,10 +179,11 @@ export async function pollChannel(sql, channel, guildRoles) {
         }
 
         for (const msg of messages) {
-            // Resolve role mentions in message content if guild roles provided
+            // Resolve role mentions in message content
+            // Uses guild roles if available, falls back to team role IDs → team names
             const resolvedContent = resolveRoleMentions(
                 (msg.content || '').substring(0, 2000),
-                guildRoles,
+                roleMap,
             )
 
             // Collect images from direct attachments + forwarded message snapshots
