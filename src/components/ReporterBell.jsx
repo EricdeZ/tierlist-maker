@@ -97,7 +97,7 @@ export default function ReporterBell() {
                     )}
 
                     <Link
-                        to="/admin"
+                        to={count > 0 ? '/admin#ready-to-report' : '/admin'}
                         onClick={() => setOpen(false)}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/10 text-xs font-semibold text-(--color-accent) hover:bg-white/5 transition-colors"
                     >
