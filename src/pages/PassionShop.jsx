@@ -227,10 +227,10 @@ function FeaturedStreamerCard({ user, balance, login }) {
                         Featured Streamer
                     </h2>
                     <p className="text-white/50 text-sm sm:text-base italic mb-4">
-                        Earn your badge. Join the rotation.
+                        Earn your badge. Get featured.
                     </p>
                     <p className="text-white/30 text-sm leading-relaxed max-w-md">
-                        The Featured Streamer badge marks you as a community content creator. Badge holders who link their Twitch channel are featured in a rotating stream spotlight across the site.
+                        The Featured Streamer badge marks you as a community content creator. Badge holders who link their Twitch channel have a chance to get a featured stream on the website.
                     </p>
 
                     {!owned && (

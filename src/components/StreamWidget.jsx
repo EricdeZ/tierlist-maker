@@ -37,7 +37,7 @@ export default function StreamWidget() {
         () => localStorage.getItem(STORAGE_KEY) === 'true'
     )
     const [dismissed, setDismissed] = useState(
-        () => sessionStorage.getItem(DISMISS_KEY) === 'true'
+        () => localStorage.getItem(DISMISS_KEY) === 'true'
     )
     const pollRef = useRef(null)
     const heartbeatRef = useRef(null)
@@ -139,7 +139,7 @@ export default function StreamWidget() {
 
     const dismiss = () => {
         setDismissed(true)
-        sessionStorage.setItem(DISMISS_KEY, 'true')
+        localStorage.setItem(DISMISS_KEY, 'true')
     }
 
     // Don't render anything if no active streamer, dismissed, or on /twitch

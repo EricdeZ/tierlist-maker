@@ -31,6 +31,11 @@ const handler = async (event) => {
                     if (!user) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
                     return await getMyStatus(sql, user)
                 }
+                case 'admin-search-users': {
+                    const admin = await requirePermission(event, 'league_manage')
+                    if (!admin) return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
+                    return await adminSearchUsers(sql, event)
+                }
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -108,7 +113,19 @@ async function finalizeExpiredSession(sql) {
     const elapsed = Date.now() - new Date(current.current_session_start).getTime()
     if (elapsed < SESSION_DURATION_MS) return current
 
-    // Session expired — clear it (featured time already tracked via heartbeats)
+    // Minimum session elapsed — check if there's a different streamer to rotate to
+    const [otherActive] = await sql`
+        SELECT id FROM featured_streamers
+        WHERE is_active = true AND id != ${current.id}
+        LIMIT 1
+    `
+
+    if (!otherActive) {
+        // Only active streamer — keep their session going
+        return current
+    }
+
+    // There's someone else to rotate to — clear current session
     await sql`
         UPDATE featured_streamers
         SET current_session_start = NULL
@@ -151,14 +168,14 @@ async function getCurrent(sql, event) {
         // Session still active — fetch full row
         const [row] = await sql`
             SELECT fs.id, fs.user_id, fs.twitch_channel, fs.current_session_start,
-                   u.discord_username
+                   COALESCE(fs.display_name, u.discord_username) as display_name
             FROM featured_streamers fs
-            JOIN users u ON u.id = fs.user_id
+            LEFT JOIN users u ON u.id = fs.user_id
             WHERE fs.id = ${current.id}
         `
         if (row) {
             const sessionStart = new Date(row.current_session_start)
-            const remaining = Math.max(0, SESSION_DURATION_MS - (Date.now() - sessionStart.getTime()))
+            const elapsed = Date.now() - sessionStart.getTime()
 
             return {
                 statusCode: 200,
@@ -168,9 +185,9 @@ async function getCurrent(sql, event) {
                     streamerId: row.id,
                     userId: row.user_id,
                     channel: row.twitch_channel,
-                    displayName: row.discord_username,
+                    displayName: row.display_name || row.twitch_channel,
                     sessionStart: row.current_session_start,
-                    sessionRemaining: Math.round(remaining / 1000),
+                    sessionElapsed: Math.round(elapsed / 1000),
                 }),
             }
         }
@@ -186,8 +203,11 @@ async function getCurrent(sql, event) {
         }
     }
 
-    const [user] = await sql`
-        SELECT discord_username FROM users WHERE id = ${next.user_id}
+    const [details] = await sql`
+        SELECT COALESCE(fs.display_name, u.discord_username) as display_name
+        FROM featured_streamers fs
+        LEFT JOIN users u ON u.id = fs.user_id
+        WHERE fs.id = ${next.id}
     `
 
     return {
@@ -198,9 +218,9 @@ async function getCurrent(sql, event) {
             streamerId: next.id,
             userId: next.user_id,
             channel: next.twitch_channel,
-            displayName: user?.discord_username || 'Unknown',
+            displayName: details?.display_name || next.twitch_channel,
             sessionStart: next.current_session_start,
-            sessionRemaining: Math.round(SESSION_DURATION_MS / 1000),
+            sessionElapsed: 0,
         }),
     }
 }
@@ -214,9 +234,9 @@ async function getQueue(sql, event) {
     const rows = await sql`
         SELECT fs.id, fs.user_id, fs.twitch_channel, fs.total_featured_seconds,
                fs.is_active, fs.current_session_start, fs.created_at,
-               u.discord_username
+               COALESCE(fs.display_name, u.discord_username) as display_name
         FROM featured_streamers fs
-        JOIN users u ON u.id = fs.user_id
+        LEFT JOIN users u ON u.id = fs.user_id
         WHERE fs.is_active = true
         ORDER BY
             fs.total_featured_seconds::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - fs.created_at)), 3600) ASC,
@@ -232,7 +252,7 @@ async function getQueue(sql, event) {
                 streamerId: r.id,
                 userId: r.user_id,
                 channel: r.twitch_channel,
-                displayName: r.discord_username,
+                displayName: r.display_name || r.twitch_channel,
                 totalFeaturedSeconds: r.total_featured_seconds,
                 isCurrent: !!r.current_session_start,
                 createdAt: r.created_at,
@@ -449,72 +469,37 @@ async function adminSwap(sql, admin, body) {
 }
 
 async function adminEdit(sql, admin, body) {
-    const { streamer_id, twitch_channel, is_active, total_featured_seconds } = body
+    const { streamer_id, twitch_channel, is_active, total_featured_seconds, display_name } = body
     if (!streamer_id) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'streamer_id required' }) }
     }
 
-    const updates = []
-    const values = {}
-
-    if (twitch_channel !== undefined) {
-        updates.push('twitch_channel')
-        values.twitch_channel = twitch_channel.trim()
-    }
-    if (is_active !== undefined) {
-        updates.push('is_active')
-        values.is_active = !!is_active
-    }
-    if (total_featured_seconds !== undefined) {
-        updates.push('total_featured_seconds')
-        values.total_featured_seconds = Math.max(0, parseInt(total_featured_seconds) || 0)
-    }
-
-    if (updates.length === 0) {
-        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Nothing to update' }) }
-    }
-
-    // Build update dynamically
-    let row
-    if (values.twitch_channel !== undefined && values.is_active !== undefined && values.total_featured_seconds !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET twitch_channel = ${values.twitch_channel}, is_active = ${values.is_active}, total_featured_seconds = ${values.total_featured_seconds}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else if (values.twitch_channel !== undefined && values.is_active !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET twitch_channel = ${values.twitch_channel}, is_active = ${values.is_active}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else if (values.twitch_channel !== undefined && values.total_featured_seconds !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET twitch_channel = ${values.twitch_channel}, total_featured_seconds = ${values.total_featured_seconds}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else if (values.is_active !== undefined && values.total_featured_seconds !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET is_active = ${values.is_active}, total_featured_seconds = ${values.total_featured_seconds}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else if (values.twitch_channel !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET twitch_channel = ${values.twitch_channel}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else if (values.is_active !== undefined) {
-        [row] = await sql`
-            UPDATE featured_streamers SET is_active = ${values.is_active}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    } else {
-        [row] = await sql`
-            UPDATE featured_streamers SET total_featured_seconds = ${values.total_featured_seconds}
-            WHERE id = ${streamer_id} RETURNING id
-        `
-    }
-
-    if (!row) {
+    // Fetch current values then merge with provided updates
+    const [current] = await sql`
+        SELECT twitch_channel, is_active, total_featured_seconds, display_name
+        FROM featured_streamers WHERE id = ${streamer_id}
+    `
+    if (!current) {
         return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'Streamer not found' }) }
+    }
+
+    const newChannel = twitch_channel !== undefined ? twitch_channel.trim() : current.twitch_channel
+    const newActive = is_active !== undefined ? !!is_active : current.is_active
+    const newSeconds = total_featured_seconds !== undefined ? Math.max(0, parseInt(total_featured_seconds) || 0) : current.total_featured_seconds
+    const newDisplayName = display_name !== undefined ? (display_name?.trim() || null) : current.display_name
+
+    await sql`
+        UPDATE featured_streamers
+        SET twitch_channel = ${newChannel},
+            is_active = ${newActive},
+            total_featured_seconds = ${newSeconds},
+            display_name = ${newDisplayName}
+        WHERE id = ${streamer_id}
+    `
+
+    // If deactivating, also clear current session
+    if (is_active === false) {
+        await sql`UPDATE featured_streamers SET current_session_start = NULL WHERE id = ${streamer_id}`
     }
 
     logAudit(sql, admin, {
@@ -522,22 +507,25 @@ async function adminEdit(sql, admin, body) {
         endpoint: 'featured-streamer',
         targetType: 'featured_streamer',
         targetId: streamer_id,
-        details: values,
+        details: { twitch_channel: newChannel, is_active: newActive, display_name: newDisplayName },
     })
 
     return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
 }
 
 async function adminAdd(sql, admin, body) {
-    const { user_id, twitch_channel } = body
-    if (!user_id || !twitch_channel?.trim()) {
-        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'user_id and twitch_channel required' }) }
+    const { user_id, twitch_channel, display_name } = body
+    if (!twitch_channel?.trim()) {
+        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'twitch_channel required' }) }
+    }
+    if (!user_id && !display_name?.trim()) {
+        return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'display_name required when no user is selected' }) }
     }
 
     try {
         await sql`
-            INSERT INTO featured_streamers (user_id, twitch_channel)
-            VALUES (${user_id}, ${twitch_channel.trim()})
+            INSERT INTO featured_streamers (user_id, twitch_channel, display_name)
+            VALUES (${user_id || null}, ${twitch_channel.trim()}, ${display_name?.trim() || null})
         `
     } catch (err) {
         if (err.message?.includes('unique') || err.message?.includes('duplicate')) {
@@ -550,7 +538,7 @@ async function adminAdd(sql, admin, body) {
         action: 'featured-streamer-add',
         endpoint: 'featured-streamer',
         targetType: 'featured_streamer',
-        details: { user_id, twitch_channel: twitch_channel.trim() },
+        details: { user_id: user_id || null, twitch_channel: twitch_channel.trim(), display_name: display_name?.trim() || null },
     })
 
     return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
@@ -579,6 +567,28 @@ async function adminRemove(sql, admin, body) {
     })
 
     return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+async function adminSearchUsers(sql, event) {
+    const { q } = event.queryStringParameters || {}
+    if (!q || q.trim().length < 2) {
+        return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ users: [] }) }
+    }
+
+    const term = `%${q.trim().toLowerCase()}%`
+    const users = await sql`
+        SELECT id, discord_username, discord_avatar, discord_id
+        FROM users
+        WHERE LOWER(discord_username) LIKE ${term}
+        ORDER BY discord_username ASC
+        LIMIT 20
+    `
+
+    return {
+        statusCode: 200,
+        headers: adminHeaders,
+        body: JSON.stringify({ users }),
+    }
 }
 
 export const onRequest = adapt(handler)
