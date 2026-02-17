@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Bell, ChevronRight, Camera } from 'lucide-react'
 import { useReadyMatchCount } from '../hooks/useReadyMatchCount'
 
@@ -7,6 +7,7 @@ export default function ReporterBell() {
     const { count, matches, hasReportPermission } = useReadyMatchCount()
     const [open, setOpen] = useState(false)
     const ref = useRef(null)
+    const navigate = useNavigate()
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -96,14 +97,16 @@ export default function ReporterBell() {
                         </div>
                     )}
 
-                    <Link
-                        to={count > 0 ? '/admin#ready-to-report' : '/admin'}
-                        onClick={() => setOpen(false)}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/10 text-xs font-semibold text-(--color-accent) hover:bg-white/5 transition-colors"
+                    <button
+                        onClick={() => {
+                            setOpen(false)
+                            navigate(count > 0 ? '/admin#ready-to-report' : '/admin')
+                        }}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/10 text-xs font-semibold text-(--color-accent) hover:bg-white/5 transition-colors w-full"
                     >
                         {count > 0 ? 'Report Matches' : 'Go to Dashboard'}
                         <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
+                    </button>
                 </div>
             )}
         </div>
