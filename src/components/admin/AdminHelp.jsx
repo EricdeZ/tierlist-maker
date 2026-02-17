@@ -169,7 +169,7 @@ export function MatchReportHelp() {
                     ),
                 },
                 {
-                    title: 'Review — Step 3: Handle Unknown Players (Subs & Aliases)',
+                    title: 'Review — Step 3: Handle Unknown Players (Rule 0-Subs & Aliases)',
                     content: (
                         <>
                             <p>
@@ -183,7 +183,7 @@ export function MatchReportHelp() {
                                 will auto-match it.
                             </p>
                             <p className="mt-1">
-                                <strong>Subs (non-roster players):</strong> If the player is a substitute who isn't on
+                                <strong>Rule 0-Subs (non-roster players):</strong> If the player is a substitute who isn't on
                                 any roster, click the player name to search the <strong>global player list</strong>.
                                 If they don't exist yet, they can be created from the Roster Manager.
                             </p>

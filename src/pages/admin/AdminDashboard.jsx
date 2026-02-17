@@ -2223,7 +2223,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     {player.is_sub && !isMatched && !showSearch && (
                         <>
                             <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">
-                                {player.sub_type === 'new' ? 'NEW SUB' : 'SUB'}
+                                {player.sub_type === 'new' ? 'NEW RULE 0-SUB' : 'RULE 0-SUB'}
                             </span>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setShowAliasModal(true) }}
@@ -2282,7 +2282,7 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                     {showSearch && searchQuery.length >= 2 && searchResults.length === 0 && (
                         <div className="absolute z-50 top-full left-0 mt-1 w-64 border rounded shadow-lg px-3 py-2 text-[10px] text-[var(--color-text-secondary)]"
                              style={{ backgroundColor: 'var(--color-card, #1e1e2e)', borderColor: 'var(--color-border, #333)' }}>
-                            No players found for "{searchQuery}" — will be created as sub on submit
+                            No players found for "{searchQuery}" — will be created as Rule 0-Sub on submit
                         </div>
                     )}
                 </div>
