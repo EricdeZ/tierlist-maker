@@ -85,7 +85,7 @@ export async function requirePermission(event, permissionKey, leagueId = null) {
         JOIN role_permissions rp ON rp.role_id = ur.role_id
         WHERE ur.user_id = ${user.id}
           AND rp.permission_key = ${permissionKey}
-          AND (ur.league_id IS NULL ${leagueId ? sql`OR ur.league_id = ${leagueId}` : sql``})
+          ${leagueId ? sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})` : sql``}
         LIMIT 1
     `
 
@@ -114,7 +114,7 @@ export async function requireAnyPermission(event, permissionKeys, leagueId = nul
             JOIN role_permissions rp ON rp.role_id = ur.role_id
             WHERE ur.user_id = ${user.id}
               AND rp.permission_key = ${permissionKey}
-              AND (ur.league_id IS NULL ${leagueId ? sql`OR ur.league_id = ${leagueId}` : sql``})
+              ${leagueId ? sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})` : sql``}
             LIMIT 1
         `
         if (has) return { user, permissionKey }
