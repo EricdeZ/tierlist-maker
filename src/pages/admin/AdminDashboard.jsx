@@ -158,6 +158,33 @@ export default function AdminDashboard() {
 
     useEffect(() => { fetchReadyMatches() }, [fetchReadyMatches])
 
+    const unlinkReadyMatch = useCallback(async (matchId) => {
+        if (!confirm('Unlink all screenshots from this match? They will move back to unmatched in Discord Review.')) return
+        try {
+            // Fetch queue item IDs for this match, then unlink them all
+            const queueRes = await fetch(
+                `${API}/discord-queue?action=queue&suggestedMatchId=${matchId}`,
+                { headers: getAuthHeaders() },
+            )
+            if (!queueRes.ok) return
+            const queueData = await queueRes.json()
+            const itemIds = (queueData.items || []).map(i => i.id)
+            if (!itemIds.length) return
+
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    action: 'update-suggested-match',
+                    queue_item_ids: itemIds,
+                    scheduled_match_id: null,
+                }),
+            })
+            if (!res.ok) throw new Error('Failed to unlink')
+            fetchReadyMatches()
+        } catch { /* silent */ }
+    }, [fetchReadyMatches])
+
     const startReadyReport = useCallback(async (readyMatch) => {
         setReadyMatchLoading(true)
         try {
@@ -685,17 +712,40 @@ export default function AdminDashboard() {
                         Ready to Report
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {readyMatches.map(rm => (
-                            <div key={rm.id} className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors">
+                        {readyMatches.map(rm => {
+                            const conf = rm.match_confidence || 'unknown'
+                            const isLow = conf === 'low'
+                            const isMedium = conf === 'medium'
+                            const confColor = isLow ? 'text-red-400' : isMedium ? 'text-amber-400' : 'text-green-400'
+                            const confBorder = isLow ? 'border-red-500/50' : isMedium ? 'border-amber-500/30' : 'border-[var(--color-border)]'
+                            const confLabel = isLow ? 'Low match' : isMedium ? 'Likely match' : 'Strong match'
+                            return (
+                            <div key={rm.id} className={`bg-[var(--color-card)] border rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors ${confBorder}`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                                        <span className={`w-2.5 h-2.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
                                         <span className="text-xs text-[var(--color-text-secondary)]">
                                             {rm.screenshot_count} screenshot{rm.screenshot_count !== 1 ? 's' : ''}
                                         </span>
                                     </div>
-                                    {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Week {rm.week}</span>}
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-semibold uppercase tracking-wide ${confColor}`} title={
+                                            isLow ? 'Matched by date only or weak signals — verify teams are correct'
+                                            : isMedium ? 'One team confirmed — double-check the opponent'
+                                            : 'Both teams confirmed via Discord roles or text'
+                                        }>
+                                            {confLabel}
+                                        </span>
+                                        {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Wk {rm.week}</span>}
+                                    </div>
                                 </div>
+                                {isLow && (
+                                    <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
+                                        <p className="text-[10px] text-red-400">
+                                            Needs review — verify this is the correct match before reporting
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team1_color }} />
                                     <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team1_name}</span>
@@ -707,20 +757,31 @@ export default function AdminDashboard() {
                                     <span className="text-xs text-[var(--color-text-secondary)]">
                                         {rm.division_name} &middot; {new Date(rm.scheduled_date).toLocaleDateString()}
                                     </span>
-                                    <button
-                                        onClick={() => startReadyReport(rm)}
-                                        disabled={readyMatchLoading}
-                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
-                                    >
-                                        Report Match
-                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => unlinkReadyMatch(rm.id)}
+                                            disabled={readyMatchLoading}
+                                            className="px-2 py-1 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-red-500/50 hover:text-red-400 disabled:opacity-50 transition"
+                                            title="Unlink screenshots from this match"
+                                        >
+                                            Unlink
+                                        </button>
+                                        <button
+                                            onClick={() => startReadyReport(rm)}
+                                            disabled={readyMatchLoading}
+                                            className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
+                                        >
+                                            Report Match
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
                     <div className="mt-2 px-1">
                         <p className="text-[10px] text-[var(--color-text-secondary)] italic">
-                            Auto-matched from Discord screenshots. Click to start reporting — select only DETAILS page screenshots for AI extraction.
+                            Auto-matched from Discord screenshots. <span className="text-red-400 not-italic font-medium">Red cards</span> have weak matches — verify the correct game before reporting.
                         </p>
                     </div>
                 </div>

@@ -469,7 +469,15 @@ async function getReadyMatches(sql) {
                d.name as division_name, l.name as league_name,
                COUNT(dq.id)::int as screenshot_count,
                MIN(dq.message_timestamp) as first_screenshot_at,
-               MAX(dq.message_timestamp) as last_screenshot_at
+               MAX(dq.message_timestamp) as last_screenshot_at,
+               MIN(CASE dq.match_confidence
+                   WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3
+                   ELSE 0 END) as confidence_rank,
+               CASE MIN(CASE dq.match_confidence
+                   WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3
+                   ELSE 0 END)
+                   WHEN 1 THEN 'low' WHEN 2 THEN 'medium' WHEN 3 THEN 'high'
+                   ELSE 'unknown' END as match_confidence
         FROM scheduled_matches sm
         JOIN teams t1 ON sm.team1_id = t1.id
         JOIN teams t2 ON sm.team2_id = t2.id
@@ -482,7 +490,10 @@ async function getReadyMatches(sql) {
                  sm.scheduled_date, sm.week, sm.best_of,
                  t1.name, t1.color, t2.name, t2.color,
                  d.name, l.name
-        ORDER BY sm.scheduled_date DESC
+        ORDER BY MIN(CASE dq.match_confidence
+                     WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3
+                     ELSE 0 END) ASC,
+                 sm.scheduled_date DESC
     `
 
     return { statusCode: 200, headers, body: JSON.stringify({ matches }) }
