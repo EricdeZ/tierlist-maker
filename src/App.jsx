@@ -55,6 +55,7 @@ import FeaturedStream from "./pages/FeaturedStream.jsx"
 import AGLSignup from "./pages/AGLSignup.jsx";
 import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
+import FantasyForge from "./pages/FantasyForge.jsx";
 
 function App() {
     return (
@@ -98,6 +99,7 @@ function App() {
                             <Route path="shop" element={<PassionShop />} />
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
+                            <Route path="forge" element={<FantasyForge />} />
 
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />

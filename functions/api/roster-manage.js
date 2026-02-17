@@ -479,6 +479,10 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin) {
               )
         `
 
+        // Re-point any user links and claim requests from source → target
+        await tx`UPDATE users SET linked_player_id = ${target_player_id} WHERE linked_player_id = ${source_player_id}`
+        await tx`UPDATE claim_requests SET player_id = ${target_player_id} WHERE player_id = ${source_player_id}`
+
         // Delete the source player (CASCADE cleans up remaining aliases)
         await tx`DELETE FROM players WHERE id = ${source_player_id}`
 

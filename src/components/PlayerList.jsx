@@ -533,13 +533,11 @@ const PlayerList = () => {
             </div>}
 
             {/* Summary Stats */}
-            {hasData && <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {hasData && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {[
                     { label: 'Total Kills', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.kills, 0) },
-                    { label: 'Total Deaths', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.deaths, 0) },
                     { label: 'Total Assists', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.assists, 0) },
                     { label: 'Average KDA', value: filteredAndSortedPlayers.length > 0 ? (filteredAndSortedPlayers.reduce((sum, p) => sum + p.kda, 0) / filteredAndSortedPlayers.length).toFixed(2) : '0.00' },
-                    { label: 'Average Win Rate', value: filteredAndSortedPlayers.length > 0 ? (filteredAndSortedPlayers.reduce((sum, p) => sum + p.winRate, 0) / filteredAndSortedPlayers.length).toFixed(0) + '%' : '0%' },
                     { label: 'Total Damage', value: formatNumber(filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.damage, 0)) },
                     { label: 'Total Mitigated', value: formatNumber(filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.mitigated, 0)) },
                 ].map(stat => (

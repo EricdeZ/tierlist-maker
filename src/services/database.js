@@ -298,6 +298,36 @@ export const orgService = {
     },
 }
 
+export const forgeService = {
+    async getMarket(seasonId) {
+        return apiCall('forge', { action: 'market', seasonId })
+    },
+
+    async getPortfolio(seasonId) {
+        return apiCall('forge', { action: 'portfolio', seasonId })
+    },
+
+    async getLeaderboard(seasonId) {
+        return apiCall('forge', { action: 'leaderboard', seasonId })
+    },
+
+    async getHistory(sparkId) {
+        return apiCall('forge', { action: 'history', sparkId })
+    },
+
+    async fuel(sparkId, sparks) {
+        return apiPost('forge', { action: 'fuel' }, { sparkId, sparks })
+    },
+
+    async cool(sparkId, sparks) {
+        return apiPost('forge', { action: 'cool' }, { sparkId, sparks })
+    },
+
+    async liquidate(seasonId) {
+        return apiPost('forge', { action: 'liquidate' }, { seasonId })
+    },
+}
+
 export const predictionsService = {
     async getUpcoming(filters = {}) {
         return apiCall('predictions', { action: 'upcoming', ...filters })

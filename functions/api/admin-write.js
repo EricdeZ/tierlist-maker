@@ -4,6 +4,7 @@ import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { updateMatchChallenges } from '../lib/challenges.js'
 import { resolvePredictions } from '../lib/predictions.js'
+import { updateForgeAfterMatch } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -207,6 +208,10 @@ async function submitMatch(sql, body, admin) {
             resolvePredictions(sql, scheduled_match_id, winnerTeamId)
                 .catch(err => console.error('Prediction resolution failed:', err))
         }
+
+        // Update Fantasy Forge player prices based on match performance (fire-and-forget)
+        updateForgeAfterMatch(sql, result.match_id)
+            .catch(err => console.error('Forge price update failed:', err))
 
         return {
             statusCode: 200,

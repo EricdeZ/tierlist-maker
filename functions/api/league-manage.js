@@ -3,6 +3,7 @@ import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { invalidatePerformanceChallenges } from '../lib/challenges.js'
+import { liquidateMarketBySeason } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -249,6 +250,9 @@ async function toggleSeason(sql, { id, is_active }, admin) {
     if (!is_active) {
         reevaluateSeasonChallenges(sql, id)
             .catch(err => console.error('Season challenge re-evaluation failed:', err))
+        // Liquidate Fantasy Forge market for this season (fire-and-forget)
+        liquidateMarketBySeason(sql, id)
+            .catch(err => console.error('Forge liquidation failed:', err))
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
@@ -278,6 +282,10 @@ async function endSeason(sql, { id }, admin, event) {
     // Re-evaluate season-based challenges for all players in this season
     reevaluateSeasonChallenges(sql, id)
         .catch(err => console.error('Season end challenge re-evaluation failed:', err))
+
+    // Liquidate Fantasy Forge market for this season (fire-and-forget)
+    liquidateMarketBySeason(sql, id)
+        .catch(err => console.error('Forge liquidation failed:', err))
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, season: row }) }
 }
