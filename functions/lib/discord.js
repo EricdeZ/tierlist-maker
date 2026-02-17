@@ -258,7 +258,7 @@ export async function syncBanList(sql, config) {
 
     await sql`
         INSERT INTO banned_content (league_id, channel_id, message_id, raw_content, parsed_data, last_synced_at)
-        VALUES (${config.league_id}, ${config.channel_id}, ${msg.id}, ${msg.content}, ${sql.json(parsed)}, NOW())
+        VALUES (${config.league_id}, ${config.channel_id}, ${msg.id}, ${msg.content}, ${JSON.stringify(parsed)}, NOW())
         ON CONFLICT (league_id) DO UPDATE SET
             message_id = EXCLUDED.message_id,
             raw_content = EXCLUDED.raw_content,
