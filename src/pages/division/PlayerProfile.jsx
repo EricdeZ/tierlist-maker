@@ -78,6 +78,7 @@ function aggregateGodStats(games, godsList) {
                 ? g.kills + (g.assists / 2)
                 : (g.kills + (g.assists / 2)) / g.deaths,
             avgDamage: g.games > 0 ? g.damage / g.games : 0,
+            avgMitigated: g.games > 0 ? g.mitigated / g.games : 0,
         }))
         .sort((a, b) => b.games - a.games)
 }
@@ -107,7 +108,10 @@ const GodPool = ({ godStats }) => {
                                     {god.winRate.toFixed(0)}% WR
                                 </span>
                                 <span>{god.kda.toFixed(1)} KDA</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-(--color-text-secondary)">
                                 <span>{formatNumber(god.avgDamage)} dmg</span>
+                                <span>{formatNumber(god.avgMitigated)} mit</span>
                             </div>
                         </div>
                     </div>
