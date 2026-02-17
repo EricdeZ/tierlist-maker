@@ -6,6 +6,7 @@ import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import ClaimProfileModal from '../ClaimProfileModal'
 import ReportDataIssueModal from '../ReportDataIssueModal'
+import ReporterBell from '../ReporterBell'
 import SidebarTrigger from './SidebarTrigger'
 import GlobalSidebar from './GlobalSidebar'
 
@@ -27,6 +28,7 @@ const AppLayout = () => {
                 {/* Global user menu — top right, hidden on pages with their own navbar */}
                 {!loading && !hasOwnNav && (
                     <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2">
+                        <ReporterBell />
                         {user && <PassionDisplay />}
                         <UserMenu />
                     </div>
