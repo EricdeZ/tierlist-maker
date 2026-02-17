@@ -1,6 +1,6 @@
 // src/pages/admin/PlayerManager.jsx
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { ExternalLink, Download, Search, X, ChevronDown, ChevronRight, Check, Users } from 'lucide-react'
+import { ExternalLink, Download, Search, X, ChevronDown, ChevronRight, Check, Users, Tag, Plus, Trash2, Merge, AlertTriangle } from 'lucide-react'
 import { PlayerManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
@@ -32,6 +32,14 @@ export default function PlayerManager() {
     // Edit modal
     const [editPlayer, setEditPlayer] = useState(null) // { id, name, discord_name, tracker_url }
     const [editSaving, setEditSaving] = useState(false)
+
+    // Alias modal
+    const [aliasPlayer, setAliasPlayer] = useState(null) // enriched player object
+    const [aliasSaving, setAliasSaving] = useState(false)
+
+    // Merge modal
+    const [showMerge, setShowMerge] = useState(false)
+    const [merging, setMerging] = useState(false)
 
     // Expanded player row
     const [expandedId, setExpandedId] = useState(null)
@@ -158,6 +166,7 @@ export default function PlayerManager() {
                 case 'games': av = a.totalGames; bv = b.totalGames; break
                 case 'seasons': av = a.seasonsPlayed; bv = b.seasonsPlayed; break
                 case 'discord': av = a.discord_name?.toLowerCase() || 'zzz'; bv = b.discord_name?.toLowerCase() || 'zzz'; break
+                case 'aliases': av = a.aliases.length; bv = b.aliases.length; break
                 default: av = a.name.toLowerCase(); bv = b.name.toLowerCase()
             }
             if (av < bv) return sortDir === 'asc' ? -1 : 1
@@ -263,6 +272,78 @@ export default function PlayerManager() {
             showToast('error', e.message)
         } finally {
             setEditSaving(false)
+        }
+    }
+
+    // Keep aliasPlayer in sync after data refresh
+    useEffect(() => {
+        if (aliasPlayer && enrichedPlayers.length > 0) {
+            const updated = enrichedPlayers.find(p => p.id === aliasPlayer.id)
+            if (updated) setAliasPlayer(updated)
+        }
+    }, [enrichedPlayers])
+
+    // ─── Alias management (calls roster-manage endpoint) ───
+    const handleAddAlias = async (playerId, alias) => {
+        setAliasSaving(true)
+        try {
+            const res = await fetch(`${API}/roster-manage`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'add-alias', player_id: playerId, alias }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.error)
+            showToast('success', `Added alias "${alias}"`)
+            fetchData()
+        } catch (e) {
+            showToast('error', e.message)
+        } finally {
+            setAliasSaving(false)
+        }
+    }
+
+    const handleRemoveAlias = async (aliasId, aliasName) => {
+        setAliasSaving(true)
+        try {
+            const res = await fetch(`${API}/roster-manage`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'remove-alias', alias_id: aliasId }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.error)
+            showToast('success', `Removed alias "${aliasName}"`)
+            fetchData()
+        } catch (e) {
+            showToast('error', e.message)
+        } finally {
+            setAliasSaving(false)
+        }
+    }
+
+    // ─── Merge players (calls roster-manage endpoint) ───
+    const handleMerge = async (sourceId, targetId) => {
+        setMerging(true)
+        try {
+            const res = await fetch(`${API}/roster-manage`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    action: 'merge-player',
+                    source_player_id: sourceId,
+                    target_player_id: targetId,
+                }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.error)
+            showToast('success', `Merged "${result.source_name}" into "${result.target_name}" — ${result.stats_reassigned || 0} stats moved`)
+            setShowMerge(false)
+            fetchData()
+        } catch (e) {
+            showToast('error', e.message)
+        } finally {
+            setMerging(false)
         }
     }
 
@@ -411,6 +492,16 @@ export default function PlayerManager() {
                         ))}
                     </select>
 
+                    {/* Merge */}
+                    <button
+                        onClick={() => setShowMerge(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                        title="Merge duplicate players"
+                    >
+                        <Merge className="w-4 h-4" />
+                        Merge
+                    </button>
+
                     {/* Export */}
                     <button
                         onClick={handleExportCSV}
@@ -467,6 +558,7 @@ export default function PlayerManager() {
                                 <SortHeader col="role" label="Role" current={sortCol} dir={sortDir} onSort={handleSort} />
                                 <SortHeader col="seasons" label="Seasons" current={sortCol} dir={sortDir} onSort={handleSort} />
                                 <SortHeader col="games" label="Games" current={sortCol} dir={sortDir} onSort={handleSort} />
+                                <SortHeader col="aliases" label="Aliases" current={sortCol} dir={sortDir} onSort={handleSort} />
                                 <th className="px-3 py-2.5 text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase">Links</th>
                                 <th className="px-3 py-2.5 text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase w-10"></th>
                             </tr>
@@ -474,7 +566,7 @@ export default function PlayerManager() {
                         <tbody>
                             {filteredPlayers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">
+                                    <td colSpan={10} className="px-4 py-8 text-center text-[var(--color-text-secondary)]">
                                         No players match your filters.
                                     </td>
                                 </tr>
@@ -487,6 +579,7 @@ export default function PlayerManager() {
                                     onToggleSelect={() => toggleSelect(p.id)}
                                     onToggleExpand={() => setExpandedId(prev => prev === p.id ? null : p.id)}
                                     onEdit={() => setEditPlayer({ id: p.id, name: p.name, discord_name: p.discord_name || '', tracker_url: p.tracker_url || '', main_role: p.main_role || '', secondary_role: p.secondary_role || '' })}
+                                    onOpenAliases={() => setAliasPlayer(p)}
                                 />
                             ))}
                         </tbody>
@@ -584,6 +677,27 @@ export default function PlayerManager() {
                     saving={editSaving}
                 />
             )}
+
+            {/* Alias Modal */}
+            {aliasPlayer && (
+                <AliasModal
+                    player={aliasPlayer}
+                    onAdd={handleAddAlias}
+                    onRemove={handleRemoveAlias}
+                    onClose={() => setAliasPlayer(null)}
+                    saving={aliasSaving}
+                />
+            )}
+
+            {/* Merge Modal */}
+            {showMerge && (
+                <MergeModal
+                    players={enrichedPlayers}
+                    onClose={() => setShowMerge(false)}
+                    onMerge={handleMerge}
+                    merging={merging}
+                />
+            )}
         </div>
     )
 }
@@ -609,7 +723,7 @@ function SortHeader({ col, label, current, dir, onSort }) {
 // ═══════════════════════════════════════════════════
 // PLAYER ROW
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggleExpand, onEdit }) {
+function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggleExpand, onEdit, onOpenAliases }) {
     const roleColors = {
         solo: 'bg-orange-500/20 text-orange-400',
         jungle: 'bg-red-500/20 text-red-400',
@@ -646,11 +760,6 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                         {p.isFreeAgent && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 font-medium">FA</span>
                         )}
-                        {p.aliases.length > 0 && (
-                            <span className="text-[10px] text-[var(--color-text-secondary)]" title={p.aliases.map(a => a.alias).join(', ')}>
-                                aka {p.aliases[0].alias}{p.aliases.length > 1 ? ` +${p.aliases.length - 1}` : ''}
-                            </span>
-                        )}
                     </div>
                 </td>
                 <td className="px-3 py-2 text-[var(--color-text-secondary)]">
@@ -675,6 +784,24 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                 </td>
                 <td className="px-3 py-2 text-[var(--color-text-secondary)] tabular-nums">{p.seasonsPlayed}</td>
                 <td className="px-3 py-2 text-[var(--color-text-secondary)] tabular-nums">{p.totalGames}</td>
+                <td className="px-3 py-2">
+                    <button
+                        onClick={onOpenAliases}
+                        className="flex items-center gap-1.5 text-xs group"
+                        title={p.aliases.length > 0 ? p.aliases.map(a => a.alias).join(', ') : 'No aliases — click to add'}
+                    >
+                        <Tag className="w-3 h-3 text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)] transition-colors" />
+                        {p.aliases.length > 0 ? (
+                            <span className="text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)] transition-colors tabular-nums">
+                                {p.aliases.length}
+                            </span>
+                        ) : (
+                            <span className="text-[var(--color-text-secondary)] opacity-30 group-hover:opacity-100 group-hover:text-[var(--color-accent)] transition-all">
+                                0
+                            </span>
+                        )}
+                    </button>
+                </td>
                 <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                         {p.tracker_url && (
@@ -704,7 +831,7 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
             {/* Expanded detail */}
             {isExpanded && (
                 <tr className="border-b border-white/5">
-                    <td colSpan={9} className="px-4 py-3 bg-white/[0.01]">
+                    <td colSpan={10} className="px-4 py-3 bg-white/[0.01]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Contact info */}
                             <div>
@@ -846,6 +973,356 @@ function EditInfoModal({ player, onChange, onSave, onClose, saving }) {
                     >
                         {saving ? 'Saving...' : 'Save'}
                     </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════
+// ALIAS MODAL
+// ═══════════════════════════════════════════════════
+function AliasModal({ player, onAdd, onRemove, onClose, saving }) {
+    const [newAlias, setNewAlias] = useState('')
+    const [editingId, setEditingId] = useState(null)
+    const [editValue, setEditValue] = useState('')
+    const inputRef = useRef(null)
+    useEffect(() => { inputRef.current?.focus() }, [])
+
+    const handleAdd = () => {
+        const trimmed = newAlias.trim()
+        if (trimmed.length < 2) return
+        if (trimmed.toLowerCase() === player.name.toLowerCase()) return
+        onAdd(player.id, trimmed)
+        setNewAlias('')
+    }
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') handleAdd()
+    }
+
+    const startEdit = (alias) => {
+        setEditingId(alias.alias_id)
+        setEditValue(alias.alias)
+    }
+
+    const handleSaveEdit = async () => {
+        const trimmed = editValue.trim()
+        if (trimmed.length < 2 || trimmed.toLowerCase() === player.name.toLowerCase()) {
+            setEditingId(null)
+            return
+        }
+        const alias = player.aliases.find(a => a.alias_id === editingId)
+        if (!alias || trimmed === alias.alias) {
+            setEditingId(null)
+            return
+        }
+        // Remove old, add new
+        await onRemove(editingId, alias.alias)
+        await onAdd(player.id, trimmed)
+        setEditingId(null)
+        setEditValue('')
+    }
+
+    const handleEditKeyDown = (e) => {
+        if (e.key === 'Enter') handleSaveEdit()
+        if (e.key === 'Escape') setEditingId(null)
+    }
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-[var(--color-text)]">
+                        Aliases — {player.name}
+                    </h3>
+                    <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                        {player.aliases.length} alias{player.aliases.length !== 1 ? 'es' : ''}
+                    </span>
+                </div>
+
+                {/* Existing aliases */}
+                <div className="space-y-1.5 mb-4">
+                    {player.aliases.length === 0 ? (
+                        <p className="text-xs text-[var(--color-text-secondary)] opacity-50 py-2">No aliases yet. Add one below.</p>
+                    ) : player.aliases.map(a => (
+                        <div key={a.alias_id} className="flex items-center gap-2 group">
+                            {editingId === a.alias_id ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={editValue}
+                                        onChange={e => setEditValue(e.target.value)}
+                                        onKeyDown={handleEditKeyDown}
+                                        onBlur={() => setEditingId(null)}
+                                        autoFocus
+                                        className="flex-1 rounded-lg px-2.5 py-1.5 text-sm border"
+                                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.2)' }}
+                                    />
+                                    <button
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={handleSaveEdit}
+                                        className="text-green-400 hover:text-green-300 transition-colors p-1"
+                                        title="Save"
+                                    >
+                                        <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <span
+                                        className="flex-1 text-sm text-[var(--color-text)] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+                                        onClick={() => startEdit(a)}
+                                        title="Click to edit"
+                                    >
+                                        {a.alias}
+                                    </span>
+                                    <button
+                                        onClick={() => onRemove(a.alias_id, a.alias)}
+                                        disabled={saving}
+                                        className="text-[var(--color-text-secondary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 disabled:opacity-30"
+                                        title="Remove alias"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Add new alias */}
+                <div className="flex items-center gap-2">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={newAlias}
+                        onChange={e => setNewAlias(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Add new alias..."
+                        className="flex-1 rounded-lg px-3 py-2 text-sm border"
+                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                    />
+                    <button
+                        onClick={handleAdd}
+                        disabled={saving || newAlias.trim().length < 2}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add
+                    </button>
+                </div>
+
+                <div className="flex justify-end mt-5">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-1.5 rounded-lg text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════
+// MERGE MODAL
+// ═══════════════════════════════════════════════════
+function MergeModal({ players, onClose, onMerge, merging }) {
+    const [sourceQuery, setSourceQuery] = useState('')
+    const [targetQuery, setTargetQuery] = useState('')
+    const [sourcePlayer, setSourcePlayer] = useState(null)
+    const [targetPlayer, setTargetPlayer] = useState(null)
+    const [showSourceDropdown, setShowSourceDropdown] = useState(false)
+    const [showTargetDropdown, setShowTargetDropdown] = useState(false)
+    const [confirmed, setConfirmed] = useState(false)
+    const sourceRef = useRef(null)
+    const targetRef = useRef(null)
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (sourceRef.current && !sourceRef.current.contains(e.target)) setShowSourceDropdown(false)
+            if (targetRef.current && !targetRef.current.contains(e.target)) setShowTargetDropdown(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    const filterPlayers = (query, excludeId) => {
+        const q = query.trim().toLowerCase()
+        if (q.length < 2) return []
+        return players
+            .filter(p => {
+                if (excludeId && p.id === excludeId) return false
+                return p.name.toLowerCase().includes(q) ||
+                    p.aliases.some(a => a.alias.toLowerCase().includes(q))
+            })
+            .slice(0, 10)
+    }
+
+    const sourceResults = filterPlayers(sourceQuery, targetPlayer?.id)
+    const targetResults = filterPlayers(targetQuery, sourcePlayer?.id)
+
+    const handleMerge = () => {
+        if (!sourcePlayer || !targetPlayer) return
+        onMerge(sourcePlayer.id, targetPlayer.id)
+    }
+
+    const renderSearchField = (config) => {
+        const { label, labelColor, borderColor, bgColor, player, query, setQuery, setPlayer, showDropdown, setShowDropdown, results, fieldRef, focusColor } = config
+        return (
+            <div ref={fieldRef} className="relative">
+                <label className={`block text-xs font-medium ${labelColor} mb-1`}>{label}</label>
+                {player ? (
+                    <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${bgColor} border ${borderColor}`}>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-[var(--color-text)]">{player.name}</span>
+                            {player.aliases.length > 0 && (
+                                <span className="text-[10px] text-[var(--color-text-secondary)]">
+                                    ({player.aliases.length} alias{player.aliases.length !== 1 ? 'es' : ''})
+                                </span>
+                            )}
+                            {player.totalGames > 0 && (
+                                <span className="text-[10px] text-[var(--color-text-secondary)]">
+                                    {player.totalGames}g
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => { setPlayer(null); setQuery(''); setConfirmed(false) }}
+                            className={`text-xs ${labelColor} hover:opacity-75`}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={e => { setQuery(e.target.value); setShowDropdown(true); setConfirmed(false) }}
+                            onFocus={() => setShowDropdown(true)}
+                            placeholder="Search player name or alias..."
+                            className={`w-full rounded-lg px-3 py-2 text-sm border focus:outline-none focus:ring-1 ${focusColor}`}
+                            style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                        />
+                        {showDropdown && results.length > 0 && (
+                            <div
+                                className="absolute z-50 top-full left-0 mt-1 w-full border rounded-lg shadow-xl max-h-48 overflow-y-auto"
+                                style={{ backgroundColor: 'var(--color-primary)', borderColor: 'rgba(255,255,255,0.1)' }}
+                            >
+                                {results.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => { setPlayer(p); setShowDropdown(false); setQuery('') }}
+                                        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text)] hover:bg-white/5 transition-colors flex items-center justify-between"
+                                    >
+                                        <span>{p.name}</span>
+                                        <span className="text-[var(--color-text-secondary)] text-[10px]">
+                                            {p.totalGames}g · {p.seasonsPlayed}s
+                                            {p.aliases.length > 0 && ` · ${p.aliases.length} alias`}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        )
+    }
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-base font-bold text-[var(--color-text)] flex items-center gap-2">
+                            <Merge className="w-4 h-4" />
+                            Merge Players
+                        </h3>
+                        <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+                            Merge a duplicate player's stats and aliases into the real player
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-lg">✕</button>
+                </div>
+
+                <div className="px-5 py-4 space-y-4">
+                    {renderSearchField({
+                        label: 'Duplicate Player (will be deleted)',
+                        labelColor: 'text-red-400',
+                        borderColor: 'border-red-500/20',
+                        bgColor: 'bg-red-500/10',
+                        focusColor: 'focus:ring-red-500/50',
+                        player: sourcePlayer,
+                        query: sourceQuery,
+                        setQuery: setSourceQuery,
+                        setPlayer: setSourcePlayer,
+                        showDropdown: showSourceDropdown,
+                        setShowDropdown: setShowSourceDropdown,
+                        results: sourceResults,
+                        fieldRef: sourceRef,
+                    })}
+
+                    <div className="text-center text-[var(--color-text-secondary)] text-lg">↓ merge into ↓</div>
+
+                    {renderSearchField({
+                        label: 'Real Player (will keep)',
+                        labelColor: 'text-green-400',
+                        borderColor: 'border-green-500/20',
+                        bgColor: 'bg-green-500/10',
+                        focusColor: 'focus:ring-green-500/50',
+                        player: targetPlayer,
+                        query: targetQuery,
+                        setQuery: setTargetQuery,
+                        setPlayer: setTargetPlayer,
+                        showDropdown: showTargetDropdown,
+                        setShowDropdown: setShowTargetDropdown,
+                        results: targetResults,
+                        fieldRef: targetRef,
+                    })}
+
+                    {/* Summary & confirm */}
+                    {sourcePlayer && targetPlayer && (
+                        <div className="border-t border-white/10 pt-3 space-y-3">
+                            <div className="text-xs text-[var(--color-text-secondary)] bg-white/5 rounded-lg px-3 py-2 space-y-1">
+                                <div>
+                                    <strong className="text-red-400">{sourcePlayer.name}</strong> will be deleted.
+                                    All their stats ({sourcePlayer.totalGames} games) will be moved to <strong className="text-green-400">{targetPlayer.name}</strong>.
+                                </div>
+                                <div className="text-[10px]">
+                                    "{sourcePlayer.name}" will be saved as an alias.
+                                    {sourcePlayer.aliases.length > 0 && ` ${sourcePlayer.aliases.length} existing alias${sourcePlayer.aliases.length !== 1 ? 'es' : ''} will also transfer.`}
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-2 text-[10px] text-yellow-400/80 bg-yellow-500/5 rounded-lg px-3 py-2">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                <span>This action cannot be undone. Make sure you have the right players selected.</span>
+                            </div>
+
+                            {!confirmed ? (
+                                <button
+                                    onClick={() => setConfirmed(true)}
+                                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-yellow-600 text-white hover:bg-yellow-500 transition-colors"
+                                >
+                                    Confirm Merge
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleMerge}
+                                    disabled={merging}
+                                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 transition-colors"
+                                >
+                                    {merging ? 'Merging...' : 'Yes, Merge & Delete Duplicate'}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
