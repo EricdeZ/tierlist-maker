@@ -135,14 +135,18 @@ async function finalizeExpiredSession(sql) {
 }
 
 async function pickNextStreamer(sql) {
-    // Fairness: lowest ratio of featured_seconds / time_since_purchase
+    // Fairness: whoever has the fewest featured seconds in the last 7 days goes next.
+    // Tiebreaker: older registration wins.
     const [next] = await sql`
-        SELECT id, user_id, twitch_channel, total_featured_seconds, created_at
-        FROM featured_streamers
-        WHERE is_active = true
-        ORDER BY
-            total_featured_seconds::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)), 3600) ASC,
-            created_at ASC
+        SELECT fs.id, fs.user_id, fs.twitch_channel, fs.total_featured_seconds, fs.created_at,
+               COALESCE(SUM(fsl.seconds_credited), 0) AS recent_seconds
+        FROM featured_streamers fs
+        LEFT JOIN featured_session_log fsl
+            ON fsl.streamer_id = fs.id
+            AND fsl.created_at > NOW() - INTERVAL '7 days'
+        WHERE fs.is_active = true
+        GROUP BY fs.id
+        ORDER BY recent_seconds ASC, fs.created_at ASC
         LIMIT 1
     `
     if (!next) return null
@@ -234,13 +238,16 @@ async function getQueue(sql, event) {
     const rows = await sql`
         SELECT fs.id, fs.user_id, fs.twitch_channel, fs.total_featured_seconds,
                fs.is_active, fs.current_session_start, fs.created_at,
-               COALESCE(fs.display_name, u.discord_username) as display_name
+               COALESCE(fs.display_name, u.discord_username) as display_name,
+               COALESCE(SUM(fsl.seconds_credited), 0) AS recent_seconds
         FROM featured_streamers fs
         LEFT JOIN users u ON u.id = fs.user_id
+        LEFT JOIN featured_session_log fsl
+            ON fsl.streamer_id = fs.id
+            AND fsl.created_at > NOW() - INTERVAL '7 days'
         WHERE fs.is_active = true
-        ORDER BY
-            fs.total_featured_seconds::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - fs.created_at)), 3600) ASC,
-            fs.created_at ASC
+        GROUP BY fs.id, u.discord_username
+        ORDER BY recent_seconds ASC, fs.created_at ASC
     `
 
     return {
@@ -254,6 +261,7 @@ async function getQueue(sql, event) {
                 channel: r.twitch_channel,
                 displayName: r.display_name || r.twitch_channel,
                 totalFeaturedSeconds: r.total_featured_seconds,
+                recentSeconds: parseInt(r.recent_seconds),
                 isCurrent: !!r.current_session_start,
                 createdAt: r.created_at,
             })),
@@ -328,6 +336,12 @@ async function heartbeat(sql, body) {
             last_heartbeat = NOW()
         WHERE id = ${streamer_id}
     `
+
+    // Log for 7-day rolling window (fire-and-forget)
+    sql`
+        INSERT INTO featured_session_log (streamer_id, seconds_credited)
+        VALUES (${streamer_id}, ${HEARTBEAT_CREDIT_S})
+    `.catch(() => {})
 
     return { statusCode: 200, headers, body: JSON.stringify({ accepted: true }) }
 }
