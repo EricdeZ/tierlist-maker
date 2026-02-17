@@ -290,13 +290,16 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
     const applyAllByStat = useCallback((statType) => {
         if (!teams || statType === 'none') return
 
-        // Gather all players grouped by their primary role
+        // Gather all players grouped by their primary role (skip players with 0 games)
         const byRole = { SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] }
         for (const team of teams) {
             for (const p of team.playersWithRoles || []) {
                 const role = p.role?.toUpperCase()
                 if (role && byRole[role]) {
-                    byRole[role].push(p.name)
+                    const stats = statsMap.get(p.name)
+                    if (stats && stats.stats.gamesPlayed > 0) {
+                        byRole[role].push(p.name)
+                    }
                 }
             }
         }
@@ -323,7 +326,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
         setSelectedStat(statType)
         setLockedStats(newLocked)
         setApplyAllOpen(false)
-    }, [teams, getNumericStatValue])
+    }, [teams, statsMap, getNumericStatValue])
 
     const [applyPlacedOpen, setApplyPlacedOpen] = useState(false)
     const applyPlacedRef = useRef(null)
