@@ -1,11 +1,12 @@
 // src/components/PlayerList.jsx - Refactored to use DivisionContext via usePlayerStats
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePlayerStats } from '../hooks/usePlayerStats'
 import { useDivision } from '../context/DivisionContext'
 import { ChevronRight } from 'lucide-react'
 import PlayerSearch from './PlayerSearch'
 import TeamLogo from './TeamLogo'
+import { godService } from '../services/database'
 
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
@@ -20,15 +21,31 @@ const PlayerList = () => {
     const basePath = `/${leagueSlug}/${divisionSlug}`
 
     // Get raw players/teams from context for slug lookups
-    const { players: rawPlayers, teams: rawTeams } = useDivision()
+    const { players: rawPlayers, teams: rawTeams, league, division } = useDivision()
 
     const [searchTerm, setSearchTerm] = useState('')
     const [sortBy, setSortBy] = useState('name')
     const [sortMode, setSortMode] = useState('asc') // 'asc' | 'desc' | 'perGameDesc'
     const [roleFilter, setRoleFilter] = useState('all')
     const [teamFilter, setTeamFilter] = useState('all')
+    const [gods, setGods] = useState([])
 
     const showPerGame = sortMode === 'perGameDesc'
+    const leagueColor = league?.color || '#6366f1'
+
+    useEffect(() => {
+        godService.getAll()
+            .then(data => setGods(data))
+            .catch(() => {})
+    }, [])
+
+    // Pick a stable spread of gods for the banner decoration
+    const bannerGods = useMemo(() => {
+        if (gods.length === 0) return []
+        const count = 16
+        const step = Math.floor(gods.length / count)
+        return Array.from({ length: count }, (_, i) => gods[i * step]).filter(Boolean)
+    }, [gods])
 
     const roleImages = {
         'SOLO': soloImage,
@@ -157,100 +174,185 @@ const PlayerList = () => {
         return [...new Set(processedPlayers.map(p => p.team.name))]
     }, [processedPlayers])
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center p-8">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-accent) mx-auto mb-4"></div>
-                    <p className="text-(--color-text-secondary)">Loading player statistics...</p>
-                </div>
-            </div>
-        )
-    }
+    // God image positions — spread across banner, varied sizes and rotation
+    const godPositions = [
+        // Top row
+        { left: '1%',   top: '5%',  size: 56, rotate: -12 },
+        { left: '13%',  top: '8%',  size: 42, rotate: 6 },
+        { left: '27%',  top: '3%',  size: 38, rotate: -5 },
+        { right: '28%', top: '6%',  size: 40, rotate: 10 },
+        { right: '14%', top: '4%',  size: 44, rotate: -8 },
+        { right: '1%',  top: '7%',  size: 52, rotate: 14 },
+        // Middle row
+        { left: '5%',   top: '42%', size: 48, rotate: 8 },
+        { left: '20%',  top: '48%', size: 36, rotate: -10 },
+        { right: '20%', top: '45%', size: 38, rotate: 7 },
+        { right: '4%',  top: '40%', size: 46, rotate: -14 },
+        // Bottom row
+        { left: '2%',   top: '78%', size: 40, rotate: -6 },
+        { left: '16%',  top: '82%', size: 34, rotate: 12 },
+        { left: '30%',  top: '80%', size: 32, rotate: -4 },
+        { right: '30%', top: '78%', size: 34, rotate: 9 },
+        { right: '15%', top: '83%', size: 36, rotate: -11 },
+        { right: '2%',  top: '80%', size: 42, rotate: 6 },
+    ]
 
-    if (error) {
-        return (
-            <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl">
-                <h3 className="font-bold text-red-400">Failed to Load Player Stats</h3>
-                <p className="text-red-300/80">{error}</p>
-            </div>
-        )
-    }
-
-    if (!processedPlayers || processedPlayers.length === 0) {
-        return (
-            <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-xl">
-                <h3 className="font-bold text-yellow-400">No Player Data Available</h3>
-                <p className="text-yellow-300/80">No player statistics found for the current season.</p>
-            </div>
-        )
-    }
+    const hasData = processedPlayers && processedPlayers.length > 0
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="text-center">
-                <h1 className="text-3xl font-bold mb-2 font-heading">Player Statistics</h1>
-                <p className="text-(--color-text-secondary)">
-                    Complete player stats for {season?.name || 'current season'}
-                </p>
-            </div>
+        <div>
+            {/* Hero Banner — full width, extends behind navbar */}
+            <div className="relative overflow-hidden border-b border-white/10 -mt-24 pt-24">
+                {/* Flowing mesh gradient — single element, multiple bg layers at different sizes */}
+                <style>{`
+                    @keyframes meshFlow {
+                        0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
+                        25%  { background-position: 100% 0%, 0% 100%, 100% 0%, 50% 0% }
+                        50%  { background-position: 100% 100%, 0% 0%, 100% 100%, 0% 100% }
+                        75%  { background-position: 0% 100%, 100% 100%, 0% 0%, 100% 0% }
+                        100% { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
+                    }
+                `}</style>
+                {/* Base tint */}
+                <div className="absolute inset-0 pointer-events-none"
+                     style={{ backgroundColor: `${leagueColor}22` }} />
+                {/* Animated mesh */}
+                <div className="absolute inset-0 pointer-events-none"
+                     style={{
+                         background: [
+                             `radial-gradient(ellipse 50% 60% at 30% 40%, ${leagueColor}50, transparent 70%)`,
+                             `radial-gradient(ellipse 60% 45% at 70% 35%, ${leagueColor}40, transparent 65%)`,
+                             `radial-gradient(ellipse 55% 50% at 40% 75%, ${leagueColor}38, transparent 70%)`,
+                             `radial-gradient(ellipse 45% 55% at 75% 65%, ${leagueColor}30, transparent 65%)`,
+                         ].join(', '),
+                         backgroundSize: '200% 200%, 250% 250%, 220% 220%, 180% 180%',
+                         animation: 'meshFlow 25s ease-in-out infinite',
+                     }} />
 
-            {/* Controls */}
-            <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                        <PlayerSearch
-                            players={processedPlayers || []}
-                            playerSlugMap={playerSlugMap}
-                            basePath={basePath}
-                            roleImages={roleImages}
-                            searchTerm={searchTerm}
-                            onSearchChange={setSearchTerm}
+                {/* God images — decorative, scattered at low opacity */}
+                {bannerGods.map((god, i) => {
+                    const pos = godPositions[i]
+                    if (!god?.image_url || !pos) return null
+                    const { size, rotate, ...posStyle } = pos
+                    return (
+                        <img
+                            key={god.id}
+                            src={god.image_url}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute pointer-events-none rounded-lg hidden md:block"
+                            style={{
+                                ...posStyle,
+                                width: size,
+                                height: size,
+                                objectFit: 'cover',
+                                opacity: 0.19,
+                                transform: `rotate(${rotate}deg)`,
+                                filter: `grayscale(40%) drop-shadow(0 0 8px ${leagueColor}40)`,
+                            }}
                         />
+                    )
+                })}
+
+                {/* Bottom accent line */}
+                <div className="absolute bottom-0 left-0 right-0 h-px"
+                     style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}7d, transparent)` }} />
+
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-5">
+                    {/* Header */}
+                    <div className="text-center mb-5">
+                        <h1 className="text-3xl font-bold mb-1 font-heading">Player Statistics</h1>
+                        <p className="text-(--color-text-secondary) text-sm">
+                            {division?.name} &middot; {season?.name || 'Current Season'}
+                        </p>
                     </div>
-                    <div>
-                        <label htmlFor="roleFilter" className="block text-sm font-medium text-(--color-text-secondary) mb-1">
-                            Filter by Role
-                        </label>
-                        <select
-                            id="roleFilter"
-                            value={roleFilter}
-                            onChange={(e) => setRoleFilter(e.target.value)}
-                            className="w-full px-3 py-2 bg-(--color-primary) border border-white/10 rounded-md text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent)/50"
-                        >
-                            <option value="all">All Roles</option>
-                            {uniqueRoles.map(role => (
-                                <option key={role} value={role}>{role}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="teamFilter" className="block text-sm font-medium text-(--color-text-secondary) mb-1">
-                            Filter by Team
-                        </label>
-                        <select
-                            id="teamFilter"
-                            value={teamFilter}
-                            onChange={(e) => setTeamFilter(e.target.value)}
-                            className="w-full px-3 py-2 bg-(--color-primary) border border-white/10 rounded-md text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent)/50"
-                        >
-                            <option value="all">All Teams</option>
-                            {uniqueTeams.map(team => (
-                                <option key={team} value={team}>{team}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex items-end">
-                        <div className="text-sm text-(--color-text-secondary)">
-                            Showing {filteredAndSortedPlayers.length} of {processedPlayers.length} players
+
+                    {/* Filters */}
+                    {hasData && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <PlayerSearch
+                                    players={processedPlayers || []}
+                                    playerSlugMap={playerSlugMap}
+                                    basePath={basePath}
+                                    roleImages={roleImages}
+                                    searchTerm={searchTerm}
+                                    onSearchChange={setSearchTerm}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="roleFilter" className="block text-sm font-medium text-(--color-text-secondary) mb-1">
+                                    Filter by Role
+                                </label>
+                                <select
+                                    id="roleFilter"
+                                    value={roleFilter}
+                                    onChange={(e) => setRoleFilter(e.target.value)}
+                                    className="w-full px-3 py-2 bg-(--color-primary)/80 border border-white/10 rounded-md text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent)/50"
+                                >
+                                    <option value="all">All Roles</option>
+                                    {uniqueRoles.map(role => (
+                                        <option key={role} value={role}>{role}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="teamFilter" className="block text-sm font-medium text-(--color-text-secondary) mb-1">
+                                    Filter by Team
+                                </label>
+                                <select
+                                    id="teamFilter"
+                                    value={teamFilter}
+                                    onChange={(e) => setTeamFilter(e.target.value)}
+                                    className="w-full px-3 py-2 bg-(--color-primary)/80 border border-white/10 rounded-md text-(--color-text) focus:outline-none focus:ring-2 focus:ring-(--color-accent)/50"
+                                >
+                                    <option value="all">All Teams</option>
+                                    {uniqueTeams.map(team => (
+                                        <option key={team} value={team}>{team}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-end">
+                                <div className="text-sm text-(--color-text-secondary)">
+                                    Showing {filteredAndSortedPlayers.length} of {processedPlayers.length} players
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
+            {/* Content — constrained width */}
+            <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+
+            {/* Loading state */}
+            {loading && (
+                <div className="flex items-center justify-center p-8">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-accent) mx-auto mb-4"></div>
+                        <p className="text-(--color-text-secondary)">Loading player statistics...</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Error state */}
+            {!loading && error && (
+                <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl">
+                    <h3 className="font-bold text-red-400">Failed to Load Player Stats</h3>
+                    <p className="text-red-300/80">{error}</p>
+                </div>
+            )}
+
+            {/* Empty state */}
+            {!loading && !error && !hasData && (
+                <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-xl">
+                    <h3 className="font-bold text-yellow-400">No Player Data Available</h3>
+                    <p className="text-yellow-300/80">No player statistics found for the current season.</p>
+                </div>
+            )}
+
             {/* Stats Table */}
-            <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
+            {hasData && <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-white/10">
                         <thead className="bg-white/5 text-center">
@@ -428,10 +530,10 @@ const PlayerList = () => {
                         <p className="text-(--color-text-secondary)/50 text-sm mt-2">Try adjusting your search or filters</p>
                     </div>
                 )}
-            </div>
+            </div>}
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {hasData && <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 {[
                     { label: 'Total Kills', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.kills, 0) },
                     { label: 'Total Deaths', value: filteredAndSortedPlayers.reduce((sum, p) => sum + p.stats.deaths, 0) },
@@ -446,6 +548,8 @@ const PlayerList = () => {
                         <div className="text-xs text-(--color-text-secondary)">{stat.label}</div>
                     </div>
                 ))}
+            </div>}
+
             </div>
         </div>
     )
