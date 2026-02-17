@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
+import { featuredStreamerService } from '../services/database'
 import { formatRank } from '../config/ranks'
 import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
@@ -11,15 +12,7 @@ import passionRain from '../assets/passion/passionrain.jpg'
 
 // ─── Shop Data ───────────────────────────────────────────────
 
-const FEATURED = {
-    id: 'featured-stream',
-    name: 'Stream Spotlight',
-    headline: 'Your stream. Front page. Live.',
-    description: 'Get your Twitch or YouTube stream embedded directly on the smitecomp.com homepage for all visitors to see. Grow your audience while the community watches.',
-    tier: 'legendary',
-    tag: 'Most Popular',
-    mockup: true,
-}
+const BADGE_COST = 4000
 
 const VAULT_ITEMS = [
     {
@@ -142,53 +135,187 @@ function FloatingCoins() {
     )
 }
 
-// ─── Stream Mockup ──────────────────────────────────────────
+// ─── Featured Streamer Badge Purchase ─────────────────────────
 
-function StreamMockup() {
+function FeaturedStreamerCard({ user, balance, login }) {
+    const [status, setStatus] = useState(null) // null=loading, { owned, channel, ... }
+    const [twitchChannel, setTwitchChannel] = useState('')
+    const [buying, setBuying] = useState(false)
+    const [updating, setUpdating] = useState(false)
+    const [toast, setToast] = useState(null)
+
+    useEffect(() => {
+        if (!user) { setStatus({ owned: false }); return }
+        let cancelled = false
+        featuredStreamerService.getStatus().then(data => {
+            if (!cancelled) {
+                setStatus(data)
+                if (data.channel) setTwitchChannel(data.channel)
+            }
+        }).catch(() => { if (!cancelled) setStatus({ owned: false }) })
+        return () => { cancelled = true }
+    }, [user])
+
+    const showToast = (type, message) => {
+        setToast({ type, message })
+        setTimeout(() => setToast(null), 3000)
+    }
+
+    const handleBuy = async () => {
+        if (!twitchChannel.trim()) return showToast('error', 'Enter your Twitch channel name')
+        setBuying(true)
+        try {
+            await featuredStreamerService.register(twitchChannel.trim())
+            setStatus({ owned: true, channel: twitchChannel.trim(), isActive: true })
+            showToast('success', 'Featured Streamer badge purchased!')
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setBuying(false)
+        }
+    }
+
+    const handleUpdateChannel = async () => {
+        if (!twitchChannel.trim()) return
+        setUpdating(true)
+        try {
+            await featuredStreamerService.updateChannel(twitchChannel.trim())
+            showToast('success', 'Channel updated!')
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setUpdating(false)
+        }
+    }
+
+    const canAfford = (balance || 0) >= BADGE_COST
+    const owned = status?.owned
+
     return (
-        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black/40 border border-white/[0.06]">
-            {/* Fake stream UI */}
-            <div className="absolute inset-0 flex flex-col">
-                {/* Video area */}
-                <div className="flex-1 relative">
-                    <div className="absolute inset-0"
-                        style={{
-                            background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1040 40%, #0d1929 100%)',
-                        }}
-                    />
-                    {/* Fake game scene suggestion */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mx-auto mb-3 flex items-center justify-center"
-                                style={{ background: 'rgba(248,197,106,0.08)', border: '1px solid rgba(248,197,106,0.15)' }}>
-                                <svg className="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="none" stroke="rgba(248,197,106,0.5)" strokeWidth="1.5">
-                                    <polygon points="5 3 19 12 5 21 5 3" fill="rgba(248,197,106,0.15)" />
-                                </svg>
-                            </div>
-                            <div className="text-[10px] sm:text-xs text-white/20 font-medium tracking-wider uppercase">Your Stream Here</div>
+        <div className="rounded-2xl overflow-hidden transition-all duration-500"
+            style={{
+                background: 'linear-gradient(135deg, rgba(248,197,106,0.04), rgba(255,255,255,0.015))',
+                border: '1px solid rgba(248,197,106,0.12)',
+                boxShadow: '0 0 80px -20px rgba(248,197,106,0.08)',
+            }}>
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                <div className="absolute inset-0 shop-shimmer-slow"
+                    style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(248,197,106,0.06) 50%, transparent 60%)' }}
+                />
+            </div>
+
+            <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-0">
+                {/* Left — info */}
+                <div className="p-6 sm:p-10 flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#f8c56a', boxShadow: '0 0 6px rgba(248,197,106,0.5)' }} />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: '#f8c56a' }}>Legendary</span>
+                        {owned && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ml-2"
+                                style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }}>
+                                Owned
+                            </span>
+                        )}
+                        {!owned && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ml-2"
+                                style={{ background: 'rgba(248,197,106,0.08)', color: '#f8c56a', border: '1px solid rgba(248,197,106,0.15)' }}>
+                                Badge
+                            </span>
+                        )}
+                    </div>
+                    <h2 className="font-heading font-black text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-2">
+                        Featured Streamer
+                    </h2>
+                    <p className="text-white/50 text-sm sm:text-base italic mb-4">
+                        Earn your badge. Join the rotation.
+                    </p>
+                    <p className="text-white/30 text-sm leading-relaxed max-w-md">
+                        The Featured Streamer badge marks you as a community content creator. Badge holders who link their Twitch channel are featured in a rotating stream spotlight across the site.
+                    </p>
+
+                    {!owned && (
+                        <div className="flex items-center gap-2 mt-6">
+                            <img src={passionCoin} alt="" className="w-5 h-5" />
+                            <span className="text-lg font-bold" style={{ color: '#f8c56a' }}>{BADGE_COST.toLocaleString()}</span>
                         </div>
-                    </div>
-                    {/* LIVE badge */}
-                    <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 flex items-center gap-1.5">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                        </span>
-                        <span className="text-[9px] sm:text-[10px] font-bold text-red-400 uppercase tracking-wider">Live</span>
-                    </div>
-                    {/* Viewer count */}
-                    <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 flex items-center gap-1 text-white/25">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/></svg>
-                        <span className="text-[9px] sm:text-[10px] font-medium">247</span>
-                    </div>
+                    )}
                 </div>
-                {/* Bottom bar */}
-                <div className="h-8 sm:h-10 bg-black/60 border-t border-white/[0.04] flex items-center px-2.5 sm:px-3 gap-2">
-                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-500/30 border border-purple-400/20 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                        <div className="h-2 w-20 sm:w-24 bg-white/10 rounded-full" />
-                    </div>
-                    <div className="h-2 w-12 sm:w-16 bg-white/[0.06] rounded-full" />
+
+                {/* Right — purchase/status */}
+                <div className="p-6 sm:p-8 flex flex-col justify-center">
+                    {!user ? (
+                        <div className="text-center py-8">
+                            <p className="text-sm text-white/40 mb-4">Log in to purchase</p>
+                            <button onClick={login}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm text-white transition-all hover:opacity-90 cursor-pointer"
+                                style={{ backgroundColor: '#5865F2' }}>
+                                Login with Discord
+                            </button>
+                        </div>
+                    ) : status === null ? (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-(--color-accent)" />
+                        </div>
+                    ) : owned ? (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 px-4 py-3 rounded-lg"
+                                style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)' }}>
+                                <span className="text-green-400 text-sm font-semibold">Badge Active</span>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-white/40 mb-1.5">Twitch Channel</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={twitchChannel}
+                                        onChange={e => setTwitchChannel(e.target.value)}
+                                        placeholder="your_channel"
+                                        className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-purple-500/50"
+                                    />
+                                    <button
+                                        onClick={handleUpdateChannel}
+                                        disabled={updating || twitchChannel === status.channel}
+                                        className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 text-sm font-semibold transition-colors disabled:opacity-30 cursor-pointer"
+                                    >
+                                        {updating ? '...' : 'Update'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-white/40 mb-1.5">Your Twitch Channel</label>
+                                <input
+                                    type="text"
+                                    value={twitchChannel}
+                                    onChange={e => setTwitchChannel(e.target.value)}
+                                    placeholder="e.g. ninja"
+                                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-purple-500/50"
+                                />
+                            </div>
+                            <button
+                                onClick={handleBuy}
+                                disabled={buying || !canAfford || !twitchChannel.trim()}
+                                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-bold text-sm transition-all hover:brightness-110 disabled:opacity-40 cursor-pointer"
+                                style={{ background: canAfford ? 'linear-gradient(135deg, #c4922e, #f8c56a)' : 'rgba(255,255,255,0.05)', color: canAfford ? '#0a0f1a' : 'rgba(255,255,255,0.3)' }}
+                            >
+                                <img src={passionCoin} alt="" className="w-4 h-4" />
+                                {buying ? 'Purchasing...' : canAfford ? `Buy for ${BADGE_COST.toLocaleString()}` : `Need ${BADGE_COST.toLocaleString()} Passion`}
+                            </button>
+                            {!canAfford && (
+                                <p className="text-xs text-white/25 text-center">
+                                    You have {(balance || 0).toLocaleString()} Passion. <Link to="/challenges" className="text-purple-400 hover:text-purple-300">Earn more</Link>
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {toast && (
+                        <div className={`mt-3 text-sm text-center ${toast.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                            {toast.message}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -347,52 +474,10 @@ export default function PassionShop() {
                 </div>
             </section>
 
-            {/* ═══ FEATURED ═══ */}
+            {/* ═══ FEATURED — Streamer Badge ═══ */}
             <section className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-20">
                 <SectionLabel label="Featured" />
-
-                <div className="rounded-2xl overflow-hidden transition-all duration-500"
-                    style={{
-                        background: 'linear-gradient(135deg, rgba(248,197,106,0.04), rgba(255,255,255,0.015))',
-                        border: '1px solid rgba(248,197,106,0.12)',
-                        boxShadow: '0 0 80px -20px rgba(248,197,106,0.08)',
-                    }}>
-                    {/* Shimmer overlay */}
-                    <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                        <div className="absolute inset-0 shop-shimmer-slow"
-                            style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(248,197,106,0.06) 50%, transparent 60%)' }}
-                        />
-                    </div>
-
-                    <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-0">
-                        {/* Left — info */}
-                        <div className="p-6 sm:p-10 flex flex-col justify-center">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#f8c56a', boxShadow: '0 0 6px rgba(248,197,106,0.5)' }} />
-                                <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: '#f8c56a' }}>Legendary</span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ml-2"
-                                    style={{ background: 'rgba(248,197,106,0.08)', color: '#f8c56a', border: '1px solid rgba(248,197,106,0.15)' }}>
-                                    Most Popular
-                                </span>
-                            </div>
-                            <h2 className="font-heading font-black text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-2">
-                                {FEATURED.name}
-                            </h2>
-                            <p className="text-white/50 text-sm sm:text-base italic mb-4">{FEATURED.headline}</p>
-                            <p className="text-white/30 text-sm leading-relaxed max-w-md">{FEATURED.description}</p>
-
-                            <div className="flex items-center gap-2 mt-8">
-                                <img src={passionCoin} alt="" className="w-5 h-5 opacity-30" />
-                                <span className="text-sm font-medium text-white/25 tracking-wide">Price TBD</span>
-                            </div>
-                        </div>
-
-                        {/* Right — mockup */}
-                        <div className="p-4 sm:p-6 lg:p-8 flex items-center">
-                            <StreamMockup />
-                        </div>
-                    </div>
-                </div>
+                <FeaturedStreamerCard user={user} balance={balance} login={login} />
             </section>
 
             {/* ═══ THE VAULT — premium/limited items ═══ */}

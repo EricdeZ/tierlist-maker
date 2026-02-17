@@ -180,6 +180,18 @@ const handler = async (event) => {
             ` : [],
         ])
 
+        // Check for Featured Streamer badge
+        if (player.is_claimed) {
+            const [featuredStreamer] = await sql`
+                SELECT 1 FROM featured_streamers fs
+                JOIN users u ON u.id = fs.user_id
+                WHERE u.linked_player_id = ${player.id}
+            `
+            if (featuredStreamer) {
+                badges.push({ badge_label: 'Featured Streamer', tier: 'legendary', title: 'Featured Streamer' })
+            }
+        }
+
         // Compute allTimeStats from leagueBreakdowns
         const allTimeStats = leagueBreakdowns.reduce((acc, lb) => ({
             games_played: acc.games_played + parseInt(lb.games_played),

@@ -235,6 +235,34 @@ export const siteConfigService = {
     },
 }
 
+export const featuredStreamerService = {
+    async getCurrent() {
+        return apiCall('featured-streamer', { action: 'current' })
+    },
+    async getQueue() {
+        return apiCall('featured-streamer', { action: 'queue' })
+    },
+    async getStatus() {
+        // Check if current user owns the badge
+        return apiCall('featured-streamer', { action: 'my-status' })
+    },
+    async register(twitch_channel) {
+        return apiPost('featured-streamer', { action: 'register' }, { twitch_channel })
+    },
+    async updateChannel(twitch_channel) {
+        return apiPost('featured-streamer', { action: 'update-channel' }, { twitch_channel })
+    },
+    async deactivate() {
+        return apiPost('featured-streamer', { action: 'deactivate' })
+    },
+    async reactivate() {
+        return apiPost('featured-streamer', { action: 'reactivate' })
+    },
+    async heartbeat(streamer_id) {
+        return apiPost('featured-streamer', { action: 'heartbeat' }, { streamer_id })
+    },
+}
+
 export const orgService = {
     async getBySlug(slug) {
         return apiCall('orgs', { slug })
