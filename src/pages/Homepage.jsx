@@ -545,13 +545,16 @@ const Homepage = () => {
                                                 </div>
 
                                                 {/* CTA arrow */}
-                                                <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, #F57C20, #E8941A)',
-                                                        boxShadow: '0 4px 20px rgba(245,124,32,0.3)',
-                                                    }}
-                                                >
-                                                    <ArrowRight className="w-4.5 h-4.5 text-white group-hover:translate-x-0.5 transition-transform duration-300" />
+                                                <div className="shrink-0 flex items-center gap-2">
+                                                    <span className="text-white font-semibold text-sm whitespace-nowrap">Sign up now</span>
+                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #F57C20, #E8941A)',
+                                                            boxShadow: '0 4px 20px rgba(245,124,32,0.3)',
+                                                        }}
+                                                    >
+                                                        <ArrowRight className="w-4.5 h-4.5 text-white group-hover:translate-x-0.5 transition-transform duration-300" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </Link>
