@@ -12,8 +12,8 @@ import obsidianImg from '../assets/ranks/obsidian.png'
 import diamondImg from '../assets/ranks/diamond.png'
 
 // Set embed URLs here — leave null for "Unlocking Soon"
-const KAIJU_EMBED_URL = null
-const OTHER_EMBED_URL = null
+const KAIJU_EMBED_URL = 'https://forms.gle/oZ8tvwAhW8Yb5fqA9'
+const OTHER_EMBED_URL = 'https://forms.gle/cWARdnQJtSQYArAR6'
 
 const OTHER_DIVISIONS = [
     { name: 'Glaciier', img: demigodImg },
