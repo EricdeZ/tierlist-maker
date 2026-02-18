@@ -138,9 +138,11 @@ async function getLeaderboard(sql, period) {
             JOIN users u ON u.id = pt.user_id
             LEFT JOIN passion_balances pb ON pb.user_id = pt.user_id
             LEFT JOIN players p ON p.id = u.linked_player_id
-            WHERE pt.amount > 0 AND pt.created_at >= NOW() - INTERVAL '14 days'
+            WHERE (pt.amount > 0 OR pt.type = 'challenge_revoked')
+              AND pt.created_at >= NOW() - INTERVAL '14 days'
             GROUP BY pt.user_id, pb.total_earned, pb.current_streak,
                      u.discord_username, u.discord_avatar, u.discord_id, p.slug
+            HAVING SUM(pt.amount) > 0
             ORDER BY recent_earned DESC
             LIMIT 50
         `
