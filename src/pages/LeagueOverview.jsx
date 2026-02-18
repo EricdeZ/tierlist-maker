@@ -359,27 +359,60 @@ const LeagueOverview = () => {
                         )}
                     </div>
 
-                    {/* Slogan */}
-                    {league.slogan && (
-                        <p className="text-sm sm:text-base font-semibold uppercase tracking-widest mb-3" style={{ color: leagueColor }}>
-                            {league.slogan}
-                        </p>
+                    {/* Slogan / League name — swapped for OSL */}
+                    {leagueSlug === 'osl' ? (
+                        <>
+                            <p className="text-sm sm:text-base font-semibold uppercase tracking-widest mb-3" style={{ color: leagueColor }}>
+                                {league.name}
+                            </p>
+                            {league.slogan && (
+                                <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4 lg:whitespace-nowrap">
+                                    {(() => {
+                                        const words = league.slogan.split(' ')
+                                        return (
+                                            <>
+                                                <span className="text-yellow-400">{words[0]}</span>
+                                                {words.length > 1 && (
+                                                    <span
+                                                        className="bg-clip-text text-transparent"
+                                                        style={{
+                                                            WebkitBackgroundClip: 'text',
+                                                            backgroundImage: heroLight.active
+                                                                ? `radial-gradient(circle 400px at ${heroLight.x}% ${heroLight.y}%, #ffffff, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0.7))`
+                                                                : 'linear-gradient(to right, rgba(255,255,255,0.85), rgba(255,255,255,0.65))',
+                                                        }}
+                                                    >
+                                                        {' ' + words.slice(1).join(' ')}
+                                                    </span>
+                                                )}
+                                            </>
+                                        )
+                                    })()}
+                                </h1>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {league.slogan && (
+                                <p className="text-sm sm:text-base font-semibold uppercase tracking-widest mb-3" style={{ color: leagueColor }}>
+                                    {league.slogan}
+                                </p>
+                            )}
+                            <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4">
+                                <span
+                                    className="bg-clip-text text-transparent"
+                                    style={{
+                                        WebkitBackgroundClip: 'text',
+                                        backgroundImage: heroLight.active
+                                            ? `radial-gradient(circle 400px at ${heroLight.x}% ${heroLight.y}%, #ffffff, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0.7))`
+                                            : 'linear-gradient(to right, rgba(255,255,255,0.85), rgba(255,255,255,0.65))',
+                                    }}
+                                >
+                                    {league.name}
+                                </span>
+                            </h1>
+                        </>
                     )}
-
-                    {/* League name */}
-                    <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4">
-                        <span
-                            className="bg-clip-text text-transparent"
-                            style={{
-                                WebkitBackgroundClip: 'text',
-                                backgroundImage: heroLight.active
-                                    ? `radial-gradient(circle 400px at ${heroLight.x}% ${heroLight.y}%, #ffffff, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0.7))`
-                                    : 'linear-gradient(to right, rgba(255,255,255,0.85), rgba(255,255,255,0.65))',
-                            }}
-                        >
-                            {league.name}
-                        </span>
-                    </h1>
 
                     {/* Description */}
                     {league.description && league.description !== league.name && (
@@ -444,6 +477,23 @@ const LeagueOverview = () => {
                             <ChevronRight className="w-5 h-5" />
                         </a>
                     )}
+
+                    {/* Sponsor badge */}
+                    <div
+                        className="flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-full border text-xs font-bold uppercase tracking-wider mt-6 mx-auto w-fit"
+                        style={{
+                            background: `${leagueColor}12`,
+                            borderColor: `${leagueColor}30`,
+                        }}
+                    >
+                        <svg className="w-4 h-4" fill={leagueColor} viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        <span style={{ color: leagueColor }}>Prize Pool Sponsored by Hi-Rez Studios</span>
+                        <svg className="w-4 h-4" fill={leagueColor} viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                    </div>
                 </div>
 
                 {/* Bottom edge fade */}
