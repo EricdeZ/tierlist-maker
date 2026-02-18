@@ -202,61 +202,64 @@ const PlayerList = () => {
     return (
         <div>
             {/* Hero Banner — full width, extends behind navbar */}
-            <div className="relative overflow-hidden border-b border-white/10 -mt-24 pt-24">
-                {/* Flowing mesh gradient — single element, multiple bg layers at different sizes */}
-                <style>{`
-                    @keyframes meshFlow {
-                        0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
-                        25%  { background-position: 100% 0%, 0% 100%, 100% 0%, 50% 0% }
-                        50%  { background-position: 100% 100%, 0% 0%, 100% 100%, 0% 100% }
-                        75%  { background-position: 0% 100%, 100% 100%, 0% 0%, 100% 0% }
-                        100% { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
-                    }
-                `}</style>
-                {/* Base tint */}
-                <div className="absolute inset-0 pointer-events-none"
-                     style={{ backgroundColor: `${leagueColor}22` }} />
-                {/* Animated mesh */}
-                <div className="absolute inset-0 pointer-events-none"
-                     style={{
-                         background: [
-                             `radial-gradient(ellipse 50% 60% at 30% 40%, ${leagueColor}50, transparent 70%)`,
-                             `radial-gradient(ellipse 60% 45% at 70% 35%, ${leagueColor}40, transparent 65%)`,
-                             `radial-gradient(ellipse 55% 50% at 40% 75%, ${leagueColor}38, transparent 70%)`,
-                             `radial-gradient(ellipse 45% 55% at 75% 65%, ${leagueColor}30, transparent 65%)`,
-                         ].join(', '),
-                         backgroundSize: '200% 200%, 250% 250%, 220% 220%, 180% 180%',
-                         animation: 'meshFlow 25s ease-in-out infinite',
-                     }} />
+            <div className="relative border-b border-white/10 -mt-24 pt-24">
+                {/* Decorative layers — clipped so gradients/images don't bleed out */}
+                <div className="absolute inset-0 overflow-hidden">
+                    {/* Flowing mesh gradient — single element, multiple bg layers at different sizes */}
+                    <style>{`
+                        @keyframes meshFlow {
+                            0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
+                            25%  { background-position: 100% 0%, 0% 100%, 100% 0%, 50% 0% }
+                            50%  { background-position: 100% 100%, 0% 0%, 100% 100%, 0% 100% }
+                            75%  { background-position: 0% 100%, 100% 100%, 0% 0%, 100% 0% }
+                            100% { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 50% }
+                        }
+                    `}</style>
+                    {/* Base tint */}
+                    <div className="absolute inset-0 pointer-events-none"
+                         style={{ backgroundColor: `${leagueColor}22` }} />
+                    {/* Animated mesh */}
+                    <div className="absolute inset-0 pointer-events-none"
+                         style={{
+                             background: [
+                                 `radial-gradient(ellipse 50% 60% at 30% 40%, ${leagueColor}50, transparent 70%)`,
+                                 `radial-gradient(ellipse 60% 45% at 70% 35%, ${leagueColor}40, transparent 65%)`,
+                                 `radial-gradient(ellipse 55% 50% at 40% 75%, ${leagueColor}38, transparent 70%)`,
+                                 `radial-gradient(ellipse 45% 55% at 75% 65%, ${leagueColor}30, transparent 65%)`,
+                             ].join(', '),
+                             backgroundSize: '200% 200%, 250% 250%, 220% 220%, 180% 180%',
+                             animation: 'meshFlow 25s ease-in-out infinite',
+                         }} />
 
-                {/* God images — decorative, scattered at low opacity */}
-                {bannerGods.map((god, i) => {
-                    const pos = godPositions[i]
-                    if (!god?.image_url || !pos) return null
-                    const { size, rotate, ...posStyle } = pos
-                    return (
-                        <img
-                            key={god.id}
-                            src={god.image_url}
-                            alt=""
-                            aria-hidden="true"
-                            className="absolute pointer-events-none rounded-lg hidden md:block"
-                            style={{
-                                ...posStyle,
-                                width: size,
-                                height: size,
-                                objectFit: 'cover',
-                                opacity: 0.19,
-                                transform: `rotate(${rotate}deg)`,
-                                filter: `grayscale(40%) drop-shadow(0 0 8px ${leagueColor}40)`,
-                            }}
-                        />
-                    )
-                })}
+                    {/* God images — decorative, scattered at low opacity */}
+                    {bannerGods.map((god, i) => {
+                        const pos = godPositions[i]
+                        if (!god?.image_url || !pos) return null
+                        const { size, rotate, ...posStyle } = pos
+                        return (
+                            <img
+                                key={god.id}
+                                src={god.image_url}
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute pointer-events-none rounded-lg hidden md:block"
+                                style={{
+                                    ...posStyle,
+                                    width: size,
+                                    height: size,
+                                    objectFit: 'cover',
+                                    opacity: 0.19,
+                                    transform: `rotate(${rotate}deg)`,
+                                    filter: `grayscale(40%) drop-shadow(0 0 8px ${leagueColor}40)`,
+                                }}
+                            />
+                        )
+                    })}
 
-                {/* Bottom accent line */}
-                <div className="absolute bottom-0 left-0 right-0 h-px"
-                     style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}7d, transparent)` }} />
+                    {/* Bottom accent line */}
+                    <div className="absolute bottom-0 left-0 right-0 h-px"
+                         style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}7d, transparent)` }} />
+                </div>
 
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-5">
                     {/* Header */}
