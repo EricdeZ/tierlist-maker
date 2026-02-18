@@ -1,12 +1,14 @@
-// src/pages/TierListPage.jsx — Standalone tier list with league/division/season selectors
-import { useState, useEffect, useMemo, useRef } from 'react'
+// src/pages/TierListPage.jsx — Standalone tier list feed with league/division/season selectors
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import DivisionContext from '../context/DivisionContext'
 import DragDropRankings from '../components/DragDropRankings'
-import { leagueService, teamService, playerService } from '../services/database'
+import PublishTierListModal from '../components/PublishTierListModal'
+import TierListPostCard from '../components/TierListPostCard'
+import { leagueService, teamService, playerService, tierlistFeedService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import { ChevronDown, Lock, Calendar } from 'lucide-react'
+import { ChevronDown, Lock, Calendar, Plus, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 // League logos
@@ -74,6 +76,190 @@ function FancySelect({ value, onChange, options, placeholder, renderOption, rend
                             {renderOption(option)}
                         </button>
                     ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// Feed content component (used inside DivisionContext)
+function FeedContent({ season, league, division, teams, players }) {
+    const { user, login } = useAuth()
+    const [posts, setPosts] = useState([])
+    const [total, setTotal] = useState(0)
+    const [hasMore, setHasMore] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const [error, setError] = useState(null)
+    const [showCreate, setShowCreate] = useState(false)
+    const [publishRankings, setPublishRankings] = useState(null)
+
+    const teamsWithPlayers = useMemo(() =>
+        teams?.map(team => ({
+            ...team,
+            players: players?.filter(p => p.team_id === team.id).map(p => p.name) || [],
+        })) || []
+    , [teams, players])
+
+    const fetchFeed = useCallback(async (offset = 0) => {
+        if (!season?.id) return
+        try {
+            const data = await tierlistFeedService.getFeed(season.id, 20, offset)
+            if (offset === 0) {
+                setPosts(data.posts)
+            } else {
+                setPosts(prev => [...prev, ...data.posts])
+            }
+            setTotal(data.total)
+            setHasMore(data.hasMore)
+        } catch (err) {
+            setError(err.message)
+        }
+    }, [season?.id])
+
+    useEffect(() => {
+        setLoading(true)
+        setShowCreate(false)
+        setPublishRankings(null)
+        fetchFeed(0).finally(() => setLoading(false))
+    }, [fetchFeed])
+
+    const loadMore = async () => {
+        setLoadingMore(true)
+        await fetchFeed(posts.length)
+        setLoadingMore(false)
+    }
+
+    const handleLike = async (postId) => {
+        const data = await tierlistFeedService.like(postId)
+        setPosts(prev => prev.map(p =>
+            p.id === postId
+                ? { ...p, likeCount: data.likeCount, likedByMe: data.liked }
+                : p
+        ))
+    }
+
+    const handleDelete = async (postId) => {
+        if (!confirm('Delete this post?')) return
+        await tierlistFeedService.deletePost(postId)
+        setPosts(prev => prev.filter(p => p.id !== postId))
+        setTotal(prev => prev - 1)
+    }
+
+    const handlePublish = async (rankings, title) => {
+        if (!season?.id) throw new Error('No active season')
+        await tierlistFeedService.publish(season.id, rankings, title)
+        setShowCreate(false)
+        setPublishRankings(null)
+        // Refresh feed
+        fetchFeed(0)
+    }
+
+    const handlePublishClick = (rankings) => {
+        if (!user) {
+            login()
+            return
+        }
+        setPublishRankings(rankings)
+    }
+
+    if (showCreate) {
+        return (
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-(--color-text) font-heading">Create Tier List</h2>
+                    <button
+                        onClick={() => setShowCreate(false)}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-white/10 text-(--color-text) hover:bg-white/15 transition-colors"
+                    >
+                        Back to Feed
+                    </button>
+                </div>
+                <DragDropRankings onPublish={handlePublishClick} />
+                {publishRankings && (
+                    <PublishTierListModal
+                        rankings={publishRankings}
+                        teams={teamsWithPlayers}
+                        league={league}
+                        division={division}
+                        season={season}
+                        onPublish={handlePublish}
+                        onClose={() => setPublishRankings(null)}
+                    />
+                )}
+            </div>
+        )
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center p-16">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-(--color-accent)" />
+            </div>
+        )
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-lg font-bold text-(--color-text) font-heading">Tier List Feed</h2>
+                    {total > 0 && (
+                        <span className="text-xs text-(--color-text-secondary)">
+                            {total} post{total !== 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+                <button
+                    onClick={() => setShowCreate(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-primary)' }}
+                >
+                    <Plus className="w-4 h-4" />
+                    Create My Own
+                </button>
+            </div>
+
+            {error && (
+                <div className="mb-4 text-sm text-red-400 bg-red-900/20 border border-red-500/20 rounded-lg px-4 py-3">
+                    {error}
+                </div>
+            )}
+
+            {posts.length === 0 ? (
+                <div className="text-center py-16">
+                    <MessageSquare className="w-12 h-12 text-(--color-text-secondary)/30 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-(--color-text) mb-2">No posts yet</h3>
+                    <p className="text-sm text-(--color-text-secondary)">
+                        Be the first to share your tier list!
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {posts.map(post => (
+                        <TierListPostCard
+                            key={post.id}
+                            post={post}
+                            teams={teamsWithPlayers}
+                            league={league}
+                            division={division}
+                            season={season}
+                            onLike={handleLike}
+                            onDelete={handleDelete}
+                        />
+                    ))}
+
+                    {hasMore && (
+                        <div className="text-center pt-2">
+                            <button
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                                className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-white/10 text-(--color-text) hover:bg-white/15 transition-colors disabled:opacity-50"
+                            >
+                                {loadingMore ? 'Loading...' : 'Load More'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -264,7 +450,7 @@ export default function TierListPage() {
                             Select a League
                         </h2>
                         <p className="text-sm text-(--color-text-secondary) text-center mb-6">
-                            Choose a league to build your tier list
+                            Choose a league to browse tier lists
                         </p>
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -414,11 +600,23 @@ export default function TierListPage() {
                 )}
             </div>
 
-            {/* Tier list */}
-            {selectedSeason && (
+            {/* Feed content */}
+            {selectedSeason && !dataLoading && (
                 <DivisionContext.Provider value={contextValue} key={selectedSeasonId}>
-                    <DragDropRankings divisionSlug={selectedDivisionSlug} />
+                    <FeedContent
+                        season={contextValue.season}
+                        league={selectedLeague}
+                        division={selectedDivision}
+                        teams={teams}
+                        players={players}
+                    />
                 </DivisionContext.Provider>
+            )}
+
+            {dataLoading && (
+                <div className="flex items-center justify-center p-16">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-(--color-accent)" />
+                </div>
             )}
 
             {!selectedSeason && !showPicker && (

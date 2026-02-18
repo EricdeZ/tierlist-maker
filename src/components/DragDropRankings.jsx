@@ -41,7 +41,7 @@ const STAT_TYPES = [
     { key: 'mitigationsPerGame', label: 'Mit/G', buttonLabel: 'Mitigations / Game' },
 ]
 
-const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
+const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) => {
     // Use DivisionContext instead of hardcoded hook
     const { teams: rawTeams, players: rawPlayers, league, division, season, loading, error } = useDivision()
     const { divisionSlug: routeSlug } = useParams()
@@ -784,6 +784,15 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                     >
                         {isExporting ? 'Exporting...' : 'Export Image'}
                     </button>
+                    {onPublish && (
+                        <button
+                            onClick={() => onPublish(rankings)}
+                            disabled={!Object.values(rankings).some(r => r.length > 0)}
+                            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                        >
+                            Post to Feed
+                        </button>
+                    )}
                 </div>
             </div>
         )
@@ -1053,6 +1062,15 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                             >
                                 {isExporting ? '...' : 'Export'}
                             </button>
+                            {onPublish && (
+                                <button
+                                    onClick={() => onPublish(rankings)}
+                                    disabled={!Object.values(rankings).some(r => r.length > 0)}
+                                    className="px-2.5 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                                >
+                                    Post
+                                </button>
+                            )}
                             <button
                                 onClick={() => setTeamsPanelPosition('right')}
                                 className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
@@ -1322,6 +1340,15 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug } = {}) => {
                                 {isExporting ? '...' : 'Export'}
                             </button>
                         </div>
+                        {onPublish && (
+                            <button
+                                onClick={() => onPublish(rankings)}
+                                disabled={!Object.values(rankings).some(r => r.length > 0)}
+                                className="w-full px-2 py-1 rounded text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                            >
+                                Post to Feed
+                            </button>
+                        )}
                     </div>
                     {/* Vertically scrollable team cards */}
                     <div className="p-3 space-y-3">

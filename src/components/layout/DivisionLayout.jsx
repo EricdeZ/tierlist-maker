@@ -15,7 +15,7 @@ const DivisionContent = () => {
         { path: basePath, label: 'Overview', exact: true },
         { path: `${basePath}/matches`, label: 'Matches' },
         { path: `${basePath}/stats`, label: 'Stats' },
-        { path: `${basePath}/rankings`, label: 'Rankings' },
+        { path: `${basePath}/tierlist`, label: 'Tierlist' },
         { path: `${basePath}/teams`, label: 'Teams' },
     ]
 

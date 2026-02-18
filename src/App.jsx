@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { PassionProvider } from './context/PassionContext'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -141,6 +141,7 @@ function App() {
                                 <Route path="stats" element={<Stats />} />
                                 <Route path="tierlist" element={<TierListFeed />} />
                                 <Route path="tierlist/create" element={<Rankings />} />
+                                <Route path="rankings" element={<Navigate to="../tierlist" replace />} />
                                 <Route path="teams" element={<Teams />} />
                                 <Route path="teams/:teamSlug" element={<TeamDetail />} />
                                 <Route path="players/:playerSlug" element={<PlayerProfile />} />

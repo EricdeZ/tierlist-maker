@@ -391,7 +391,7 @@ const DivisionOverview = () => {
                 </Link>
 
                 <Link
-                    to={`${basePath}/rankings`}
+                    to={`${basePath}/tierlist`}
                     className="group relative overflow-hidden rounded-xl border border-white/10 p-5 transition-all duration-300 hover:-translate-y-0.5"
                     style={{
                         background: `linear-gradient(135deg, var(--color-secondary), ${leagueColor}08)`,

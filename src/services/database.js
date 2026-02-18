@@ -15,7 +15,12 @@ const apiCall = async (endpoint, params = {}) => {
     })
 
     if (!response.ok) {
-        throw new Error(`API call failed: ${response.statusText}`)
+        let message = `API call failed: ${response.statusText}`
+        try {
+            const data = await response.json()
+            if (data.error) message = data.error
+        } catch {}
+        throw new Error(message)
     }
 
     return response.json()
@@ -40,7 +45,12 @@ const apiPost = async (endpoint, params = {}, body = {}) => {
     })
 
     if (!response.ok) {
-        throw new Error(`API call failed: ${response.statusText}`)
+        let message = `API call failed: ${response.statusText}`
+        try {
+            const data = await response.json()
+            if (data.error) message = data.error
+        } catch {}
+        throw new Error(message)
     }
 
     return response.json()
@@ -367,6 +377,24 @@ export const feedbackService = {
     },
     async remove(id) {
         return apiPost('feedback', {}, { action: 'delete', id })
+    },
+}
+
+export const tierlistFeedService = {
+    async getFeed(seasonId, limit = 20, offset = 0) {
+        return apiCall('tierlist-feed', { action: 'feed', seasonId, limit, offset })
+    },
+    async getPost(postId) {
+        return apiCall('tierlist-feed', { action: 'post', postId })
+    },
+    async publish(seasonId, rankings, title) {
+        return apiPost('tierlist-feed', {}, { action: 'publish', seasonId, rankings, title })
+    },
+    async like(postId) {
+        return apiPost('tierlist-feed', {}, { action: 'like', postId })
+    },
+    async deletePost(postId) {
+        return apiPost('tierlist-feed', {}, { action: 'delete', postId })
     },
 }
 
