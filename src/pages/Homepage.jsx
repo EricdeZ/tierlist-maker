@@ -447,9 +447,9 @@ const Homepage = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            {league.description && league.description !== league.name && (
+                                            {league.slogan && (
                                                 <p className={`text-sm ${isActive || league.slug === 'agl' ? 'text-(--color-text-secondary)' : 'text-(--color-text-secondary)/40'}`}>
-                                                    {league.description}
+                                                    {league.slogan}
                                                 </p>
                                             )}
                                         </div>

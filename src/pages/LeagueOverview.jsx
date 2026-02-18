@@ -359,6 +359,13 @@ const LeagueOverview = () => {
                         )}
                     </div>
 
+                    {/* Slogan */}
+                    {league.slogan && (
+                        <p className="text-sm sm:text-base font-semibold uppercase tracking-widest mb-3" style={{ color: leagueColor }}>
+                            {league.slogan}
+                        </p>
+                    )}
+
                     {/* League name */}
                     <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4">
                         <span
@@ -376,9 +383,21 @@ const LeagueOverview = () => {
 
                     {/* Description */}
                     {league.description && league.description !== league.name && (
-                        <p className="text-lg sm:text-xl text-(--color-text-secondary) max-w-2xl mx-auto leading-relaxed mb-8">
+                        <p className="text-lg sm:text-xl text-(--color-text-secondary) max-w-2xl mx-auto leading-relaxed mb-4">
                             {league.description}
                         </p>
+                    )}
+
+                    {/* Promotional text */}
+                    {league.promotional_text && (
+                        <p className="text-sm sm:text-base text-(--color-text-secondary) max-w-2xl mx-auto leading-relaxed mb-8 opacity-80">
+                            {league.promotional_text}
+                        </p>
+                    )}
+
+                    {/* Spacer when no promo text but description exists */}
+                    {!league.promotional_text && league.description && league.description !== league.name && (
+                        <div className="mb-4" />
                     )}
 
                     {/* Badges + CTA */}
