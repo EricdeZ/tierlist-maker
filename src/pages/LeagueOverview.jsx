@@ -411,6 +411,11 @@ const LeagueOverview = () => {
                                 Season Active
                             </div>
                         )}
+                        {league.league_tags?.map(tag => (
+                            <span key={tag} className="px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: `${leagueColor}15`, border: `1px solid ${leagueColor}25`, color: leagueColor }}>
+                                {tag}
+                            </span>
+                        ))}
                         {league.discord_url && (
                             <a
                                 href={league.discord_url}
@@ -632,6 +637,17 @@ const LeagueOverview = () => {
                                                                 <User className="w-4 h-4" style={{ color: leagueColor }} />
                                                                 {division.player_count} players
                                                             </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Division tags */}
+                                                    {division.tags?.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1.5 mb-4">
+                                                            {division.tags.map(t => (
+                                                                <span key={t.label} className="text-[11px] px-2.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${leagueColor}12`, color: leagueColor, border: `1px solid ${leagueColor}20` }}>
+                                                                    {t.label}
+                                                                </span>
+                                                            ))}
                                                         </div>
                                                     )}
 

@@ -146,6 +146,15 @@ const LeaguesBrowse = () => {
                                                     {league.description}
                                                 </p>
                                             )}
+                                            {league.league_tags?.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                    {league.league_tags.map(tag => (
+                                                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             {league.discord_url && (

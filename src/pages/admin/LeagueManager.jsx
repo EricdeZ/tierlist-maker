@@ -156,8 +156,8 @@ export default function LeagueManager() {
     }
 
     // ─── Derived data ───
-    const { leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons } = useMemo(() => {
-        if (!data) return { leagues: [], divisionsByLeague: {}, seasonsByDivision: {}, teamsBySeason: {}, playerCountMap: {}, matchCountMap: {}, allSeasons: [] }
+    const { leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons, tagsByDivision } = useMemo(() => {
+        if (!data) return { leagues: [], divisionsByLeague: {}, seasonsByDivision: {}, teamsBySeason: {}, playerCountMap: {}, matchCountMap: {}, allSeasons: [], tagsByDivision: {} }
 
         const divisionsByLeague = {}
         for (const d of data.divisions) {
@@ -187,6 +187,12 @@ export default function LeagueManager() {
             matchCountMap[mc.season_id] = parseInt(mc.match_count)
         }
 
+        const tagsByDivision = {}
+        for (const t of (data.divisionTags || [])) {
+            if (!tagsByDivision[t.division_id]) tagsByDivision[t.division_id] = []
+            tagsByDivision[t.division_id].push({ label: t.label, show_on_league: t.show_on_league })
+        }
+
         // Flat season list with context labels for copy picker
         const allSeasons = data.seasons.map(s => {
             const div = data.divisions.find(d => d.id === s.division_id)
@@ -195,7 +201,7 @@ export default function LeagueManager() {
             return { ...s, label: `${league?.name || '?'} / ${div?.name || '?'} / ${s.name}`, teamCount }
         })
 
-        return { leagues: data.leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons }
+        return { leagues: data.leagues, divisionsByLeague, seasonsByDivision, teamsBySeason, playerCountMap, matchCountMap, allSeasons, tagsByDivision }
     }, [data])
 
     // ─── Loading ───
@@ -417,27 +423,38 @@ export default function LeagueManager() {
                                                     <Layers className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
 
                                                     {editItem?.type === 'division' && editItem.id === div.id ? (
-                                                        <InlineEdit
-                                                            fields={[
-                                                                { key: 'name', label: 'Name', value: editItem.name },
-                                                                { key: 'slug', label: 'Slug', value: editItem.slug },
-                                                                { key: 'tier', label: 'Tier', value: editItem.tier || '', type: 'number', small: true },
-                                                            ]}
-                                                            onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
-                                                            onSave={handleSaveEdit}
-                                                            onCancel={() => setEditItem(null)}
-                                                            saving={saving}
-                                                        />
+                                                        <div className="flex-1">
+                                                            <InlineEdit
+                                                                fields={[
+                                                                    { key: 'name', label: 'Name', value: editItem.name },
+                                                                    { key: 'slug', label: 'Slug', value: editItem.slug },
+                                                                    { key: 'tier', label: 'Tier', value: editItem.tier || '', type: 'number', small: true },
+                                                                ]}
+                                                                onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
+                                                                onSave={handleSaveEdit}
+                                                                onCancel={() => setEditItem(null)}
+                                                                saving={saving}
+                                                            />
+                                                            <TagEditor
+                                                                tags={editItem.tags || []}
+                                                                onChange={tags => setEditItem(prev => ({ ...prev, tags }))}
+                                                            />
+                                                        </div>
                                                     ) : (
                                                         <>
-                                                            <div className="flex-1 min-w-0">
+                                                            <div className="flex-1 min-w-0 flex items-center flex-wrap gap-y-1">
                                                                 <span className="font-medium text-sm text-[var(--color-text)]">{div.name}</span>
                                                                 <span className="text-xs text-[var(--color-text-secondary)] ml-2">/{div.slug}</span>
                                                                 {div.tier && <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Tier {div.tier}</span>}
+                                                                {(tagsByDivision[div.id] || []).map(t => (
+                                                                    <span key={t.label} className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded ${t.show_on_league ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-[var(--color-text-secondary)]'}`} title={t.show_on_league ? 'Shown on league' : 'Division only'}>
+                                                                        {t.label}{t.show_on_league ? ' \u2191' : ''}
+                                                                    </span>
+                                                                ))}
                                                                 <span className="text-xs text-[var(--color-text-secondary)] ml-2">{seasons.length} season{seasons.length !== 1 ? 's' : ''}</span>
                                                             </div>
                                                             <div className="flex items-center gap-1">
-                                                                <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'division', id: div.id, name: div.name, slug: div.slug, tier: div.tier || '', description: div.description || '' })} />
+                                                                <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'division', id: div.id, name: div.name, slug: div.slug, tier: div.tier || '', description: div.description || '', tags: tagsByDivision[div.id] || [] })} />
                                                                 <IconBtn icon={Trash2} title="Delete" onClick={() => handleDelete('division', div.id, div.name)} danger />
                                                             </div>
                                                         </>
@@ -619,19 +636,25 @@ export default function LeagueManager() {
                                     {/* Add division */}
                                     <div className="pl-10 pr-4 py-2.5 border-t border-white/5">
                                         {createItem?.type === 'division' && createItem.league_id === league.id ? (
-                                            <InlineEdit
-                                                fields={[
-                                                    { key: 'name', label: 'Division name', value: createItem.name || '' },
-                                                    { key: 'tier', label: 'Tier', value: createItem.tier || '', type: 'number', small: true },
-                                                ]}
-                                                onChange={(k, v) => setCreateItem(prev => ({ ...prev, [k]: v }))}
-                                                onSave={handleSaveCreate}
-                                                onCancel={() => setCreateItem(null)}
-                                                saving={saving}
-                                            />
+                                            <div>
+                                                <InlineEdit
+                                                    fields={[
+                                                        { key: 'name', label: 'Division name', value: createItem.name || '' },
+                                                        { key: 'tier', label: 'Tier', value: createItem.tier || '', type: 'number', small: true },
+                                                    ]}
+                                                    onChange={(k, v) => setCreateItem(prev => ({ ...prev, [k]: v }))}
+                                                    onSave={handleSaveCreate}
+                                                    onCancel={() => setCreateItem(null)}
+                                                    saving={saving}
+                                                />
+                                                <TagEditor
+                                                    tags={createItem.tags || []}
+                                                    onChange={tags => setCreateItem(prev => ({ ...prev, tags }))}
+                                                />
+                                            </div>
                                         ) : (
                                             <button
-                                                onClick={() => setCreateItem({ type: 'division', league_id: league.id, name: '', tier: '' })}
+                                                onClick={() => setCreateItem({ type: 'division', league_id: league.id, name: '', tier: '', tags: [] })}
                                                 className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Add division
@@ -714,6 +737,68 @@ function InlineEdit({ fields, onChange, onSave, onCancel, saving }) {
                 <button onClick={onCancel} className="p-1 rounded text-[var(--color-text-secondary)] hover:bg-white/5" title="Cancel">
                     <X className="w-3.5 h-3.5" />
                 </button>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════
+// TAG EDITOR
+// ═══════════════════════════════════════════════════
+function TagEditor({ tags, onChange }) {
+    const [input, setInput] = useState('')
+    const [showOnLeague, setShowOnLeague] = useState(false)
+
+    const addTag = () => {
+        const label = input.trim()
+        if (!label || tags.some(t => t.label.toLowerCase() === label.toLowerCase())) return
+        onChange([...tags, { label, show_on_league: showOnLeague }])
+        setInput('')
+        setShowOnLeague(false)
+    }
+
+    const removeTag = (idx) => {
+        onChange(tags.filter((_, i) => i !== idx))
+    }
+
+    const toggleLeague = (idx) => {
+        onChange(tags.map((t, i) => i === idx ? { ...t, show_on_league: !t.show_on_league } : t))
+    }
+
+    return (
+        <div className="mt-1.5">
+            <label className="block text-[10px] text-[var(--color-text-secondary)] mb-1">Tags</label>
+            {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                    {tags.map((t, i) => (
+                        <span
+                            key={i}
+                            className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${t.show_on_league ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-[var(--color-text-secondary)]'}`}
+                        >
+                            {t.label}
+                            <button onClick={() => toggleLeague(i)} className="hover:text-[var(--color-accent)]" title={t.show_on_league ? 'Shown on league (click to toggle)' : 'Division only (click to show on league)'}>
+                                {t.show_on_league ? '\u2191' : '\u00b7'}
+                            </button>
+                            <button onClick={() => removeTag(i)} className="hover:text-red-400">{'\u2715'}</button>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <div className="flex items-center gap-1.5">
+                <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Add tag..."
+                    className="rounded px-2 py-1 text-xs border w-28"
+                    style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                />
+                <label className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] cursor-pointer select-none">
+                    <input type="checkbox" checked={showOnLeague} onChange={e => setShowOnLeague(e.target.checked)} className="accent-blue-500" />
+                    League
+                </label>
+                <button onClick={addTag} className="text-[10px] text-[var(--color-accent)] hover:text-[var(--color-text)]">+ Add</button>
             </div>
         </div>
     )

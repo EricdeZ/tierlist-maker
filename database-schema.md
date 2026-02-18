@@ -30,6 +30,16 @@
 
 UNIQUE(league_id, slug)
 
+### division_tags
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| division_id | integer | NO | FK → divisions.id (CASCADE) |
+| label | varchar(50) | NO | |
+| show_on_league | boolean | NO | false |
+
+UNIQUE(division_id, label)
+
 ### seasons
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|

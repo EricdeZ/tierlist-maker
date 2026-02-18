@@ -82,31 +82,71 @@ const handler = async (event, context) => {
                 `
 
                 const statsMap = Object.fromEntries(divisionStats.map(s => [s.division_id, s]))
+
+                // Fetch division tags
+                const divTags = await sql`
+                    SELECT id, division_id, label, show_on_league
+                    FROM division_tags
+                    WHERE division_id = ANY(${divisions.map(d => d.id)})
+                    ORDER BY id
+                `
+                const tagsByDiv = {}
+                const leagueTags = []
+                const seenLeagueTags = new Set()
+                for (const t of divTags) {
+                    if (!tagsByDiv[t.division_id]) tagsByDiv[t.division_id] = []
+                    tagsByDiv[t.division_id].push({ label: t.label, show_on_league: t.show_on_league })
+                    if (t.show_on_league && !seenLeagueTags.has(t.label)) {
+                        seenLeagueTags.add(t.label)
+                        leagueTags.push(t.label)
+                    }
+                }
+
                 const enrichedDivisions = divisions.map(d => ({
                     ...d,
                     team_count: statsMap[d.id]?.team_count || 0,
                     player_count: statsMap[d.id]?.player_count || 0,
                     teams: statsMap[d.id]?.teams || [],
+                    tags: tagsByDiv[d.id] || [],
                 }))
 
                 return {
                     statusCode: 200,
                     headers: getHeaders(event),
-                    body: JSON.stringify({ ...league, divisions: enrichedDivisions }),
+                    body: JSON.stringify({ ...league, divisions: enrichedDivisions, league_tags: leagueTags }),
                 }
             }
 
             // Get all leagues (basic info)
             const leagues = await sql`
-                SELECT id, name, slug, description, discord_url, color
+                SELECT id, name, slug, description, discord_url, color, slogan, promotional_text
                 FROM leagues
                 ORDER BY name
             `
 
+            // Fetch league-level tags (show_on_league=true) grouped by league
+            const allLeagueTags = await sql`
+                SELECT DISTINCT d.league_id, dt.label
+                FROM division_tags dt
+                JOIN divisions d ON d.id = dt.division_id
+                WHERE dt.show_on_league = true
+                ORDER BY d.league_id, dt.label
+            `
+            const leagueTagMap = {}
+            for (const t of allLeagueTags) {
+                if (!leagueTagMap[t.league_id]) leagueTagMap[t.league_id] = []
+                leagueTagMap[t.league_id].push(t.label)
+            }
+
+            const enrichedLeagues = leagues.map(l => ({
+                ...l,
+                league_tags: leagueTagMap[l.id] || [],
+            }))
+
             return {
                 statusCode: 200,
                 headers: getHeaders(event),
-                body: JSON.stringify(leagues),
+                body: JSON.stringify(enrichedLeagues),
             }
         }
 

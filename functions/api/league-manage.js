@@ -55,10 +55,15 @@ const handler = async (event) => {
                 GROUP BY season_id
             `
 
+            const divisionTags = await sql`
+                SELECT id, division_id, label, show_on_league
+                FROM division_tags ORDER BY id
+            `
+
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify({ leagues, divisions, seasons, teams, teamPlayerCounts, seasonMatchCounts }),
+                body: JSON.stringify({ leagues, divisions, seasons, teams, teamPlayerCounts, seasonMatchCounts, divisionTags }),
             }
         }
 
@@ -160,7 +165,7 @@ async function deleteLeague(sql, { id }, admin) {
 // DIVISION CRUD
 // ═══════════════════════════════════════════════════
 
-async function createDivision(sql, { league_id, name, tier, description }, admin) {
+async function createDivision(sql, { league_id, name, tier, description, tags }, admin) {
     if (!league_id || !name?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_id and name required' }) }
     }
@@ -170,11 +175,16 @@ async function createDivision(sql, { league_id, name, tier, description }, admin
         VALUES (${league_id}, ${name.trim()}, ${tier || null}, ${slug}, ${description || null})
         RETURNING *
     `
+    if (tags?.length) {
+        for (const t of tags) {
+            await sql`INSERT INTO division_tags (division_id, label, show_on_league) VALUES (${row.id}, ${t.label.trim()}, ${!!t.show_on_league})`
+        }
+    }
     await logAudit(sql, admin, { action: 'create-division', endpoint: 'league-manage', leagueId: league_id, targetType: 'division', targetId: row.id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, division: row }) }
 }
 
-async function updateDivision(sql, { id, name, tier, slug, description }, admin) {
+async function updateDivision(sql, { id, name, tier, slug, description, tags }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE divisions SET
@@ -186,6 +196,14 @@ async function updateDivision(sql, { id, name, tier, slug, description }, admin)
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Division not found' }) }
+    if (tags !== undefined) {
+        await sql`DELETE FROM division_tags WHERE division_id = ${id}`
+        if (tags?.length) {
+            for (const t of tags) {
+                await sql`INSERT INTO division_tags (division_id, label, show_on_league) VALUES (${id}, ${t.label.trim()}, ${!!t.show_on_league})`
+            }
+        }
+    }
     await logAudit(sql, admin, { action: 'update-division', endpoint: 'league-manage', leagueId: row.league_id, targetType: 'division', targetId: id, details: { name, slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, division: row }) }
 }
