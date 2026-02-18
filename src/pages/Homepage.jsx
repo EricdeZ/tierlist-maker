@@ -411,18 +411,18 @@ const Homepage = () => {
                                 <div key={league.id} id={`league-${league.slug}`}>
                                     <div className="flex items-center gap-4 mb-6">
                                         {logo ? (
-                                            <img src={logo} alt="" className={`h-12 w-12 object-contain rounded-lg ${!isActive ? 'opacity-40' : ''}`} />
+                                            <img src={logo} alt="" className={`h-12 w-12 object-contain rounded-lg ${!isActive && league.slug !== 'agl' ? 'opacity-40' : ''}`} />
                                         ) : (
-                                            <div className={`h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center ${!isActive ? 'opacity-40' : ''}`}>
+                                            <div className={`h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center ${!isActive && league.slug !== 'agl' ? 'opacity-40' : ''}`}>
                                                 <Trophy className="w-6 h-6" style={{ color: leagueColor }} />
                                             </div>
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-3 flex-wrap">
-                                                {isActive ? (
+                                                {isActive || league.slug === 'agl' ? (
                                                     <Link
-                                                        to={`/${league.slug}`}
-                                                        className="font-heading text-2xl font-bold text-(--color-text) hover:text-(--color-accent) transition-colors"
+                                                        to={league.slug === 'agl' ? '/agl/signup' : `/${league.slug}`}
+                                                        className={`font-heading text-2xl font-bold transition-colors ${league.slug === 'agl' ? 'text-white hover:text-white/80' : 'text-(--color-text) hover:text-(--color-accent)'}`}
                                                     >
                                                         {league.name}
                                                     </Link>
@@ -431,7 +431,12 @@ const Homepage = () => {
                                                         {league.name}
                                                     </h3>
                                                 )}
-                                                {isActive ? (
+                                                {league.slug === 'agl' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
+                                                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />
+                                                        Signups are now open
+                                                    </span>
+                                                ) : isActive ? (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
                                                         <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />
                                                         Live
@@ -443,7 +448,7 @@ const Homepage = () => {
                                                 )}
                                             </div>
                                             {league.description && league.description !== league.name && (
-                                                <p className={`text-sm ${isActive ? 'text-(--color-text-secondary)' : 'text-(--color-text-secondary)/40'}`}>
+                                                <p className={`text-sm ${isActive || league.slug === 'agl' ? 'text-(--color-text-secondary)' : 'text-(--color-text-secondary)/40'}`}>
                                                     {league.description}
                                                 </p>
                                             )}
