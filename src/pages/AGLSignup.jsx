@@ -170,22 +170,43 @@ export default function AGLSignup() {
                 {/* Embed / Unlocking Soon */}
                 <div className="mt-10">
                     {embedUrl ? (
-                        <div
-                            className="rounded-xl border border-white/10 overflow-hidden"
-                            style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
-                        >
-                            <iframe
-                                src={embedUrl}
-                                width="100%"
-                                height="900"
-                                frameBorder="0"
-                                title={isKaiju ? 'Kaiju Division Signup' : 'Division Signup'}
-                                className="w-full"
-                                style={{ minHeight: 600 }}
+                        <>
+                            <div
+                                className="rounded-xl border border-white/10 overflow-hidden"
+                                style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
                             >
-                                Loading...
-                            </iframe>
-                        </div>
+                                <iframe
+                                    src={embedUrl}
+                                    width="100%"
+                                    height="900"
+                                    frameBorder="0"
+                                    title={isKaiju ? 'Kaiju Division Signup' : 'Division Signup'}
+                                    className="w-full"
+                                    style={{ minHeight: 600 }}
+                                >
+                                    Loading...
+                                </iframe>
+                            </div>
+                            <div className="mt-4 text-center">
+                                <a
+                                    href={embedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-all hover:scale-105"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #F57C20, #E8941A)',
+                                        color: '#fff',
+                                        boxShadow: '0 0 20px rgba(245,124,32,0.3)',
+                                    }}
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                    </svg>
+                                    {isKaiju ? 'Open Cash Division Form' : 'Open Diamond Division Form'}
+                                </a>
+                                <p className="text-white/40 text-xs mt-2">Form not loading? Click the button above to open it directly.</p>
+                            </div>
+                        </>
                     ) : (
                         <UnlockingSoon />
                     )}
