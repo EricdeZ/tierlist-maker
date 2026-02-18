@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { leagueService } from '../services/database'
 import {
     ArrowLeft, ChevronDown, ChevronRight, Calendar, Users, User,
-    MessageCircle, Shield, BarChart3, Star
+    MessageCircle, Shield, BarChart3, Star, DollarSign
 } from 'lucide-react'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
@@ -12,8 +12,16 @@ import BannedContentBanner from '../components/BannedContentBanner'
 import TeamLogo from '../components/TeamLogo'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage, RANK_LABELS } from '../utils/divisionImages'
+import diamondsImg from '../assets/diamonds.png'
 
 const teamImages = import.meta.glob('../assets/teams/*.webp', { eager: true, import: 'default' })
+
+const getTagStyle = (label, leagueColor) => {
+    const lower = label.toLowerCase()
+    if (lower === 'cash prize') return { bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)', color: '#22c55e', icon: 'cash' }
+    if (lower === 'diamond prize') return { bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.3)', color: '#60a5fa', icon: 'diamond' }
+    return { bg: `${leagueColor}15`, border: `${leagueColor}25`, color: leagueColor, icon: null }
+}
 
 const DiscordIcon = ({ className }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -444,11 +452,16 @@ const LeagueOverview = () => {
                                 Season Active
                             </div>
                         )}
-                        {league.league_tags?.map(tag => (
-                            <span key={tag} className="px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: `${leagueColor}15`, border: `1px solid ${leagueColor}25`, color: leagueColor }}>
-                                {tag}
-                            </span>
-                        ))}
+                        {league.league_tags?.map(tag => {
+                            const ts = getTagStyle(tag, leagueColor)
+                            return (
+                                <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: ts.bg, border: `1px solid ${ts.border}`, color: ts.color }}>
+                                    {ts.icon === 'cash' && <DollarSign className="w-3.5 h-3.5" />}
+                                    {ts.icon === 'diamond' && <img src={diamondsImg} alt="" className="w-3.5 h-3.5 object-contain" />}
+                                    {tag}
+                                </span>
+                            )
+                        })}
                         {league.discord_url && (
                             <a
                                 href={league.discord_url}
@@ -693,11 +706,16 @@ const LeagueOverview = () => {
                                                     {/* Division tags */}
                                                     {division.tags?.length > 0 && (
                                                         <div className="flex flex-wrap gap-1.5 mb-4">
-                                                            {division.tags.map(t => (
-                                                                <span key={t.label} className="text-[11px] px-2.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${leagueColor}12`, color: leagueColor, border: `1px solid ${leagueColor}20` }}>
-                                                                    {t.label}
-                                                                </span>
-                                                            ))}
+                                                            {division.tags.map(t => {
+                                                                const ts = getTagStyle(t.label, leagueColor)
+                                                                return (
+                                                                    <span key={t.label} className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>
+                                                                        {ts.icon === 'cash' && <DollarSign className="w-3 h-3" />}
+                                                                        {ts.icon === 'diamond' && <img src={diamondsImg} alt="" className="w-3 h-3 object-contain" />}
+                                                                        {t.label}
+                                                                    </span>
+                                                                )
+                                                            })}
                                                         </div>
                                                     )}
 
