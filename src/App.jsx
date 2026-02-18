@@ -19,6 +19,7 @@ import TeamDetail from './pages/division/TeamDetail'
 import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
+import TierListFeed from "./pages/division/TierListFeed.jsx";
 import LeagueOverview from "./pages/LeagueOverview.jsx";
 import LeaguesBrowse from "./pages/LeaguesBrowse.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
@@ -57,6 +58,7 @@ import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
 import Feedback from "./pages/Feedback.jsx";
+import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
 
 function App() {
@@ -104,6 +106,7 @@ function App() {
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
                             <Route path="feedback" element={<Feedback />} />
+                            <Route path="support" element={<Support />} />
 
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />
@@ -136,7 +139,8 @@ function App() {
                                 <Route path="matches" element={<Matches />} />
                                 <Route path="matches/:matchId" element={<MatchDetail />} />
                                 <Route path="stats" element={<Stats />} />
-                                <Route path="rankings" element={<Rankings />} />
+                                <Route path="tierlist" element={<TierListFeed />} />
+                                <Route path="tierlist/create" element={<Rankings />} />
                                 <Route path="teams" element={<Teams />} />
                                 <Route path="teams/:teamSlug" element={<TeamDetail />} />
                                 <Route path="players/:playerSlug" element={<PlayerProfile />} />

@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart
 } from 'lucide-react'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
@@ -490,18 +490,23 @@ export default function GlobalSidebar() {
                             </SidebarLink>
                         </SidebarSection>
 
-                        {/* Feedback — logged-in only */}
+                        {/* Support & Feedback */}
+                        <div className="border-b border-white/5 my-2 mx-3" />
+                        <SidebarLink
+                            to="/support"
+                            icon={Heart}
+                            active={isActive('/support')}
+                        >
+                            Support
+                        </SidebarLink>
                         {user && (
-                            <>
-                                <div className="border-b border-white/5 my-2 mx-3" />
-                                <SidebarLink
-                                    to="/feedback"
-                                    icon={MessageSquare}
-                                    active={isActive('/feedback')}
-                                >
-                                    Submit Feedback
-                                </SidebarLink>
-                            </>
+                            <SidebarLink
+                                to="/feedback"
+                                icon={MessageSquare}
+                                active={isActive('/feedback')}
+                            >
+                                Submit Feedback
+                            </SidebarLink>
                         )}
 
                         {/* Admin section — conditional */}

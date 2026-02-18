@@ -1121,7 +1121,7 @@ const Homepage = () => {
                             SMITE 2 Companion
                         </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap justify-center">
                         {mainLeagues.filter(l => l.discord_url).map(l => (
                             <a
                                 key={l.id}
@@ -1135,6 +1135,14 @@ const Homepage = () => {
                                 {l.name}
                             </a>
                         ))}
+                        <span className="text-(--color-text-secondary)/20 hidden sm:inline">·</span>
+                        <Link
+                            to="/support"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--color-accent)/70 hover:text-(--color-accent) transition-colors"
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Support smitecomp.com
+                        </Link>
                     </div>
                     <p className="text-xs text-(--color-text-secondary)/30">
                         Community project · Not affiliated with Hi-Rez Studios
