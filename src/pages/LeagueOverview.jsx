@@ -455,7 +455,7 @@ const LeagueOverview = () => {
                         {league.league_tags?.map(tag => {
                             const ts = getTagStyle(tag, leagueColor)
                             return (
-                                <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: ts.bg, border: `1px solid ${ts.border}`, color: ts.color }}>
+                                <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider" style={{ backgroundColor: ts.bg, border: `1px solid ${ts.border}`, color: ts.color }}>
                                     {ts.icon === 'cash' && <DollarSign className="w-3.5 h-3.5" />}
                                     {ts.icon === 'diamond' && <img src={diamondsImg} alt="" className="w-3.5 h-3.5 object-contain" />}
                                     {tag}
@@ -709,7 +709,7 @@ const LeagueOverview = () => {
                                                             {division.tags.map(t => {
                                                                 const ts = getTagStyle(t.label, leagueColor)
                                                                 return (
-                                                                    <span key={t.label} className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>
+                                                                    <span key={t.label} className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium uppercase tracking-wider" style={{ backgroundColor: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>
                                                                         {ts.icon === 'cash' && <DollarSign className="w-3 h-3" />}
                                                                         {ts.icon === 'diamond' && <img src={diamondsImg} alt="" className="w-3 h-3 object-contain" />}
                                                                         {t.label}
