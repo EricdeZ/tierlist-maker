@@ -400,16 +400,16 @@ const PlayerList = () => {
 
                             return (
                                 <tr key={player.id} className={index % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                    <td className="px-4 py-4 text-sm font-medium max-w-[150px]">
                                         {pSlug ? (
                                             <Link
                                                 to={`${basePath}/players/${pSlug}`}
-                                                className="text-(--color-text) hover:text-(--color-accent) transition-colors"
+                                                className="text-(--color-text) hover:text-(--color-accent) transition-colors block truncate"
                                             >
                                                 {player.name}
                                             </Link>
                                         ) : (
-                                            <span className="text-(--color-text)">{player.name}</span>
+                                            <span className="text-(--color-text) block truncate">{player.name}</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap text-sm">
