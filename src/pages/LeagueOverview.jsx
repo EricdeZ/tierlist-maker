@@ -23,8 +23,8 @@ const DiscordIcon = ({ className }) => (
 
 const LeagueOverview = () => {
     const { leagueSlug } = useParams()
-    const { hasAnyPermission } = useAuth()
-    const canPreview = hasAnyPermission
+    const { hasPermission } = useAuth()
+    const canPreview = () => hasPermission('league_preview', league?.id)
     const [league, setLeague] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -220,7 +220,7 @@ const LeagueOverview = () => {
 
     const divisions = league.divisions || []
     const logo = getLeagueLogo(league.slug)
-    const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview))
+    const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview()))
     const leagueColor = league.color || 'var(--color-accent)'
     const totalTeams = activeDivisions.reduce((sum, d) => sum + (d.team_count || 0), 0)
     const totalPlayers = activeDivisions.reduce((sum, d) => sum + (d.player_count || 0), 0)
@@ -529,7 +529,7 @@ const LeagueOverview = () => {
                             {divisions.map(division => {
                                 const rankImg = getDivisionImage(leagueSlug, division.slug, division.tier)
                                 const rankLabel = RANK_LABELS[division.tier]
-                                const activeSeason = division.seasons?.find(s => s.is_active || canPreview)
+                                const activeSeason = division.seasons?.find(s => s.is_active || canPreview())
                                 const hasData = !!activeSeason
                                 const isExpanded = expanded[division.id]
                                 const seasons = division.seasons || []

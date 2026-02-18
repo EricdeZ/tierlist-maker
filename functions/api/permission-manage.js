@@ -16,6 +16,7 @@ const PERMISSION_KEYS = [
     { key: 'claim_manage',      label: 'Claim Manage',      description: 'Review player claim requests', scopeable: false },
     { key: 'permission_manage', label: 'Permission Manage', description: 'Create roles, assign permissions to users', scopeable: false },
     { key: 'audit_log_view',   label: 'Audit Log',         description: 'View the audit log of all admin actions', scopeable: false },
+    { key: 'league_preview',   label: 'League Preview',    description: 'View inactive seasons before they go live', scopeable: true },
 ]
 
 const VALID_KEYS = PERMISSION_KEYS.map(p => p.key)

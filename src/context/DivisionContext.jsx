@@ -8,7 +8,7 @@ const DivisionContext = createContext(null)
 
 export const DivisionProvider = ({ children }) => {
     const { leagueSlug, divisionSlug } = useParams()
-    const { hasAnyPermission, loading: authLoading } = useAuth()
+    const { hasPermission, loading: authLoading } = useAuth()
 
     const [state, setState] = useState({
         league: null,
@@ -43,10 +43,10 @@ export const DivisionProvider = ({ children }) => {
                     throw new Error(`Division "${divisionSlug}" not found in ${league.name}`)
                 }
 
-                // Step 3: Find active season (admins can also see inactive seasons)
+                // Step 3: Find active season (users with league_preview can also see inactive seasons)
                 const validSeasons = division.seasons?.filter(s => s.id) || []
                 const season = validSeasons.find(s => s.is_active)
-                    || (hasAnyPermission && validSeasons[0])
+                    || (hasPermission('league_preview', league.id) && validSeasons[0])
 
                 // Step 4: Load teams + players if a season exists
                 let teams = []
@@ -87,7 +87,7 @@ export const DivisionProvider = ({ children }) => {
 
         loadData()
         return () => { cancelled = true }
-    }, [leagueSlug, divisionSlug, hasAnyPermission, authLoading])
+    }, [leagueSlug, divisionSlug, hasPermission, authLoading])
 
     return (
         <DivisionContext.Provider value={state}>

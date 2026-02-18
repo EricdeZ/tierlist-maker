@@ -21,7 +21,7 @@ const handler = async (event) => {
         // ─── GET: Full hierarchy with counts ───
         if (event.httpMethod === 'GET') {
             const leagues = await sql`
-                SELECT id, name, slug, description, discord_url, color, created_at
+                SELECT id, name, slug, description, discord_url, color, slogan, promotional_text, created_at
                 FROM leagues ORDER BY name
             `
 
@@ -112,19 +112,19 @@ function slugify(str) {
 // LEAGUE CRUD
 // ═══════════════════════════════════════════════════
 
-async function createLeague(sql, { name, description, discord_url, color }, admin) {
+async function createLeague(sql, { name, description, discord_url, color, slogan, promotional_text }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const slug = slugify(name.trim())
     const [row] = await sql`
-        INSERT INTO leagues (name, slug, description, discord_url, color)
-        VALUES (${name.trim()}, ${slug}, ${description || null}, ${discord_url || null}, ${color || null})
+        INSERT INTO leagues (name, slug, description, discord_url, color, slogan, promotional_text)
+        VALUES (${name.trim()}, ${slug}, ${description || null}, ${discord_url || null}, ${color || null}, ${slogan || null}, ${promotional_text || null})
         RETURNING *
     `
     await logAudit(sql, admin, { action: 'create-league', endpoint: 'league-manage', targetType: 'league', targetId: row.id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, league: row }) }
 }
 
-async function updateLeague(sql, { id, name, slug, description, discord_url, color }, admin) {
+async function updateLeague(sql, { id, name, slug, description, discord_url, color, slogan, promotional_text }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [row] = await sql`
         UPDATE leagues SET
@@ -133,6 +133,8 @@ async function updateLeague(sql, { id, name, slug, description, discord_url, col
             description = ${description ?? null},
             discord_url = ${discord_url ?? null},
             color = COALESCE(${color || null}, color),
+            slogan = ${slogan ?? null},
+            promotional_text = ${promotional_text ?? null},
             updated_at = NOW()
         WHERE id = ${id} RETURNING *
     `

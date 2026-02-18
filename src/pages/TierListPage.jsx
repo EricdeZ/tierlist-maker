@@ -81,8 +81,8 @@ function FancySelect({ value, onChange, options, placeholder, renderOption, rend
 }
 
 export default function TierListPage() {
-    const { hasAnyPermission } = useAuth()
-    const canPreview = hasAnyPermission
+    const { hasPermission } = useAuth()
+    const canPreview = (leagueId) => hasPermission('league_preview', leagueId)
     const [leagues, setLeagues] = useState([])
     const [leaguesLoading, setLeaguesLoading] = useState(true)
     const [showPicker, setShowPicker] = useState(true)
@@ -119,7 +119,7 @@ export default function TierListPage() {
     }, [])
 
     const hasActiveSeason = (league) =>
-        league.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview))
+        league.divisions?.some(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))
 
     const activeLeagues = useMemo(
         () => leagues.filter(hasActiveSeason),
@@ -138,7 +138,7 @@ export default function TierListPage() {
     )
 
     const activeDivisions = useMemo(
-        () => selectedLeague?.divisions?.filter(d => d.seasons?.some(s => s.is_active || canPreview)) || [],
+        () => selectedLeague?.divisions?.filter(d => d.seasons?.some(s => s.is_active || canPreview(selectedLeague?.id))) || [],
         [selectedLeague]
     )
 
@@ -156,7 +156,7 @@ export default function TierListPage() {
     )
 
     const activeSeasons = useMemo(
-        () => selectedDivision?.seasons?.filter(s => s.is_active || canPreview) || [],
+        () => selectedDivision?.seasons?.filter(s => s.is_active || canPreview(selectedLeague?.id)) || [],
         [selectedDivision]
     )
 

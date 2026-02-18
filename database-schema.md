@@ -11,6 +11,8 @@
 | description | text | YES | |
 | discord_url | text | YES | |
 | color | varchar(7) | YES | |
+| slogan | text | YES | |
+| promotional_text | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 

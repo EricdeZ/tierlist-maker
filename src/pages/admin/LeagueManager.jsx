@@ -372,7 +372,9 @@ export default function LeagueManager() {
                                         fields={[
                                             { key: 'name', label: 'Name', value: editItem.name },
                                             { key: 'slug', label: 'Slug', value: editItem.slug },
+                                            { key: 'slogan', label: 'Slogan', value: editItem.slogan || '', wide: true },
                                             { key: 'description', label: 'Description', value: editItem.description || '', wide: true },
+                                            { key: 'promotional_text', label: 'Promo Text', value: editItem.promotional_text || '', wide: true },
                                             { key: 'discord_url', label: 'Discord URL', value: editItem.discord_url || '', wide: true },
                                             { key: 'color', label: 'Color', value: editItem.color || '#3b82f6', type: 'color', small: true },
                                         ]}
@@ -391,7 +393,7 @@ export default function LeagueManager() {
                                             {league.discord_url && <MessageCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" title="Discord linked" />}
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'league', id: league.id, name: league.name, slug: league.slug, description: league.description || '', discord_url: league.discord_url || '', color: league.color || '' })} />
+                                            <IconBtn icon={Pencil} title="Edit" onClick={() => setEditItem({ type: 'league', id: league.id, name: league.name, slug: league.slug, description: league.description || '', discord_url: league.discord_url || '', color: league.color || '', slogan: league.slogan || '', promotional_text: league.promotional_text || '' })} />
                                             <IconBtn icon={Trash2} title="Delete" onClick={() => handleDelete('league', league.id, league.name)} danger />
                                         </div>
                                     </>
@@ -650,7 +652,9 @@ export default function LeagueManager() {
                         <InlineEdit
                             fields={[
                                 { key: 'name', label: 'League name', value: createItem.name || '' },
+                                { key: 'slogan', label: 'Slogan', value: createItem.slogan || '', wide: true },
                                 { key: 'description', label: 'Description', value: createItem.description || '', wide: true },
+                                { key: 'promotional_text', label: 'Promo Text', value: createItem.promotional_text || '', wide: true },
                                 { key: 'discord_url', label: 'Discord URL', value: createItem.discord_url || '', wide: true },
                                 { key: 'color', label: 'Color', value: createItem.color || '#3b82f6', type: 'color', small: true },
                             ]}
@@ -662,7 +666,7 @@ export default function LeagueManager() {
                     </div>
                 ) : (
                     <button
-                        onClick={() => setCreateItem({ type: 'league', name: '', description: '', discord_url: '', color: '' })}
+                        onClick={() => setCreateItem({ type: 'league', name: '', description: '', discord_url: '', color: '', slogan: '', promotional_text: '' })}
                         className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors px-4 py-2 rounded-xl border border-dashed border-white/10 hover:border-white/20 w-full justify-center"
                     >
                         <Plus className="w-4 h-4" /> Add League
