@@ -358,3 +358,15 @@ export const predictionsService = {
     },
 }
 
+export const feedbackService = {
+    async submit(data) {
+        return apiPost('feedback', {}, data)
+    },
+    async adminGetAll() {
+        return apiCall('feedback')
+    },
+    async remove(id) {
+        return apiPost('feedback', {}, { action: 'delete', id })
+    },
+}
+

@@ -56,6 +56,8 @@ import AGLSignup from "./pages/AGLSignup.jsx";
 import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
+import Feedback from "./pages/Feedback.jsx";
+import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
 
 function App() {
     return (
@@ -90,6 +92,7 @@ function App() {
                                 <Route path="debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
                                 <Route path="data-reports" element={<ProtectedRoute requiredPermission="league_manage"><DataReportManager /></ProtectedRoute>} />
                                 <Route path="orgs" element={<ProtectedRoute requiredPermission="league_manage"><OrgManager /></ProtectedRoute>} />
+                                <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Passion pages */}
@@ -100,6 +103,7 @@ function App() {
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
+                            <Route path="feedback" element={<Feedback />} />
 
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />

@@ -30,6 +30,7 @@ const morePages = [
     { path: '/admin/permissions',    label: 'Permissions',     permission: 'permission_manage' },
     { path: '/admin/auditlog',       label: 'Audit Log',       permission: 'audit_log_view' },
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },
+    { path: '/admin/feedback',       label: 'Feedback',        permission: 'feedback_manage' },
 ]
 
 export default function AdminNavbar() {

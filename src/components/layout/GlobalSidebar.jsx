@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare
 } from 'lucide-react'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
@@ -489,6 +489,20 @@ export default function GlobalSidebar() {
                                 Featured Stream
                             </SidebarLink>
                         </SidebarSection>
+
+                        {/* Feedback — logged-in only */}
+                        {user && (
+                            <>
+                                <div className="border-b border-white/5 my-2 mx-3" />
+                                <SidebarLink
+                                    to="/feedback"
+                                    icon={MessageSquare}
+                                    active={isActive('/feedback')}
+                                >
+                                    Submit Feedback
+                                </SidebarLink>
+                            </>
+                        )}
 
                         {/* Admin section — conditional */}
                         {(isAdmin || hasAnyPermission) && (
