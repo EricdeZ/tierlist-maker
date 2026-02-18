@@ -124,6 +124,7 @@ async function getMatchDetail(sql, matchId, admin, isOwnOnly) {
             pgs.league_player_id,
             pgs.team_side,
             pgs.god_played,
+            pgs.role_played,
             pgs.kills, pgs.deaths, pgs.assists,
             pgs.damage, pgs.mitigated,
             pgs.gpm, pgs.structure_damage,
@@ -305,13 +306,14 @@ async function saveGame(sql, body, admin, isOwnOnly) {
                     INSERT INTO player_game_stats (
                         game_id, league_player_id, team_side,
                         kills, deaths, assists, damage, mitigated, god_played,
-                        gpm, structure_damage, self_healing, ally_healing
+                        gpm, structure_damage, self_healing, ally_healing, role_played
                     ) VALUES (
                         ${game_id}, ${p.league_player_id}, ${p.team_side},
                         ${p.kills || 0}, ${p.deaths || 0}, ${p.assists || 0},
                         ${p.damage || null}, ${p.mitigated || null}, ${p.god_played || 'Unknown'},
                         ${p.gpm || null}, ${p.structure_damage || null},
-                        ${p.self_healing || null}, ${p.ally_healing || null}
+                        ${p.self_healing || null}, ${p.ally_healing || null},
+                        ${p.role_played || null}
                     )
                 `
             }

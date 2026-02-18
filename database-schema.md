@@ -166,6 +166,7 @@ UNIQUE(match_id, game_number)
 | self_healing | integer | YES | 0 |
 | structure_damage | integer | YES | 0 |
 | gpm | integer | YES | 0 |
+| role_played | varchar(20) | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 

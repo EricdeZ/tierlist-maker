@@ -73,6 +73,18 @@ const handler = async (event) => {
             ORDER BY pa.player_id, pa.alias
         `
 
+        // Last recorded role_played per league_player (for prefilling in match reports)
+        const lastRoles = await sql`
+            SELECT DISTINCT ON (pgs.league_player_id)
+                pgs.league_player_id,
+                pgs.role_played
+            FROM player_game_stats pgs
+            JOIN games g ON pgs.game_id = g.id
+            JOIN matches m ON g.match_id = m.id
+            WHERE pgs.role_played IS NOT NULL
+            ORDER BY pgs.league_player_id, m.date DESC, g.id DESC
+        `
+
         // All gods for autocomplete in match review
         const gods = await sql`
             SELECT id, name, slug, image_url
@@ -96,7 +108,7 @@ const handler = async (event) => {
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases, gods, scheduledMatches }),
+            body: JSON.stringify({ seasons, teams, matches, players, globalPlayers, aliases, gods, scheduledMatches, lastRoles }),
         }
     } catch (error) {
         console.error('Admin data error:', error)

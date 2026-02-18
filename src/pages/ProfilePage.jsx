@@ -11,6 +11,13 @@ import RankBadge from '../components/RankBadge'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
+import soloImage from '../assets/roles/solo.webp'
+import jungleImage from '../assets/roles/jungle.webp'
+import midImage from '../assets/roles/mid.webp'
+import suppImage from '../assets/roles/supp.webp'
+import adcImage from '../assets/roles/adc.webp'
+
+const ROLE_IMAGES = { Solo: soloImage, Jungle: jungleImage, Mid: midImage, Support: suppImage, ADC: adcImage }
 
 const ProfilePage = () => {
     const { playerSlug } = useParams()
@@ -469,6 +476,9 @@ const ProfilePage = () => {
                                         )}
                                         <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Opponent</th>
                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase"></th>
+                                        {filteredGames.some(g => g.role_played) && (
+                                            <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">Role</th>
+                                        )}
                                         {filteredGames.some(g => g.god_played) && (
                                             <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">God</th>
                                         )}
@@ -542,6 +552,15 @@ const ProfilePage = () => {
                                                         {isWin ? 'W' : 'L'}
                                                     </span>
                                                 </td>
+                                                {filteredGames.some(g => g.role_played) && (
+                                                    <td className="px-2 py-2.5 text-center">
+                                                        {game.role_played && ROLE_IMAGES[game.role_played] ? (
+                                                            <img src={ROLE_IMAGES[game.role_played]} alt={game.role_played} title={game.role_played} className="w-4 h-4 object-contain inline-block" />
+                                                        ) : (
+                                                            <span className="text-sm text-(--color-text-secondary)">—</span>
+                                                        )}
+                                                    </td>
+                                                )}
                                                 {filteredGames.some(g => g.god_played) && (
                                                     <td className="px-2 py-2.5 text-center text-sm text-(--color-text)">
                                                         {game.god_played || '—'}

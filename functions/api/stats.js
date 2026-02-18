@@ -36,6 +36,7 @@ const handler = async (event) => {
                         pgs.damage,
                         pgs.mitigated,
                         pgs.god_played,
+                        pgs.role_played,
                         pgs.team_side,
                         CASE pgs.team_side
                             WHEN 1 THEN m.team1_id

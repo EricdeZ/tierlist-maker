@@ -138,14 +138,15 @@ async function submitMatch(sql, body, admin) {
                             INSERT INTO player_game_stats (
                                 game_id, league_player_id, team_side,
                                 kills, deaths, assists, damage, mitigated, god_played,
-                                gpm, structure_damage, self_healing, ally_healing
+                                gpm, structure_damage, self_healing, ally_healing, role_played
                             )
                             VALUES (
                                 ${gameId}, ${lpId}, 1,
                                 ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
                                 ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
                                 ${player.gpm ?? null}, ${player.structure_damage ?? null},
-                                ${player.self_healing ?? null}, ${player.ally_healing ?? null}
+                                ${player.self_healing ?? null}, ${player.ally_healing ?? null},
+                                ${player.role_played || null}
                             )
                         `
                     }
@@ -160,14 +161,15 @@ async function submitMatch(sql, body, admin) {
                             INSERT INTO player_game_stats (
                                 game_id, league_player_id, team_side,
                                 kills, deaths, assists, damage, mitigated, god_played,
-                                gpm, structure_damage, self_healing, ally_healing
+                                gpm, structure_damage, self_healing, ally_healing, role_played
                             )
                             VALUES (
                                 ${gameId}, ${lpId}, 2,
                                 ${player.kills || 0}, ${player.deaths || 0}, ${player.assists || 0},
                                 ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
                                 ${player.gpm ?? null}, ${player.structure_damage ?? null},
-                                ${player.self_healing ?? null}, ${player.ally_healing ?? null}
+                                ${player.self_healing ?? null}, ${player.ally_healing ?? null},
+                                ${player.role_played || null}
                             )
                         `
                     }

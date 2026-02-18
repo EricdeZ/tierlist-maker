@@ -9,6 +9,14 @@ import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
 import DiscordImagesPanel from '../../components/admin/DiscordImagesPanel'
 import FloatingImageViewer from '../../components/admin/FloatingImageViewer'
 import { getAuthHeaders } from '../../services/adminApi.js'
+import soloImage from '../../assets/roles/solo.webp'
+import jungleImage from '../../assets/roles/jungle.webp'
+import midImage from '../../assets/roles/mid.webp'
+import suppImage from '../../assets/roles/supp.webp'
+import adcImage from '../../assets/roles/adc.webp'
+
+const ROLE_IMAGES = { Solo: soloImage, Jungle: jungleImage, Mid: midImage, Support: suppImage, ADC: adcImage }
+const ROLE_LIST = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC']
 
 const API = import.meta.env.VITE_API_URL || '/api'
 const STORAGE_KEY = 'smite2_admin_pending'
@@ -505,7 +513,7 @@ export default function AdminDashboard() {
             const result = await res.json()
 
             // Build editable data from extraction result
-            const editData = buildEditData(result)
+            const editData = buildEditData(result, adminData)
 
             // Apply the selected season if the AI didn't infer one or to override
             if (selectedSeasonId) {
@@ -595,6 +603,7 @@ export default function AdminDashboard() {
                     const mapPlayer = p => ({
                         player_name: p.player_name,
                         god_played: p.god_played,
+                        role_played: p.role_played || null,
                         kills: p.kills || 0,
                         deaths: p.deaths || 0,
                         assists: p.assists || 0,
@@ -971,9 +980,20 @@ export default function AdminDashboard() {
 // ═══════════════════════════════════════════════════
 // BUILD EDITABLE DATA FROM AI EXTRACTION RESULT
 // ═══════════════════════════════════════════════════
-function buildEditData(result) {
+function buildEditData(result, adminData) {
     const pm0 = result.player_matches?.[0]
     const meta = result.match_meta
+
+    // Build lookup: league_player_id → last role_played
+    const lastRoleLookup = {}
+    for (const lr of (adminData?.lastRoles || [])) {
+        lastRoleLookup[lr.league_player_id] = lr.role_played
+    }
+    // Also fall back to league_players.role from roster
+    const rosterRoleLookup = {}
+    for (const p of (adminData?.players || [])) {
+        rosterRoleLookup[p.league_player_id] = p.role
+    }
 
     const games = (result.games || []).map((game, idx) => {
         if (!game.success) return null
@@ -983,6 +1003,14 @@ function buildEditData(result) {
         const mapPlayers = (players, side) => players.map(p => {
             const m = pm?.matched?.find(x => x.extracted_name === p.player_name && x.side === side)
             const sub = pm?.unmatched?.find(x => x.extracted_name === p.player_name && x.side === side)
+            const lpId = m?.db_player?.league_player_id
+            // Prefill role: last recorded role_played > roster role
+            const prefillRole = lpId ? (lastRoleLookup[lpId] || rosterRoleLookup[lpId] || null) : null
+            // Normalize roster roles like "sub" or "fill" to null (not valid game roles)
+            const validRoles = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC']
+            const normalizedRole = prefillRole && validRoles.some(r => r.toLowerCase() === prefillRole.toLowerCase())
+                ? validRoles.find(r => r.toLowerCase() === prefillRole.toLowerCase())
+                : null
             return {
                 ...p,
                 original_name: p.player_name,
@@ -992,15 +1020,44 @@ function buildEditData(result) {
                 matched_alias: m?.matched_alias || null,
                 is_sub: !!sub,
                 sub_type: sub?.sub_type || null,
+                role_played: normalizedRole,
             }
         })
+
+        const left_players = mapPlayers(game.data.left_players, 'left')
+        const right_players = mapPlayers(game.data.right_players, 'right')
+
+        // Ensure exactly one of each role per team — dedup then fill empty slots
+        const deduplicateRoles = (teamPlayers) => {
+            const seen = new Set()
+            for (let i = 0; i < teamPlayers.length; i++) {
+                const r = teamPlayers[i].role_played
+                if (r) {
+                    if (seen.has(r)) {
+                        teamPlayers[i].role_played = null
+                    } else {
+                        seen.add(r)
+                    }
+                }
+            }
+            // Fill all empty slots with remaining roles
+            const missing = ROLE_LIST.filter(r => !seen.has(r))
+            let mi = 0
+            for (let i = 0; i < teamPlayers.length; i++) {
+                if (!teamPlayers[i].role_played && mi < missing.length) {
+                    teamPlayers[i].role_played = missing[mi++]
+                }
+            }
+        }
+        deduplicateRoles(left_players)
+        deduplicateRoles(right_players)
 
         return {
             game_index: idx,
             winning_team_id: gw?.winning_team_id || null,
             is_forfeit: false,
-            left_players: mapPlayers(game.data.left_players, 'left'),
-            right_players: mapPlayers(game.data.right_players, 'right'),
+            left_players,
+            right_players,
         }
     }).filter(Boolean)
 
@@ -1851,7 +1908,7 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
                     <button
                         onClick={() => {
                             const emptyPlayer = () => ({
-                                player_name: '', original_name: '', god_played: '', kills: 0, deaths: 0, assists: 0,
+                                player_name: '', original_name: '', god_played: '', role_played: '', kills: 0, deaths: 0, assists: 0,
                                 player_damage: 0, mitigated: 0, structure_damage: 0, gpm: 0,
                                 matched_name: null, matched_lp_id: null, is_sub: false, sub_type: null,
                             })
@@ -1953,9 +2010,11 @@ function EditableMatchData({ editData, adminData, result, onChange }) {
 function GameEditor({ game, team1, team2, seasonId, adminData, onChange }) {
     const updatePlayer = (side, playerIdx, updates) => {
         const key = side === 'left' ? 'left_players' : 'right_players'
-        const players = [...game[key]]
-        players[playerIdx] = { ...players[playerIdx], ...updates }
-        onChange({ ...game, [key]: players })
+        onChange(prev => {
+            const players = [...prev[key]]
+            players[playerIdx] = { ...players[playerIdx], ...updates }
+            return { ...prev, [key]: players }
+        })
     }
 
     return (
@@ -2040,6 +2099,38 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
         if (p.player_name) usedNames.add(p.player_name.toLowerCase())
     }
 
+    // Drag-and-drop role swap between players in this team
+    const [dragSource, setDragSource] = useState(null)
+
+    const handleRoleDragStart = (playerIdx) => {
+        setDragSource(playerIdx)
+    }
+
+    const handleRoleDrop = (targetIdx) => {
+        if (dragSource === null || dragSource === targetIdx) { setDragSource(null); return }
+        const sourceRole = players[dragSource]?.role_played || null
+        const targetRole = players[targetIdx]?.role_played || null
+        // Swap roles
+        onUpdatePlayer(dragSource, { role_played: targetRole })
+        onUpdatePlayer(targetIdx, { role_played: sourceRole })
+        setDragSource(null)
+    }
+
+    // Click-to-pick with swap enforcement — each role at most once per team
+    const handleRoleSelect = (playerIdx, newRole) => {
+        if (!newRole) {
+            onUpdatePlayer(playerIdx, { role_played: null })
+            return
+        }
+        // If another player on this team already has this role, swap
+        const conflictIdx = players.findIndex((p, i) => i !== playerIdx && p.role_played === newRole)
+        if (conflictIdx !== -1) {
+            const currentRole = players[playerIdx]?.role_played || null
+            onUpdatePlayer(conflictIdx, { role_played: currentRole })
+        }
+        onUpdatePlayer(playerIdx, { role_played: newRole })
+    }
+
     return (
         <div className="p-3">
             <div className="flex items-center gap-2 mb-2">
@@ -2051,6 +2142,7 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
                 <thead>
                 <tr className="text-[var(--color-text-secondary)] border-b border-[var(--color-border)]">
                     <th className="text-left py-1 pr-2 font-medium min-w-[140px]">Player</th>
+                    <th className="text-center py-1 pr-2 font-medium w-10">Role</th>
                     <th className="text-left py-1 pr-2 font-medium min-w-[80px]">God</th>
                     <th className="text-center py-1 px-1 font-medium w-8">K</th>
                     <th className="text-center py-1 px-1 font-medium w-8">D</th>
@@ -2061,9 +2153,13 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
                 </thead>
                 <tbody>
                 {(players || []).map((player, idx) => (
-                    <PlayerRow key={idx} player={player} seasonId={seasonId} adminData={adminData}
+                    <PlayerRow key={idx} player={player} playerIdx={idx} seasonId={seasonId} adminData={adminData}
                                usedLpIds={usedLpIds} usedNames={usedNames}
-                               onChange={(updates) => onUpdatePlayer(idx, updates)} />
+                               onChange={(updates) => onUpdatePlayer(idx, updates)}
+                               onRoleSelect={(newRole) => handleRoleSelect(idx, newRole)}
+                               onRoleDragStart={handleRoleDragStart}
+                               onRoleDrop={handleRoleDrop}
+                               isDragSource={dragSource === idx} />
                 ))}
                 </tbody>
             </table>
@@ -2073,9 +2169,89 @@ function PlayerTable({ label, color, players, allGamePlayers, seasonId, adminDat
 
 
 // ═══════════════════════════════════════════════════
+// ROLE ICON (draggable role badge with click-to-cycle)
+// ═══════════════════════════════════════════════════
+function RoleIcon({ role, playerIdx, onRoleSelect, onDragStart, onDrop, isDragSource }) {
+    const [showPicker, setShowPicker] = useState(false)
+    const ref = useRef(null)
+
+    useEffect(() => {
+        if (!showPicker) return
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setShowPicker(false) }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [showPicker])
+
+    const img = role ? ROLE_IMAGES[role] : null
+
+    return (
+        <div
+            ref={ref}
+            className={`relative flex items-center justify-center ${isDragSource ? 'opacity-40' : ''}`}
+            draggable
+            onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/plain', String(playerIdx))
+                onDragStart(playerIdx)
+            }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDrop={(e) => { e.preventDefault(); onDrop(playerIdx) }}
+            onDragEnd={() => onDragStart(null)}
+        >
+            <button
+                type="button"
+                onClick={() => setShowPicker(!showPicker)}
+                className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/10 transition-colors cursor-grab active:cursor-grabbing"
+                title={role ? `${role} — drag to swap, click to change` : 'Click to set role, drag to swap'}
+            >
+                {img ? (
+                    <img src={img} alt={role} className="w-5 h-5 object-contain" draggable={false} />
+                ) : (
+                    <span className="text-[10px] text-[var(--color-text-secondary)]/50">—</span>
+                )}
+            </button>
+
+            {showPicker && (
+                <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 flex gap-0.5 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl p-1">
+                    {ROLE_LIST.map(r => (
+                        <button
+                            key={r}
+                            type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => {
+                                onRoleSelect(role === r ? null : r)
+                                setShowPicker(false)
+                            }}
+                            className={`w-7 h-7 rounded flex items-center justify-center transition-all ${
+                                role === r ? 'bg-[var(--color-accent)]/20 ring-1 ring-[var(--color-accent)]' : 'hover:bg-white/10'
+                            }`}
+                            title={r}
+                        >
+                            <img src={ROLE_IMAGES[r]} alt={r} className="w-5 h-5 object-contain" draggable={false} />
+                        </button>
+                    ))}
+                    {role && (
+                        <button
+                            type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { onRoleSelect(null); setShowPicker(false) }}
+                            className="w-7 h-7 rounded flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-400/10 transition-all text-xs font-bold"
+                            title="Clear role"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
 // PLAYER ROW (inline editing + DB name search)
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange }) {
+function PlayerRow({ player, playerIdx, seasonId, adminData, usedLpIds, usedNames, onChange, onRoleSelect, onRoleDragStart, onRoleDrop, isDragSource }) {
     const [showSearch, setShowSearch] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [showAliasModal, setShowAliasModal] = useState(false)
@@ -2288,6 +2464,16 @@ function PlayerRow({ player, seasonId, adminData, usedLpIds, usedNames, onChange
                 </div>
             </td>
 
+            <td className="py-1.5 pr-2">
+                <RoleIcon
+                    role={player.role_played}
+                    playerIdx={playerIdx}
+                    onRoleSelect={onRoleSelect}
+                    onDragStart={onRoleDragStart}
+                    onDrop={onRoleDrop}
+                    isDragSource={isDragSource}
+                />
+            </td>
             <td className="py-1.5 pr-2">
                 <GodAutocomplete value={player.god_played || ''} gods={adminData?.gods} onChange={updates => onChange(updates)} />
             </td>

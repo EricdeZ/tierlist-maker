@@ -7,6 +7,14 @@ import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
 import { Flag, Pencil } from 'lucide-react'
+import soloImage from '../../assets/roles/solo.webp'
+import jungleImage from '../../assets/roles/jungle.webp'
+import midImage from '../../assets/roles/mid.webp'
+import suppImage from '../../assets/roles/supp.webp'
+import adcImage from '../../assets/roles/adc.webp'
+
+const ROLE_IMAGES = { Solo: soloImage, Jungle: jungleImage, Mid: midImage, Support: suppImage, ADC: adcImage }
+const ROLE_ORDER = { Solo: 0, Jungle: 1, Mid: 2, Support: 3, ADC: 4 }
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
@@ -420,6 +428,12 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
         )
     }
 
+    // Sort by role order if any player has a role assigned
+    const hasRoles = players.some(p => p.role_played)
+    const sorted = hasRoles
+        ? [...players].sort((a, b) => (ROLE_ORDER[a.role_played] ?? 99) - (ROLE_ORDER[b.role_played] ?? 99))
+        : players
+
     return (
         <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden">
             {/* Team header */}
@@ -445,6 +459,7 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
                     <thead className="bg-white/[0.03]">
                         <tr>
                             <th className="px-3 py-2 text-left text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">Player</th>
+                            <th className="px-3 py-2 text-center text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
                             <th className="px-3 py-2 text-center text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">God</th>
                             <th className="px-3 py-2 text-center text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">K</th>
                             <th className="px-3 py-2 text-center text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">D</th>
@@ -454,7 +469,7 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.03]">
-                        {players.map((player, idx) => {
+                        {sorted.map((player, idx) => {
                             const kda = player.deaths === 0
                                 ? player.kills + (player.assists / 2)
                                 : (player.kills + (player.assists / 2)) / player.deaths
@@ -468,6 +483,13 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
                                         >
                                             {player.player_name}
                                         </Link>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                        {player.role_played && ROLE_IMAGES[player.role_played] ? (
+                                            <img src={ROLE_IMAGES[player.role_played]} alt={player.role_played} title={player.role_played} className="w-5 h-5 object-contain inline-block" />
+                                        ) : (
+                                            <span className="text-xs text-(--color-text-secondary)">—</span>
+                                        )}
                                     </td>
                                     <td className="px-3 py-2.5 text-center text-xs text-(--color-text-secondary) whitespace-nowrap">
                                         {player.god_played || '—'}

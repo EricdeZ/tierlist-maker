@@ -507,6 +507,9 @@ const PlayerProfile = () => {
                                             <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Date</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Opponent</th>
                                             <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Result</th>
+                                            {gameHistory.some(g => g.role_played) && (
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
+                                            )}
                                             {gameHistory.some(g => g.god_played) && (
                                                 <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">God</th>
                                             )}
@@ -556,6 +559,15 @@ const PlayerProfile = () => {
                                                             {isWin ? 'W' : 'L'}
                                                         </span>
                                                     </td>
+                                                    {gameHistory.some(g => g.role_played) && (
+                                                        <td className="px-4 py-3 text-center">
+                                                            {game.role_played && roleImages[game.role_played.toUpperCase()] ? (
+                                                                <img src={roleImages[game.role_played.toUpperCase()]} alt={game.role_played} title={game.role_played} className="w-5 h-5 object-contain inline-block" />
+                                                            ) : (
+                                                                <span className="text-sm text-(--color-text-secondary)">—</span>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                     {gameHistory.some(g => g.god_played) && (
                                                         <td className="px-4 py-3 text-center text-sm text-(--color-text)">
                                                             {game.god_played || '—'}
@@ -780,6 +792,9 @@ const PlayerProfile = () => {
                                                     )}
                                                     <th className="px-3 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase">Opponent</th>
                                                     <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase"></th>
+                                                    {filteredGames.some(g => g.role_played) && (
+                                                        <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">Role</th>
+                                                    )}
                                                     {filteredGames.some(g => g.god_played) && (
                                                         <th className="px-2 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase">God</th>
                                                     )}
@@ -853,6 +868,15 @@ const PlayerProfile = () => {
                                                                     {isWin ? 'W' : 'L'}
                                                                 </span>
                                                             </td>
+                                                            {filteredGames.some(g => g.role_played) && (
+                                                                <td className="px-2 py-2.5 text-center">
+                                                                    {game.role_played && roleImages[game.role_played.toUpperCase()] ? (
+                                                                        <img src={roleImages[game.role_played.toUpperCase()]} alt={game.role_played} title={game.role_played} className="w-4 h-4 object-contain inline-block" />
+                                                                    ) : (
+                                                                        <span className="text-sm text-(--color-text-secondary)">—</span>
+                                                                    )}
+                                                                </td>
+                                                            )}
                                                             {filteredGames.some(g => g.god_played) && (
                                                                 <td className="px-2 py-2.5 text-center text-sm text-(--color-text)">
                                                                     {game.god_played || '—'}

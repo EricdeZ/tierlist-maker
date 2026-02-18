@@ -4,6 +4,14 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
+import soloImage from '../../assets/roles/solo.webp'
+import jungleImage from '../../assets/roles/jungle.webp'
+import midImage from '../../assets/roles/mid.webp'
+import suppImage from '../../assets/roles/supp.webp'
+import adcImage from '../../assets/roles/adc.webp'
+
+const ROLE_IMAGES = { Solo: soloImage, Jungle: jungleImage, Mid: midImage, Support: suppImage, ADC: adcImage }
+const ROLE_LIST = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC']
 
 const API = import.meta.env.VITE_API_URL || '/api'
 const SEASON_KEY = 'smite2_admin_season'
@@ -209,6 +217,7 @@ export default function MatchManager() {
                 league_player_id: p.league_player_id,
                 team_side: p.team_side,
                 god_played: p.god_played,
+                role_played: p.role_played || null,
                 kills: p.kills || 0,
                 deaths: p.deaths || 0,
                 assists: p.assists || 0,
@@ -566,6 +575,20 @@ function GameBlock({ game, gameIdx, matchId, team1_id, team2_id, team1_name, tea
 // STATS TABLE (one side of a game)
 // ═══════════════════════════════════════════════════
 function StatsTable({ label, color, players, teamSide, gods, adminData, onUpdate, isWinner }) {
+    // Click-to-pick with swap enforcement — each role at most once per team
+    const handleRoleSelect = (playerIdx, newRole) => {
+        if (!newRole) {
+            onUpdate(playerIdx, { role_played: null })
+            return
+        }
+        const conflictIdx = players.findIndex((p, i) => i !== playerIdx && p.role_played === newRole)
+        if (conflictIdx !== -1) {
+            const currentRole = players[playerIdx]?.role_played || null
+            onUpdate(conflictIdx, { role_played: currentRole })
+        }
+        onUpdate(playerIdx, { role_played: newRole })
+    }
+
     return (
         <div className="p-3">
             <div className="flex items-center gap-2 mb-2">
@@ -579,6 +602,7 @@ function StatsTable({ label, color, players, teamSide, gods, adminData, onUpdate
                     <thead>
                         <tr className="text-[var(--color-text-secondary)] text-[10px]">
                             <th className="text-left py-1 pr-2 min-w-[90px]">Player</th>
+                            <th className="text-left py-1 pr-2 w-16">Role</th>
                             <th className="text-left py-1 pr-2 min-w-[90px]">God</th>
                             <th className="text-center py-1 px-1 w-10">K</th>
                             <th className="text-center py-1 px-1 w-10">D</th>
@@ -593,7 +617,8 @@ function StatsTable({ label, color, players, teamSide, gods, adminData, onUpdate
                                      player={player}
                                      gods={gods}
                                      adminData={adminData}
-                                     onChange={(updates) => onUpdate(idx, updates)} />
+                                     onChange={(updates) => onUpdate(idx, updates)}
+                                     onRoleSelect={(newRole) => handleRoleSelect(idx, newRole)} />
                         ))}
                     </tbody>
                 </table>
@@ -606,11 +631,68 @@ function StatsTable({ label, color, players, teamSide, gods, adminData, onUpdate
 // ═══════════════════════════════════════════════════
 // STAT ROW (single player in a game)
 // ═══════════════════════════════════════════════════
-function StatRow({ player, gods, adminData, onChange }) {
+function StatRow({ player, gods, adminData, onChange, onRoleSelect }) {
+    const [showRolePicker, setShowRolePicker] = useState(false)
+    const roleRef = useRef(null)
+
+    useEffect(() => {
+        if (!showRolePicker) return
+        const handler = (e) => { if (roleRef.current && !roleRef.current.contains(e.target)) setShowRolePicker(false) }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [showRolePicker])
+
+    const roleImg = player.role_played ? ROLE_IMAGES[player.role_played] : null
+
     return (
         <tr className="border-t border-[var(--color-border)]/30">
             <td className="py-1.5 pr-2">
                 <PlayerSwap player={player} adminData={adminData} onChange={onChange} />
+            </td>
+            <td className="py-1.5 pr-2">
+                <div ref={roleRef} className="relative flex items-center justify-center">
+                    <button
+                        type="button"
+                        onClick={() => setShowRolePicker(!showRolePicker)}
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/10 transition-colors"
+                        title={player.role_played || 'Set role'}
+                    >
+                        {roleImg ? (
+                            <img src={roleImg} alt={player.role_played} className="w-5 h-5 object-contain" />
+                        ) : (
+                            <span className="text-[10px] text-[var(--color-text-secondary)]/50">—</span>
+                        )}
+                    </button>
+                    {showRolePicker && (
+                        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 flex gap-0.5 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl p-1">
+                            {ROLE_LIST.map(r => (
+                                <button
+                                    key={r}
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => { onRoleSelect(player.role_played === r ? null : r); setShowRolePicker(false) }}
+                                    className={`w-7 h-7 rounded flex items-center justify-center transition-all ${
+                                        player.role_played === r ? 'bg-[var(--color-accent)]/20 ring-1 ring-[var(--color-accent)]' : 'hover:bg-white/10'
+                                    }`}
+                                    title={r}
+                                >
+                                    <img src={ROLE_IMAGES[r]} alt={r} className="w-5 h-5 object-contain" />
+                                </button>
+                            ))}
+                            {player.role_played && (
+                                <button
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => { onRoleSelect(null); setShowRolePicker(false) }}
+                                    className="w-7 h-7 rounded flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-400/10 transition-all text-xs font-bold"
+                                    title="Clear role"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </td>
             <td className="py-1.5 pr-2">
                 <GodAutocomplete value={player.god_played || ''} gods={gods} onChange={updates => onChange(updates)} />
