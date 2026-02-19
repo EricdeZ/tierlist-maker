@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { leagueService } from '../services/database'
 import { useAuth } from '../context/AuthContext'
-import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Shield, Sparkles, ArrowRight, Gem, DollarSign, Bell, Camera } from 'lucide-react'
+import { Trophy, BarChart3, Calendar, Swords, ChevronRight, MessageCircle, Mic, Video, Gamepad2, User, ListOrdered, Shield, Sparkles, ArrowRight, Gem, DollarSign, Bell, Camera, Crown } from 'lucide-react'
 import smiteLogo from '../assets/smite2.png'
 import statsheetImg from '../assets/statsheet.png'
 import diamondsImg from '../assets/diamonds.png'
@@ -725,6 +725,42 @@ const Homepage = () => {
                                 </div>
                                 <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-5">
                                     Rank players by role with drag-and-drop. Export as shareable images and compare your rankings with the community.
+                                </p>
+                                <span
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-heading font-bold text-sm transition-all duration-300 group-hover:scale-[1.03]"
+                                    style={{ background: 'linear-gradient(135deg, var(--color-accent), #e5a84e)', color: 'var(--color-primary)' }}
+                                >
+                                    Try It Out
+                                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </span>
+                            </div>
+                        </Link>
+
+                        {/* God Tier List */}
+                        <Link
+                            to="/god-tierlist"
+                            className="group relative overflow-hidden rounded-2xl border border-white/10 hover:border-(--color-accent)/40 p-6 sm:p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-(--color-accent)/10"
+                            style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
+                        >
+                            <div
+                                className="absolute top-0 right-0 w-40 h-40 opacity-10 group-hover:opacity-20 transition-opacity"
+                                style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                            />
+                            <div
+                                className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                style={{ background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)' }}
+                            />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 rounded-xl bg-(--color-accent)/10 flex items-center justify-center">
+                                        <Crown className="w-6 h-6 text-(--color-accent)" />
+                                    </div>
+                                    <h3 className="font-heading text-xl font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors">
+                                        God Tier List
+                                    </h3>
+                                </div>
+                                <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-5">
+                                    Rank every SMITE 2 god in classic S/A/B/C/D/F tiers. Drag and drop to create your definitive tier list and export as an image.
                                 </p>
                                 <span
                                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-heading font-bold text-sm transition-all duration-300 group-hover:scale-[1.03]"

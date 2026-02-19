@@ -57,6 +57,7 @@ import AGLSignup from "./pages/AGLSignup.jsx";
 import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
+import GodTierList from "./pages/GodTierList.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
@@ -116,6 +117,9 @@ function App() {
 
                             {/* Standalone tier list */}
                             <Route path="tierlist" element={<TierListPage />} />
+
+                            {/* God tier list */}
+                            <Route path="god-tierlist" element={<GodTierList />} />
 
                             {/* Enhanced player profile (cross-season) */}
                             <Route path="profile/:playerSlug" element={<ProfilePage />} />

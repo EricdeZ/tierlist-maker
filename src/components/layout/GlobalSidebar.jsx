@@ -482,6 +482,9 @@ export default function GlobalSidebar() {
                             <SidebarLink to="/tierlist" active={isActive('/tierlist')}>
                                 Tier List
                             </SidebarLink>
+                            <SidebarLink to="/god-tierlist" active={isActive('/god-tierlist')}>
+                                God Tier List
+                            </SidebarLink>
                             <SidebarLink to="/draft" active={isActive('/draft')}>
                                 Draft Simulator
                             </SidebarLink>
