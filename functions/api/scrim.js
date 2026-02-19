@@ -153,6 +153,7 @@ const SCRIM_SELECT = `
 function formatScrim(row) {
     return {
         id: row.id,
+        userId: row.user_id,
         teamId: row.team_id,
         teamName: row.team_name,
         teamSlug: row.team_slug,
