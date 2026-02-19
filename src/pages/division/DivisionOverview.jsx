@@ -1,10 +1,10 @@
 // src/pages/division/DivisionOverview.jsx
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { statsService } from '../../services/database'
-import { Trophy, Calendar, BarChart3, ChevronRight, ChevronLeft, ChevronDown, MessageCircle, Users, User } from 'lucide-react'
+import { Trophy, Calendar, BarChart3, ChevronRight, ChevronLeft, MessageCircle, Users, User } from 'lucide-react'
 import PageTitle from '../../components/PageTitle'
 import BannedContentBanner from '../../components/BannedContentBanner'
 import ChallengeBanner from '../../components/ChallengeBanner'
@@ -69,14 +69,11 @@ const PlayerTicker = ({ players, allPlayers, leagueColor, basePath }) => {
 
 const DivisionOverview = () => {
     const { leagueSlug, divisionSlug } = useParams()
-    const navigate = useNavigate()
     const { league, division, season, teams, players } = useDivision()
     const { user, linkedPlayer, login, loading: authLoading } = useAuth()
     const [seasonStats, setSeasonStats] = useState(null)
     const [playerStats, setPlayerStats] = useState(null)
     const [statsError, setStatsError] = useState(false)
-    const [divDropdownOpen, setDivDropdownOpen] = useState(false)
-    const divDropdownRef = useRef(null)
 
     // Mouse-tracking hero gradient
     const heroRef = useRef(null)
@@ -96,18 +93,6 @@ const DivisionOverview = () => {
     const handleHeroLeave = useCallback(() => {
         setHeroLight(prev => ({ ...prev, active: false }))
     }, [])
-
-    // Close division dropdown on click outside
-    useEffect(() => {
-        if (!divDropdownOpen) return
-        const handleClickOutside = (e) => {
-            if (divDropdownRef.current && !divDropdownRef.current.contains(e.target)) {
-                setDivDropdownOpen(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [divDropdownOpen])
 
     useEffect(() => {
         if (!season) return
@@ -257,50 +242,13 @@ const DivisionOverview = () => {
                             </div>
                         )}
                         <div className="text-left">
-                            <div className="flex items-center gap-3 mb-1 relative" ref={divDropdownRef}>
+                            <div className="flex items-center gap-3 mb-1">
                                 {rankImg && (
                                     <img src={rankImg} alt="" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
                                 )}
-                                {league?.divisions?.length > 1 ? (
-                                    <>
-                                        <button
-                                            onClick={() => setDivDropdownOpen(prev => !prev)}
-                                            className="font-heading text-4xl sm:text-5xl font-black text-(--color-text) flex items-center gap-2 hover:text-(--color-accent) transition-colors cursor-pointer"
-                                        >
-                                            {division?.name}
-                                            <ChevronDown className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform duration-200 ${divDropdownOpen ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        {divDropdownOpen && (
-                                            <div className="absolute top-full left-0 mt-2 z-50 min-w-[200px] rounded-xl border border-white/15 bg-(--color-secondary) shadow-2xl overflow-hidden backdrop-blur-xl">
-                                                {league.divisions.map(d => {
-                                                    const isActive = d.slug === divisionSlug
-                                                    const img = getDivisionImage(leagueSlug, d.slug, d.tier)
-                                                    return (
-                                                        <button
-                                                            key={d.id}
-                                                            onClick={() => {
-                                                                setDivDropdownOpen(false)
-                                                                if (!isActive) navigate(`/${leagueSlug}/${d.slug}`)
-                                                            }}
-                                                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer ${
-                                                                isActive
-                                                                    ? 'bg-white/10 text-(--color-accent)'
-                                                                    : 'hover:bg-white/5 text-(--color-text)'
-                                                            }`}
-                                                        >
-                                                            {img && <img src={img} alt="" className="h-6 w-6 object-contain shrink-0" />}
-                                                            <span className="font-heading font-bold text-sm">{d.name}</span>
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <h1 className="font-heading text-4xl sm:text-5xl font-black text-(--color-text)">
-                                        {division?.name}
-                                    </h1>
-                                )}
+                                <h1 className="font-heading text-4xl sm:text-5xl font-black text-(--color-text)">
+                                    {division?.name}
+                                </h1>
                             </div>
                             {season && (
                                 <p className="text-(--color-text-secondary) text-sm sm:text-base">
