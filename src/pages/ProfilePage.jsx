@@ -8,6 +8,7 @@ import { getRank, formatRank } from '../config/ranks'
 import { getDivisionImage } from '../utils/divisionImages'
 import { getLeagueLogo } from '../utils/leagueImages'
 import RankBadge from '../components/RankBadge'
+import GodpoolTierListDisplay from '../components/GodpoolTierListDisplay'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
@@ -349,11 +350,19 @@ const ProfilePage = () => {
 
                     {/* God Pool */}
                     <GodPool godStats={aggregateGodStats(filteredGames, gods)} />
+
+                    {/* Godpool Tier List */}
+                    <GodpoolTierListDisplay playerSlug={player.slug} isOwnProfile={isOwnProfile} gods={gods} />
                 </>
             ) : (
-                <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-8 text-center mb-8">
-                    <p className="text-(--color-text-secondary)">No games played yet.</p>
-                </div>
+                <>
+                    <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-8 text-center mb-8">
+                        <p className="text-(--color-text-secondary)">No games played yet.</p>
+                    </div>
+
+                    {/* Godpool Tier List (show even with no games) */}
+                    <GodpoolTierListDisplay playerSlug={player.slug} isOwnProfile={isOwnProfile} gods={gods} />
+                </>
             )}
 
             {/* Season History */}

@@ -334,6 +334,15 @@ INDEX idx_predictions_user ON (user_id, status)
 UNIQUE(message_id, attachment_id)
 CHECK (status IN ('pending', 'processing', 'used', 'skipped'))
 
+### godpool_tierlists
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| user_id | integer | NO | FK → users.id (CASCADE), UNIQUE |
+| tiers | jsonb | NO | |
+| visibility | varchar(10) | NO | 'private' |
+| updated_at | timestamptz | NO | NOW() |
+
 ## Views
 
 ### season_hierarchy

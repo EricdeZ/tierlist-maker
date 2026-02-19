@@ -1,9 +1,12 @@
 // src/pages/GodTierList.jsx — SMITE 2 God Tier List (S/A/B/C/D/F)
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { godService } from '../services/database'
+import { useSearchParams } from 'react-router-dom'
+import { godService, godpoolService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
+import { useAuth } from '../context/AuthContext'
 import { saveGodTierList, loadGodTierList, clearGodTierList } from '../utils/godTierListStorage'
 import { exportGodTierListAsImage } from '../utils/godTierListCanvasExport'
+import { Lock, Users, Globe, Save, Check } from 'lucide-react'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 
@@ -22,6 +25,9 @@ const EMPTY_TIERS = { S: [], A: [], B: [], C: [], D: [], F: [] }
 
 export default function GodTierList() {
     const { trackAction } = usePassion()
+    const { user, linkedPlayer } = useAuth()
+    const [searchParams] = useSearchParams()
+    const isGodpoolMode = searchParams.get('godpool') === '1'
     const hasTrackedSave = useRef(false)
     const isInitialMount = useRef(true)
 
@@ -33,6 +39,12 @@ export default function GodTierList() {
     const [isExporting, setIsExporting] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
     const [mobileTier, setMobileTier] = useState('S')
+
+    // Godpool save state
+    const [visibility, setVisibility] = useState('public')
+    const [isSavingGodpool, setIsSavingGodpool] = useState(false)
+    const [godpoolSaved, setGodpoolSaved] = useState(false)
+    const [godpoolLoaded, setGodpoolLoaded] = useState(false)
 
     // Drag state
     const [draggedGod, setDraggedGod] = useState(null) // { godId, sourceTier }
@@ -65,15 +77,35 @@ export default function GodTierList() {
         return () => window.removeEventListener('resize', check)
     }, [])
 
-    // Load gods + restore from localStorage
+    // Load gods + restore from localStorage (or godpool if in godpool mode)
     useEffect(() => {
-        godService.getAll()
-            .then(data => {
+        const load = async () => {
+            try {
+                const data = await godService.getAll()
                 setGods(data)
-                // Restore tiers from localStorage, filter stale IDs
+                const validIds = new Set(data.map(g => g.id))
+
+                // In godpool mode, try to load existing godpool first
+                if (isGodpoolMode && linkedPlayer?.slug) {
+                    try {
+                        const { tierlist } = await godpoolService.get(linkedPlayer.slug)
+                        if (tierlist) {
+                            const filtered = {}
+                            for (const t of TIERS) {
+                                filtered[t] = (tierlist.tiers[t] || []).filter(id => validIds.has(id))
+                            }
+                            setTiers(filtered)
+                            setVisibility(tierlist.visibility || 'public')
+                            setGodpoolLoaded(true)
+                            setLoading(false)
+                            return
+                        }
+                    } catch { /* fall through to localStorage */ }
+                }
+
+                // Restore from localStorage
                 const saved = loadGodTierList()
                 if (saved) {
-                    const validIds = new Set(data.map(g => g.id))
                     const filtered = {}
                     for (const t of TIERS) {
                         filtered[t] = (saved[t] || []).filter(id => validIds.has(id))
@@ -81,13 +113,14 @@ export default function GodTierList() {
                     setTiers(filtered)
                 }
                 setLoading(false)
-            })
-            .catch(err => {
+            } catch (err) {
                 console.error('Failed to load gods:', err)
                 setError('Failed to load gods')
                 setLoading(false)
-            })
-    }, [])
+            }
+        }
+        load()
+    }, [isGodpoolMode, linkedPlayer?.slug])
 
     // Auto-save on tiers change
     useEffect(() => {
@@ -213,6 +246,20 @@ export default function GodTierList() {
             await exportGodTierListAsImage(tiers, godsMap)
         } finally {
             setTimeout(() => setIsExporting(false), 1000)
+        }
+    }
+
+    const handleSaveGodpool = async () => {
+        setIsSavingGodpool(true)
+        setGodpoolSaved(false)
+        try {
+            await godpoolService.save(tiers, visibility)
+            setGodpoolSaved(true)
+            setTimeout(() => setGodpoolSaved(false), 3000)
+        } catch (err) {
+            alert('Failed to save: ' + err.message)
+        } finally {
+            setIsSavingGodpool(false)
         }
     }
 
@@ -423,6 +470,16 @@ export default function GodTierList() {
                         </div>
                     </div>
 
+                    {/* Godpool save panel (mobile) */}
+                    {isGodpoolMode && user && <GodpoolSavePanel
+                        visibility={visibility}
+                        setVisibility={setVisibility}
+                        onSave={handleSaveGodpool}
+                        isSaving={isSavingGodpool}
+                        saved={godpoolSaved}
+                        totalPlaced={totalPlaced}
+                    />}
+
                     {/* Actions */}
                     <div className="flex gap-2">
                         <button
@@ -484,6 +541,16 @@ export default function GodTierList() {
                         </button>
                     </div>
                 </div>
+
+                {/* Godpool save panel */}
+                {isGodpoolMode && user && <GodpoolSavePanel
+                    visibility={visibility}
+                    setVisibility={setVisibility}
+                    onSave={handleSaveGodpool}
+                    isSaving={isSavingGodpool}
+                    saved={godpoolSaved}
+                    totalPlaced={totalPlaced}
+                />}
 
                 {/* Tier rows */}
                 <div className="space-y-2 mb-8">
@@ -636,6 +703,67 @@ export default function GodTierList() {
                         )}
                     </div>
                 </div>
+            </div>
+        </div>
+    )
+}
+
+
+function GodpoolSavePanel({ visibility, setVisibility, onSave, isSaving, saved, totalPlaced }) {
+    const options = [
+        { value: 'private', icon: Lock, label: 'Only Me' },
+        { value: 'team', icon: Users, label: 'My Team' },
+        { value: 'public', icon: Globe, label: 'Public' },
+    ]
+
+    return (
+        <div className="bg-(--color-secondary) rounded-xl border border-(--color-accent)/20 p-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1">
+                    <h3 className="text-sm font-bold text-(--color-text) mb-1">
+                        Save to Profile
+                    </h3>
+                    <p className="text-xs text-(--color-text-secondary)">
+                        Who can see this tier list on your profile?
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {options.map(opt => {
+                        const Icon = opt.icon
+                        const isActive = visibility === opt.value
+                        return (
+                            <button
+                                key={opt.value}
+                                onClick={() => setVisibility(opt.value)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                    isActive
+                                        ? 'bg-(--color-accent) text-(--color-primary)'
+                                        : 'bg-white/5 text-(--color-text-secondary) hover:bg-white/10'
+                                }`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                {opt.label}
+                            </button>
+                        )
+                    })}
+                </div>
+                <button
+                    onClick={onSave}
+                    disabled={isSaving || totalPlaced === 0}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                    style={saved
+                        ? { backgroundColor: '#16a34a', color: 'white' }
+                        : { backgroundColor: 'var(--color-accent)', color: 'var(--color-primary)' }
+                    }
+                >
+                    {saved ? (
+                        <><Check className="w-4 h-4" /> Saved!</>
+                    ) : isSaving ? (
+                        'Saving...'
+                    ) : (
+                        <><Save className="w-4 h-4" /> Save to Profile</>
+                    )}
+                </button>
             </div>
         </div>
     )

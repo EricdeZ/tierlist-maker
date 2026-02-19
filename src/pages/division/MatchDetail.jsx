@@ -1,6 +1,6 @@
 // src/pages/division/MatchDetail.jsx
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { useAuth } from '../../context/AuthContext'
 import { matchService } from '../../services/database'
@@ -18,14 +18,17 @@ const ROLE_ORDER = { Solo: 0, Jungle: 1, Mid: 2, Support: 3, ADC: 4 }
 
 const MatchDetail = () => {
     const { leagueSlug, divisionSlug, matchId } = useParams()
+    const [searchParams] = useSearchParams()
     const { user, permissions } = useAuth()
     const { season } = useDivision()
+    const fromTeamSlug = searchParams.get('from')
     const [match, setMatch] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [activeGame, setActiveGame] = useState(0)
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
+    const teamFromMatch = `?from=match-${matchId}`
 
     useEffect(() => {
         if (!matchId) return
@@ -81,8 +84,8 @@ const MatchDetail = () => {
                 <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-8 text-center">
                     <h2 className="text-2xl font-bold text-red-400 mb-3">Failed to Load Match</h2>
                     <p className="text-red-300/80 mb-6">{error}</p>
-                    <Link to={`${basePath}/matches`} className="text-(--color-accent) hover:underline">
-                        ← Back to Matches
+                    <Link to={fromTeamSlug ? `${basePath}/teams/${fromTeamSlug}` : `${basePath}/matches`} className="text-(--color-accent) hover:underline">
+                        ← {fromTeamSlug ? 'Back to Team' : 'Back to Matches'}
                     </Link>
                 </div>
             </div>
@@ -93,8 +96,8 @@ const MatchDetail = () => {
         return (
             <div className="max-w-3xl mx-auto py-16 px-4 text-center">
                 <h2 className="text-2xl font-bold text-(--color-text) mb-4">Match Not Found</h2>
-                <Link to={`${basePath}/matches`} className="text-(--color-accent) hover:underline">
-                    ← Back to Matches
+                <Link to={fromTeamSlug ? `${basePath}/teams/${fromTeamSlug}` : `${basePath}/matches`} className="text-(--color-accent) hover:underline">
+                    ← {fromTeamSlug ? 'Back to Team' : 'Back to Matches'}
                 </Link>
             </div>
         )
@@ -110,10 +113,25 @@ const MatchDetail = () => {
             {match && <PageTitle title={`${match.team1_name} vs ${match.team2_name}`} description={`${match.team1_name} vs ${match.team2_name} match details. Game-by-game stats, player performances, KDA, damage, and mitigated.`} />}
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-(--color-text-secondary) mb-6">
-                <Link to={`${basePath}/matches`} className="hover:text-(--color-accent) transition-colors">
-                    Matches
-                </Link>
-                <span>/</span>
+                {fromTeamSlug ? (
+                    <>
+                        <Link to={`${basePath}/teams`} className="hover:text-(--color-accent) transition-colors">
+                            Teams
+                        </Link>
+                        <span>/</span>
+                        <Link to={`${basePath}/teams/${fromTeamSlug}`} className="hover:text-(--color-accent) transition-colors">
+                            {fromTeamSlug === match.team1_slug ? match.team1_name : match.team2_name}
+                        </Link>
+                        <span>/</span>
+                    </>
+                ) : (
+                    <>
+                        <Link to={`${basePath}/matches`} className="hover:text-(--color-accent) transition-colors">
+                            Matches
+                        </Link>
+                        <span>/</span>
+                    </>
+                )}
                 <span className="text-(--color-text)">
                     {match.team1_name} vs {match.team2_name}
                 </span>
@@ -167,7 +185,7 @@ const MatchDetail = () => {
                     <div className="hidden sm:flex items-center justify-center gap-6">
                         {/* Team 1 */}
                         <Link
-                            to={`${basePath}/teams/${match.team1_slug}`}
+                            to={`${basePath}/teams/${match.team1_slug}${teamFromMatch}`}
                             className={`flex-1 flex items-center gap-4 justify-end group transition-opacity ${team2Won && match.is_completed ? 'opacity-50' : ''}`}
                         >
                             <span className="text-xl font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors text-right">
@@ -196,7 +214,7 @@ const MatchDetail = () => {
 
                         {/* Team 2 */}
                         <Link
-                            to={`${basePath}/teams/${match.team2_slug}`}
+                            to={`${basePath}/teams/${match.team2_slug}${teamFromMatch}`}
                             className={`flex-1 flex items-center gap-4 group transition-opacity ${team1Won && match.is_completed ? 'opacity-50' : ''}`}
                         >
                             <TeamLogo slug={match.team2_slug} name={match.team2_name} size={48} />
@@ -211,7 +229,7 @@ const MatchDetail = () => {
                     <div className="sm:hidden space-y-3">
                         <div className="flex items-center justify-between">
                             <Link
-                                to={`${basePath}/teams/${match.team1_slug}`}
+                                to={`${basePath}/teams/${match.team1_slug}${teamFromMatch}`}
                                 className={`flex items-center gap-3 group ${team2Won && match.is_completed ? 'opacity-50' : ''}`}
                             >
                                 <TeamLogo slug={match.team1_slug} name={match.team1_name} size={32} />
@@ -228,7 +246,7 @@ const MatchDetail = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <Link
-                                to={`${basePath}/teams/${match.team2_slug}`}
+                                to={`${basePath}/teams/${match.team2_slug}${teamFromMatch}`}
                                 className={`flex items-center gap-3 group ${team1Won && match.is_completed ? 'opacity-50' : ''}`}
                             >
                                 <TeamLogo slug={match.team2_slug} name={match.team2_name} size={32} />
@@ -355,6 +373,7 @@ const MatchDetail = () => {
                                             isWinner={currentGame.winner_team_id === match.team1_id}
                                             basePath={basePath}
                                             formatNumber={formatNumber}
+                                            teamFromMatch={teamFromMatch}
                                         />
                                         <TeamGameStats
                                             teamName={match.team2_name}
@@ -364,6 +383,7 @@ const MatchDetail = () => {
                                             isWinner={currentGame.winner_team_id === match.team2_id}
                                             basePath={basePath}
                                             formatNumber={formatNumber}
+                                            teamFromMatch={teamFromMatch}
                                         />
                                     </div>
                                 </>
@@ -419,7 +439,7 @@ const TeamComparisonBar = ({ label, val1, val2, color1, color2, format }) => {
 }
 
 /* ── Team game stats table ── */
-const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, basePath, formatNumber }) => {
+const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, basePath, formatNumber, teamFromMatch }) => {
     if (!players || players.length === 0) {
         return (
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 text-center">
@@ -441,7 +461,7 @@ const TeamGameStats = ({ teamName, teamColor, teamSlug, players, isWinner, baseP
                 <TeamLogo slug={teamSlug} name={teamName} size={20} />
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
                 <Link
-                    to={`${basePath}/teams/${teamSlug}`}
+                    to={`${basePath}/teams/${teamSlug}${teamFromMatch}`}
                     className="text-sm font-bold text-(--color-text) hover:text-(--color-accent) transition-colors"
                 >
                     {teamName}

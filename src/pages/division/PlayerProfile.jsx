@@ -12,6 +12,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { UserCheck, User, ExternalLink, ArrowLeft } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
+import GodpoolTierListDisplay from '../../components/GodpoolTierListDisplay'
 import passionCoin from '../../assets/passion/passion.png'
 
 import soloImage from '../../assets/roles/solo.webp'
@@ -489,6 +490,9 @@ const PlayerProfile = () => {
                         {/* God Pool */}
                         <GodPool godStats={aggregateGodStats(gameHistory, gods)} />
 
+                        {/* Godpool Tier List */}
+                        <GodpoolTierListDisplay playerSlug={player.slug} isOwnProfile={isOwnProfile} gods={gods} />
+
                         {/* Match History */}
                         <h2 className="font-heading text-xl font-bold text-(--color-text) mb-4">
                             Match History
@@ -660,6 +664,9 @@ const PlayerProfile = () => {
 
                         {/* God Pool */}
                         <GodPool godStats={aggregateGodStats(filteredGames, gods)} />
+
+                        {/* Godpool Tier List */}
+                        <GodpoolTierListDisplay playerSlug={player.slug} isOwnProfile={isOwnProfile} gods={gods} />
 
                         {/* Season History */}
                         {filteredSeasons.length > 0 && (

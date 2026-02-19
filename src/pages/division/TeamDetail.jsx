@@ -1,6 +1,6 @@
 // src/pages/division/TeamDetail.jsx
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
 import { statsService, matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
@@ -23,7 +23,10 @@ const roleImages = {
 
 const TeamDetail = () => {
     const { leagueSlug, divisionSlug, teamSlug } = useParams()
+    const [searchParams] = useSearchParams()
     const { teams, players, season, division } = useDivision()
+    const fromParam = searchParams.get('from')
+    const fromMatchId = fromParam?.startsWith('match-') ? fromParam.slice(6) : null
 
     const [rosterStats, setRosterStats] = useState([])
     const [matches, setMatches] = useState([])
@@ -90,8 +93,8 @@ const TeamDetail = () => {
         return (
             <div className="max-w-3xl mx-auto py-16 px-4 text-center">
                 <h2 className="text-2xl font-bold text-(--color-text) mb-4">Team Not Found</h2>
-                <Link to={`${basePath}/teams`} className="text-(--color-accent) hover:underline">
-                    ← Back to Teams
+                <Link to={fromMatchId ? `${basePath}/matches/${fromMatchId}` : `${basePath}/teams`} className="text-(--color-accent) hover:underline">
+                    ← {fromMatchId ? 'Back to Match' : 'Back to Teams'}
                 </Link>
             </div>
         )
@@ -117,10 +120,10 @@ const TeamDetail = () => {
             {team && <PageTitle title={`${team.name} - ${division?.name || ''}`} description={`${team.name} roster, match history, and stats in the ${division?.name || ''} division. View player performances and team record.`} />}
             {/* Back link */}
             <Link
-                to={`${basePath}/teams`}
+                to={fromMatchId ? `${basePath}/matches/${fromMatchId}` : `${basePath}/teams`}
                 className="inline-flex items-center gap-1.5 text-sm text-(--color-text-secondary) hover:text-(--color-accent) transition-colors mb-4"
             >
-                ← Back to Teams
+                ← {fromMatchId ? 'Back to Match' : 'Back to Teams'}
             </Link>
 
             {/* Team Header */}
@@ -271,7 +274,7 @@ const TeamDetail = () => {
                                     ? { name: match.team2_name, color: match.team2_color, slug: match.team2_slug, teamSlug: match.team2_slug }
                                     : { name: match.team1_name, color: match.team1_color, slug: match.team1_slug, teamSlug: match.team1_slug }
                                 const isWin = match.winner_team_id === team.id
-                                const matchLink = match.is_completed ? `${basePath}/matches/${match.id}` : null
+                                const matchLink = match.is_completed ? `${basePath}/matches/${match.id}?from=${teamSlug}` : null
 
                                 const CardTag = matchLink ? Link : 'div'
                                 const cardProps = matchLink

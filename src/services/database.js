@@ -158,6 +158,18 @@ export const godService = {
     }
 }
 
+export const godpoolService = {
+    async get(playerSlug) {
+        return apiCall('godpool', { action: 'get', playerSlug })
+    },
+    async save(tiers, visibility) {
+        return apiPost('godpool', {}, { action: 'save', tiers, visibility })
+    },
+    async delete() {
+        return apiPost('godpool', {}, { action: 'delete' })
+    },
+}
+
 export const bannedContentService = {
     async getByLeague(leagueId) {
         return apiCall('banned-content', { leagueId })
