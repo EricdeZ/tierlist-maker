@@ -81,6 +81,62 @@ async function getCaptainTeams(sql, userId) {
 
 
 // ═══════════════════════════════════════════════════
+// Helper: Check if user has scrim_manage permission
+// ═══════════════════════════════════════════════════
+async function hasScrimManagePermission(sql, userId) {
+    const [has] = await sql`
+        SELECT 1 FROM user_roles ur
+        JOIN role_permissions rp ON rp.role_id = ur.role_id
+        WHERE ur.user_id = ${userId}
+          AND rp.permission_key = 'scrim_manage'
+        LIMIT 1
+    `
+    return !!has
+}
+
+
+// ═══════════════════════════════════════════════════
+// Helper: Get all active teams (for scrim_manage users)
+// ═══════════════════════════════════════════════════
+async function getAllActiveTeamsForScrimManage(sql) {
+    return sql`
+        SELECT t.id as team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo,
+               t.season_id, s.name as season_name,
+               d.name as division_name, d.tier as division_tier, d.slug as division_slug,
+               l.id as league_id, l.name as league_name, l.slug as league_slug
+        FROM teams t
+        JOIN seasons s ON s.id = t.season_id
+        JOIN divisions d ON d.id = s.division_id
+        JOIN leagues l ON l.id = s.league_id
+        WHERE s.is_active = true
+        ORDER BY l.name, d.tier NULLS LAST, t.name
+    `
+}
+
+
+// ═══════════════════════════════════════════════════
+// Helper: Get eligible teams (captain OR scrim_manage)
+// ═══════════════════════════════════════════════════
+async function getEligibleTeams(sql, userId) {
+    const captainTeams = await getCaptainTeams(sql, userId)
+    const hasPermission = await hasScrimManagePermission(sql, userId)
+
+    if (!hasPermission) return captainTeams
+
+    // scrim_manage users get all active teams
+    const allTeams = await getAllActiveTeamsForScrimManage(sql)
+    const seen = new Set(captainTeams.map(t => t.team_id))
+    for (const t of allTeams) {
+        if (!seen.has(t.team_id)) {
+            captainTeams.push(t)
+            seen.add(t.team_id)
+        }
+    }
+    return captainTeams
+}
+
+
+// ═══════════════════════════════════════════════════
 // Shared: scrim list query with team/league/division joins
 // ═══════════════════════════════════════════════════
 const SCRIM_SELECT = `
@@ -192,7 +248,7 @@ async function getMyScrims(sql, event) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
-    const captainTeams = await getCaptainTeams(sql, user.id)
+    const captainTeams = await getEligibleTeams(sql, user.id)
     if (captainTeams.length === 0) {
         return { statusCode: 200, headers, body: JSON.stringify({ scrims: [], captainTeams: [] }) }
     }
@@ -261,7 +317,7 @@ async function getIncoming(sql, event) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
-    const captainTeams = await getCaptainTeams(sql, user.id)
+    const captainTeams = await getEligibleTeams(sql, user.id)
     if (captainTeams.length === 0) {
         return { statusCode: 200, headers, body: JSON.stringify({ scrims: [] }) }
     }
@@ -315,7 +371,7 @@ async function getCaptainTeamsAction(sql, event) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
-    const teams = await getCaptainTeams(sql, user.id)
+    const teams = await getEligibleTeams(sql, user.id)
 
     return {
         statusCode: 200,
@@ -387,10 +443,10 @@ async function createScrim(sql, user, body) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Invalid pick_mode. Must be one of: ${validModes.join(', ')}` }) }
     }
 
-    // Verify user is captain of team_id
-    const captainTeams = await getCaptainTeams(sql, user.id)
-    const isCaptain = captainTeams.some(t => t.team_id === team_id)
-    if (!isCaptain) {
+    // Verify user is captain or has scrim_manage permission
+    const captainTeams = await getEligibleTeams(sql, user.id)
+    const isEligible = captainTeams.some(t => t.team_id === team_id)
+    if (!isEligible) {
         return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'You are not a captain of this team' }) }
     }
 
@@ -438,10 +494,10 @@ async function acceptScrim(sql, user, body) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'scrim_id and team_id are required' }) }
     }
 
-    // Verify user is captain of accepting team
-    const captainTeams = await getCaptainTeams(sql, user.id)
-    const isCaptain = captainTeams.some(t => t.team_id === team_id)
-    if (!isCaptain) {
+    // Verify user is captain or has scrim_manage permission
+    const captainTeams = await getEligibleTeams(sql, user.id)
+    const isEligible = captainTeams.some(t => t.team_id === team_id)
+    if (!isEligible) {
         return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'You are not a captain of this team' }) }
     }
 
@@ -507,10 +563,10 @@ async function cancelScrim(sql, user, body) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Can only cancel open scrim requests' }) }
     }
 
-    // Verify user is captain of the posting team
-    const captainTeams = await getCaptainTeams(sql, user.id)
-    const isCaptain = captainTeams.some(t => t.team_id === scrim.team_id)
-    if (!isCaptain) {
+    // Verify user is captain or has scrim_manage permission
+    const captainTeams = await getEligibleTeams(sql, user.id)
+    const isEligible = captainTeams.some(t => t.team_id === scrim.team_id)
+    if (!isEligible) {
         return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'You are not a captain of the posting team' }) }
     }
 
@@ -550,10 +606,10 @@ async function declineScrim(sql, user, body) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'This is not a direct challenge' }) }
     }
 
-    // Verify user is captain of the challenged team
-    const captainTeams = await getCaptainTeams(sql, user.id)
-    const isCaptain = captainTeams.some(t => t.team_id === scrim.challenged_team_id)
-    if (!isCaptain) {
+    // Verify user is captain or has scrim_manage permission
+    const captainTeams = await getEligibleTeams(sql, user.id)
+    const isEligible = captainTeams.some(t => t.team_id === scrim.challenged_team_id)
+    if (!isEligible) {
         return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'You are not a captain of the challenged team' }) }
     }
 
