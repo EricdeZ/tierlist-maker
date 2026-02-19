@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { scrimService, godService, coinflipService, leagueService } from '../services/database'
+import { scrimService, godService, coinflipService, leagueService, setImpersonation, clearImpersonation, getImpersonation } from '../services/database'
 import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
@@ -15,7 +15,7 @@ import minionImg from '../assets/minion.png'
 import { RANK_LABELS, getDivisionImage } from '../utils/divisionImages'
 import {
     Swords, Clock, Shield, MessageSquare, Search,
-    Plus, X, Check, Send, Users,
+    Plus, X, Check, Send, Users, Copy,
     Calendar, Filter, Target, ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 
@@ -57,6 +57,63 @@ function formatRelativeDate(dateStr) {
     if (diffHours > 1) return `in ${diffHours} hours`
     if (diffHours === 1) return 'in 1 hour'
     return 'soon'
+}
+
+function formatScrimForClipboard(s, myTeamIds) {
+    const tierLabel = (tier) => tier ? (RANK_LABELS[tier] || 'Tier ' + tier) : ''
+
+    // Figure out which side is "me" vs "enemy"
+    const iAmPoster = myTeamIds && myTeamIds.has(s.teamId)
+    const iAmAccepter = myTeamIds && s.acceptedTeamId && myTeamIds.has(s.acceptedTeamId)
+
+    let my, enemy
+    if (iAmAccepter && !iAmPoster) {
+        my = { team: s.acceptedTeamName, league: s.acceptedLeagueName, div: s.acceptedDivisionName, tier: s.acceptedDivisionTier }
+        enemy = { team: s.teamName, league: s.leagueName, div: s.divisionName, tier: s.divisionTier }
+    } else {
+        my = { team: s.teamName, league: s.leagueName, div: s.divisionName, tier: s.divisionTier }
+        enemy = s.acceptedTeamName
+            ? { team: s.acceptedTeamName, league: s.acceptedLeagueName, div: s.acceptedDivisionName, tier: s.acceptedDivisionTier }
+            : s.challengedTeamName
+                ? { team: s.challengedTeamName, league: s.challengedLeagueName, div: s.challengedDivisionName, tier: null }
+                : null
+    }
+
+    const lines = []
+    lines.push(`My Team: ${my.team}`)
+    lines.push(`My League: ${my.league || 'N/A'}`)
+    lines.push(`My Division: ${my.div || 'N/A'}${my.tier ? ` (${tierLabel(my.tier)})` : ''}`)
+    if (enemy) {
+        lines.push(`Enemy Team: ${enemy.team}`)
+        lines.push(`Enemy League: ${enemy.league || 'N/A'}`)
+        lines.push(`Enemy Division: ${enemy.div || 'N/A'}${enemy.tier ? ` (${tierLabel(enemy.tier)})` : ''}`)
+    }
+    lines.push(`Date: ${formatDateEST(s.scheduledDate)}`)
+    lines.push(`Mode: ${formatPickMode(s.pickMode)}`)
+    if (s.bannedContentLeague) lines.push(`Bans: ${s.bannedContentLeague}`)
+    if (s.notes) lines.push(`Notes: ${s.notes}`)
+    return lines.join('\n')
+}
+
+let _toastTimer = null
+function showCopiedToast() {
+    let el = document.getElementById('xp-copy-toast')
+    if (!el) {
+        el = document.createElement('div')
+        el.id = 'xp-copy-toast'
+        el.className = 'xp-copy-toast'
+        document.body.appendChild(el)
+    }
+    el.textContent = 'Copied to clipboard!'
+    el.classList.add('xp-copy-toast-visible')
+    clearTimeout(_toastTimer)
+    _toastTimer = setTimeout(() => el.classList.remove('xp-copy-toast-visible'), 2000)
+}
+
+async function copyScrimsToClipboard(scrims, myTeamIds) {
+    const text = scrims.map(s => formatScrimForClipboard(s, myTeamIds)).join('\n\n') + '\n\nhttps://smitecomp.com/scrims'
+    await navigator.clipboard.writeText(text)
+    showCopiedToast()
 }
 
 
@@ -528,11 +585,16 @@ function XpDinoGame() {
         loop()
 
         // Keyboard: track keydown AND keyup, prevent repeat events
+        const isTyping = () => {
+            const tag = document.activeElement?.tagName
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable
+        }
         const onKeyDown = (e) => {
-            if (e.repeat) return // ignore key repeat — only first press matters
+            if (e.repeat || isTyping()) return
             if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); onPress() }
         }
         const onKeyUp = (e) => {
+            if (isTyping()) return
             if (e.code === 'Space' || e.code === 'ArrowUp') onRelease()
         }
         window.addEventListener('keydown', onKeyDown)
@@ -769,7 +831,7 @@ function XpCoinFlip() {
 // Main component
 // ═══════════════════════════════════════════════════
 export default function ScrimPlanner() {
-    const { user, login } = useAuth()
+    const { user, login, hasPermission } = useAuth()
     const [activeTab, setActiveTab] = useState('open')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -784,12 +846,24 @@ export default function ScrimPlanner() {
 
     const [myScrims, setMyScrims] = useState([])
     const [captainTeams, setCaptainTeams] = useState([])
+    const [myTeams, setMyTeams] = useState([])
     const [incomingScrims, setIncomingScrims] = useState([])
 
     const [allTeams, setAllTeams] = useState([])
     const [showPostWindow, setShowPostWindow] = useState(false)
+    const [showHelp, setShowHelp] = useState(false)
 
     const [actionLoading, setActionLoading] = useState(null)
+
+    // Reliability + blacklist state
+    const [reliabilityScores, setReliabilityScores] = useState({})
+    const [blacklist, setBlacklist] = useState([])
+    const [blockedByMe, setBlockedByMe] = useState([])
+    const [blockedMe, setBlockedMe] = useState([])
+
+    // Impersonation state (Owner only)
+    const [impersonatedUser, setImpersonatedUser] = useState(null)
+    const isOwner = hasPermission('permission_manage')
 
     const isCaptain = captainTeams.length > 0
 
@@ -814,6 +888,9 @@ export default function ScrimPlanner() {
             const [myData, incomingData] = await Promise.all([scrimService.getMyScrims(), scrimService.getIncoming()])
             setMyScrims(myData.scrims || [])
             setCaptainTeams(myData.captainTeams || [])
+            setMyTeams(myData.myTeams || [])
+            setBlockedByMe(myData.blockedByMe || [])
+            setBlockedMe(myData.blockedMe || [])
             setIncomingScrims(incomingData.scrims || [])
         } catch (err) { console.error('Failed to load my scrims:', err) }
     }, [user])
@@ -837,6 +914,106 @@ export default function ScrimPlanner() {
             scrimService.getAllActiveTeams().then(data => setAllTeams(data.teams || [])).catch(() => {})
         }
     }, [showPostWindow]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load allTeams for blacklist window too (captain only)
+    useEffect(() => {
+        if (isCaptain && allTeams.length === 0) {
+            scrimService.getAllActiveTeams().then(data => setAllTeams(data.teams || [])).catch(() => {})
+        }
+    }, [isCaptain]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load blacklist
+    const loadBlacklist = useCallback(async () => {
+        if (!user) return
+        try {
+            const data = await scrimService.getBlacklist()
+            setBlacklist(data.blacklist || [])
+        } catch (err) { console.error('Failed to load blacklist:', err) }
+    }, [user])
+
+    useEffect(() => { if (user && isCaptain) loadBlacklist() }, [user, isCaptain]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fetch reliability scores for visible teams
+    useEffect(() => {
+        const teamIds = new Set()
+        openScrims.forEach(s => { teamIds.add(s.teamId); if (s.acceptedTeamId) teamIds.add(s.acceptedTeamId) })
+        myScrims.forEach(s => { teamIds.add(s.teamId); if (s.acceptedTeamId) teamIds.add(s.acceptedTeamId) })
+        incomingScrims.forEach(s => { teamIds.add(s.teamId) })
+        const ids = [...teamIds].filter(Boolean)
+        if (ids.length === 0) return
+        scrimService.getTeamReliability(ids)
+            .then(data => setReliabilityScores(data.reliability || {}))
+            .catch(() => {})
+    }, [openScrims, myScrims, incomingScrims])
+
+    // Client-side blacklist filtering for open scrims
+    const filteredOpenScrims = useMemo(() => {
+        if (!user || blockedMe.length === 0) return openScrims
+        const myTeamIds = new Set(myTeams.map(t => t.teamId))
+        const blockerTeamIds = new Set(
+            blockedMe
+                .filter(b => myTeamIds.has(b.blockedTeamId))
+                .map(b => b.teamId)
+        )
+        return openScrims.filter(s => !blockerTeamIds.has(s.teamId))
+    }, [openScrims, blockedMe, myTeams, user])
+
+    // Outcome reporting handlers
+    const handleReportOutcome = async (scrimId, outcome) => {
+        setActionLoading(scrimId)
+        try {
+            await scrimService.reportOutcome({ scrim_id: scrimId, outcome })
+            await loadMyScrims()
+        } catch (err) { alert(err.message || 'Failed to report outcome') }
+        finally { setActionLoading(null) }
+    }
+
+    const handleDisputeOutcome = async (scrimId) => {
+        setActionLoading(scrimId)
+        try {
+            await scrimService.disputeOutcome(scrimId)
+            await loadMyScrims()
+        } catch (err) { alert(err.message || 'Failed to dispute') }
+        finally { setActionLoading(null) }
+    }
+
+    // Blacklist handlers
+    const handleBlacklistAdd = async (teamId, blockedTeamId) => {
+        try {
+            await scrimService.addToBlacklist(teamId, blockedTeamId)
+            await loadBlacklist()
+            await loadMyScrims()
+        } catch (err) { alert(err.message || 'Failed to add to blacklist') }
+    }
+
+    const handleBlacklistRemove = async (teamId, blockedTeamId) => {
+        try {
+            await scrimService.removeFromBlacklist(teamId, blockedTeamId)
+            await loadBlacklist()
+            await loadMyScrims()
+        } catch (err) { alert(err.message || 'Failed to remove from blacklist') }
+    }
+
+    // Impersonation handlers
+    const handleImpersonate = (u) => {
+        setImpersonatedUser(u)
+        setImpersonation(u.id)
+        // Reload data as the impersonated user
+        loadMyScrims()
+        loadOpenScrims()
+    }
+
+    const handleClearImpersonation = () => {
+        setImpersonatedUser(null)
+        clearImpersonation()
+        loadMyScrims()
+        loadOpenScrims()
+    }
+
+    // Clear impersonation on unmount
+    useEffect(() => {
+        return () => clearImpersonation()
+    }, [])
 
     // Close start menu on click outside
     useEffect(() => {
@@ -887,8 +1064,8 @@ export default function ScrimPlanner() {
     const [acceptModal, setAcceptModal] = useState(null)
 
     // Calculate default window position (centered, below banner)
-    const defaultWinX = typeof window !== 'undefined' ? Math.max(20, (window.innerWidth - 800) / 2) : 100
-    const defaultWinY = typeof window !== 'undefined' ? Math.min(380, window.innerHeight * 0.35) : 380
+    const defaultWinX = typeof window !== 'undefined' ? Math.max(20, (window.innerWidth - 800) * 0.3) : 100
+    const defaultWinY = typeof window !== 'undefined' ? Math.min(420, window.innerHeight * 0.38) : 420
 
     return (
         <>
@@ -915,8 +1092,8 @@ export default function ScrimPlanner() {
                 <DraggableXpWindow
                     title="CoinFlip.exe"
                     icon="&#128176;"
-                    defaultX={typeof window !== 'undefined' ? Math.min(window.innerWidth - 280, window.innerWidth * 0.72) : 500}
-                    defaultY={110}
+                    defaultX={typeof window !== 'undefined' ? Math.min(window.innerWidth - 280, window.innerWidth * 0.55) : 500}
+                    defaultY={120}
                     className="xp-coinflip-window"
                     resizable={false}
                 >
@@ -924,7 +1101,7 @@ export default function ScrimPlanner() {
                 </DraggableXpWindow>
 
                 {/* ═══ SCRIM CALENDAR WINDOW ═══ */}
-                {user && captainTeams.length > 0 && (
+                {user && myTeams.length > 0 && (
                     <DraggableXpWindow
                         title="Scrim Calendar"
                         icon="&#128197;"
@@ -933,7 +1110,60 @@ export default function ScrimPlanner() {
                         className="xp-scrim-cal-window"
                         resizable={true}
                     >
-                        <XpScrimCalendarWindow myScrims={myScrims} captainTeams={captainTeams} />
+                        <XpScrimCalendarWindow myScrims={myScrims} myTeams={myTeams} />
+                    </DraggableXpWindow>
+                )}
+
+                {/* ═══ BLACKLIST WINDOW ═══ */}
+                {user && isCaptain && (
+                    <DraggableXpWindow
+                        title="Blacklist"
+                        icon="&#128683;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth * 0.55) : 400}
+                        defaultY={380}
+                        className="xp-blacklist-window"
+                        resizable={true}
+                    >
+                        <XpBlacklistWindow
+                            captainTeams={captainTeams}
+                            allTeams={allTeams}
+                            blacklist={blacklist}
+                            onAdd={handleBlacklistAdd}
+                            onRemove={handleBlacklistRemove}
+                        />
+                    </DraggableXpWindow>
+                )}
+
+                {/* ═══ IMPERSONATION WINDOW (Owner only) ═══ */}
+                {user && isOwner && (
+                    <DraggableXpWindow
+                        title="Impersonate"
+                        icon="&#128373;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth * 0.6) : 400}
+                        defaultY={560}
+                        className="xp-impersonate-window"
+                        resizable={false}
+                    >
+                        <XpImpersonateWindow
+                            impersonatedUser={impersonatedUser}
+                            onImpersonate={handleImpersonate}
+                            onClear={handleClearImpersonation}
+                        />
+                    </DraggableXpWindow>
+                )}
+
+                {/* ═══ HELP WINDOW ═══ */}
+                {showHelp && (
+                    <DraggableXpWindow
+                        title="Scrim Help"
+                        icon="&#10068;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth * 0.35) : 200}
+                        defaultY={100}
+                        className="xp-help-window"
+                        resizable={true}
+                        onClose={() => setShowHelp(false)}
+                    >
+                        <XpScrimHelpWindow />
                     </DraggableXpWindow>
                 )}
 
@@ -955,12 +1185,18 @@ export default function ScrimPlanner() {
                                 </button>
                             ))}
                         </div>
-                        {isCaptain && (
-                            <button onClick={() => setShowPostWindow(true)}
-                                className="xp-btn xp-btn-primary xp-post-scrim-btn" style={{ fontSize: 10, padding: '2px 10px', marginRight: 4, alignSelf: 'center' }}>
-                                <Plus size={11} /> Post Scrim
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => setShowHelp(true)}
+                                className="xp-btn" style={{ fontSize: 10, padding: '2px 8px', alignSelf: 'center' }}>
+                                ?
                             </button>
-                        )}
+                            {isCaptain && (
+                                <button onClick={() => setShowPostWindow(true)}
+                                    className="xp-btn xp-btn-primary xp-post-scrim-btn" style={{ fontSize: 10, padding: '2px 10px', marginRight: 4, alignSelf: 'center' }}>
+                                    <Plus size={11} /> Post Scrim
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="xp-tab-content">
@@ -976,17 +1212,19 @@ export default function ScrimPlanner() {
                         {!loading && !error && (
                             <>
                                 {activeTab === 'open' && (
-                                    <OpenScrimsTab scrims={openScrims} user={user} currentUserId={user?.id}
+                                    <OpenScrimsTab scrims={filteredOpenScrims} user={user} currentUserId={user?.id}
                                         captainTeams={captainTeams} leagueFilter={leagueFilter} setLeagueFilter={setLeagueFilter}
                                         tierFilter={tierFilter} setTierFilter={setTierFilter} uniqueLeagues={uniqueLeagues}
                                         uniqueTiers={uniqueTiers} onAccept={handleAccept} actionLoading={actionLoading}
-                                        login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal} />
+                                        login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                                        reliabilityScores={reliabilityScores} />
                                 )}
                                 {activeTab === 'my' && user && (
                                     <MyScrimsTab scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}
                                         currentUserId={user?.id} onAccept={handleAccept} onCancel={handleCancel}
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
-                                        setAcceptModal={setAcceptModal} />
+                                        setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
+                                        onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome} />
                                 )}
                             </>
                         )}
@@ -1057,7 +1295,7 @@ export default function ScrimPlanner() {
                         <span style={{ fontSize: 12 }}>&#128176;</span>
                         <span>CoinFlip</span>
                     </button>
-                    {user && captainTeams.length > 0 && (
+                    {user && myTeams.length > 0 && (
                         <button className="xp-taskbar-window-btn xp-taskbar-window-active">
                             <span style={{ fontSize: 12 }}>&#128197;</span>
                             <span>Calendar</span>
@@ -1067,6 +1305,24 @@ export default function ScrimPlanner() {
                         <button className="xp-taskbar-window-btn xp-taskbar-window-active">
                             <span style={{ fontSize: 12 }}>&#128228;</span>
                             <span>Post Scrim</span>
+                        </button>
+                    )}
+                    {user && isCaptain && (
+                        <button className="xp-taskbar-window-btn xp-taskbar-window-active">
+                            <span style={{ fontSize: 12 }}>&#128683;</span>
+                            <span>Blacklist</span>
+                        </button>
+                    )}
+                    {user && isOwner && (
+                        <button className={`xp-taskbar-window-btn xp-taskbar-window-active${impersonatedUser ? ' xp-taskbar-impersonating' : ''}`}>
+                            <span style={{ fontSize: 12 }}>&#128373;</span>
+                            <span>{impersonatedUser ? impersonatedUser.discordUsername : 'Impersonate'}</span>
+                        </button>
+                    )}
+                    {showHelp && (
+                        <button className="xp-taskbar-window-btn xp-taskbar-window-active">
+                            <span style={{ fontSize: 12 }}>&#10068;</span>
+                            <span>Help</span>
                         </button>
                     )}
 
@@ -1091,7 +1347,7 @@ export default function ScrimPlanner() {
 // ═══════════════════════════════════════════════════
 // Scrim Card
 // ═══════════════════════════════════════════════════
-function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, actionLoading, acceptModal, setAcceptModal, isChallenge }) {
+function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores }) {
     const isLoading = actionLoading === scrim.id
     const acceptableTeams = captainTeams.filter(t => t.teamId !== scrim.teamId)
     const handleAcceptClick = () => {
@@ -1102,6 +1358,13 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
     const isOwnTeam = captainTeams.some(t => t.teamId === scrim.teamId)
     const canAccept = acceptableTeams.length > 0 && !isOwnPost
     const canCancel = isOwnPost || isOwnTeam
+    const isPast = new Date(scrim.scheduledDate) < new Date()
+    const isInvolvedCaptain = captainTeams.some(t => t.teamId === scrim.teamId || t.teamId === scrim.acceptedTeamId)
+
+    // Determine if current user is captain of the accused team (for disputes)
+    const accusedTeamId = scrim.outcome === 'no_show_by_poster' ? scrim.teamId
+        : scrim.outcome === 'no_show_by_accepter' ? scrim.acceptedTeamId : null
+    const isAccusedCaptain = accusedTeamId && captainTeams.some(t => t.teamId === accusedTeamId)
 
     return (
         <div className="xp-scrim-card">
@@ -1110,6 +1373,7 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <span className="xp-text" style={{ fontWeight: 700 }}>{scrim.teamName}</span>
+                        <ReliabilityBadge score={reliabilityScores?.[scrim.teamId]?.score} />
                         <span className="xp-text" style={{ fontSize: 10, color: '#666' }}>{scrim.leagueName} &middot; {scrim.divisionName}</span>
                     </div>
                     <div className="flex items-center gap-1 mb-1">
@@ -1155,7 +1419,12 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
                             <span className="xp-text" style={{ fontSize: 11, fontWeight: 700, color: '#2d8212' }}>{scrim.acceptedTeamName}</span>
                         </div>
                     )}
-                    <div className="xp-text" style={{ fontSize: 10, color: '#999' }}>Posted by {scrim.postedBy}</div>
+                    <div className="flex items-center gap-2">
+                        <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>Posted by {scrim.postedBy}</span>
+                        <button onClick={() => copyScrimsToClipboard([scrim], new Set(captainTeams.map(t => t.teamId)))} className="xp-copy-btn" title="Copy to clipboard">
+                            <Copy size={10} />
+                        </button>
+                    </div>
                 </div>
                 {showActions && (
                     <div className="flex flex-col gap-1 flex-shrink-0">
@@ -1181,7 +1450,39 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
                         {scrim.status === 'open' && canCancel && (
                             <button onClick={() => onCancel(scrim.id)} disabled={isLoading} className="xp-btn xp-btn-danger">{isLoading ? '...' : 'Cancel'}</button>
                         )}
-                        {scrim.status === 'accepted' && <span className="xp-badge xp-badge-green">Accepted</span>}
+                        {scrim.status === 'accepted' && !isPast && <span className="xp-badge xp-badge-green">Accepted</span>}
+                        {scrim.status === 'accepted' && isPast && !scrim.outcome && isInvolvedCaptain && onReportOutcome && (
+                            <>
+                                <button onClick={() => onReportOutcome(scrim.id, 'completed')} disabled={isLoading}
+                                    className="xp-btn xp-btn-primary" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'Completed'}
+                                </button>
+                                <button onClick={() => onReportOutcome(scrim.id, 'no_show_self')} disabled={isLoading}
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'We No-Showed'}
+                                </button>
+                                <button onClick={() => onReportOutcome(scrim.id, 'no_show_opponent')} disabled={isLoading}
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'They No-Showed'}
+                                </button>
+                            </>
+                        )}
+                        {scrim.status === 'accepted' && isPast && !scrim.outcome && !isInvolvedCaptain && (
+                            <span className="xp-badge xp-badge-amber">Awaiting Report</span>
+                        )}
+                        {scrim.status === 'completed' && <span className="xp-badge xp-badge-green">Completed</span>}
+                        {scrim.status === 'no_show' && !scrim.outcomeDisputed && (
+                            <>
+                                <span className="xp-badge xp-badge-red">No-Show</span>
+                                {isAccusedCaptain && scrim.outcomeDisputeDeadline && new Date(scrim.outcomeDisputeDeadline) > new Date() && onDisputeOutcome && (
+                                    <button onClick={() => onDisputeOutcome(scrim.id)} disabled={isLoading}
+                                        className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                        {isLoading ? '...' : 'Dispute'}
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        {scrim.status === 'disputed' && <span className="xp-badge xp-badge-amber">Disputed</span>}
                         {scrim.status === 'cancelled' && <span className="xp-badge xp-badge-red">Cancelled</span>}
                         {scrim.status === 'expired' && <span className="xp-badge xp-badge-gray">Expired</span>}
                     </div>
@@ -1195,7 +1496,7 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
 // ═══════════════════════════════════════════════════
 // Open Scrims Tab
 // ═══════════════════════════════════════════════════
-function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, uniqueLeagues, uniqueTiers, onAccept, actionLoading, acceptModal, setAcceptModal }) {
+function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, uniqueLeagues, uniqueTiers, onAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
     return (
         <div>
             {scrims.length > 0 && (
@@ -1215,7 +1516,8 @@ function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter
                 {scrims.map(scrim => (
                     <ScrimCard key={scrim.id} scrim={scrim} showActions={!!user} captainTeams={captainTeams}
                         currentUserId={currentUserId} onAccept={onAccept} onCancel={() => {}} onDecline={() => {}}
-                        actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal} isChallenge={false} />
+                        actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                        isChallenge={false} reliabilityScores={reliabilityScores} />
                 ))}
             </div>
             {scrims.length === 0 && (
@@ -1235,9 +1537,12 @@ function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter
 // ═══════════════════════════════════════════════════
 // My Scrims Tab
 // ═══════════════════════════════════════════════════
-function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onDecline, actionLoading, acceptModal, setAcceptModal }) {
+function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
     const openScrims = scrims.filter(s => s.status === 'open' && !incomingScrims.some(i => i.id === s.id))
-    const acceptedScrims = scrims.filter(s => s.status === 'accepted')
+    const upcomingScrims = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) >= new Date())
+    const needsReport = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) < new Date() && !s.outcome)
+    const completedScrims = scrims.filter(s => s.status === 'completed')
+    const noShowScrims = scrims.filter(s => s.status === 'no_show' || s.status === 'disputed')
     const pastScrims = scrims.filter(s => s.status === 'cancelled' || s.status === 'expired')
 
     const Section = ({ title, items, challenge = false, dim = false }) => items.length > 0 && (
@@ -1246,8 +1551,10 @@ function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAc
             <div className="flex flex-col gap-0.5">
                 {items.map(s => (
                     <ScrimCard key={s.id} scrim={s} showActions captainTeams={captainTeams} currentUserId={currentUserId}
-                        onAccept={onAccept} onCancel={onCancel} onDecline={onDecline} actionLoading={actionLoading}
-                        acceptModal={acceptModal} setAcceptModal={setAcceptModal} isChallenge={challenge || !!s.challengedTeamId} />
+                        onAccept={onAccept} onCancel={onCancel} onDecline={onDecline}
+                        onReportOutcome={onReportOutcome} onDisputeOutcome={onDisputeOutcome}
+                        actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                        isChallenge={challenge || !!s.challengedTeamId} reliabilityScores={reliabilityScores} />
                 ))}
             </div>
         </fieldset>
@@ -1256,8 +1563,11 @@ function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAc
     return (
         <div className="flex flex-col gap-3">
             <Section title="Incoming Challenges" items={incomingScrims} challenge />
+            {needsReport.length > 0 && <Section title="Needs Report" items={needsReport} />}
             <Section title="Your Open Requests" items={openScrims} />
-            <Section title="Confirmed Scrims" items={acceptedScrims} />
+            <Section title="Upcoming Scrims" items={upcomingScrims} />
+            <Section title="Completed" items={completedScrims} dim />
+            {noShowScrims.length > 0 && <Section title="No-Shows / Disputes" items={noShowScrims} dim />}
             <Section title="Past Scrims" items={pastScrims} dim />
             {scrims.length === 0 && incomingScrims.length === 0 && (
                 <div className="text-center py-10">
@@ -1266,6 +1576,284 @@ function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAc
                     <div className="xp-text" style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
                         {captainTeams.length > 0 ? 'Post a scrim or accept one from Open Scrims.' : 'You need to be a team captain to manage scrims.'}
                     </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// Impersonation Window (Owner only)
+// ═══════════════════════════════════════════════════
+function XpImpersonateWindow({ impersonatedUser, onImpersonate, onClear }) {
+    const [searchQuery, setSearchQuery] = useState('')
+    const [results, setResults] = useState([])
+    const [searching, setSearching] = useState(false)
+    const debounceRef = useRef(null)
+
+    useEffect(() => {
+        if (!searchQuery.trim()) { setResults([]); return }
+        clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(async () => {
+            setSearching(true)
+            try {
+                const data = await scrimService.searchUsers(searchQuery.trim())
+                setResults(data.users || [])
+            } catch { setResults([]) }
+            finally { setSearching(false) }
+        }, 300)
+        return () => clearTimeout(debounceRef.current)
+    }, [searchQuery])
+
+    return (
+        <div style={{ padding: 6 }}>
+            {impersonatedUser && (
+                <div className="flex items-center gap-2 mb-2 p-1.5" style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 2 }}>
+                    <span style={{ fontSize: 14 }}>&#128373;</span>
+                    <div className="flex-1 min-w-0">
+                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 11 }}>Acting as: {impersonatedUser.discordUsername}</div>
+                        <div className="xp-text" style={{ fontSize: 9, color: '#666' }}>ID: {impersonatedUser.id}</div>
+                    </div>
+                    <button onClick={onClear} className="xp-btn xp-btn-danger" style={{ padding: '1px 8px', fontSize: 10 }}>
+                        Stop
+                    </button>
+                </div>
+            )}
+
+            <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search user by Discord name..."
+                className="xp-input w-full"
+                style={{ fontSize: 11, marginBottom: 4 }}
+            />
+
+            {searching && <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center' }}>Searching...</div>}
+
+            {!searching && results.length > 0 && (
+                <div className="xp-listbox" style={{ maxHeight: 160, overflowY: 'auto' }}>
+                    {results.map(u => (
+                        <button key={u.id} onClick={() => {
+                            onImpersonate(u)
+                            setSearchQuery('')
+                            setResults([])
+                        }} className="xp-listbox-item" style={{
+                            background: impersonatedUser?.id === u.id ? '#316ac5' : undefined,
+                            color: impersonatedUser?.id === u.id ? '#fff' : undefined,
+                        }}>
+                            <span className="xp-text" style={{ fontSize: 11 }}>{u.discordUsername}</span>
+                            <span className="xp-text" style={{ fontSize: 9, color: impersonatedUser?.id === u.id ? '#ccc' : '#888', marginLeft: 'auto' }}>#{u.id}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {!searching && searchQuery && results.length === 0 && (
+                <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center', padding: '4px 0' }}>No users found</div>
+            )}
+
+            {!impersonatedUser && !searchQuery && (
+                <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center', padding: '8px 0' }}>
+                    Search for a user to act as them.
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// Scrim Help Window
+// ═══════════════════════════════════════════════════
+function XpScrimHelpWindow() {
+    const sectionStyle = { marginBottom: 10 }
+    const headingStyle = { fontWeight: 700, fontSize: 12, color: '#003399', marginBottom: 3, borderBottom: '1px solid #ccc', paddingBottom: 2 }
+    const textStyle = { fontSize: 11, lineHeight: '1.5', color: '#222' }
+    const listStyle = { fontSize: 11, lineHeight: '1.6', color: '#222', paddingLeft: 16, margin: '2px 0' }
+    const warnStyle = { fontSize: 11, lineHeight: '1.5', color: '#cc0000', fontWeight: 600, background: '#fff0f0', border: '1px solid #ffcccc', padding: '4px 6px', borderRadius: 2, marginTop: 4 }
+
+    return (
+        <div style={{ padding: 8 }}>
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>How It Works</div>
+                <ol className="xp-text" style={listStyle}>
+                    <li><b>Post a Scrim</b> &mdash; Captains pick a date/time, pick mode, and which tiers can accept.</li>
+                    <li><b>Accept a Scrim</b> &mdash; Browse Open Scrims and accept with one of your captain teams.</li>
+                    <li><b>Play the Match</b> &mdash; Show up at the scheduled time and play your scrim.</li>
+                    <li><b>Report Outcome</b> &mdash; After the scheduled time, report the result: Completed, We No-Showed, or They No-Showed.</li>
+                </ol>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Outcome Reporting</div>
+                <div className="xp-text" style={textStyle}>
+                    After a scrim's scheduled time passes, either captain can report the outcome:
+                </div>
+                <ul className="xp-text" style={listStyle}>
+                    <li><b>Completed</b> &mdash; The scrim was played successfully.</li>
+                    <li><b>We No-Showed</b> &mdash; Your team didn't make it. This is a self-admission and is immediately confirmed.</li>
+                    <li><b>They No-Showed</b> &mdash; The other team didn't show up. The accused team has 24 hours to dispute the claim.</li>
+                </ul>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Disputes</div>
+                <div className="xp-text" style={textStyle}>
+                    If you're accused of a no-show, you have <b>24 hours</b> to dispute it. A disputed no-show won't count against your reliability score. If you don't dispute within 24 hours, the no-show is confirmed.
+                </div>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Reliability Score</div>
+                <div className="xp-text" style={textStyle}>
+                    Every team has a reliability score shown as a percentage next to their name. It's calculated as:
+                </div>
+                <div className="xp-text" style={{ ...textStyle, textAlign: 'center', fontWeight: 700, margin: '4px 0', fontFamily: 'monospace' }}>
+                    completed / (completed + confirmed no-shows) &times; 100
+                </div>
+                <div className="xp-text" style={textStyle}>
+                    Disputed and self-admitted no-shows that are within the dispute window don't affect the score until confirmed. Only confirmed no-shows (undisputed after 24h) count against you.
+                </div>
+                <div className="xp-text" style={warnStyle}>
+                    Teams with low reliability scores will be visible to all captains. If your reliability drops too low, you won't be able to post or accept new scrims until it improves.
+                </div>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Blacklist</div>
+                <div className="xp-text" style={textStyle}>
+                    Captains can block specific teams from accepting their scrims. Blocked teams won't see your open scrim requests at all. Blacklisting is one-directional &mdash; if you block a team, they can't accept your scrims, but you can still see and accept theirs. Neither side can send direct challenges to the other while blocked.
+                </div>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Pick Modes</div>
+                <ul className="xp-text" style={listStyle}>
+                    <li><b>Regular</b> &mdash; Standard picks and bans.</li>
+                    <li><b>Fearless</b> &mdash; No god can be picked or banned more than once across all games.</li>
+                    <li><b>Fearless Picks</b> &mdash; No god can be picked more than once (bans can repeat).</li>
+                    <li><b>Fearless Bans</b> &mdash; No ban can repeat (picks can repeat).</li>
+                </ul>
+            </div>
+
+            <div style={sectionStyle}>
+                <div className="xp-text" style={headingStyle}>Direct Challenges</div>
+                <div className="xp-text" style={textStyle}>
+                    Instead of posting an open request, you can directly challenge a specific team. They'll see the challenge in their "My Scrims" tab under incoming challenges. They can accept or decline.
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// Reliability Badge
+// ═══════════════════════════════════════════════════
+function ReliabilityBadge({ score }) {
+    if (score === null || score === undefined) return null
+    const color = score >= 90 ? '#2d8212' : score >= 70 ? '#c08030' : '#cc0000'
+    return (
+        <span className="xp-text" style={{ fontSize: 9, color, fontWeight: 700 }}
+              title={`Reliability: ${score}%`}>
+            ({score}%)
+        </span>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// Blacklist Window
+// ═══════════════════════════════════════════════════
+function XpBlacklistWindow({ captainTeams, allTeams, blacklist, onAdd, onRemove }) {
+    const [selectedTeamId, setSelectedTeamId] = useState(() => captainTeams[0]?.teamId || '')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [showSearch, setShowSearch] = useState(false)
+
+    const teamBlacklist = blacklist.filter(b => b.teamId === Number(selectedTeamId))
+    const blockedIds = new Set(teamBlacklist.map(b => b.blockedTeamId))
+
+    const filteredTeams = allTeams.filter(t =>
+        t.id !== Number(selectedTeamId) &&
+        !blockedIds.has(t.id) &&
+        (searchQuery === '' || t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+
+    return (
+        <div style={{ padding: 6 }}>
+            {captainTeams.length > 1 && (
+                <select value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)}
+                        className="xp-select w-full" style={{ marginBottom: 6, fontSize: 11 }}>
+                    {captainTeams.map(t => (
+                        <option key={t.teamId} value={t.teamId}>{t.teamName} — {t.divisionName}{t.divisionTier ? ` (${RANK_LABELS[t.divisionTier] || 'Tier ' + t.divisionTier})` : ''}</option>
+                    ))}
+                </select>
+            )}
+            {captainTeams.length === 1 && (
+                <div className="flex items-center gap-2 mb-2">
+                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={18} />
+                    <span className="xp-text" style={{ fontWeight: 700, fontSize: 12 }}>{captainTeams[0].teamName}</span>
+                    <span className="xp-text" style={{ fontSize: 9, color: '#666' }}>{captainTeams[0].divisionName}{captainTeams[0].divisionTier ? ` (${RANK_LABELS[captainTeams[0].divisionTier] || 'Tier ' + captainTeams[0].divisionTier})` : ''}</span>
+                </div>
+            )}
+
+            {teamBlacklist.length === 0 ? (
+                <div className="xp-text" style={{ textAlign: 'center', color: '#888', padding: '12px 0', fontSize: 11 }}>
+                    No teams blocked.
+                </div>
+            ) : (
+                <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 6 }}>
+                    {teamBlacklist.map(entry => (
+                        <div key={entry.id} className="flex items-center gap-2 p-1.5"
+                             style={{ borderBottom: '1px solid #e0e0e0' }}>
+                            <TeamLogo slug={entry.blockedTeamSlug} name={entry.blockedTeamName} size={18} />
+                            <div className="flex-1 min-w-0">
+                                <div className="xp-text" style={{ fontWeight: 600, fontSize: 11 }}>{entry.blockedTeamName}</div>
+                                <div className="xp-text" style={{ fontSize: 9, color: '#666' }}>
+                                    {entry.blockedLeagueName} - {entry.blockedDivisionName}{entry.blockedDivisionTier ? ` (${RANK_LABELS[entry.blockedDivisionTier] || 'Tier ' + entry.blockedDivisionTier})` : ''}
+                                </div>
+                            </div>
+                            <button onClick={() => onRemove(entry.teamId, entry.blockedTeamId)}
+                                    className="xp-btn xp-btn-danger" style={{ padding: '1px 6px', fontSize: 9 }}>
+                                Unblock
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {!showSearch ? (
+                <button onClick={() => setShowSearch(true)} className="xp-btn w-full" style={{ fontSize: 11 }}>
+                    + Block a Team
+                </button>
+            ) : (
+                <div>
+                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                           placeholder="Search team to block..." className="xp-input w-full" style={{ fontSize: 11, marginBottom: 4 }} autoFocus />
+                    {searchQuery && (
+                        <div className="xp-listbox" style={{ maxHeight: 140, overflowY: 'auto' }}>
+                            {filteredTeams.slice(0, 15).map(team => (
+                                <button key={team.id} onClick={() => {
+                                    onAdd(Number(selectedTeamId), team.id)
+                                    setSearchQuery('')
+                                    setShowSearch(false)
+                                }} className="xp-listbox-item">
+                                    <TeamLogo slug={team.slug} name={team.name} size={14} />
+                                    <span className="xp-text" style={{ fontSize: 11 }}>{team.name}</span>
+                                    <span className="xp-text" style={{ fontSize: 9, color: '#888', marginLeft: 'auto' }}>{team.divisionName}{team.divisionTier ? ` (${RANK_LABELS[team.divisionTier] || 'T' + team.divisionTier})` : ''}</span>
+                                </button>
+                            ))}
+                            {filteredTeams.length === 0 && (
+                                <div className="xp-text" style={{ padding: '4px 8px', fontSize: 10, color: '#666' }}>
+                                    No teams found
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <button onClick={() => { setShowSearch(false); setSearchQuery('') }}
+                            className="xp-btn w-full" style={{ fontSize: 10, marginTop: 4 }}>Cancel</button>
                 </div>
             )}
         </div>
@@ -1346,7 +1934,7 @@ function toESTDateStr(isoStr) {
     return `${est.getFullYear()}-${String(est.getMonth() + 1).padStart(2, '0')}-${String(est.getDate()).padStart(2, '0')}`
 }
 
-function XpScrimCalendarWindow({ myScrims, captainTeams }) {
+function XpScrimCalendarWindow({ myScrims, myTeams }) {
     const [viewMonth, setViewMonth] = useState(() => new Date())
     const [selectedDay, setSelectedDay] = useState(null)
 
@@ -1363,7 +1951,7 @@ function XpScrimCalendarWindow({ myScrims, captainTeams }) {
     // Build map: dateStr → array of scrims
     const scrimsByDate = useMemo(() => {
         const map = {}
-        const teamIds = new Set(captainTeams.map(t => t.teamId))
+        const teamIds = new Set(myTeams.map(t => t.teamId))
         for (const s of (myScrims || [])) {
             if (s.status === 'cancelled' || s.status === 'expired') continue
             if (!teamIds.has(s.teamId) && !teamIds.has(s.acceptedTeamId)) continue
@@ -1372,7 +1960,7 @@ function XpScrimCalendarWindow({ myScrims, captainTeams }) {
             map[dateStr].push(s)
         }
         return map
-    }, [myScrims, captainTeams])
+    }, [myScrims, myTeams])
 
     const cells = []
     for (let i = 0; i < firstDay; i++) cells.push(null)
@@ -1423,8 +2011,8 @@ function XpScrimCalendarWindow({ myScrims, captainTeams }) {
                         )
                     })}
                 </div>
-                {/* Legend */}
-                <div className="flex items-center gap-4 px-2 py-1.5" style={{ background: '#ece9d8', borderTop: '1px solid #c0c0c0' }}>
+                {/* Legend + Export */}
+                <div className="flex items-center gap-3 px-2 py-1.5" style={{ background: '#ece9d8', borderTop: '1px solid #c0c0c0' }}>
                     <div className="flex items-center gap-1">
                         <span className="xp-cal-dot xp-cal-dot-confirmed" style={{ position: 'static' }} />
                         <span className="xp-text" style={{ fontSize: 10 }}>Confirmed</span>
@@ -1433,6 +2021,14 @@ function XpScrimCalendarWindow({ myScrims, captainTeams }) {
                         <span className="xp-cal-dot xp-cal-dot-pending" style={{ position: 'static' }} />
                         <span className="xp-text" style={{ fontSize: 10 }}>Pending</span>
                     </div>
+                    <div className="flex-1" />
+                    <button onClick={() => {
+                        const allScrims = Object.values(scrimsByDate).flat().sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
+                        if (allScrims.length === 0) return
+                        copyScrimsToClipboard(allScrims, new Set(myTeams.map(t => t.teamId)))
+                    }} className="xp-copy-btn" title="Copy all scrims to clipboard" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Copy size={10} /> Export All
+                    </button>
                 </div>
             </div>
 
@@ -1539,7 +2135,13 @@ function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess }) {
     const [bannedContentLeague, setBannedContentLeague] = useState('')
     const [challengedTeamId, setChallengedTeamId] = useState('')
     const [notes, setNotes] = useState('')
-    const [acceptableTiers, setAcceptableTiers] = useState([1, 2, 3, 4, 5])
+    const [acceptableTiers, setAcceptableTiers] = useState(() => {
+        const tier = captainTeams[0]?.divisionTier
+        if (!tier) return [1, 2, 3, 4, 5]
+        const tiers = [tier]
+        if (tier > 1) tiers.push(tier - 1)
+        return tiers.sort((a, b) => a - b)
+    })
 
     // UI state
     const [teamSearch, setTeamSearch] = useState('')
@@ -1550,6 +2152,16 @@ function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess }) {
     const [postError, setPostError] = useState(null)
     const [postSuccess, setPostSuccess] = useState(false)
     const [leagues, setLeagues] = useState([])
+
+    // Update acceptable tiers when team changes
+    useEffect(() => {
+        const team = captainTeams.find(t => t.teamId === Number(teamId))
+        const tier = team?.divisionTier
+        if (!tier) { setAcceptableTiers([1, 2, 3, 4, 5]); return }
+        const tiers = [tier]
+        if (tier > 1) tiers.push(tier - 1)
+        setAcceptableTiers(tiers.sort((a, b) => a - b))
+    }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch leagues for banned content dropdown
     useEffect(() => {
@@ -2541,6 +3153,60 @@ const XP_STYLES = `
 }
 .xp-checkbox { accent-color: #0058e6; cursor: pointer; }
 
+/* ── Blacklist Window ── */
+.xp-blacklist-window {
+    z-index: 13;
+    width: 280px !important;
+    min-height: 200px;
+}
+.xp-blacklist-window .xp-window-body {
+    padding: 0 !important;
+}
+
+/* ── Impersonation Window ── */
+.xp-impersonate-window {
+    z-index: 14;
+    width: 260px !important;
+}
+.xp-impersonate-window .xp-window-body {
+    padding: 0 !important;
+}
+.xp-taskbar-impersonating {
+    background: linear-gradient(180deg, #ffc107, #e6a800) !important;
+    color: #000 !important;
+    font-weight: bold;
+}
+
+/* ── Help Window ── */
+.xp-help-window {
+    z-index: 16;
+    width: 360px !important;
+    max-height: 500px;
+}
+.xp-help-window .xp-window-body {
+    padding: 0 !important;
+}
+
+/* ── Copy Button ── */
+.xp-copy-btn {
+    background: none; border: 1px solid transparent; color: #666; cursor: pointer;
+    padding: 1px 3px; border-radius: 2px; display: inline-flex; align-items: center; gap: 2px;
+    font-family: system-ui, Tahoma, sans-serif; line-height: 1;
+}
+.xp-copy-btn:hover {
+    border-color: #999; background: #f0f0f0; color: #333;
+}
+
+/* ── Copied Toast ── */
+.xp-copy-toast {
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    background: #333; color: #fff; padding: 6px 16px; border-radius: 4px;
+    font-family: system-ui, Tahoma, sans-serif; font-size: 12px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+    z-index: 9999;
+}
+.xp-copy-toast-visible { opacity: 1; }
+
 /* ── Scrim Calendar Window ── */
 .xp-scrim-cal-window {
     z-index: 12;
@@ -2602,6 +3268,7 @@ const XP_STYLES = `
     .xp-dino-window { display: none !important; }
     .xp-coinflip-window { display: none !important; }
     .xp-scrim-cal-window { display: none !important; }
+    .xp-help-window { display: none !important; }
     .xp-post-window {
         position: relative !important;
         left: auto !important; top: auto !important;

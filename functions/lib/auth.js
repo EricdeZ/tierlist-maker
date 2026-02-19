@@ -51,6 +51,7 @@ export async function requireAdmin(event) {
 
 /**
  * Verify JWT and return the user row (any role).
+ * Supports owner impersonation via x-impersonate header.
  * Returns the full user row or null.
  */
 export async function requireAuth(event) {
@@ -62,7 +63,28 @@ export async function requireAuth(event) {
         SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
         FROM users WHERE id = ${payload.userId}
     `
-    return user || null
+    if (!user) return null
+
+    // Owner impersonation: if x-impersonate header is set and caller has permission_manage (Owner only)
+    const impersonateId = event.headers['x-impersonate']
+    if (impersonateId) {
+        const [hasPermission] = await sql`
+            SELECT 1 FROM user_roles ur
+            JOIN role_permissions rp ON rp.role_id = ur.role_id
+            WHERE ur.user_id = ${user.id}
+              AND rp.permission_key = 'permission_manage'
+            LIMIT 1
+        `
+        if (hasPermission) {
+            const [impersonated] = await sql`
+                SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
+                FROM users WHERE id = ${Number(impersonateId)}
+            `
+            if (impersonated) return impersonated
+        }
+    }
+
+    return user
 }
 
 /**

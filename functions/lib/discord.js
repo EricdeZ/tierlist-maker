@@ -111,6 +111,45 @@ export function resolveRoleMentions(content, rolesMap) {
 }
 
 /**
+ * Send a DM to a Discord user via the bot.
+ * Opens (or reuses) a DM channel, then posts a message.
+ * Silently fails if the user has DMs disabled.
+ * @param {string} discordUserId - The user's Discord snowflake ID
+ * @param {object} options - { content, embeds }
+ */
+export async function sendDM(discordUserId, { content, embeds }) {
+    try {
+        const hdrs = { ...getDiscordHeaders(), 'Content-Type': 'application/json' }
+
+        // Open/get DM channel
+        const chanRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
+            method: 'POST',
+            headers: hdrs,
+            body: JSON.stringify({ recipient_id: discordUserId }),
+        })
+        if (!chanRes.ok) {
+            const text = await chanRes.text().catch(() => '')
+            console.error(`Discord DM channel open failed ${chanRes.status}: ${text.slice(0, 200)}`)
+            return
+        }
+        const channel = await chanRes.json()
+
+        // Send message in the DM channel
+        const msgRes = await fetch(`${DISCORD_API}/channels/${channel.id}/messages`, {
+            method: 'POST',
+            headers: hdrs,
+            body: JSON.stringify({ content, embeds }),
+        })
+        if (!msgRes.ok) {
+            const text = await msgRes.text().catch(() => '')
+            console.error(`Discord DM send failed ${msgRes.status}: ${text.slice(0, 200)}`)
+        }
+    } catch (err) {
+        console.error('sendDM error:', err.message || err)
+    }
+}
+
+/**
  * Send a message to a Discord webhook.
  * @param {string} webhookUrl - Full Discord webhook URL
  * @param {object} options - { content, embeds }

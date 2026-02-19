@@ -1,6 +1,12 @@
 // src/services/database.js
 const API_BASE = '/api'
 
+// Owner impersonation support
+let _impersonateUserId = null
+export function setImpersonation(userId) { _impersonateUserId = userId }
+export function clearImpersonation() { _impersonateUserId = null }
+export function getImpersonation() { return _impersonateUserId }
+
 const apiCall = async (endpoint, params = {}) => {
     const url = new URL(`${API_BASE}/${endpoint}`, window.location.origin)
     Object.keys(params).forEach(key => {
@@ -10,8 +16,12 @@ const apiCall = async (endpoint, params = {}) => {
     })
 
     const token = localStorage.getItem('auth_token')
+    const hdrs = {}
+    if (token) hdrs.Authorization = `Bearer ${token}`
+    if (_impersonateUserId) hdrs['X-Impersonate'] = String(_impersonateUserId)
+
     const response = await fetch(url, {
-        ...(token && { headers: { Authorization: `Bearer ${token}` } }),
+        headers: Object.keys(hdrs).length > 0 ? hdrs : undefined,
     })
 
     if (!response.ok) {
@@ -35,12 +45,13 @@ const apiPost = async (endpoint, params = {}, body = {}) => {
     })
 
     const token = localStorage.getItem('auth_token')
+    const hdrs = { 'Content-Type': 'application/json' }
+    if (token) hdrs.Authorization = `Bearer ${token}`
+    if (_impersonateUserId) hdrs['X-Impersonate'] = String(_impersonateUserId)
+
     const response = await fetch(url, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
-        },
+        headers: hdrs,
         body: JSON.stringify(body),
     })
 
@@ -440,6 +451,27 @@ export const scrimService = {
     },
     async decline(scrimId) {
         return apiPost('scrim', { action: 'decline' }, { scrim_id: scrimId })
+    },
+    async reportOutcome(data) {
+        return apiPost('scrim', { action: 'report-outcome' }, data)
+    },
+    async disputeOutcome(scrimId) {
+        return apiPost('scrim', { action: 'dispute-outcome' }, { scrim_id: scrimId })
+    },
+    async getTeamReliability(teamIds) {
+        return apiCall('scrim', { action: 'team-reliability', team_ids: teamIds.join(',') })
+    },
+    async getBlacklist() {
+        return apiCall('scrim', { action: 'blacklist' })
+    },
+    async addToBlacklist(teamId, blockedTeamId) {
+        return apiPost('scrim', { action: 'blacklist-add' }, { team_id: teamId, blocked_team_id: blockedTeamId })
+    },
+    async removeFromBlacklist(teamId, blockedTeamId) {
+        return apiPost('scrim', { action: 'blacklist-remove' }, { team_id: teamId, blocked_team_id: blockedTeamId })
+    },
+    async searchUsers(query) {
+        return apiCall('scrim', { action: 'search-users', ...(query ? { q: query } : {}) })
     },
 }
 
