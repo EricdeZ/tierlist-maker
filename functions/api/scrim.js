@@ -142,7 +142,7 @@ async function getEligibleTeams(sql, userId) {
 const SCRIM_SELECT = `
     sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
     sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
-    sr.notes, sr.status, sr.accepted_team_id, sr.accepted_user_id,
+    sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
     sr.accepted_at, sr.created_at, sr.updated_at,
     t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
     d.name as division_name, d.tier as division_tier,
@@ -181,6 +181,7 @@ function formatScrim(row) {
         acceptedTeamSlug: row.accepted_team_slug || null,
         acceptedTeamLogo: row.accepted_team_logo || null,
         acceptedTeamColor: row.accepted_team_color || null,
+        acceptableTiers: row.acceptable_tiers || null,
         acceptedAt: row.accepted_at,
         createdAt: row.created_at,
     }
@@ -205,7 +206,7 @@ async function listScrims(sql, params) {
         SELECT
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
-            sr.notes, sr.status, sr.accepted_team_id, sr.accepted_user_id,
+            sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
             d.name as division_name, d.tier as division_tier,
@@ -260,7 +261,7 @@ async function getMyScrims(sql, event) {
         SELECT
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
-            sr.notes, sr.status, sr.accepted_team_id, sr.accepted_user_id,
+            sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
             d.name as division_name, d.tier as division_tier,
@@ -329,7 +330,7 @@ async function getIncoming(sql, event) {
         SELECT
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
-            sr.notes, sr.status, sr.accepted_team_id, sr.accepted_user_id,
+            sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
             d.name as division_name, d.tier as division_tier,
@@ -385,6 +386,7 @@ async function getCaptainTeamsAction(sql, event) {
                 teamLogo: t.team_logo,
                 divisionName: t.division_name,
                 divisionTier: t.division_tier,
+                divisionSlug: t.division_slug,
                 leagueName: t.league_name,
                 leagueSlug: t.league_slug,
             })),
@@ -433,7 +435,7 @@ async function getAllActiveTeams(sql) {
 // POST: Create a scrim request
 // ═══════════════════════════════════════════════════
 async function createScrim(sql, user, body) {
-    const { team_id, scheduled_date, pick_mode, banned_content_league, notes, challenged_team_id } = body
+    const { team_id, scheduled_date, pick_mode, banned_content_league, notes, challenged_team_id, acceptable_tiers } = body
 
     if (!team_id || !scheduled_date) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'team_id and scheduled_date are required' }) }
@@ -471,9 +473,16 @@ async function createScrim(sql, user, body) {
         }
     }
 
+    // Validate acceptable_tiers if provided
+    if (acceptable_tiers) {
+        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 5)) {
+            return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'acceptable_tiers must be an array of integers 1-5' }) }
+        }
+    }
+
     const [created] = await sql`
-        INSERT INTO scrim_requests (team_id, user_id, challenged_team_id, scheduled_date, pick_mode, banned_content_league, notes)
-        VALUES (${team_id}, ${user.id}, ${challenged_team_id || null}, ${scheduled_date}, ${pick_mode || 'regular'}, ${banned_content_league || null}, ${notes || null})
+        INSERT INTO scrim_requests (team_id, user_id, challenged_team_id, scheduled_date, pick_mode, banned_content_league, notes, acceptable_tiers)
+        VALUES (${team_id}, ${user.id}, ${challenged_team_id || null}, ${scheduled_date}, ${pick_mode || 'regular'}, ${banned_content_league || null}, ${notes || null}, ${acceptable_tiers ? JSON.stringify(acceptable_tiers) : null})
         RETURNING id, status, created_at
     `
 

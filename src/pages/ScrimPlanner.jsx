@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { scrimService, godService, coinflipService } from '../services/database'
+import { scrimService, godService, coinflipService, leagueService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
@@ -12,10 +12,11 @@ import xpBg from '../assets/xp-bg.jpg'
 import shortcutOverlay from '../assets/shortcut.PNG'
 import zeusImg from '../assets/zeus.png'
 import minionImg from '../assets/minion.png'
+import { RANK_LABELS, getDivisionImage } from '../utils/divisionImages'
 import {
     Swords, Clock, Shield, MessageSquare, Search,
     Plus, X, Check, Send, Users,
-    Calendar, Filter, Target,
+    Calendar, Filter, Target, ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 
 const PICK_MODES = [
@@ -785,17 +786,8 @@ export default function ScrimPlanner() {
     const [captainTeams, setCaptainTeams] = useState([])
     const [incomingScrims, setIncomingScrims] = useState([])
 
-    const [postForm, setPostForm] = useState({
-        team_id: '', scheduled_date: '', pick_mode: 'regular',
-        banned_content_league: '', notes: '', challenged_team_id: '',
-    })
-    const [posting, setPosting] = useState(false)
-    const [postError, setPostError] = useState(null)
-    const [postSuccess, setPostSuccess] = useState(false)
-
     const [allTeams, setAllTeams] = useState([])
-    const [teamSearch, setTeamSearch] = useState('')
-    const [showTeamPicker, setShowTeamPicker] = useState(false)
+    const [showPostWindow, setShowPostWindow] = useState(false)
 
     const [actionLoading, setActionLoading] = useState(null)
 
@@ -804,7 +796,6 @@ export default function ScrimPlanner() {
     const TABS = [
         { key: 'open', label: 'Open Scrims' },
         ...(user ? [{ key: 'my', label: 'My Scrims' }] : []),
-        ...(isCaptain ? [{ key: 'post', label: 'Post Scrim' }] : []),
     ]
 
     const loadOpenScrims = useCallback(async () => {
@@ -842,14 +833,10 @@ export default function ScrimPlanner() {
     useEffect(() => { if (!loading) loadOpenScrims() }, [leagueFilter, tierFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        if (activeTab === 'post' && allTeams.length === 0) {
+        if (showPostWindow && allTeams.length === 0) {
             scrimService.getAllActiveTeams().then(data => setAllTeams(data.teams || [])).catch(() => {})
         }
-    }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (captainTeams.length > 0 && !postForm.team_id) setPostForm(prev => ({ ...prev, team_id: captainTeams[0].teamId }))
-    }, [captainTeams]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [showPostWindow]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Close start menu on click outside
     useEffect(() => {
@@ -874,26 +861,6 @@ export default function ScrimPlanner() {
         }).catch(() => {})
     }, [])
 
-    const handlePost = async (e) => {
-        e.preventDefault()
-        setPosting(true); setPostError(null); setPostSuccess(false)
-        try {
-            await scrimService.create({
-                team_id: Number(postForm.team_id),
-                scheduled_date: new Date(postForm.scheduled_date).toISOString(),
-                pick_mode: postForm.pick_mode,
-                banned_content_league: postForm.banned_content_league || null,
-                notes: postForm.notes || null,
-                challenged_team_id: postForm.challenged_team_id ? Number(postForm.challenged_team_id) : null,
-            })
-            setPostSuccess(true)
-            setPostForm(prev => ({ ...prev, scheduled_date: '', banned_content_league: '', notes: '', challenged_team_id: '' }))
-            setTeamSearch('')
-            await Promise.all([loadOpenScrims(), loadMyScrims()])
-        } catch (err) { setPostError(err.message || 'Failed to post scrim') }
-        finally { setPosting(false) }
-    }
-
     const handleAccept = async (scrimId, teamId) => {
         setActionLoading(scrimId)
         try { await scrimService.accept({ scrim_id: scrimId, team_id: teamId }); await Promise.all([loadOpenScrims(), loadMyScrims()]) }
@@ -917,14 +884,6 @@ export default function ScrimPlanner() {
 
     const uniqueLeagues = [...new Map(openScrims.map(s => [s.leagueSlug, { slug: s.leagueSlug, name: s.leagueName }])).values()]
     const uniqueTiers = [...new Set(openScrims.map(s => s.divisionTier).filter(Boolean))].sort((a, b) => a - b)
-    const selectedTeam = captainTeams.find(t => t.teamId === Number(postForm.team_id))
-    const captainTeamIds = new Set(captainTeams.map(t => t.teamId))
-    const filteredChallengeTeams = allTeams.filter(t =>
-        !captainTeamIds.has(t.id) && (teamSearch === '' ||
-            t.name.toLowerCase().includes(teamSearch.toLowerCase()) ||
-            t.leagueName.toLowerCase().includes(teamSearch.toLowerCase()) ||
-            t.divisionName.toLowerCase().includes(teamSearch.toLowerCase()))
-    )
     const [acceptModal, setAcceptModal] = useState(null)
 
     // Calculate default window position (centered, below banner)
@@ -964,6 +923,20 @@ export default function ScrimPlanner() {
                     <XpCoinFlip />
                 </DraggableXpWindow>
 
+                {/* ═══ SCRIM CALENDAR WINDOW ═══ */}
+                {user && captainTeams.length > 0 && (
+                    <DraggableXpWindow
+                        title="Scrim Calendar"
+                        icon="&#128197;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 360) : 400}
+                        defaultY={80}
+                        className="xp-scrim-cal-window"
+                        resizable={true}
+                    >
+                        <XpScrimCalendarWindow myScrims={myScrims} captainTeams={captainTeams} />
+                    </DraggableXpWindow>
+                )}
+
                 {/* ═══ DRAGGABLE SCRIM PLANNER WINDOW ═══ */}
                 <DraggableXpWindow
                     title="Scrim Planner"
@@ -972,14 +945,22 @@ export default function ScrimPlanner() {
                     defaultY={defaultWinY}
                     className="xp-main-window"
                 >
-                    {/* Tabs */}
-                    <div className="xp-tab-bar">
-                        {TABS.map(tab => (
-                            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                className={`xp-tab ${activeTab === tab.key ? 'xp-tab-active' : ''}`}>
-                                {tab.label}
+                    {/* Tabs + Post button */}
+                    <div className="xp-tab-bar" style={{ justifyContent: 'space-between' }}>
+                        <div className="flex">
+                            {TABS.map(tab => (
+                                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                    className={`xp-tab ${activeTab === tab.key ? 'xp-tab-active' : ''}`}>
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        {isCaptain && (
+                            <button onClick={() => setShowPostWindow(true)}
+                                className="xp-btn xp-btn-primary xp-post-scrim-btn" style={{ fontSize: 10, padding: '2px 10px', marginRight: 4, alignSelf: 'center' }}>
+                                <Plus size={11} /> Post Scrim
                             </button>
-                        ))}
+                        )}
                     </div>
 
                     <div className="xp-tab-content">
@@ -1007,18 +988,28 @@ export default function ScrimPlanner() {
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
                                         setAcceptModal={setAcceptModal} />
                                 )}
-                                {activeTab === 'post' && isCaptain && (
-                                    <PostScrimTab form={postForm} setForm={setPostForm} captainTeams={captainTeams}
-                                        selectedTeam={selectedTeam} onSubmit={handlePost} posting={posting}
-                                        postError={postError} postSuccess={postSuccess} teamSearch={teamSearch}
-                                        setTeamSearch={setTeamSearch} showTeamPicker={showTeamPicker}
-                                        setShowTeamPicker={setShowTeamPicker} filteredChallengeTeams={filteredChallengeTeams}
-                                        allTeams={allTeams} />
-                                )}
                             </>
                         )}
                     </div>
                 </DraggableXpWindow>
+
+                {/* ═══ POST SCRIM WIZARD WINDOW ═══ */}
+                {showPostWindow && isCaptain && (
+                    <DraggableXpWindow
+                        title="Post Scrim Wizard"
+                        icon="&#128228;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(40, (window.innerWidth - 520) / 2) : 100}
+                        defaultY={typeof window !== 'undefined' ? Math.min(120, window.innerHeight * 0.15) : 120}
+                        className="xp-post-window"
+                        resizable={false}
+                        onClose={() => setShowPostWindow(false)}
+                        zIndex={30}
+                    >
+                        <PostScrimWizard captainTeams={captainTeams} allTeams={allTeams}
+                            myScrims={myScrims}
+                            onSuccess={() => { loadOpenScrims(); loadMyScrims(); setShowPostWindow(false) }} />
+                    </DraggableXpWindow>
+                )}
 
                 {/* ═══ XP TASKBAR ═══ */}
                 <div className="xp-taskbar">
@@ -1066,6 +1057,18 @@ export default function ScrimPlanner() {
                         <span style={{ fontSize: 12 }}>&#128176;</span>
                         <span>CoinFlip</span>
                     </button>
+                    {user && captainTeams.length > 0 && (
+                        <button className="xp-taskbar-window-btn xp-taskbar-window-active">
+                            <span style={{ fontSize: 12 }}>&#128197;</span>
+                            <span>Calendar</span>
+                        </button>
+                    )}
+                    {showPostWindow && (
+                        <button className="xp-taskbar-window-btn xp-taskbar-window-active">
+                            <span style={{ fontSize: 12 }}>&#128228;</span>
+                            <span>Post Scrim</span>
+                        </button>
+                    )}
 
                     <div className="flex-1" />
 
@@ -1120,6 +1123,16 @@ function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, 
                         {scrim.bannedContentLeague && <span className="xp-badge xp-badge-red"><Shield size={9} /> {scrim.bannedContentLeague}</span>}
                         {isChallenge && <span className="xp-badge xp-badge-purple"><Target size={9} /> Challenge</span>}
                     </div>
+                    {scrim.acceptableTiers && scrim.acceptableTiers.length < 5 && (
+                        <div className="flex items-center gap-1 flex-wrap mb-1">
+                            <span className="xp-text" style={{ fontSize: 10, color: '#666' }}>Accepts:</span>
+                            {scrim.acceptableTiers.sort((a, b) => a - b).map(tier => (
+                                <span key={tier} className="xp-badge xp-badge-amber" style={{ fontSize: 9 }}>
+                                    {RANK_LABELS[tier]}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     {scrim.notes && (
                         <div className="flex items-start gap-1 mb-1">
                             <MessageSquare size={10} style={{ color: '#888', marginTop: 2, flexShrink: 0 }} />
@@ -1261,115 +1274,773 @@ function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAc
 
 
 // ═══════════════════════════════════════════════════
-// Post Scrim Tab
+// XP Calendar Component
 // ═══════════════════════════════════════════════════
-function PostScrimTab({ form, setForm, captainTeams, selectedTeam, onSubmit, posting, postError, postSuccess, teamSearch, setTeamSearch, showTeamPicker, setShowTeamPicker, filteredChallengeTeams, allTeams }) {
-    const challengedTeam = allTeams.find(t => t.id === Number(form.challenged_team_id))
+function XpCalendar({ selectedDate, onSelectDate, scrimDates }) {
+    const [viewMonth, setViewMonth] = useState(() => new Date())
+
+    const year = viewMonth.getFullYear()
+    const month = viewMonth.getMonth()
+    const monthName = viewMonth.toLocaleString('en-US', { month: 'long' })
+
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    const cells = []
+    for (let i = 0; i < firstDay; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+    while (cells.length % 7 !== 0) cells.push(null)
+
+    const dayHeaders = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
     return (
-        <div style={{ maxWidth: 460, margin: '0 auto' }}>
-            <form onSubmit={onSubmit}>
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Your Team</legend>
-                    {captainTeams.length === 1 ? (
-                        <div className="flex items-center gap-3 p-1.5" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
-                            <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={24} />
-                            <div>
-                                <div className="xp-text" style={{ fontWeight: 700 }}>{captainTeams[0].teamName}</div>
-                                <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName} &middot; {captainTeams[0].divisionName}</div>
-                            </div>
+        <div className="xp-calendar" style={{ maxWidth: 280, margin: '0 auto' }}>
+            <div className="xp-calendar-header">
+                <button type="button" onClick={() => setViewMonth(new Date(year, month - 1, 1))} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                    <ChevronLeft size={12} />
+                </button>
+                <span style={{ fontFamily: '"Pixelify Sans", system-ui', fontSize: 13 }}>{monthName} {year}</span>
+                <button type="button" onClick={() => setViewMonth(new Date(year, month + 1, 1))} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                    <ChevronRight size={12} />
+                </button>
+            </div>
+            <div className="xp-calendar-grid">
+                {dayHeaders.map(d => <div key={d} className="xp-calendar-day-header">{d}</div>)}
+                {cells.map((day, i) => {
+                    if (!day) return <div key={`e${i}`} className="xp-calendar-day" />
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                    const isPast = new Date(year, month, day) < today
+                    const isToday = dateStr === todayStr
+                    const isSelected = dateStr === selectedDate
+                    const hasScrim = scrimDates.has(dateStr)
+                    const cls = [
+                        'xp-calendar-day',
+                        isPast && 'xp-calendar-day-past',
+                        isToday && 'xp-calendar-day-today',
+                        isSelected && 'xp-calendar-day-selected',
+                        hasScrim && 'xp-calendar-day-scrim',
+                    ].filter(Boolean).join(' ')
+                    return (
+                        <div key={dateStr} className={cls}
+                            onClick={() => !isPast && onSelectDate(dateStr, hasScrim)}>
+                            {day}
                         </div>
-                    ) : (
-                        <select value={form.team_id} onChange={e => setForm({ ...form, team_id: e.target.value })} className="xp-select w-full">
-                            {captainTeams.map(t => <option key={t.teamId} value={t.teamId}>{t.teamName} ({t.leagueName} - {t.divisionName})</option>)}
-                        </select>
-                    )}
-                    {selectedTeam && <div className="xp-text" style={{ fontSize: 10, color: '#0058e6', marginTop: 3 }}>Division: {selectedTeam.divisionName}</div>}
-                </fieldset>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
 
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Date & Time (EST)</legend>
-                    <input type="datetime-local" value={form.scheduled_date} onChange={e => setForm({ ...form, scheduled_date: e.target.value })} required className="xp-input w-full" />
-                    <div className="xp-text" style={{ fontSize: 10, color: '#666', marginTop: 2 }}>All times in Eastern Standard Time</div>
-                </fieldset>
 
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Pick Mode</legend>
-                    <div className="flex flex-col gap-1">
-                        {PICK_MODES.map(mode => (
-                            <label key={mode.value} className="xp-radio-label">
-                                <input type="radio" name="pick_mode" checked={form.pick_mode === mode.value}
-                                    onChange={() => setForm({ ...form, pick_mode: mode.value })} className="xp-radio" />
-                                <span className="xp-text">{mode.label}</span>
-                            </label>
-                        ))}
+// ═══════════════════════════════════════════════════
+// Scrim Calendar Window (standalone, resizable)
+// ═══════════════════════════════════════════════════
+function toESTDateStr(isoStr) {
+    const d = new Date(isoStr)
+    const est = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    return `${est.getFullYear()}-${String(est.getMonth() + 1).padStart(2, '0')}-${String(est.getDate()).padStart(2, '0')}`
+}
+
+function XpScrimCalendarWindow({ myScrims, captainTeams }) {
+    const [viewMonth, setViewMonth] = useState(() => new Date())
+    const [selectedDay, setSelectedDay] = useState(null)
+
+    const year = viewMonth.getFullYear()
+    const month = viewMonth.getMonth()
+    const monthName = viewMonth.toLocaleString('en-US', { month: 'long' })
+
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    // Build map: dateStr → array of scrims
+    const scrimsByDate = useMemo(() => {
+        const map = {}
+        const teamIds = new Set(captainTeams.map(t => t.teamId))
+        for (const s of (myScrims || [])) {
+            if (s.status === 'cancelled' || s.status === 'expired') continue
+            if (!teamIds.has(s.teamId) && !teamIds.has(s.acceptedTeamId)) continue
+            const dateStr = toESTDateStr(s.scheduledDate)
+            if (!map[dateStr]) map[dateStr] = []
+            map[dateStr].push(s)
+        }
+        return map
+    }, [myScrims, captainTeams])
+
+    const cells = []
+    for (let i = 0; i < firstDay; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+    while (cells.length % 7 !== 0) cells.push(null)
+
+    const dayHeaders = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+    const selectedScrims = selectedDay ? (scrimsByDate[selectedDay] || []) : []
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Calendar grid */}
+            <div className="xp-calendar" style={{ maxWidth: 'none', border: 'none', borderBottom: '2px groove #d4d0c8' }}>
+                <div className="xp-calendar-header">
+                    <button type="button" onClick={() => { setViewMonth(new Date(year, month - 1, 1)); setSelectedDay(null) }} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                        <ChevronLeft size={12} />
+                    </button>
+                    <span style={{ fontFamily: '"Pixelify Sans", system-ui', fontSize: 14 }}>{monthName} {year}</span>
+                    <button type="button" onClick={() => { setViewMonth(new Date(year, month + 1, 1)); setSelectedDay(null) }} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                        <ChevronRight size={12} />
+                    </button>
+                </div>
+                <div className="xp-calendar-grid">
+                    {dayHeaders.map(d => <div key={d} className="xp-calendar-day-header">{d}</div>)}
+                    {cells.map((day, i) => {
+                        if (!day) return <div key={`e${i}`} className="xp-calendar-day xp-cal-big-day" />
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                        const scrims = scrimsByDate[dateStr] || []
+                        const hasConfirmed = scrims.some(s => s.status === 'accepted')
+                        const hasPending = scrims.some(s => s.status === 'open')
+                        const isToday = dateStr === todayStr
+                        const isSelected = dateStr === selectedDay
+                        const cls = [
+                            'xp-calendar-day xp-cal-big-day',
+                            isToday && 'xp-calendar-day-today',
+                            isSelected && 'xp-calendar-day-selected',
+                        ].filter(Boolean).join(' ')
+                        return (
+                            <div key={dateStr} className={cls} onClick={() => setSelectedDay(dateStr)}>
+                                <span>{day}</span>
+                                {(hasConfirmed || hasPending) && (
+                                    <div className="xp-cal-dots">
+                                        {hasConfirmed && <span className="xp-cal-dot xp-cal-dot-confirmed" />}
+                                        {hasPending && <span className="xp-cal-dot xp-cal-dot-pending" />}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+                {/* Legend */}
+                <div className="flex items-center gap-4 px-2 py-1.5" style={{ background: '#ece9d8', borderTop: '1px solid #c0c0c0' }}>
+                    <div className="flex items-center gap-1">
+                        <span className="xp-cal-dot xp-cal-dot-confirmed" style={{ position: 'static' }} />
+                        <span className="xp-text" style={{ fontSize: 10 }}>Confirmed</span>
                     </div>
-                </fieldset>
+                    <div className="flex items-center gap-1">
+                        <span className="xp-cal-dot xp-cal-dot-pending" style={{ position: 'static' }} />
+                        <span className="xp-text" style={{ fontSize: 10 }}>Pending</span>
+                    </div>
+                </div>
+            </div>
 
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Banned Content</legend>
-                    <input type="text" value={form.banned_content_league} onChange={e => setForm({ ...form, banned_content_league: e.target.value })}
-                        placeholder="e.g., AGL Deity bans, No bans..." className="xp-input w-full" />
-                </fieldset>
-
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Challenge a Team (optional)</legend>
-                    <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>Leave empty for an open request visible to all.</div>
-                    {challengedTeam ? (
-                        <div className="flex items-center gap-2 p-1.5" style={{ background: '#e0c8ff', border: '1px solid #8055c0' }}>
-                            <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={20} />
-                            <div className="flex-1">
-                                <div className="xp-text" style={{ fontWeight: 700, color: '#400080' }}>{challengedTeam.name}</div>
-                                <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{challengedTeam.leagueName} &middot; {challengedTeam.divisionName}</div>
-                            </div>
-                            <button type="button" onClick={() => { setForm({ ...form, challenged_team_id: '' }); setTeamSearch('') }} className="xp-btn" style={{ padding: '1px 6px', fontSize: 10 }}>X</button>
+            {/* Day detail panel */}
+            <div className="xp-cal-detail" style={{ flex: 1, overflowY: 'auto', padding: 6, minHeight: 60 }}>
+                {!selectedDay && (
+                    <div className="xp-text" style={{ color: '#888', textAlign: 'center', paddingTop: 12 }}>
+                        Click a day to see scrim details.
+                    </div>
+                )}
+                {selectedDay && selectedScrims.length === 0 && (
+                    <div className="xp-text" style={{ color: '#888', textAlign: 'center', paddingTop: 12 }}>
+                        No scrims on {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.
+                    </div>
+                )}
+                {selectedDay && selectedScrims.length > 0 && (
+                    <div>
+                        <div className="xp-text" style={{ fontWeight: 700, marginBottom: 4 }}>
+                            {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                         </div>
-                    ) : (
-                        <div className="relative">
-                            <input type="text" value={teamSearch} onChange={e => { setTeamSearch(e.target.value); setShowTeamPicker(true) }}
-                                onFocus={() => setShowTeamPicker(true)} placeholder="Search for a team..." className="xp-input w-full" />
-                            {showTeamPicker && teamSearch && (
-                                <div className="xp-listbox absolute z-10 w-full" style={{ maxHeight: 180, overflowY: 'auto' }}>
-                                    {filteredChallengeTeams.slice(0, 20).map(team => (
-                                        <button key={team.id} type="button" onClick={() => { setForm({ ...form, challenged_team_id: String(team.id) }); setShowTeamPicker(false); setTeamSearch('') }} className="xp-listbox-item">
-                                            <TeamLogo slug={team.slug} name={team.name} size={16} />
-                                            <div>
-                                                <div className="xp-text" style={{ fontWeight: 500 }}>{team.name}</div>
-                                                <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{team.leagueName} &middot; {team.divisionName}</div>
-                                            </div>
-                                        </button>
+                        <div className="flex flex-col gap-1">
+                            {selectedScrims.map(s => (
+                                <div key={s.id} className="xp-cal-scrim-item">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <TeamLogo slug={s.teamSlug} name={s.teamName} size={18} />
+                                        <span className="xp-text" style={{ fontWeight: 700 }}>{s.teamName}</span>
+                                        {s.status === 'accepted' ? (
+                                            <span className="xp-badge xp-badge-green" style={{ fontSize: 9 }}>Confirmed</span>
+                                        ) : (
+                                            <span className="xp-badge xp-badge-amber" style={{ fontSize: 9 }}>Pending</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <Clock size={10} style={{ color: '#555' }} />
+                                        <span className="xp-text" style={{ fontSize: 11 }}>{formatDateEST(s.scheduledDate)}</span>
+                                        <span className={`xp-badge ${XP_PICK_BADGE[s.pickMode] || 'xp-badge-blue'}`} style={{ fontSize: 9 }}>{formatPickMode(s.pickMode)}</span>
+                                    </div>
+                                    {s.status === 'accepted' && s.acceptedTeamName && (
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <span className="xp-text" style={{ fontSize: 10, color: '#2d8212' }}>vs</span>
+                                            <TeamLogo slug={s.acceptedTeamSlug} name={s.acceptedTeamName} size={14} />
+                                            <span className="xp-text" style={{ fontSize: 11, fontWeight: 600, color: '#2d8212' }}>{s.acceptedTeamName}</span>
+                                        </div>
+                                    )}
+                                    {s.challengedTeamName && s.status === 'open' && (
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <Target size={10} style={{ color: '#6a3ea1' }} />
+                                            <span className="xp-text" style={{ fontSize: 10, color: '#6a3ea1' }}>Challenging {s.challengedTeamName}</span>
+                                        </div>
+                                    )}
+                                    {s.notes && (
+                                        <div className="xp-text" style={{ fontSize: 10, color: '#666', marginTop: 1 }}>
+                                            <MessageSquare size={9} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
+                                            {s.notes}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// XP Dialog (modal popup)
+// ═══════════════════════════════════════════════════
+function XpDialog({ title, icon, children, onClose }) {
+    return (
+        <div className="xp-dialog-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+            <div className="xp-window xp-dialog">
+                <div className="xp-title-bar">
+                    <div className="flex items-center gap-1.5">
+                        {icon && <span style={{ fontSize: 13 }}>{icon}</span>}
+                        <span className="xp-title-text" style={{ fontSize: 11 }}>{title}</span>
+                    </div>
+                    <button type="button" className="xp-title-btn xp-tbtn-x" onClick={onClose}>&times;</button>
+                </div>
+                <div className="xp-window-body" style={{ padding: 12 }}>
+                    {children}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// Post Scrim Wizard (XP Installer style)
+// ═══════════════════════════════════════════════════
+function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess }) {
+    const [step, setStep] = useState(0)
+
+    // Form state
+    const [teamId, setTeamId] = useState(() => captainTeams[0]?.teamId || '')
+    const [selectedDate, setSelectedDate] = useState(null)
+    const [timeHour, setTimeHour] = useState('7')
+    const [timeMinute, setTimeMinute] = useState('00')
+    const [timeAmPm, setTimeAmPm] = useState('PM')
+    const [pickMode, setPickMode] = useState('regular')
+    const [bannedContentLeague, setBannedContentLeague] = useState('')
+    const [challengedTeamId, setChallengedTeamId] = useState('')
+    const [notes, setNotes] = useState('')
+    const [acceptableTiers, setAcceptableTiers] = useState([1, 2, 3, 4, 5])
+
+    // UI state
+    const [teamSearch, setTeamSearch] = useState('')
+    const [showTeamPicker, setShowTeamPicker] = useState(false)
+    const [showConflictDialog, setShowConflictDialog] = useState(null)
+    const [showCancelDialog, setShowCancelDialog] = useState(false)
+    const [posting, setPosting] = useState(false)
+    const [postError, setPostError] = useState(null)
+    const [postSuccess, setPostSuccess] = useState(false)
+    const [leagues, setLeagues] = useState([])
+
+    // Fetch leagues for banned content dropdown
+    useEffect(() => {
+        leagueService.getAll().then(data => setLeagues(data || [])).catch(() => {})
+    }, [])
+
+    const selectedTeam = captainTeams.find(t => t.teamId === Number(teamId))
+    const tierImg = selectedTeam ? getDivisionImage(selectedTeam.leagueSlug, selectedTeam.divisionSlug, selectedTeam.divisionTier) : null
+
+    // Get scrim dates for the selected team (for calendar)
+    const scrimDates = useMemo(() => {
+        const dates = new Set()
+        if (!selectedTeam) return dates
+        const tid = selectedTeam.teamId
+        for (const s of (myScrims || [])) {
+            if ((s.teamId === tid || s.acceptedTeamId === tid) && (s.status === 'open' || s.status === 'accepted')) {
+                // Convert to EST date string
+                const d = new Date(s.scheduledDate)
+                const est = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+                const dateStr = `${est.getFullYear()}-${String(est.getMonth() + 1).padStart(2, '0')}-${String(est.getDate()).padStart(2, '0')}`
+                dates.add(dateStr)
+            }
+        }
+        return dates
+    }, [myScrims, selectedTeam])
+
+    // Filter challenge teams — only exclude the selected posting team
+    const filteredChallengeTeams = useMemo(() => {
+        const selectedId = Number(teamId)
+        return allTeams.filter(t =>
+            t.id !== selectedId && (teamSearch === '' ||
+                t.name.toLowerCase().includes(teamSearch.toLowerCase()) ||
+                t.leagueName.toLowerCase().includes(teamSearch.toLowerCase()) ||
+                t.divisionName.toLowerCase().includes(teamSearch.toLowerCase()))
+        )
+    }, [allTeams, teamId, teamSearch])
+
+    const challengedTeam = allTeams.find(t => t.id === Number(challengedTeamId))
+
+    // Map tier → unique division names for display
+    const tierDivisions = useMemo(() => {
+        const map = {}
+        for (const t of allTeams) {
+            if (t.divisionTier) {
+                if (!map[t.divisionTier]) map[t.divisionTier] = new Set()
+                map[t.divisionTier].add(t.divisionName)
+            }
+        }
+        const result = {}
+        for (const [tier, names] of Object.entries(map)) {
+            result[tier] = [...names].sort()
+        }
+        return result
+    }, [allTeams])
+
+    const STEPS = [
+        { title: 'Team', subtitle: 'Select Your Team' },
+        { title: 'Date', subtitle: 'Choose a Date' },
+        { title: 'Time', subtitle: 'Set Time (EST)' },
+        { title: 'Settings', subtitle: 'Pick Mode & Bans' },
+        { title: 'Opponent', subtitle: 'Challenge & Tiers' },
+        { title: 'Review', subtitle: 'Notes & Confirm' },
+    ]
+
+    const canAdvance = () => {
+        if (step === 0) return !!teamId
+        if (step === 1) return !!selectedDate
+        if (step === 4) return acceptableTiers.length > 0
+        return true
+    }
+
+    const handleDateSelect = (dateStr, hasScrim) => {
+        if (hasScrim) {
+            setShowConflictDialog(dateStr)
+        } else {
+            setSelectedDate(dateStr)
+        }
+    }
+
+    const confirmConflictDate = () => {
+        setSelectedDate(showConflictDialog)
+        setShowConflictDialog(null)
+    }
+
+    const toggleTier = (tier) => {
+        setAcceptableTiers(prev =>
+            prev.includes(tier) ? prev.filter(t => t !== tier) : [...prev, tier].sort((a, b) => a - b)
+        )
+    }
+
+    const assembleScheduledDate = () => {
+        const h = Number(timeHour)
+        const hour24 = timeAmPm === 'AM' ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12)
+        return `${selectedDate}T${String(hour24).padStart(2, '0')}:${timeMinute}:00-05:00`
+    }
+
+    const handleSubmit = async () => {
+        setPosting(true)
+        setPostError(null)
+        try {
+            await scrimService.create({
+                team_id: Number(teamId),
+                scheduled_date: assembleScheduledDate(),
+                pick_mode: pickMode,
+                banned_content_league: bannedContentLeague || null,
+                notes: notes || null,
+                challenged_team_id: challengedTeamId ? Number(challengedTeamId) : null,
+                acceptable_tiers: acceptableTiers.length < 5 ? acceptableTiers : null,
+            })
+            setPostSuccess(true)
+        } catch (err) {
+            setPostError(err.message || 'Failed to post scrim')
+        } finally {
+            setPosting(false)
+        }
+    }
+
+    const resetWizard = () => {
+        setStep(0)
+        setSelectedDate(null)
+        setTimeHour('7'); setTimeMinute('00'); setTimeAmPm('PM')
+        setPickMode('regular'); setBannedContentLeague('')
+        setChallengedTeamId(''); setNotes('')
+        setAcceptableTiers([1, 2, 3, 4, 5])
+        setTeamSearch(''); setShowTeamPicker(false)
+        setPostError(null); setPostSuccess(false)
+    }
+
+    // Success screen
+    if (postSuccess) {
+        return (
+            <div className="xp-wizard">
+                <div className="xp-wizard-body" style={{ minHeight: 200 }}>
+                    <div className="xp-wizard-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                        <div style={{ fontSize: 36 }}>&#9989;</div>
+                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 14 }}>Scrim Request Posted!</div>
+                        <div className="xp-text" style={{ fontSize: 11, color: '#555', textAlign: 'center' }}>
+                            {challengedTeamId ? 'Your challenge has been sent.' : 'Your open scrim request is now visible to all teams.'}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                            <button type="button" onClick={() => { resetWizard() }} className="xp-btn">Post Another</button>
+                            <button type="button" onClick={onSuccess} className="xp-btn xp-btn-primary">View My Scrims</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="xp-wizard">
+            <div className="xp-wizard-body">
+                {/* Sidebar (hidden on mobile via CSS) */}
+                <div className="xp-wizard-sidebar">
+                    {STEPS.map((s, i) => (
+                        <div key={i} className={`xp-wizard-step-item ${i === step ? 'xp-wizard-step-item-active' : i < step ? 'xp-wizard-step-item-done' : ''}`}>
+                            <span className="xp-wizard-step-num">{i < step ? '✓' : i + 1}</span>
+                            <span>{s.title}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Content */}
+                <div className="xp-wizard-content">
+                    {/* Mobile step indicator */}
+                    <div className="xp-wizard-mobile-step">Step {step + 1} of {STEPS.length} — {STEPS[step].subtitle}</div>
+
+                    {/* Step header */}
+                    <div style={{ marginBottom: 10 }}>
+                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{STEPS[step].subtitle}</div>
+                        <div style={{ height: 1, background: '#7f9db9', margin: '4px 0 8px' }} />
+                    </div>
+
+                    {/* ── Step 0: Team Selection ── */}
+                    {step === 0 && (
+                        <div>
+                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                                Welcome to the Scrim Request Wizard. Select the team you want to post a scrim for.
+                            </div>
+                            {captainTeams.length === 1 ? (
+                                <div className="flex items-center gap-3 p-2" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
+                                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={28} />
+                                    <div>
+                                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{captainTeams[0].teamName}</div>
+                                        <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName}</div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <select value={teamId} onChange={e => setTeamId(e.target.value)} className="xp-select w-full" style={{ fontSize: 12, padding: '4px 6px' }}>
+                                    {captainTeams.map(t => (
+                                        <option key={t.teamId} value={t.teamId}>{t.teamName} ({t.leagueName} - {t.divisionName})</option>
                                     ))}
-                                    {filteredChallengeTeams.length === 0 && <div className="xp-text" style={{ padding: '4px 8px', fontSize: 11, color: '#666' }}>No teams found</div>}
+                                </select>
+                            )}
+                            {selectedTeam && (
+                                <div className="flex items-center gap-3 mt-3 p-2" style={{ background: '#e8f0ff', border: '1px solid #7f9db9' }}>
+                                    {tierImg && <img src={tierImg} alt="" style={{ width: 32, height: 32 }} />}
+                                    <div>
+                                        <div className="xp-text" style={{ fontWeight: 700, color: '#0054e3' }}>
+                                            {selectedTeam.divisionName}
+                                        </div>
+                                        <div className="xp-text" style={{ fontSize: 10, color: '#555' }}>
+                                            {selectedTeam.divisionTier ? `Tier ${selectedTeam.divisionTier} — ${RANK_LABELS[selectedTeam.divisionTier] || ''}` : 'No tier assigned'}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
-                </fieldset>
 
-                <fieldset className="xp-fieldset">
-                    <legend className="xp-fieldset-legend">Notes (optional)</legend>
-                    <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                        placeholder="Additional details..." rows={3} maxLength={500} className="xp-input w-full" style={{ resize: 'none' }} />
-                </fieldset>
+                    {/* ── Step 1: Date Selection ── */}
+                    {step === 1 && (
+                        <div>
+                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                                Choose a date for your scrim. Days with an orange dot have existing team scrims.
+                            </div>
+                            <XpCalendar selectedDate={selectedDate} onSelectDate={handleDateSelect} scrimDates={scrimDates} />
+                            {selectedDate && (
+                                <div className="xp-text" style={{ textAlign: 'center', marginTop: 6, fontWeight: 700, color: '#0054e3' }}>
+                                    Selected: {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                {postError && (
-                    <div className="flex items-center gap-2 mb-2 p-2" style={{ background: '#ffc8c8', border: '1px solid #c05555' }}>
-                        <div className="xp-error-icon" style={{ width: 16, height: 16, fontSize: 9 }}>X</div>
-                        <span className="xp-text" style={{ fontSize: 11, color: '#800000' }}>{postError}</span>
+                    {/* ── Step 2: Time Selection ── */}
+                    {step === 2 && (
+                        <div>
+                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                                Set the start time for your scrim.
+                            </div>
+                            <div className="flex items-center justify-center gap-2 my-4">
+                                <Clock size={20} style={{ color: '#0054e3' }} />
+                                <select value={timeHour} onChange={e => setTimeHour(e.target.value)} className="xp-time-select">
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                        <option key={h} value={String(h)}>{h}</option>
+                                    ))}
+                                </select>
+                                <span className="xp-time-colon">:</span>
+                                <select value={timeMinute} onChange={e => setTimeMinute(e.target.value)} className="xp-time-select">
+                                    {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                                <select value={timeAmPm} onChange={e => setTimeAmPm(e.target.value)} className="xp-time-select" style={{ width: 56 }}>
+                                    <option value="AM">AM</option>
+                                    <option value="PM">PM</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-2 p-2 mt-2" style={{ background: '#fffff0', border: '1px solid #c0a030' }}>
+                                <AlertTriangle size={14} style={{ color: '#c08030', flexShrink: 0 }} />
+                                <span className="xp-text" style={{ fontSize: 11, color: '#604000' }}>
+                                    All times are in <strong>Eastern Standard Time (EST)</strong>. Enter the time as you would read a clock in EST.
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Step 3: Game Settings ── */}
+                    {step === 3 && (
+                        <div>
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Pick Mode</legend>
+                                <div className="flex flex-col gap-1">
+                                    {PICK_MODES.map(mode => (
+                                        <label key={mode.value} className="xp-radio-label">
+                                            <input type="radio" name="wiz_pick_mode" checked={pickMode === mode.value}
+                                                onChange={() => setPickMode(mode.value)} className="xp-radio" />
+                                            <span className="xp-text">{mode.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Banned Content League</legend>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                    Select a league whose banned content rules apply to this scrim.
+                                </div>
+                                <select value={bannedContentLeague} onChange={e => setBannedContentLeague(e.target.value)} className="xp-select w-full">
+                                    <option value="">None (No bans)</option>
+                                    {leagues.map(l => (
+                                        <option key={l.id} value={l.name}>{l.name}</option>
+                                    ))}
+                                </select>
+                            </fieldset>
+                        </div>
+                    )}
+
+                    {/* ── Step 4: Opponent & Tiers ── */}
+                    {step === 4 && (
+                        <div>
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Challenge a Team (optional)</legend>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                    Leave empty for an open request visible to all teams.
+                                </div>
+                                {challengedTeam ? (
+                                    <div className="flex items-center gap-2 p-1.5" style={{ background: '#e0c8ff', border: '1px solid #8055c0' }}>
+                                        <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={20} />
+                                        <div className="flex-1">
+                                            <div className="xp-text" style={{ fontWeight: 700, color: '#400080' }}>{challengedTeam.name}</div>
+                                            <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{challengedTeam.leagueName} &middot; {challengedTeam.divisionName}</div>
+                                        </div>
+                                        <button type="button" onClick={() => { setChallengedTeamId(''); setTeamSearch('') }} className="xp-btn" style={{ padding: '1px 6px', fontSize: 10 }}>X</button>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <input type="text" value={teamSearch} onChange={e => { setTeamSearch(e.target.value); setShowTeamPicker(true) }}
+                                            onFocus={() => setShowTeamPicker(true)} placeholder="Search for a team..." className="xp-input w-full" />
+                                        {showTeamPicker && teamSearch && (
+                                            <div className="xp-listbox absolute z-10 w-full" style={{ maxHeight: 160, overflowY: 'auto' }}>
+                                                {filteredChallengeTeams.slice(0, 20).map(team => (
+                                                    <button key={team.id} type="button" onClick={() => { setChallengedTeamId(String(team.id)); setShowTeamPicker(false); setTeamSearch('') }} className="xp-listbox-item">
+                                                        <TeamLogo slug={team.slug} name={team.name} size={16} />
+                                                        <div>
+                                                            <div className="xp-text" style={{ fontWeight: 500 }}>{team.name}</div>
+                                                            <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{team.leagueName} &middot; {team.divisionName}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {filteredChallengeTeams.length === 0 && (
+                                                    <div className="xp-text" style={{ padding: '4px 8px', fontSize: 11, color: '#666' }}>No teams found</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </fieldset>
+
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Acceptable Tiers</legend>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                    Select which division tiers you are willing to accept scrims from.
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    {[1, 2, 3, 4, 5].map(tier => {
+                                        const img = getDivisionImage(null, null, tier)
+                                        return (
+                                            <label key={tier} className="xp-checkbox-label">
+                                                <input type="checkbox" checked={acceptableTiers.includes(tier)}
+                                                    onChange={() => toggleTier(tier)} className="xp-checkbox" />
+                                                {img && <img src={img} alt="" style={{ width: 16, height: 16 }} />}
+                                                <span className="xp-text">
+                                                    Tier {tier} — {RANK_LABELS[tier]}
+                                                    {tierDivisions[tier] && <span style={{ color: '#666' }}> ({tierDivisions[tier].join(', ')})</span>}
+                                                </span>
+                                            </label>
+                                        )
+                                    })}
+                                </div>
+                                {acceptableTiers.length === 0 && (
+                                    <div className="xp-text" style={{ fontSize: 10, color: '#800000', marginTop: 4 }}>
+                                        You must select at least one tier.
+                                    </div>
+                                )}
+                            </fieldset>
+                        </div>
+                    )}
+
+                    {/* ── Step 5: Notes & Review ── */}
+                    {step === 5 && (
+                        <div>
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Notes (optional)</legend>
+                                <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                                    placeholder="Additional details..." rows={2} maxLength={500}
+                                    className="xp-input w-full" style={{ resize: 'none' }} />
+                            </fieldset>
+
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Review</legend>
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Team:</span>
+                                        {selectedTeam && <TeamLogo slug={selectedTeam.teamSlug} name={selectedTeam.teamName} size={16} />}
+                                        <span className="xp-text">{selectedTeam?.teamName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Division:</span>
+                                        <span className="xp-text">{selectedTeam?.divisionName} ({RANK_LABELS[selectedTeam?.divisionTier] || 'N/A'})</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Date:</span>
+                                        <span className="xp-text">
+                                            {selectedDate && new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Time:</span>
+                                        <span className="xp-text">{timeHour}:{timeMinute} {timeAmPm} EST</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Pick Mode:</span>
+                                        <span className={`xp-badge ${XP_PICK_BADGE[pickMode] || 'xp-badge-blue'}`}>{formatPickMode(pickMode)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Bans:</span>
+                                        <span className="xp-text">{bannedContentLeague || 'None'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Opponent:</span>
+                                        {challengedTeam ? (
+                                            <span className="flex items-center gap-1">
+                                                <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={14} />
+                                                <span className="xp-text" style={{ color: '#400080' }}>{challengedTeam.name}</span>
+                                            </span>
+                                        ) : (
+                                            <span className="xp-text" style={{ color: '#555' }}>Open Request</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Tiers:</span>
+                                        <span className="xp-text">
+                                            {acceptableTiers.length === 5 ? 'All tiers' : acceptableTiers.map(t => RANK_LABELS[t]).join(', ')}
+                                        </span>
+                                    </div>
+                                    {notes && (
+                                        <div className="flex items-start gap-2">
+                                            <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Notes:</span>
+                                            <span className="xp-text" style={{ color: '#555' }}>{notes}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </fieldset>
+
+                            {postError && (
+                                <div className="flex items-center gap-2 mb-2 p-2" style={{ background: '#ffc8c8', border: '1px solid #c05555' }}>
+                                    <div className="xp-error-icon" style={{ width: 16, height: 16, fontSize: 9 }}>X</div>
+                                    <span className="xp-text" style={{ fontSize: 11, color: '#800000' }}>{postError}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer navigation */}
+            <div className="xp-wizard-footer">
+                <div>
+                    {step > 0 && (
+                        <button type="button" onClick={() => setStep(s => s - 1)} className="xp-btn">
+                            &lt; Back
+                        </button>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    {step < 5 ? (
+                        <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="xp-btn xp-btn-primary">
+                            Next &gt;
+                        </button>
+                    ) : (
+                        <button type="button" onClick={handleSubmit} disabled={posting || !canAdvance()} className="xp-btn xp-btn-primary">
+                            {posting ? 'Posting...' : 'Finish'}
+                        </button>
+                    )}
+                    <button type="button" onClick={() => setShowCancelDialog(true)} className="xp-btn">Cancel</button>
+                </div>
+            </div>
+
+            {/* Conflict warning dialog */}
+            {showConflictDialog && (
+                <XpDialog title="Schedule Conflict" icon="⚠️" onClose={() => setShowConflictDialog(null)}>
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle size={28} style={{ color: '#c08030', flexShrink: 0 }} />
+                        <div>
+                            <div className="xp-text" style={{ fontWeight: 700, marginBottom: 4 }}>Your team already has a scrim on this date.</div>
+                            <div className="xp-text" style={{ fontSize: 11, color: '#555' }}>
+                                Are you sure you want to schedule another scrim on {new Date(showConflictDialog + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}?
+                            </div>
+                        </div>
                     </div>
-                )}
-                {postSuccess && (
-                    <div className="flex items-center gap-2 mb-2 p-2" style={{ background: '#c8ffc8', border: '1px solid #55c055' }}>
-                        <Check size={13} style={{ color: '#2d8212' }} />
-                        <span className="xp-text" style={{ fontSize: 11, color: '#004000' }}>Scrim request posted!</span>
+                    <div className="flex justify-end gap-2 mt-3">
+                        <button type="button" onClick={confirmConflictDate} className="xp-btn xp-btn-primary">Yes</button>
+                        <button type="button" onClick={() => setShowConflictDialog(null)} className="xp-btn">No</button>
                     </div>
-                )}
+                </XpDialog>
+            )}
 
-                <button type="submit" disabled={posting || !form.team_id || !form.scheduled_date}
-                    className="xp-btn xp-btn-primary w-full" style={{ padding: '6px 16px', fontSize: 12 }}>
-                    {posting ? 'Posting...' : form.challenged_team_id ? 'Send Challenge' : 'Post Open Scrim'}
-                </button>
-            </form>
+            {/* Cancel confirmation dialog */}
+            {showCancelDialog && (
+                <XpDialog title="Cancel Wizard" icon="❓" onClose={() => setShowCancelDialog(false)}>
+                    <div className="xp-text" style={{ marginBottom: 8 }}>
+                        Are you sure you want to cancel? All entered information will be lost.
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => { setShowCancelDialog(false); resetWizard() }} className="xp-btn xp-btn-danger">Yes, Cancel</button>
+                        <button type="button" onClick={() => setShowCancelDialog(false)} className="xp-btn">No, Continue</button>
+                    </div>
+                </XpDialog>
+            )}
         </div>
     )
 }
@@ -1797,22 +2468,254 @@ const XP_STYLES = `
 .xp-window-body-scroll::-webkit-scrollbar-thumb:hover { background: #d0ccc0; }
 .xp-window-body-scroll::-webkit-scrollbar-button { background: #ece9d8; border: 1px solid #808080; height: 17px; }
 
+/* ── Wizard (XP Installer) ── */
+.xp-wizard { display: flex; flex-direction: column; }
+.xp-wizard-body { display: flex; min-height: 260px; }
+.xp-wizard-sidebar {
+    width: 130px; flex-shrink: 0;
+    background: linear-gradient(180deg, #5989c7 0%, #3a6ea5 100%);
+    padding: 14px 6px; border-right: 1px solid #7f9db9;
+}
+.xp-wizard-step-item {
+    font-family: system-ui, Tahoma, sans-serif; font-size: 10px;
+    color: rgba(255,255,255,0.5); padding: 3px 5px; margin-bottom: 1px;
+    border-radius: 2px; display: flex; align-items: center; gap: 5px;
+}
+.xp-wizard-step-item-active { color: #fff; font-weight: bold; background: rgba(255,255,255,0.15); }
+.xp-wizard-step-item-done { color: rgba(255,255,255,0.75); }
+.xp-wizard-step-num {
+    width: 16px; height: 16px; border-radius: 50%; font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.2); font-weight: bold; flex-shrink: 0;
+}
+.xp-wizard-step-item-active .xp-wizard-step-num { background: #fff; color: #0054e3; }
+.xp-wizard-step-item-done .xp-wizard-step-num { background: rgba(255,255,255,0.35); }
+.xp-wizard-content { flex: 1; padding: 10px 12px; overflow-y: auto; max-height: 360px; }
+.xp-wizard-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 8px; border-top: 2px groove #d4d0c8; background: #ece9d8;
+}
+.xp-wizard-mobile-step { display: none; }
+
+/* ── Calendar ── */
+.xp-calendar { border: 2px solid; border-color: #7f9db9 #f0f0f0 #f0f0f0 #7f9db9; background: #fff; }
+.xp-calendar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 3px 6px; background: linear-gradient(180deg, #0997ff 0%, #0054ee 100%);
+    color: #fff; font-weight: bold;
+}
+.xp-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.xp-calendar-day-header {
+    text-align: center; font-size: 10px; font-weight: bold;
+    padding: 3px; color: #555; background: #ece9d8;
+    border-bottom: 1px solid #c0c0c0;
+}
+.xp-calendar-day {
+    text-align: center; padding: 5px 2px; font-size: 11px;
+    cursor: pointer; border: 1px solid transparent; position: relative;
+    font-family: system-ui, Tahoma, sans-serif; color: #000;
+}
+.xp-calendar-day:hover { background: #eff4ff; border-color: #316ac5; }
+.xp-calendar-day-selected { background: #316ac5 !important; color: #fff !important; font-weight: bold; }
+.xp-calendar-day-today { border-color: #0054e3; font-weight: bold; }
+.xp-calendar-day-past { color: #c0c0c0 !important; cursor: default; }
+.xp-calendar-day-past:hover { background: transparent; border-color: transparent; }
+.xp-calendar-day-scrim::after {
+    content: ''; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: #ff6600;
+}
+
+/* ── Time Picker ── */
+.xp-time-select {
+    font-family: system-ui, Tahoma, sans-serif; font-size: 14px;
+    padding: 4px 6px; background: #fff;
+    border: 2px solid; border-color: #7f9db9 #f0f0f0 #f0f0f0 #7f9db9;
+    color: #000; text-align: center; width: 52px; cursor: pointer;
+}
+.xp-time-colon { font-size: 18px; font-weight: bold; color: #000; }
+
+/* ── Checkbox (XP style) ── */
+.xp-checkbox-label {
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+    padding: 2px 0; font-family: system-ui, Tahoma, sans-serif; font-size: 11px;
+}
+.xp-checkbox { accent-color: #0058e6; cursor: pointer; }
+
+/* ── Scrim Calendar Window ── */
+.xp-scrim-cal-window {
+    z-index: 12;
+    width: 320px !important;
+}
+.xp-scrim-cal-window .xp-window-body {
+    padding: 0 !important;
+    display: flex; flex-direction: column;
+}
+.xp-cal-big-day {
+    min-height: 32px; padding: 3px 2px !important;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 1px; position: relative;
+}
+.xp-cal-dots {
+    display: flex; gap: 2px; position: absolute; bottom: 2px;
+}
+.xp-cal-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+}
+.xp-cal-dot-confirmed { background: #2d8212; }
+.xp-cal-dot-pending { background: #e89c0c; }
+.xp-cal-scrim-item {
+    background: #fff; border: 1px solid #d4d0c8; padding: 4px 6px;
+    border-left: 3px solid #0054e3;
+}
+.xp-cal-scrim-item:hover { background: #f4f8ff; }
+.xp-cal-detail {
+    scrollbar-width: thin;
+    scrollbar-color: #a0a0a0 #ece9d8;
+}
+
+/* ── Post Scrim Window ── */
+.xp-post-window {
+    z-index: 30;
+    width: min(520px, 92vw) !important;
+}
+
+/* ── Dialog (XP warning popup) ── */
+.xp-dialog-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+}
+.xp-dialog { width: 340px; max-width: 92vw; }
+
 /* ── Mobile adjustments ── */
 @media (max-width: 768px) {
-    .xp-window-draggable {
+    /* Hide all XP chrome on mobile — only show scrim planner content */
+    .xp-theme {
+        background: none !important;
+        background-color: var(--color-primary, #0f1923) !important;
+        padding-bottom: 0 !important;
+        color: var(--color-text, #e0e0e0) !important;
+        font-family: "Montserrat", system-ui, sans-serif !important;
+        color-scheme: dark !important;
+        padding-top: 72px;
+    }
+    .xp-dino-window { display: none !important; }
+    .xp-coinflip-window { display: none !important; }
+    .xp-scrim-cal-window { display: none !important; }
+    .xp-post-window {
         position: relative !important;
         left: auto !important; top: auto !important;
         width: 100% !important; height: auto !important;
-        margin: 8px 0;
-        border-radius: 0;
+        border: none !important; border-radius: 0 !important;
+        box-shadow: none !important; overflow: visible !important;
+        margin-top: 8px;
     }
-    .xp-window-body-scroll { max-height: none; }
-    .xp-resize-handle { display: none; }
-    .xp-dino-window { margin-top: 72px !important; }
-    .xp-coinflip-window { width: 100% !important; }
-    .xp-desktop-icons { display: none; }
-    .xp-taskbar-window-btn { min-width: auto; }
-    .xp-tray-text { display: none; }
-    .xp-start-menu { width: 200px; }
+    .xp-post-window > .xp-title-bar { display: none !important; }
+    .xp-post-window > .xp-window-body { background: transparent !important; padding: 0 !important; }
+    .xp-desktop-icons { display: none !important; }
+    .xp-taskbar { display: none !important; }
+    .xp-resize-handle { display: none !important; }
+
+    /* Strip XP window chrome from the main scrim planner window */
+    .xp-main-window {
+        position: relative !important;
+        left: auto !important; top: auto !important;
+        width: 100% !important; height: auto !important;
+        border: none !important; border-radius: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+    }
+    .xp-main-window > .xp-title-bar { display: none !important; }
+    .xp-main-window > .xp-window-body {
+        background: transparent !important;
+        padding: 0 12px !important;
+    }
+
+    /* Restyle tabs for dark theme */
+    .xp-tab-bar {
+        border-bottom-color: rgba(255,255,255,0.1) !important;
+        padding-left: 0 !important;
+        gap: 4px !important;
+    }
+    .xp-tab {
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-bottom: none !important;
+        color: var(--color-text, #e0e0e0) !important;
+        font-family: "Montserrat", system-ui, sans-serif !important;
+        font-size: 12px !important; font-weight: 600 !important;
+        padding: 8px 16px !important;
+    }
+    .xp-tab:hover { background: rgba(255,255,255,0.1) !important; }
+    .xp-tab-active {
+        background: rgba(255,255,255,0.12) !important;
+        border-bottom: 1px solid transparent !important;
+        color: var(--color-accent, #4fa0e8) !important;
+    }
+    .xp-tab-content {
+        background: transparent !important;
+        border: none !important;
+        padding: 12px 0 !important;
+    }
+
+    /* Restyle XP elements for dark mobile theme */
+    .xp-text { color: var(--color-text, #e0e0e0) !important; font-family: "Montserrat", system-ui, sans-serif !important; }
+    .xp-fieldset { border-color: rgba(255,255,255,0.15) !important; }
+    .xp-fieldset-legend { color: var(--color-text, #e0e0e0) !important; font-family: "Montserrat", system-ui, sans-serif !important; }
+    .xp-input, .xp-select {
+        background: rgba(255,255,255,0.08) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        color: var(--color-text, #e0e0e0) !important;
+        font-family: "Montserrat", system-ui, sans-serif !important;
+    }
+    .xp-scrim-card {
+        background: rgba(255,255,255,0.05) !important;
+        border-color: rgba(255,255,255,0.1) !important;
+    }
+    .xp-scrim-card:hover { background: rgba(255,255,255,0.08) !important; }
+    .xp-listbox {
+        background: var(--color-secondary, #1a2733) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+    }
+    .xp-listbox-item { color: var(--color-text, #e0e0e0) !important; }
+    .xp-listbox-item:hover { background: var(--color-accent, #4fa0e8) !important; }
+    .xp-radio-label { color: var(--color-text, #e0e0e0) !important; }
+    .xp-progress { border-color: rgba(255,255,255,0.2) !important; background: rgba(255,255,255,0.05) !important; }
+
+    /* Wizard mobile overrides */
+    .xp-wizard-sidebar { display: none !important; }
+    .xp-wizard-mobile-step {
+        display: block !important;
+        font-family: "Montserrat", system-ui, sans-serif;
+        font-size: 11px; color: var(--color-accent, #4fa0e8);
+        font-weight: 600; margin-bottom: 6px;
+    }
+    .xp-wizard-content {
+        padding: 8px 2px !important; max-height: none !important;
+    }
+    .xp-wizard-footer {
+        border-color: rgba(255,255,255,0.1) !important;
+        background: transparent !important;
+    }
+    .xp-wizard-footer .xp-btn { font-family: "Montserrat", system-ui, sans-serif !important; }
+    .xp-calendar { border-color: rgba(255,255,255,0.2) !important; background: rgba(255,255,255,0.05) !important; }
+    .xp-calendar-header { background: var(--color-accent, #4fa0e8) !important; }
+    .xp-calendar-day-header { background: rgba(255,255,255,0.05) !important; color: var(--color-text, #e0e0e0) !important; border-color: rgba(255,255,255,0.1) !important; }
+    .xp-calendar-day { color: var(--color-text, #e0e0e0) !important; }
+    .xp-calendar-day:hover { background: rgba(255,255,255,0.1) !important; }
+    .xp-calendar-day-selected { background: var(--color-accent, #4fa0e8) !important; color: #fff !important; }
+    .xp-calendar-day-past { color: rgba(255,255,255,0.2) !important; }
+    .xp-calendar-day-today { border-color: var(--color-accent, #4fa0e8) !important; }
+    .xp-time-select {
+        background: rgba(255,255,255,0.08) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        color: var(--color-text, #e0e0e0) !important;
+        font-family: "Montserrat", system-ui, sans-serif !important;
+    }
+    .xp-time-colon { color: var(--color-text, #e0e0e0) !important; }
+    .xp-checkbox-label { color: var(--color-text, #e0e0e0) !important; font-family: "Montserrat", system-ui, sans-serif !important; }
+    .xp-dialog-overlay { z-index: 200; }
+    .xp-dialog .xp-window-body { background: var(--color-secondary, #1a2733) !important; }
+    .xp-dialog .xp-text { color: var(--color-text, #e0e0e0) !important; }
 }
 `
