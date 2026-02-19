@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { scrimService, godService, coinflipService } from '../services/database'
 import { usePassion } from '../context/PassionContext'
@@ -10,6 +10,8 @@ import passionCoin from '../assets/passion/passion.png'
 import passionTails from '../assets/passion/passiontails.png'
 import xpBg from '../assets/xp-bg.jpg'
 import shortcutOverlay from '../assets/shortcut.PNG'
+import zeusImg from '../assets/zeus.png'
+import minionImg from '../assets/minion.png'
 import {
     Swords, Clock, Shield, MessageSquare, Search,
     Plus, X, Check, Send, Users,
@@ -60,9 +62,10 @@ function formatRelativeDate(dateStr) {
 // ═══════════════════════════════════════════════════
 // Draggable + Resizable XP Window
 // ═══════════════════════════════════════════════════
-function DraggableXpWindow({ title, icon, children, defaultX, defaultY, className = '', zIndex = 10, onFocus, resizable = true }) {
+function DraggableXpWindow({ title, icon, children, defaultX, defaultY, className = '', zIndex = 10, onFocus, resizable = true, onClose }) {
     const [pos, setPos] = useState({ x: defaultX ?? 0, y: defaultY ?? 0 })
     const [size, setSize] = useState({ w: 0, h: 0 }) // 0 = use CSS default
+    const [closed, setClosed] = useState(false)
     const dragRef = useRef({ active: false, offsetX: 0, offsetY: 0 })
     const resizeRef = useRef({ active: false, startX: 0, startY: 0, startW: 0, startH: 0 })
     const windowRef = useRef(null)
@@ -135,9 +138,16 @@ function DraggableXpWindow({ title, icon, children, defaultX, defaultY, classNam
         }
     }, [handleDragMove, handleDragUp, handleResizeMove, handleResizeUp])
 
+    const handleClose = () => {
+        setClosed(true)
+        onClose?.()
+    }
+
     const sizeStyle = {}
     if (size.w > 0) sizeStyle.width = size.w
     if (size.h > 0) sizeStyle.height = size.h
+
+    if (closed) return null
 
     return (
         <div
@@ -154,7 +164,7 @@ function DraggableXpWindow({ title, icon, children, defaultX, defaultY, classNam
                 <div className="flex items-center gap-0.5">
                     <span className="xp-title-btn xp-tbtn-min">_</span>
                     <span className="xp-title-btn xp-tbtn-max">&#9633;</span>
-                    <span className="xp-title-btn xp-tbtn-x">&times;</span>
+                    <span className="xp-title-btn xp-tbtn-x" onClick={handleClose}>&times;</span>
                 </div>
             </div>
             <div className="xp-window-body xp-window-body-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -181,19 +191,20 @@ const GRID_CELL_H = 120 // px per grid row
 const GRID_ORIGIN_X = 12 // left offset
 const GRID_ORIGIN_Y = 84 // top offset (below navbar)
 
-function DesktopIconGrid({ gods }) {
+function DesktopIconGrid({ gods, topPlayers }) {
+    const navigate = useNavigate()
     // Track each icon's grid position { col, row } — columns-first, top-to-bottom
     const rows = 4
     const [positions, setPositions] = useState(() =>
         gods.map((_, i) => ({ col: Math.floor(i / rows), row: i % rows }))
     )
     const [dragging, setDragging] = useState(null) // { index, x, y } while dragging
-    const dragRef = useRef({ active: false, index: -1, offsetX: 0, offsetY: 0 })
+    const dragRef = useRef({ active: false, index: -1, offsetX: 0, offsetY: 0, startX: 0, startY: 0, moved: false })
 
     const handlePointerDown = useCallback((e, index) => {
         e.preventDefault()
         const rect = e.currentTarget.getBoundingClientRect()
-        dragRef.current = { active: true, index, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
+        dragRef.current = { active: true, index, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, moved: false }
         setDragging({ index, x: rect.left, y: rect.top })
         window.addEventListener('pointermove', handleMove)
         window.addEventListener('pointerup', handleUp)
@@ -201,6 +212,9 @@ function DesktopIconGrid({ gods }) {
 
     const handleMove = useCallback((e) => {
         if (!dragRef.current.active) return
+        const dx = Math.abs(e.clientX - dragRef.current.startX)
+        const dy = Math.abs(e.clientY - dragRef.current.startY)
+        if (dx > 5 || dy > 5) dragRef.current.moved = true
         setDragging({
             index: dragRef.current.index,
             x: e.clientX - dragRef.current.offsetX,
@@ -215,6 +229,17 @@ function DesktopIconGrid({ gods }) {
         window.removeEventListener('pointermove', handleMove)
         window.removeEventListener('pointerup', handleUp)
 
+        // If not dragged, treat as click → navigate to top player
+        if (!d.moved && gods[d.index]) {
+            const god = gods[d.index]
+            const top = topPlayers?.[god.id]
+            if (top?.playerSlug) {
+                navigate(`/profile/${top.playerSlug}`)
+            }
+            setDragging(null)
+            return
+        }
+
         setDragging(prev => {
             if (!prev) return null
             // Snap to nearest grid cell
@@ -223,7 +248,7 @@ function DesktopIconGrid({ gods }) {
             setPositions(p => p.map((pos, i) => i === prev.index ? { col: snapCol, row: snapRow } : pos))
             return null
         })
-    }, [handleMove])
+    }, [handleMove, gods, topPlayers, navigate])
 
     useEffect(() => () => {
         window.removeEventListener('pointermove', handleMove)
@@ -234,6 +259,7 @@ function DesktopIconGrid({ gods }) {
         <div className="xp-desktop-icons">
             {gods.map((god, i) => {
                 const isDragging = dragging?.index === i
+                const top = topPlayers?.[god.id]
                 const style = isDragging
                     ? { position: 'fixed', left: dragging.x, top: dragging.y, zIndex: 30 }
                     : { position: 'absolute', left: GRID_ORIGIN_X + positions[i].col * GRID_CELL_W, top: GRID_ORIGIN_Y + positions[i].row * GRID_CELL_H }
@@ -243,6 +269,7 @@ function DesktopIconGrid({ gods }) {
                         className={`xp-desktop-icon ${isDragging ? 'xp-desktop-icon-selected' : ''}`}
                         style={style}
                         onPointerDown={(e) => handlePointerDown(e, i)}
+                        title={top ? `${top.playerName} (${top.games} games)` : god.name}
                     >
                         <div className="xp-desktop-icon-img-wrap">
                             <img src={god.image_url} alt={god.name} className="xp-desktop-icon-img" draggable={false} />
@@ -273,204 +300,137 @@ function XpProgressBar() {
 
 
 // ═══════════════════════════════════════════════════
-// SMITE Runner Game — Full-width banner
+// SMITE Runner Game — Zeus vs Minions
 // ═══════════════════════════════════════════════════
 function XpDinoGame() {
     const canvasRef = useRef(null)
+    const rafRef = useRef(null)
     const stateRef = useRef({
-        player: { x: 60, y: 0, vy: 0, w: 24, h: 30 },
+        player: { x: 60, y: 0, vy: 0, w: 40, h: 55 },
         obstacles: [],
         clouds: [],
-        towers: [],
+        columns: [],
         score: 0, speed: 3.5,
         gameOver: false, started: false,
         frame: 0, nextObstacle: 80, ground: 0,
-        holding: false, holdFrames: 0,
     })
-    const rafRef = useRef(null)
+    // Jump state tracked via refs so the game loop always sees the latest values
+    const keyDownRef = useRef(false)   // is space/click currently held?
+    const jumpActiveRef = useRef(false) // are we in the "boost" window of a jump?
+    const boostFramesRef = useRef(0)
 
     const W = 900, H = 150, GROUND = H - 22
-    const SHORT_JUMP = -7.5
-    const LONG_JUMP = -10.5
+    const GRAVITY = 0.55
+    const INITIAL_VY = -5        // small kick on press
+    const BOOST_FORCE = -0.65    // extra upward force per frame while held
+    const MAX_BOOST_FRAMES = 14  // frames you can hold for extra height (~230ms at 60fps)
+
+    // Preload images
+    const zeusImgRef = useRef(null)
+    const minionImgRef = useRef(null)
+    useEffect(() => {
+        const z = new Image(); z.src = zeusImg; zeusImgRef.current = z
+        const m = new Image(); m.src = minionImg; minionImgRef.current = m
+    }, [])
 
     const reset = useCallback(() => {
         const s = stateRef.current
-        s.player = { x: 60, y: 0, vy: 0, w: 24, h: 30 }
+        s.player = { x: 60, y: 0, vy: 0, w: 40, h: 55 }
         s.obstacles = []
-        s.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 8 + Math.random() * 25 }))
-        s.towers = [{ x: W * 0.65 }, { x: W * 1.4 }]
+        s.clouds = Array.from({ length: 6 }, (_, i) => ({ x: 80 + i * 160, y: 12 + Math.random() * 30 }))
+        s.columns = [{ x: W * 0.55 }, { x: W * 1.2 }]
         s.score = 0; s.speed = 3.5
         s.gameOver = false; s.started = true
         s.frame = 0; s.nextObstacle = 80; s.ground = 0
-        s.holding = false; s.holdFrames = 0
+        keyDownRef.current = false
+        jumpActiveRef.current = false
+        boostFramesRef.current = 0
     }, [])
 
-    const startJump = useCallback(() => {
+    // --- Input handlers ---
+    // Space DOWN: if on ground, start jump. Set keyDown flag.
+    const onPress = useCallback(() => {
         const s = stateRef.current
         if (s.gameOver) { reset(); return }
         if (!s.started) { reset(); return }
+        keyDownRef.current = true
+        // Only initiate jump if on the ground
         if (s.player.y === 0) {
-            s.holding = true
-            s.holdFrames = 0
-            s.player.vy = SHORT_JUMP
+            s.player.vy = INITIAL_VY
+            jumpActiveRef.current = true
+            boostFramesRef.current = 0
         }
     }, [reset])
 
-    const releaseJump = useCallback(() => {
-        const s = stateRef.current
-        s.holding = false
+    // Space UP: stop boosting immediately — this is what makes short hops short
+    const onRelease = useCallback(() => {
+        keyDownRef.current = false
+        jumpActiveRef.current = false
     }, [])
 
     useEffect(() => {
         const canvas = canvasRef.current
         if (!canvas) return
         const ctx = canvas.getContext('2d')
-        stateRef.current.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 80 + i * 180, y: 8 + Math.random() * 25 }))
-        stateRef.current.towers = [{ x: W * 0.65 }, { x: W * 1.4 }]
+        ctx.imageSmoothingEnabled = false // pixelated sprites
+        const s0 = stateRef.current
+        s0.clouds = Array.from({ length: 6 }, (_, i) => ({ x: 80 + i * 160, y: 12 + Math.random() * 30 }))
+        s0.columns = [{ x: W * 0.55 }, { x: W * 1.2 }]
 
-        // Draw SMITE warrior (pixel art)
-        const drawPlayer = (p, frame) => {
-            const baseY = GROUND - p.h - p.y
-            // Body (golden armor)
-            ctx.fillStyle = '#c8a020'
-            ctx.fillRect(p.x + 4, baseY + 6, 16, 14) // torso
-            // Head
-            ctx.fillStyle = '#e8c870'
-            ctx.fillRect(p.x + 7, baseY, 12, 10) // head
-            // Helmet crest
-            ctx.fillStyle = '#d04040'
-            ctx.fillRect(p.x + 10, baseY - 4, 6, 5) // crest
-            ctx.fillRect(p.x + 12, baseY - 7, 3, 4) // crest tip
-            // Eyes
-            ctx.fillStyle = '#40c8ff'
-            ctx.fillRect(p.x + 9, baseY + 3, 3, 2)
-            ctx.fillRect(p.x + 14, baseY + 3, 3, 2)
-            // Legs
-            ctx.fillStyle = '#8a6a10'
-            if (p.y > 0) {
-                ctx.fillRect(p.x + 5, baseY + 20, 5, 10)
-                ctx.fillRect(p.x + 14, baseY + 20, 5, 10)
-            } else {
-                const leg = Math.floor(frame / 4) % 2
-                ctx.fillRect(p.x + 5, baseY + 20, 5, leg ? 10 : 6)
-                ctx.fillRect(p.x + 14, baseY + 20, 5, leg ? 6 : 10)
-            }
-            // Sword (right side)
-            ctx.fillStyle = '#b0b8c8'
-            ctx.fillRect(p.x + 20, baseY + 2, 3, 16) // blade
-            ctx.fillStyle = '#c8a020'
-            ctx.fillRect(p.x + 19, baseY + 16, 5, 3) // hilt
-            // Shield (left side)
-            ctx.fillStyle = '#3060c0'
-            ctx.fillRect(p.x - 3, baseY + 6, 6, 12)
-            ctx.fillStyle = '#c8a020'
-            ctx.fillRect(p.x - 1, baseY + 9, 2, 6) // shield emblem
-        }
-
-        // Draw obstacle: minions (small), jungle camps (medium), tower bases (tall)
-        const drawObstacle = (o) => {
-            if (o.type === 'minion') {
-                // Small purple minion
-                const baseY = GROUND - o.h
-                ctx.fillStyle = '#7030a0'
-                ctx.fillRect(o.x + 1, baseY + 2, o.w - 2, o.h - 4) // body
-                ctx.fillStyle = '#9050c0'
-                ctx.fillRect(o.x + 2, baseY, o.w - 4, 5) // head
-                ctx.fillStyle = '#ff4040'
-                ctx.fillRect(o.x + 3, baseY + 2, 2, 2) // eye
-                // Spear
-                ctx.fillStyle = '#806030'
-                ctx.fillRect(o.x + o.w - 2, baseY - 4, 2, o.h + 2)
-            } else if (o.type === 'camp') {
-                // Jungle camp (fury/buff style)
-                const baseY = GROUND - o.h
-                ctx.fillStyle = '#c04020'
-                ctx.fillRect(o.x, baseY + 4, o.w, o.h - 4) // body
-                ctx.fillStyle = '#e06030'
-                ctx.fillRect(o.x + 1, baseY, o.w - 2, 8) // head
-                ctx.fillStyle = '#ffcc00'
-                ctx.fillRect(o.x + 2, baseY + 2, 3, 3) // eye
-                ctx.fillRect(o.x + o.w - 5, baseY + 2, 3, 3) // eye
-                // Horns
-                ctx.fillStyle = '#804020'
-                ctx.fillRect(o.x - 2, baseY - 3, 3, 5)
-                ctx.fillRect(o.x + o.w - 1, baseY - 3, 3, 5)
-            } else {
-                // Phoenix pillar
-                const baseY = GROUND - o.h
-                ctx.fillStyle = '#606060'
-                ctx.fillRect(o.x, baseY, o.w, o.h) // pillar
-                ctx.fillStyle = '#808080'
-                ctx.fillRect(o.x - 2, baseY, o.w + 4, 4) // top
-                ctx.fillRect(o.x - 2, GROUND - 4, o.w + 4, 4) // base
-                // Fire on top
-                ctx.fillStyle = '#ff6600'
-                ctx.fillRect(o.x + 2, baseY - 5, o.w - 4, 5)
-                ctx.fillStyle = '#ffcc00'
-                ctx.fillRect(o.x + 3, baseY - 8, o.w - 6, 4)
-            }
-        }
-
-        // Draw background tower (decorative, far lane)
-        const drawTower = (t) => {
-            ctx.fillStyle = 'rgba(80,80,80,0.15)'
-            ctx.fillRect(t.x, GROUND - 70, 14, 70)
-            ctx.fillRect(t.x - 3, GROUND - 74, 20, 6)
-            ctx.fillRect(t.x - 1, GROUND - 78, 16, 5)
-            // Glow
-            ctx.fillStyle = 'rgba(255,100,0,0.12)'
-            ctx.fillRect(t.x + 3, GROUND - 82, 8, 5)
+        // Background Greek column
+        const drawColumn = (c) => {
+            ctx.fillStyle = 'rgba(180,170,150,0.2)'
+            ctx.fillRect(c.x, GROUND - 65, 10, 65)
+            ctx.fillRect(c.x - 3, GROUND - 69, 16, 5)
+            ctx.fillRect(c.x - 2, GROUND - 72, 14, 4)
+            ctx.fillRect(c.x - 3, GROUND - 2, 16, 3)
         }
 
         const loop = () => {
             const s = stateRef.current
             ctx.clearRect(0, 0, W, H)
 
-            // Sky gradient (conquest map feel)
+            // Light sky (Mount Olympus)
             const sky = ctx.createLinearGradient(0, 0, 0, GROUND)
-            sky.addColorStop(0, '#2a1a3a')
-            sky.addColorStop(0.5, '#3a2848')
-            sky.addColorStop(1, '#4a3858')
+            sky.addColorStop(0, '#88b8e8')
+            sky.addColorStop(0.4, '#a8d0f0')
+            sky.addColorStop(1, '#d8e8f4')
             ctx.fillStyle = sky
             ctx.fillRect(0, 0, W, GROUND)
 
-            // Stars
-            ctx.fillStyle = 'rgba(255,255,255,0.3)'
-            for (let i = 0; i < W; i += 47) {
-                ctx.fillRect((i * 7 + 13) % W, (i * 3 + 7) % (GROUND - 20), 1, 1)
-            }
-
-            // Clouds (mystical)
-            ctx.fillStyle = 'rgba(120,100,160,0.3)'
+            // Clouds
+            ctx.fillStyle = 'rgba(255,255,255,0.6)'
             s.clouds.forEach(c => {
-                ctx.fillRect(c.x, c.y, 40, 5)
-                ctx.fillRect(c.x + 8, c.y - 3, 24, 3)
-                ctx.fillRect(c.x + 4, c.y + 5, 30, 3)
+                ctx.fillRect(c.x, c.y, 45, 6)
+                ctx.fillRect(c.x + 8, c.y - 4, 28, 5)
+                ctx.fillRect(c.x + 4, c.y + 5, 35, 4)
             })
 
-            // Background towers
-            s.towers.forEach(drawTower)
+            // Background columns
+            s.columns.forEach(drawColumn)
 
-            // Ground (lane path)
-            ctx.fillStyle = '#5a4a38'
+            // Ground (marble path)
+            ctx.fillStyle = '#d8d0c0'
             ctx.fillRect(0, GROUND, W, H - GROUND)
-            ctx.fillStyle = '#7a6a50'
+            ctx.fillStyle = '#c0b8a8'
             ctx.fillRect(0, GROUND, W, 2)
-            // Lane markings
-            ctx.fillStyle = '#4a3a28'
-            for (let i = 0; i < W; i += 20) {
-                if ((i + Math.floor(s.ground)) % 40 < 20) ctx.fillRect(i, GROUND + 8, 10, 2)
+            ctx.fillStyle = '#c8c0b0'
+            for (let i = 0; i < W; i += 24) {
+                if ((i + Math.floor(s.ground)) % 48 < 24) ctx.fillRect(i, GROUND + 6, 20, 2)
             }
 
             if (!s.started) {
-                drawPlayer(s.player, 0)
-                ctx.fillStyle = '#ffcc00'
+                // Draw Zeus idle
+                if (zeusImgRef.current?.complete) {
+                    ctx.drawImage(zeusImgRef.current, s.player.x, GROUND - s.player.h, s.player.w, s.player.h)
+                }
+                ctx.fillStyle = '#2050a0'
                 ctx.font = '14px "Pixelify Sans", monospace'
                 ctx.textAlign = 'center'
-                ctx.fillText('CLICK OR PRESS SPACE TO START', W / 2, GROUND - 55)
+                ctx.fillText('CLICK OR PRESS SPACE TO START', W / 2, GROUND - 65)
                 ctx.font = '11px "Pixelify Sans", monospace'
-                ctx.fillStyle = '#c8b080'
-                ctx.fillText('Tap = short hop  |  Hold = long leap', W / 2, GROUND - 37)
+                ctx.fillStyle = '#5070a0'
+                ctx.fillText('Tap = short hop  |  Hold = long leap', W / 2, GROUND - 48)
                 rafRef.current = requestAnimationFrame(loop)
                 return
             }
@@ -478,71 +438,86 @@ function XpDinoGame() {
             if (!s.gameOver) {
                 s.frame++
 
-                // Hold detection: if still holding and just left ground, upgrade to long jump
-                if (s.holding && s.player.y > 0 && s.holdFrames < 8) {
-                    s.holdFrames++
-                    // Gradually strengthen jump while holding (up to long jump)
-                    const t = Math.min(s.holdFrames / 6, 1)
-                    s.player.vy = SHORT_JUMP + t * (LONG_JUMP - SHORT_JUMP)
+                // ── Jump physics (Mario-style variable height) ──
+                // While space is held AND we're in the boost window, add upward force
+                if (jumpActiveRef.current && keyDownRef.current && boostFramesRef.current < MAX_BOOST_FRAMES) {
+                    s.player.vy += BOOST_FORCE
+                    boostFramesRef.current++
+                }
+                // If key released mid-jump, stop boosting (jumpActiveRef already false from onRelease)
+
+                s.player.vy += GRAVITY
+                s.player.y = Math.max(0, s.player.y - s.player.vy)
+
+                // Landed
+                if (s.player.y === 0 && s.player.vy > 0) {
+                    s.player.vy = 0
+                    jumpActiveRef.current = false
+                    boostFramesRef.current = 0
                 }
 
-                s.player.vy += 0.5
-                s.player.y = Math.max(0, s.player.y - s.player.vy)
-                if (s.player.y === 0) { s.holding = false; s.holdFrames = 0 }
-
                 s.ground = (s.ground + s.speed) % W
-                s.clouds.forEach(c => { c.x -= s.speed * 0.2; if (c.x < -50) c.x = W + Math.random() * 100 })
-                s.towers.forEach(t => { t.x -= s.speed * 0.15; if (t.x < -30) t.x = W + 200 + Math.random() * 300 })
+                s.clouds.forEach(c => { c.x -= s.speed * 0.15; if (c.x < -60) c.x = W + Math.random() * 120 })
+                s.columns.forEach(c => { c.x -= s.speed * 0.1; if (c.x < -20) c.x = W + 200 + Math.random() * 400 })
 
+                // Spawn minions (varying sizes)
                 s.nextObstacle--
                 if (s.nextObstacle <= 0) {
                     const r = Math.random()
-                    if (r < 0.45) {
-                        // Minion (short, hop over)
-                        s.obstacles.push({ x: W + 10, h: 16 + Math.random() * 6, w: 10, type: 'minion' })
-                    } else if (r < 0.8) {
-                        // Jungle camp (medium, need decent jump)
-                        s.obstacles.push({ x: W + 10, h: 24 + Math.random() * 8, w: 14, type: 'camp' })
+                    const mw = 28 + Math.random() * 8  // minion width
+                    if (r < 0.5) {
+                        s.obstacles.push({ x: W + 10, h: 28 + Math.random() * 8, w: mw })  // short
+                    } else if (r < 0.85) {
+                        s.obstacles.push({ x: W + 10, h: 38 + Math.random() * 8, w: mw })  // medium
                     } else {
-                        // Phoenix pillar (tall, need long jump)
-                        s.obstacles.push({ x: W + 10, h: 32 + Math.random() * 8, w: 10, type: 'pillar' })
+                        s.obstacles.push({ x: W + 10, h: 48 + Math.random() * 8, w: mw })  // tall
                     }
                     s.nextObstacle = 45 + Math.random() * 65
                 }
                 s.obstacles.forEach(o => { o.x -= s.speed })
-                s.obstacles = s.obstacles.filter(o => o.x > -20)
+                s.obstacles = s.obstacles.filter(o => o.x > -40)
 
-                const pBox = { x: s.player.x + 2, w: s.player.w - 4, y: s.player.y, h: s.player.h }
+                // Collision
+                const pBox = { x: s.player.x + 8, w: s.player.w - 16, y: s.player.y, h: s.player.h - 5 }
                 for (const o of s.obstacles) {
-                    if (pBox.x + pBox.w > o.x && pBox.x < o.x + o.w && pBox.y < o.h) s.gameOver = true
+                    if (pBox.x + pBox.w > o.x + 4 && pBox.x < o.x + o.w - 4 && pBox.y < o.h) s.gameOver = true
                 }
                 s.score = Math.floor(s.frame / 5)
                 s.speed = 3.5 + s.score * 0.004
             }
 
-            s.obstacles.forEach(drawObstacle)
-            drawPlayer(s.player, s.frame)
+            // Draw minions
+            if (minionImgRef.current?.complete) {
+                s.obstacles.forEach(o => {
+                    ctx.drawImage(minionImgRef.current, o.x, GROUND - o.h, o.w, o.h)
+                })
+            }
+
+            // Draw Zeus
+            if (zeusImgRef.current?.complete) {
+                const p = s.player
+                ctx.drawImage(zeusImgRef.current, p.x, GROUND - p.h - p.y, p.w, p.h)
+            }
 
             // HUD
-            ctx.fillStyle = '#ffcc00'
+            ctx.fillStyle = '#2050a0'
             ctx.font = '12px "Pixelify Sans", monospace'
             ctx.textAlign = 'right'
             ctx.fillText('GOLD ' + String(s.score).padStart(5, '0'), W - 12, 18)
 
-            // Jump indicator
             ctx.textAlign = 'left'
-            ctx.fillStyle = '#c8b080'
+            ctx.fillStyle = '#7090b0'
             ctx.font = '9px "Pixelify Sans", monospace'
             ctx.fillText('TAP=HOP  HOLD=LEAP', 8, 14)
 
             if (s.gameOver) {
-                ctx.fillStyle = 'rgba(20,10,30,0.7)'
+                ctx.fillStyle = 'rgba(255,255,255,0.75)'
                 ctx.fillRect(0, 0, W, H)
-                ctx.fillStyle = '#ff4040'
+                ctx.fillStyle = '#c03030'
                 ctx.font = '16px "Pixelify Sans", monospace'
                 ctx.textAlign = 'center'
                 ctx.fillText('Y O U   H A V E   B E E N   S L A I N', W / 2, GROUND - 55)
-                ctx.fillStyle = '#ffcc00'
+                ctx.fillStyle = '#2050a0'
                 ctx.font = '11px "Pixelify Sans", monospace'
                 ctx.fillText('Gold: ' + s.score + '  —  Click to Respawn', W / 2, GROUND - 35)
             }
@@ -551,11 +526,13 @@ function XpDinoGame() {
         }
         loop()
 
+        // Keyboard: track keydown AND keyup, prevent repeat events
         const onKeyDown = (e) => {
-            if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); startJump() }
+            if (e.repeat) return // ignore key repeat — only first press matters
+            if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); onPress() }
         }
         const onKeyUp = (e) => {
-            if (e.code === 'Space' || e.code === 'ArrowUp') releaseJump()
+            if (e.code === 'Space' || e.code === 'ArrowUp') onRelease()
         }
         window.addEventListener('keydown', onKeyDown)
         window.addEventListener('keyup', onKeyUp)
@@ -564,13 +541,13 @@ function XpDinoGame() {
             window.removeEventListener('keyup', onKeyUp)
             if (rafRef.current) cancelAnimationFrame(rafRef.current)
         }
-    }, [startJump, releaseJump])
+    }, [onPress, onRelease])
 
     return (
         <div style={{ background: '#c0c0c0', padding: 3 }}>
             <canvas ref={canvasRef} width={W} height={H}
-                onPointerDown={startJump} onPointerUp={releaseJump}
-                style={{ display: 'block', width: '100%', height: 'auto', imageRendering: 'pixelated', cursor: 'pointer', border: '2px inset #d4d0c8', touchAction: 'none' }}
+                onPointerDown={onPress} onPointerUp={onRelease}
+                style={{ display: 'block', width: '100%', height: 'auto', imageRendering: 'auto', cursor: 'pointer', border: '2px inset #d4d0c8', touchAction: 'none' }}
             />
         </div>
     )
@@ -798,6 +775,7 @@ export default function ScrimPlanner() {
     const [startMenuOpen, setStartMenuOpen] = useState(false)
     const startRef = useRef(null)
     const [desktopGods, setDesktopGods] = useState([])
+    const [topPlayers, setTopPlayers] = useState({})
 
     const [openScrims, setOpenScrims] = useState([])
     const [leagueFilter, setLeagueFilter] = useState('')
@@ -883,13 +861,16 @@ export default function ScrimPlanner() {
         return () => document.removeEventListener('mousedown', handle)
     }, [startMenuOpen])
 
-    // Load random gods for desktop icons
+    // Load random gods for desktop icons + top players per god
     useEffect(() => {
         godService.getAll().then(data => {
             const gods = data.gods || data || []
             if (gods.length === 0) return
             const shuffled = [...gods].sort(() => Math.random() - 0.5)
             setDesktopGods(shuffled.slice(0, 24))
+        }).catch(() => {})
+        godService.getTopPlayers().then(data => {
+            setTopPlayers(data.topPlayers || {})
         }).catch(() => {})
     }, [])
 
@@ -957,7 +938,7 @@ export default function ScrimPlanner() {
 
             <div className="xp-theme" style={{ backgroundImage: `url(${xpBg})` }}>
                 {/* ═══ DESKTOP GOD ICONS (left-aligned grid, draggable + snapping) ═══ */}
-                {desktopGods.length > 0 && <DesktopIconGrid gods={desktopGods} />}
+                {desktopGods.length > 0 && <DesktopIconGrid gods={desktopGods} topPlayers={topPlayers} />}
 
                 {/* ═══ DINO BANNER (draggable window) ═══ */}
                 <DraggableXpWindow
@@ -1402,6 +1383,7 @@ const XP_STYLES = `
 .xp-theme {
     font-family: system-ui, Tahoma, "Segoe UI", sans-serif;
     color: #000;
+    color-scheme: light;
     position: relative;
     min-height: 100vh;
     padding-bottom: 44px;

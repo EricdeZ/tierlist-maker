@@ -155,6 +155,9 @@ export const profileService = {
 export const godService = {
     async getAll() {
         return apiCall('gods')
+    },
+    async getTopPlayers() {
+        return apiCall('gods', { action: 'top-players' })
     }
 }
 
