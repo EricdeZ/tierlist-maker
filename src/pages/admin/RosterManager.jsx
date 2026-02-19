@@ -16,7 +16,7 @@ const playerSort = (a, b) => {
     if (!a.is_captain && b.is_captain) return 1
     return a.name.localeCompare(b.name)
 }
-const ROLE_LABELS = { Sub: 'Rule 0-Sub' }
+const ROLE_LABELS = { sub: 'Rule 0-Sub' }
 
 // ─── Persistence ───
 function loadState() {
@@ -1223,7 +1223,7 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                 className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 transition-opacity hover:opacity-80 ${colorClass}`}
                 title="Click to change role"
             >
-                {ROLE_LABELS[role] || role || 'Fill'}
+                {ROLE_LABELS[(role || '').toLowerCase()] || role || 'Fill'}
             </button>
 
             {editing && (
@@ -1249,7 +1249,7 @@ function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5'
                             }`}
                         >
-                            <span>{ROLE_LABELS[r] || r}</span>
+                            <span>{ROLE_LABELS[r.toLowerCase()] || r}</span>
                             {r.toLowerCase() === roleLower && <span>✓</span>}
                         </button>
                     ))}
