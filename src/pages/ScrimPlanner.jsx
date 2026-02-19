@@ -624,10 +624,10 @@ function XpCoinFlip() {
                         </thead>
                         <tbody>
                             {leaderboard.slice(0, 10).map((entry, i) => (
-                                <tr key={entry.user_id || i} style={{ borderBottom: '1px solid #e8e8e8' }}>
-                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{i + 1}</td>
-                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{entry.discord_username || entry.player_name || '???'}</td>
-                                    <td className="xp-text" style={{ padding: '2px 6px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#0058e6' }}>{entry.best_streak}</td>
+                                <tr key={entry.userId || i} style={{ borderBottom: '1px solid #e8e8e8' }}>
+                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{entry.position || i + 1}</td>
+                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{entry.playerName || entry.discordUsername || '???'}</td>
+                                    <td className="xp-text" style={{ padding: '2px 6px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#0058e6' }}>{entry.bestStreak}</td>
                                 </tr>
                             ))}
                             {leaderboard.length === 0 && (
