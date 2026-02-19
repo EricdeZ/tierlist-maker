@@ -1,7 +1,7 @@
 // src/pages/admin/RosterManager.jsx
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Home } from 'lucide-react'
+import { Home, Crown } from 'lucide-react'
 import { RosterManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import TeamLogo from '../../components/TeamLogo'
@@ -10,6 +10,12 @@ const API = import.meta.env.VITE_API_URL || '/api'
 const STORAGE_KEY = 'smite2_roster_admin'
 
 const ROLES = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC', 'Sub', 'Fill']
+
+const playerSort = (a, b) => {
+    if (a.is_captain && !b.is_captain) return -1
+    if (!a.is_captain && b.is_captain) return 1
+    return a.name.localeCompare(b.name)
+}
 const ROLE_LABELS = { Sub: 'Rule 0-Sub' }
 
 // ─── Persistence ───
@@ -150,7 +156,7 @@ export default function RosterManager() {
         const activePlayers = seasonPlayers.filter(
             p => String(p.team_id) === String(team.team_id) && p.is_active !== false
         )
-        return { ...team, players: activePlayers.sort((a, b) => a.name.localeCompare(b.name)) }
+        return { ...team, players: activePlayers.sort(playerSort) }
     })
 
     // Dropped players (inactive in this season) — need a separate query or derive from data
@@ -256,7 +262,7 @@ export default function RosterManager() {
                     secondary_role: player.secondary_role,
                     is_pending: true,
                 })
-                team.players.sort((a, b) => a.name.localeCompare(b.name))
+                team.players.sort(playerSort)
             }
             return next
         })
@@ -332,8 +338,9 @@ export default function RosterManager() {
                 if (idx >= 0) {
                     const [moved] = fromTeam.players.splice(idx, 1)
                     moved.team_id = targetTeamId
+                    moved.is_captain = false
                     toTeam.players.push(moved)
-                    toTeam.players.sort((a, b) => a.name.localeCompare(b.name))
+                    toTeam.players.sort(playerSort)
                 }
             }
             return next
@@ -390,11 +397,13 @@ export default function RosterManager() {
                     const playerA = teamA.players[idxA]
                     const playerB = teamB.players[idxB]
                     playerA.team_id = targetPlayer.team_id
+                    playerA.is_captain = false
                     playerB.team_id = draggedPlayer.fromTeamId
+                    playerB.is_captain = false
                     teamA.players[idxA] = playerB
                     teamB.players[idxB] = playerA
-                    teamA.players.sort((a, b) => a.name.localeCompare(b.name))
-                    teamB.players.sort((a, b) => a.name.localeCompare(b.name))
+                    teamA.players.sort(playerSort)
+                    teamB.players.sort(playerSort)
                 }
             }
             return next
@@ -426,6 +435,33 @@ export default function RosterManager() {
             for (const team of next) {
                 const player = team.players.find(p => p.league_player_id === leaguePlayerId)
                 if (player) { player.role = newRole; break }
+            }
+            return next
+        })
+    }
+
+    // ─── Set captain (pending) ───
+    const handleSetCaptain = (leaguePlayerId, playerName, teamId) => {
+        // Deduplicate: replace any previous set-captain for the same team
+        setPendingChanges(prev => [
+            ...prev.filter(c => !(c.type === 'set-captain' && String(c.team_id) === String(teamId))),
+            {
+                id: crypto.randomUUID(),
+                type: 'set-captain',
+                league_player_id: leaguePlayerId,
+                team_id: teamId,
+                description: `Set ${playerName} as captain`,
+            },
+        ])
+
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            const team = next.find(t => String(t.team_id) === String(teamId))
+            if (team) {
+                team.players.forEach(p => { p.is_captain = false })
+                const player = team.players.find(p => p.league_player_id === leaguePlayerId)
+                if (player) player.is_captain = true
+                team.players.sort(playerSort)
             }
             return next
         })
@@ -478,6 +514,8 @@ export default function RosterManager() {
                     payload = { action: 'transfer-player', league_player_id: change.league_player_id, new_team_id: change.new_team_id }
                 } else if (change.type === 'add') {
                     payload = { action: 'add-player-to-team', player_id: change.player_id, team_id: change.team_id, season_id: parseInt(selectedSeasonId), role: change.role }
+                } else if (change.type === 'set-captain') {
+                    payload = { action: 'set-captain', league_player_id: change.league_player_id }
                 } else {
                     payload = { action: 'change-role', league_player_id: change.league_player_id, role: change.role }
                 }
@@ -798,6 +836,7 @@ export default function RosterManager() {
                             onDropOnPlayer={handleDropOnPlayer}
                             onSetDragOverPlayer={setDragOverPlayer}
                             onRoleChange={handleRoleChange}
+                            onSetCaptain={handleSetCaptain}
                             onDropPlayer={handleDropPlayer}
                             onRemovePendingAdd={handleRemovePendingAdd}
                             onManageAliases={(playerId, playerName) => setAliasModal({ playerId, playerName })}
@@ -882,7 +921,7 @@ function TeamCard({
     team, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
     onDropOnPlayer, onSetDragOverPlayer,
-    onRoleChange, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
+    onRoleChange, onSetCaptain, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
 }) {
     const isValidTarget = hasDraggedPlayer && !isSameTeam
 
@@ -939,6 +978,7 @@ function TeamCard({
                         onDropOnPlayer={onDropOnPlayer}
                         onSetDragOverPlayer={onSetDragOverPlayer}
                         onRoleChange={onRoleChange}
+                        onSetCaptain={onSetCaptain}
                         onDropPlayer={onDropPlayer}
                         onRemovePendingAdd={onRemovePendingAdd}
                         onManageAliases={onManageAliases}
@@ -977,7 +1017,7 @@ function TeamCard({
 // ═══════════════════════════════════════════════════
 // PLAYER ROW (inside team card)
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
+function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onSetCaptain, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
     const isPending = player.is_pending
@@ -1024,6 +1064,26 @@ function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasD
                 <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
                 <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
             </div>
+
+            {/* Captain crown */}
+            {!isPending && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (!player.is_captain) {
+                            onSetCaptain(player.league_player_id, player.name, teamId)
+                        }
+                    }}
+                    className={`shrink-0 transition-all ${
+                        player.is_captain
+                            ? 'text-yellow-400 opacity-100'
+                            : 'text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-30 hover:!opacity-70 hover:!text-yellow-400'
+                    }`}
+                    title={player.is_captain ? 'Team Captain' : 'Set as Captain'}
+                >
+                    <Crown className="w-4 h-4" />
+                </button>
+            )}
 
             {/* Player name */}
             <span className="text-sm text-[var(--color-text)] flex-1 truncate" title={player.name}>

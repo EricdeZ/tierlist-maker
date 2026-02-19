@@ -94,6 +94,7 @@ const handler = async (event) => {
                         p.tracker_url,
                         lp.role,
                         lp.secondary_role,
+                        lp.is_captain,
                         t.name as team_name,
                         t.color as team_color,
                         COALESCE(pa.games_played, 0) as games_played,

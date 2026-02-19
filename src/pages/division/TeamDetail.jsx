@@ -5,7 +5,7 @@ import { useDivision } from '../../context/DivisionContext'
 import { statsService, matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
-import { Building2 } from 'lucide-react'
+import { Building2, Crown } from 'lucide-react'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -57,6 +57,7 @@ const TeamDetail = () => {
                 const filtered = allStats
                     .filter(s => teamPlayerIds.includes(s.id))
                     .map(s => {
+                        const pInfo = teamPlayers.find(p => p.id === s.id)
                         const gamesPlayed = parseInt(s.games_played) || 0
                         const wins = parseInt(s.wins) || 0
                         const totalKills = parseInt(s.total_kills) || 0
@@ -68,7 +69,12 @@ const TeamDetail = () => {
                             : (totalKills + (totalAssists / 2)) / totalDeaths
                         const winRate = gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0
 
-                        return { ...s, gamesPlayed, wins, totalKills, totalDeaths, totalAssists, kda, winRate }
+                        return { ...s, gamesPlayed, wins, totalKills, totalDeaths, totalAssists, kda, winRate, is_captain: pInfo?.is_captain || false }
+                    })
+                    .sort((a, b) => {
+                        if (a.is_captain && !b.is_captain) return -1
+                        if (!a.is_captain && b.is_captain) return 1
+                        return 0
                     })
 
                 setRosterStats(filtered)
@@ -204,8 +210,11 @@ const TeamDetail = () => {
                                             <td className="px-4 py-3">
                                                 <Link
                                                     to={`${basePath}/players/${slug}`}
-                                                    className="text-sm font-semibold text-(--color-text) hover:text-(--color-accent) transition-colors"
+                                                    className="text-sm font-semibold text-(--color-text) hover:text-(--color-accent) transition-colors inline-flex items-center gap-1.5"
                                                 >
+                                                    {player.is_captain && (
+                                                        <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
+                                                    )}
                                                     {player.name}
                                                 </Link>
                                             </td>

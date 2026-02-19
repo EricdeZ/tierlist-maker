@@ -108,8 +108,10 @@ UNIQUE(season_id, slug)
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 | secondary_role | varchar | YES | |
+| is_captain | boolean | NO | false |
 
 UNIQUE(player_id, team_id, season_id, role)
+UNIQUE(team_id, season_id) WHERE is_captain = true AND is_active = true (partial)
 
 ### matches
 | Column | Type | Nullable | Default |

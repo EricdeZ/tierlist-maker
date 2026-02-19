@@ -52,6 +52,8 @@ const handler = async (event) => {
                 return await mergePlayer(sql, body, admin)
             case 'rename-player':
                 return await renamePlayer(sql, body, admin)
+            case 'set-captain':
+                return await setCaptain(sql, body, admin)
             default:
                 return {
                     statusCode: 400,
@@ -143,9 +145,9 @@ async function transferPlayer(sql, { league_player_id, new_team_id }, admin) {
 
     const [updated] = await sql`
         UPDATE league_players
-        SET team_id = ${new_team_id}, updated_at = NOW()
+        SET team_id = ${new_team_id}, is_captain = false, updated_at = NOW()
         WHERE id = ${league_player_id}
-        RETURNING id, team_id
+        RETURNING id, team_id, is_captain
     `
 
     await logAudit(sql, admin, { action: 'transfer-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { new_team_id, team_name: team.name } })
@@ -167,9 +169,9 @@ async function dropPlayer(sql, { league_player_id }, admin) {
 
     const [updated] = await sql`
         UPDATE league_players
-        SET is_active = false, updated_at = NOW()
+        SET is_active = false, is_captain = false, updated_at = NOW()
         WHERE id = ${league_player_id}
-        RETURNING id, is_active
+        RETURNING id, is_active, is_captain
     `
 
     if (!updated) {
@@ -567,6 +569,54 @@ async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }, adm
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, message: `Renamed "${result.old_name}" to "${result.new_name}"`, ...result }),
+    }
+}
+
+/**
+ * Set a player as team captain.
+ * Removes captain from any existing captain on the same team+season.
+ */
+async function setCaptain(sql, { league_player_id }, admin) {
+    if (!league_player_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+
+    const [lp] = await sql`
+        SELECT id, team_id, season_id, is_active FROM league_players WHERE id = ${league_player_id}
+    `
+    if (!lp) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
+    }
+    if (!lp.is_active) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot set an inactive player as captain' }) }
+    }
+
+    // Remove captain from all players on same team+season
+    await sql`
+        UPDATE league_players
+        SET is_captain = false, updated_at = NOW()
+        WHERE team_id = ${lp.team_id} AND season_id = ${lp.season_id} AND is_captain = true
+    `
+
+    const [updated] = await sql`
+        UPDATE league_players
+        SET is_captain = true, updated_at = NOW()
+        WHERE id = ${league_player_id}
+        RETURNING id, is_captain
+    `
+
+    await logAudit(sql, admin, {
+        action: 'set-captain',
+        endpoint: 'roster-manage',
+        targetType: 'league_player',
+        targetId: league_player_id,
+        details: { team_id: lp.team_id, season_id: lp.season_id },
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, updated }),
     }
 }
 

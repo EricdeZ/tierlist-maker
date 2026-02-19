@@ -13,7 +13,7 @@ const handler = async (event, context) => {
             // Get all players in a season (exclude subs)
             if (seasonId && !playerId) {
                 const players = await sql`
-                    SELECT 
+                    SELECT
                         p.id,
                         p.name,
                         p.slug,
@@ -21,6 +21,7 @@ const handler = async (event, context) => {
                         lp.role,
                         lp.secondary_role,
                         lp.is_active,
+                        lp.is_captain,
                         t.id as team_id,
                         t.name as team_name,
                         t.color as team_color,
@@ -28,10 +29,10 @@ const handler = async (event, context) => {
                     FROM league_players lp
                     JOIN players p ON lp.player_id = p.id
                     LEFT JOIN teams t ON lp.team_id = t.id
-                    WHERE lp.season_id = ${seasonId} 
+                    WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
                       AND LOWER(lp.role) != 'sub'
-                    ORDER BY t.name, p.name
+                    ORDER BY t.name, CASE WHEN lp.is_captain THEN 0 ELSE 1 END, p.name
                 `
 
                 return {

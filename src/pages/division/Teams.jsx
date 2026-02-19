@@ -1,6 +1,7 @@
 // src/pages/division/Teams.jsx
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Crown } from 'lucide-react'
 import { useDivision } from '../../context/DivisionContext'
 import { matchService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
@@ -60,7 +61,12 @@ const Teams = () => {
     }, [matches])
 
     const getTeamPlayers = (teamId) =>
-        players?.filter(p => p.team_id === teamId) || []
+        (players?.filter(p => p.team_id === teamId) || [])
+            .sort((a, b) => {
+                if (a.is_captain && !b.is_captain) return -1
+                if (!a.is_captain && b.is_captain) return 1
+                return a.name.localeCompare(b.name)
+            })
 
     return (
         <div className="max-w-6xl mx-auto py-8 px-4">
@@ -156,7 +162,12 @@ const Teams = () => {
                                             to={`${basePath}/players/${player.slug}`}
                                             className="text-sm text-(--color-text-secondary) flex items-center justify-between hover:text-(--color-accent) transition-colors py-0.5 group"
                                         >
-                                            <span>{player.name}</span>
+                                            <span className="flex items-center gap-1.5">
+                                                {player.is_captain && (
+                                                    <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
+                                                )}
+                                                {player.name}
+                                            </span>
                                             <div className="flex items-center gap-1.5">
                                                 {player.role && !roleImg && (
                                                     <span className="text-xs text-(--color-text-secondary)/50 uppercase">
