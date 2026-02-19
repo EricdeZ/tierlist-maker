@@ -229,26 +229,25 @@ function DesktopIconGrid({ gods, topPlayers }) {
         window.removeEventListener('pointermove', handleMove)
         window.removeEventListener('pointerup', handleUp)
 
-        // If not dragged, treat as click → navigate to top player
-        if (!d.moved && gods[d.index]) {
-            const god = gods[d.index]
-            const top = topPlayers?.[god.id]
-            if (top?.playerSlug) {
-                navigate(`/profile/${top.playerSlug}`)
-            }
-            setDragging(null)
-            return
-        }
-
         setDragging(prev => {
             if (!prev) return null
+            // If not dragged, just deselect (don't snap)
+            if (!d.moved) return null
             // Snap to nearest grid cell
             const snapCol = Math.max(0, Math.round((prev.x - GRID_ORIGIN_X) / GRID_CELL_W))
             const snapRow = Math.max(0, Math.round((prev.y - GRID_ORIGIN_Y) / GRID_CELL_H))
             setPositions(p => p.map((pos, i) => i === prev.index ? { col: snapCol, row: snapRow } : pos))
             return null
         })
-    }, [handleMove, gods, topPlayers, navigate])
+    }, [handleMove])
+
+    // Double-click navigates to the top player for that god
+    const handleDoubleClick = useCallback((god) => {
+        const top = topPlayers?.[god.id]
+        if (top?.playerSlug) {
+            navigate(`/profile/${top.playerSlug}`)
+        }
+    }, [topPlayers, navigate])
 
     useEffect(() => () => {
         window.removeEventListener('pointermove', handleMove)
@@ -269,6 +268,7 @@ function DesktopIconGrid({ gods, topPlayers }) {
                         className={`xp-desktop-icon ${isDragging ? 'xp-desktop-icon-selected' : ''}`}
                         style={style}
                         onPointerDown={(e) => handlePointerDown(e, i)}
+                        onDoubleClick={() => handleDoubleClick(god)}
                         title={top ? `${top.playerName} (${top.games} games)` : god.name}
                     >
                         <div className="xp-desktop-icon-img-wrap">
