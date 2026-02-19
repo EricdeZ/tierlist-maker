@@ -345,6 +345,27 @@ CHECK (status IN ('pending', 'processing', 'used', 'skipped'))
 | visibility | varchar(10) | NO | 'private' |
 | updated_at | timestamptz | NO | NOW() |
 
+### scrim_requests
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| team_id | integer | NO | FK → teams.id (CASCADE) |
+| user_id | integer | NO | FK → users.id (SET NULL) |
+| challenged_team_id | integer | YES | FK → teams.id (CASCADE) |
+| scheduled_date | timestamptz | NO | |
+| pick_mode | varchar(30) | NO | 'regular' |
+| banned_content_league | varchar(255) | YES | |
+| notes | text | YES | |
+| status | varchar(20) | NO | 'open' |
+| accepted_team_id | integer | YES | FK → teams.id (SET NULL) |
+| accepted_user_id | integer | YES | FK → users.id (SET NULL) |
+| accepted_at | timestamptz | YES | |
+| created_at | timestamptz | NO | NOW() |
+| updated_at | timestamptz | NO | NOW() |
+
+CHECK(status IN ('open', 'accepted', 'cancelled', 'expired'))
+CHECK(pick_mode IN ('regular', 'fearless', 'fearless_picks', 'fearless_bans'))
+
 ## Views
 
 ### season_hierarchy

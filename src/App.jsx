@@ -58,6 +58,7 @@ import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
 import GodTierList from "./pages/GodTierList.jsx";
+import ScrimPlanner from "./pages/ScrimPlanner.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
@@ -106,6 +107,7 @@ function App() {
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
+                            <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
 

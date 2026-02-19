@@ -410,3 +410,33 @@ export const tierlistFeedService = {
     },
 }
 
+export const scrimService = {
+    async list(filters = {}) {
+        return apiCall('scrim', { action: 'list', ...filters })
+    },
+    async getMyScrims() {
+        return apiCall('scrim', { action: 'my-scrims' })
+    },
+    async getIncoming() {
+        return apiCall('scrim', { action: 'incoming' })
+    },
+    async getCaptainTeams() {
+        return apiCall('scrim', { action: 'captain-teams' })
+    },
+    async getAllActiveTeams() {
+        return apiCall('scrim', { action: 'all-teams' })
+    },
+    async create(data) {
+        return apiPost('scrim', { action: 'create' }, data)
+    },
+    async accept(data) {
+        return apiPost('scrim', { action: 'accept' }, data)
+    },
+    async cancel(scrimId) {
+        return apiPost('scrim', { action: 'cancel' }, { scrim_id: scrimId })
+    },
+    async decline(scrimId) {
+        return apiPost('scrim', { action: 'decline' }, { scrim_id: scrimId })
+    },
+}
+
