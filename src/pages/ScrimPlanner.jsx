@@ -273,162 +273,304 @@ function XpProgressBar() {
 
 
 // ═══════════════════════════════════════════════════
-// Dino Runner Game — Full-width banner
+// SMITE Runner Game — Full-width banner
 // ═══════════════════════════════════════════════════
 function XpDinoGame() {
     const canvasRef = useRef(null)
     const stateRef = useRef({
-        dino: { x: 60, y: 0, vy: 0, w: 22, h: 26 },
-        cacti: [],
+        player: { x: 60, y: 0, vy: 0, w: 24, h: 30 },
+        obstacles: [],
         clouds: [],
+        towers: [],
         score: 0, speed: 3.5,
         gameOver: false, started: false,
-        frame: 0, nextCactus: 80, ground: 0,
+        frame: 0, nextObstacle: 80, ground: 0,
+        holding: false, holdFrames: 0,
     })
     const rafRef = useRef(null)
 
     const W = 900, H = 150, GROUND = H - 22
+    const SHORT_JUMP = -7.5
+    const LONG_JUMP = -10.5
 
     const reset = useCallback(() => {
         const s = stateRef.current
-        s.dino = { x: 60, y: 0, vy: 0, w: 22, h: 26 }
-        s.cacti = []
-        s.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 10 + Math.random() * 30 }))
+        s.player = { x: 60, y: 0, vy: 0, w: 24, h: 30 }
+        s.obstacles = []
+        s.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 8 + Math.random() * 25 }))
+        s.towers = [{ x: W * 0.65 }, { x: W * 1.4 }]
         s.score = 0; s.speed = 3.5
         s.gameOver = false; s.started = true
-        s.frame = 0; s.nextCactus = 80; s.ground = 0
+        s.frame = 0; s.nextObstacle = 80; s.ground = 0
+        s.holding = false; s.holdFrames = 0
     }, [])
 
-    const jump = useCallback(() => {
+    const startJump = useCallback(() => {
         const s = stateRef.current
         if (s.gameOver) { reset(); return }
         if (!s.started) { reset(); return }
-        if (s.dino.y === 0) s.dino.vy = -9
+        if (s.player.y === 0) {
+            s.holding = true
+            s.holdFrames = 0
+            s.player.vy = SHORT_JUMP
+        }
     }, [reset])
+
+    const releaseJump = useCallback(() => {
+        const s = stateRef.current
+        s.holding = false
+    }, [])
 
     useEffect(() => {
         const canvas = canvasRef.current
         if (!canvas) return
         const ctx = canvas.getContext('2d')
-        stateRef.current.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 80 + i * 180, y: 10 + Math.random() * 30 }))
+        stateRef.current.clouds = Array.from({ length: 5 }, (_, i) => ({ x: 80 + i * 180, y: 8 + Math.random() * 25 }))
+        stateRef.current.towers = [{ x: W * 0.65 }, { x: W * 1.4 }]
 
-        const drawDino = (d, frame) => {
-            const baseY = GROUND - d.h - d.y
-            ctx.fillStyle = '#535353'
-            ctx.fillRect(d.x, baseY, d.w, d.h - 4)
-            ctx.fillRect(d.x + 12, baseY - 7, 14, 11)
-            ctx.fillStyle = '#fff'
-            ctx.fillRect(d.x + 20, baseY - 5, 3, 3)
-            ctx.fillStyle = '#535353'
-            if (d.y > 0) {
-                ctx.fillRect(d.x + 4, baseY + d.h - 4, 5, 7)
-                ctx.fillRect(d.x + 13, baseY + d.h - 4, 5, 7)
+        // Draw SMITE warrior (pixel art)
+        const drawPlayer = (p, frame) => {
+            const baseY = GROUND - p.h - p.y
+            // Body (golden armor)
+            ctx.fillStyle = '#c8a020'
+            ctx.fillRect(p.x + 4, baseY + 6, 16, 14) // torso
+            // Head
+            ctx.fillStyle = '#e8c870'
+            ctx.fillRect(p.x + 7, baseY, 12, 10) // head
+            // Helmet crest
+            ctx.fillStyle = '#d04040'
+            ctx.fillRect(p.x + 10, baseY - 4, 6, 5) // crest
+            ctx.fillRect(p.x + 12, baseY - 7, 3, 4) // crest tip
+            // Eyes
+            ctx.fillStyle = '#40c8ff'
+            ctx.fillRect(p.x + 9, baseY + 3, 3, 2)
+            ctx.fillRect(p.x + 14, baseY + 3, 3, 2)
+            // Legs
+            ctx.fillStyle = '#8a6a10'
+            if (p.y > 0) {
+                ctx.fillRect(p.x + 5, baseY + 20, 5, 10)
+                ctx.fillRect(p.x + 14, baseY + 20, 5, 10)
             } else {
                 const leg = Math.floor(frame / 4) % 2
-                ctx.fillRect(d.x + 4, baseY + d.h - 4, 5, leg ? 7 : 3)
-                ctx.fillRect(d.x + 13, baseY + d.h - 4, 5, leg ? 3 : 7)
+                ctx.fillRect(p.x + 5, baseY + 20, 5, leg ? 10 : 6)
+                ctx.fillRect(p.x + 14, baseY + 20, 5, leg ? 6 : 10)
             }
-            ctx.fillRect(d.x - 5, baseY + 4, 7, 4)
-            ctx.fillRect(d.x - 8, baseY + 2, 5, 4)
+            // Sword (right side)
+            ctx.fillStyle = '#b0b8c8'
+            ctx.fillRect(p.x + 20, baseY + 2, 3, 16) // blade
+            ctx.fillStyle = '#c8a020'
+            ctx.fillRect(p.x + 19, baseY + 16, 5, 3) // hilt
+            // Shield (left side)
+            ctx.fillStyle = '#3060c0'
+            ctx.fillRect(p.x - 3, baseY + 6, 6, 12)
+            ctx.fillStyle = '#c8a020'
+            ctx.fillRect(p.x - 1, baseY + 9, 2, 6) // shield emblem
         }
 
-        const drawCactus = (c) => {
-            ctx.fillStyle = '#535353'
-            ctx.fillRect(c.x, GROUND - c.h, c.w, c.h)
-            if (c.h > 22) {
-                ctx.fillRect(c.x - 4, GROUND - c.h + 8, 4, 10)
-                ctx.fillRect(c.x + c.w, GROUND - c.h + 12, 4, 8)
+        // Draw obstacle: minions (small), jungle camps (medium), tower bases (tall)
+        const drawObstacle = (o) => {
+            if (o.type === 'minion') {
+                // Small purple minion
+                const baseY = GROUND - o.h
+                ctx.fillStyle = '#7030a0'
+                ctx.fillRect(o.x + 1, baseY + 2, o.w - 2, o.h - 4) // body
+                ctx.fillStyle = '#9050c0'
+                ctx.fillRect(o.x + 2, baseY, o.w - 4, 5) // head
+                ctx.fillStyle = '#ff4040'
+                ctx.fillRect(o.x + 3, baseY + 2, 2, 2) // eye
+                // Spear
+                ctx.fillStyle = '#806030'
+                ctx.fillRect(o.x + o.w - 2, baseY - 4, 2, o.h + 2)
+            } else if (o.type === 'camp') {
+                // Jungle camp (fury/buff style)
+                const baseY = GROUND - o.h
+                ctx.fillStyle = '#c04020'
+                ctx.fillRect(o.x, baseY + 4, o.w, o.h - 4) // body
+                ctx.fillStyle = '#e06030'
+                ctx.fillRect(o.x + 1, baseY, o.w - 2, 8) // head
+                ctx.fillStyle = '#ffcc00'
+                ctx.fillRect(o.x + 2, baseY + 2, 3, 3) // eye
+                ctx.fillRect(o.x + o.w - 5, baseY + 2, 3, 3) // eye
+                // Horns
+                ctx.fillStyle = '#804020'
+                ctx.fillRect(o.x - 2, baseY - 3, 3, 5)
+                ctx.fillRect(o.x + o.w - 1, baseY - 3, 3, 5)
+            } else {
+                // Phoenix pillar
+                const baseY = GROUND - o.h
+                ctx.fillStyle = '#606060'
+                ctx.fillRect(o.x, baseY, o.w, o.h) // pillar
+                ctx.fillStyle = '#808080'
+                ctx.fillRect(o.x - 2, baseY, o.w + 4, 4) // top
+                ctx.fillRect(o.x - 2, GROUND - 4, o.w + 4, 4) // base
+                // Fire on top
+                ctx.fillStyle = '#ff6600'
+                ctx.fillRect(o.x + 2, baseY - 5, o.w - 4, 5)
+                ctx.fillStyle = '#ffcc00'
+                ctx.fillRect(o.x + 3, baseY - 8, o.w - 6, 4)
             }
+        }
+
+        // Draw background tower (decorative, far lane)
+        const drawTower = (t) => {
+            ctx.fillStyle = 'rgba(80,80,80,0.15)'
+            ctx.fillRect(t.x, GROUND - 70, 14, 70)
+            ctx.fillRect(t.x - 3, GROUND - 74, 20, 6)
+            ctx.fillRect(t.x - 1, GROUND - 78, 16, 5)
+            // Glow
+            ctx.fillStyle = 'rgba(255,100,0,0.12)'
+            ctx.fillRect(t.x + 3, GROUND - 82, 8, 5)
         }
 
         const loop = () => {
             const s = stateRef.current
             ctx.clearRect(0, 0, W, H)
-            ctx.fillStyle = '#f7f7f7'
-            ctx.fillRect(0, 0, W, H)
 
-            // clouds
-            ctx.fillStyle = '#ddd'
+            // Sky gradient (conquest map feel)
+            const sky = ctx.createLinearGradient(0, 0, 0, GROUND)
+            sky.addColorStop(0, '#2a1a3a')
+            sky.addColorStop(0.5, '#3a2848')
+            sky.addColorStop(1, '#4a3858')
+            ctx.fillStyle = sky
+            ctx.fillRect(0, 0, W, GROUND)
+
+            // Stars
+            ctx.fillStyle = 'rgba(255,255,255,0.3)'
+            for (let i = 0; i < W; i += 47) {
+                ctx.fillRect((i * 7 + 13) % W, (i * 3 + 7) % (GROUND - 20), 1, 1)
+            }
+
+            // Clouds (mystical)
+            ctx.fillStyle = 'rgba(120,100,160,0.3)'
             s.clouds.forEach(c => {
-                ctx.fillRect(c.x, c.y, 35, 6)
-                ctx.fillRect(c.x + 6, c.y - 4, 22, 4)
-                ctx.fillRect(c.x + 3, c.y + 6, 28, 3)
+                ctx.fillRect(c.x, c.y, 40, 5)
+                ctx.fillRect(c.x + 8, c.y - 3, 24, 3)
+                ctx.fillRect(c.x + 4, c.y + 5, 30, 3)
             })
 
-            // ground
-            ctx.fillStyle = '#535353'
-            ctx.fillRect(0, GROUND, W, 1)
-            for (let i = 0; i < W; i += 8) {
-                if ((i + Math.floor(s.ground)) % 16 < 8) ctx.fillRect(i, GROUND + 4, 3, 1)
+            // Background towers
+            s.towers.forEach(drawTower)
+
+            // Ground (lane path)
+            ctx.fillStyle = '#5a4a38'
+            ctx.fillRect(0, GROUND, W, H - GROUND)
+            ctx.fillStyle = '#7a6a50'
+            ctx.fillRect(0, GROUND, W, 2)
+            // Lane markings
+            ctx.fillStyle = '#4a3a28'
+            for (let i = 0; i < W; i += 20) {
+                if ((i + Math.floor(s.ground)) % 40 < 20) ctx.fillRect(i, GROUND + 8, 10, 2)
             }
 
             if (!s.started) {
-                drawDino(s.dino, 0)
-                ctx.fillStyle = '#535353'
+                drawPlayer(s.player, 0)
+                ctx.fillStyle = '#ffcc00'
                 ctx.font = '14px "Pixelify Sans", monospace'
                 ctx.textAlign = 'center'
-                ctx.fillText('CLICK OR PRESS SPACE TO START', W / 2, GROUND - 50)
+                ctx.fillText('CLICK OR PRESS SPACE TO START', W / 2, GROUND - 55)
                 ctx.font = '11px "Pixelify Sans", monospace'
-                ctx.fillText('Jump over the cacti!', W / 2, GROUND - 32)
+                ctx.fillStyle = '#c8b080'
+                ctx.fillText('Tap = short hop  |  Hold = long leap', W / 2, GROUND - 37)
                 rafRef.current = requestAnimationFrame(loop)
                 return
             }
 
             if (!s.gameOver) {
                 s.frame++
-                s.dino.vy += 0.5
-                s.dino.y = Math.max(0, s.dino.y - s.dino.vy)
-                s.ground = (s.ground + s.speed) % W
-                s.clouds.forEach(c => { c.x -= s.speed * 0.3; if (c.x < -50) c.x = W + Math.random() * 100 })
 
-                s.nextCactus--
-                if (s.nextCactus <= 0) {
-                    s.cacti.push({ x: W + 10, h: 18 + Math.random() * 22, w: 8 + Math.random() * 7 })
-                    s.nextCactus = 45 + Math.random() * 65
+                // Hold detection: if still holding and just left ground, upgrade to long jump
+                if (s.holding && s.player.y > 0 && s.holdFrames < 8) {
+                    s.holdFrames++
+                    // Gradually strengthen jump while holding (up to long jump)
+                    const t = Math.min(s.holdFrames / 6, 1)
+                    s.player.vy = SHORT_JUMP + t * (LONG_JUMP - SHORT_JUMP)
                 }
-                s.cacti.forEach(c => { c.x -= s.speed })
-                s.cacti = s.cacti.filter(c => c.x > -20)
 
-                const dBox = { x: s.dino.x + 2, w: s.dino.w - 4, y: s.dino.y, h: s.dino.h }
-                for (const c of s.cacti) {
-                    if (dBox.x + dBox.w > c.x && dBox.x < c.x + c.w && dBox.y < c.h) s.gameOver = true
+                s.player.vy += 0.5
+                s.player.y = Math.max(0, s.player.y - s.player.vy)
+                if (s.player.y === 0) { s.holding = false; s.holdFrames = 0 }
+
+                s.ground = (s.ground + s.speed) % W
+                s.clouds.forEach(c => { c.x -= s.speed * 0.2; if (c.x < -50) c.x = W + Math.random() * 100 })
+                s.towers.forEach(t => { t.x -= s.speed * 0.15; if (t.x < -30) t.x = W + 200 + Math.random() * 300 })
+
+                s.nextObstacle--
+                if (s.nextObstacle <= 0) {
+                    const r = Math.random()
+                    if (r < 0.45) {
+                        // Minion (short, hop over)
+                        s.obstacles.push({ x: W + 10, h: 16 + Math.random() * 6, w: 10, type: 'minion' })
+                    } else if (r < 0.8) {
+                        // Jungle camp (medium, need decent jump)
+                        s.obstacles.push({ x: W + 10, h: 24 + Math.random() * 8, w: 14, type: 'camp' })
+                    } else {
+                        // Phoenix pillar (tall, need long jump)
+                        s.obstacles.push({ x: W + 10, h: 32 + Math.random() * 8, w: 10, type: 'pillar' })
+                    }
+                    s.nextObstacle = 45 + Math.random() * 65
+                }
+                s.obstacles.forEach(o => { o.x -= s.speed })
+                s.obstacles = s.obstacles.filter(o => o.x > -20)
+
+                const pBox = { x: s.player.x + 2, w: s.player.w - 4, y: s.player.y, h: s.player.h }
+                for (const o of s.obstacles) {
+                    if (pBox.x + pBox.w > o.x && pBox.x < o.x + o.w && pBox.y < o.h) s.gameOver = true
                 }
                 s.score = Math.floor(s.frame / 5)
                 s.speed = 3.5 + s.score * 0.004
             }
 
-            s.cacti.forEach(drawCactus)
-            drawDino(s.dino, s.frame)
+            s.obstacles.forEach(drawObstacle)
+            drawPlayer(s.player, s.frame)
 
-            ctx.fillStyle = '#535353'
+            // HUD
+            ctx.fillStyle = '#ffcc00'
             ctx.font = '12px "Pixelify Sans", monospace'
             ctx.textAlign = 'right'
-            ctx.fillText('HI ' + String(s.score).padStart(5, '0'), W - 12, 18)
+            ctx.fillText('GOLD ' + String(s.score).padStart(5, '0'), W - 12, 18)
+
+            // Jump indicator
+            ctx.textAlign = 'left'
+            ctx.fillStyle = '#c8b080'
+            ctx.font = '9px "Pixelify Sans", monospace'
+            ctx.fillText('TAP=HOP  HOLD=LEAP', 8, 14)
 
             if (s.gameOver) {
-                ctx.fillStyle = 'rgba(247,247,247,0.6)'
+                ctx.fillStyle = 'rgba(20,10,30,0.7)'
                 ctx.fillRect(0, 0, W, H)
-                ctx.fillStyle = '#535353'
+                ctx.fillStyle = '#ff4040'
                 ctx.font = '16px "Pixelify Sans", monospace'
                 ctx.textAlign = 'center'
-                ctx.fillText('G A M E   O V E R', W / 2, GROUND - 55)
+                ctx.fillText('Y O U   H A V E   B E E N   S L A I N', W / 2, GROUND - 55)
+                ctx.fillStyle = '#ffcc00'
                 ctx.font = '11px "Pixelify Sans", monospace'
-                ctx.fillText('Score: ' + s.score + '  —  Click to Restart', W / 2, GROUND - 35)
+                ctx.fillText('Gold: ' + s.score + '  —  Click to Respawn', W / 2, GROUND - 35)
             }
 
             rafRef.current = requestAnimationFrame(loop)
         }
         loop()
 
-        const onKey = (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump() } }
-        window.addEventListener('keydown', onKey)
-        return () => { window.removeEventListener('keydown', onKey); if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-    }, [jump])
+        const onKeyDown = (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); startJump() }
+        }
+        const onKeyUp = (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') releaseJump()
+        }
+        window.addEventListener('keydown', onKeyDown)
+        window.addEventListener('keyup', onKeyUp)
+        return () => {
+            window.removeEventListener('keydown', onKeyDown)
+            window.removeEventListener('keyup', onKeyUp)
+            if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        }
+    }, [startJump, releaseJump])
 
     return (
         <div style={{ background: '#c0c0c0', padding: 3 }}>
-            <canvas ref={canvasRef} width={W} height={H} onClick={jump}
-                style={{ display: 'block', width: '100%', height: 'auto', imageRendering: 'pixelated', cursor: 'pointer', border: '2px inset #d4d0c8' }}
+            <canvas ref={canvasRef} width={W} height={H}
+                onPointerDown={startJump} onPointerUp={releaseJump}
+                style={{ display: 'block', width: '100%', height: 'auto', imageRendering: 'pixelated', cursor: 'pointer', border: '2px inset #d4d0c8', touchAction: 'none' }}
             />
         </div>
     )
@@ -499,20 +641,27 @@ function XpCoinFlip() {
         setResultDelta(null)
         setLastResult(null)
 
-        // Animate spinning
-        let angle = 0
-        const spin = () => {
-            angle += 18
-            setFlipAngle(angle)
-            if (angle < 720) flipRef.current = requestAnimationFrame(spin)
+        // Fire API call and start 2s spin in parallel
+        const apiPromise = coinflipService.flip().catch(err => { console.error('Flip failed:', err); return null })
+        const timerPromise = new Promise(resolve => setTimeout(resolve, 2000))
+
+        // Animate spinning for full 2 seconds
+        const spinStart = performance.now()
+        const spin = (now) => {
+            const elapsed = now - spinStart
+            // Speed up then slow down: fast in middle, decelerate near end
+            const t = Math.min(elapsed / 2000, 1)
+            const speed = t < 0.7 ? 20 : 20 * (1 - (t - 0.7) / 0.3) + 4
+            setFlipAngle(prev => prev + speed)
+            if (elapsed < 2000) flipRef.current = requestAnimationFrame(spin)
         }
         flipRef.current = requestAnimationFrame(spin)
 
-        try {
-            const data = await coinflipService.flip()
-            // Stop spin
-            if (flipRef.current) cancelAnimationFrame(flipRef.current)
+        // Wait for both API and timer
+        const [data] = await Promise.all([apiPromise, timerPromise])
+        if (flipRef.current) cancelAnimationFrame(flipRef.current)
 
+        if (data) {
             const isHeads = data.result === 'heads'
             setFlipAngle(isHeads ? 0 : 180)
             setLastResult(data.result)
@@ -522,15 +671,11 @@ function XpCoinFlip() {
             setTotalFlips(data.totalFlips)
             setTotalHeads(data.totalHeads)
             setLocalBalance(data.balance)
-
             setTimeout(() => refreshBalance(), 500)
-        } catch (err) {
-            if (flipRef.current) cancelAnimationFrame(flipRef.current)
+        } else {
             setFlipAngle(0)
-            console.error('Flip failed:', err)
-        } finally {
-            setFlipping(false)
         }
+        setFlipping(false)
     }
 
     useEffect(() => () => { if (flipRef.current) cancelAnimationFrame(flipRef.current) }, [])
@@ -816,8 +961,8 @@ export default function ScrimPlanner() {
 
                 {/* ═══ DINO BANNER (draggable window) ═══ */}
                 <DraggableXpWindow
-                    title="DinoRunner.exe"
-                    icon="&#127918;"
+                    title="SmiteRunner.exe"
+                    icon="&#9876;"
                     defaultX={typeof window !== 'undefined' ? Math.max(0, (window.innerWidth - Math.min(900, window.innerWidth * 0.92)) / 2) : 0}
                     defaultY={80}
                     className="xp-dino-window"
