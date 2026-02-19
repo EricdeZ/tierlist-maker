@@ -170,9 +170,9 @@ const ProfilePage = () => {
                         )}
                     </div>
 
-                    {/* Rank */}
+                    {/* Rank — hidden on mobile, shown below card instead */}
                     {player.total_earned != null && (
-                        <Link to="/challenges" className="flex flex-col items-center gap-1 flex-shrink-0 hover:opacity-80 transition-opacity">
+                        <Link to="/challenges" className="hidden sm:flex flex-col items-center gap-1 flex-shrink-0 hover:opacity-80 transition-opacity">
                             <RankBadge totalEarned={player.total_earned} size="lg" />
                             <span className="text-xs font-semibold text-(--color-text-secondary)">
                                 {formatRank(getRank(player.total_earned))}
@@ -181,6 +181,13 @@ const ProfilePage = () => {
                     )}
                 </div>
             </div>
+
+            {/* Rank — mobile only, below header card */}
+            {player.total_earned != null && (
+                <Link to="/challenges" className="flex sm:hidden justify-center py-3 mb-2 hover:opacity-80 transition-opacity">
+                    <RankBadge totalEarned={player.total_earned} size="lg" showLabel />
+                </Link>
+            )}
 
             {/* Profile Tags */}
             <div className="flex items-center gap-2 mb-6">
@@ -191,7 +198,7 @@ const ProfilePage = () => {
                     </span>
                 )}
                 {isOwnProfile && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium">
+                    <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--color-accent)/10 border border-(--color-accent)/20 text-(--color-accent) text-xs font-medium">
                         Your Profile
                     </span>
                 )}
