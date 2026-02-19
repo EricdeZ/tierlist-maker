@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { scrimService, godService } from '../services/database'
+import { scrimService, godService, coinflipService } from '../services/database'
+import { usePassion } from '../context/PassionContext'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import TeamLogo from '../components/TeamLogo'
 import passionCoin from '../assets/passion/passion.png'
+import passionTails from '../assets/passion/passiontails.png'
 import xpBg from '../assets/xp-bg.jpg'
 import shortcutOverlay from '../assets/shortcut.PNG'
 import {
@@ -449,6 +451,198 @@ function XpClock() {
 
 
 // ═══════════════════════════════════════════════════
+// XP Coin Flip (mini window game)
+// ═══════════════════════════════════════════════════
+function XpCoinFlip() {
+    const { user } = useAuth()
+    const { balance, refreshBalance } = usePassion()
+
+    const [flipping, setFlipping] = useState(false)
+    const [lastResult, setLastResult] = useState(null)
+    const [currentStreak, setCurrentStreak] = useState(0)
+    const [bestStreak, setBestStreak] = useState(0)
+    const [totalFlips, setTotalFlips] = useState(0)
+    const [totalHeads, setTotalHeads] = useState(0)
+    const [localBalance, setLocalBalance] = useState(null)
+    const [resultDelta, setResultDelta] = useState(null)
+    const [leaderboard, setLeaderboard] = useState([])
+    const [showLeaderboard, setShowLeaderboard] = useState(false)
+    const [flipAngle, setFlipAngle] = useState(0)
+    const flipRef = useRef(null)
+
+    useEffect(() => {
+        if (!user) return
+        coinflipService.getMyStats()
+            .then(data => {
+                setCurrentStreak(data.currentStreak || 0)
+                setBestStreak(data.bestStreak || 0)
+                setTotalFlips(data.totalFlips || 0)
+                setTotalHeads(data.totalHeads || 0)
+            })
+            .catch(() => {})
+    }, [user])
+
+    useEffect(() => {
+        if (!flipping && balance !== undefined) setLocalBalance(balance)
+    }, [balance, flipping])
+
+    const loadLeaderboard = () => {
+        coinflipService.getLeaderboard()
+            .then(data => setLeaderboard(data.leaderboard || []))
+            .catch(() => {})
+    }
+
+    const handleFlip = async () => {
+        if (flipping || !user) return
+        if ((localBalance ?? balance) < 1) return
+        setFlipping(true)
+        setResultDelta(null)
+        setLastResult(null)
+
+        // Animate spinning
+        let angle = 0
+        const spin = () => {
+            angle += 18
+            setFlipAngle(angle)
+            if (angle < 720) flipRef.current = requestAnimationFrame(spin)
+        }
+        flipRef.current = requestAnimationFrame(spin)
+
+        try {
+            const data = await coinflipService.flip()
+            // Stop spin
+            if (flipRef.current) cancelAnimationFrame(flipRef.current)
+
+            const isHeads = data.result === 'heads'
+            setFlipAngle(isHeads ? 0 : 180)
+            setLastResult(data.result)
+            setResultDelta(isHeads ? +1 : -1)
+            setCurrentStreak(data.currentStreak)
+            setBestStreak(data.bestStreak)
+            setTotalFlips(data.totalFlips)
+            setTotalHeads(data.totalHeads)
+            setLocalBalance(data.balance)
+
+            setTimeout(() => refreshBalance(), 500)
+        } catch (err) {
+            if (flipRef.current) cancelAnimationFrame(flipRef.current)
+            setFlipAngle(0)
+            console.error('Flip failed:', err)
+        } finally {
+            setFlipping(false)
+        }
+    }
+
+    useEffect(() => () => { if (flipRef.current) cancelAnimationFrame(flipRef.current) }, [])
+
+    const headsRate = totalFlips > 0 ? Math.round((totalHeads / totalFlips) * 100) : 0
+
+    // Determine which face to show
+    const showTails = flipAngle % 360 >= 90 && flipAngle % 360 < 270
+    const coinSrc = lastResult === 'tails' && !flipping ? passionTails
+        : lastResult === 'heads' && !flipping ? passionCoin
+        : showTails ? passionTails : passionCoin
+
+    if (!user) {
+        return (
+            <div className="text-center py-6">
+                <div style={{ fontSize: 32 }}>&#128176;</div>
+                <div className="xp-text" style={{ fontWeight: 700, marginTop: 4 }}>Log in to flip</div>
+                <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>Costs 1 Passion per flip</div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ padding: 4 }}>
+            {/* Coin display */}
+            <div className="flex flex-col items-center" style={{ padding: '10px 0 6px' }}>
+                <div
+                    className="xp-coin-wrap"
+                    style={{ transform: flipping ? `rotateY(${flipAngle}deg)` : undefined }}
+                >
+                    <img src={coinSrc} alt="coin" className="xp-coin-img" draggable={false} />
+                </div>
+
+                {/* Result feedback */}
+                {resultDelta !== null && (
+                    <div style={{
+                        fontSize: 14, fontWeight: 700, marginTop: 4,
+                        fontFamily: '"Pixelify Sans", system-ui',
+                        color: resultDelta > 0 ? '#2d8212' : '#cc0000',
+                    }}>
+                        {resultDelta > 0 ? 'HEADS! +1' : 'TAILS! -1'}
+                    </div>
+                )}
+
+                {/* Flip button */}
+                <button
+                    onClick={handleFlip}
+                    disabled={flipping || (localBalance ?? balance) < 1}
+                    className="xp-btn xp-btn-primary"
+                    style={{ marginTop: 6, padding: '4px 20px', fontSize: 12 }}
+                >
+                    {flipping ? 'Flipping...' : 'Flip (1 Passion)'}
+                </button>
+
+                {(localBalance ?? balance) < 1 && !flipping && (
+                    <div className="xp-text" style={{ fontSize: 10, color: '#cc0000', marginTop: 2 }}>Not enough Passion!</div>
+                )}
+            </div>
+
+            {/* Stats panel */}
+            <fieldset className="xp-fieldset" style={{ marginTop: 4 }}>
+                <legend className="xp-fieldset-legend">Stats</legend>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+                    <div className="xp-text"><b>Balance:</b> {localBalance ?? balance ?? 0}</div>
+                    <div className="xp-text"><b>Streak:</b> {currentStreak}</div>
+                    <div className="xp-text"><b>Best:</b> {bestStreak}</div>
+                    <div className="xp-text"><b>Flips:</b> {totalFlips}</div>
+                    <div className="xp-text"><b>Heads:</b> {totalHeads} ({headsRate}%)</div>
+                    <div className="xp-text"><b>Tails:</b> {totalFlips - totalHeads}</div>
+                </div>
+            </fieldset>
+
+            {/* Leaderboard toggle */}
+            <button
+                onClick={() => { setShowLeaderboard(!showLeaderboard); if (!showLeaderboard) loadLeaderboard() }}
+                className="xp-btn w-full"
+                style={{ marginTop: 4, fontSize: 11 }}
+            >
+                {showLeaderboard ? 'Hide Leaderboard' : 'Show Leaderboard'}
+            </button>
+
+            {showLeaderboard && (
+                <div style={{ marginTop: 4, background: '#fff', border: '2px solid', borderColor: '#7f9db9 #f0f0f0 #f0f0f0 #7f9db9', maxHeight: 150, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: '#ece9d8', borderBottom: '1px solid #c0c0c0' }}>
+                                <th className="xp-text" style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 700, fontSize: 10 }}>#</th>
+                                <th className="xp-text" style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 700, fontSize: 10 }}>Player</th>
+                                <th className="xp-text" style={{ padding: '2px 6px', textAlign: 'right', fontWeight: 700, fontSize: 10 }}>Best</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {leaderboard.slice(0, 10).map((entry, i) => (
+                                <tr key={entry.user_id || i} style={{ borderBottom: '1px solid #e8e8e8' }}>
+                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{i + 1}</td>
+                                    <td className="xp-text" style={{ padding: '2px 6px', fontSize: 10 }}>{entry.discord_username || entry.player_name || '???'}</td>
+                                    <td className="xp-text" style={{ padding: '2px 6px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#0058e6' }}>{entry.best_streak}</td>
+                                </tr>
+                            ))}
+                            {leaderboard.length === 0 && (
+                                <tr><td colSpan={3} className="xp-text" style={{ padding: '6px', textAlign: 'center', fontSize: 10, color: '#666' }}>No data yet</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════
 export default function ScrimPlanner() {
@@ -632,6 +826,18 @@ export default function ScrimPlanner() {
                     <XpDinoGame />
                 </DraggableXpWindow>
 
+                {/* ═══ COIN FLIP WINDOW ═══ */}
+                <DraggableXpWindow
+                    title="CoinFlip.exe"
+                    icon="&#128176;"
+                    defaultX={typeof window !== 'undefined' ? Math.min(window.innerWidth - 280, window.innerWidth * 0.72) : 500}
+                    defaultY={110}
+                    className="xp-coinflip-window"
+                    resizable={false}
+                >
+                    <XpCoinFlip />
+                </DraggableXpWindow>
+
                 {/* ═══ DRAGGABLE SCRIM PLANNER WINDOW ═══ */}
                 <DraggableXpWindow
                     title="Scrim Planner"
@@ -725,10 +931,14 @@ export default function ScrimPlanner() {
                     {/* Quick launch divider */}
                     <div className="xp-taskbar-divider" />
 
-                    {/* Active window button */}
+                    {/* Active window buttons */}
                     <button className="xp-taskbar-window-btn xp-taskbar-window-active">
                         <span style={{ fontSize: 12 }}>&#9876;</span>
                         <span>Scrim Planner</span>
+                    </button>
+                    <button className="xp-taskbar-window-btn xp-taskbar-window-active">
+                        <span style={{ fontSize: 12 }}>&#128176;</span>
+                        <span>CoinFlip</span>
                     </button>
 
                     <div className="flex-1" />
@@ -1429,6 +1639,27 @@ const XP_STYLES = `
     font-size: 11px; color: #fff; white-space: nowrap;
 }
 
+/* ── Coin Flip Window ── */
+.xp-coinflip-window {
+    z-index: 15;
+    width: 240px !important;
+}
+.xp-coin-wrap {
+    width: 80px; height: 80px;
+    border: 2px outset #d4d0c8; background: #c0c0c0;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+    overflow: hidden; position: relative;
+    transition: transform 0.1s linear;
+}
+.xp-coin-img {
+    width: 6px; height: 6px; object-fit: contain;
+    image-rendering: pixelated;
+    transform: scale(14);
+    transform-origin: top left;
+    position: absolute; top: 0; left: 0;
+    filter: contrast(1.15) saturate(0.85);
+}
+
 /* ── Scrollbar (XP style) ── */
 .xp-window-body-scroll::-webkit-scrollbar { width: 17px; }
 .xp-window-body-scroll::-webkit-scrollbar-track { background: #ece9d8; border-left: 1px solid #c0c0c0; }
@@ -1451,6 +1682,7 @@ const XP_STYLES = `
     .xp-window-body-scroll { max-height: none; }
     .xp-resize-handle { display: none; }
     .xp-dino-window { margin-top: 72px !important; }
+    .xp-coinflip-window { width: 100% !important; }
     .xp-desktop-icons { display: none; }
     .xp-taskbar-window-btn { min-width: auto; }
     .xp-tray-text { display: none; }
