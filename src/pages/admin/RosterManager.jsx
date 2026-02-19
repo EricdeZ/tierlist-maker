@@ -72,6 +72,9 @@ export default function RosterManager() {
     const [showPool, setShowPool] = useState(false)
     const [poolSearch, setPoolSearch] = useState('')
 
+    // Show Rule 0-Subs toggle
+    const [showSubs, setShowSubs] = useState(false)
+
     // ─── Fetch admin data ───
     const fetchData = useCallback(async () => {
         setAdminLoading(true)
@@ -740,16 +743,28 @@ export default function RosterManager() {
                 </div>
                 <div className="flex items-center gap-3">
                     {selectedSeasonId && (
-                        <button
-                            onClick={() => setShowPool(!showPool)}
-                            className={`px-3 py-1.5 rounded-lg text-xs transition-colors border ${
-                                showPool
-                                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/30'
-                                    : 'bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 border-white/10'
-                            }`}
-                        >
-                            Player Pool{poolPlayers.length > 0 ? ` (${poolPlayers.length})` : ''}
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setShowSubs(!showSubs)}
+                                className={`px-3 py-1.5 rounded-lg text-xs transition-colors border ${
+                                    showSubs
+                                        ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/30'
+                                        : 'bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 border-white/10'
+                                }`}
+                            >
+                                Rule 0-Subs
+                            </button>
+                            <button
+                                onClick={() => setShowPool(!showPool)}
+                                className={`px-3 py-1.5 rounded-lg text-xs transition-colors border ${
+                                    showPool
+                                        ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/30'
+                                        : 'bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10 border-white/10'
+                                }`}
+                            >
+                                Player Pool{poolPlayers.length > 0 ? ` (${poolPlayers.length})` : ''}
+                            </button>
+                        </>
                     )}
                     <button
                         onClick={() => setShowMerge(true)}
@@ -822,6 +837,7 @@ export default function RosterManager() {
                         <TeamCard
                             key={team.team_id}
                             team={team}
+                            showSubs={showSubs}
                             isDragOver={String(dragOverTeam) === String(team.team_id)}
                             hasDraggedPlayer={!!draggedPlayer}
                             isSameTeam={draggedPlayer && String(draggedPlayer.team_id) === String(team.team_id)}
@@ -918,7 +934,7 @@ export default function RosterManager() {
 // TEAM CARD
 // ═══════════════════════════════════════════════════
 function TeamCard({
-    team, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
+    team, showSubs, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
     onDropOnPlayer, onSetDragOverPlayer,
     onRoleChange, onSetCaptain, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
@@ -953,13 +969,13 @@ function TeamCard({
                     </h3>
                 </div>
                 <span className="text-xs text-[var(--color-text-secondary)]">
-                    {team.players.filter(p => p.role?.toLowerCase() !== 'sub').length} players
+                    {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').length} players
                 </span>
             </div>
 
             {/* Player list */}
             <div className="px-3 pb-2 space-y-1 min-h-[120px]">
-                {team.players.filter(p => p.role?.toLowerCase() !== 'sub').map(player => (
+                {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').map(player => (
                     <PlayerRow
                         key={player.league_player_id}
                         player={player}
@@ -986,7 +1002,7 @@ function TeamCard({
                     />
                 ))}
 
-                {team.players.filter(p => p.role?.toLowerCase() !== 'sub').length === 0 && (
+                {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').length === 0 && (
                     <div className="text-center py-6 text-sm text-[var(--color-text-secondary)]/50 italic">
                         No active players
                     </div>
