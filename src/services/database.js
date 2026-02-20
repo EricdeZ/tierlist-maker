@@ -226,6 +226,24 @@ export const coinflipService = {
     },
 }
 
+export const smiterunnerService = {
+    async startSession() {
+        return apiPost('smiterunner', { action: 'start' })
+    },
+    async heartbeat(sessionToken, ticks) {
+        return apiPost('smiterunner', { action: 'heartbeat' }, { sessionToken, ticks })
+    },
+    async submitScore(sessionToken, score, ticks) {
+        return apiPost('smiterunner', { action: 'submit' }, { sessionToken, score, ticks })
+    },
+    async getLeaderboard() {
+        return apiCall('smiterunner', { action: 'leaderboard' })
+    },
+    async getMyStats() {
+        return apiCall('smiterunner', { action: 'my-stats' })
+    },
+}
+
 export const challengeService = {
     async getAll() {
         return apiCall('challenges')
