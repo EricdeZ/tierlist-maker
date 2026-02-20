@@ -6,12 +6,13 @@ import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
 import ReporterBell from '../ReporterBell'
-import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown } from 'lucide-react'
+import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown, Calendar } from 'lucide-react'
 
 const tools = [
     { to: '/tierlist',      icon: ListOrdered,  label: 'Tier List' },
     { to: '/god-tierlist',  icon: Crown,        label: 'God Tier List' },
     { to: '/draft',         icon: Swords,       label: 'Draft Simulator' },
+    { to: '/scrims',        icon: Calendar,     label: 'Scrims' },
     { to: '/coinflip',      icon: Coins,        label: 'Coin Flip' },
     { to: '/shop',          icon: ShoppingBag,  label: 'Passion Shop' },
 ]

@@ -183,7 +183,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                     <div className="xp-wizard-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                         <div style={{ fontSize: 36 }}>&#9989;</div>
                         <div className="xp-text" style={{ fontWeight: 700, fontSize: 14 }}>Scrim Request Posted!</div>
-                        <div className="xp-text" style={{ fontSize: 11, color: '#555', textAlign: 'center' }}>
+                        <div className="xp-text xp-text-muted" style={{ fontSize: 11, color: '#555', textAlign: 'center' }}>
                             {challengedTeamId ? 'Your challenge has been sent.' : 'Your open scrim request is now visible to all teams.'}
                         </div>
                         <div className="flex gap-2 mt-2">
@@ -217,21 +217,21 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                     {/* Step header */}
                     <div style={{ marginBottom: 10 }}>
                         <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{STEPS[step].subtitle}</div>
-                        <div style={{ height: 1, background: '#7f9db9', margin: '4px 0 8px' }} />
+                        <div className="xp-step-divider" style={{ height: 1, background: '#7f9db9', margin: '4px 0 8px' }} />
                     </div>
 
                     {/* ── Step 0: Team Selection ── */}
                     {step === 0 && (
                         <div>
-                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                            <div className="xp-text xp-text-muted" style={{ marginBottom: 8, color: '#555' }}>
                                 Welcome to the Scrim Request Wizard. Select the team you want to post a scrim for.
                             </div>
                             {captainTeams.length === 1 ? (
-                                <div className="flex items-center gap-3 p-2" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
+                                <div className="xp-team-card flex items-center gap-3 p-2" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
                                     <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={28} />
                                     <div>
                                         <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{captainTeams[0].teamName}</div>
-                                        <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName}</div>
+                                        <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName}</div>
                                     </div>
                                 </div>
                             ) : (
@@ -242,13 +242,13 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                 </select>
                             )}
                             {selectedTeam && (
-                                <div className="flex items-center gap-3 mt-3 p-2" style={{ background: '#e8f0ff', border: '1px solid #7f9db9' }}>
+                                <div className="xp-division-preview flex items-center gap-3 mt-3 p-2" style={{ background: '#e8f0ff', border: '1px solid #7f9db9' }}>
                                     {tierImg && <img src={tierImg} alt="" style={{ width: 32, height: 32 }} />}
                                     <div>
-                                        <div className="xp-text" style={{ fontWeight: 700, color: '#0054e3' }}>
+                                        <div className="xp-text xp-division-preview-title" style={{ fontWeight: 700, color: '#0054e3' }}>
                                             {selectedTeam.divisionName}
                                         </div>
-                                        <div className="xp-text" style={{ fontSize: 10, color: '#555' }}>
+                                        <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#555' }}>
                                             {selectedTeam.divisionTier ? `Tier ${selectedTeam.divisionTier} — ${RANK_LABELS[selectedTeam.divisionTier] || ''}` : 'No tier assigned'}
                                         </div>
                                     </div>
@@ -260,12 +260,12 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                     {/* ── Step 1: Date Selection ── */}
                     {step === 1 && (
                         <div>
-                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                            <div className="xp-text xp-text-muted" style={{ marginBottom: 8, color: '#555' }}>
                                 Choose a date for your scrim. Days with an orange dot have existing team scrims.
                             </div>
                             <XpCalendar selectedDate={selectedDate} onSelectDate={handleDateSelect} scrimDates={scrimDates} />
                             {selectedDate && (
-                                <div className="xp-text" style={{ textAlign: 'center', marginTop: 6, fontWeight: 700, color: '#0054e3' }}>
+                                <div className="xp-text xp-selected-date" style={{ textAlign: 'center', marginTop: 6, fontWeight: 700, color: '#0054e3' }}>
                                     Selected: {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                 </div>
                             )}
@@ -275,7 +275,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                     {/* ── Step 2: Time Selection ── */}
                     {step === 2 && (
                         <div>
-                            <div className="xp-text" style={{ marginBottom: 8, color: '#555' }}>
+                            <div className="xp-text xp-text-muted" style={{ marginBottom: 8, color: '#555' }}>
                                 Set the start time for your scrim.
                             </div>
                             <div className="flex items-center justify-center gap-2 my-4">
@@ -296,9 +296,9 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                     <option value="PM">PM</option>
                                 </select>
                             </div>
-                            <div className="flex items-center gap-2 p-2 mt-2" style={{ background: '#fffff0', border: '1px solid #c0a030' }}>
+                            <div className="xp-info-box xp-info-box-warn flex items-center gap-2 p-2 mt-2" style={{ background: '#fffff0', border: '1px solid #c0a030' }}>
                                 <AlertTriangle size={14} style={{ color: '#c08030', flexShrink: 0 }} />
-                                <span className="xp-text" style={{ fontSize: 11, color: '#604000' }}>
+                                <span className="xp-text xp-info-box-text" style={{ fontSize: 11, color: '#604000' }}>
                                     All times are in <strong>Eastern Standard Time (EST)</strong>. Enter the time as you would read a clock in EST.
                                 </span>
                             </div>
@@ -345,11 +345,11 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                     Leave empty for an open request visible to all teams.
                                 </div>
                                 {challengedTeam ? (
-                                    <div className="flex items-center gap-2 p-1.5" style={{ background: '#e0c8ff', border: '1px solid #8055c0' }}>
+                                    <div className="xp-challenged-team flex items-center gap-2 p-1.5" style={{ background: '#e0c8ff', border: '1px solid #8055c0' }}>
                                         <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={20} />
                                         <div className="flex-1">
-                                            <div className="xp-text" style={{ fontWeight: 700, color: '#400080' }}>{challengedTeam.name}</div>
-                                            <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{challengedTeam.leagueName} &middot; {challengedTeam.divisionName}</div>
+                                            <div className="xp-text xp-challenged-team-name" style={{ fontWeight: 700, color: '#400080' }}>{challengedTeam.name}</div>
+                                            <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#666' }}>{challengedTeam.leagueName} &middot; {challengedTeam.divisionName}</div>
                                         </div>
                                         <button type="button" onClick={() => { setChallengedTeamId(''); setTeamSearch('') }} className="xp-btn" style={{ padding: '1px 6px', fontSize: 10 }}>X</button>
                                     </div>
@@ -474,9 +474,9 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                             </fieldset>
 
                             {postError && (
-                                <div className="flex items-center gap-2 mb-2 p-2" style={{ background: '#ffc8c8', border: '1px solid #c05555' }}>
+                                <div className="xp-info-box xp-info-box-error flex items-center gap-2 mb-2 p-2" style={{ background: '#ffc8c8', border: '1px solid #c05555' }}>
                                     <div className="xp-error-icon" style={{ width: 16, height: 16, fontSize: 9 }}>X</div>
-                                    <span className="xp-text" style={{ fontSize: 11, color: '#800000' }}>{postError}</span>
+                                    <span className="xp-text xp-info-box-text" style={{ fontSize: 11, color: '#800000' }}>{postError}</span>
                                 </div>
                             )}
                         </div>

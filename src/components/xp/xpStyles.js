@@ -238,6 +238,34 @@ const XP_STYLES = `
 }
 .xp-scrim-card:hover { background: #eff4ff; }
 
+/* Desktop: logo left, content fills, actions right */
+.xp-scrim-layout {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto auto;
+    gap: 0 12px;
+}
+.xp-scrim-header {
+    grid-column: 1 / 3; grid-row: 1;
+    display: flex; align-items: flex-start; gap: 8px; min-width: 0;
+    margin-bottom: 2px;
+}
+.xp-scrim-meta-inline { margin-top: 1px; }
+.xp-scrim-body {
+    grid-column: 1 / 3; grid-row: 2;
+    padding-left: 55px; /* logo 47px + gap */
+    min-width: 0;
+}
+.xp-scrim-footer {
+    grid-column: 1 / 3; grid-row: 3;
+    padding-left: 55px;
+}
+.xp-scrim-actions {
+    grid-column: 3; grid-row: 1 / 4;
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+    align-self: start;
+}
+
 /* ── Team & League links ── */
 .xp-team-link {
     font-weight: 700; font-size: 13px; color: #1563b8;
@@ -794,6 +822,790 @@ const XP_STYLES = `
     .xp-tier-badge-3 { background: rgba(42,144,101,0.2) !important; border-color: #2a9065 !important; color: #50d090 !important; }
     .xp-tier-badge-4 { background: rgba(32,96,192,0.2) !important; border-color: #2060c0 !important; color: #70a8f0 !important; }
     .xp-tier-badge-5 { background: rgba(0,152,184,0.2) !important; border-color: #0098b8 !important; color: #40d8f8 !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE LAYOUT — sm-* classes (dark modern theme, no XP chrome)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sm-mobile-view {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: #0f1923;
+    color: #e0e6ed;
+    font-family: 'Lato', system-ui, sans-serif;
+    padding-top: 72px; /* space below fixed navbar */
+    padding-bottom: 72px; /* space for bottom nav + safe area */
+    overflow-x: hidden;
+}
+
+/* ─── Hero banner ───────────────────────────────────── */
+.sm-hero {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, #1a3a5c 0%, #0d2240 40%, #162040 70%, #1a1040 100%);
+    border-bottom: 1px solid rgba(79, 160, 232, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.sm-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(79, 160, 232, 0.12) 0%, transparent 70%),
+                radial-gradient(ellipse at 80% 50%, rgba(128, 48, 192, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.sm-hero-icon {
+    color: #4fa0e8;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 8px rgba(79, 160, 232, 0.4));
+    position: relative;
+}
+
+.sm-hero-title {
+    font-family: 'Montserrat', 'Lato', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: #fff;
+    margin: 0 0 2px;
+    position: relative;
+}
+
+.sm-hero-sub {
+    font-size: 12px;
+    color: #8ca8c4;
+    margin: 0;
+    line-height: 1.3;
+    position: relative;
+}
+
+.sm-content {
+    flex: 1;
+    padding: 12px 14px 8px;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* ─── Bottom navigation ─────────────────────────────── */
+.sm-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: rgba(15, 25, 35, 0.97);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    box-sizing: border-box;
+    max-height: 70px;
+}
+
+.sm-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 4px 4px;
+    background: none;
+    border: none;
+    color: #8899aa;
+    font-size: 10px;
+    font-family: 'Lato', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.sm-nav-btn.active {
+    color: #4fa0e8;
+    background: rgba(79, 160, 232, 0.08);
+}
+
+.sm-nav-btn:not(.active):hover {
+    color: #c0ccd8;
+    background: rgba(255,255,255,0.04);
+}
+
+/* ─── Loading / error states ────────────────────────── */
+.sm-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 48px 0;
+    color: #8899aa;
+    font-size: 13px;
+}
+
+.sm-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(79,160,232,0.2);
+    border-top-color: #4fa0e8;
+    border-radius: 50%;
+    animation: sm-spin 0.8s linear infinite;
+}
+
+@keyframes sm-spin {
+    to { transform: rotate(360deg); }
+}
+
+.sm-error-box {
+    background: rgba(220, 60, 60, 0.15);
+    border: 1px solid rgba(220, 60, 60, 0.4);
+    color: #f08080;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+/* ─── Section headers ───────────────────────────────── */
+.sm-section-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.sm-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e0e6ed;
+    margin: 0 0 2px;
+}
+
+.sm-section-sub {
+    font-size: 11px;
+    color: #8899aa;
+    margin: 0;
+}
+
+/* ─── Login CTA ─────────────────────────────────────── */
+.sm-login-cta {
+    text-align: center;
+    padding: 20px 0 8px;
+}
+
+.sm-login-btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #4fa0e8, #2060c0);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Lato', system-ui, sans-serif;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.sm-login-btn:hover { opacity: 0.85; }
+
+/* ─── Override XP component styles inside mobile view ── */
+
+/* Reset XP base element styles */
+.sm-mobile-view .xp-text {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    color: #c8d4e0 !important;
+}
+
+.sm-mobile-view .xp-window,
+.sm-mobile-view .xp-titlebar,
+.sm-mobile-view .xp-window-body {
+    all: unset !important;
+    display: block !important;
+}
+
+/* ─── ScrimCard inside mobile view ──────────────────── */
+.sm-mobile-view .xp-scrim-card {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    margin-bottom: 10px !important;
+    padding: 12px !important;
+}
+
+.sm-mobile-view .xp-scrim-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+}
+
+.sm-mobile-view .xp-scrim-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* Smaller logo on mobile */
+.sm-mobile-view .xp-scrim-header img[class*="team-logo"],
+.sm-mobile-view .xp-scrim-header > div:first-child img {
+    width: 36px !important;
+    height: 36px !important;
+}
+
+.sm-mobile-view .xp-scrim-meta-inline {
+    margin-top: 2px !important;
+}
+
+.sm-mobile-view .xp-scrim-body {
+    padding-left: 0 !important;
+    margin-bottom: 4px !important;
+}
+
+.sm-mobile-view .xp-scrim-footer {
+    background: transparent !important;
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+    padding: 6px 0 0 !important;
+    margin-top: 4px !important;
+    grid-column: auto !important;
+    padding-left: 0 !important;
+}
+
+.sm-mobile-view .xp-scrim-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: center !important;
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+    padding-top: 8px !important;
+    margin-top: 6px !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+}
+
+.sm-mobile-view .xp-scrim-actions .xp-btn {
+    flex: 1 !important;
+    min-width: 0 !important;
+    text-align: center !important;
+}
+
+.sm-mobile-view .xp-scrim-actions .xp-listbox {
+    flex-basis: 100% !important;
+}
+
+/* ─── Badges ─────────────────────────────────────────── */
+.sm-mobile-view .xp-badge {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+    padding: 1px 6px !important;
+    font-weight: 700 !important;
+}
+
+.sm-mobile-view .xp-badge-green  { background: rgba(42,144,101,0.2) !important; border-color: #2a9065 !important; color: #50d090 !important; }
+.sm-mobile-view .xp-badge-amber  { background: rgba(200,140,0,0.2) !important;  border-color: #b88a00 !important; color: #f0c040 !important; }
+.sm-mobile-view .xp-badge-red    { background: rgba(200,60,60,0.2) !important;   border-color: #c03030 !important; color: #f08080 !important; }
+.sm-mobile-view .xp-badge-blue   { background: rgba(32,96,192,0.2) !important;   border-color: #2060c0 !important; color: #70a8f0 !important; }
+.sm-mobile-view .xp-badge-purple { background: rgba(128,48,192,0.2) !important;  border-color: #8030c0 !important; color: #d090ff !important; }
+
+/* ─── Buttons ────────────────────────────────────────── */
+.sm-mobile-view .xp-btn {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: #c8d4e0 !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background 0.15s !important;
+}
+
+.sm-mobile-view .xp-btn:hover {
+    background: rgba(255,255,255,0.14) !important;
+}
+
+.sm-mobile-view .xp-btn-primary {
+    background: linear-gradient(135deg, #4fa0e8, #2060c0) !important;
+    border-color: #2060c0 !important;
+    color: #fff !important;
+}
+
+.sm-mobile-view .xp-btn-primary:hover {
+    opacity: 0.85 !important;
+    background: linear-gradient(135deg, #4fa0e8, #2060c0) !important;
+}
+
+.sm-mobile-view .xp-btn-danger {
+    background: rgba(200,60,60,0.15) !important;
+    border-color: rgba(200,60,60,0.4) !important;
+    color: #f08080 !important;
+}
+
+.sm-mobile-view .xp-btn-danger:hover {
+    background: rgba(200,60,60,0.25) !important;
+}
+
+.sm-mobile-view .xp-btn:disabled,
+.sm-mobile-view .xp-btn[disabled] {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+}
+
+/* ─── Inputs & selects ───────────────────────────────── */
+.sm-mobile-view .xp-input,
+.sm-mobile-view .xp-select,
+.sm-mobile-view .xp-textarea {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 6px !important;
+    color: #e0e6ed !important;
+    box-shadow: none !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    outline: none !important;
+}
+
+.sm-mobile-view .xp-input:focus,
+.sm-mobile-view .xp-select:focus,
+.sm-mobile-view .xp-textarea:focus {
+    border-color: #4fa0e8 !important;
+    box-shadow: 0 0 0 2px rgba(79,160,232,0.2) !important;
+}
+
+/* ─── Listbox dropdown ───────────────────────────────── */
+.sm-mobile-view .xp-listbox {
+    background: #1a2634 !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+}
+
+.sm-mobile-view .xp-listbox-item {
+    background: none !important;
+    color: #c8d4e0 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.sm-mobile-view .xp-listbox-item:hover {
+    background: rgba(79,160,232,0.1) !important;
+    color: #fff !important;
+}
+
+/* ─── Filter row (OpenScrimsTab) ─────────────────────── */
+.sm-mobile-view .xp-filter-row {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin-bottom: 10px !important;
+    gap: 6px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+}
+
+/* ─── Reliability bar ────────────────────────────────── */
+.sm-mobile-view .xp-reliability-bar-bg {
+    background: rgba(255,255,255,0.1) !important;
+    border-radius: 4px !important;
+}
+
+/* ─── Team/player links ──────────────────────────────── */
+.sm-mobile-view .xp-team-link,
+.sm-mobile-view .xp-league-link {
+    color: #4fa0e8 !important;
+}
+
+.sm-mobile-view .xp-team-link:hover,
+.sm-mobile-view .xp-league-link:hover {
+    color: #7dc0f0 !important;
+}
+
+/* ─── Wizard (PostScrimWizard) ───────────────────────── */
+.sm-mobile-view .xp-wizard {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    width: 100% !important;
+}
+
+.sm-mobile-view .xp-wizard-header {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    padding: 0 0 10px !important;
+    margin-bottom: 12px !important;
+}
+
+.sm-mobile-view .xp-wizard-title {
+    color: #e0e6ed !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+}
+
+.sm-mobile-view .xp-wizard-body {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.sm-mobile-view .xp-wizard-step {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 10px !important;
+    padding: 14px !important;
+}
+
+.sm-mobile-view .xp-wizard-footer {
+    background: transparent !important;
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
+    padding: 10px 0 0 !important;
+    margin-top: 10px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+}
+
+.sm-mobile-view .xp-step-label {
+    color: #8899aa !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+}
+
+.sm-mobile-view .xp-step-label.active {
+    color: #4fa0e8 !important;
+}
+
+.sm-mobile-view .xp-progress-bar-bg {
+    background: rgba(255,255,255,0.1) !important;
+    border-radius: 4px !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.sm-mobile-view .xp-progress-bar-fill {
+    background: linear-gradient(90deg, #2060c0, #4fa0e8) !important;
+    border-radius: 4px !important;
+}
+
+/* ─── Tier badges ────────────────────────────────────── */
+.sm-mobile-view .xp-tier-badge-1 { background: rgba(200,160,0,0.2) !important; border-color: #c0a030 !important; color: #f0c840 !important; }
+.sm-mobile-view .xp-tier-badge-2 { background: rgba(128,48,192,0.2) !important; border-color: #8030c0 !important; color: #d090ff !important; }
+.sm-mobile-view .xp-tier-badge-3 { background: rgba(42,144,101,0.2) !important; border-color: #2a9065 !important; color: #50d090 !important; }
+.sm-mobile-view .xp-tier-badge-4 { background: rgba(32,96,192,0.2) !important; border-color: #2060c0 !important; color: #70a8f0 !important; }
+.sm-mobile-view .xp-tier-badge-5 { background: rgba(0,152,184,0.2) !important; border-color: #0098b8 !important; color: #40d8f8 !important; }
+
+/* ─── Calendar (mobile My Scrims fallback) ───────────── */
+.sm-mobile-view .xp-calendar {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 10px !important;
+}
+
+.sm-mobile-view .xp-calendar-header {
+    background: rgba(255,255,255,0.06) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    color: #e0e6ed !important;
+}
+
+.sm-mobile-view .xp-calendar-day {
+    color: #c8d4e0 !important;
+    background: transparent !important;
+}
+
+.sm-mobile-view .xp-calendar-day:hover {
+    background: rgba(79,160,232,0.12) !important;
+}
+
+.sm-mobile-view .xp-calendar-day-today {
+    background: rgba(79,160,232,0.18) !important;
+    color: #4fa0e8 !important;
+    font-weight: 700 !important;
+}
+
+.sm-mobile-view .xp-calendar-day-selected {
+    background: rgba(79,160,232,0.3) !important;
+    color: #fff !important;
+}
+
+.sm-mobile-view .xp-calendar-day-header {
+    color: #8899aa !important;
+    background: transparent !important;
+}
+
+.sm-mobile-view .xp-calendar-day-past {
+    color: #556677 !important;
+    opacity: 0.5 !important;
+}
+
+.sm-mobile-view .xp-calendar-day-scrim::after {
+    background: #f0a020 !important;
+}
+
+/* ─── Muted text (secondary/helper text) ─────────────── */
+.sm-mobile-view .xp-text-muted {
+    color: #8899aa !important;
+}
+
+/* ─── Fieldsets ──────────────────────────────────────── */
+.sm-mobile-view .xp-fieldset {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,0.03) !important;
+    padding: 10px 12px !important;
+    margin-bottom: 10px !important;
+}
+
+.sm-mobile-view .xp-fieldset-legend {
+    color: #e0e6ed !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    background: transparent !important;
+    padding: 0 4px !important;
+}
+
+/* ─── Radio & checkbox labels ────────────────────────── */
+.sm-mobile-view .xp-radio-label,
+.sm-mobile-view .xp-checkbox-label {
+    color: #c8d4e0 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 0 !important;
+}
+
+.sm-mobile-view .xp-radio,
+.sm-mobile-view .xp-checkbox {
+    accent-color: #4fa0e8 !important;
+}
+
+/* ─── Time selects ───────────────────────────────────── */
+.sm-mobile-view .xp-time-select {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 6px !important;
+    color: #e0e6ed !important;
+    box-shadow: none !important;
+    padding: 6px 8px !important;
+    font-size: 14px !important;
+}
+
+.sm-mobile-view .xp-time-select:focus {
+    border-color: #4fa0e8 !important;
+    box-shadow: 0 0 0 2px rgba(79,160,232,0.2) !important;
+}
+
+.sm-mobile-view .xp-time-colon {
+    color: #8899aa !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+}
+
+/* ─── Select option elements (dropdown internals) ────── */
+.sm-mobile-view .xp-select option,
+.sm-mobile-view .xp-time-select option {
+    background: #1a2634 !important;
+    color: #e0e6ed !important;
+}
+
+/* ─── Wizard: team card (step 0 single team) ─────────── */
+.sm-mobile-view .xp-team-card {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 8px !important;
+}
+
+/* ─── Wizard: division preview box ───────────────────── */
+.sm-mobile-view .xp-division-preview {
+    background: rgba(79,160,232,0.1) !important;
+    border: 1px solid rgba(79,160,232,0.3) !important;
+    border-radius: 8px !important;
+}
+
+.sm-mobile-view .xp-division-preview-title {
+    color: #4fa0e8 !important;
+}
+
+/* ─── Wizard: info/warning boxes ─────────────────────── */
+.sm-mobile-view .xp-info-box-warn {
+    background: rgba(200,160,0,0.12) !important;
+    border: 1px solid rgba(200,160,0,0.35) !important;
+    border-radius: 8px !important;
+}
+
+.sm-mobile-view .xp-info-box-warn .xp-info-box-text {
+    color: #f0c040 !important;
+}
+
+.sm-mobile-view .xp-info-box-warn svg {
+    color: #f0a020 !important;
+}
+
+.sm-mobile-view .xp-info-box-error {
+    background: rgba(220,60,60,0.12) !important;
+    border: 1px solid rgba(220,60,60,0.35) !important;
+    border-radius: 8px !important;
+}
+
+.sm-mobile-view .xp-info-box-error .xp-info-box-text {
+    color: #f08080 !important;
+}
+
+/* ─── Wizard: challenged team display ────────────────── */
+.sm-mobile-view .xp-challenged-team {
+    background: rgba(128,48,192,0.12) !important;
+    border: 1px solid rgba(128,48,192,0.3) !important;
+    border-radius: 8px !important;
+}
+
+.sm-mobile-view .xp-challenged-team-name {
+    color: #d090ff !important;
+}
+
+/* ─── Wizard: selected date text ─────────────────────── */
+.sm-mobile-view .xp-selected-date {
+    color: #4fa0e8 !important;
+}
+
+/* ─── Wizard: step divider line ──────────────────────── */
+.sm-mobile-view .xp-step-divider {
+    background: rgba(255,255,255,0.1) !important;
+}
+
+/* ─── Wizard: mobile step indicator ──────────────────── */
+.sm-mobile-view .xp-wizard-mobile-step {
+    color: #8899aa !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 11px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 8px !important;
+    background: transparent !important;
+}
+
+/* ─── Wizard: sidebar hidden on mobile ───────────────── */
+.sm-mobile-view .xp-wizard-sidebar {
+    display: none !important;
+}
+
+/* ─── Wizard: content area ───────────────────────────── */
+.sm-mobile-view .xp-wizard-content {
+    background: transparent !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* ─── Wizard: inline spans (tier division names etc) ──── */
+.sm-mobile-view .xp-checkbox-label span[style],
+.sm-mobile-view .xp-wizard-content span[style] {
+    color: inherit !important;
+}
+
+/* ─── Blacklist item dividers ────────────────────────── */
+.sm-mobile-view .xp-blacklist-item {
+    border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ─── Dialog overlay (conflict/cancel) ───────────────── */
+.sm-mobile-view .xp-dialog-overlay {
+    background: rgba(0,0,0,0.6) !important;
+}
+
+.sm-mobile-view .xp-dialog {
+    background: #1a2634 !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+
+.sm-mobile-view .xp-title-bar {
+    background: rgba(255,255,255,0.06) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 8px 12px !important;
+}
+
+.sm-mobile-view .xp-title-text {
+    color: #e0e6ed !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+}
+
+.sm-mobile-view .xp-title-btn {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: #c8d4e0 !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
+
+.sm-mobile-view .xp-title-btn:hover {
+    background: rgba(255,255,255,0.15) !important;
+}
+
+/* ─── Error icon (small X badge) ─────────────────────── */
+.sm-mobile-view .xp-error-icon {
+    background: rgba(220,60,60,0.3) !important;
+    border-color: rgba(220,60,60,0.5) !important;
+    color: #f08080 !important;
+}
+
+/* ─── Calendar legend footer ─────────────────────────── */
+.sm-mobile-view .xp-calendar > div:last-child {
+    background: rgba(255,255,255,0.04) !important;
+    border-top-color: rgba(255,255,255,0.1) !important;
+}
+
+.sm-mobile-view .xp-copy-btn {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: #c8d4e0 !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
+
+.sm-mobile-view .xp-copy-btn:hover {
+    background: rgba(255,255,255,0.15) !important;
+}
+
+/* ─── Calendar detail panel ──────────────────────────── */
+.sm-mobile-view .xp-cal-detail {
+    background: transparent !important;
+}
+
+.sm-mobile-view .xp-cal-scrim-item {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 6px !important;
+    padding: 6px 8px !important;
 }
 `
 

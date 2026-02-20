@@ -10,6 +10,7 @@ import ReporterBell from '../ReporterBell'
 import SidebarTrigger from './SidebarTrigger'
 import GlobalSidebar from './GlobalSidebar'
 import StreamWidget from '../StreamWidget'
+import WhatsNewModal from '../WhatsNewModal'
 
 const AppLayout = () => {
     const { user, loading } = useAuth()
@@ -38,6 +39,7 @@ const AppLayout = () => {
                 <StreamWidget />
                 <ClaimProfileModal />
                 <ReportDataIssueModal />
+                <WhatsNewModal />
             </div>
         </SidebarProvider>
     )

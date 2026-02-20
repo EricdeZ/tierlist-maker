@@ -31,16 +31,12 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
 
     return (
         <div className="xp-scrim-card">
-            <div className="flex items-start gap-3">
-                {/* Team logo — 30% bigger */}
-                <div className="flex-shrink-0 mt-0.5">
+            <div className="xp-scrim-layout">
+                {/* Header: Team logo + name + challenge badge */}
+                <div className="xp-scrim-header">
                     <TeamLogo slug={scrim.teamSlug} name={scrim.teamName} size={47} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    {/* Row 1: Team name */}
-                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                             {teamUrl ? (
                                 <a href={teamUrl} target="_blank" rel="noopener noreferrer" className="xp-team-link">{scrim.teamName}</a>
                             ) : (
@@ -48,39 +44,39 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                             )}
                             {isChallenge && <span className="xp-badge xp-badge-purple" style={{ fontSize: 9 }}><Target size={8} /> Challenge</span>}
                         </div>
+                        {/* League · Division — shown inline on desktop */}
+                        <div className="xp-scrim-meta-inline flex items-center gap-1.5 flex-wrap">
+                            {leagueUrl ? (
+                                <a href={leagueUrl} target="_blank" rel="noopener noreferrer" className="xp-league-link">{scrim.leagueName}</a>
+                            ) : (
+                                <span className="xp-text" style={{ fontSize: 10, color: '#555' }}>{scrim.leagueName}</span>
+                            )}
+                            {scrim.divisionName && (
+                                <>
+                                    <span className="xp-text" style={{ fontSize: 10, color: '#bbb' }}>·</span>
+                                    {divImg && <img src={divImg} alt="" style={{ width: 13, height: 13, objectFit: 'contain', imageRendering: 'pixelated', flexShrink: 0 }} />}
+                                    <span className="xp-text" style={{ fontSize: 10, color: '#555' }}>
+                                        {scrim.divisionName}{scrim.divisionTier ? ` (${RANK_LABELS[scrim.divisionTier]})` : ''}
+                                    </span>
+                                </>
+                            )}
+                            {reliability?.score !== null && reliability?.score !== undefined && (
+                                <div style={{ marginLeft: 4 }}>
+                                    <ReliabilityBar score={reliability.score} />
+                                </div>
+                            )}
+                        </div>
                     </div>
+                </div>
 
-                    {/* Row 2: League · Division with icon */}
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                        {leagueUrl ? (
-                            <a href={leagueUrl} target="_blank" rel="noopener noreferrer" className="xp-league-link">{scrim.leagueName}</a>
-                        ) : (
-                            <span className="xp-text" style={{ fontSize: 10, color: '#555' }}>{scrim.leagueName}</span>
-                        )}
-                        {scrim.divisionName && (
-                            <>
-                                <span className="xp-text" style={{ fontSize: 10, color: '#bbb' }}>·</span>
-                                {divImg && <img src={divImg} alt="" style={{ width: 13, height: 13, objectFit: 'contain', imageRendering: 'pixelated', flexShrink: 0 }} />}
-                                <span className="xp-text" style={{ fontSize: 10, color: '#555' }}>
-                                    {scrim.divisionName}{scrim.divisionTier ? ` (${RANK_LABELS[scrim.divisionTier]})` : ''}
-                                </span>
-                            </>
-                        )}
-                        {reliability?.score !== null && reliability?.score !== undefined && (
-                            <div style={{ marginLeft: 4 }}>
-                                <ReliabilityBar score={reliability.score} />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Row 3: Date */}
+                {/* Body: date, mode, tiers, notes, matchups */}
+                <div className="xp-scrim-body">
                     <div className="flex items-center gap-1.5 mb-1.5">
                         <Clock size={11} style={{ color: '#555', flexShrink: 0 }} />
                         <span className="xp-text" style={{ fontSize: 11, fontWeight: 600 }}>{formatDateEST(scrim.scheduledDate)}</span>
                         <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>({formatRelativeDate(scrim.scheduledDate)})</span>
                     </div>
 
-                    {/* Row 4: Pick mode + bans tags */}
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                         <span className={`xp-badge ${XP_PICK_BADGE[scrim.pickMode] || 'xp-badge-blue'}`}>{formatPickMode(scrim.pickMode)}</span>
                         {scrim.bannedContentLeague && (
@@ -88,7 +84,6 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         )}
                     </div>
 
-                    {/* Row 5: Acceptable tiers with rank icons + per-tier colors */}
                     {scrim.acceptableTiers && scrim.acceptableTiers.length < 5 && (
                         <div className="flex items-center gap-1 flex-wrap mb-1">
                             <span className="xp-text" style={{ fontSize: 10, color: '#666' }}>Open to:</span>
@@ -104,7 +99,6 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         </div>
                     )}
 
-                    {/* Notes */}
                     {scrim.notes && (
                         <div className="flex items-start gap-1 mb-1">
                             <MessageSquare size={10} style={{ color: '#888', marginTop: 2, flexShrink: 0 }} />
@@ -112,9 +106,8 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         </div>
                     )}
 
-                    {/* Challenging */}
                     {scrim.challengedTeamName && (
-                        <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <Target size={11} style={{ color: '#6a3ea1', flexShrink: 0 }} />
                             <span className="xp-text" style={{ fontSize: 11, color: '#6a3ea1' }}>Challenging:</span>
                             <TeamLogo slug={scrim.challengedTeamSlug} name={scrim.challengedTeamName} size={14} />
@@ -127,9 +120,8 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         </div>
                     )}
 
-                    {/* Accepted by */}
                     {scrim.status === 'accepted' && scrim.acceptedTeamName && (
-                        <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <Check size={11} style={{ color: '#2d8212', flexShrink: 0 }} />
                             <span className="xp-text" style={{ fontSize: 11, color: '#2d8212' }}>Accepted by:</span>
                             <TeamLogo slug={scrim.acceptedTeamSlug} name={scrim.acceptedTeamName} size={16} />
@@ -141,23 +133,23 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                             {scrim.acceptedDivisionName && <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>· {scrim.acceptedDivisionName}</span>}
                         </div>
                     )}
-
-                    {/* Footer: posted by + export */}
-                    <div className="xp-scrim-footer">
-                        <span className="xp-text" style={{ fontSize: 10, color: '#aaa' }}>Posted by {scrim.postedBy}</span>
-                        <button
-                            onClick={() => copyScrimsToClipboard([scrim], myTeamIds)}
-                            className="xp-export-btn"
-                            title="Copy scrim info to clipboard"
-                        >
-                            <Copy size={10} /> Export
-                        </button>
-                    </div>
                 </div>
 
-                {/* Actions column */}
+                {/* Footer: posted by + export */}
+                <div className="xp-scrim-footer">
+                    <span className="xp-text" style={{ fontSize: 10, color: '#aaa' }}>Posted by {scrim.postedBy}</span>
+                    <button
+                        onClick={() => copyScrimsToClipboard([scrim], myTeamIds)}
+                        className="xp-export-btn"
+                        title="Copy scrim info to clipboard"
+                    >
+                        <Copy size={10} /> Export
+                    </button>
+                </div>
+
+                {/* Actions */}
                 {showActions && (
-                    <div className="flex flex-col gap-1 flex-shrink-0 items-end">
+                    <div className="xp-scrim-actions">
                         {scrim.status === 'open' && canAccept && (
                             <>
                                 <button onClick={handleAcceptClick} disabled={isLoading} className="xp-btn xp-btn-primary">{isLoading ? '...' : 'Accept'}</button>

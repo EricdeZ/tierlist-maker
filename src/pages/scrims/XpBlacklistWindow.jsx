@@ -41,12 +41,12 @@ export default function XpBlacklistWindow({ captainTeams, allTeams, blacklist, o
             ) : (
                 <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 6 }}>
                     {teamBlacklist.map(entry => (
-                        <div key={entry.id} className="flex items-center gap-2 p-1.5"
+                        <div key={entry.id} className="xp-blacklist-item flex items-center gap-2 p-1.5"
                              style={{ borderBottom: '1px solid #e0e0e0' }}>
                             <TeamLogo slug={entry.blockedTeamSlug} name={entry.blockedTeamName} size={18} />
                             <div className="flex-1 min-w-0">
                                 <div className="xp-text" style={{ fontWeight: 600, fontSize: 11 }}>{entry.blockedTeamName}</div>
-                                <div className="xp-text" style={{ fontSize: 9, color: '#666' }}>
+                                <div className="xp-text xp-text-muted" style={{ fontSize: 9, color: '#666' }}>
                                     {entry.blockedLeagueName} - {entry.blockedDivisionName}{entry.blockedDivisionTier ? ` (${RANK_LABELS[entry.blockedDivisionTier] || 'Tier ' + entry.blockedDivisionTier})` : ''}
                                 </div>
                             </div>

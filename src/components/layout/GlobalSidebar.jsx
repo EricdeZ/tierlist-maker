@@ -488,6 +488,9 @@ export default function GlobalSidebar() {
                             <SidebarLink to="/draft" active={isActive('/draft')}>
                                 Draft Simulator
                             </SidebarLink>
+                            <SidebarLink to="/scrims" active={isActive('/scrims')}>
+                                Scrims
+                            </SidebarLink>
                             <SidebarLink to="/twitch" icon={Tv} active={isActive('/twitch')}>
                                 Featured Stream
                             </SidebarLink>
@@ -495,6 +498,15 @@ export default function GlobalSidebar() {
 
                         {/* Support & Feedback */}
                         <div className="border-b border-white/5 my-2 mx-3" />
+                        <SidebarLink
+                            icon={Sparkles}
+                            onClick={() => {
+                                close()
+                                window.dispatchEvent(new CustomEvent('open-whats-new'))
+                            }}
+                        >
+                            What's New
+                        </SidebarLink>
                         <SidebarLink
                             to="/support"
                             icon={Heart}

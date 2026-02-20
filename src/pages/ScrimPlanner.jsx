@@ -6,7 +6,7 @@ import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import xpBg from '../assets/xp-bg.jpg'
-import { Plus } from 'lucide-react'
+import { Plus, Search, Shield, Ban, Swords } from 'lucide-react'
 import DraggableXpWindow from '../components/xp/DraggableXpWindow'
 import XpProgressBar from '../components/xp/XpProgressBar'
 import XpDinoGame from '../components/xp/XpDinoGame'
@@ -60,6 +60,35 @@ export default function ScrimPlanner() {
     const isOwner = hasPermission('permission_manage')
 
     const isCaptain = captainTeams.length > 0
+
+    // ── Mobile detection ──────────────────────────────────────────
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    )
+    const [mobileTab, setMobileTab] = useState('open')
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)')
+        const handler = (e) => setIsMobile(e.matches)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
+
+    // Reset mobile tab when auth state changes
+    useEffect(() => {
+        if (!user && (mobileTab === 'my' || mobileTab === 'post' || mobileTab === 'blacklist'))
+            setMobileTab('open')
+    }, [user]) // eslint-disable-line
+    useEffect(() => {
+        if (!isCaptain && (mobileTab === 'post' || mobileTab === 'blacklist'))
+            setMobileTab(user ? 'my' : 'open')
+    }, [isCaptain]) // eslint-disable-line
+
+    // Load allTeams when navigating to Post tab on mobile
+    useEffect(() => {
+        if (isMobile && mobileTab === 'post' && allTeams.length === 0)
+            scrimService.getAllActiveTeams().then(d => setAllTeams(d.teams || [])).catch(() => {})
+    }, [isMobile, mobileTab]) // eslint-disable-line
 
     const TABS = [
         { key: 'open', label: 'Open Scrims' },
@@ -261,6 +290,105 @@ export default function ScrimPlanner() {
     const defaultWinX = typeof window !== 'undefined' ? Math.max(20, (window.innerWidth - 800) * 0.3) : 100
     const defaultWinY = typeof window !== 'undefined' ? Math.min(420, window.innerHeight * 0.38) : 420
 
+    // ── Mobile Layout ─────────────────────────────────────────────
+    if (isMobile) {
+        const mobileTabs = [
+            { key: 'open', label: 'Open', icon: Search },
+            ...(user ? [{ key: 'my', label: 'My Scrims', icon: Shield }] : []),
+            ...(isCaptain ? [{ key: 'post', label: 'Post', icon: Plus }] : []),
+            ...(isCaptain ? [{ key: 'blacklist', label: 'Blacklist', icon: Ban }] : []),
+        ]
+        return (
+            <>
+                <PageTitle title="Scrim Planner" description="Find and schedule scrimmage matches." />
+                <Navbar />
+                <div className="sm-mobile-view">
+                    <div className="sm-hero">
+                        <Swords size={28} className="sm-hero-icon" />
+                        <div>
+                            <h1 className="sm-hero-title">Scrim Battles</h1>
+                            <p className="sm-hero-sub">Challenge teams, schedule scrims, and prove your squad.</p>
+                        </div>
+                    </div>
+                    <div className="sm-content">
+                        {loading && (
+                            <div className="sm-loading">
+                                <div className="sm-spinner" />
+                                <span>Loading scrims…</span>
+                            </div>
+                        )}
+                        {error && <div className="sm-error-box">⚠ {error}</div>}
+
+                        {!loading && !error && (
+                            <>
+                                {mobileTab === 'open' && (
+                                    <OpenScrimsTab
+                                        scrims={filteredOpenScrims} user={user} currentUserId={user?.id}
+                                        captainTeams={captainTeams} leagueFilter={leagueFilter} setLeagueFilter={setLeagueFilter}
+                                        tierFilter={tierFilter} setTierFilter={setTierFilter} uniqueLeagues={uniqueLeagues}
+                                        uniqueTiers={uniqueTiers} onAccept={handleAccept} actionLoading={actionLoading}
+                                        login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                                        reliabilityScores={reliabilityScores}
+                                    />
+                                )}
+                                {mobileTab === 'my' && user && (
+                                    <MyScrimsTab
+                                        scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}
+                                        currentUserId={user?.id} onAccept={handleAccept} onCancel={handleCancel}
+                                        onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
+                                        setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
+                                        onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome}
+                                    />
+                                )}
+                                {mobileTab === 'post' && (
+                                    <PostScrimWizard
+                                        captainTeams={captainTeams} allTeams={allTeams} myScrims={myScrims}
+                                        onSuccess={() => { loadOpenScrims(); loadMyScrims(); setMobileTab('my') }}
+                                    />
+                                )}
+                                {mobileTab === 'blacklist' && (
+                                    <div>
+                                        <div className="sm-section-header">
+                                            <h2 className="sm-section-title">Blacklist</h2>
+                                            <p className="sm-section-sub">Teams you've blocked from accepting your open scrims.</p>
+                                        </div>
+                                        <XpBlacklistWindow
+                                            captainTeams={captainTeams} allTeams={allTeams}
+                                            blacklist={blacklist} onAdd={handleBlacklistAdd} onRemove={handleBlacklistRemove}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {!user && mobileTab === 'open' && !loading && (
+                            <div className="sm-login-cta">
+                                <button className="sm-login-btn" onClick={login}>
+                                    Log in to accept or post scrims
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <nav className="sm-bottom-nav">
+                        {mobileTabs.map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                className={`sm-nav-btn${mobileTab === key ? ' active' : ''}`}
+                                onClick={() => setMobileTab(key)}
+                            >
+                                <Icon size={22} />
+                                <span>{label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+                <style>{XP_STYLES}</style>
+            </>
+        )
+    }
+
+    // ── Desktop Layout (XP theme) ─────────────────────────────────
     return (
         <>
             <PageTitle title="Scrim Planner" description="Find and schedule scrimmage matches." />
