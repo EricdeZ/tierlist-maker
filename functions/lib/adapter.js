@@ -41,6 +41,7 @@ export function adapt(handler) {
             body,
             path: url.pathname,
             rawUrl: request.url,
+            waitUntil: context.waitUntil.bind(context),
         }
 
         const result = await handler(event)

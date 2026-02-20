@@ -49,7 +49,7 @@ const handler = async (event) => {
                 case 'create':
                     return await createScrim(sql, user, body)
                 case 'accept':
-                    return await acceptScrim(sql, user, body)
+                    return await acceptScrim(sql, user, body, event.waitUntil)
                 case 'cancel':
                     return await cancelScrim(sql, user, body)
                 case 'decline':
@@ -587,7 +587,7 @@ async function createScrim(sql, user, body) {
 // ═══════════════════════════════════════════════════
 // POST: Accept a scrim request
 // ═══════════════════════════════════════════════════
-async function acceptScrim(sql, user, body) {
+async function acceptScrim(sql, user, body, waitUntil) {
     const { scrim_id, team_id } = body
 
     if (!scrim_id || !team_id) {
@@ -645,8 +645,8 @@ async function acceptScrim(sql, user, body) {
         return { statusCode: 409, headers: adminHeaders, body: JSON.stringify({ error: 'Scrim was already accepted or cancelled' }) }
     }
 
-    // Fire-and-forget: DM both captains
-    notifyScrimAccepted(sql, scrim_id, team_id).catch(() => {})
+    // DM both captains — register with waitUntil so CF doesn't kill the context before it finishes
+    waitUntil(notifyScrimAccepted(sql, scrim_id, team_id).catch(() => {}))
 
     return {
         statusCode: 200,

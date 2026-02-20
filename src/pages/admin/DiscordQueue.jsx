@@ -19,6 +19,11 @@ export default function DiscordQueue() {
     const [polling, setPolling] = useState(false)
     const [toast, setToast] = useState(null)
 
+    // Test DM state
+    const [testDmUserId, setTestDmUserId] = useState('')
+    const [testDmMessage, setTestDmMessage] = useState('')
+    const [testDmSending, setTestDmSending] = useState(false)
+
     // Team role mapping state
     const [selectedSeasonId, setSelectedSeasonId] = useState(null)
     const [teamMappings, setTeamMappings] = useState([]) // teams with discord_role_id
@@ -127,6 +132,31 @@ export default function DiscordQueue() {
             showToast('error', `Poll failed: ${err.message}`)
         } finally {
             setPolling(false)
+        }
+    }
+
+    // ─── Test DM ───
+    const sendTestDM = async () => {
+        if (!testDmUserId.trim()) {
+            showToast('error', 'Discord User ID is required')
+            return
+        }
+        setTestDmSending(true)
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'send-test-dm', discord_user_id: testDmUserId.trim(), message: testDmMessage.trim() || undefined }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error)
+            showToast('success', 'Test DM sent (if the user has DMs enabled)')
+            setTestDmUserId('')
+            setTestDmMessage('')
+        } catch (err) {
+            showToast('error', `DM failed: ${err.message}`)
+        } finally {
+            setTestDmSending(false)
         }
     }
 
@@ -561,6 +591,37 @@ export default function DiscordQueue() {
                     {selectedSeasonId && !loadingMappings && displayMappings.length === 0 && (
                         <p className="text-sm text-gray-500 py-2">No teams found for this season.</p>
                     )}
+                </section>
+
+                {/* ═══ Test DM ═══ */}
+                <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Test Bot DM</h2>
+                    <p className="text-xs text-gray-500 mb-3">
+                        Send a test DM via the bot to verify DM delivery is working. Enable Discord Developer Mode (Settings &gt; Advanced) to copy a User ID by right-clicking a user.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="text"
+                            placeholder="Discord User ID *"
+                            value={testDmUserId}
+                            onChange={e => setTestDmUserId(e.target.value)}
+                            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none w-48 flex-shrink-0"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Custom message (optional)"
+                            value={testDmMessage}
+                            onChange={e => setTestDmMessage(e.target.value)}
+                            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none flex-1"
+                        />
+                        <button
+                            onClick={sendTestDM}
+                            disabled={testDmSending || !testDmUserId.trim()}
+                            className="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex-shrink-0"
+                        >
+                            {testDmSending ? 'Sending...' : 'Send Test DM'}
+                        </button>
+                    </div>
                 </section>
             </div>
         </div>

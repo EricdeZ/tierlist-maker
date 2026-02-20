@@ -2,7 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
-import { fetchMessage, pollChannel, reactToMessage, fetchGuildRoles, fetchGuildMembers } from '../lib/discord.js'
+import { fetchMessage, pollChannel, reactToMessage, fetchGuildRoles, fetchGuildMembers, sendDM } from '../lib/discord.js'
 import { autoMatchQueueItems } from '../lib/discord-match.js'
 
 
@@ -56,6 +56,7 @@ const handler = async (event) => {
                 case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin)
                 case 'skip-channel-pending':   return await skipChannelPending(sql, body, admin)
                 case 'match-now':              return await matchNow(sql, admin)
+                case 'send-test-dm':           return await sendTestDM(sql, body, admin)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -766,6 +767,37 @@ async function updateSuggestedMatch(sql, body, admin) {
     await logAudit(sql, admin, {
         action: 'update-suggested-match', endpoint: 'discord-queue',
         details: { queue_item_ids, scheduled_match_id },
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// POST: Send a test DM to a Discord user
+// ═══════════════════════════════════════════════════
+async function sendTestDM(sql, body, admin) {
+    const { discord_user_id, message } = body
+
+    if (!discord_user_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'discord_user_id required' }) }
+    }
+
+    const testMessage = message?.trim() || 'This is a test DM from the SMITE 2 Companion bot. If you received this, DMs are working correctly!'
+
+    await sendDM(discord_user_id, {
+        embeds: [{
+            title: '🤖 Bot DM Test',
+            description: testMessage,
+            color: 0x5865f2,
+            footer: { text: `Sent by ${admin.discord_username || admin.id}` },
+            timestamp: new Date().toISOString(),
+        }],
+    })
+
+    await logAudit(sql, admin, {
+        action: 'send-test-dm', endpoint: 'discord-queue',
+        details: { discord_user_id },
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
