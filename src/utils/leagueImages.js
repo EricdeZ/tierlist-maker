@@ -16,6 +16,7 @@ const ALIASES = {
     'albion-giants-league': 'agl',
     'babylon-smite-league': 'babylon',
     'oceanic-smite-league': 'osl',
+    'tanuki-smite-league': 'tsl',
 }
 
 /**

@@ -49,11 +49,13 @@ export default {
             }
         }
 
-        // Sync guild members → player records (fire-and-forget)
+        // Sync guild members → player records
         for (const guildId of uniqueGuildIds) {
             if (guildMembers[guildId]?.length) {
-                syncGuildMembers(sql, guildId, guildMembers[guildId])
-                    .catch(err => console.error(`discord-poll: member sync failed for guild ${guildId}:`, err.message))
+                ctx.waitUntil(
+                    syncGuildMembers(sql, guildId, guildMembers[guildId])
+                        .catch(err => console.error(`discord-poll: member sync failed for guild ${guildId}:`, err.message))
+                )
             }
         }
 
@@ -66,16 +68,18 @@ export default {
                 results.push({ channelId: channel.channel_id, ...result })
                 console.log(`discord-poll: ${channel.channel_name || channel.channel_id} — ${result.newImages} new images from ${result.totalMessages} messages`)
 
-                // Auto-match new queue items to scheduled matches (fire-and-forget)
+                // Auto-match new queue items to scheduled matches
                 if (result.newItemIds?.length) {
-                    autoMatchQueueItems(
-                        sql,
-                        result.newItemIds,
-                        channel,
-                        guildMembers[channel.guild_id] || [],
-                    ).catch(err => {
-                        console.error(`discord-poll: auto-match failed for ${channel.channel_name || channel.channel_id}:`, err.message)
-                    })
+                    ctx.waitUntil(
+                        autoMatchQueueItems(
+                            sql,
+                            result.newItemIds,
+                            channel,
+                            guildMembers[channel.guild_id] || [],
+                        ).catch(err => {
+                            console.error(`discord-poll: auto-match failed for ${channel.channel_name || channel.channel_id}:`, err.message)
+                        })
+                    )
                 }
             } catch (err) {
                 console.error(`discord-poll: error polling ${channel.channel_name || channel.channel_id}:`, err.message)

@@ -51,7 +51,7 @@ const handler = async (event) => {
                 case 'update-status':  return await updateQueueStatus(sql, body, admin)
                 case 'mark-used':      return await markUsed(sql, body, admin)
                 case 'fetch-images':   return await fetchImages(sql, body)
-                case 'poll-now':       return await pollNow(sql, admin)
+                case 'poll-now':       return await pollNow(sql, admin, event.waitUntil)
                 case 'map-team-role':          return await mapTeamRole(sql, body, admin)
                 case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin)
                 case 'skip-channel-pending':   return await skipChannelPending(sql, body, admin)
@@ -504,7 +504,7 @@ async function getReadyMatches(sql) {
 // ═══════════════════════════════════════════════════
 // POST: Trigger immediate poll
 // ═══════════════════════════════════════════════════
-async function pollNow(sql, admin) {
+async function pollNow(sql, admin, waitUntil) {
     const channels = await sql`SELECT * FROM discord_channels WHERE is_active = true`
 
     if (!channels.length) {
@@ -537,12 +537,12 @@ async function pollNow(sql, admin) {
             const result = await pollChannel(sql, channel, roles)
             results.push({ channelId: channel.channel_id, channelName: channel.channel_name, ...result })
 
-            // Auto-match new items (fire-and-forget)
+            // Auto-match new items — register with waitUntil so CF doesn't kill the context before it finishes
             if (result.newItemIds?.length) {
-                autoMatchQueueItems(
+                waitUntil(autoMatchQueueItems(
                     sql, result.newItemIds, channel,
                     guildMembers[channel.guild_id] || [],
-                ).catch(() => {})
+                ).catch(() => {}))
             }
         } catch (err) {
             results.push({ channelId: channel.channel_id, channelName: channel.channel_name, error: err.message })

@@ -166,6 +166,31 @@ export default function DiscordReview() {
         }
     }
 
+    // Skip (dismiss) unmatched items
+    const skipItems = async (itemIds) => {
+        try {
+            const res = await fetch(`${API}/discord-queue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    action: 'update-status',
+                    queue_item_ids: itemIds,
+                    status: 'skipped',
+                }),
+            })
+            if (!res.ok) throw new Error('Failed to skip')
+            showToast('success', `Skipped ${itemIds.length} item(s)`)
+            setSelectedItems(prev => {
+                const next = new Set(prev)
+                itemIds.forEach(id => next.delete(id))
+                return next
+            })
+            await fetchReview()
+        } catch (err) {
+            showToast('error', err.message)
+        }
+    }
+
     // Unlink items from a match
     const unlinkFromMatch = async (itemIds) => {
         try {
@@ -309,6 +334,7 @@ export default function DiscordReview() {
                             assignToMatch={assignToMatch}
                             assigning={assigning}
                             unlinkFromMatch={unlinkFromMatch}
+                            skipItems={skipItems}
                         />
                     )}
                     {tab === 'members' && (
@@ -343,7 +369,15 @@ function StatCard({ label, value, color }) {
 }
 
 
-function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggleItem, selectAllUnmatched, assignMatchId, setAssignMatchId, assignToMatch, assigning, unlinkFromMatch }) {
+function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggleItem, selectAllUnmatched, assignMatchId, setAssignMatchId, assignToMatch, assigning, unlinkFromMatch, skipItems }) {
+    const [skipping, setSkipping] = useState(false)
+
+    const handleSkipSelected = async () => {
+        setSkipping(true)
+        await skipItems([...selectedItems])
+        setSkipping(false)
+    }
+
     return (
         <div className="space-y-8">
             {/* Unmatched items section */}
@@ -387,10 +421,17 @@ function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggle
                                 </select>
                                 <button
                                     onClick={assignToMatch}
-                                    disabled={!assignMatchId || assigning}
+                                    disabled={!assignMatchId || assigning || skipping}
                                     className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-50 transition"
                                 >
                                     {assigning ? 'Assigning...' : 'Assign'}
+                                </button>
+                                <button
+                                    onClick={handleSkipSelected}
+                                    disabled={assigning || skipping}
+                                    className="px-3 py-1.5 rounded-lg text-sm text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50 transition"
+                                >
+                                    {skipping ? 'Skipping...' : 'Skip'}
                                 </button>
                                 <button
                                     onClick={() => setSelectedItems(new Set())}
@@ -443,6 +484,13 @@ function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggle
                                             </div>
                                         )}
                                     </div>
+                                    <button
+                                        onClick={e => { e.stopPropagation(); skipItems([item.id]) }}
+                                        className="shrink-0 px-2.5 py-1 rounded text-xs text-[var(--color-text-secondary)] hover:text-amber-400 bg-white/5 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 transition"
+                                        title="Skip this screenshot"
+                                    >
+                                        Skip
+                                    </button>
                                 </div>
                             ))}
                         </div>

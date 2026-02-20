@@ -84,7 +84,7 @@ export default function Navbar({ title, branding, tabs }) {
                 <div className="flex items-center gap-3 sm:gap-6">
                     {/* Sidebar trigger — visible below 1400px */}
                     <button
-                        onClick={toggleSidebar}
+                        onClick={() => { toggleSidebar(); setMobileOpen(false); }}
                         className="sidebar:hidden flex items-center justify-center w-8 h-8 rounded-lg text-(--color-accent) hover:bg-white/10 transition-colors cursor-pointer border border-(--color-accent)/25"
                         aria-label="Open menu"
                     >
@@ -206,9 +206,11 @@ export default function Navbar({ title, branding, tabs }) {
 
                     {/* ── Mobile: passion + user + hamburger ── */}
                     <div className={`flex ${bpHide} items-center gap-2 ml-auto`}>
-                        <ReporterBell />
-                        {user && <PassionDisplay compact />}
-                        <UserMenu compact />
+                        <div onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
+                            <ReporterBell />
+                            {user && <PassionDisplay compact />}
+                            <UserMenu compact />
+                        </div>
                         <button
                             onClick={() => setMobileOpen(!mobileOpen)}
                             className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"

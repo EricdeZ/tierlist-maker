@@ -198,6 +198,7 @@ function formatScrim(row) {
         teamColor: row.team_color,
         divisionName: row.division_name,
         divisionTier: row.division_tier,
+        divisionSlug: row.division_slug || null,
         leagueName: row.league_name,
         leagueSlug: row.league_slug,
         postedBy: row.posted_by,
@@ -207,6 +208,7 @@ function formatScrim(row) {
         challengedTeamLogo: row.challenged_team_logo || null,
         challengedTeamColor: row.challenged_team_color || null,
         challengedDivisionName: row.challenged_division_name || null,
+        challengedDivisionSlug: row.challenged_division_slug || null,
         challengedLeagueName: row.challenged_league_name || null,
         scheduledDate: row.scheduled_date,
         pickMode: row.pick_mode,
@@ -220,6 +222,7 @@ function formatScrim(row) {
         acceptedTeamColor: row.accepted_team_color || null,
         acceptedDivisionName: row.accepted_division_name || null,
         acceptedDivisionTier: row.accepted_division_tier || null,
+        acceptedDivisionSlug: row.accepted_division_slug || null,
         acceptedLeagueName: row.accepted_league_name || null,
         acceptableTiers: row.acceptable_tiers || null,
         acceptedAt: row.accepted_at,
@@ -254,12 +257,12 @@ async function listScrims(sql, params) {
             sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier,
+            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
             l.name as league_name, l.slug as league_slug,
             u.discord_username as posted_by,
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
-            cd.name as challenged_division_name,
+            cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name
         FROM scrim_requests sr
         JOIN teams t ON t.id = sr.team_id
@@ -320,16 +323,16 @@ async function getMyScrims(sql, event) {
             sr.outcome, sr.outcome_reported_by, sr.outcome_reported_at,
             sr.outcome_disputed, sr.outcome_dispute_deadline,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier,
+            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
             l.name as league_name, l.slug as league_slug,
             u.discord_username as posted_by,
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
-            cd.name as challenged_division_name,
+            cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name,
             at2.name as accepted_team_name, at2.slug as accepted_team_slug,
             at2.logo_url as accepted_team_logo, at2.color as accepted_team_color,
-            ad.name as accepted_division_name, ad.tier as accepted_division_tier,
+            ad.name as accepted_division_name, ad.tier as accepted_division_tier, ad.slug as accepted_division_slug,
             al.name as accepted_league_name
         FROM scrim_requests sr
         JOIN teams t ON t.id = sr.team_id
@@ -412,12 +415,12 @@ async function getIncoming(sql, event) {
             sr.notes, sr.status, sr.acceptable_tiers, sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier,
+            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
             l.name as league_name, l.slug as league_slug,
             u.discord_username as posted_by,
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
-            cd.name as challenged_division_name,
+            cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name
         FROM scrim_requests sr
         JOIN teams t ON t.id = sr.team_id
@@ -659,7 +662,7 @@ async function acceptScrim(sql, user, body, waitUntil) {
 // ═══════════════════════════════════════════════════
 // Helper: DM both captains when a scrim is accepted
 // ═══════════════════════════════════════════════════
-const RANK_LABELS = { 1: 'Olympian', 2: 'Titan', 3: 'Immortal', 4: 'Divine', 5: 'Heroic' }
+const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond' }
 const PICK_MODE_LABELS = { regular: 'Regular', fearless: 'Fearless', fearless_picks: 'Fearless Picks', fearless_bans: 'Fearless Bans' }
 
 function formatDateEST(date) {

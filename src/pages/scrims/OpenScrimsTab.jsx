@@ -1,0 +1,38 @@
+import ScrimCard from './ScrimCard'
+
+export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, uniqueLeagues, uniqueTiers, onAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
+    return (
+        <div>
+            {scrims.length > 0 && (
+                <div className="flex items-center gap-2 mb-2 flex-wrap" style={{ borderBottom: '1px solid #c0c0c0', paddingBottom: 6 }}>
+                    <span className="xp-text" style={{ fontSize: 11, fontWeight: 700 }}>Filter:</span>
+                    <select value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)} className="xp-select">
+                        <option value="">All Leagues</option>
+                        {uniqueLeagues.map(l => <option key={l.slug} value={l.slug}>{l.name}</option>)}
+                    </select>
+                    <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="xp-select">
+                        <option value="">All Tiers</option>
+                        {uniqueTiers.map(t => <option key={t} value={t}>Tier {t}</option>)}
+                    </select>
+                </div>
+            )}
+            <div className="flex flex-col gap-0.5">
+                {scrims.map(scrim => (
+                    <ScrimCard key={scrim.id} scrim={scrim} showActions={!!user} captainTeams={captainTeams}
+                        currentUserId={currentUserId} onAccept={onAccept} onCancel={() => {}} onDecline={() => {}}
+                        actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                        isChallenge={false} reliabilityScores={reliabilityScores} />
+                ))}
+            </div>
+            {scrims.length === 0 && (
+                <div className="text-center py-10">
+                    <div style={{ fontSize: 36 }}>&#9876;</div>
+                    <div className="xp-text" style={{ fontWeight: 700, marginTop: 4 }}>No open scrims right now</div>
+                    <div className="xp-text" style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                        {user ? 'Be the first to post a scrim request!' : 'Check back later or log in to post one.'}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}

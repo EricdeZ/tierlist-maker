@@ -8,25 +8,13 @@ import smiteLogo from '../assets/smite2.png'
 import statsheetImg from '../assets/statsheet.png'
 import diamondsImg from '../assets/diamonds.png'
 
-// League logos
-import aglLogo from '../assets/leagues/agl.png'
-import babylonLogo from '../assets/leagues/babylon.png'
-import oslLogo from '../assets/leagues/osl.png'
-
 import { getDivisionImage, RANK_LABELS, ALL_RANK_IMAGES } from '../utils/divisionImages'
+import { getLeagueLogo } from '../utils/leagueImages'
 import ChallengeBanner from '../components/ChallengeBanner'
 import PassionPromoBanner from '../components/PassionPromoBanner'
 import PageTitle from '../components/PageTitle'
 import { useReadyMatchCount } from '../hooks/useReadyMatchCount'
 
-const LEAGUE_LOGOS = {
-    'agl': aglLogo,
-    'albion-giants-league': aglLogo,
-    'bsl': babylonLogo,
-    'babylon-smite-league': babylonLogo,
-    'osl': oslLogo,
-    'olympian-smite-league': oslLogo,
-}
 
 const DiscordIcon = ({ className }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -403,7 +391,7 @@ const Homepage = () => {
                     <div className="space-y-16">
                         {mainLeagues.map(league => {
                             const divisions = league.divisions || []
-                            const logo = LEAGUE_LOGOS[league.slug]
+                            const logo = getLeagueLogo(league.slug)
                             const leagueColor = league.color || 'var(--color-accent)'
                             const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))
 
