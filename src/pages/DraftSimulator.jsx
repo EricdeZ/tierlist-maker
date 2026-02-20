@@ -48,6 +48,26 @@ const FORMATS = [
 
 const GAME_COUNTS = [1, 2, 3, 5, 7]
 
+const STORAGE_KEY = 'draft-simulator-state'
+
+function loadDraftState() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (!raw) return null
+        const data = JSON.parse(raw)
+        data.orderAspects = new Set(data.orderAspects || [])
+        data.chaosAspects = new Set(data.chaosAspects || [])
+        if (data.completedGames) {
+            data.completedGames = data.completedGames.map(g => ({
+                ...g,
+                orderAspects: new Set(g.orderAspects || []),
+                chaosAspects: new Set(g.chaosAspects || []),
+            }))
+        }
+        return data
+    } catch { return null }
+}
+
 export default function DraftSimulator() {
     const { trackAction } = usePassion()
     const hasTrackedAction = useRef(false)
@@ -55,27 +75,29 @@ export default function DraftSimulator() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
-    const [totalGames, setTotalGames] = useState(1)
-    const [format, setFormat] = useState('regular')
-    const [draftStarted, setDraftStarted] = useState(false)
+    const saved = useRef(loadDraftState()).current
 
-    const [currentGame, setCurrentGame] = useState(1)
-    const [completedGames, setCompletedGames] = useState([])
+    const [totalGames, setTotalGames] = useState(saved?.totalGames ?? 1)
+    const [format, setFormat] = useState(saved?.format ?? 'regular')
+    const [draftStarted, setDraftStarted] = useState(saved?.draftStarted ?? false)
+
+    const [currentGame, setCurrentGame] = useState(saved?.currentGame ?? 1)
+    const [completedGames, setCompletedGames] = useState(saved?.completedGames ?? [])
     const [showSummary, setShowSummary] = useState(false)
 
-    const [currentStep, setCurrentStep] = useState(0)
-    const [orderBans, setOrderBans] = useState([])
-    const [chaosBans, setChaosBans] = useState([])
-    const [orderPicks, setOrderPicks] = useState([])
-    const [chaosPicks, setChaosPicks] = useState([])
+    const [currentStep, setCurrentStep] = useState(saved?.currentStep ?? 0)
+    const [orderBans, setOrderBans] = useState(saved?.orderBans ?? [])
+    const [chaosBans, setChaosBans] = useState(saved?.chaosBans ?? [])
+    const [orderPicks, setOrderPicks] = useState(saved?.orderPicks ?? [])
+    const [chaosPicks, setChaosPicks] = useState(saved?.chaosPicks ?? [])
     const [selectedGod, setSelectedGod] = useState(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [leagues, setLeagues] = useState([])
-    const [selectedLeagueId, setSelectedLeagueId] = useState(null)
+    const [selectedLeagueId, setSelectedLeagueId] = useState(saved?.selectedLeagueId ?? null)
     const [banList, setBanList] = useState(null)
     const [showBans, setShowBans] = useState(false)
-    const [orderAspects, setOrderAspects] = useState(new Set())
-    const [chaosAspects, setChaosAspects] = useState(new Set())
+    const [orderAspects, setOrderAspects] = useState(saved?.orderAspects ?? new Set())
+    const [chaosAspects, setChaosAspects] = useState(saved?.chaosAspects ?? new Set())
 
     const isGameComplete = currentStep >= DRAFT_SEQUENCE.length
     const isSeriesComplete = isGameComplete && currentGame >= totalGames
@@ -134,7 +156,7 @@ export default function DraftSimulator() {
         leagueService.getAll()
             .then(data => {
                 setLeagues(data || [])
-                if (data?.length === 1) setSelectedLeagueId(data[0].id)
+                if (data?.length === 1 && !saved?.selectedLeagueId) setSelectedLeagueId(data[0].id)
             })
             .catch(() => {})
     }, [])
@@ -145,6 +167,25 @@ export default function DraftSimulator() {
             .then(data => setBanList(data.banList?.parsed_data || null))
             .catch(() => setBanList(null))
     }, [selectedLeagueId])
+
+    // Persist draft state to localStorage
+    useEffect(() => {
+        if (!draftStarted) return
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                totalGames, format, draftStarted,
+                currentGame, completedGames: completedGames.map(g => ({
+                    ...g,
+                    orderAspects: [...(g.orderAspects || [])],
+                    chaosAspects: [...(g.chaosAspects || [])],
+                })),
+                currentStep, orderBans, chaosBans, orderPicks, chaosPicks,
+                selectedLeagueId,
+                orderAspects: [...orderAspects],
+                chaosAspects: [...chaosAspects],
+            }))
+        } catch {}
+    }, [totalGames, format, draftStarted, currentGame, completedGames, currentStep, orderBans, chaosBans, orderPicks, chaosPicks, selectedLeagueId, orderAspects, chaosAspects])
 
     const filteredGods = gods.filter(god =>
         god.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -183,6 +224,20 @@ export default function DraftSimulator() {
         })
     }
 
+    const handleUndo = () => {
+        if (currentStep === 0) return
+        const lastStep = DRAFT_SEQUENCE[currentStep - 1]
+        if (lastStep.type === 'ban') {
+            if (lastStep.team === 'order') setOrderBans(prev => prev.slice(0, -1))
+            else setChaosBans(prev => prev.slice(0, -1))
+        } else {
+            if (lastStep.team === 'order') setOrderPicks(prev => prev.slice(0, -1))
+            else setChaosPicks(prev => prev.slice(0, -1))
+        }
+        setSelectedGod(null)
+        setCurrentStep(prev => prev - 1)
+    }
+
     const resetCurrentGame = () => {
         setCurrentStep(0)
         setOrderBans([])
@@ -216,6 +271,7 @@ export default function DraftSimulator() {
         setCompletedGames([])
         setShowSummary(false)
         resetCurrentGame()
+        localStorage.removeItem(STORAGE_KEY)
     }
 
     const getPhaseLabel = () => {
@@ -352,12 +408,26 @@ export default function DraftSimulator() {
                                 </span>
                             )}
                         </div>
-                        <button
-                            onClick={handleFullReset}
-                            className="px-3 py-1 rounded-md bg-white/5 text-(--color-text-secondary) text-xs font-medium hover:bg-white/10 transition-colors whitespace-nowrap flex-shrink-0"
-                        >
-                            Reset
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                                onClick={handleUndo}
+                                disabled={currentStep === 0}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                                    currentStep === 0
+                                        ? 'bg-white/5 text-white/15 cursor-not-allowed'
+                                        : 'bg-white/5 text-(--color-text-secondary) hover:bg-white/10'
+                                }`}
+                                title="Undo last pick/ban"
+                            >
+                                Undo
+                            </button>
+                            <button
+                                onClick={handleFullReset}
+                                className="px-3 py-1 rounded-md bg-white/5 text-(--color-text-secondary) text-xs font-medium hover:bg-white/10 transition-colors whitespace-nowrap"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
 
                     {/* Phase Banner */}
