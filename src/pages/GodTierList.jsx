@@ -6,7 +6,7 @@ import { usePassion } from '../context/PassionContext'
 import { useAuth } from '../context/AuthContext'
 import { saveGodTierList, loadGodTierList, clearGodTierList } from '../utils/godTierListStorage'
 import { exportGodTierListAsImage } from '../utils/godTierListCanvasExport'
-import { Lock, Users, Globe, Save, Check } from 'lucide-react'
+import { Lock, Users, Globe, Save, Check, Pencil } from 'lucide-react'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 
@@ -35,6 +35,8 @@ export default function GodTierList() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [tiers, setTiers] = useState(EMPTY_TIERS)
+    const [title, setTitle] = useState('')
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [isExporting, setIsExporting] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
@@ -108,9 +110,10 @@ export default function GodTierList() {
                 if (saved) {
                     const filtered = {}
                     for (const t of TIERS) {
-                        filtered[t] = (saved[t] || []).filter(id => validIds.has(id))
+                        filtered[t] = (saved.tiers[t] || []).filter(id => validIds.has(id))
                     }
                     setTiers(filtered)
+                    if (saved.title) setTitle(saved.title)
                 }
                 setLoading(false)
             } catch (err) {
@@ -122,21 +125,21 @@ export default function GodTierList() {
         load()
     }, [isGodpoolMode, linkedPlayer?.slug])
 
-    // Auto-save on tiers change
+    // Auto-save on tiers/title change
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false
             return
         }
         const hasAny = TIERS.some(t => tiers[t].length > 0)
-        if (hasAny) {
-            saveGodTierList(tiers)
-            if (!hasTrackedSave.current) {
+        if (hasAny || title) {
+            saveGodTierList(tiers, title)
+            if (!hasTrackedSave.current && hasAny) {
                 hasTrackedSave.current = true
                 trackAction('tier_list_save', 'god-tierlist')
             }
         }
-    }, [tiers, trackAction])
+    }, [tiers, title, trackAction])
 
     // Cleanup drag state on global events
     useEffect(() => {
@@ -237,13 +240,14 @@ export default function GodTierList() {
 
     const clearAll = () => {
         setTiers({ ...EMPTY_TIERS })
+        setTitle('')
         clearGodTierList()
     }
 
     const handleExport = async () => {
         setIsExporting(true)
         try {
-            await exportGodTierListAsImage(tiers, godsMap)
+            await exportGodTierListAsImage(tiers, godsMap, { title })
         } finally {
             setTimeout(() => setIsExporting(false), 1000)
         }
@@ -349,6 +353,31 @@ export default function GodTierList() {
                 <PageTitle title="SMITE 2 God Tier List Maker" description="Create your SMITE 2 god tier list. Rank every god in classic S/A/B/C/D/F tiers, export as image, and share with your friends." />
 
                 <div className="pt-20 px-3 pb-4">
+                    {/* Editable title */}
+                    <div className="mb-3">
+                        {isEditingTitle ? (
+                            <input
+                                autoFocus
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onBlur={() => setIsEditingTitle(false)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingTitle(false) }}
+                                placeholder="God Tier List"
+                                maxLength={60}
+                                className="text-lg font-bold text-(--color-text) font-heading bg-transparent border-b-2 border-(--color-accent) outline-none w-full"
+                            />
+                        ) : (
+                            <h1
+                                className="text-lg font-bold text-(--color-text) font-heading flex items-center gap-2"
+                                onClick={() => setIsEditingTitle(true)}
+                            >
+                                {title || 'God Tier List'}
+                                <Pencil className="w-3.5 h-3.5 text-(--color-text-secondary)" />
+                            </h1>
+                        )}
+                    </div>
+
                     {/* Tier tabs */}
                     <div className="flex gap-1.5 mb-4">
                         {TIERS.map(t => (
@@ -512,9 +541,27 @@ export default function GodTierList() {
                 {/* Header + Actions */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-(--color-text) font-heading">
-                            God Tier List
-                        </h1>
+                        {isEditingTitle ? (
+                            <input
+                                autoFocus
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onBlur={() => setIsEditingTitle(false)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingTitle(false) }}
+                                placeholder="God Tier List"
+                                maxLength={60}
+                                className="text-2xl font-bold text-(--color-text) font-heading bg-transparent border-b-2 border-(--color-accent) outline-none w-80"
+                            />
+                        ) : (
+                            <h1
+                                className="text-2xl font-bold text-(--color-text) font-heading flex items-center gap-2 group cursor-pointer"
+                                onClick={() => setIsEditingTitle(true)}
+                            >
+                                {title || 'God Tier List'}
+                                <Pencil className="w-4 h-4 text-(--color-text-secondary) opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </h1>
+                        )}
                         <p className="text-sm text-(--color-text-secondary) mt-1">
                             Drag gods into tiers to rank them
                             {totalPlaced > 0 && (

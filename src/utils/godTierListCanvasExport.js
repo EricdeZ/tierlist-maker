@@ -63,7 +63,7 @@ async function preloadImages(godIds, godsMap) {
     return map
 }
 
-export async function exportGodTierListAsImage(tiers, godsMap, filename = 'god-tierlist') {
+export async function exportGodTierListAsImage(tiers, godsMap, { filename = 'god-tierlist', title = '' } = {}) {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     const scale = window.devicePixelRatio || 2
@@ -133,7 +133,7 @@ export async function exportGodTierListAsImage(tiers, godsMap, filename = 'god-t
     ctx.fillStyle = TEXT_WHITE
     ctx.font = `bold 28px ${FONT_HEADING}`
     ctx.textAlign = 'center'
-    ctx.fillText('SMITE 2 God Tier List', WIDTH / 2, 44)
+    ctx.fillText(title || 'SMITE 2 God Tier List', WIDTH / 2, 44)
 
     ctx.fillStyle = TEXT_DIM
     ctx.font = `14px ${FONT_BODY}`

@@ -2,10 +2,11 @@
 const STORAGE_KEY = 'god-tierlist'
 const TIERS = ['S', 'A', 'B', 'C', 'D', 'F']
 
-export const saveGodTierList = (tiers) => {
+export const saveGodTierList = (tiers, title) => {
     try {
         const data = {
             tiers,
+            title: title || '',
             timestamp: new Date().toISOString(),
             version: '1.0',
         }
@@ -23,7 +24,7 @@ export const loadGodTierList = () => {
         if (!data.tiers || typeof data.tiers !== 'object') return null
         const hasTiers = TIERS.every(t => Array.isArray(data.tiers[t]))
         if (!hasTiers) return null
-        return data.tiers
+        return { tiers: data.tiers, title: data.title || '' }
     } catch {
         return null
     }
