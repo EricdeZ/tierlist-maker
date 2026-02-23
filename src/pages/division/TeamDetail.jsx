@@ -32,6 +32,7 @@ const TeamDetail = () => {
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [showPerGame, setShowPerGame] = useState(false)
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
     const team = teams?.find(t => t.slug === teamSlug)
@@ -183,7 +184,19 @@ const TeamDetail = () => {
             ) : (
                 <>
                     {/* Roster Stats */}
-                    <h2 className="font-heading text-xl font-bold text-(--color-text) mb-4">Roster</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-heading text-xl font-bold text-(--color-text)">Roster</h2>
+                        <button
+                            onClick={() => setShowPerGame(!showPerGame)}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                                showPerGame
+                                    ? 'bg-(--color-accent)/15 border-(--color-accent)/40 text-(--color-accent)'
+                                    : 'bg-white/5 border-white/10 text-(--color-text-secondary) hover:text-(--color-text) hover:border-white/20'
+                            }`}
+                        >
+                            {showPerGame ? 'Per Game' : 'Totals'}
+                        </button>
+                    </div>
                     <div className="bg-(--color-secondary) rounded-xl border border-white/10 overflow-hidden mb-8">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/10">
@@ -192,11 +205,11 @@ const TeamDetail = () => {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Player</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Games</th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">K/D/A</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">{showPerGame ? 'K/D/A /G' : 'K/D/A'}</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">KDA</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Win Rate</th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Damage</th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Mitigated</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">{showPerGame ? 'Dmg/G' : 'Damage'}</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">{showPerGame ? 'Mit/G' : 'Mitigated'}</th>
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -227,7 +240,19 @@ const TeamDetail = () => {
                                                 {player.gamesPlayed}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm text-(--color-text)">
-                                                {player.totalKills}/{player.totalDeaths}/{player.totalAssists}
+                                                {showPerGame ? (
+                                                    <>
+                                                        <div>{parseFloat(player.avg_kills).toFixed(1)}/{parseFloat(player.avg_deaths).toFixed(1)}/{parseFloat(player.avg_assists).toFixed(1)}</div>
+                                                        <div className="text-xs text-(--color-text-secondary)">({player.totalKills}/{player.totalDeaths}/{player.totalAssists})</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div>{player.totalKills}/{player.totalDeaths}/{player.totalAssists}</div>
+                                                        {player.gamesPlayed > 0 && (
+                                                            <div className="text-xs text-(--color-text-secondary)">({parseFloat(player.avg_kills).toFixed(1)}/{parseFloat(player.avg_deaths).toFixed(1)}/{parseFloat(player.avg_assists).toFixed(1)} /g)</div>
+                                                        )}
+                                                    </>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-bold">
                                                     <span className={
@@ -246,10 +271,34 @@ const TeamDetail = () => {
                                                     </span>
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm text-(--color-text)">
-                                                {formatNumber(parseInt(player.total_damage) || 0)}
+                                                {showPerGame ? (
+                                                    <>
+                                                        <div>{formatNumber(parseFloat(player.avg_damage) || 0)}</div>
+                                                        <div className="text-xs text-(--color-text-secondary)">({formatNumber(parseInt(player.total_damage) || 0)} total)</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div>{formatNumber(parseInt(player.total_damage) || 0)}</div>
+                                                        {player.gamesPlayed > 0 && (
+                                                            <div className="text-xs text-(--color-text-secondary)">({formatNumber(parseFloat(player.avg_damage) || 0)} /g)</div>
+                                                        )}
+                                                    </>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm text-(--color-text)">
-                                                {formatNumber(parseInt(player.total_mitigated) || 0)}
+                                                {showPerGame ? (
+                                                    <>
+                                                        <div>{formatNumber(parseFloat(player.avg_mitigated) || 0)}</div>
+                                                        <div className="text-xs text-(--color-text-secondary)">({formatNumber(parseInt(player.total_mitigated) || 0)} total)</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div>{formatNumber(parseInt(player.total_mitigated) || 0)}</div>
+                                                        {player.gamesPlayed > 0 && (
+                                                            <div className="text-xs text-(--color-text-secondary)">({formatNumber(parseFloat(player.avg_mitigated) || 0)} /g)</div>
+                                                        )}
+                                                    </>
+                                                )}
                                             </td>
                                         </tr>
                                     )
