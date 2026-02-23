@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requirePermission, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { updateMatchChallenges } from '../lib/challenges.js'
 import { resolvePredictions } from '../lib/predictions.js'
@@ -31,11 +31,11 @@ const handler = async (event) => {
             }
 
             if (body.action === 'submit-match') {
-                return await submitMatch(sql, body, admin)
+                return await submitMatch(sql, body, admin, event)
             }
 
             if (body.action === 'batch-submit') {
-                return await batchSubmit(sql, body, admin)
+                return await batchSubmit(sql, body, admin, event)
             }
 
             return {
@@ -110,7 +110,7 @@ async function updatePlayerRoles(sql, matchId) {
  * Submit a single match with its games and player stats.
  * Expects pre-edited data from the admin dashboard.
  */
-async function submitMatch(sql, body, admin) {
+async function submitMatch(sql, body, admin, event) {
     const { season_id, team1_id, team2_id, week, date, best_of, games, scheduled_match_id } = body
 
     if (!season_id || !team1_id || !team2_id || !games?.length) {
@@ -119,6 +119,16 @@ async function submitMatch(sql, body, admin) {
             headers,
             body: JSON.stringify({ error: 'Missing required fields: season_id, team1_id, team2_id, games' }),
         }
+    }
+
+    // Validate user has match_report permission for this league
+    const leagueId = await getLeagueIdFromSeason(season_id)
+    if (!leagueId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid season_id' }) }
+    }
+    const hasLeaguePerm = await requirePermission(event, 'match_report', leagueId)
+    if (!hasLeaguePerm) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     // Validate each game has a winner
@@ -244,7 +254,7 @@ async function submitMatch(sql, body, admin) {
         })
 
         if (admin) {
-            await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId: null, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length, scheduled_match_id: scheduled_match_id || null } })
+            await logAudit(sql, admin, { action: 'submit-match', endpoint: 'admin-write', leagueId, targetType: 'match', targetId: result.match_id, details: { season_id, team1_id, team2_id, week, games_count: games.length, scheduled_match_id: scheduled_match_id || null } })
         }
 
         // Push challenge progress for players in this match (fire-and-forget)
@@ -283,7 +293,7 @@ async function submitMatch(sql, body, admin) {
 /**
  * Batch submit: submits multiple matches sequentially.
  */
-async function batchSubmit(sql, body, admin) {
+async function batchSubmit(sql, body, admin, event) {
     const { matches } = body
     if (!matches?.length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'No matches provided' }) }
@@ -291,7 +301,7 @@ async function batchSubmit(sql, body, admin) {
 
     const results = []
     for (const matchData of matches) {
-        const res = await submitMatch(sql, { ...matchData, action: 'submit-match' }, admin)
+        const res = await submitMatch(sql, { ...matchData, action: 'submit-match' }, admin, event)
         const data = JSON.parse(res.body)
         results.push({
             success: res.statusCode === 200,

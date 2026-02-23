@@ -22,6 +22,8 @@ export async function adminFetch(endpoint, options = {}) {
 
     const headers = { 'Content-Type': 'application/json' }
     if (token) headers['Authorization'] = `Bearer ${token}`
+    const impId = localStorage.getItem('impersonate_user_id')
+    if (impId) headers['X-Impersonate'] = impId
 
     const response = await fetch(url, {
         method,
@@ -51,5 +53,7 @@ export function getAuthHeaders() {
     const token = localStorage.getItem('auth_token')
     const headers = { 'Content-Type': 'application/json' }
     if (token) headers['Authorization'] = `Bearer ${token}`
+    const impId = localStorage.getItem('impersonate_user_id')
+    if (impId) headers['X-Impersonate'] = impId
     return headers
 }

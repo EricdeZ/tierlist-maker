@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
-import { requireAnyPermission } from '../lib/auth.js'
+import { requireAnyPermission, getLeagueIdFromSeason, getLeagueIdFromMatch } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
 
@@ -24,10 +24,10 @@ const handler = async (event) => {
             const { seasonId, matchId } = event.queryStringParameters || {}
 
             if (matchId) {
-                return await getMatchDetail(sql, matchId, admin, isOwnOnly)
+                return await getMatchDetail(sql, matchId, admin, isOwnOnly, event)
             }
             if (seasonId) {
-                return await listMatches(sql, seasonId, admin, isOwnOnly)
+                return await listMatches(sql, seasonId, admin, isOwnOnly, event)
             }
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId or matchId required' }) }
         }
@@ -41,13 +41,13 @@ const handler = async (event) => {
 
             switch (body.action) {
                 case 'delete-match':
-                    return await deleteMatch(sql, body, admin, isOwnOnly)
+                    return await deleteMatch(sql, body, admin, isOwnOnly, event)
                 case 'delete-game':
-                    return await deleteGame(sql, body, admin, isOwnOnly)
+                    return await deleteGame(sql, body, admin, isOwnOnly, event)
                 case 'update-match':
-                    return await updateMatch(sql, body, admin, isOwnOnly)
+                    return await updateMatch(sql, body, admin, isOwnOnly, event)
                 case 'save-game':
-                    return await saveGame(sql, body, admin, isOwnOnly)
+                    return await saveGame(sql, body, admin, isOwnOnly, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -64,7 +64,12 @@ const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 // GET: List matches for a season
 // ═══════════════════════════════════════════════════
-async function listMatches(sql, seasonId, admin, isOwnOnly) {
+async function listMatches(sql, seasonId, admin, isOwnOnly, event) {
+    const leagueId = await getLeagueIdFromSeason(seasonId)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
     const matches = await sql`
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
@@ -89,7 +94,12 @@ async function listMatches(sql, seasonId, admin, isOwnOnly) {
 // ═══════════════════════════════════════════════════
 // GET: Full match detail with all stats
 // ═══════════════════════════════════════════════════
-async function getMatchDetail(sql, matchId, admin, isOwnOnly) {
+async function getMatchDetail(sql, matchId, admin, isOwnOnly, event) {
+    const leagueId = await getLeagueIdFromMatch(matchId)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
     const [match] = await sql`
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
@@ -169,10 +179,15 @@ async function checkOwnership(sql, matchId, userId) {
 // ═══════════════════════════════════════════════════
 // POST: Delete entire match (cascade)
 // ═══════════════════════════════════════════════════
-async function deleteMatch(sql, body, admin, isOwnOnly) {
+async function deleteMatch(sql, body, admin, isOwnOnly, event) {
     const { match_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromMatch(match_id)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     if (isOwnOnly) {
@@ -208,10 +223,15 @@ async function deleteMatch(sql, body, admin, isOwnOnly) {
 // ═══════════════════════════════════════════════════
 // POST: Delete a single game (cascade stats, recalc winner)
 // ═══════════════════════════════════════════════════
-async function deleteGame(sql, body, admin, isOwnOnly) {
+async function deleteGame(sql, body, admin, isOwnOnly, event) {
     const { game_id, match_id } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromMatch(match_id)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     if (isOwnOnly) {
@@ -251,10 +271,15 @@ async function deleteGame(sql, body, admin, isOwnOnly) {
 // ═══════════════════════════════════════════════════
 // POST: Update match-level fields
 // ═══════════════════════════════════════════════════
-async function updateMatch(sql, body, admin, isOwnOnly) {
+async function updateMatch(sql, body, admin, isOwnOnly, event) {
     const { match_id, date, week, team1_id, team2_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromMatch(match_id)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     if (isOwnOnly) {
@@ -280,10 +305,15 @@ async function updateMatch(sql, body, admin, isOwnOnly) {
 // ═══════════════════════════════════════════════════
 // POST: Save game (winner + all player stats)
 // ═══════════════════════════════════════════════════
-async function saveGame(sql, body, admin, isOwnOnly) {
+async function saveGame(sql, body, admin, isOwnOnly, event) {
     const { game_id, match_id, winner_team_id, players } = body
     if (!game_id || !match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'game_id and match_id required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromMatch(match_id)
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_manage_own'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     if (isOwnOnly) {

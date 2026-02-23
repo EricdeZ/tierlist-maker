@@ -1,7 +1,7 @@
 import { adapt } from '../lib/adapter.js'
 // Returns current authenticated user info
 import { getDB, headers } from '../lib/db.js'
-import { requireAuth, getUserPermissions } from '../lib/auth.js'
+import { resolveUser, getUserPermissions } from '../lib/auth.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -12,10 +12,13 @@ const handler = async (event) => {
         return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
     }
 
-    const user = await requireAuth(event)
-    if (!user) {
+    const resolved = await resolveUser(event)
+    if (!resolved) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid or expired token' }) }
     }
+
+    const { user, realUser } = resolved
+    const impersonating = user.id !== realUser.id
 
     // If user has a linked player, fetch player details + their most recent division
     let linkedPlayer = null
@@ -36,24 +39,36 @@ const handler = async (event) => {
         linkedPlayer = player || null
     }
 
-    // Fetch RBAC permissions
+    // Fetch RBAC permissions for the effective user (impersonated if applicable)
     const permissions = await getUserPermissions(user.id)
+
+    const response = {
+        user: {
+            id: user.id,
+            discord_id: user.discord_id,
+            discord_username: user.discord_username,
+            discord_avatar: user.discord_avatar,
+            role: user.role,
+            linked_player_id: user.linked_player_id,
+        },
+        linkedPlayer,
+        permissions,
+    }
+
+    if (impersonating) {
+        response.impersonating = true
+        response.realUser = {
+            id: realUser.id,
+            discord_id: realUser.discord_id,
+            discord_username: realUser.discord_username,
+            discord_avatar: realUser.discord_avatar,
+        }
+    }
 
     return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({
-            user: {
-                id: user.id,
-                discord_id: user.discord_id,
-                discord_username: user.discord_username,
-                discord_avatar: user.discord_avatar,
-                role: user.role,
-                linked_player_id: user.linked_player_id,
-            },
-            linkedPlayer,
-            permissions,
-        }),
+        body: JSON.stringify(response),
     }
 }
 

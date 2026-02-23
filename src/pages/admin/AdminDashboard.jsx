@@ -884,7 +884,7 @@ export default function AdminDashboard() {
 
             {/* Match Reports */}
             <div className="space-y-6">
-                {matchReports.map(mr => (
+                {[...matchReports].reverse().map(mr => (
                     <MatchReportCard
                         key={mr.id}
                         report={mr}

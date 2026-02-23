@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requirePermission, getAllowedLeagueIds, leagueFilter, getLeagueIdFromTeam } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { fetchMessage, pollChannel, reactToMessage, fetchGuildRoles, fetchGuildMembers, sendDM } from '../lib/discord.js'
 import { autoMatchQueueItems } from '../lib/discord-match.js'
@@ -17,22 +17,25 @@ const handler = async (event) => {
     }
 
     const sql = getDB()
+    const allowed = await getAllowedLeagueIds(admin.id, 'match_report')
+    const lf = leagueFilter(sql, allowed)
+    const isGlobal = allowed === null
 
     try {
         // ─── GET ───
         if (event.httpMethod === 'GET') {
             const params = event.queryStringParameters || {}
             switch (params.action) {
-                case 'queue':              return await getQueue(sql, params)
-                case 'channels':           return await getChannels(sql)
-                case 'stats':              return await getStats(sql)
+                case 'queue':              return await getQueue(sql, params, lf)
+                case 'channels':           return await getChannels(sql, lf)
+                case 'stats':              return await getStats(sql, lf)
                 case 'guild-roles':        return await getGuildRoles(params)
                 case 'team-role-mappings': return await getTeamRoleMappings(sql, params)
-                case 'mapping-summary':    return await getMappingSummary(sql)
-                case 'ready-matches':      return await getReadyMatches(sql)
-                case 'match-review':       return await getMatchReview(sql)
-                case 'member-sync-status': return await getMemberSyncStatus(sql)
-                case 'discord-activity':   return await getDiscordActivity(sql)
+                case 'mapping-summary':    return await getMappingSummary(sql, lf)
+                case 'ready-matches':      return await getReadyMatches(sql, lf)
+                case 'match-review':       return await getMatchReview(sql, lf)
+                case 'member-sync-status': return await getMemberSyncStatus(sql, lf)
+                case 'discord-activity':   return await getDiscordActivity(sql, lf, allowed)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
             }
@@ -46,17 +49,25 @@ const handler = async (event) => {
             const body = JSON.parse(event.body)
 
             switch (body.action) {
-                case 'add-channel':    return await addChannel(sql, body, admin)
-                case 'remove-channel': return await removeChannel(sql, body, admin)
-                case 'update-status':  return await updateQueueStatus(sql, body, admin)
-                case 'mark-used':      return await markUsed(sql, body, admin)
-                case 'fetch-images':   return await fetchImages(sql, body)
-                case 'poll-now':       return await pollNow(sql, admin, event.waitUntil)
-                case 'map-team-role':          return await mapTeamRole(sql, body, admin)
-                case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin)
+                case 'add-channel':
+                    if (!isGlobal) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global permission required for channel configuration' }) }
+                    return await addChannel(sql, body, admin)
+                case 'remove-channel':
+                    if (!isGlobal) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global permission required for channel configuration' }) }
+                    return await removeChannel(sql, body, admin)
+                case 'update-status':  return await updateQueueStatus(sql, body, admin, allowed)
+                case 'mark-used':      return await markUsed(sql, body, admin, allowed)
+                case 'fetch-images':   return await fetchImages(sql, body, allowed)
+                case 'poll-now':
+                    if (!isGlobal) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global permission required for polling' }) }
+                    return await pollNow(sql, admin, event.waitUntil)
+                case 'map-team-role':          return await mapTeamRole(sql, body, admin, event)
+                case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin, allowed)
                 case 'skip-channel-pending':   return await skipChannelPending(sql, body, admin)
-                case 'match-now':              return await matchNow(sql, admin)
-                case 'send-test-dm':           return await sendTestDM(sql, body, admin)
+                case 'match-now':              return await matchNow(sql, admin, allowed)
+                case 'send-test-dm':
+                    if (!isGlobal) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global permission required for DMs' }) }
+                    return await sendTestDM(sql, body, admin)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -73,7 +84,7 @@ const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 // GET: Pending queue items
 // ═══════════════════════════════════════════════════
-async function getQueue(sql, params) {
+async function getQueue(sql, params, lf) {
     const { channelId, divisionId, status, suggestedMatchId } = params
     const filterStatus = status || 'pending'
 
@@ -89,6 +100,7 @@ async function getQueue(sql, params) {
         JOIN divisions d ON dc.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
         WHERE dq.status = ${filterStatus}
+        ${lf}
         ${channelId ? sql`AND dc.id = ${parseInt(channelId)}` : sql``}
         ${divisionId ? sql`AND dc.division_id = ${parseInt(divisionId)}` : sql``}
         ${suggestedMatchId ? sql`AND dq.suggested_match_id = ${parseInt(suggestedMatchId)}` : sql``}
@@ -103,7 +115,7 @@ async function getQueue(sql, params) {
 // ═══════════════════════════════════════════════════
 // GET: Configured channels
 // ═══════════════════════════════════════════════════
-async function getChannels(sql) {
+async function getChannels(sql, lf) {
     const channels = await sql`
         SELECT dc.id, dc.channel_id, dc.channel_name, dc.guild_id, dc.guild_name,
                dc.division_id, dc.is_active, dc.last_message_id, dc.last_polled_at,
@@ -113,6 +125,7 @@ async function getChannels(sql) {
         FROM discord_channels dc
         JOIN divisions d ON dc.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
+        WHERE true ${lf}
         ORDER BY l.name, d.name
     `
 
@@ -123,7 +136,7 @@ async function getChannels(sql) {
 // ═══════════════════════════════════════════════════
 // GET: Queue stats
 // ═══════════════════════════════════════════════════
-async function getStats(sql) {
+async function getStats(sql, lf) {
     const stats = await sql`
         SELECT dc.id as channel_id, dc.channel_name, dc.guild_name,
                d.name as division_name,
@@ -132,8 +145,9 @@ async function getStats(sql) {
                COUNT(*) FILTER (WHERE dq.status = 'skipped') as skipped
         FROM discord_channels dc
         JOIN divisions d ON dc.division_id = d.id
+        JOIN leagues l ON d.league_id = l.id
         LEFT JOIN discord_queue dq ON dq.channel_id = dc.id
-        WHERE dc.is_active = true
+        WHERE dc.is_active = true ${lf}
         GROUP BY dc.id, dc.channel_name, dc.guild_name, d.name
         ORDER BY d.name
     `
@@ -201,23 +215,36 @@ async function removeChannel(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Update queue item status (skip / reset)
 // ═══════════════════════════════════════════════════
-async function updateQueueStatus(sql, body, admin) {
+async function updateQueueStatus(sql, body, admin, allowedLeagues) {
     const { queue_item_ids, status } = body
 
     if (!queue_item_ids?.length || !status) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'queue_item_ids and status required' }) }
     }
 
-    const allowed = ['pending', 'skipped']
-    if (!allowed.includes(status)) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: `Status must be: ${allowed.join(', ')}` }) }
+    const allowedStatuses = ['pending', 'skipped']
+    if (!allowedStatuses.includes(status)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: `Status must be: ${allowedStatuses.join(', ')}` }) }
     }
 
-    await sql`
-        UPDATE discord_queue
-        SET status = ${status}, processed_by = ${admin.id}, processed_at = NOW()
-        WHERE id = ANY(${queue_item_ids})
-    `
+    // For league-scoped users, only update items in their leagues
+    if (allowedLeagues !== null) {
+        await sql`
+            UPDATE discord_queue dq
+            SET status = ${status}, processed_by = ${admin.id}, processed_at = NOW()
+            FROM discord_channels dc
+            JOIN divisions d ON dc.division_id = d.id
+            WHERE dq.channel_id = dc.id
+              AND d.league_id = ANY(${allowedLeagues})
+              AND dq.id = ANY(${queue_item_ids})
+        `
+    } else {
+        await sql`
+            UPDATE discord_queue
+            SET status = ${status}, processed_by = ${admin.id}, processed_at = NOW()
+            WHERE id = ANY(${queue_item_ids})
+        `
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, updated: queue_item_ids.length }) }
 }
@@ -260,7 +287,7 @@ async function skipChannelPending(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Mark queue items as used (after match submission)
 // ═══════════════════════════════════════════════════
-async function markUsed(sql, body, admin) {
+async function markUsed(sql, body, admin, allowedLeagues) {
     const { queue_item_ids, match_id } = body
 
     if (!queue_item_ids?.length) {
@@ -272,17 +299,34 @@ async function markUsed(sql, body, admin) {
         SELECT DISTINCT dq.message_id, dc.channel_id as discord_channel_id
         FROM discord_queue dq
         JOIN discord_channels dc ON dq.channel_id = dc.id
+        JOIN divisions d ON dc.division_id = d.id
         WHERE dq.id = ANY(${queue_item_ids})
+        ${allowedLeagues !== null ? sql`AND d.league_id = ANY(${allowedLeagues})` : sql``}
     `
 
-    await sql`
-        UPDATE discord_queue
-        SET status = 'used',
-            used_in_match_id = ${match_id || null},
-            processed_by = ${admin.id},
-            processed_at = NOW()
-        WHERE id = ANY(${queue_item_ids})
-    `
+    if (allowedLeagues !== null) {
+        await sql`
+            UPDATE discord_queue dq
+            SET status = 'used',
+                used_in_match_id = ${match_id || null},
+                processed_by = ${admin.id},
+                processed_at = NOW()
+            FROM discord_channels dc
+            JOIN divisions d ON dc.division_id = d.id
+            WHERE dq.channel_id = dc.id
+              AND d.league_id = ANY(${allowedLeagues})
+              AND dq.id = ANY(${queue_item_ids})
+        `
+    } else {
+        await sql`
+            UPDATE discord_queue
+            SET status = 'used',
+                used_in_match_id = ${match_id || null},
+                processed_by = ${admin.id},
+                processed_at = NOW()
+            WHERE id = ANY(${queue_item_ids})
+        `
+    }
 
     // React to original Discord messages with 🤖 (fire-and-forget)
     for (const item of items) {
@@ -296,20 +340,22 @@ async function markUsed(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Fetch fresh images from Discord (base64)
 // ═══════════════════════════════════════════════════
-async function fetchImages(sql, body) {
+async function fetchImages(sql, body, allowedLeagues) {
     const { queue_item_ids } = body
 
     if (!queue_item_ids?.length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'queue_item_ids required' }) }
     }
 
-    // Get queue items with channel info
+    // Get queue items with channel info (filtered by allowed leagues)
     const items = await sql`
         SELECT dq.id, dq.message_id, dq.attachment_id, dq.attachment_filename,
                dc.channel_id as discord_channel_id
         FROM discord_queue dq
         JOIN discord_channels dc ON dq.channel_id = dc.id
+        JOIN divisions d ON dc.division_id = d.id
         WHERE dq.id = ANY(${queue_item_ids})
+        ${allowedLeagues !== null ? sql`AND d.league_id = ANY(${allowedLeagues})` : sql``}
     `
 
     // Group by message to minimize Discord API calls
@@ -413,7 +459,7 @@ async function getTeamRoleMappings(sql, params) {
 // ═══════════════════════════════════════════════════
 // GET: Mapping summary — per-division team role mapping counts
 // ═══════════════════════════════════════════════════
-async function getMappingSummary(sql) {
+async function getMappingSummary(sql, lf) {
     const rows = await sql`
         SELECT d.name as division_name, l.name as league_name, s.name as season_name,
                COUNT(*)::int as total,
@@ -422,7 +468,7 @@ async function getMappingSummary(sql) {
         JOIN seasons s ON t.season_id = s.id
         JOIN divisions d ON s.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
-        WHERE s.is_active = true
+        WHERE s.is_active = true ${lf}
         GROUP BY l.name, d.name, s.name
         ORDER BY l.name, d.name
     `
@@ -434,11 +480,16 @@ async function getMappingSummary(sql) {
 // ═══════════════════════════════════════════════════
 // POST: Map a Discord role to a team
 // ═══════════════════════════════════════════════════
-async function mapTeamRole(sql, body, admin) {
+async function mapTeamRole(sql, body, admin, event) {
     const { team_id, discord_role_id } = body
 
     if (!team_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'team_id required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromTeam(team_id)
+    if (!await requirePermission(event, 'match_report', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     // discord_role_id can be null (to unmap)
@@ -461,7 +512,7 @@ async function mapTeamRole(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // GET: Scheduled matches with pending screenshots (ready to report)
 // ═══════════════════════════════════════════════════
-async function getReadyMatches(sql) {
+async function getReadyMatches(sql, lf) {
     const matches = await sql`
         SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                sm.scheduled_date, sm.week, sm.best_of,
@@ -486,7 +537,7 @@ async function getReadyMatches(sql) {
         JOIN divisions d ON s.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
         JOIN discord_queue dq ON dq.suggested_match_id = sm.id AND dq.status = 'pending'
-        WHERE sm.status = 'scheduled'
+        WHERE sm.status = 'scheduled' ${lf}
         GROUP BY sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                  sm.scheduled_date, sm.week, sm.best_of,
                  t1.name, t1.color, t2.name, t2.color,
@@ -560,12 +611,15 @@ async function pollNow(sql, admin, waitUntil) {
 // ═══════════════════════════════════════════════════
 // POST: Re-run auto-matching on all unmatched pending items
 // ═══════════════════════════════════════════════════
-async function matchNow(sql, admin) {
-    // Get all pending unmatched items grouped by channel
+async function matchNow(sql, admin, allowedLeagues) {
+    // Get all pending unmatched items grouped by channel (filtered by allowed leagues)
     const items = await sql`
         SELECT dq.id, dq.channel_id
         FROM discord_queue dq
+        JOIN discord_channels dc ON dq.channel_id = dc.id
+        JOIN divisions d ON dc.division_id = d.id
         WHERE dq.status = 'pending' AND dq.suggested_match_id IS NULL
+        ${allowedLeagues !== null ? sql`AND d.league_id = ANY(${allowedLeagues})` : sql``}
     `
 
     if (!items.length) {
@@ -628,7 +682,7 @@ async function matchNow(sql, admin) {
 // ═══════════════════════════════════════════════════
 // GET: Match review — unmatched + matched queue items
 // ═══════════════════════════════════════════════════
-async function getMatchReview(sql) {
+async function getMatchReview(sql, lf) {
     // Unmatched pending items (no suggested_match_id)
     const unmatched = await sql`
         SELECT dq.id, dq.attachment_filename, dq.author_name, dq.author_id,
@@ -639,7 +693,7 @@ async function getMatchReview(sql) {
         JOIN discord_channels dc ON dq.channel_id = dc.id
         JOIN divisions d ON dc.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
-        WHERE dq.status = 'pending' AND dq.suggested_match_id IS NULL
+        WHERE dq.status = 'pending' AND dq.suggested_match_id IS NULL ${lf}
         ORDER BY dq.message_timestamp DESC
         LIMIT 100
     `
@@ -665,7 +719,8 @@ async function getMatchReview(sql) {
         JOIN teams t2 ON sm.team2_id = t2.id
         JOIN seasons s ON sm.season_id = s.id
         JOIN divisions d ON s.division_id = d.id
-        WHERE dq.status = 'pending'
+        JOIN leagues l ON d.league_id = l.id
+        WHERE dq.status = 'pending' ${lf}
         GROUP BY sm.id, sm.team1_id, sm.team2_id, sm.scheduled_date, sm.week,
                  sm.season_id, t1.name, t1.color, t2.name, t2.color, d.name
         ORDER BY sm.scheduled_date DESC
@@ -681,7 +736,8 @@ async function getMatchReview(sql) {
         JOIN teams t2 ON sm.team2_id = t2.id
         JOIN seasons s ON sm.season_id = s.id
         JOIN divisions d ON s.division_id = d.id
-        WHERE sm.status = 'scheduled'
+        JOIN leagues l ON d.league_id = l.id
+        WHERE sm.status = 'scheduled' ${lf}
         ORDER BY sm.scheduled_date DESC
         LIMIT 50
     `
@@ -693,7 +749,7 @@ async function getMatchReview(sql) {
 // ═══════════════════════════════════════════════════
 // GET: Member sync status — players with/without discord mapping
 // ═══════════════════════════════════════════════════
-async function getMemberSyncStatus(sql) {
+async function getMemberSyncStatus(sql, lf) {
     // Teams with discord roles + their players' discord link status
     const teamPlayers = await sql`
         SELECT t.id as team_id, t.name as team_name, t.color, t.discord_role_id,
@@ -702,26 +758,26 @@ async function getMemberSyncStatus(sql) {
         FROM teams t
         JOIN seasons s ON t.season_id = s.id AND s.is_active = true
         JOIN divisions d ON s.division_id = d.id
+        JOIN leagues l ON d.league_id = l.id
         LEFT JOIN league_players lp ON lp.team_id = t.id
         LEFT JOIN players p ON lp.player_id = p.id
-        WHERE t.discord_role_id IS NOT NULL
+        WHERE t.discord_role_id IS NOT NULL ${lf}
         ORDER BY d.name, t.name, p.name
     `
 
-    // Summary stats
+    // Summary stats (filtered to user's allowed leagues)
     const summary = await sql`
         SELECT
             COUNT(DISTINCT t.id)::int as teams_with_roles,
-            (SELECT COUNT(*)::int FROM teams t2
-             JOIN seasons s2 ON t2.season_id = s2.id AND s2.is_active = true
-             WHERE t2.discord_role_id IS NULL) as teams_without_roles,
             COUNT(DISTINCT CASE WHEN p.discord_id IS NOT NULL OR p.discord_name IS NOT NULL THEN p.id END)::int as players_linked,
             COUNT(DISTINCT CASE WHEN p.discord_id IS NULL AND p.discord_name IS NULL AND p.id IS NOT NULL THEN p.id END)::int as players_unlinked
         FROM teams t
         JOIN seasons s ON t.season_id = s.id AND s.is_active = true
+        JOIN divisions d ON s.division_id = d.id
+        JOIN leagues l ON d.league_id = l.id
         LEFT JOIN league_players lp ON lp.team_id = t.id
         LEFT JOIN players p ON lp.player_id = p.id
-        WHERE t.discord_role_id IS NOT NULL
+        WHERE t.discord_role_id IS NOT NULL ${lf}
     `
 
     return { statusCode: 200, headers, body: JSON.stringify({ teamPlayers, summary: summary[0] }) }
@@ -731,7 +787,7 @@ async function getMemberSyncStatus(sql) {
 // ═══════════════════════════════════════════════════
 // GET: Recent discord-related audit log entries
 // ═══════════════════════════════════════════════════
-async function getDiscordActivity(sql) {
+async function getDiscordActivity(sql, lf, allowed) {
     const entries = await sql`
         SELECT al.id, al.user_id, al.action, al.endpoint, al.target_type,
                al.target_id, al.details, al.created_at,
@@ -739,6 +795,7 @@ async function getDiscordActivity(sql) {
         FROM audit_log al
         LEFT JOIN users u ON al.user_id = u.id
         WHERE al.endpoint = 'discord-queue'
+        ${allowed !== null ? sql`AND (al.league_id IS NULL OR al.league_id = ANY(${allowed}))` : sql``}
         ORDER BY al.created_at DESC
         LIMIT 50
     `
@@ -750,7 +807,7 @@ async function getDiscordActivity(sql) {
 // ═══════════════════════════════════════════════════
 // POST: Manually assign/change suggested_match_id on queue items
 // ═══════════════════════════════════════════════════
-async function updateSuggestedMatch(sql, body, admin) {
+async function updateSuggestedMatch(sql, body, admin, allowedLeagues) {
     const { queue_item_ids, scheduled_match_id } = body
 
     if (!queue_item_ids?.length) {
@@ -758,11 +815,23 @@ async function updateSuggestedMatch(sql, body, admin) {
     }
 
     // scheduled_match_id can be null (to unlink)
-    await sql`
-        UPDATE discord_queue
-        SET suggested_match_id = ${scheduled_match_id || null}
-        WHERE id = ANY(${queue_item_ids}) AND status = 'pending'
-    `
+    if (allowedLeagues !== null) {
+        await sql`
+            UPDATE discord_queue dq
+            SET suggested_match_id = ${scheduled_match_id || null}
+            FROM discord_channels dc
+            JOIN divisions d ON dc.division_id = d.id
+            WHERE dq.channel_id = dc.id
+              AND d.league_id = ANY(${allowedLeagues})
+              AND dq.id = ANY(${queue_item_ids}) AND dq.status = 'pending'
+        `
+    } else {
+        await sql`
+            UPDATE discord_queue
+            SET suggested_match_id = ${scheduled_match_id || null}
+            WHERE id = ANY(${queue_item_ids}) AND status = 'pending'
+        `
+    }
 
     await logAudit(sql, admin, {
         action: 'update-suggested-match', endpoint: 'discord-queue',

@@ -1,5 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { setImpersonation, clearImpersonation } from '../services/database.js'
 
 const AuthContext = createContext(null)
 
@@ -9,6 +10,9 @@ export const AuthProvider = ({ children }) => {
     const [permissions, setPermissions] = useState({ global: [], byLeague: {} })
     const [loading, setLoading] = useState(true)
     const [token, setToken] = useState(() => localStorage.getItem('auth_token'))
+    const [impersonating, setImpersonating] = useState(false)
+    const [realUser, setRealUser] = useState(null)
+    const [impersonateId, setImpersonateId] = useState(() => localStorage.getItem('impersonate_user_id'))
 
     // On mount: check URL for auth_token (from OAuth redirect)
     useEffect(() => {
@@ -35,12 +39,23 @@ export const AuthProvider = ({ children }) => {
         }
     }, [])
 
-    // Whenever token changes, fetch user info
+    // Sync database.js impersonation on mount and when impersonateId changes
+    useEffect(() => {
+        if (impersonateId) {
+            setImpersonation(impersonateId)
+        } else {
+            clearImpersonation()
+        }
+    }, [impersonateId])
+
+    // Whenever token or impersonateId changes, fetch user info
     useEffect(() => {
         if (!token) {
             setUser(null)
             setLinkedPlayer(null)
             setPermissions({ global: [], byLeague: {} })
+            setImpersonating(false)
+            setRealUser(null)
             setLoading(false)
             return
         }
@@ -49,9 +64,10 @@ export const AuthProvider = ({ children }) => {
 
         const fetchUser = async () => {
             try {
-                const res = await fetch('/api/auth-me', {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
+                const headers = { Authorization: `Bearer ${token}` }
+                if (impersonateId) headers['X-Impersonate'] = impersonateId
+
+                const res = await fetch('/api/auth-me', { headers })
                 if (!res.ok) throw new Error('Invalid token')
                 const data = await res.json()
                 if (!cancelled) {
@@ -59,6 +75,8 @@ export const AuthProvider = ({ children }) => {
                     setUser(data.user)
                     setLinkedPlayer(data.linkedPlayer)
                     setPermissions(data.permissions || { global: [], byLeague: {} })
+                    setImpersonating(!!data.impersonating)
+                    setRealUser(data.realUser || null)
                 }
             } catch {
                 if (!cancelled) {
@@ -67,6 +85,8 @@ export const AuthProvider = ({ children }) => {
                     setUser(null)
                     setLinkedPlayer(null)
                     setPermissions({ global: [], byLeague: {} })
+                    setImpersonating(false)
+                    setRealUser(null)
                 }
             } finally {
                 if (!cancelled) setLoading(false)
@@ -75,7 +95,7 @@ export const AuthProvider = ({ children }) => {
 
         fetchUser()
         return () => { cancelled = true }
-    }, [token])
+    }, [token, impersonateId])
 
     const login = useCallback(() => {
         const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID
@@ -94,10 +114,25 @@ export const AuthProvider = ({ children }) => {
 
     const logout = useCallback(() => {
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('impersonate_user_id')
+        clearImpersonation()
         setToken(null)
         setUser(null)
         setLinkedPlayer(null)
         setPermissions({ global: [], byLeague: {} })
+        setImpersonating(false)
+        setRealUser(null)
+        setImpersonateId(null)
+    }, [])
+
+    const startImpersonation = useCallback((userId) => {
+        localStorage.setItem('impersonate_user_id', String(userId))
+        setImpersonateId(String(userId))
+    }, [])
+
+    const stopImpersonation = useCallback(() => {
+        localStorage.removeItem('impersonate_user_id')
+        setImpersonateId(null)
     }, [])
 
     const isAdmin = user?.role === 'admin'
@@ -136,6 +171,10 @@ export const AuthProvider = ({ children }) => {
             permissions,
             hasPermission,
             hasAnyPermission,
+            impersonating,
+            realUser,
+            startImpersonation,
+            stopImpersonation,
         }}>
             {children}
         </AuthContext.Provider>

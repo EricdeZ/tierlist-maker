@@ -7,8 +7,9 @@ import PageTitle from '../../components/PageTitle'
 const API = import.meta.env.VITE_API_URL || '/api'
 
 export default function DiscordQueue() {
-    const { hasPermission } = useAuth()
+    const { hasPermission, permissions } = useAuth()
     const isOwner = hasPermission('permission_manage')
+    const isGlobalAdmin = permissions.global.includes('match_report')
     const [channels, setChannels] = useState([])
     const [divisions, setDivisions] = useState([])
     const [seasons, setSeasons] = useState([])
@@ -324,13 +325,15 @@ export default function DiscordQueue() {
                         <h1 className="text-lg font-semibold">Discord Configuration</h1>
                         <p className="text-xs text-gray-500">Channels, team role mapping, and auto-match settings</p>
                     </div>
-                    <button
-                        onClick={pollNow}
-                        disabled={polling}
-                        className="px-3 py-1.5 text-sm rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-wait transition"
-                    >
-                        {polling ? 'Polling...' : 'Poll Now'}
-                    </button>
+                    {isGlobalAdmin && (
+                        <button
+                            onClick={pollNow}
+                            disabled={polling}
+                            className="px-3 py-1.5 text-sm rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-wait transition"
+                        >
+                            {polling ? 'Polling...' : 'Poll Now'}
+                        </button>
+                    )}
                 </div>
                 {/* Toast */}
                 {toast && (
@@ -341,8 +344,8 @@ export default function DiscordQueue() {
                     </div>
                 )}
 
-                {/* ═══ Channel Configuration ═══ */}
-                <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                {/* ═══ Channel Configuration (global admins only) ═══ */}
+                {isGlobalAdmin && <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Configured Channels</h2>
                         <button
@@ -458,7 +461,7 @@ export default function DiscordQueue() {
                             ))}
                         </div>
                     )}
-                </section>
+                </section>}
 
                 {/* ═══ Team Role Mapping ═══ */}
                 <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
@@ -593,8 +596,8 @@ export default function DiscordQueue() {
                     )}
                 </section>
 
-                {/* ═══ Test DM ═══ */}
-                <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                {/* ═══ Test DM (global admins only) ═══ */}
+                {isGlobalAdmin && <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
                     <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Test Bot DM</h2>
                     <p className="text-xs text-gray-500 mb-3">
                         Send a test DM via the bot to verify DM delivery is working. Enable Discord Developer Mode (Settings &gt; Advanced) to copy a User ID by right-clicking a user.
@@ -622,7 +625,7 @@ export default function DiscordQueue() {
                             {testDmSending ? 'Sending...' : 'Send Test DM'}
                         </button>
                     </div>
-                </section>
+                </section>}
             </div>
         </div>
     )

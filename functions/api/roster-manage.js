@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 
 const handler = async (event) => {
@@ -33,27 +33,27 @@ const handler = async (event) => {
 
         switch (action) {
             case 'change-role':
-                return await changeRole(sql, body, admin)
+                return await changeRole(sql, body, admin, event)
             case 'transfer-player':
-                return await transferPlayer(sql, body, admin)
+                return await transferPlayer(sql, body, admin, event)
             case 'drop-player':
-                return await dropPlayer(sql, body, admin)
+                return await dropPlayer(sql, body, admin, event)
             case 'add-player-to-team':
-                return await addPlayerToTeam(sql, body, admin)
+                return await addPlayerToTeam(sql, body, admin, event)
             case 'create-and-add-player':
-                return await createAndAddPlayer(sql, body, admin)
+                return await createAndAddPlayer(sql, body, admin, event)
             case 'reactivate-player':
-                return await reactivatePlayer(sql, body, admin)
+                return await reactivatePlayer(sql, body, admin, event)
             case 'add-alias':
-                return await addAlias(sql, body, admin)
+                return await addAlias(sql, body, admin, event)
             case 'remove-alias':
-                return await removeAlias(sql, body, admin)
+                return await removeAlias(sql, body, admin, event)
             case 'merge-player':
-                return await mergePlayer(sql, body, admin)
+                return await mergePlayer(sql, body, admin, event)
             case 'rename-player':
-                return await renamePlayer(sql, body, admin)
+                return await renamePlayer(sql, body, admin, event)
             case 'set-captain':
-                return await setCaptain(sql, body, admin)
+                return await setCaptain(sql, body, admin, event)
             default:
                 return {
                     statusCode: 400,
@@ -74,9 +74,13 @@ const handler = async (event) => {
 /**
  * Change a league_player's role
  */
-async function changeRole(sql, { league_player_id, role, secondary_role }, admin) {
+async function changeRole(sql, { league_player_id, role, secondary_role }, admin, event) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
     if (!role) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'role required' }) }
@@ -114,13 +118,17 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
 /**
  * Transfer a player from one team to another within the same season
  */
-async function transferPlayer(sql, { league_player_id, new_team_id }, admin) {
+async function transferPlayer(sql, { league_player_id, new_team_id }, admin, event) {
     if (!league_player_id || !new_team_id) {
         return {
             statusCode: 400,
             headers,
             body: JSON.stringify({ error: 'league_player_id and new_team_id required' }),
         }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     // Verify the league_player exists
@@ -162,9 +170,13 @@ async function transferPlayer(sql, { league_player_id, new_team_id }, admin) {
 /**
  * Drop (deactivate) a player from their roster
  */
-async function dropPlayer(sql, { league_player_id }, admin) {
+async function dropPlayer(sql, { league_player_id }, admin, event) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     const [updated] = await sql`
@@ -190,9 +202,13 @@ async function dropPlayer(sql, { league_player_id }, admin) {
 /**
  * Reactivate a previously dropped player
  */
-async function reactivatePlayer(sql, { league_player_id }, admin) {
+async function reactivatePlayer(sql, { league_player_id }, admin, event) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     const [updated] = await sql`
@@ -219,13 +235,17 @@ async function reactivatePlayer(sql, { league_player_id }, admin) {
  * Add an existing player (from the global players table) to a team for a specific season.
  * Creates a new league_players record.
  */
-async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, admin) {
+async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, admin, event) {
     if (!player_id || !team_id || !season_id) {
         return {
             statusCode: 400,
             headers,
             body: JSON.stringify({ error: 'player_id, team_id, and season_id required' }),
         }
+    }
+    const leagueId = await getLeagueIdFromSeason(season_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     // Fall back to player's default role if none specified
@@ -287,13 +307,17 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
 /**
  * Create a brand-new player in the global players table AND add them to a team.
  */
-async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_role, secondary_role }, admin) {
+async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_role, secondary_role }, admin, event) {
     if (!name || !team_id || !season_id) {
         return {
             statusCode: 400,
             headers,
             body: JSON.stringify({ error: 'name, team_id, and season_id required' }),
         }
+    }
+    const leagueId = await getLeagueIdFromSeason(season_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     const trimmed = name.trim()
@@ -355,9 +379,13 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_ro
 /**
  * Add an alias (old name) for a player
  */
-async function addAlias(sql, { player_id, alias }, admin) {
+async function addAlias(sql, { player_id, alias }, admin, event) {
     if (!player_id || !alias?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and alias required' }) }
+    }
+    // Aliases are global — require global roster_manage permission
+    if (!await requirePermission(event, 'roster_manage', null)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global roster permission required for alias management' }) }
     }
     const trimmed = alias.trim()
 
@@ -391,9 +419,12 @@ async function addAlias(sql, { player_id, alias }, admin) {
 /**
  * Remove an alias by its ID
  */
-async function removeAlias(sql, { alias_id }, admin) {
+async function removeAlias(sql, { alias_id }, admin, event) {
     if (!alias_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'alias_id required' }) }
+    }
+    if (!await requirePermission(event, 'roster_manage', null)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global roster permission required for alias management' }) }
     }
     const [deleted] = await sql`
         DELETE FROM player_aliases WHERE id = ${alias_id} RETURNING id, player_id, alias
@@ -409,9 +440,12 @@ async function removeAlias(sql, { alias_id }, admin) {
  * Merge a duplicate player into the real player.
  * Reassigns all stats, saves old name as alias, deletes the duplicate.
  */
-async function mergePlayer(sql, { source_player_id, target_player_id }, admin) {
+async function mergePlayer(sql, { source_player_id, target_player_id }, admin, event) {
     if (!source_player_id || !target_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'source_player_id and target_player_id required' }) }
+    }
+    if (!await requirePermission(event, 'roster_manage', null)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global roster permission required for player merge' }) }
     }
     if (String(source_player_id) === String(target_player_id)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot merge a player into themselves' }) }
@@ -512,9 +546,12 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin) {
  * Rename a player. Updates the global players table name + slug.
  * Optionally saves the old name as an alias.
  */
-async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }, admin) {
+async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }, admin, event) {
     if (!player_id || !new_name?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id and new_name required' }) }
+    }
+    if (!await requirePermission(event, 'roster_manage', null)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global roster permission required for player rename' }) }
     }
     const trimmed = new_name.trim()
     if (trimmed.length < 2) {
@@ -576,9 +613,13 @@ async function renamePlayer(sql, { player_id, new_name, save_old_as_alias }, adm
  * Set a player as team captain.
  * Removes captain from any existing captain on the same team+season.
  */
-async function setCaptain(sql, { league_player_id }, admin) {
+async function setCaptain(sql, { league_player_id }, admin, event) {
     if (!league_player_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     const [lp] = await sql`

@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requirePermission, getAllowedLeagueIds, leagueFilter } from '../lib/auth.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -15,7 +15,11 @@ const handler = async (event) => {
     const sql = getDB()
 
     try {
-        // Fetch all seasons with their league/division/team info
+        // Determine which leagues this user can access for match_report
+        const allowed = await getAllowedLeagueIds(admin.id, 'match_report')
+        const lf = leagueFilter(sql, allowed)
+
+        // Fetch seasons with their league/division info (filtered by allowed leagues)
         const seasons = await sql`
             SELECT
                 s.id as season_id, s.name as season_name, s.is_active,
@@ -24,6 +28,7 @@ const handler = async (event) => {
             FROM seasons s
             JOIN divisions d ON s.division_id = d.id
             JOIN leagues l ON d.league_id = l.id
+            WHERE true ${lf}
             ORDER BY l.name, d.name, s.name
         `
 
@@ -32,6 +37,10 @@ const handler = async (event) => {
                 t.id as team_id, t.name as team_name, t.slug as team_slug, t.color,
                 t.season_id
             FROM teams t
+            JOIN seasons s ON t.season_id = s.id
+            JOIN divisions d ON s.division_id = d.id
+            JOIN leagues l ON d.league_id = l.id
+            WHERE true ${lf}
             ORDER BY t.name
         `
 
@@ -43,10 +52,14 @@ const handler = async (event) => {
             FROM matches m
             JOIN teams t1 ON m.team1_id = t1.id
             JOIN teams t2 ON m.team2_id = t2.id
+            JOIN seasons s ON m.season_id = s.id
+            JOIN divisions d ON s.division_id = d.id
+            JOIN leagues l ON d.league_id = l.id
+            WHERE true ${lf}
             ORDER BY m.date DESC
         `
 
-        // All players across all seasons (for player name search)
+        // Players on rosters (filtered by allowed leagues)
         const players = await sql`
             SELECT
                 p.id as player_id, p.name, p.slug,
@@ -55,18 +68,21 @@ const handler = async (event) => {
             FROM league_players lp
             JOIN players p ON lp.player_id = p.id
             LEFT JOIN teams t ON lp.team_id = t.id
-            WHERE lp.is_active = true
+            JOIN seasons s ON lp.season_id = s.id
+            JOIN divisions d ON s.division_id = d.id
+            JOIN leagues l ON d.league_id = l.id
+            WHERE lp.is_active = true ${lf}
             ORDER BY p.name
         `
 
-        // Also get global players (not on active rosters) for sub matching
+        // Global players for sub matching (unfiltered reference data)
         const globalPlayers = await sql`
             SELECT id as player_id, name, slug, main_role, secondary_role, discord_name
             FROM players
             ORDER BY name
         `
 
-        // Player aliases for name resolution
+        // Player aliases for name resolution (unfiltered reference data)
         const aliases = await sql`
             SELECT pa.id as alias_id, pa.player_id, pa.alias
             FROM player_aliases pa
@@ -85,14 +101,14 @@ const handler = async (event) => {
             ORDER BY pgs.league_player_id, m.date DESC, g.id DESC
         `
 
-        // All gods for autocomplete in match review
+        // All gods for autocomplete in match review (unfiltered reference data)
         const gods = await sql`
             SELECT id, name, slug, image_url
             FROM gods
             ORDER BY name
         `
 
-        // Scheduled matches (pending) for linking during match report
+        // Scheduled matches (pending) for linking during match report (filtered)
         const scheduledMatches = await sql`
             SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                    sm.best_of, sm.scheduled_date, sm.week, sm.status,
@@ -101,7 +117,10 @@ const handler = async (event) => {
             FROM scheduled_matches sm
             JOIN teams t1 ON sm.team1_id = t1.id
             JOIN teams t2 ON sm.team2_id = t2.id
-            WHERE sm.status = 'scheduled'
+            JOIN seasons s ON sm.season_id = s.id
+            JOIN divisions d ON s.division_id = d.id
+            JOIN leagues l ON d.league_id = l.id
+            WHERE sm.status = 'scheduled' ${lf}
             ORDER BY sm.scheduled_date ASC
         `
 

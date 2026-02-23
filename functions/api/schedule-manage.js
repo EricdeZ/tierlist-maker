@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
-import { requirePermission } from '../lib/auth.js'
+import { requirePermission, getAllowedLeagueIds, leagueFilter, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { refundPredictions } from '../lib/predictions.js'
 
@@ -20,6 +20,8 @@ const handler = async (event) => {
         // ─── GET: list seasons, teams, and scheduled matches ───
         if (event.httpMethod === 'GET') {
             const { seasonId } = event.queryStringParameters || {}
+            const allowed = await getAllowedLeagueIds(admin.id, 'match_schedule')
+            const lf = leagueFilter(sql, allowed)
 
             const [seasons, teams] = await Promise.all([
                 sql`
@@ -28,11 +30,16 @@ const handler = async (event) => {
                     FROM seasons s
                     JOIN divisions d ON s.division_id = d.id
                     JOIN leagues l ON d.league_id = l.id
+                    WHERE true ${lf}
                     ORDER BY l.name, d.name, s.name
                 `,
                 sql`
                     SELECT t.id as team_id, t.name as team_name, t.color, t.season_id
                     FROM teams t
+                    JOIN seasons s ON t.season_id = s.id
+                    JOIN divisions d ON s.division_id = d.id
+                    JOIN leagues l ON d.league_id = l.id
+                    WHERE true ${lf}
                     ORDER BY t.name
                 `,
             ])
@@ -65,13 +72,13 @@ const handler = async (event) => {
 
             switch (body.action) {
                 case 'create':
-                    return await createMatch(sql, body, admin)
+                    return await createMatch(sql, body, admin, event)
                 case 'update':
-                    return await updateMatch(sql, body, admin)
+                    return await updateMatch(sql, body, admin, event)
                 case 'update-status':
-                    return await updateStatus(sql, body, admin)
+                    return await updateStatus(sql, body, admin, event)
                 case 'delete':
-                    return await deleteMatch(sql, body, admin)
+                    return await deleteMatch(sql, body, admin, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -88,11 +95,16 @@ const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 // POST: Create a scheduled match
 // ═══════════════════════════════════════════════════
-async function createMatch(sql, body, admin) {
+async function createMatch(sql, body, admin, event) {
     const { season_id, team1_id, team2_id, best_of, scheduled_date, week } = body
 
     if (!season_id || !team1_id || !team2_id || !scheduled_date) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id, team1_id, team2_id, and scheduled_date are required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromSeason(season_id)
+    if (!await requirePermission(event, 'match_schedule', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
     if (String(team1_id) === String(team2_id)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Teams must be different' }) }
@@ -125,11 +137,16 @@ async function createMatch(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Update a scheduled match
 // ═══════════════════════════════════════════════════
-async function updateMatch(sql, body, admin) {
+async function updateMatch(sql, body, admin, event) {
     const { id, team1_id, team2_id, best_of, scheduled_date, week } = body
 
     if (!id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    }
+
+    const [sm] = await sql`SELECT s.league_id FROM scheduled_matches sm JOIN seasons s ON sm.season_id = s.id WHERE sm.id = ${id}`
+    if (!sm || !await requirePermission(event, 'match_schedule', sm.league_id)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
     if (team1_id && team2_id && String(team1_id) === String(team2_id)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Teams must be different' }) }
@@ -159,11 +176,16 @@ async function updateMatch(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Update match status
 // ═══════════════════════════════════════════════════
-async function updateStatus(sql, body, admin) {
+async function updateStatus(sql, body, admin, event) {
     const { id, status } = body
 
     if (!id || !status) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and status required' }) }
+    }
+
+    const [sm] = await sql`SELECT s.league_id FROM scheduled_matches sm JOIN seasons s ON sm.season_id = s.id WHERE sm.id = ${id}`
+    if (!sm || !await requirePermission(event, 'match_schedule', sm.league_id)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     const validStatuses = ['scheduled', 'completed', 'cancelled']
@@ -195,11 +217,16 @@ async function updateStatus(sql, body, admin) {
 // ═══════════════════════════════════════════════════
 // POST: Delete a scheduled match
 // ═══════════════════════════════════════════════════
-async function deleteMatch(sql, body, admin) {
+async function deleteMatch(sql, body, admin, event) {
     const { id } = body
 
     if (!id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    }
+
+    const [sm] = await sql`SELECT s.league_id FROM scheduled_matches sm JOIN seasons s ON sm.season_id = s.id WHERE sm.id = ${id}`
+    if (!sm || !await requirePermission(event, 'match_schedule', sm.league_id)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
     await sql`DELETE FROM scheduled_matches WHERE id = ${id}`

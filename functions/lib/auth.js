@@ -22,25 +22,58 @@ export async function verifyAuth(event) {
 }
 
 /**
+ * Resolve the effective user from JWT + optional impersonation.
+ * If x-impersonate header is set and the real user has permission_manage,
+ * returns the impersonated user as `user` and the real caller as `realUser`.
+ * Returns { user, realUser } or null if JWT is invalid.
+ */
+export async function resolveUser(event) {
+    const payload = await verifyAuth(event)
+    if (!payload) return null
+
+    const sql = getDB()
+    const [realUser] = await sql`
+        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
+        FROM users WHERE id = ${payload.userId}
+    `
+    if (!realUser) return null
+
+    const impersonateId = event.headers['x-impersonate']
+    if (impersonateId) {
+        const [hasPermission] = await sql`
+            SELECT 1 FROM user_roles ur
+            JOIN role_permissions rp ON rp.role_id = ur.role_id
+            WHERE ur.user_id = ${realUser.id}
+              AND rp.permission_key = 'permission_manage'
+            LIMIT 1
+        `
+        if (hasPermission) {
+            const [impersonated] = await sql`
+                SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
+                FROM users WHERE id = ${Number(impersonateId)}
+            `
+            if (impersonated) return { user: impersonated, realUser }
+        }
+    }
+
+    return { user: realUser, realUser }
+}
+
+/**
  * Verify JWT and confirm the user is an admin (re-checks DB).
  * Accepts users with role='admin' OR users with any RBAC role assignment.
  * Returns the full user row or null.
  */
 export async function requireAdmin(event) {
-    const payload = await verifyAuth(event)
-    if (!payload) return null
-
-    const sql = getDB()
-    const [user] = await sql`
-        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
-        FROM users WHERE id = ${payload.userId}
-    `
-    if (!user) return null
+    const resolved = await resolveUser(event)
+    if (!resolved) return null
+    const { user } = resolved
 
     // Legacy admin check
     if (user.role === 'admin') return user
 
     // RBAC check: user has any role assignment
+    const sql = getDB()
     const [hasRole] = await sql`
         SELECT 1 FROM user_roles WHERE user_id = ${user.id} LIMIT 1
     `
@@ -55,36 +88,8 @@ export async function requireAdmin(event) {
  * Returns the full user row or null.
  */
 export async function requireAuth(event) {
-    const payload = await verifyAuth(event)
-    if (!payload) return null
-
-    const sql = getDB()
-    const [user] = await sql`
-        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
-        FROM users WHERE id = ${payload.userId}
-    `
-    if (!user) return null
-
-    // Owner impersonation: if x-impersonate header is set and caller has permission_manage (Owner only)
-    const impersonateId = event.headers['x-impersonate']
-    if (impersonateId) {
-        const [hasPermission] = await sql`
-            SELECT 1 FROM user_roles ur
-            JOIN role_permissions rp ON rp.role_id = ur.role_id
-            WHERE ur.user_id = ${user.id}
-              AND rp.permission_key = 'permission_manage'
-            LIMIT 1
-        `
-        if (hasPermission) {
-            const [impersonated] = await sql`
-                SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
-                FROM users WHERE id = ${Number(impersonateId)}
-            `
-            if (impersonated) return impersonated
-        }
-    }
-
-    return user
+    const resolved = await resolveUser(event)
+    return resolved?.user || null
 }
 
 /**
@@ -92,18 +97,14 @@ export async function requireAuth(event) {
  * optionally scoped to a league.
  */
 export async function requirePermission(event, permissionKey, leagueId = undefined) {
-    const payload = await verifyAuth(event)
-    if (!payload) return null
+    const resolved = await resolveUser(event)
+    if (!resolved) return null
+    const { user } = resolved
 
     const sql = getDB()
-    const [user] = await sql`
-        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
-        FROM users WHERE id = ${payload.userId}
-    `
-    if (!user) return null
 
     // undefined = any scope (gate check), null = global only, number = global or that league
-    const leagueFilter = leagueId === undefined
+    const leagueFilt = leagueId === undefined
         ? sql``
         : leagueId === null
             ? sql`AND ur.league_id IS NULL`
@@ -114,7 +115,7 @@ export async function requirePermission(event, permissionKey, leagueId = undefin
         JOIN role_permissions rp ON rp.role_id = ur.role_id
         WHERE ur.user_id = ${user.id}
           AND rp.permission_key = ${permissionKey}
-          ${leagueFilter}
+          ${leagueFilt}
         LIMIT 1
     `
 
@@ -127,17 +128,13 @@ export async function requirePermission(event, permissionKey, leagueId = undefin
  * for the first match, or null if none matched.
  */
 export async function requireAnyPermission(event, permissionKeys, leagueId = undefined) {
-    const payload = await verifyAuth(event)
-    if (!payload) return null
+    const resolved = await resolveUser(event)
+    if (!resolved) return null
+    const { user } = resolved
 
     const sql = getDB()
-    const [user] = await sql`
-        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id
-        FROM users WHERE id = ${payload.userId}
-    `
-    if (!user) return null
 
-    const leagueFilter = leagueId === undefined
+    const leagueFilt = leagueId === undefined
         ? sql``
         : leagueId === null
             ? sql`AND ur.league_id IS NULL`
@@ -149,7 +146,7 @@ export async function requireAnyPermission(event, permissionKeys, leagueId = und
             JOIN role_permissions rp ON rp.role_id = ur.role_id
             WHERE ur.user_id = ${user.id}
               AND rp.permission_key = ${permissionKey}
-              ${leagueFilter}
+              ${leagueFilt}
             LIMIT 1
         `
         if (has) return { user, permissionKey }
@@ -189,6 +186,29 @@ export async function getUserPermissions(userId) {
     }
 
     return { global, byLeague }
+}
+
+/**
+ * Get the league IDs a user is allowed to access for a given permission.
+ * Returns null if user has global access (show all), or number[] of allowed league IDs.
+ */
+export async function getAllowedLeagueIds(userId, permissionKey) {
+    const perms = await getUserPermissions(userId)
+    if (perms.global.includes(permissionKey)) return null
+    const ids = []
+    for (const [lid, keys] of Object.entries(perms.byLeague)) {
+        if (keys.includes(permissionKey)) ids.push(Number(lid))
+    }
+    return ids
+}
+
+/**
+ * Build a SQL fragment to filter by allowed league IDs (expects `l` alias for leagues table).
+ * Returns empty fragment if allowedLeagueIds is null (global access).
+ */
+export function leagueFilter(sql, allowedLeagueIds) {
+    if (allowedLeagueIds === null) return sql``
+    return sql`AND l.id = ANY(${allowedLeagueIds})`
 }
 
 /**
