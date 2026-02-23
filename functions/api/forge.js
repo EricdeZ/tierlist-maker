@@ -51,6 +51,8 @@ const handler = async (event) => {
                     return await fuel(sql, user, body)
                 case 'cool':
                     return await cool(sql, user, body)
+                case 'toggle-status':
+                    return await adminToggleStatus(sql, event, user, body)
                 case 'liquidate':
                     return await adminLiquidate(sql, event, user, body)
                 default:
@@ -426,20 +428,28 @@ async function fuel(sql, user, body) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 10 Sparks per transaction' }) }
     }
 
-    // Prevent trading own team's players
-    const [ownTeamCheck] = await sql`
-        SELECT 1 FROM player_sparks ps
-        JOIN league_players lp ON ps.league_player_id = lp.id
-        WHERE ps.id = ${sparkId}
-          AND lp.team_id IN (
-              SELECT lp2.team_id FROM league_players lp2
-              JOIN teams t ON t.id = lp2.team_id
-              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                AND lp2.is_active = true
-          )
+    // Prevent trading own team's players (owners bypass)
+    const [isOwner] = await sql`
+        SELECT 1 FROM user_roles ur
+        JOIN role_permissions rp ON rp.role_id = ur.role_id
+        WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
+        LIMIT 1
     `
-    if (ownTeamCheck) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot fuel players on your own team' }) }
+    if (!isOwner) {
+        const [ownTeamCheck] = await sql`
+            SELECT 1 FROM player_sparks ps
+            JOIN league_players lp ON ps.league_player_id = lp.id
+            WHERE ps.id = ${sparkId}
+              AND lp.team_id IN (
+                  SELECT lp2.team_id FROM league_players lp2
+                  JOIN teams t ON t.id = lp2.team_id
+                  WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                    AND lp2.is_active = true
+              )
+        `
+        if (ownTeamCheck) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot fuel players on your own team' }) }
+        }
     }
 
     try {
@@ -485,20 +495,28 @@ async function cool(sql, user, body) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId and sparks (>= 1) are required' }) }
     }
 
-    // Prevent trading own team's players
-    const [ownTeamCheck] = await sql`
-        SELECT 1 FROM player_sparks ps
-        JOIN league_players lp ON ps.league_player_id = lp.id
-        WHERE ps.id = ${sparkId}
-          AND lp.team_id IN (
-              SELECT lp2.team_id FROM league_players lp2
-              JOIN teams t ON t.id = lp2.team_id
-              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                AND lp2.is_active = true
-          )
+    // Prevent trading own team's players (owners bypass)
+    const [isOwnerCool] = await sql`
+        SELECT 1 FROM user_roles ur
+        JOIN role_permissions rp ON rp.role_id = ur.role_id
+        WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
+        LIMIT 1
     `
-    if (ownTeamCheck) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot cool players on your own team' }) }
+    if (!isOwnerCool) {
+        const [ownTeamCheck] = await sql`
+            SELECT 1 FROM player_sparks ps
+            JOIN league_players lp ON ps.league_player_id = lp.id
+            WHERE ps.id = ${sparkId}
+              AND lp.team_id IN (
+                  SELECT lp2.team_id FROM league_players lp2
+                  JOIN teams t ON t.id = lp2.team_id
+                  WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                    AND lp2.is_active = true
+              )
+        `
+        if (ownTeamCheck) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot cool players on your own team' }) }
+        }
     }
 
     try {
@@ -559,6 +577,50 @@ async function cool(sql, user, body) {
 // ═══════════════════════════════════════════════════
 // POST: Admin liquidate a market
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// POST: Toggle market status (open/closed) — Owner only
+// ═══════════════════════════════════════════════════
+async function adminToggleStatus(sql, event, user, body) {
+    const admin = await requirePermission(event, 'permission_manage')
+    if (!admin) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
+    }
+
+    const { seasonId, status } = body
+    if (!seasonId || !['open', 'closed'].includes(status)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId and status (open|closed) are required' }) }
+    }
+
+    const [market] = await sql`
+        SELECT id, status FROM forge_markets WHERE season_id = ${seasonId}
+    `
+    if (!market) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'No market found for this season' }) }
+    }
+    if (market.status === 'liquidated') {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot toggle a liquidated market' }) }
+    }
+
+    await sql`
+        UPDATE forge_markets SET status = ${status} WHERE id = ${market.id}
+    `
+
+    await logAudit(sql, admin, {
+        action: `forge-market-${status}`,
+        endpoint: 'forge',
+        targetType: 'forge_market',
+        targetId: market.id,
+        details: { seasonId, newStatus: status },
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, status }),
+    }
+}
+
+
 async function adminLiquidate(sql, event, user, body) {
     const admin = await requirePermission(event, 'league_manage')
     if (!admin) {

@@ -380,6 +380,10 @@ export const forgeService = {
     async liquidate(seasonId) {
         return apiPost('forge', { action: 'liquidate' }, { seasonId })
     },
+
+    async toggleStatus(seasonId, status) {
+        return apiPost('forge', { action: 'toggle-status' }, { seasonId, status })
+    },
 }
 
 export const predictionsService = {

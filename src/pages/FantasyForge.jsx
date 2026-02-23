@@ -21,13 +21,15 @@ import './forge/forge.css'
 const SEASON_KEY = 'smite2_forge_season'
 
 export default function FantasyForge() {
-    const { user, login, loading: authLoading } = useAuth()
+    const { user, login, loading: authLoading, hasPermission } = useAuth()
     const { balance, refreshBalance } = usePassion()
     const [activeTab, setActiveTab] = useState('market')
     const [loading, setLoading] = useState(true)
     const [seasonsLoaded, setSeasonsLoaded] = useState(false)
     const [initialDataLoaded, setInitialDataLoaded] = useState(false)
     const [error, setError] = useState(null)
+
+    const isOwner = hasPermission('permission_manage')
 
     // Market state
     const [market, setMarket] = useState(null)
@@ -299,6 +301,19 @@ export default function FantasyForge() {
         }
     }
 
+    // ── Toggle market status (owner only) ──
+    const toggleMarketStatus = async () => {
+        if (!market || !isOwner) return
+        const newStatus = market.status === 'open' ? 'closed' : 'open'
+        try {
+            await forgeService.toggleStatus(seasonId, newStatus)
+            setMarket(prev => ({ ...prev, status: newStatus }))
+            setToastMessage(`Forge market ${newStatus === 'open' ? 'opened' : 'closed'}`)
+        } catch (err) {
+            setToastMessage(`Failed: ${err.message}`)
+        }
+    }
+
     // ── Fuel spectacle: burst + shake + flash + toast ──
     const triggerFuelSpectacle = (playerName) => {
         // 1. Fire burst at center of screen
@@ -467,13 +482,26 @@ export default function FantasyForge() {
                                 </span>
                             </div>
                             {market?.status === 'open' && (
-                                <div className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)]">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_8px_var(--forge-gain)]" style={{ animation: 'forge-blink 2s infinite' }} />
-                                    Active
-                                </div>
+                                isOwner ? (
+                                    <button onClick={toggleMarketStatus} className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)] cursor-pointer hover:opacity-80 transition-opacity" title="Click to close market">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_8px_var(--forge-gain)]" style={{ animation: 'forge-blink 2s infinite' }} />
+                                        Open
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)]">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_8px_var(--forge-gain)]" style={{ animation: 'forge-blink 2s infinite' }} />
+                                        Open
+                                    </div>
+                                )
                             )}
                             {market?.status === 'closed' && (
-                                <span className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-loss)]">Closed</span>
+                                isOwner ? (
+                                    <button onClick={toggleMarketStatus} className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-loss)] cursor-pointer hover:opacity-80 transition-opacity" title="Click to open market">
+                                        Closed
+                                    </button>
+                                ) : (
+                                    <span className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-loss)]">Closed</span>
+                                )
                             )}
                             {market?.status === 'liquidated' && (
                                 <span className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-text-dim)]">Season Ended</span>
@@ -526,6 +554,7 @@ export default function FantasyForge() {
                             featuredPlayer={featuredPlayer}
                             historyData={historyData}
                             userTeamId={userTeamId}
+                            isOwner={isOwner}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}

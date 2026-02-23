@@ -67,7 +67,7 @@ function TeamFilterDropdown({ teams, value, onChange }) {
 export default function ForgeMarketTab({
     players, allPlayers, teams,
     search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
-    loading, marketStatus, featuredPlayer, historyData, userTeamId,
+    loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
     onFuel, onCool, onSelectPlayer,
 }) {
     if (loading) {
@@ -110,6 +110,7 @@ export default function ForgeMarketTab({
                     historyData={historyData}
                     marketStatus={marketStatus}
                     userTeamId={userTeamId}
+                    isOwner={isOwner}
                     onFuel={onFuel}
                     onCool={onCool}
                 />
@@ -132,6 +133,7 @@ export default function ForgeMarketTab({
                                 selected={featuredPlayer?.sparkId === p.sparkId}
                                 marketStatus={marketStatus}
                                 userTeamId={userTeamId}
+                                isOwner={isOwner}
                                 onSelect={onSelectPlayer}
                                 onFuel={onFuel}
                                 onCool={onCool}
@@ -184,6 +186,7 @@ export default function ForgeMarketTab({
                         selected={featuredPlayer?.sparkId === p.sparkId}
                         marketStatus={marketStatus}
                         userTeamId={userTeamId}
+                        isOwner={isOwner}
                         onSelect={onSelectPlayer}
                         onFuel={onFuel}
                         onCool={onCool}
