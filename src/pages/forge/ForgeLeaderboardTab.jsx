@@ -1,11 +1,17 @@
 import { Trophy } from 'lucide-react'
 import passionCoin from '../../assets/passion/passion.png'
+import sparkIcon from '../../assets/spark.png'
+import forgeLogo from '../../assets/forge.png'
 
 export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserId }) {
     if (loading) {
         return (
-            <div className="text-center py-12">
+            <div className="flex flex-col items-center justify-center py-16">
+                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading leaderboard...</div>
+                <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
+                    <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
+                </div>
             </div>
         )
     }
@@ -20,14 +26,14 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
     }
 
     return (
-        <div className="max-w-2xl mx-auto space-y-[2px]">
+        <div className="max-w-2xl mx-auto space-y-[2px] forge-stagger">
             {leaderboard.map((entry) => {
                 const isMe = entry.userId === currentUserId
 
                 return (
                     <div
                         key={entry.userId}
-                        className={`flex items-center gap-3 p-3 transition-all ${
+                        className={`forge-lb-row flex items-center gap-3 p-3 ${
                             isMe
                                 ? 'bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/25'
                                 : 'bg-[var(--forge-panel)] border border-transparent'
@@ -64,9 +70,10 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                                 {entry.username || 'Unknown'}
                                 {isMe && <span className="text-[var(--forge-flame-bright)] text-sm ml-1">(you)</span>}
                             </div>
-                            <div className="text-sm text-[var(--forge-text-dim)]">
+                            <div className="text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
                                 <span className="forge-num">{entry.holdingsCount}</span> player{entry.holdingsCount !== 1 ? 's' : ''}
                                 {' '}&middot;{' '}
+                                <img src={sparkIcon} alt="" className="w-3 h-3 object-contain inline" />
                                 <span className="forge-num">{entry.totalSparks}</span> Spark{entry.totalSparks !== 1 ? 's' : ''}
                             </div>
                         </div>

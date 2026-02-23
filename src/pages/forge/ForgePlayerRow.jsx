@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { Flame, Snowflake } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
-import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
+import sparkIcon from '../../assets/spark.png'
+import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 
-export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, onSelect, onFuel, onCool }) {
+export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, onSelect, onFuel, onCool }) {
     const chartRef = useRef(null)
-    const tier = getHeatTier(player.priceChange24h)
+    const change = getActiveChange(player, changeView)
+    const tier = getHeatTier(change)
     const isOpen = marketStatus === 'open'
     const isOwnTeam = !isOwner && userTeamId && player.teamId === userTeamId
-    const change = player.priceChange24h
     const isUp = change > 0
     const isDown = change < 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
@@ -26,7 +27,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
 
     return (
         <div
-            className={`forge-${tier} grid items-center bg-[var(--forge-panel)] py-2 cursor-pointer border border-transparent transition-all hover:bg-[var(--forge-panel)]/80 hover:border-[var(--forge-border)] hover:translate-x-1 group ${
+            className={`forge-${tier} forge-player-row grid items-center bg-[var(--forge-panel)] py-2 cursor-pointer border border-transparent hover:bg-[var(--forge-panel)]/80 hover:border-[var(--forge-border)] group ${
                 selected ? 'forge-row-selected' : ''
             }`}
             style={{
@@ -99,7 +100,10 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
 
             {/* Sparks */}
             <div className="text-center px-2 hidden sm:block">
-                <div className="forge-num text-[0.95rem] text-[var(--forge-text-mid)]">{player.totalSparks}</div>
+                <div className="forge-num text-[0.95rem] text-[var(--forge-text-mid)] flex items-center justify-center gap-1">
+                    <img src={sparkIcon} alt="" className="w-3.5 h-3.5 object-contain" />
+                    {player.totalSparks}
+                </div>
                 <div className="text-[0.65rem] text-[var(--forge-text-dim)] uppercase tracking-wider">sparks</div>
             </div>
 
@@ -109,7 +113,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                     <>
                         <button
                             onClick={e => { e.stopPropagation(); onFuel(player) }}
-                            className="py-1.5 px-3 forge-head text-[0.95rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn transition-all hover:shadow-[0_2px_14px_rgba(232,101,32,0.5)]"
+                            className="py-1.5 px-3 forge-head text-[0.95rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn forge-btn-fuel"
                             style={{
                                 background: 'var(--forge-flame)',
                                 boxShadow: '0 2px 8px rgba(232,101,32,0.25)',
@@ -120,7 +124,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                         {player.holding && player.holding.sparks > 0 && (
                             <button
                                 onClick={e => { e.stopPropagation(); onCool(player) }}
-                                className="py-1.5 px-3 forge-head text-[0.95rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer transition-colors hover:bg-[var(--forge-cool)]/12"
+                                className="py-1.5 px-3 forge-head text-[0.95rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-btn-cool"
                             >
                                 Cool
                             </button>

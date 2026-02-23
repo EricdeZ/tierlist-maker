@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { Flame, Snowflake } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
-import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
+import sparkIcon from '../../assets/spark.png'
+import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 
-export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, onFuel, onCool }) {
+export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, onFuel, onCool }) {
     const chartRef = useRef(null)
     const nameRef = useRef(null)
     const prevPlayerRef = useRef(null)
@@ -31,24 +32,26 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
         if (!chartRef.current) return
         const data = historyData?.length ? historyData : FALLBACK_HISTORY
         const hasData = historyData?.length > 0
-        const tier = getHeatTier(player?.priceChange24h)
+        const change = getActiveChange(player, changeView)
+        const tier = getHeatTier(change)
         const colors = hasData ? (SPARK_COLORS[tier] || SPARK_COLORS.warm) : SPARK_COLORS.neutral
         drawSparkline(chartRef.current, data, { lineColor: colors.line, fillColor: colors.fill })
-    }, [historyData, player?.priceChange24h])
+    }, [historyData, player?.priceChange24h, player?.priceChange7d, changeView])
 
     if (!player) return null
 
-    const tier = getHeatTier(player.priceChange24h)
+    const change = getActiveChange(player, changeView)
+    const tier = getHeatTier(change)
     const isOpen = marketStatus === 'open'
     const isOwnTeam = !isOwner && userTeamId && player.teamId === userTeamId
-    const change = player.priceChange24h
     const isUp = change > 0
     const isDown = change < 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
+    const changeLabel = changeView === '7d' ? '7d Change' : '24h Change'
 
     return (
-        <div className="relative mb-4 bg-[var(--forge-panel)] border border-[var(--forge-edge)] overflow-hidden min-h-[200px] flex">
+        <div className="forge-hero relative mb-4 bg-[var(--forge-panel)] border border-[var(--forge-edge)] overflow-hidden min-h-[200px] flex">
             {/* Left accent line */}
             <div className="absolute top-0 left-0 w-[3px] h-full forge-accent-line z-10" />
 
@@ -136,7 +139,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                             <div className={`forge-num text-[1.9rem] leading-none ${isUp ? 'text-[var(--forge-gain)]' : isDown ? 'text-[var(--forge-loss)]' : 'text-white'}`}>
                                 {change != null ? `${isUp ? '+' : ''}${change.toFixed(1)}%` : '\u00B10%'}
                             </div>
-                            <div className="forge-head text-[0.75rem] font-medium tracking-wider text-[var(--forge-text-dim)] mt-0.5">24h Change</div>
+                            <div className="forge-head text-[0.75rem] font-medium tracking-wider text-[var(--forge-text-dim)] mt-0.5">{changeLabel}</div>
                         </div>
                         {player.perfMultiplier != null && (
                             <div>
@@ -151,7 +154,8 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                             </div>
                         )}
                         <div>
-                            <div className="forge-num text-[1.9rem] leading-none text-[var(--forge-text)]">
+                            <div className="forge-num text-[1.9rem] leading-none text-[var(--forge-text)] flex items-center gap-1.5">
+                                <img src={sparkIcon} alt="" className="w-5 h-5 object-contain inline -mt-0.5" />
                                 {player.totalSparks}
                             </div>
                             <div className="forge-head text-[0.75rem] font-medium tracking-wider text-[var(--forge-text-dim)] mt-0.5">Sparks</div>
@@ -164,7 +168,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                     <div className="flex flex-col gap-2 flex-shrink-0">
                         <button
                             onClick={() => onFuel(player)}
-                            className="forge-clip-btn forge-head text-[1rem] font-bold tracking-wider px-5 py-3 text-white flex items-center gap-2 transition-all hover:-translate-y-0.5"
+                            className="forge-clip-btn forge-btn-fuel forge-head text-[1rem] font-bold tracking-wider px-5 py-3 text-white flex items-center gap-2"
                             style={{
                                 background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
                                 boxShadow: '0 4px 20px rgba(232,101,32,0.3)',
@@ -176,7 +180,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                         {player.holding && player.holding.sparks > 0 && (
                             <button
                                 onClick={() => onCool(player)}
-                                className="forge-clip-btn forge-head text-[1rem] font-bold tracking-wider px-5 py-3 text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/20 flex items-center gap-2 transition-colors hover:bg-[var(--forge-cool)]/12"
+                                className="forge-clip-btn forge-btn-cool forge-head text-[1rem] font-bold tracking-wider px-5 py-3 text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/20 flex items-center gap-2"
                             >
                                 <Snowflake size={16} />
                                 Cool

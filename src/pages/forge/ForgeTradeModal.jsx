@@ -1,6 +1,7 @@
 import { Flame, Snowflake, ChevronDown, ChevronUp, X } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import passionCoin from '../../assets/passion/passion.png'
+import sparkIcon from '../../assets/spark.png'
 
 export default function ForgeTradeModal({
     player, mode, amount, setAmount, balance,
@@ -103,9 +104,10 @@ export default function ForgeTradeModal({
                                 >
                                     <ChevronDown size={16} />
                                 </button>
-                                <div className="flex-1 text-center">
+                                <div className="flex-1 text-center flex items-center justify-center gap-2">
                                     <span className="forge-num text-4xl">{amount}</span>
-                                    <span className="forge-head text-sm text-[var(--forge-text-dim)] ml-1">
+                                    <img src={sparkIcon} alt="" className="w-6 h-6 object-contain" />
+                                    <span className="forge-head text-sm text-[var(--forge-text-dim)]">
                                         Spark{amount !== 1 ? 's' : ''}
                                     </span>
                                 </div>
@@ -149,10 +151,10 @@ export default function ForgeTradeModal({
                         <button
                             onClick={onExecute}
                             disabled={trading}
-                            className={`w-full py-3 forge-head text-base font-bold tracking-wider transition-all disabled:opacity-50 forge-clip-btn ${
+                            className={`w-full py-3 forge-head text-base font-bold tracking-wider disabled:opacity-50 forge-clip-btn ${
                                 isFuel
-                                    ? 'text-white shadow-[0_4px_20px_rgba(232,101,32,0.3)] hover:shadow-[0_4px_30px_rgba(232,101,32,0.5)] hover:-translate-y-0.5'
-                                    : 'text-white'
+                                    ? 'text-white forge-btn-fuel'
+                                    : 'text-white forge-btn-cool'
                             }`}
                             style={{
                                 background: isFuel

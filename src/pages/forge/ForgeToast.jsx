@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import sparkIcon from '../../assets/spark.png'
 
 export default function ForgeToast({ message, onDone }) {
     const [phase, setPhase] = useState('show') // show → hide → gone
@@ -18,7 +19,7 @@ export default function ForgeToast({ message, onDone }) {
 
     return (
         <div className={`forge-toast ${phase}`}>
-            <span className="text-xl">&#128293;</span>
+            <img src={sparkIcon} alt="" className="w-5 h-5 object-contain" />
             <span>{message}</span>
         </div>
     )

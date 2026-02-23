@@ -132,18 +132,32 @@ async function getMarket(sql, user, params, event) {
         }
     }
 
-    // Get 24h price change from history
-    const priceChanges = sparkIds.length > 0 ? await sql`
-        SELECT DISTINCT ON (spark_id) spark_id, price
-        FROM spark_price_history
-        WHERE spark_id = ANY(${sparkIds})
-          AND created_at <= NOW() - INTERVAL '24 hours'
-        ORDER BY spark_id, created_at DESC
-    ` : []
+    // Get 24h and 7d price changes from history
+    const [priceChanges24h, priceChanges7d] = sparkIds.length > 0 ? await Promise.all([
+        sql`
+            SELECT DISTINCT ON (spark_id) spark_id, price
+            FROM spark_price_history
+            WHERE spark_id = ANY(${sparkIds})
+              AND created_at <= NOW() - INTERVAL '24 hours'
+            ORDER BY spark_id, created_at DESC
+        `,
+        sql`
+            SELECT DISTINCT ON (spark_id) spark_id, price
+            FROM spark_price_history
+            WHERE spark_id = ANY(${sparkIds})
+              AND created_at <= NOW() - INTERVAL '7 days'
+            ORDER BY spark_id, created_at DESC
+        `,
+    ]) : [[], []]
 
     const priceChangeMap = {}
-    for (const pc of priceChanges) {
+    for (const pc of priceChanges24h) {
         priceChangeMap[pc.spark_id] = Number(pc.price)
+    }
+
+    const priceChange7dMap = {}
+    for (const pc of priceChanges7d) {
+        priceChange7dMap[pc.spark_id] = Number(pc.price)
     }
 
     // Get user's team for this season (to prevent self-trading)
@@ -161,9 +175,13 @@ async function getMarket(sql, user, params, event) {
     const result = sparks.map(s => {
         const holding = holdingsMap[s.spark_id] || null
         const price24hAgo = priceChangeMap[s.spark_id]
+        const price7dAgo = priceChange7dMap[s.spark_id]
         const currentPrice = Number(s.current_price)
         const priceChange = price24hAgo
             ? Math.round((currentPrice - price24hAgo) / price24hAgo * 10000) / 100
+            : null
+        const priceChange7d = price7dAgo
+            ? Math.round((currentPrice - price7dAgo) / price7dAgo * 10000) / 100
             : null
 
         return {
@@ -179,6 +197,7 @@ async function getMarket(sql, user, params, event) {
             totalSparks: s.total_sparks,
             perfMultiplier: Number(s.perf_multiplier),
             priceChange24h: priceChange,
+            priceChange7d,
             holding,
             godImageUrl: s.god_image_url || null,
         }

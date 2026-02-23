@@ -5,6 +5,7 @@ import { SORT_OPTIONS } from './forgeConstants'
 import ForgeHero from './ForgeHero'
 import ForgePlayerCard from './ForgePlayerCard'
 import ForgePlayerRow from './ForgePlayerRow'
+import forgeLogo from '../../assets/forge.png'
 
 function TeamFilterDropdown({ teams, value, onChange }) {
     const [open, setOpen] = useState(false)
@@ -68,12 +69,17 @@ export default function ForgeMarketTab({
     players, allPlayers, teams,
     search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
+    changeView,
     onFuel, onCool, onSelectPlayer,
 }) {
     if (loading) {
         return (
-            <div className="text-center py-12">
+            <div className="flex flex-col items-center justify-center py-16">
+                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading the Forge...</div>
+                <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
+                    <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
+                </div>
             </div>
         )
     }
@@ -111,6 +117,7 @@ export default function ForgeMarketTab({
                     marketStatus={marketStatus}
                     userTeamId={userTeamId}
                     isOwner={isOwner}
+                    changeView={changeView}
                     onFuel={onFuel}
                     onCool={onCool}
                 />
@@ -125,7 +132,7 @@ export default function ForgeMarketTab({
                         </h2>
                         <div className="forge-section-accent" />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5 forge-stagger">
                         {top3.map(p => (
                             <ForgePlayerCard
                                 key={p.sparkId}
@@ -134,6 +141,7 @@ export default function ForgeMarketTab({
                                 marketStatus={marketStatus}
                                 userTeamId={userTeamId}
                                 isOwner={isOwner}
+                                changeView={changeView}
                                 onSelect={onSelectPlayer}
                                 onFuel={onFuel}
                                 onCool={onCool}
@@ -157,7 +165,7 @@ export default function ForgeMarketTab({
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search players, teams..."
-                    className="flex-1 py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-lg outline-none focus:border-[var(--forge-border-lt)] placeholder:text-[var(--forge-text-dim)]"
+                    className="flex-1 py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-lg outline-none focus:border-[var(--forge-flame)]/40 transition-colors placeholder:text-[var(--forge-text-dim)]"
                 />
 
                 <TeamFilterDropdown
@@ -178,7 +186,7 @@ export default function ForgeMarketTab({
             </div>
 
             {/* Player rows */}
-            <div className="flex flex-col gap-[2px]">
+            <div className="flex flex-col gap-[2px] forge-stagger">
                 {tableRows.map(p => (
                     <ForgePlayerRow
                         key={p.sparkId}
@@ -187,6 +195,7 @@ export default function ForgeMarketTab({
                         marketStatus={marketStatus}
                         userTeamId={userTeamId}
                         isOwner={isOwner}
+                        changeView={changeView}
                         onSelect={onSelectPlayer}
                         onFuel={onFuel}
                         onCool={onCool}

@@ -15,12 +15,17 @@ export const SORT_OPTIONS = [
     { key: 'name-asc', label: 'Name (A-Z)' },
 ]
 
-// Heat tier thresholds based on 24h price change
-export function getHeatTier(priceChange24h) {
-    if (priceChange24h == null) return 'warm'
-    if (priceChange24h > 10) return 'blazing'
-    if (priceChange24h > 0) return 'warm'
+// Heat tier thresholds based on price change (supports 24h or 7d)
+export function getHeatTier(priceChange) {
+    if (priceChange == null) return 'warm'
+    if (priceChange > 10) return 'blazing'
+    if (priceChange > 0) return 'warm'
     return 'cooling'
+}
+
+// Get the active change value based on period
+export function getActiveChange(player, changeView) {
+    return changeView === '7d' ? player.priceChange7d : player.priceChange24h
 }
 
 // Forge color tokens — CSS custom properties are defined in forge.css,

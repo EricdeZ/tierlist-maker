@@ -1,5 +1,7 @@
 import { Zap, Flame, Snowflake, Wallet } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
+import sparkIcon from '../../assets/spark.png'
+import forgeLogo from '../../assets/forge.png'
 import passionCoin from '../../assets/passion/passion.png'
 import { getHeatTier } from './forgeConstants'
 
@@ -28,8 +30,12 @@ function StatBlock({ label, value, icon: Icon, color, prefix = '', raw = false }
 export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
     if (loading) {
         return (
-            <div className="text-center py-12">
+            <div className="flex flex-col items-center justify-center py-16">
+                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading your Sparks...</div>
+                <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
+                    <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
+                </div>
             </div>
         )
     }
@@ -37,7 +43,7 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
     if (!portfolio || portfolio.holdings.length === 0) {
         return (
             <div className="text-center py-12">
-                <Zap className="mx-auto mb-3 opacity-30" size={40} style={{ color: 'var(--forge-text-dim)' }} />
+                <img src={sparkIcon} alt="" className="w-10 h-10 object-contain mx-auto mb-3 opacity-30" />
                 <p className="forge-body text-[var(--forge-text-dim)]">You haven't fueled any players yet.</p>
                 <p className="text-xs text-[var(--forge-text-dim)] mt-1 opacity-60">Head to The Forge to get started!</p>
             </div>
@@ -69,14 +75,14 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
             )}
 
             {/* Holdings */}
-            <div className="space-y-[2px]">
+            <div className="space-y-[2px] forge-stagger">
                 {portfolio.holdings.map(h => {
                     const tier = getHeatTier(h.priceChange24h)
 
                     return (
                         <div
                             key={h.sparkId}
-                            className={`forge-${tier} flex items-center gap-3 p-3 bg-[var(--forge-panel)] border border-transparent hover:border-[var(--forge-border-lt)] transition-all`}
+                            className={`forge-${tier} forge-holding flex items-center gap-3 p-3 bg-[var(--forge-panel)] border border-transparent`}
                         >
                             {/* Heat bar */}
                             <div className="w-1 h-10 rounded-sm forge-heat-bar" />
@@ -89,7 +95,11 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
                                     <TeamLogo slug={h.teamSlug} name={h.teamName} size={14} />
                                     <span style={{ color: h.teamColor }}>{h.teamName}</span>
                                     {h.role && <span className="opacity-60"> &middot; {h.role}</span>}
-                                    <span className="opacity-60"> &middot; <span className="forge-num">{h.sparks}</span> Spark{h.sparks !== 1 ? 's' : ''}</span>
+                                    <span className="opacity-60 flex items-center gap-0.5">
+                                        &middot;
+                                        <img src={sparkIcon} alt="" className="w-3 h-3 object-contain inline" />
+                                        <span className="forge-num">{h.sparks}</span> Spark{h.sparks !== 1 ? 's' : ''}
+                                    </span>
                                 </div>
                             </div>
 
@@ -105,7 +115,7 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
 
                             <button
                                 onClick={() => onCool(h.sparkId, h.playerName, { sparks: h.sparks })}
-                                className="p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] hover:bg-[var(--forge-cool)]/15 transition-colors forge-clip-btn"
+                                className="p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] forge-btn-cool forge-clip-btn"
                                 title="Cool"
                             >
                                 <Snowflake size={14} />
@@ -126,7 +136,7 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
                     </div>
                     <div className="space-y-1">
                         {portfolio.transactions.map(t => (
-                            <div key={t.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--forge-panel)]/40 text-base">
+                            <div key={t.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--forge-panel)]/40 text-base hover:bg-[var(--forge-panel)]/60 transition-colors">
                                 {t.type === 'fuel' ? (
                                     <Flame size={14} className="text-[var(--forge-flame)] flex-shrink-0" />
                                 ) : (
@@ -134,7 +144,10 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
                                 )}
                                 <span className="forge-body flex-1 min-w-0 truncate">
                                     {t.type === 'fuel' ? 'Fueled' : t.type === 'cool' ? 'Cooled' : 'Liquidated'} {t.playerName}
-                                    <span className="opacity-50"> (<span className="forge-num">{t.sparks}</span> Spark{t.sparks !== 1 ? 's' : ''})</span>
+                                    <span className="opacity-50 inline-flex items-center gap-0.5 ml-1">
+                                        (<img src={sparkIcon} alt="" className="w-3 h-3 object-contain inline" />
+                                        <span className="forge-num">{t.sparks}</span> Spark{t.sparks !== 1 ? 's' : ''})
+                                    </span>
                                 </span>
                                 <span className={`forge-num font-medium ${t.type === 'fuel' ? 'text-[var(--forge-loss)]' : 'text-[var(--forge-gain)]'}`}>
                                     {t.type === 'fuel' ? '-' : '+'}{t.totalCost.toLocaleString()}

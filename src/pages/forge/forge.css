@@ -100,6 +100,36 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes forge-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+@keyframes forge-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes forge-ember-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(232, 101, 32, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(232, 101, 32, 0.5), 0 0 40px rgba(232, 101, 32, 0.15); }
+}
+
+@keyframes forge-heat-bar-pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+@keyframes forge-slide-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes forge-tab-glow {
+    0%, 100% { text-shadow: 0 0 0px transparent; }
+    50% { text-shadow: 0 0 12px rgba(255, 170, 51, 0.4); }
+}
+
 /* ── Screen shake (applied to container) ── */
 .forge-shaking {
     animation: forge-shake 0.4s ease;
@@ -126,12 +156,47 @@
     animation: forge-blink 2s infinite;
 }
 
+/* ── Logo float ── */
+.forge-logo-float {
+    animation: forge-float 3s ease-in-out infinite;
+}
+
+/* ── Loading shimmer ── */
+.forge-shimmer {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(232, 101, 32, 0.08) 40%,
+        rgba(232, 101, 32, 0.15) 50%,
+        rgba(232, 101, 32, 0.08) 60%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: forge-shimmer 2s ease-in-out infinite;
+}
+
+/* ── Staggered fade-in for lists ── */
+.forge-stagger > * {
+    animation: forge-slide-up 0.35s ease both;
+}
+.forge-stagger > *:nth-child(1) { animation-delay: 0s; }
+.forge-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.forge-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.forge-stagger > *:nth-child(4) { animation-delay: 0.15s; }
+.forge-stagger > *:nth-child(5) { animation-delay: 0.2s; }
+.forge-stagger > *:nth-child(6) { animation-delay: 0.25s; }
+.forge-stagger > *:nth-child(7) { animation-delay: 0.3s; }
+.forge-stagger > *:nth-child(8) { animation-delay: 0.35s; }
+.forge-stagger > *:nth-child(9) { animation-delay: 0.4s; }
+.forge-stagger > *:nth-child(10) { animation-delay: 0.45s; }
+
 /* ── Heat tier modifiers ── */
 
 /* Blazing (>10% gain) */
 .forge-blazing .forge-heat-bar {
     background: linear-gradient(180deg, var(--forge-flame-bright), var(--forge-ember));
     box-shadow: 0 0 4px rgba(232, 101, 32, 0.3);
+    animation: forge-heat-bar-pulse 2s ease-in-out infinite;
 }
 
 .forge-blazing .forge-price-text {
@@ -257,12 +322,118 @@
     background: rgba(232, 101, 32, 0.03) !important;
 }
 
+/* ── Player row hover effects ── */
+.forge-player-row {
+    transition: all 0.2s ease;
+}
+.forge-player-row:hover .forge-heat-bar {
+    box-shadow: 0 0 8px rgba(232, 101, 32, 0.4);
+    width: 3px;
+}
+.forge-player-row .forge-heat-bar {
+    transition: all 0.2s ease;
+    width: 4px;
+}
+
+/* ── Player card hover glow ── */
+.forge-player-card {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.forge-player-card:hover {
+    border-color: rgba(232, 101, 32, 0.3) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(232, 101, 32, 0.08);
+    transform: translateY(-4px);
+}
+
+/* ── Fuel button glow on hover ── */
+.forge-btn-fuel {
+    transition: all 0.25s ease;
+    position: relative;
+}
+.forge-btn-fuel:hover {
+    box-shadow: 0 4px 24px rgba(232, 101, 32, 0.5), 0 0 40px rgba(232, 101, 32, 0.2) !important;
+    transform: translateY(-2px);
+}
+
+/* ── Cool button frost on hover ── */
+.forge-btn-cool {
+    transition: all 0.25s ease;
+}
+.forge-btn-cool:hover {
+    box-shadow: 0 4px 20px rgba(68, 153, 187, 0.3);
+    transform: translateY(-1px);
+}
+
+/* ── Tab active glow ── */
+.forge-tab-active {
+    animation: forge-tab-glow 3s ease-in-out infinite;
+}
+
+/* ── Tab underline slide ── */
+.forge-tab-underline {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Change toggle pill ── */
+.forge-change-toggle {
+    position: relative;
+    overflow: hidden;
+}
+.forge-change-toggle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(232, 101, 32, 0.06), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.forge-change-toggle:hover::after {
+    opacity: 1;
+}
+
+/* ── Ember glow for logo ── */
+.forge-logo-glow {
+    animation: forge-ember-glow 3s ease-in-out infinite;
+}
+
+/* ── Hero container hover ── */
+.forge-hero {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.forge-hero:hover {
+    border-color: rgba(232, 101, 32, 0.2);
+    box-shadow: 0 4px 40px rgba(232, 101, 32, 0.08);
+}
+
+/* ── Leaderboard row hover ── */
+.forge-lb-row {
+    transition: all 0.2s ease;
+}
+.forge-lb-row:hover {
+    background: rgba(232, 101, 32, 0.04);
+    transform: translateX(4px);
+}
+
+/* ── Portfolio holding hover ── */
+.forge-holding {
+    transition: all 0.2s ease;
+}
+.forge-holding:hover {
+    background: rgba(232, 101, 32, 0.04);
+    border-color: rgba(232, 101, 32, 0.15) !important;
+    transform: translateX(4px);
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
     .forge-hex-outer,
     .forge-hex-glow,
     .forge-shaking,
-    .forge-num-pop {
+    .forge-num-pop,
+    .forge-logo-float,
+    .forge-shimmer,
+    .forge-logo-glow,
+    .forge-tab-active {
         animation: none !important;
     }
 
@@ -273,5 +444,17 @@
 
     .forge-toast.show {
         transform: translateX(-50%) translateY(0);
+    }
+
+    .forge-stagger > * {
+        animation: none !important;
+        opacity: 1;
+    }
+
+    .forge-player-card:hover,
+    .forge-player-row:hover,
+    .forge-lb-row:hover,
+    .forge-holding:hover {
+        transform: none;
     }
 }

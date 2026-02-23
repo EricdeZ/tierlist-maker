@@ -5,8 +5,8 @@ import { usePassion } from '../context/PassionContext'
 import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import passionCoin from '../assets/passion/passion.png'
-import { Flame, ChevronDown } from 'lucide-react'
+import forgeLogo from '../assets/forge.png'
+import { ChevronDown } from 'lucide-react'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
 
@@ -20,6 +20,7 @@ import ForgeToast from './forge/ForgeToast'
 import './forge/forge.css'
 
 const SEASON_KEY = 'smite2_forge_season'
+const CHANGE_VIEW_KEY = 'smite2_forge_change_view'
 
 export default function FantasyForge() {
     const { leagueSlug: urlLeagueSlug, divisionSlug: urlDivisionSlug } = useParams()
@@ -33,6 +34,17 @@ export default function FantasyForge() {
     const [error, setError] = useState(null)
 
     const isOwner = hasPermission('permission_manage')
+
+    // Change view toggle (24h vs 7d)
+    const [changeView, setChangeView] = useState(() => {
+        try { return localStorage.getItem(CHANGE_VIEW_KEY) || '24h' }
+        catch { return '24h' }
+    })
+    const toggleChangeView = () => {
+        const next = changeView === '24h' ? '7d' : '24h'
+        setChangeView(next)
+        localStorage.setItem(CHANGE_VIEW_KEY, next)
+    }
 
     // Market state
     const [market, setMarket] = useState(null)
@@ -285,7 +297,10 @@ export default function FantasyForge() {
         list.sort((a, b) => {
             let va, vb
             if (key === 'price') { va = a.currentPrice; vb = b.currentPrice }
-            else if (key === 'change') { va = a.priceChange24h ?? -999; vb = b.priceChange24h ?? -999 }
+            else if (key === 'change') {
+                const cv = changeView === '7d' ? 'priceChange7d' : 'priceChange24h'
+                va = a[cv] ?? -999; vb = b[cv] ?? -999
+            }
             else if (key === 'sparks') { va = a.totalSparks; vb = b.totalSparks }
             else if (key === 'name') { va = a.playerName; vb = b.playerName }
             if (typeof va === 'string') return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
@@ -293,7 +308,7 @@ export default function FantasyForge() {
         })
 
         return list
-    }, [players, search, teamFilter, sortBy])
+    }, [players, search, teamFilter, sortBy, changeView])
 
     // ── Select player for hero ──
     const handleSelectPlayer = (player) => {
@@ -387,18 +402,16 @@ export default function FantasyForge() {
                 <Navbar title="Fantasy Forge" />
                 <PageTitle title="Fantasy Forge" description="Invest your Passion in players. Fuel the players you believe in." />
                 <div className="flex flex-col items-center justify-center pt-48">
-                    <div
-                        className="w-14 h-14 forge-clip-hex flex items-center justify-center text-lg mb-4"
-                        style={{
-                            background: 'var(--forge-flame)',
-                            boxShadow: '0 0 24px rgba(232,101,32,0.4)',
-                            animation: 'forge-glow-pulse 2s ease-in-out infinite',
-                        }}
-                    >
-                        &#9876;
-                    </div>
+                    <img
+                        src={forgeLogo}
+                        alt="Fantasy Forge"
+                        className="w-20 h-20 object-contain forge-logo-float forge-logo-glow rounded-lg mb-4"
+                    />
                     <div className="forge-head text-lg font-semibold tracking-wider text-[var(--forge-text-mid)]">
                         Igniting the Forge...
+                    </div>
+                    <div className="w-48 h-1 mt-3 rounded-full overflow-hidden bg-[var(--forge-edge)]">
+                        <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
                     </div>
                 </div>
             </div>
@@ -412,14 +425,18 @@ export default function FantasyForge() {
                 <Navbar title="Fantasy Forge" />
                 <PageTitle title="Fantasy Forge" description="Invest your Passion in players. Fuel the players you believe in." />
                 <div className="max-w-lg mx-auto px-4 pt-32 text-center">
-                    <Flame className="mx-auto mb-4 text-[var(--forge-flame)]" size={48} />
+                    <img
+                        src={forgeLogo}
+                        alt="Fantasy Forge"
+                        className="w-24 h-24 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow rounded-lg"
+                    />
                     <h2 className="forge-head text-3xl font-bold tracking-wider mb-2">Fantasy Forge</h2>
                     <p className="forge-body text-[var(--forge-text-mid)] mb-6">
                         Fuel the players you believe in with your Passion. Watch their value rise with demand and performance.
                     </p>
                     <button
                         onClick={login}
-                        className="forge-clip-btn forge-head text-base font-bold tracking-wider px-6 py-3 text-white transition-all hover:-translate-y-0.5"
+                        className="forge-clip-btn forge-btn-fuel forge-head text-base font-bold tracking-wider px-6 py-3 text-white"
                         style={{
                             background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
                             boxShadow: '0 4px 20px rgba(232,101,32,0.3)',
@@ -460,21 +477,21 @@ export default function FantasyForge() {
             <div ref={containerRef} className="relative" style={{ zIndex: 1 }}>
                 <div className="max-w-[1300px] mx-auto px-5 pt-24 pb-20">
 
-                    {/* Top bar: brand + passion chip */}
+                    {/* Top bar: brand + controls */}
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[var(--forge-border)] relative">
                         <div className="absolute bottom-[-1px] left-0 w-[200px] h-[2px]" style={{ background: 'linear-gradient(90deg, var(--forge-flame), transparent)' }} />
                         <div className="flex items-center gap-2.5">
-                            <div
-                                className="w-8 h-8 forge-clip-hex flex items-center justify-center text-sm"
-                                style={{ background: 'var(--forge-flame)', boxShadow: '0 0 16px rgba(232,101,32,0.3)' }}
-                            >
-                                &#9876;
-                            </div>
+                            <img
+                                src={forgeLogo}
+                                alt="Forge"
+                                className="w-9 h-9 object-contain forge-logo-glow rounded"
+                            />
                             <div className="forge-head text-[1.6rem] font-bold tracking-wider">
                                 Fantasy <span className="text-[var(--forge-flame-bright)]">Forge</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            {/* Season selector */}
                             {visibleSeasons.length > 1 && (() => {
                                 const selected = visibleSeasons.find(s => s.id === seasonId)
                                 const selectedLeagueLogo = selected ? getLeagueLogo(selected.leagueSlug) : null
@@ -521,12 +538,22 @@ export default function FantasyForge() {
                                     </div>
                                 )
                             })()}
-                            <div className="flex items-center gap-2 px-4 py-1.5 forge-clip-chip" style={{ background: 'rgba(232,101,32,0.06)', border: '1px solid rgba(232,101,32,0.15)' }}>
-                                <img src={passionCoin} alt="" className="w-4 h-4" />
-                                <span className="forge-num text-[1.25rem] text-[var(--forge-gold-bright)]">
-                                    {balance?.toLocaleString() ?? '\u2014'}
+
+                            {/* Change view toggle */}
+                            <button
+                                onClick={toggleChangeView}
+                                className="forge-change-toggle flex items-center forge-head text-[0.85rem] font-semibold tracking-wider cursor-pointer"
+                                title={`Showing ${changeView} change. Click to toggle.`}
+                            >
+                                <span className={`px-2.5 py-1.5 transition-all ${changeView === '24h' ? 'bg-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] border border-[var(--forge-flame)]/25' : 'bg-[var(--forge-panel)] text-[var(--forge-text-dim)] border border-[var(--forge-border)]'}`}>
+                                    24H
                                 </span>
-                            </div>
+                                <span className={`px-2.5 py-1.5 transition-all ${changeView === '7d' ? 'bg-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] border border-[var(--forge-flame)]/25' : 'bg-[var(--forge-panel)] text-[var(--forge-text-dim)] border border-[var(--forge-border)]'}`}>
+                                    7D
+                                </span>
+                            </button>
+
+                            {/* Market status */}
                             {market?.status === 'open' && (
                                 isOwner ? (
                                     <button onClick={toggleMarketStatus} className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)] cursor-pointer hover:opacity-80 transition-opacity" title="Click to close market">
@@ -561,16 +588,16 @@ export default function FantasyForge() {
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`px-6 py-2.5 forge-head text-lg font-semibold tracking-wider relative transition-colors ${
+                                className={`px-6 py-2.5 forge-head text-lg font-semibold tracking-wider relative transition-all ${
                                     activeTab === tab.key
-                                        ? 'text-[var(--forge-flame-bright)]'
-                                        : 'text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)]'
+                                        ? 'text-[var(--forge-flame-bright)] forge-tab-active'
+                                        : 'text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)] hover:bg-[var(--forge-flame)]/3'
                                 }`}
                             >
                                 {tab.label}
                                 {activeTab === tab.key && (
                                     <span
-                                        className="absolute bottom-0 left-3 right-3 h-[2px]"
+                                        className="absolute bottom-0 left-3 right-3 h-[2px] forge-tab-underline"
                                         style={{ background: 'var(--forge-flame)', boxShadow: '0 0 10px rgba(232,101,32,0.4)' }}
                                     />
                                 )}
@@ -601,6 +628,7 @@ export default function FantasyForge() {
                             historyData={historyData}
                             userTeamId={userTeamId}
                             isOwner={isOwner}
+                            changeView={changeView}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
