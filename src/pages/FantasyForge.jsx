@@ -405,7 +405,7 @@ export default function FantasyForge() {
                     <img
                         src={forgeLogo}
                         alt="Fantasy Forge"
-                        className="w-20 h-20 object-contain forge-logo-float forge-logo-glow rounded-lg mb-4"
+                        className="w-20 h-20 object-contain forge-logo-float forge-logo-glow mb-4"
                     />
                     <div className="forge-head text-lg font-semibold tracking-wider text-[var(--forge-text-mid)]">
                         Igniting the Forge...
@@ -428,7 +428,7 @@ export default function FantasyForge() {
                     <img
                         src={forgeLogo}
                         alt="Fantasy Forge"
-                        className="w-24 h-24 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow rounded-lg"
+                        className="w-24 h-24 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow"
                     />
                     <h2 className="forge-head text-3xl font-bold tracking-wider mb-2">Fantasy Forge</h2>
                     <p className="forge-body text-[var(--forge-text-mid)] mb-6">
@@ -484,7 +484,7 @@ export default function FantasyForge() {
                             <img
                                 src={forgeLogo}
                                 alt="Forge"
-                                className="w-9 h-9 object-contain forge-logo-glow rounded"
+                                className="w-9 h-9 object-contain forge-logo-glow"
                             />
                             <div className="forge-head text-[1.6rem] font-bold tracking-wider">
                                 Fantasy <span className="text-[var(--forge-flame-bright)]">Forge</span>

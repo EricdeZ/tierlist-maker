@@ -111,8 +111,8 @@
 }
 
 @keyframes forge-ember-glow {
-    0%, 100% { box-shadow: 0 0 8px rgba(232, 101, 32, 0.2); }
-    50% { box-shadow: 0 0 20px rgba(232, 101, 32, 0.5), 0 0 40px rgba(232, 101, 32, 0.15); }
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(232, 101, 32, 0.3)); }
+    50% { filter: drop-shadow(0 0 16px rgba(232, 101, 32, 0.6)) drop-shadow(0 0 30px rgba(232, 101, 32, 0.2)); }
 }
 
 @keyframes forge-heat-bar-pulse {
