@@ -5,7 +5,9 @@ import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
-import { Flame } from 'lucide-react'
+import { Flame, ChevronDown } from 'lucide-react'
+import { getLeagueLogo } from '../utils/leagueImages'
+import { getDivisionImage } from '../utils/divisionImages'
 
 import { TABS } from './forge/forgeConstants'
 import { createEmberSystem, fireBurst } from './forge/forgeCanvas'
@@ -15,6 +17,8 @@ import ForgeLeaderboardTab from './forge/ForgeLeaderboardTab'
 import ForgeTradeModal from './forge/ForgeTradeModal'
 import ForgeToast from './forge/ForgeToast'
 import './forge/forge.css'
+
+const SEASON_KEY = 'smite2_forge_season'
 
 export default function FantasyForge() {
     const { user, login, loading: authLoading } = useAuth()
@@ -45,9 +49,19 @@ export default function FantasyForge() {
     const [tradeResult, setTradeResult] = useState(null)
     const [tradeError, setTradeError] = useState(null)
 
-    // Season selection
+    // Season selection (persisted in localStorage)
     const [seasons, setSeasons] = useState([])
-    const [seasonId, setSeasonId] = useState(null)
+    const [seasonId, setSeasonIdRaw] = useState(() => {
+        try { return parseInt(localStorage.getItem(SEASON_KEY)) || null }
+        catch { return null }
+    })
+    const setSeasonId = (id) => {
+        setSeasonIdRaw(id)
+        if (id) localStorage.setItem(SEASON_KEY, String(id))
+        else localStorage.removeItem(SEASON_KEY)
+    }
+    const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false)
+    const seasonDropdownRef = useRef(null)
 
     // Forge-specific UI state
     const [featuredPlayer, setFeaturedPlayer] = useState(null)
@@ -87,6 +101,16 @@ export default function FantasyForge() {
         }
     }, [user]) // re-init when user logs in (canvas appears)
 
+    // ── Close season dropdown on outside click ──
+    useEffect(() => {
+        if (!seasonDropdownOpen) return
+        const handleClick = (e) => {
+            if (seasonDropdownRef.current && !seasonDropdownRef.current.contains(e.target)) setSeasonDropdownOpen(false)
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [seasonDropdownOpen])
+
     // ── Load seasons ──
     useEffect(() => {
         const loadSeasons = async () => {
@@ -104,7 +128,10 @@ export default function FantasyForge() {
                                 id: season.id,
                                 name: season.name,
                                 leagueName: full.name,
+                                leagueSlug: full.slug,
                                 divisionName: div.name,
+                                divisionSlug: div.slug,
+                                divisionTier: div.tier,
                                 isActive: season.is_active,
                             })
                         }
@@ -117,9 +144,16 @@ export default function FantasyForge() {
                 })
 
                 setSeasons(allSeasons)
-                const active = allSeasons.find(s => s.isActive)
-                if (active) setSeasonId(active.id)
-                else if (allSeasons.length > 0) setSeasonId(allSeasons[0].id)
+
+                // Prefer saved season from localStorage if it still exists
+                const savedId = seasonId
+                if (savedId && allSeasons.find(s => s.id === savedId)) {
+                    // Already set from localStorage init, keep it
+                } else {
+                    const active = allSeasons.find(s => s.isActive)
+                    if (active) setSeasonId(active.id)
+                    else if (allSeasons.length > 0) setSeasonId(allSeasons[0].id)
+                }
             } catch (err) {
                 console.error('Failed to load seasons:', err)
             } finally {
@@ -385,19 +419,54 @@ export default function FantasyForge() {
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            {seasons.length > 1 && (
-                                <select
-                                    value={seasonId || ''}
-                                    onChange={e => setSeasonId(Number(e.target.value))}
-                                    className="px-3 py-2 bg-[var(--forge-surface)] border border-[var(--forge-border)] forge-body text-lg focus:outline-none focus:border-[var(--forge-border-lt)]"
-                                >
-                                    {seasons.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.leagueName} — {s.divisionName} — {s.name}{s.isActive ? ' (Active)' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
+                            {seasons.length > 1 && (() => {
+                                const selected = seasons.find(s => s.id === seasonId)
+                                const selectedLeagueLogo = selected ? getLeagueLogo(selected.leagueSlug) : null
+                                const selectedDivLogo = selected ? getDivisionImage(selected.leagueSlug, selected.divisionSlug, selected.divisionTier) : null
+                                return (
+                                    <div className="relative" ref={seasonDropdownRef}>
+                                        <button
+                                            onClick={() => setSeasonDropdownOpen(!seasonDropdownOpen)}
+                                            className="flex items-center gap-2 py-2 px-3 bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] forge-body text-base cursor-pointer hover:border-[var(--forge-border-lt)] transition-colors whitespace-nowrap"
+                                        >
+                                            {selectedLeagueLogo && <img src={selectedLeagueLogo} alt="" className="w-5 h-5 object-contain" />}
+                                            {selectedDivLogo && <img src={selectedDivLogo} alt="" className="w-5 h-5 object-contain" />}
+                                            <span>{selected ? `${selected.leagueName} — ${selected.divisionName}` : 'Select Season'}</span>
+                                            {selected?.isActive && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_6px_var(--forge-gain)]" />
+                                            )}
+                                            <ChevronDown size={14} className={`transition-transform ${seasonDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {seasonDropdownOpen && (
+                                            <div className="absolute top-full right-0 mt-1 min-w-[280px] bg-[var(--color-primary)] border border-[var(--forge-border)] shadow-xl z-50 max-h-[350px] overflow-y-auto">
+                                                {seasons.map(s => {
+                                                    const lLogo = getLeagueLogo(s.leagueSlug)
+                                                    const dLogo = getDivisionImage(s.leagueSlug, s.divisionSlug, s.divisionTier)
+                                                    return (
+                                                        <button
+                                                            key={s.id}
+                                                            onClick={() => { setSeasonId(s.id); setSeasonDropdownOpen(false) }}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
+                                                                seasonId === s.id ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
+                                                            }`}
+                                                        >
+                                                            {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                            {dLogo && <img src={dLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                            <span className="flex-1">{s.leagueName} — {s.divisionName}</span>
+                                                            {s.isActive && (
+                                                                <span className="flex items-center gap-1 forge-head text-[0.75rem] tracking-wider text-[var(--forge-gain)]">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)]" />
+                                                                    Active
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })()}
                             <div className="flex items-center gap-2 px-4 py-1.5 forge-clip-chip" style={{ background: 'rgba(232,101,32,0.06)', border: '1px solid rgba(232,101,32,0.15)' }}>
                                 <img src={passionCoin} alt="" className="w-4 h-4" />
                                 <span className="forge-num text-[1.25rem] text-[var(--forge-gold-bright)]">
