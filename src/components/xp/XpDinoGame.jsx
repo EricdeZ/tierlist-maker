@@ -353,7 +353,7 @@ export default function XpDinoGame() {
     }, [onPress, onRelease, updateGameTick, handleGameOver])
 
     return (
-        <div style={{ background: '#c0c0c0', padding: 3 }}>
+        <div data-smiterunner style={{ background: '#c0c0c0', padding: 3 }}>
             <canvas ref={canvasRef} width={W} height={H}
                 onPointerDown={onPress} onPointerUp={onRelease}
                 style={{ display: 'block', width: '100%', height: 'auto', imageRendering: 'auto', cursor: 'pointer', border: '2px inset #d4d0c8', touchAction: 'none' }}

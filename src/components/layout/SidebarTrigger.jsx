@@ -2,10 +2,28 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useSidebar } from '../../context/SidebarContext'
 
+const shortcutLabel = 'Space'
+
 export default function SidebarTrigger({ hideOnSmall = false }) {
-    const { isOpen, toggle } = useSidebar()
+    const { isOpen, toggle, hasUsedShortcut } = useSidebar()
     const [expanded, setExpanded] = useState(false)
     const hasFired = useRef(false)
+    const [isBigScreen, setIsBigScreen] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(min-width: 87.5rem)').matches
+    )
+
+    // Track sidebar breakpoint (87.5rem) for persistent shortcut hint
+    useEffect(() => {
+        const mq = window.matchMedia('(min-width: 87.5rem)')
+        setIsBigScreen(mq.matches)
+        const handler = (e) => setIsBigScreen(e.matches)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
+
+    // On big screens, keep showing shortcut hint until user presses it
+    const showPersistentHint = isBigScreen && !hasUsedShortcut && !isOpen
+    const isExpanded = expanded || showPersistentHint
 
     // One-time expand after scrolling past the hero
     useEffect(() => {
@@ -37,18 +55,18 @@ export default function SidebarTrigger({ hideOnSmall = false }) {
                 text-(--color-accent) hover:border-(--color-accent)/60
                 transition-all duration-500 ease-in-out cursor-pointer
                 ${hideOnSmall ? 'hidden sidebar:flex' : 'flex'}
-                ${!isOpen && !expanded ? 'sidebar-trigger-wiggle sidebar-trigger-glow' : ''}
+                ${!isOpen && !isExpanded ? 'sidebar-trigger-wiggle sidebar-trigger-glow' : ''}
                 ${isOpen ? 'bg-(--color-primary)/80 backdrop-blur-sm' : ''}
             `}
             style={{
-                width: expanded ? '160px' : '40px',
+                width: isExpanded ? '175px' : '40px',
                 ...(!isOpen ? {
-                    background: expanded
+                    background: isExpanded
                         ? 'linear-gradient(135deg, rgba(248,197,106,0.2), rgba(248,197,106,0.08))'
                         : 'linear-gradient(135deg, rgba(248,197,106,0.15), rgba(248,197,106,0.05))',
                 } : {}),
             }}
-            aria-label={isOpen ? 'Close menu' : 'Open menu'}
+            aria-label={isOpen ? 'Close menu' : `Open menu (${shortcutLabel})`}
         >
             <ChevronRight
                 className={`w-5 h-5 shrink-0 ml-[9px] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
@@ -56,9 +74,9 @@ export default function SidebarTrigger({ hideOnSmall = false }) {
             />
             <span
                 className="text-xs font-semibold whitespace-nowrap transition-opacity duration-500"
-                style={{ opacity: expanded ? 1 : 0 }}
+                style={{ opacity: isExpanded ? 1 : 0 }}
             >
-                Show Sidebar
+                {showPersistentHint ? `Press ${shortcutLabel}` : `Show Sidebar (${shortcutLabel})`}
             </span>
         </button>
     )
