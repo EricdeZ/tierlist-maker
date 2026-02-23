@@ -279,12 +279,10 @@ export default function ScheduleManager() {
                 </div>
             </div>
 
-            {/* Add/Edit Form — always visible when a season is selected */}
-            {selectedSeasonId && (
-                <div className={`bg-[var(--color-secondary)] border rounded-xl p-5 mb-6 ${editingMatch ? 'border-yellow-500/30' : 'border-cyan-500/20'}`}>
-                    <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">
-                        {editingMatch ? 'Edit Scheduled Match' : 'Schedule New Match'}
-                    </h2>
+            {/* Create Form — always visible when a season is selected (hidden during edit) */}
+            {selectedSeasonId && !editingMatch && (
+                <div className="bg-[var(--color-secondary)] border border-cyan-500/20 rounded-xl p-5 mb-6">
+                    <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">Schedule New Match</h2>
                     <form onSubmit={handleSubmit}>
                         {/* Persistent fields: Best Of, Date, Week */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -358,24 +356,13 @@ export default function ScheduleManager() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors whitespace-nowrap"
-                                >
-                                    {saving ? 'Saving...' : editingMatch ? 'Update Match' : 'Schedule Match'}
-                                </button>
-                                {editingMatch && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setEditingMatch(null); setFormData(p => ({ ...p, team1_id: '', team2_id: '' })) }}
-                                        className="px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                                {saving ? 'Saving...' : 'Schedule Match'}
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => setFormData(p => {
@@ -411,53 +398,145 @@ export default function ScheduleManager() {
                             <h3 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">{group}</h3>
                             <div className="space-y-2">
                                 {matches.map(m => (
-                                    <div key={m.id} className="bg-[var(--color-secondary)] border border-white/10 rounded-lg px-4 py-3 flex items-center gap-4">
-                                        {/* Date */}
-                                        <span className="text-xs text-[var(--color-text-secondary)] tabular-nums w-20 shrink-0">
-                                            {m.scheduled_date ? m.scheduled_date.slice(0, 10) : '—'}
-                                        </span>
+                                    <div key={m.id}>
+                                        <div className={`bg-[var(--color-secondary)] border rounded-lg px-4 py-3 flex items-center gap-4 ${editingMatch?.id === m.id ? 'border-yellow-500/30' : 'border-white/10'}`}>
+                                            {/* Date */}
+                                            <span className="text-xs text-[var(--color-text-secondary)] tabular-nums w-20 shrink-0">
+                                                {m.scheduled_date ? m.scheduled_date.slice(0, 10) : '—'}
+                                            </span>
 
-                                        {/* Teams */}
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                            <TeamLogo slug={m.team1_slug} name={m.team1_name} size={18} />
-                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />
-                                            <span className="text-sm text-[var(--color-text)]">{m.team1_name}</span>
-                                            <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
-                                            <TeamLogo slug={m.team2_slug} name={m.team2_name} size={18} />
-                                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team2_color || '#ef4444' }} />
-                                            <span className="text-sm text-[var(--color-text)]">{m.team2_name}</span>
+                                            {/* Teams */}
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <TeamLogo slug={m.team1_slug} name={m.team1_name} size={18} />
+                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />
+                                                <span className="text-sm text-[var(--color-text)]">{m.team1_name}</span>
+                                                <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
+                                                <TeamLogo slug={m.team2_slug} name={m.team2_name} size={18} />
+                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team2_color || '#ef4444' }} />
+                                                <span className="text-sm text-[var(--color-text)]">{m.team2_name}</span>
+                                            </div>
+
+                                            {/* Best of */}
+                                            <span className="text-xs text-[var(--color-text-secondary)] shrink-0">Bo{m.best_of}</span>
+
+                                            {/* Status */}
+                                            <select
+                                                value={m.status}
+                                                onChange={e => handleStatusChange(m, e.target.value)}
+                                                className={`text-xs px-2 py-1 rounded-md border cursor-pointer ${STATUS_STYLES[m.status] || ''}`}
+                                                style={{ backgroundColor: 'transparent' }}
+                                            >
+                                                <option value="scheduled">Scheduled</option>
+                                                <option value="completed">Completed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => editingMatch?.id === m.id ? setEditingMatch(null) : handleEdit(m)}
+                                                    className={`px-2 py-1 rounded text-xs transition-colors ${editingMatch?.id === m.id ? 'text-yellow-400 bg-yellow-500/10' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5'}`}
+                                                >
+                                                    {editingMatch?.id === m.id ? 'Cancel' : 'Edit'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(m)}
+                                                    className="px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {/* Best of */}
-                                        <span className="text-xs text-[var(--color-text-secondary)] shrink-0">Bo{m.best_of}</span>
-
-                                        {/* Status */}
-                                        <select
-                                            value={m.status}
-                                            onChange={e => handleStatusChange(m, e.target.value)}
-                                            className={`text-xs px-2 py-1 rounded-md border cursor-pointer ${STATUS_STYLES[m.status] || ''}`}
-                                            style={{ backgroundColor: 'transparent' }}
-                                        >
-                                            <option value="scheduled">Scheduled</option>
-                                            <option value="completed">Completed</option>
-                                            <option value="cancelled">Cancelled</option>
-                                        </select>
-
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <button
-                                                onClick={() => handleEdit(m)}
-                                                className="px-2 py-1 rounded text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(m)}
-                                                className="px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
+                                        {/* Inline edit form */}
+                                        {editingMatch?.id === m.id && (
+                                            <form onSubmit={handleSubmit} className="bg-[var(--color-secondary)] border border-yellow-500/30 border-t-0 rounded-b-lg px-4 py-3 -mt-1">
+                                                <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-3 items-end">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Team 1</label>
+                                                        <select
+                                                            value={formData.team1_id}
+                                                            onChange={e => setFormData(p => ({ ...p, team1_id: e.target.value }))}
+                                                            required
+                                                            className="w-full rounded-lg px-2 py-1.5 text-xs border"
+                                                            style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                                        >
+                                                            <option value="">Select...</option>
+                                                            {seasonTeams.map(t => (
+                                                                <option key={t.team_id} value={t.team_id}>{t.team_name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Team 2</label>
+                                                        <select
+                                                            value={formData.team2_id}
+                                                            onChange={e => setFormData(p => ({ ...p, team2_id: e.target.value }))}
+                                                            required
+                                                            className="w-full rounded-lg px-2 py-1.5 text-xs border"
+                                                            style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                                        >
+                                                            <option value="">Select...</option>
+                                                            {seasonTeams.filter(t => String(t.team_id) !== String(formData.team1_id)).map(t => (
+                                                                <option key={t.team_id} value={t.team_id}>{t.team_name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={formData.scheduled_date}
+                                                            onChange={e => setFormData(p => ({ ...p, scheduled_date: e.target.value }))}
+                                                            required
+                                                            className="w-full rounded-lg px-2 py-1.5 text-xs border"
+                                                            style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Bo / Week</label>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="9"
+                                                                value={formData.best_of}
+                                                                onChange={e => setFormData(p => ({ ...p, best_of: e.target.value }))}
+                                                                required
+                                                                className="w-1/2 rounded-lg px-2 py-1.5 text-xs border [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                                                placeholder="Bo"
+                                                            />
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={formData.week}
+                                                                onChange={e => setFormData(p => ({ ...p, week: e.target.value }))}
+                                                                className="w-1/2 rounded-lg px-2 py-1.5 text-xs border [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                                                placeholder="Wk"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+                                                        <button
+                                                            type="submit"
+                                                            disabled={saving}
+                                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                                        >
+                                                            {saving ? 'Saving...' : 'Update'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingMatch(null)}
+                                                            className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        )}
                                     </div>
                                 ))}
                             </div>
