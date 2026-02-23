@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { forgeService, leagueService } from '../services/database'
@@ -21,6 +22,8 @@ import './forge/forge.css'
 const SEASON_KEY = 'smite2_forge_season'
 
 export default function FantasyForge() {
+    const { leagueSlug: urlLeagueSlug, divisionSlug: urlDivisionSlug } = useParams()
+    const navigate = useNavigate()
     const { user, login, loading: authLoading, hasPermission } = useAuth()
     const { balance, refreshBalance } = usePassion()
     const [activeTab, setActiveTab] = useState('market')
@@ -52,17 +55,26 @@ export default function FantasyForge() {
     const [tradeResult, setTradeResult] = useState(null)
     const [tradeError, setTradeError] = useState(null)
 
-    // Season selection (persisted in localStorage)
+    // Season selection (persisted in localStorage + URL)
     const [seasons, setSeasons] = useState([])
     const [seasonId, setSeasonIdRaw] = useState(() => {
         try { return parseInt(localStorage.getItem(SEASON_KEY)) || null }
         catch { return null }
     })
-    const setSeasonId = (id) => {
+    const setSeasonId = useCallback((id, allSeasons) => {
         setSeasonIdRaw(id)
-        if (id) localStorage.setItem(SEASON_KEY, String(id))
-        else localStorage.removeItem(SEASON_KEY)
-    }
+        if (id) {
+            localStorage.setItem(SEASON_KEY, String(id))
+            // Update URL to match selected season
+            const list = allSeasons || seasons
+            const s = list.find(s => s.id === id)
+            if (s) {
+                navigate(`/forge/${s.leagueSlug}/${s.divisionSlug}`, { replace: true })
+            }
+        } else {
+            localStorage.removeItem(SEASON_KEY)
+        }
+    }, [seasons, navigate])
     const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false)
     const seasonDropdownRef = useRef(null)
 
@@ -164,12 +176,19 @@ export default function FantasyForge() {
                     ? allSeasons
                     : allSeasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
 
-                // Prefer saved season from localStorage if it still exists in visible list
+                // Priority: 1) URL slugs, 2) localStorage, 3) first visible
+                const urlMatch = urlLeagueSlug && urlDivisionSlug
+                    ? visible.find(s => s.leagueSlug === urlLeagueSlug && s.divisionSlug === urlDivisionSlug)
+                    : null
                 const savedId = seasonId
-                if (savedId && visible.find(s => s.id === savedId)) {
-                    // Already set from localStorage init, keep it
+                if (urlMatch) {
+                    setSeasonId(urlMatch.id, allSeasons)
+                } else if (savedId && visible.find(s => s.id === savedId)) {
+                    // Keep localStorage selection, but sync URL
+                    const saved = visible.find(s => s.id === savedId)
+                    if (saved) navigate(`/forge/${saved.leagueSlug}/${saved.divisionSlug}`, { replace: true })
                 } else if (visible.length > 0) {
-                    setSeasonId(visible[0].id)
+                    setSeasonId(visible[0].id, allSeasons)
                 }
             } catch (err) {
                 console.error('Failed to load seasons:', err)

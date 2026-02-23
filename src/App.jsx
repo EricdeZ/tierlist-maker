@@ -63,6 +63,10 @@ import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
 
+// Codex
+import CodexLayout from './components/layout/CodexLayout'
+import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
+
 function App() {
     return (
         <AuthProvider>
@@ -99,6 +103,11 @@ function App() {
                                 <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />
                             </Route>
 
+                            {/* Codex pages (nested under CodexLayout with shared navbar) */}
+                            <Route path="codex" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><CodexLayout /></ProtectedRoute>}>
+                                <Route index element={<CodexDashboard />} />
+                            </Route>
+
                             {/* Passion pages */}
                             <Route path="leaderboard" element={<PassionLeaderboard />} />
                             <Route path="challenges" element={<Challenges />} />
@@ -107,6 +116,7 @@ function App() {
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug" element={<FantasyForge />} />
                             <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />

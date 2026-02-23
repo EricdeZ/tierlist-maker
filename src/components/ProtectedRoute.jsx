@@ -2,7 +2,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export default function ProtectedRoute({ children, requireAdmin = false, requiredPermission = null }) {
+export default function ProtectedRoute({ children, requireAdmin = false, requiredPermission = null, redirectTo = '/admin' }) {
     const { user, loading, isAdmin, hasPermission, hasAnyPermission, permissions } = useAuth()
 
     if (loading) {
@@ -28,7 +28,7 @@ export default function ProtectedRoute({ children, requireAdmin = false, require
             return Object.values(permissions.byLeague).some(perms => perms.includes(key))
         })
         if (!hasAny) {
-            return <Navigate to="/admin" replace />
+            return <Navigate to={redirectTo} replace />
         }
     }
 

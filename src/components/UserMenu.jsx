@@ -2,10 +2,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, Shield, User, UserCheck } from 'lucide-react'
+import { LogOut, Shield, BookOpen, User, UserCheck } from 'lucide-react'
 
 export default function UserMenu({ compact = false }) {
-    const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, avatarUrl } = useAuth()
+    const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, hasPermission, avatarUrl } = useAuth()
     const [open, setOpen] = useState(false)
     const menuRef = useRef(null)
 
@@ -102,6 +102,17 @@ export default function UserMenu({ compact = false }) {
                             >
                                 <Shield className="w-4 h-4 text-(--color-text-secondary)" />
                                 Admin Dashboard
+                            </Link>
+                        )}
+
+                        {hasPermission('codex_edit') && (
+                            <Link
+                                to="/codex"
+                                onClick={() => setOpen(false)}
+                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                            >
+                                <BookOpen className="w-4 h-4 text-amber-400" />
+                                Codex Dashboard
                             </Link>
                         )}
                     </div>

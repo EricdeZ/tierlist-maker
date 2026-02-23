@@ -2,3 +2,7 @@ name = "smite-companion"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
+
+[[r2_buckets]]
+binding = "TEAM_ICONS"
+bucket_name = "smite-companion-team-icons"

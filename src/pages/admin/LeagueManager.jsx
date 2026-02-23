@@ -1,9 +1,10 @@
 // src/pages/admin/LeagueManager.jsx
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag, ImagePlus } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
+import TeamLogo from '../../components/TeamLogo'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
@@ -542,6 +543,12 @@ export default function LeagueManager() {
                                                                                 const pc = playerCountMap[team.id] || 0
                                                                                 return editItem?.type === 'team' && editItem.id === team.id ? (
                                                                                     <div key={team.id} className="flex items-center gap-2 py-1">
+                                                                                        <TeamIconUpload
+                                                                                            teamId={team.id}
+                                                                                            currentUrl={team.logo_url}
+                                                                                            teamSlug={team.slug}
+                                                                                            onComplete={(type, msg) => { showToast(type, msg); fetchData() }}
+                                                                                        />
                                                                                         <InlineEdit
                                                                                             fields={[
                                                                                                 { key: 'name', label: 'Name', value: editItem.name },
@@ -556,6 +563,7 @@ export default function LeagueManager() {
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div key={team.id} className="flex items-center gap-2 py-1 group">
+                                                                                        <TeamLogo slug={team.slug} name={team.name} size={16} logoUrl={team.logo_url} />
                                                                                         <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
                                                                                         <span className="text-xs text-[var(--color-text)]">{team.name}</span>
                                                                                         <span className="text-[10px] text-[var(--color-text-secondary)]">/{team.slug}</span>
@@ -696,6 +704,95 @@ export default function LeagueManager() {
                     </button>
                 )}
             </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════
+// TEAM ICON UPLOAD
+// ═══════════════════════════════════════════════════
+function TeamIconUpload({ teamId, currentUrl, teamSlug, onComplete }) {
+    const [uploading, setUploading] = useState(false)
+    const fileRef = useRef(null)
+
+    const handleUpload = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (file.size > 512 * 1024) {
+            onComplete?.('error', 'Image must be under 512KB')
+            return
+        }
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+            onComplete?.('error', 'Only JPEG, PNG, WebP, and GIF allowed')
+            return
+        }
+
+        setUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append('teamId', teamId)
+            formData.append('file', file)
+
+            const token = localStorage.getItem('auth_token')
+            const res = await fetch(`${API}/team-upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Upload failed')
+            onComplete?.('success', 'Icon uploaded')
+        } catch (err) {
+            onComplete?.('error', err.message)
+        } finally {
+            setUploading(false)
+            if (fileRef.current) fileRef.current.value = ''
+        }
+    }
+
+    const handleRemove = async () => {
+        setUploading(true)
+        try {
+            const token = localStorage.getItem('auth_token')
+            const res = await fetch(`${API}/team-upload?teamId=${teamId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Remove failed')
+            onComplete?.('success', 'Icon removed')
+        } catch (err) {
+            onComplete?.('error', err.message)
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    return (
+        <div className="flex items-center gap-1.5">
+            {currentUrl ? (
+                <img src={currentUrl} className="w-6 h-6 rounded object-cover border border-white/10" alt="" />
+            ) : (
+                <TeamLogo slug={teamSlug} size={24} />
+            )}
+            <input type="file" ref={fileRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleUpload} />
+            <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+            >
+                {uploading ? '...' : currentUrl ? 'Change' : 'Upload'}
+            </button>
+            {currentUrl && (
+                <button
+                    onClick={handleRemove}
+                    disabled={uploading}
+                    className="text-[10px] text-red-400/70 hover:text-red-300 transition-colors"
+                >
+                    Remove
+                </button>
+            )}
         </div>
     )
 }

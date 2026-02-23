@@ -16,6 +16,7 @@ const handler = async (event, context) => {
                     t.name,
                     t.color,
                     t.slug,
+                    t.logo_url,
                     t.organization_id,
                     o.name as org_name,
                     o.slug as org_slug,
@@ -28,7 +29,7 @@ const handler = async (event, context) => {
                     AND LOWER(lp.role) != 'sub'
                 LEFT JOIN organizations o ON t.organization_id = o.id
                 WHERE t.season_id = ${seasonId}
-                GROUP BY t.id, t.season_id, t.name, t.color, t.slug,
+                GROUP BY t.id, t.season_id, t.name, t.color, t.slug, t.logo_url,
                          t.organization_id, o.name, o.slug, o.color
                 ORDER BY t.name
             `

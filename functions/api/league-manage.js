@@ -98,7 +98,7 @@ const handler = async (event) => {
             // Team CRUD
             case 'create-team':     return await createTeam(sql, body, admin)
             case 'update-team':     return await updateTeam(sql, body, admin)
-            case 'delete-team':     return await deleteTeam(sql, body, admin)
+            case 'delete-team':     return await deleteTeam(sql, body, admin, event.env)
             case 'copy-teams':      return await copyTeams(sql, body, admin)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
@@ -393,11 +393,11 @@ async function copyTeams(sql, { source_season_id, target_season_id, team_ids }, 
     let sourceTeams
     if (team_ids?.length) {
         sourceTeams = await sql`
-            SELECT name, color FROM teams WHERE season_id = ${source_season_id} AND id = ANY(${team_ids}) ORDER BY name
+            SELECT name, color, logo_url FROM teams WHERE season_id = ${source_season_id} AND id = ANY(${team_ids}) ORDER BY name
         `
     } else {
         sourceTeams = await sql`
-            SELECT name, color FROM teams WHERE season_id = ${source_season_id} ORDER BY name
+            SELECT name, color, logo_url FROM teams WHERE season_id = ${source_season_id} ORDER BY name
         `
     }
     if (sourceTeams.length === 0) {
@@ -407,8 +407,8 @@ async function copyTeams(sql, { source_season_id, target_season_id, team_ids }, 
     for (const t of sourceTeams) {
         const slug = slugify(t.name)
         const [row] = await sql`
-            INSERT INTO teams (season_id, name, color, slug)
-            VALUES (${target_season_id}, ${t.name}, ${t.color}, ${slug})
+            INSERT INTO teams (season_id, name, color, slug, logo_url)
+            VALUES (${target_season_id}, ${t.name}, ${t.color}, ${slug}, ${t.logo_url || null})
             RETURNING *
         `
         created.push(row)
@@ -417,7 +417,7 @@ async function copyTeams(sql, { source_season_id, target_season_id, team_ids }, 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, teams: created, count: created.length }) }
 }
 
-async function deleteTeam(sql, { id }, admin) {
+async function deleteTeam(sql, { id }, admin, env) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const [hasPlayers] = await sql`SELECT 1 FROM league_players WHERE team_id = ${id} LIMIT 1`
     if (hasPlayers) {
@@ -427,8 +427,18 @@ async function deleteTeam(sql, { id }, admin) {
     if (hasMatches) {
         return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete team that has matches.' }) }
     }
-    const [row] = await sql`DELETE FROM teams WHERE id = ${id} RETURNING id, name`
+    const [row] = await sql`DELETE FROM teams WHERE id = ${id} RETURNING id, name, logo_url`
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found' }) }
+
+    // Clean up R2 icon if it exists
+    if (row.logo_url && env?.TEAM_ICONS) {
+        try {
+            const urlPath = new URL(row.logo_url).pathname
+            const key = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
+            env.TEAM_ICONS.delete(key).catch(() => {})
+        } catch { /* best-effort */ }
+    }
+
     await logAudit(sql, admin, { action: 'delete-team', endpoint: 'league-manage', targetType: 'team', targetId: id, details: { name: row.name } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
