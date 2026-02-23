@@ -53,6 +53,20 @@ const handler = async (event) => {
 // POST: Server-authoritative coin flip
 // ═══════════════════════════════════════════════════
 async function handleFlip(sql, user) {
+    // Rate limit: 1 flip per 2 seconds per user
+    const [recent] = await sql`
+        SELECT last_flip_at FROM coinflip_streaks
+        WHERE user_id = ${user.id}
+          AND last_flip_at > NOW() - INTERVAL '2 seconds'
+    `
+    if (recent) {
+        return {
+            statusCode: 429,
+            headers,
+            body: JSON.stringify({ error: 'rate_limited', message: 'Slow down! Wait a moment between flips.' }),
+        }
+    }
+
     // Ensure passion balance row exists
     await sql`
         INSERT INTO passion_balances (user_id)

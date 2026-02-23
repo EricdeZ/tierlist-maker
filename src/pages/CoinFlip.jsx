@@ -248,10 +248,20 @@ export default function CoinFlip() {
         const prevStreak = currentStreak
 
         // Fire API + minimum animation time in parallel
-        const [data] = await Promise.all([
-            coinflipService.flip(),
-            new Promise(resolve => setTimeout(resolve, mode3d ? 550 : 900)),
-        ])
+        let data
+        try {
+            ;[data] = await Promise.all([
+                coinflipService.flip(),
+                new Promise(resolve => setTimeout(resolve, mode3d ? 550 : 900)),
+            ])
+        } catch (err) {
+            // Rate limited or network error — cancel animation and bail
+            if (mode3d) cancelAnimationFrame(spinRafRef.current)
+            else cancelAnimationFrame(flip2dRafRef.current)
+            setFlipping(false)
+            setLanding(false)
+            return
+        }
 
         if (data.error === 'insufficient_balance') {
             if (mode3d) cancelAnimationFrame(spinRafRef.current)
