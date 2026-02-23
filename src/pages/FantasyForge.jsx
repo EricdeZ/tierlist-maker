@@ -125,9 +125,13 @@ export default function FantasyForge() {
                 const leagueList = Array.isArray(allLeagues) ? allLeagues : (allLeagues?.leagues || [])
                 const marketStatuses = marketStatusData.statuses || {}
 
+                // Fetch all league details in parallel (not sequentially)
+                const fullLeagues = await Promise.all(
+                    leagueList.map(league => leagueService.getBySlug(league.slug).catch(() => null))
+                )
+
                 const allSeasons = []
-                for (const league of leagueList) {
-                    const full = await leagueService.getBySlug(league.slug)
+                for (const full of fullLeagues) {
                     if (!full?.divisions) continue
                     for (const div of full.divisions) {
                         for (const season of (div.seasons || [])) {
