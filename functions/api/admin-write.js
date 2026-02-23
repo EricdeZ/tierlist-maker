@@ -61,6 +61,52 @@ const handler = async (event) => {
 }
 
 /**
+ * Update league_player role/secondary_role based on their most recent games.
+ * role = what they played last game, secondary_role = the game before that.
+ */
+async function updatePlayerRoles(sql, matchId) {
+    const players = await sql`
+        SELECT DISTINCT league_player_id FROM player_game_stats
+        WHERE game_id IN (SELECT id FROM games WHERE match_id = ${matchId})
+        AND role_played IS NOT NULL
+    `
+
+    for (const { league_player_id } of players) {
+        // Find primary role (most recent game)
+        const [latest] = await sql`
+            SELECT pgs.role_played
+            FROM player_game_stats pgs
+            JOIN games g ON g.id = pgs.game_id
+            WHERE pgs.league_player_id = ${league_player_id}
+            AND pgs.role_played IS NOT NULL
+            ORDER BY g.id DESC
+            LIMIT 1
+        `
+
+        if (latest) {
+            const role = latest.role_played
+            // Secondary = most recent game where they played a different role
+            const [secondary] = await sql`
+                SELECT pgs.role_played
+                FROM player_game_stats pgs
+                JOIN games g ON g.id = pgs.game_id
+                WHERE pgs.league_player_id = ${league_player_id}
+                AND pgs.role_played IS NOT NULL
+                AND pgs.role_played != ${role}
+                ORDER BY g.id DESC
+                LIMIT 1
+            `
+            const secondaryRole = secondary?.role_played || null
+            await sql`
+                UPDATE league_players
+                SET role = ${role}, secondary_role = ${secondaryRole}, updated_at = NOW()
+                WHERE id = ${league_player_id}
+            `
+        }
+    }
+}
+
+/**
  * Submit a single match with its games and player stats.
  * Expects pre-edited data from the admin dashboard.
  */
@@ -214,6 +260,10 @@ async function submitMatch(sql, body, admin) {
         // Update Fantasy Forge player prices based on match performance (fire-and-forget)
         updateForgeAfterMatch(sql, result.match_id)
             .catch(err => console.error('Forge price update failed:', err))
+
+        // Update league_player roles based on recent games played (fire-and-forget)
+        updatePlayerRoles(sql, result.match_id)
+            .catch(err => console.error('Player role update failed:', err))
 
         return {
             statusCode: 200,
