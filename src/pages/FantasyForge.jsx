@@ -154,14 +154,18 @@ export default function FantasyForge() {
 
                 setSeasons(allSeasons)
 
-                // Prefer saved season from localStorage if it still exists
+                // Filter to visible seasons (regular users only see open markets)
+                const ownerNow = hasPermission('permission_manage')
+                const visible = ownerNow
+                    ? allSeasons
+                    : allSeasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
+
+                // Prefer saved season from localStorage if it still exists in visible list
                 const savedId = seasonId
-                if (savedId && allSeasons.find(s => s.id === savedId)) {
+                if (savedId && visible.find(s => s.id === savedId)) {
                     // Already set from localStorage init, keep it
-                } else {
-                    const active = allSeasons.find(s => s.isActive)
-                    if (active) setSeasonId(active.id)
-                    else if (allSeasons.length > 0) setSeasonId(allSeasons[0].id)
+                } else if (visible.length > 0) {
+                    setSeasonId(visible[0].id)
                 }
             } catch (err) {
                 console.error('Failed to load seasons:', err)
