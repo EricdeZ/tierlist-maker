@@ -1,0 +1,277 @@
+/* ═══════════════════════════════════════════════════
+   Fantasy Forge — Custom CSS
+   Keyframes, clip-paths, font classes, heat tiers
+   ═══════════════════════════════════════════════════ */
+
+/* ── Color tokens ── */
+:root {
+    --forge-flame: #e86520;
+    --forge-flame-hot: #ff6a00;
+    --forge-flame-bright: #ffaa33;
+    --forge-ember: #c44a10;
+    --forge-gold: #d4a030;
+    --forge-gold-bright: #f0c840;
+    --forge-molten: #ff3d00;
+    --forge-spark: #ffcc44;
+    --forge-gain: #44cc66;
+    --forge-loss: #ee4444;
+    --forge-cool: #4499bb;
+    --forge-cool-dim: #2a4858;
+    --forge-text: #e0dcd4;
+    --forge-text-mid: #999088;
+    --forge-text-dim: #5a554e;
+    --forge-panel: rgba(14, 14, 14, 0.6);
+    --forge-surface: rgba(17, 17, 17, 0.8);
+    --forge-edge: #1c1c1c;
+    --forge-border: #222;
+    --forge-border-lt: #333;
+}
+
+/* ── Font utility classes ── */
+.forge-num {
+    font-family: 'MedievalSharp', cursive;
+}
+
+.forge-head {
+    font-family: 'Teko', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.forge-body {
+    font-family: 'Rajdhani', sans-serif;
+}
+
+/* ── Clip-path shapes ── */
+.forge-clip-btn {
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.forge-clip-chip {
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.forge-clip-hex {
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+/* ── Keyframes ── */
+@keyframes forge-shake {
+    0%, 100% { transform: translate(0); }
+    10% { transform: translate(-3px, 2px); }
+    30% { transform: translate(3px, -2px); }
+    50% { transform: translate(-2px, 3px); }
+    70% { transform: translate(2px, -1px); }
+    90% { transform: translate(-1px, 1px); }
+}
+
+@keyframes forge-price-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25); color: var(--forge-flame-bright); }
+    100% { transform: scale(1); }
+}
+
+@keyframes forge-toast-in {
+    from { transform: translateX(-50%) translateY(-80px); }
+    to { transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes forge-toast-out {
+    from { transform: translateX(-50%) translateY(0); }
+    to { transform: translateX(-50%) translateY(-80px); }
+}
+
+@keyframes forge-hex-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes forge-glow-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes forge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes forge-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Screen shake (applied to container) ── */
+.forge-shaking {
+    animation: forge-shake 0.4s ease;
+}
+
+/* ── Price pop animation ── */
+.forge-num-pop {
+    animation: forge-price-pop 0.5s ease;
+}
+
+/* ── Hero hex spinning border ── */
+.forge-hex-outer {
+    background: conic-gradient(from 0deg, var(--forge-flame), var(--forge-gold-bright), var(--forge-molten), var(--forge-flame));
+    animation: forge-hex-spin 5s linear infinite;
+}
+
+/* ── Hero glow pulse ── */
+.forge-hex-glow {
+    animation: forge-glow-pulse 3s ease-in-out infinite;
+}
+
+/* ── Status blink ── */
+.forge-blink::before {
+    animation: forge-blink 2s infinite;
+}
+
+/* ── Heat tier modifiers ── */
+
+/* Blazing (>10% gain) */
+.forge-blazing .forge-heat-bar {
+    background: linear-gradient(180deg, var(--forge-flame-bright), var(--forge-ember));
+    box-shadow: 0 0 4px rgba(232, 101, 32, 0.3);
+}
+
+.forge-blazing .forge-price-text {
+    background: linear-gradient(180deg, var(--forge-gold-bright), var(--forge-flame));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 4px rgba(232, 101, 32, 0.2));
+}
+
+.forge-blazing .forge-heat-fill {
+    width: 100%;
+    background: linear-gradient(90deg, var(--forge-ember), var(--forge-flame), var(--forge-flame-bright));
+    box-shadow: 0 0 6px rgba(232, 101, 32, 0.3);
+}
+
+/* Warm (0-10% gain) */
+.forge-warm .forge-heat-bar {
+    background: var(--forge-gold);
+    opacity: 0.5;
+}
+
+.forge-warm .forge-price-text {
+    color: var(--forge-gold);
+}
+
+.forge-warm .forge-heat-fill {
+    width: 65%;
+    background: linear-gradient(90deg, var(--forge-ember), var(--forge-flame));
+    opacity: 0.7;
+}
+
+/* Cooling (<=0% change) */
+.forge-cooling .forge-heat-bar {
+    background: var(--forge-cool);
+    opacity: 0.3;
+}
+
+.forge-cooling .forge-price-text {
+    color: var(--forge-cool);
+}
+
+.forge-cooling .forge-heat-fill {
+    width: 30%;
+    background: var(--forge-cool);
+    opacity: 0.4;
+}
+
+/* ── Flash overlay ── */
+.forge-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--fx, 50%) var(--fy, 50%), rgba(232, 101, 32, 0.15), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.forge-flash.active {
+    opacity: 1;
+    transition: none;
+}
+
+/* ── Toast ── */
+.forge-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    z-index: 200;
+    padding: 14px 28px;
+    background: var(--forge-surface);
+    border: 1px solid var(--forge-flame);
+    font-family: 'Teko', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--forge-flame-bright);
+    box-shadow: 0 8px 30px rgba(232, 101, 32, 0.3);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+
+.forge-toast.show {
+    animation: forge-toast-in 0.4s cubic-bezier(0.17, 0.67, 0.3, 1.3) forwards;
+}
+
+.forge-toast.hide {
+    animation: forge-toast-out 0.3s ease forwards;
+}
+
+/* ── Hero accent line ── */
+.forge-accent-line {
+    background: linear-gradient(180deg, var(--forge-flame-bright), var(--forge-flame), var(--forge-ember));
+    box-shadow: 0 0 12px rgba(232, 101, 32, 0.3);
+}
+
+/* ── Section header underline accent ── */
+.forge-section-accent::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--forge-flame), transparent);
+}
+
+/* ── Featured card selected state ── */
+.forge-card-selected {
+    border-color: var(--forge-flame) !important;
+    box-shadow: 0 0 20px rgba(232, 101, 32, 0.15);
+}
+
+/* ── Player row selected state ── */
+.forge-row-selected {
+    border-color: var(--forge-flame) !important;
+    background: rgba(232, 101, 32, 0.03) !important;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    .forge-hex-outer,
+    .forge-hex-glow,
+    .forge-shaking,
+    .forge-num-pop {
+        animation: none !important;
+    }
+
+    .forge-toast.show,
+    .forge-toast.hide {
+        animation: none !important;
+    }
+
+    .forge-toast.show {
+        transform: translateX(-50%) translateY(0);
+    }
+}

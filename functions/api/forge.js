@@ -79,18 +79,29 @@ async function getMarket(sql, user, params, event) {
     const market = await ensureMarket(sql, seasonId)
     await ensurePlayerSparks(sql, market.id, seasonId)
 
-    // Get all player sparks with player/team info
+    // Get all player sparks with player/team info + most-played god image
     const sparks = await sql`
         SELECT
             ps.id as spark_id, ps.current_price, ps.total_sparks, ps.perf_multiplier,
             ps.last_perf_update, ps.updated_at,
             p.name as player_name, p.slug as player_slug,
             lp.role, lp.team_id,
-            t.name as team_name, t.slug as team_slug, t.color as team_color
+            t.name as team_name, t.slug as team_slug, t.color as team_color,
+            mpg.god_image_url
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
         JOIN players p ON lp.player_id = p.id
         JOIN teams t ON lp.team_id = t.id
+        LEFT JOIN LATERAL (
+            SELECT g.image_url as god_image_url
+            FROM player_game_stats pgs
+            JOIN gods g ON LOWER(g.name) = LOWER(pgs.god_played)
+            WHERE pgs.league_player_id = lp.id
+              AND pgs.god_played IS NOT NULL
+            GROUP BY g.image_url
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        ) mpg ON true
         WHERE ps.market_id = ${market.id}
           AND lp.is_active = true
           AND LOWER(COALESCE(lp.role, '')) != 'sub'
@@ -153,6 +164,7 @@ async function getMarket(sql, user, params, event) {
             perfMultiplier: Number(s.perf_multiplier),
             priceChange24h: priceChange,
             holding,
+            godImageUrl: s.god_image_url || null,
         }
     })
 
