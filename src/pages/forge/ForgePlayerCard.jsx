@@ -4,10 +4,11 @@ import TeamLogo from '../../components/TeamLogo'
 import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 
-export default function ForgePlayerCard({ player, selected, marketStatus, onSelect, onFuel, onCool }) {
+export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, onSelect, onFuel, onCool }) {
     const chartRef = useRef(null)
     const tier = getHeatTier(player.priceChange24h)
     const isOpen = marketStatus === 'open'
+    const isOwnTeam = userTeamId && player.teamId === userTeamId
     const change = player.priceChange24h
     const isUp = change > 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
@@ -100,7 +101,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, onSele
                 </div>
 
                 {/* Action buttons */}
-                {isOpen && (
+                {isOpen && !isOwnTeam && (
                     <div className="flex gap-1">
                         <button
                             onClick={e => { e.stopPropagation(); onFuel(player) }}

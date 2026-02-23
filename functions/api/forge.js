@@ -142,6 +142,18 @@ async function getMarket(sql, user, params, event) {
         priceChangeMap[pc.spark_id] = Number(pc.price)
     }
 
+    // Get user's team for this season (to prevent self-trading)
+    const [userTeamRow] = await sql`
+        SELECT lp.team_id
+        FROM league_players lp
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+          AND lp.is_active = true
+          AND t.season_id = ${seasonId}
+        LIMIT 1
+    `
+    const userTeamId = userTeamRow?.team_id || null
+
     const result = sparks.map(s => {
         const holding = holdingsMap[s.spark_id] || null
         const price24hAgo = priceChangeMap[s.spark_id]
@@ -179,6 +191,7 @@ async function getMarket(sql, user, params, event) {
                 basePrice: market.base_price,
             },
             players: result,
+            userTeamId,
         }),
     }
 }
@@ -413,6 +426,22 @@ async function fuel(sql, user, body) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 10 Sparks per transaction' }) }
     }
 
+    // Prevent trading own team's players
+    const [ownTeamCheck] = await sql`
+        SELECT 1 FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        WHERE ps.id = ${sparkId}
+          AND lp.team_id IN (
+              SELECT lp2.team_id FROM league_players lp2
+              JOIN teams t ON t.id = lp2.team_id
+              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                AND lp2.is_active = true
+          )
+    `
+    if (ownTeamCheck) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot fuel players on your own team' }) }
+    }
+
     try {
         const result = await transaction(async (tx) => {
             return await executeFuel(tx, user.id, sparkId, numSparks)
@@ -454,6 +483,22 @@ async function cool(sql, user, body) {
 
     if (!sparkId || !numSparks || numSparks < 1) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId and sparks (>= 1) are required' }) }
+    }
+
+    // Prevent trading own team's players
+    const [ownTeamCheck] = await sql`
+        SELECT 1 FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        WHERE ps.id = ${sparkId}
+          AND lp.team_id IN (
+              SELECT lp2.team_id FROM league_players lp2
+              JOIN teams t ON t.id = lp2.team_id
+              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                AND lp2.is_active = true
+          )
+    `
+    if (ownTeamCheck) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot cool players on your own team' }) }
     }
 
     try {

@@ -4,10 +4,11 @@ import TeamLogo from '../../components/TeamLogo'
 import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 
-export default function ForgePlayerRow({ player, selected, marketStatus, onSelect, onFuel, onCool }) {
+export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, onSelect, onFuel, onCool }) {
     const chartRef = useRef(null)
     const tier = getHeatTier(player.priceChange24h)
     const isOpen = marketStatus === 'open'
+    const isOwnTeam = userTeamId && player.teamId === userTeamId
     const change = player.priceChange24h
     const isUp = change > 0
     const isDown = change < 0
@@ -104,7 +105,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, onSelec
 
             {/* Actions (revealed on hover, always visible on mobile) */}
             <div className="flex gap-1 px-1.5 opacity-0 group-hover:opacity-100 sm:opacity-0 max-sm:opacity-100 transition-opacity">
-                {isOpen && (
+                {isOpen && !isOwnTeam && (
                     <>
                         <button
                             onClick={e => { e.stopPropagation(); onFuel(player) }}

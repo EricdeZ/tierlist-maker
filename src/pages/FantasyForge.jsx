@@ -32,6 +32,7 @@ export default function FantasyForge() {
     // Market state
     const [market, setMarket] = useState(null)
     const [players, setPlayers] = useState([])
+    const [userTeamId, setUserTeamId] = useState(null)
     const [search, setSearch] = useState('')
     const [sortBy, setSortBy] = useState('price-desc')
     const [teamFilter, setTeamFilter] = useState('')
@@ -174,6 +175,7 @@ export default function FantasyForge() {
                 const data = await forgeService.getMarket(seasonId)
                 setMarket(data.market)
                 setPlayers(data.players || [])
+                setUserTeamId(data.userTeamId || null)
             } else if (activeTab === 'portfolio') {
                 if (!user) { setLoading(false); return }
                 const data = await forgeService.getPortfolio(seasonId)
@@ -432,9 +434,6 @@ export default function FantasyForge() {
                                             {selectedLeagueLogo && <img src={selectedLeagueLogo} alt="" className="w-5 h-5 object-contain" />}
                                             {selectedDivLogo && <img src={selectedDivLogo} alt="" className="w-5 h-5 object-contain" />}
                                             <span>{selected ? `${selected.leagueName} — ${selected.divisionName}` : 'Select Season'}</span>
-                                            {selected?.isActive && (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_6px_var(--forge-gain)]" />
-                                            )}
                                             <ChevronDown size={14} className={`transition-transform ${seasonDropdownOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {seasonDropdownOpen && (
@@ -453,12 +452,6 @@ export default function FantasyForge() {
                                                             {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
                                                             {dLogo && <img src={dLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
                                                             <span className="flex-1">{s.leagueName} — {s.divisionName}</span>
-                                                            {s.isActive && (
-                                                                <span className="flex items-center gap-1 forge-head text-[0.75rem] tracking-wider text-[var(--forge-gain)]">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)]" />
-                                                                    Active
-                                                                </span>
-                                                            )}
                                                         </button>
                                                     )
                                                 })}
@@ -532,6 +525,7 @@ export default function FantasyForge() {
                             marketStatus={market?.status}
                             featuredPlayer={featuredPlayer}
                             historyData={historyData}
+                            userTeamId={userTeamId}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
