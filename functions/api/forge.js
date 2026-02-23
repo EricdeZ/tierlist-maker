@@ -32,6 +32,8 @@ const handler = async (event) => {
             switch (action) {
                 case 'market':
                     return await getMarket(sql, user, params, event)
+                case 'market-statuses':
+                    return await getMarketStatuses(sql)
                 case 'portfolio':
                     return await getPortfolio(sql, user, params)
                 case 'leaderboard':
@@ -195,6 +197,25 @@ async function getMarket(sql, user, params, event) {
             players: result,
             userTeamId,
         }),
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// GET: All market statuses (lightweight, for season dropdown filtering)
+// ═══════════════════════════════════════════════════
+async function getMarketStatuses(sql) {
+    const rows = await sql`
+        SELECT season_id, status FROM forge_markets
+    `
+    const statuses = {}
+    for (const r of rows) {
+        statuses[r.season_id] = r.status
+    }
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ statuses }),
     }
 }
 

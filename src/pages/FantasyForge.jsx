@@ -118,8 +118,12 @@ export default function FantasyForge() {
     useEffect(() => {
         const loadSeasons = async () => {
             try {
-                const allLeagues = await leagueService.getAll()
+                const [allLeagues, marketStatusData] = await Promise.all([
+                    leagueService.getAll(),
+                    forgeService.getMarketStatuses().catch(() => ({ statuses: {} })),
+                ])
                 const leagueList = Array.isArray(allLeagues) ? allLeagues : (allLeagues?.leagues || [])
+                const marketStatuses = marketStatusData.statuses || {}
 
                 const allSeasons = []
                 for (const league of leagueList) {
@@ -127,6 +131,7 @@ export default function FantasyForge() {
                     if (!full?.divisions) continue
                     for (const div of full.divisions) {
                         for (const season of (div.seasons || [])) {
+                            const forgeStatus = marketStatuses[season.id] || null
                             allSeasons.push({
                                 id: season.id,
                                 name: season.name,
@@ -136,6 +141,7 @@ export default function FantasyForge() {
                                 divisionSlug: div.slug,
                                 divisionTier: div.tier,
                                 isActive: season.is_active,
+                                forgeStatus,
                             })
                         }
                     }
@@ -217,6 +223,12 @@ export default function FantasyForge() {
             setHistoryData([])
         }
     }
+
+    // ── Visible seasons: owners see all, regular users only see open markets ──
+    const visibleSeasons = useMemo(() => {
+        if (isOwner) return seasons
+        return seasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
+    }, [seasons, isOwner])
 
     // ── Unique teams for filter ──
     const teams = useMemo(() => {
@@ -436,8 +448,8 @@ export default function FantasyForge() {
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            {seasons.length > 1 && (() => {
-                                const selected = seasons.find(s => s.id === seasonId)
+                            {visibleSeasons.length > 1 && (() => {
+                                const selected = visibleSeasons.find(s => s.id === seasonId)
                                 const selectedLeagueLogo = selected ? getLeagueLogo(selected.leagueSlug) : null
                                 const selectedDivLogo = selected ? getDivisionImage(selected.leagueSlug, selected.divisionSlug, selected.divisionTier) : null
                                 return (
@@ -453,7 +465,7 @@ export default function FantasyForge() {
                                         </button>
                                         {seasonDropdownOpen && (
                                             <div className="absolute top-full right-0 mt-1 min-w-[280px] bg-[var(--color-primary)] border border-[var(--forge-border)] shadow-xl z-50 max-h-[350px] overflow-y-auto">
-                                                {seasons.map(s => {
+                                                {visibleSeasons.map(s => {
                                                     const lLogo = getLeagueLogo(s.leagueSlug)
                                                     const dLogo = getDivisionImage(s.leagueSlug, s.divisionSlug, s.divisionTier)
                                                     return (
@@ -467,6 +479,13 @@ export default function FantasyForge() {
                                                             {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
                                                             {dLogo && <img src={dLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
                                                             <span className="flex-1">{s.leagueName} — {s.divisionName}</span>
+                                                            {isOwner && s.forgeStatus && s.forgeStatus !== 'open' && (
+                                                                <span className={`forge-head text-[0.75rem] tracking-wider ${
+                                                                    s.forgeStatus === 'closed' ? 'text-[var(--forge-loss)]' : 'text-[var(--forge-text-dim)]'
+                                                                }`}>
+                                                                    {s.forgeStatus === 'closed' ? 'Closed' : 'Ended'}
+                                                                </span>
+                                                            )}
                                                         </button>
                                                     )
                                                 })}

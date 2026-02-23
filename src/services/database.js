@@ -369,6 +369,10 @@ export const forgeService = {
         return apiCall('forge', { action: 'history', sparkId })
     },
 
+    async getMarketStatuses() {
+        return apiCall('forge', { action: 'market-statuses' })
+    },
+
     async fuel(sparkId, sparks) {
         return apiPost('forge', { action: 'fuel' }, { sparkId, sparks })
     },
