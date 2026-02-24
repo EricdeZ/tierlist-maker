@@ -94,10 +94,16 @@ export function MatchReportHelp() {
                 {
                     title: 'Create a New Match Report',
                     content: (
-                        <p>
-                            Click <strong>"+ New Match"</strong> to create a blank report card.
-                            Each report represents one full match set (e.g. a best-of-3).
-                        </p>
+                        <>
+                            <p>
+                                Click <strong>"New Match Report"</strong> to create a blank report card.
+                                Each report represents one full match set (e.g. a best-of-3).
+                            </p>
+                            <p className="mt-1">
+                                Alternatively, click <strong>"Manual Match Report"</strong> to enter stats by hand
+                                without uploading screenshots.
+                            </p>
+                        </>
                     ),
                 },
                 {
@@ -126,6 +132,16 @@ export function MatchReportHelp() {
                     ),
                 },
                 {
+                    title: 'Extract Match Data',
+                    content: (
+                        <p>
+                            After uploading images, click the <strong>"Extract Match Data"</strong> button to
+                            trigger AI extraction. The page will show progress as it processes each screenshot.
+                            Once complete, the report enters <strong>Review</strong> status.
+                        </p>
+                    ),
+                },
+                {
                     title: 'What the AI Extracts',
                     content: (
                         <>
@@ -147,7 +163,7 @@ export function MatchReportHelp() {
                     content: (
                         <>
                             <p>
-                                After extraction, the report enters <strong>Review</strong> status. Start by filling in the fields
+                                Once the report is in <strong>Review</strong> status, start by filling in the fields
                                 that the AI cannot extract:
                             </p>
                             <ul className="list-disc list-inside mt-1 space-y-0.5">
@@ -204,9 +220,27 @@ export function MatchReportHelp() {
                     content: (
                         <p>
                             Once everything looks good, check the box on each report and click <strong>"Submit Selected"</strong> to
-                            send match data to the database. Successfully submitted matches turn green. You can also submit
-                            individually with the submit button on each card.
+                            send match data to the database. Successfully submitted matches appear dimmed with a green border.
+                            You can also click the <strong>"Submit"</strong> button on each individual card. After submitting,
+                            use <strong>"Clear Submitted"</strong> to remove completed reports from the dashboard.
                         </p>
+                    ),
+                },
+                {
+                    title: 'Ready to Report (Discord)',
+                    content: (
+                        <>
+                            <p>
+                                If Discord integration is configured, auto-matched screenshots appear in the
+                                <strong> "Ready to Report"</strong> section at the top of the page. These are screenshots
+                                from Discord that have been automatically linked to scheduled matches.
+                            </p>
+                            <p className="mt-1">
+                                Click <strong>"Report Match"</strong> on a ready card to start a new report pre-populated
+                                with the matched images. You can also use the <strong>"Schedule Panel"</strong> and
+                                <strong> "Discord Panel"</strong> toggles in the action bar to view related data.
+                            </p>
+                        </>
                     ),
                 },
             ]}
@@ -249,6 +283,18 @@ export function RosterManagerHelp() {
                         <p>
                             Click on a player's <strong>role badge</strong> (Solo, Jungle, Mid, Support, ADC, Rule 0-Sub, Fill) to open
                             a dropdown and assign a different role. The change is staged locally until you save.
+                            Use the <strong>"Rule 0-Subs"</strong> toggle in the header to show or hide substitute players.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Set Team Captain',
+                    content: (
+                        <p>
+                            Hover over a player and click the <strong>crown icon</strong> to set them as team captain.
+                            Each team can have one captain per season. Captains are sorted first on the roster and
+                            shown with a yellow crown badge. Captain status is automatically cleared when a player
+                            is transferred or dropped.
                         </p>
                     ),
                 },
@@ -290,7 +336,7 @@ export function RosterManagerHelp() {
                                 player or create a new one.
                             </p>
                             <p className="mt-1">
-                                To remove a player from the roster, use the actions menu and select <strong>"Drop"</strong>.
+                                To remove a player from the roster, use the actions menu and select <strong>"Drop from Roster"</strong>.
                                 This deactivates them from the team but preserves their historical data.
                             </p>
                         </>
@@ -300,9 +346,9 @@ export function RosterManagerHelp() {
                     title: 'Save Changes',
                     content: (
                         <p>
-                            All changes are <strong>staged locally</strong> until you click <strong>"Save All"</strong> in the
-                            bottom bar. This lets you make multiple changes and review them before committing. Click
-                            <strong> "Discard"</strong> to undo all pending changes.
+                            All changes are <strong>staged locally</strong> until you click <strong>"Save Changes"</strong> in the
+                            bottom bar (shows the number of pending changes). This lets you make multiple changes
+                            and review them before committing. Click <strong>"Discard"</strong> to undo all pending changes.
                         </p>
                     ),
                 },
@@ -339,11 +385,22 @@ export function PlayerManagerHelp() {
                     ),
                 },
                 {
-                    title: 'Edit Discord & Tracker Info',
+                    title: 'Edit Player Info',
                     content: (
                         <p>
-                            Click <strong>"Edit"</strong> on any player row to update their Discord username or
-                            Tracker.gg profile URL. This info is stored globally and shared across all seasons.
+                            Click <strong>"Edit"</strong> on any player row to update their Discord username,
+                            Tracker.gg profile URL, and <strong>default roles</strong> (main and secondary).
+                            This info is stored globally and shared across all seasons.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Manage Aliases',
+                    content: (
+                        <p>
+                            Click <strong>"Aliases"</strong> on a player row to open the alias manager. You can
+                            add, edit, or remove alternate names (old IGNs, smurf accounts). Aliases are used
+                            during match report processing to auto-match players to their roster entries.
                         </p>
                     ),
                 },
@@ -370,6 +427,16 @@ export function PlayerManagerHelp() {
                             Players tagged <strong>"FA"</strong> (Free Agent) are not on any active season roster.
                             Use the <strong>"Free Agents"</strong> filter to find them quickly. These are players
                             who played in a previous season but haven't been enrolled in the current one yet.
+                        </p>
+                    ),
+                },
+                {
+                    title: 'Merge Duplicate Players',
+                    content: (
+                        <p>
+                            If the same person exists as two separate player entries, click <strong>"Merge"</strong> in
+                            the header. Select the source (duplicate) and target (keeper) — all stats and history from the
+                            source will be merged into the target, and the duplicate is removed.
                         </p>
                     ),
                 },
@@ -430,8 +497,9 @@ export function MatchManagerHelp() {
                             <ul className="list-disc list-inside mt-1 space-y-0.5">
                                 <li><strong>Winner</strong> — toggle between Team 1 and Team 2</li>
                                 <li><strong>God picks</strong> — use the autocomplete to change a player's god</li>
+                                <li><strong>Roles</strong> — click the role icon to assign Solo, Jungle, Mid, Support, or ADC</li>
                                 <li><strong>Stats</strong> — edit Kills, Deaths, Assists, Damage, Mitigated directly</li>
-                                <li><strong>Players</strong> — click a player name to swap them for someone else</li>
+                                <li><strong>Players</strong> — click a player name to search and swap them for someone else</li>
                             </ul>
                         </>
                     ),
@@ -466,8 +534,11 @@ export function LeagueManagerHelp() {
                                 <li><strong>Leagues</strong> — top level (e.g. "Babylon Smite League")</li>
                                 <li><strong>Divisions</strong> — skill tiers within a league (e.g. "Ishtar", Tier 1)</li>
                                 <li><strong>Seasons</strong> — time periods within a division (e.g. "Season 2")</li>
-                                <li><strong>Teams</strong> — competing teams within a season</li>
                             </ul>
+                            <p className="mt-1">
+                                Teams are managed separately in the <strong>Team Manager</strong>.
+                                Each season shows its team and match counts at a glance.
+                            </p>
                         </>
                     ),
                 },
@@ -494,11 +565,18 @@ export function LeagueManagerHelp() {
                 {
                     title: 'Edit Names, Slugs & Settings',
                     content: (
-                        <p>
-                            Click the <strong>pencil icon</strong> on any item to edit it inline. You can change
-                            names, URL slugs, tier numbers, team colors, and date ranges. The slug is used in
-                            URLs (e.g. <code>/bsl/ishtar</code>), so change it carefully.
-                        </p>
+                        <>
+                            <p>
+                                Click the <strong>pencil icon</strong> on any item to edit it inline. You can change
+                                names, URL slugs, tier numbers, and date ranges. The slug is used in
+                                URLs (e.g. <code>/bsl/ishtar</code>), so change it carefully.
+                            </p>
+                            <p className="mt-1">
+                                Leagues also have editable fields for <strong>color</strong>, <strong>slogan</strong>,
+                                <strong> description</strong>, <strong>promotional text</strong>, and <strong>Discord URL</strong>.
+                                Divisions support <strong>tags</strong> with an optional "show on league" toggle.
+                            </p>
+                        </>
                     ),
                 },
                 {
@@ -512,11 +590,21 @@ export function LeagueManagerHelp() {
                     ),
                 },
                 {
+                    title: 'End a Season',
+                    content: (
+                        <p>
+                            Owners can click the <strong>flag icon</strong> on a season to officially end it.
+                            This sets the end date to today, deactivates the season, and triggers
+                            season-based challenge awards. This action cannot be undone.
+                        </p>
+                    ),
+                },
+                {
                     title: 'Delete Items',
                     content: (
                         <p>
-                            Click the <strong>trash icon</strong> to delete. Deletions cascade upward — you must remove
-                            children first (e.g. remove all teams before deleting a season, all seasons before a division).
+                            Click the <strong>trash icon</strong> to delete. Deletions cascade — you must remove
+                            children first (e.g. all seasons before a division, all divisions before a league).
                             This prevents accidental data loss.
                         </p>
                     ),
@@ -599,13 +687,23 @@ export function PermissionManagerHelp() {
                             <ul className="list-disc list-inside mt-1 space-y-0.5">
                                 <li><strong>Match Report</strong> — Create match reports from screenshots</li>
                                 <li><strong>Roster Manage</strong> — Edit rosters, transfer/drop/add players</li>
-                                <li><strong>Match Manage</strong> — Edit or delete existing match data</li>
-                                <li><strong>Player Manage</strong> — Edit players, bulk enroll (global)</li>
-                                <li><strong>League Manage</strong> — Create/edit leagues, divisions, seasons, teams</li>
-                                <li><strong>User Manage</strong> — Manage Discord-authenticated users</li>
-                                <li><strong>Claim Manage</strong> — Review player claim requests</li>
+                                <li><strong>Match Manage</strong> — Edit or delete any existing match data</li>
+                                <li><strong>Match Manage Own</strong> — Edit or delete only matches you reported</li>
+                                <li><strong>Match Schedule</strong> — Create and manage match schedules</li>
+                                <li><strong>Player Manage</strong> — Edit players, bulk enroll (global only)</li>
+                                <li><strong>League Manage</strong> — Create/edit leagues, divisions, and seasons</li>
+                                <li><strong>Team Manage</strong> — Create, edit, delete teams and upload team icons</li>
+                                <li><strong>User Manage</strong> — Manage Discord-authenticated users (global only)</li>
+                                <li><strong>Claim Manage</strong> — Review player claim requests (global only)</li>
+                                <li><strong>Audit Log View</strong> — View the audit log of all admin actions</li>
+                                <li><strong>League Preview</strong> — View inactive seasons before they go live</li>
+                                <li><strong>Codex Edit</strong> — Access and edit the Codex</li>
                                 <li><strong>Permission Manage</strong> — This page (role & permission admin)</li>
                             </ul>
+                            <p className="mt-2">
+                                Permissions marked <em>"global only"</em> cannot be scoped to a specific league — they
+                                always apply system-wide.
+                            </p>
                         </>
                     ),
                 },

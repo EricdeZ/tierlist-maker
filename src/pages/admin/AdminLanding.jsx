@@ -129,7 +129,7 @@ const tools = [
     },
     {
         title: 'Challenge Manager',
-        description: 'Create and manage Passion challenges. Define objectives like "Deal 50,000 damage" or "Log in 7 days in a row" that users complete to earn bonus Passion coins.',
+        description: 'Create and manage Passion challenges. Define objectives like "Deal 50,000 damage" or "Log in 7 days in a row" that users complete to earn bonus Passion.',
         path: '/admin/challenges',
         permission: 'league_manage',
         globalOnly: true,
