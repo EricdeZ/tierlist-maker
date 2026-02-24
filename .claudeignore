@@ -1,0 +1,21 @@
+# Static assets (images, fonts, icons)
+src/assets/
+public/
+
+# Database migrations (schema reference is in database-schema.md)
+database/migrations/
+
+# Build output and tooling cache
+dist/
+.wrangler/
+
+# Large style-only files (pure definitions, rarely need direct edits)
+src/components/xp/xpStyles.js
+src/pages/forge/forge.css
+
+# Package lock (huge, never manually edited)
+package-lock.json
+
+# Tutorial content (long static text)
+src/components/admin/AdminHelp.jsx
+src/pages/forge/ForgeTutorial.jsx
