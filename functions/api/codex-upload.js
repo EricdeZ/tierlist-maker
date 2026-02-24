@@ -59,7 +59,7 @@ export async function onRequest(context) {
         return handleList(sql, url)
     }
     if (request.method === 'POST') {
-        return handleUpload(request, sql, bucket, admin)
+        return handleUpload(request, sql, bucket, admin, env)
     }
     if (request.method === 'DELETE') {
         const id = url.searchParams.get('id')
@@ -84,7 +84,7 @@ async function handleList(sql, url) {
     return json({ images, categories: categories.map(c => c.category) })
 }
 
-async function handleUpload(request, sql, bucket, admin) {
+async function handleUpload(request, sql, bucket, admin, env) {
     let formData
     try {
         formData = await request.formData()
@@ -131,7 +131,8 @@ async function handleUpload(request, sql, bucket, admin) {
     })
 
     // Build URL with cache buster and update the row
-    const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}?v=${Date.now()}`
+    const r2Base = env.R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || ''
+    const publicUrl = `${r2Base}/${key}?v=${Date.now()}`
     await sql`UPDATE codex_images SET url = ${publicUrl} WHERE id = ${row.id}`
 
     logAudit(sql, admin, {

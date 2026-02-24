@@ -57,6 +57,16 @@ export default function CodexNavbar() {
                             Items
                         </Link>
                         <Link
+                            to="/codex/gods"
+                            className={`text-xs font-bold uppercase px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+                                location.pathname.startsWith('/codex/gods')
+                                    ? 'text-(--color-accent) bg-(--color-accent)/10'
+                                    : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5'
+                            }`}
+                        >
+                            Gods
+                        </Link>
+                        <Link
                             to="/codex/images"
                             className={`text-xs font-bold uppercase px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
                                 location.pathname.startsWith('/codex/images')

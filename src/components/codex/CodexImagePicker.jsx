@@ -5,11 +5,12 @@ import { ImagePlus, X, Upload } from 'lucide-react'
 /**
  * Reusable image picker for selecting from uploaded codex images.
  * Props:
- *   value     - current image URL (or null)
- *   onChange  - callback with selected URL (or null to clear)
- *   className - optional wrapper class
+ *   value         - current image URL (or null)
+ *   onChange       - callback with selected URL (or null to clear)
+ *   onSelectFull  - optional callback with full image object { id, url, filename } on selection
+ *   className     - optional wrapper class
  */
-export default function CodexImagePicker({ value, onChange, className = '' }) {
+export default function CodexImagePicker({ value, onChange, onSelectFull, className = '' }) {
     const [open, setOpen] = useState(false)
     const [images, setImages] = useState([])
     const [categories, setCategories] = useState([])
@@ -51,8 +52,9 @@ export default function CodexImagePicker({ value, onChange, className = '' }) {
         return () => document.removeEventListener('mousedown', handle)
     }, [open])
 
-    const handleSelect = (url) => {
-        onChange(url)
+    const handleSelect = (image) => {
+        onChange(image.url)
+        if (onSelectFull) onSelectFull(image)
         setOpen(false)
     }
 
@@ -156,7 +158,7 @@ export default function CodexImagePicker({ value, onChange, className = '' }) {
                                 {filtered.map(image => (
                                     <button
                                         key={image.id}
-                                        onClick={() => handleSelect(image.url)}
+                                        onClick={() => handleSelect(image)}
                                         className={`aspect-square rounded-lg overflow-hidden bg-black/20 hover:ring-2 hover:ring-(--color-accent) transition-all cursor-pointer flex items-center justify-center p-1 ${value === image.url ? 'ring-2 ring-(--color-accent)' : 'border border-white/5'}`}
                                         title={image.filename}
                                     >

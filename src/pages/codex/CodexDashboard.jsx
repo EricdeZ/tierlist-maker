@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import PageTitle from '../../components/PageTitle'
-import { Package, ImagePlus } from 'lucide-react'
+import { Package, ImagePlus, Swords } from 'lucide-react'
 
 export default function CodexDashboard() {
     return (
@@ -30,6 +30,29 @@ export default function CodexDashboard() {
                         </div>
                         <div className="hidden sm:flex shrink-0 items-center">
                             <span className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors">
+                                Open
+                            </span>
+                        </div>
+                    </div>
+                </Link>
+
+                <Link
+                    to="/codex/gods"
+                    className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 hover:border-cyan-500/40 transition-colors"
+                    style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}
+                >
+                    <div className="p-4 sm:p-6 flex items-start gap-3 sm:gap-5">
+                        <div className="shrink-0 mt-0.5 text-cyan-400">
+                            <Swords className="w-7 h-7" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-heading text-lg sm:text-xl font-semibold text-(--color-text) mb-1">Gods</h2>
+                            <p className="hidden sm:block text-sm text-(--color-text-secondary) leading-relaxed">
+                                Manage SMITE gods with custom fields and tags. Define god attributes, categorize with tags, and link to the god database.
+                            </p>
+                        </div>
+                        <div className="hidden sm:flex shrink-0 items-center">
+                            <span className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 transition-colors">
                                 Open
                             </span>
                         </div>

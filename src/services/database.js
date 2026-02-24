@@ -417,6 +417,63 @@ export const codexService = {
     async updateImageCategory(id, category) {
         return apiPost('codex-manage', {}, { action: 'update-image-category', id, category })
     },
+    // Gods
+    async getAllGods() {
+        return apiCall('codex-manage', { type: 'gods' })
+    },
+    async createGodField(data) {
+        return apiPost('codex-manage', {}, { action: 'create-god-field', ...data })
+    },
+    async updateGodField(data) {
+        return apiPost('codex-manage', {}, { action: 'update-god-field', ...data })
+    },
+    async deleteGodField(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-god-field', id })
+    },
+    async createGodTag(data) {
+        return apiPost('codex-manage', {}, { action: 'create-god-tag', ...data })
+    },
+    async updateGodTag(data) {
+        return apiPost('codex-manage', {}, { action: 'update-god-tag', ...data })
+    },
+    async deleteGodTag(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-god-tag', id })
+    },
+    async createGod(data) {
+        return apiPost('codex-manage', {}, { action: 'create-god', ...data })
+    },
+    async updateGod(data) {
+        return apiPost('codex-manage', {}, { action: 'update-god', ...data })
+    },
+    async deleteGod(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-god', id })
+    },
+    // God Categories
+    async createGodCategory(data) {
+        return apiPost('codex-manage', {}, { action: 'create-god-category', ...data })
+    },
+    async updateGodCategory(data) {
+        return apiPost('codex-manage', {}, { action: 'update-god-category', ...data })
+    },
+    async deleteGodCategory(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-god-category', id })
+    },
+    async reorderGodCategories(items) {
+        return apiPost('codex-manage', {}, { action: 'reorder-god-categories', items })
+    },
+    // God Images (gallery)
+    async addGodImage(data) {
+        return apiPost('codex-manage', {}, { action: 'add-god-image', ...data })
+    },
+    async removeGodImage(id) {
+        return apiPost('codex-manage', {}, { action: 'remove-god-image', id })
+    },
+    async reorderGodImages(items) {
+        return apiPost('codex-manage', {}, { action: 'reorder-god-images', items })
+    },
+    async updateGodImageCaption(id, caption) {
+        return apiPost('codex-manage', {}, { action: 'update-god-image', id, caption })
+    },
 }
 
 export const forgeService = {

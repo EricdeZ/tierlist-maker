@@ -68,6 +68,7 @@ import TeamManager from "./pages/admin/TeamManager.jsx";
 import CodexLayout from './components/layout/CodexLayout'
 import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
 import CodexItems from "./pages/codex/CodexItems.jsx";
+import CodexGods from "./pages/codex/CodexGods.jsx";
 import CodexImages from "./pages/codex/CodexImages.jsx";
 
 function App() {
@@ -111,6 +112,7 @@ function App() {
                             <Route path="codex" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><CodexLayout /></ProtectedRoute>}>
                                 <Route index element={<CodexDashboard />} />
                                 <Route path="items" element={<CodexItems />} />
+                                <Route path="gods" element={<CodexGods />} />
                                 <Route path="images" element={<CodexImages />} />
                             </Route>
 

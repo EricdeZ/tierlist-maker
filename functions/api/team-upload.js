@@ -58,7 +58,7 @@ export async function onRequest(context) {
     const bucket = env.TEAM_ICONS
 
     if (request.method === 'POST') {
-        return handleUpload(request, sql, bucket, admin)
+        return handleUpload(request, sql, bucket, admin, env)
     }
     if (request.method === 'DELETE') {
         const teamId = url.searchParams.get('teamId')
@@ -68,7 +68,7 @@ export async function onRequest(context) {
     return json({ error: 'Method not allowed' }, 405)
 }
 
-async function handleUpload(request, sql, bucket, admin) {
+async function handleUpload(request, sql, bucket, admin, env) {
     let formData
     try {
         formData = await request.formData()
@@ -118,7 +118,8 @@ async function handleUpload(request, sql, bucket, admin) {
     })
 
     // Build URL with cache buster
-    const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}?v=${Date.now()}`
+    const r2Base = env.R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || ''
+    const publicUrl = `${r2Base}/${key}?v=${Date.now()}`
 
     // Update DB
     await sql`UPDATE teams SET logo_url = ${publicUrl}, updated_at = NOW() WHERE id = ${team.id}`
