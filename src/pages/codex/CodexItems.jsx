@@ -316,6 +316,7 @@ export default function CodexItems() {
                                             className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent) cursor-pointer">
                                             <option value="text">Text</option>
                                             <option value="number">Number</option>
+                                            <option value="boolean">Boolean</option>
                                             <option value="group">Group</option>
                                         </select>
                                     </div>
@@ -343,6 +344,7 @@ export default function CodexItems() {
                                                             className="w-24 px-2 py-1.5 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-xs focus:outline-none focus:border-(--color-accent) cursor-pointer">
                                                             <option value="text">Text</option>
                                                             <option value="number">Number</option>
+                                                            <option value="boolean">Boolean</option>
                                                         </select>
                                                         <button type="button" onClick={() => removeSubField(idx)}
                                                             className="p-1 rounded hover:bg-red-500/10 text-(--color-text-secondary) hover:text-red-400 transition-colors cursor-pointer">
@@ -538,16 +540,34 @@ export default function CodexItems() {
                                                     {field.options.sub_fields.map(sf => (
                                                         <div key={sf.key} className="flex-1">
                                                             <label className="block text-[10px] text-(--color-text-secondary)/60 mb-0.5">{sf.label}</label>
-                                                            <input
-                                                                type={sf.type === 'number' ? 'number' : 'text'}
-                                                                value={(itemForm.field_values[field.slug] || {})[sf.key] ?? ''}
-                                                                onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
-                                                                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
-                                                                placeholder={sf.label}
-                                                            />
+                                                            {sf.type === 'boolean' ? (
+                                                                <label className="flex items-center gap-2 px-3 py-2 bg-black/20 border border-white/10 rounded-lg cursor-pointer">
+                                                                    <input type="checkbox"
+                                                                        checked={!!(itemForm.field_values[field.slug] || {})[sf.key]}
+                                                                        onChange={e => setGroupSubValue(field.slug, sf.key, e.target.checked)}
+                                                                        className="rounded border-white/20 bg-black/20 text-(--color-accent) focus:ring-(--color-accent)" />
+                                                                    <span className="text-sm text-(--color-text)">{(itemForm.field_values[field.slug] || {})[sf.key] ? 'Yes' : 'No'}</span>
+                                                                </label>
+                                                            ) : (
+                                                                <input
+                                                                    type={sf.type === 'number' ? 'number' : 'text'}
+                                                                    value={(itemForm.field_values[field.slug] || {})[sf.key] ?? ''}
+                                                                    onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
+                                                                    className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
+                                                                    placeholder={sf.label}
+                                                                />
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
+                                            ) : field.field_type === 'boolean' ? (
+                                                <label className="flex items-center gap-2 px-3 py-2 bg-black/20 border border-white/10 rounded-lg cursor-pointer">
+                                                    <input type="checkbox"
+                                                        checked={!!itemForm.field_values[field.slug]}
+                                                        onChange={e => setItemFieldValue(field.slug, e.target.checked)}
+                                                        className="rounded border-white/20 bg-black/20 text-(--color-accent) focus:ring-(--color-accent)" />
+                                                    <span className="text-sm text-(--color-text)">{itemForm.field_values[field.slug] ? 'Yes' : 'No'}</span>
+                                                </label>
                                             ) : (
                                                 <input
                                                     type={field.field_type === 'number' ? 'number' : 'text'}
@@ -636,6 +656,7 @@ export default function CodexItems() {
                                             {fields.filter(f => {
                                                 const val = item.field_values[f.slug]
                                                 if (f.field_type === 'group') return val && typeof val === 'object' && Object.values(val).some(v => v !== '' && v != null)
+                                                if (f.field_type === 'boolean') return val !== undefined
                                                 return val !== undefined && val !== ''
                                             }).map(field => (
                                                 <span key={field.slug} className="text-xs text-(--color-text-secondary)/50">
@@ -644,10 +665,18 @@ export default function CodexItems() {
                                                     <span className="text-(--color-text-secondary)">
                                                         {field.field_type === 'group' && field.options?.sub_fields
                                                             ? field.options.sub_fields
-                                                                .filter(sf => (item.field_values[field.slug] || {})[sf.key])
-                                                                .map(sf => `${sf.label}: ${(item.field_values[field.slug] || {})[sf.key]}`)
+                                                                .filter(sf => {
+                                                                    const v = (item.field_values[field.slug] || {})[sf.key]
+                                                                    return sf.type === 'boolean' ? v !== undefined : !!v
+                                                                })
+                                                                .map(sf => {
+                                                                    const v = (item.field_values[field.slug] || {})[sf.key]
+                                                                    return `${sf.label}: ${sf.type === 'boolean' ? (v ? 'Yes' : 'No') : v}`
+                                                                })
                                                                 .join(' / ')
-                                                            : item.field_values[field.slug]
+                                                            : field.field_type === 'boolean'
+                                                                ? (item.field_values[field.slug] ? 'Yes' : 'No')
+                                                                : item.field_values[field.slug]
                                                         }
                                                     </span>
                                                 </span>
