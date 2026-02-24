@@ -35,6 +35,9 @@ export default function ScrimPlanner() {
     const [openScrims, setOpenScrims] = useState([])
     const [leagueFilter, setLeagueFilter] = useState('')
     const [tierFilter, setTierFilter] = useState('')
+    const [regionFilter, setRegionFilter] = useState('')
+    const [divisionFilter, setDivisionFilter] = useState('')
+    const [activeDivisions, setActiveDivisions] = useState([])
 
     const [myScrims, setMyScrims] = useState([])
     const [captainTeams, setCaptainTeams] = useState([])
@@ -100,10 +103,12 @@ export default function ScrimPlanner() {
             const filters = {}
             if (leagueFilter) filters.league_id = leagueFilter
             if (tierFilter) filters.division_tier = tierFilter
+            if (regionFilter) filters.region = regionFilter
+            if (divisionFilter) filters.division_id = divisionFilter
             const data = await scrimService.list(filters)
             setOpenScrims(data.scrims || [])
         } catch (err) { console.error('Failed to load scrims:', err) }
-    }, [leagueFilter, tierFilter])
+    }, [leagueFilter, tierFilter, regionFilter, divisionFilter])
 
     const loadMyScrims = useCallback(async () => {
         if (!user) return
@@ -130,7 +135,12 @@ export default function ScrimPlanner() {
         load()
     }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    useEffect(() => { if (!loading) loadOpenScrims() }, [leagueFilter, tierFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (!loading) loadOpenScrims() }, [leagueFilter, tierFilter, regionFilter, divisionFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fetch active divisions for filters
+    useEffect(() => {
+        scrimService.getActiveDivisions().then(data => setActiveDivisions(data.divisions || [])).catch(() => {})
+    }, [])
 
     useEffect(() => {
         if (showPostWindow && allTeams.length === 0) {
@@ -199,6 +209,43 @@ export default function ScrimPlanner() {
         } catch (err) { alert(err.message || 'Failed to dispute') }
         finally { setActionLoading(null) }
     }
+
+    // Confirmation handlers
+    const handleConfirmAccept = async (scrimId) => {
+        setActionLoading(scrimId)
+        try {
+            await scrimService.confirmAccept(scrimId)
+            await Promise.all([loadOpenScrims(), loadMyScrims()])
+        } catch (err) { alert(err.message || 'Failed to confirm') }
+        finally { setActionLoading(null) }
+    }
+
+    const handleDenyAccept = async (scrimId) => {
+        setActionLoading(scrimId)
+        try {
+            await scrimService.denyAccept(scrimId)
+            await Promise.all([loadOpenScrims(), loadMyScrims()])
+        } catch (err) { alert(err.message || 'Failed to deny') }
+        finally { setActionLoading(null) }
+    }
+
+    // DM confirmation polling — check for Discord DM replies when pending scrims exist
+    const hasPendingScrims = useMemo(() => myScrims.some(s => s.status === 'pending_confirmation'), [myScrims])
+
+    useEffect(() => {
+        if (!user || !hasPendingScrims) return
+        // Check immediately
+        scrimService.checkDMConfirmations().then(data => {
+            if (data.processed > 0) { loadMyScrims(); loadOpenScrims() }
+        }).catch(() => {})
+        // Poll every 30s
+        const interval = setInterval(() => {
+            scrimService.checkDMConfirmations().then(data => {
+                if (data.processed > 0) { loadMyScrims(); loadOpenScrims() }
+            }).catch(() => {})
+        }, 30000)
+        return () => clearInterval(interval)
+    }, [user, hasPendingScrims]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Blacklist handlers
     const handleBlacklistAdd = async (teamId, blockedTeamId) => {
@@ -325,8 +372,12 @@ export default function ScrimPlanner() {
                                     <OpenScrimsTab
                                         scrims={filteredOpenScrims} user={user} currentUserId={user?.id}
                                         captainTeams={captainTeams} leagueFilter={leagueFilter} setLeagueFilter={setLeagueFilter}
-                                        tierFilter={tierFilter} setTierFilter={setTierFilter} uniqueLeagues={uniqueLeagues}
-                                        uniqueTiers={uniqueTiers} onAccept={handleAccept} actionLoading={actionLoading}
+                                        tierFilter={tierFilter} setTierFilter={setTierFilter}
+                                        regionFilter={regionFilter} setRegionFilter={setRegionFilter}
+                                        divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
+                                        uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
+                                        activeDivisions={activeDivisions}
+                                        onAccept={handleAccept} actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
                                     />
@@ -338,6 +389,8 @@ export default function ScrimPlanner() {
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
                                         setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
                                         onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome}
+                                        onConfirmAccept={handleConfirmAccept} onDenyAccept={handleDenyAccept}
+                                        activeDivisions={activeDivisions}
                                     />
                                 )}
                                 {mobileTab === 'post' && (
@@ -550,8 +603,12 @@ export default function ScrimPlanner() {
                                 {activeTab === 'open' && (
                                     <OpenScrimsTab scrims={filteredOpenScrims} user={user} currentUserId={user?.id}
                                         captainTeams={captainTeams} leagueFilter={leagueFilter} setLeagueFilter={setLeagueFilter}
-                                        tierFilter={tierFilter} setTierFilter={setTierFilter} uniqueLeagues={uniqueLeagues}
-                                        uniqueTiers={uniqueTiers} onAccept={handleAccept} actionLoading={actionLoading}
+                                        tierFilter={tierFilter} setTierFilter={setTierFilter}
+                                        regionFilter={regionFilter} setRegionFilter={setRegionFilter}
+                                        divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
+                                        uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
+                                        activeDivisions={activeDivisions}
+                                        onAccept={handleAccept} actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores} />
                                 )}
@@ -560,7 +617,9 @@ export default function ScrimPlanner() {
                                         currentUserId={user?.id} onAccept={handleAccept} onCancel={handleCancel}
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
                                         setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
-                                        onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome} />
+                                        onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome}
+                                        onConfirmAccept={handleConfirmAccept} onDenyAccept={handleDenyAccept}
+                                        activeDivisions={activeDivisions} />
                                 )}
                             </>
                         )}

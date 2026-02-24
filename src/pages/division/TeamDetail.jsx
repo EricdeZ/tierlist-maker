@@ -135,11 +135,21 @@ const TeamDetail = () => {
 
             {/* Team Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
-                <div className="flex items-center gap-4">
-                    <TeamLogo slug={team.slug} name={team.name} size={56} logoUrl={team.logo_url} color={team.color} />
-                    <div className="w-4 h-14 rounded" style={{ backgroundColor: team.color }} />
-                    <div className="flex-1">
-                        <h1 className="font-heading text-3xl font-bold text-(--color-text)">
+                <div className="flex flex-col items-center text-center gap-2 sm:flex-row sm:items-center sm:text-left sm:gap-4">
+                    <div
+                        className="sm:hidden"
+                        style={{
+                            filter: `drop-shadow(0 0 10px ${team.color}90) drop-shadow(0 0 22px ${team.color}50)`,
+                        }}
+                    >
+                        <TeamLogo slug={team.slug} name={team.name} size={64} logoUrl={team.logo_url} color={team.color} />
+                    </div>
+                    <div className="hidden sm:block flex-shrink-0">
+                        <TeamLogo slug={team.slug} name={team.name} size={56} logoUrl={team.logo_url} color={team.color} />
+                    </div>
+                    <div className="hidden sm:block w-4 h-14 rounded" style={{ backgroundColor: team.color }} />
+                    <div className="sm:flex-1 sm:min-w-0">
+                        <h1 className="font-heading text-3xl font-bold text-(--color-text) leading-tight">
                             {team.name}
                         </h1>
                         <p className="text-(--color-text-secondary)">
@@ -147,7 +157,7 @@ const TeamDetail = () => {
                         </p>
                     </div>
                     {!loading && completedMatches.length > 0 && (
-                        <div className="text-right flex-shrink-0">
+                        <div className="sm:text-right flex-shrink-0">
                             <div className="font-heading text-2xl font-bold text-(--color-text)">
                                 <span className="text-green-400">{teamWins}</span>
                                 <span className="text-(--color-text-secondary) mx-1">–</span>

@@ -493,6 +493,10 @@ export const forgeService = {
         return apiCall('forge', { action: 'history', sparkId })
     },
 
+    async getBatchHistory(sparkIds) {
+        return apiCall('forge', { action: 'batch-history', sparkIds: sparkIds.join(',') })
+    },
+
     async getMarketStatuses() {
         return apiCall('forge', { action: 'market-statuses' })
     },
@@ -511,6 +515,14 @@ export const forgeService = {
 
     async toggleStatus(seasonId, status) {
         return apiPost('forge', { action: 'toggle-status' }, { seasonId, status })
+    },
+
+    async getTutorialStatus(seasonId) {
+        return apiCall('forge', { action: 'tutorial-status', seasonId })
+    },
+
+    async tutorialFuel(sparkId) {
+        return apiPost('forge', { action: 'tutorial-fuel' }, { sparkId })
     },
 }
 
@@ -622,6 +634,18 @@ export const scrimService = {
     },
     async searchUsers(query) {
         return apiCall('scrim', { action: 'search-users', ...(query ? { q: query } : {}) })
+    },
+    async getActiveDivisions() {
+        return apiCall('scrim', { action: 'active-divisions' })
+    },
+    async confirmAccept(scrimId) {
+        return apiPost('scrim', { action: 'confirm-accept' }, { scrim_id: scrimId })
+    },
+    async denyAccept(scrimId) {
+        return apiPost('scrim', { action: 'deny-accept' }, { scrim_id: scrimId })
+    },
+    async checkDMConfirmations() {
+        return apiCall('scrim', { action: 'check-dm-confirmations' })
     },
 }
 

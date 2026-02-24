@@ -1,10 +1,10 @@
-import { Clock, Shield, MessageSquare, Check, Copy, Target } from 'lucide-react'
+import { Clock, Shield, MessageSquare, Check, Copy, Target, Bell } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import { RANK_LABELS, getDivisionImage } from '../../utils/divisionImages'
 import ReliabilityBar from './ReliabilityBar'
 import { XP_PICK_BADGE, formatPickMode, formatDateEST, formatRelativeDate, copyScrimsToClipboard } from './scrimUtils'
 
-export default function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores }) {
+export default function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores, activeDivisions }) {
     const isLoading = actionLoading === scrim.id
     const acceptableTeams = captainTeams.filter(t => t.teamId !== scrim.teamId)
     const handleAcceptClick = () => {
@@ -82,9 +82,29 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         {scrim.bannedContentLeague && (
                             <span className="xp-badge xp-badge-red"><Shield size={9} /> {scrim.bannedContentLeague} Bans</span>
                         )}
+                        <span className={`xp-badge ${scrim.region === 'EU' ? 'xp-badge-purple' : 'xp-badge-blue'}`}>{scrim.region || 'NA'}</span>
+                        {scrim.requiresConfirmation && scrim.status === 'open' && (
+                            <span className="xp-badge xp-badge-amber" style={{ fontSize: 9 }}><Bell size={8} /> Requires Confirmation</span>
+                        )}
                     </div>
 
-                    {scrim.acceptableTiers && scrim.acceptableTiers.length < 5 && (
+                    {scrim.acceptableDivisions && scrim.acceptableDivisions.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap mb-1">
+                            <span className="xp-text" style={{ fontSize: 10, color: '#666' }}>Open to:</span>
+                            {scrim.acceptableDivisions.map(divId => {
+                                const div = activeDivisions?.find(d => d.id === divId)
+                                const tImg = div?.tier ? getDivisionImage(null, null, div.tier) : null
+                                return (
+                                    <span key={divId} className={`xp-badge ${div?.tier ? `xp-tier-badge-${div.tier}` : 'xp-badge-gray'}`}>
+                                        {tImg && <img src={tImg} alt="" style={{ width: 10, height: 10, objectFit: 'contain', imageRendering: 'pixelated' }} />}
+                                        {div?.name || `Division #${divId}`}
+                                    </span>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {!scrim.acceptableDivisions && scrim.acceptableTiers && scrim.acceptableTiers.length < 5 && (
                         <div className="flex items-center gap-1 flex-wrap mb-1">
                             <span className="xp-text" style={{ fontSize: 10, color: '#666' }}>Open to:</span>
                             {scrim.acceptableTiers.sort((a, b) => a - b).map(tier => {
@@ -117,6 +137,16 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                                 <span className="xp-text" style={{ fontSize: 11, fontWeight: 700, color: '#6a3ea1' }}>{scrim.challengedTeamName}</span>
                             )}
                             {scrim.challengedDivisionName && <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>· {scrim.challengedDivisionName}</span>}
+                        </div>
+                    )}
+
+                    {scrim.status === 'pending_confirmation' && scrim.pendingTeamName && (
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <Clock size={11} style={{ color: '#c08030', flexShrink: 0 }} />
+                            <span className="xp-text" style={{ fontSize: 11, color: '#c08030' }}>Pending confirmation:</span>
+                            <TeamLogo slug={scrim.pendingTeamSlug} name={scrim.pendingTeamName} size={16} color={scrim.pendingTeamColor} />
+                            <span className="xp-text" style={{ fontSize: 11, fontWeight: 700, color: '#c08030' }}>{scrim.pendingTeamName}</span>
+                            {scrim.pendingDivisionName && <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>· {scrim.pendingDivisionName}</span>}
                         </div>
                     )}
 
@@ -171,6 +201,25 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         )}
                         {scrim.status === 'open' && canCancel && (
                             <button onClick={() => onCancel(scrim.id)} disabled={isLoading} className="xp-btn xp-btn-danger">{isLoading ? '...' : 'Cancel'}</button>
+                        )}
+                        {scrim.status === 'pending_confirmation' && isOwnTeam && onConfirmAccept && (
+                            <>
+                                <button onClick={() => onConfirmAccept(scrim.id)} disabled={isLoading}
+                                    className="xp-btn xp-btn-primary" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'Confirm'}
+                                </button>
+                                <button onClick={() => onDenyAccept(scrim.id)} disabled={isLoading}
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'Deny'}
+                                </button>
+                                <button onClick={() => onCancel(scrim.id)} disabled={isLoading}
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    {isLoading ? '...' : 'Cancel Scrim'}
+                                </button>
+                            </>
+                        )}
+                        {scrim.status === 'pending_confirmation' && !isOwnTeam && (
+                            <span className="xp-badge xp-badge-amber">Awaiting Confirmation</span>
                         )}
                         {scrim.status === 'accepted' && !isPast && <span className="xp-badge xp-badge-green">Accepted</span>}
                         {scrim.status === 'accepted' && isPast && !scrim.outcome && isInvolvedCaptain && onReportOutcome && (

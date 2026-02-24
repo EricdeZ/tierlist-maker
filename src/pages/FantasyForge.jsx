@@ -6,7 +6,7 @@ import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import forgeLogo from '../assets/forge.png'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, RotateCcw, Flame } from 'lucide-react'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
 
@@ -17,6 +17,7 @@ import ForgePortfolioTab from './forge/ForgePortfolioTab'
 import ForgeLeaderboardTab from './forge/ForgeLeaderboardTab'
 import ForgeTradeModal from './forge/ForgeTradeModal'
 import ForgeToast from './forge/ForgeToast'
+import ForgeTutorial from './forge/ForgeTutorial'
 import './forge/forge.css'
 
 const SEASON_KEY = 'smite2_forge_season'
@@ -56,6 +57,7 @@ export default function FantasyForge() {
 
     // Portfolio state
     const [portfolio, setPortfolio] = useState(null)
+    const [portfolioHistories, setPortfolioHistories] = useState(null)
 
     // Leaderboard state
     const [leaderboard, setLeaderboard] = useState([])
@@ -90,10 +92,14 @@ export default function FantasyForge() {
     const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false)
     const seasonDropdownRef = useRef(null)
 
+    // Free Starter Sparks tracking
+    const [freeSparksRemaining, setFreeSparksRemaining] = useState(0)
+
     // Forge-specific UI state
     const [featuredPlayer, setFeaturedPlayer] = useState(null)
     const [historyData, setHistoryData] = useState([])
     const [toastMessage, setToastMessage] = useState(null)
+    const [tutorialReplay, setTutorialReplay] = useState(false)
 
     // Canvas refs
     const bgCanvasRef = useRef(null)
@@ -223,10 +229,20 @@ export default function FantasyForge() {
                 setMarket(data.market)
                 setPlayers(data.players || [])
                 setUserTeamId(data.userTeamId || null)
+                setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
             } else if (activeTab === 'portfolio') {
                 if (!user) { setLoading(false); return }
                 const data = await forgeService.getPortfolio(seasonId)
                 setPortfolio(data)
+                // Load batch history for holdings
+                if (data.holdings?.length > 0) {
+                    const sparkIds = data.holdings.map(h => h.sparkId)
+                    forgeService.getBatchHistory(sparkIds).then(res => {
+                        setPortfolioHistories(res.histories || {})
+                    }).catch(() => setPortfolioHistories({}))
+                } else {
+                    setPortfolioHistories({})
+                }
             } else if (activeTab === 'leaderboard') {
                 const data = await forgeService.getLeaderboard(seasonId)
                 setLeaderboard(data.leaderboard || [])
@@ -241,15 +257,19 @@ export default function FantasyForge() {
 
     useEffect(() => { loadData() }, [loadData])
 
-    // ── Auto-feature hottest player when market loads ──
+    // ── Auto-feature a random player (not top 3) when market loads ──
     useEffect(() => {
         if (players.length === 0) return
         if (featuredPlayer && players.find(p => p.sparkId === featuredPlayer.sparkId)) return
-        // Feature highest-priced player
-        const hottest = [...players].sort((a, b) => b.currentPrice - a.currentPrice)[0]
-        if (hottest) {
-            setFeaturedPlayer(hottest)
-            loadPlayerHistory(hottest.sparkId)
+        // Exclude top 3 by price (shown as performer cards)
+        const sorted = [...players].sort((a, b) => b.currentPrice - a.currentPrice)
+        const top3Ids = new Set(sorted.slice(0, 3).map(p => p.sparkId))
+        const remaining = players.filter(p => !top3Ids.has(p.sparkId))
+        const pool = remaining.length > 0 ? remaining : players
+        const chosen = pool[Math.floor(Math.random() * pool.length)]
+        if (chosen) {
+            setFeaturedPlayer(chosen)
+            loadPlayerHistory(chosen.sparkId)
         }
     }, [players])
 
@@ -268,6 +288,9 @@ export default function FantasyForge() {
         if (isOwner) return seasons
         return seasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
     }, [seasons, isOwner])
+
+    // ── Selected season info for profile links ──
+    const selectedSeason = useMemo(() => visibleSeasons.find(s => s.id === seasonId), [visibleSeasons, seasonId])
 
     // ── Unique teams for filter ──
     const teams = useMemo(() => {
@@ -316,6 +339,16 @@ export default function FantasyForge() {
         loadPlayerHistory(player.sparkId)
     }
 
+    // ── Random player for hero (excluding current) ──
+    const handleRandomPlayer = useCallback(() => {
+        if (players.length === 0) return
+        const pool = players.filter(p => p.sparkId !== featuredPlayer?.sparkId)
+        if (pool.length === 0) return
+        const random = pool[Math.floor(Math.random() * pool.length)]
+        setFeaturedPlayer(random)
+        loadPlayerHistory(random.sparkId)
+    }, [players, featuredPlayer])
+
     // ── Trade handlers ──
     const openTrade = (player, mode) => {
         setTradeModal({ player, mode })
@@ -355,6 +388,25 @@ export default function FantasyForge() {
         }
     }
 
+    // ── Free Starter Spark fuel (from trade modal) ──
+    const executeFreeFuel = async (sparkId) => {
+        setTrading(true)
+        setTradeError(null)
+        setTradeResult(null)
+
+        try {
+            const result = await forgeService.tutorialFuel(sparkId)
+            if (result.freeSparksRemaining != null) setFreeSparksRemaining(result.freeSparksRemaining)
+            setTradeResult({ ...result, isFreeSpark: true })
+            triggerFuelSpectacle(tradeModal.player.playerName, 1)
+            setTimeout(() => loadData(), 500)
+        } catch (err) {
+            setTradeError(err.message || 'Failed to use Starter Spark')
+        } finally {
+            setTrading(false)
+        }
+    }
+
     // ── Toggle market status (owner only) ──
     const toggleMarketStatus = async () => {
         if (!market || !isOwner) return
@@ -369,7 +421,7 @@ export default function FantasyForge() {
     }
 
     // ── Fuel spectacle: burst + shake + flash + toast ──
-    const triggerFuelSpectacle = (playerName) => {
+    const triggerFuelSpectacle = (playerName, sparkCount) => {
         // 1. Fire burst at center of screen
         if (fxCanvasRef.current) {
             const cx = window.innerWidth / 2
@@ -390,8 +442,21 @@ export default function FantasyForge() {
         }
 
         // 4. Toast
-        setToastMessage(`Spark Fueled! +${tradeAmount} to ${playerName}`)
+        const amount = sparkCount || tradeAmount
+        setToastMessage(`Spark Fueled! +${amount} to ${playerName}`)
     }
+
+    // ── Tutorial fuel handler ──
+    const handleTutorialFuel = useCallback((player, result) => {
+        triggerFuelSpectacle(player.playerName, result.sparks || 1)
+        if (result.freeSparksRemaining != null) setFreeSparksRemaining(result.freeSparksRemaining)
+        setTimeout(() => loadData(), 500)
+    }, [loadData])
+
+    // ── Tutorial complete handler ──
+    const handleTutorialComplete = useCallback(() => {
+        loadData()
+    }, [loadData])
 
     // ── Full-page loading screen while auth + seasons + initial data resolve ──
     const isInitializing = authLoading || !seasonsLoaded || (!initialDataLoaded && !!seasonId)
@@ -475,7 +540,24 @@ export default function FantasyForge() {
             <ForgeToast message={toastMessage} onDone={() => setToastMessage(null)} />
 
             <div ref={containerRef} className="relative" style={{ zIndex: 1 }}>
-                <div className="max-w-[1300px] mx-auto px-5 pt-24 pb-20">
+                {/* Slim fiery hero banner */}
+                <div className="forge-banner h-32 flex items-end justify-center pb-3">
+                    <div className="relative z-10 flex items-center gap-3">
+                        <Flame size={22} className="text-[var(--forge-flame-bright)]" style={{ filter: 'drop-shadow(0 0 8px rgba(255,170,51,0.6))' }} />
+                        <img
+                            src={forgeLogo}
+                            alt=""
+                            className="w-8 h-8 object-contain"
+                            style={{ filter: 'drop-shadow(0 0 10px rgba(232,101,32,0.6))' }}
+                        />
+                        <div className="forge-head text-2xl font-bold tracking-[0.25em] text-white" style={{ textShadow: '0 0 20px rgba(232,101,32,0.5)' }}>
+                            Fantasy <span className="text-[var(--forge-flame-bright)]">Forge</span>
+                        </div>
+                        <Flame size={22} className="text-[var(--forge-flame-bright)]" style={{ filter: 'drop-shadow(0 0 8px rgba(255,170,51,0.6))' }} />
+                    </div>
+                </div>
+
+                <div className="max-w-[1300px] mx-auto px-5 pt-5 pb-20">
 
                     {/* Top bar: brand + controls */}
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[var(--forge-border)] relative">
@@ -553,6 +635,18 @@ export default function FantasyForge() {
                                 </span>
                             </button>
 
+                            {/* Replay tutorial */}
+                            {!tutorialReplay && (
+                                <button
+                                    onClick={() => { setTutorialReplay(true); setActiveTab('market') }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--forge-text-dim)] hover:text-[var(--forge-flame-bright)] hover:bg-[var(--forge-flame)]/8 border border-transparent hover:border-[var(--forge-flame)]/20 transition-all forge-head text-[0.75rem] tracking-wider"
+                                    title="Replay tutorial"
+                                >
+                                    <RotateCcw size={13} />
+                                    Tutorial
+                                </button>
+                            )}
+
                             {/* Market status */}
                             {market?.status === 'open' && (
                                 isOwner ? (
@@ -629,16 +723,21 @@ export default function FantasyForge() {
                             userTeamId={userTeamId}
                             isOwner={isOwner}
                             changeView={changeView}
+                            freeSparksRemaining={freeSparksRemaining}
+                            seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
+                            onRandomPlayer={handleRandomPlayer}
                         />
                     )}
 
                     {activeTab === 'portfolio' && (
                         <ForgePortfolioTab
                             portfolio={portfolio}
+                            portfolioHistories={portfolioHistories}
                             loading={loading}
+                            seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}
                         />
                     )}
@@ -648,10 +747,30 @@ export default function FantasyForge() {
                             leaderboard={leaderboard}
                             loading={loading}
                             currentUserId={user?.id}
+                            seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                         />
                     )}
                 </div>
             </div>
+
+            {/* Tutorial */}
+            {activeTab === 'market' && (
+                <ForgeTutorial
+                    players={players}
+                    seasonId={seasonId}
+                    marketOpen={market?.status === 'open'}
+                    onTutorialFuel={handleTutorialFuel}
+                    onSelectFeatured={handleSelectPlayer}
+                    onComplete={handleTutorialComplete}
+                    search={search}
+                    setSearch={setSearch}
+                    filteredPlayers={filteredPlayers}
+                    userTeamId={userTeamId}
+                    isOwner={isOwner}
+                    isReplay={tutorialReplay}
+                    onReplayComplete={() => setTutorialReplay(false)}
+                />
+            )}
 
             {/* Trade Modal */}
             {tradeModal && (
@@ -664,7 +783,9 @@ export default function FantasyForge() {
                     trading={trading}
                     result={tradeResult}
                     error={tradeError}
+                    freeSparksRemaining={freeSparksRemaining}
                     onExecute={executeTrade}
+                    onFreeFuel={executeFreeFuel}
                     onClose={() => setTradeModal(null)}
                 />
             )}

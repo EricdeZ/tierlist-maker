@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { Flame, Snowflake } from 'lucide-react'
+import { Flame, Snowflake, Crown } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
 import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
+import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, onSelect, onFuel, onCool }) {
+const RANK_LABELS = ['', '1st', '2nd', '3rd']
+
+export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, tutorialIndex, rank }) {
     const chartRef = useRef(null)
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
@@ -14,6 +17,10 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
     const isUp = change > 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
+    const avatarUrl = usePlayerAvatar(player)
+    const profileUrl = seasonSlugs
+        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
+        : `/profile/${player.playerSlug}`
 
     // Draw sparkline (fallback to flat line at 100 if no data)
     useEffect(() => {
@@ -28,32 +35,70 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
         <div
             className={`forge-player-card bg-[var(--forge-panel)] border border-[var(--forge-edge)] overflow-hidden cursor-pointer relative ${
                 selected ? 'forge-card-selected' : ''
-            } forge-${tier}`}
+            } forge-${tier} ${rank === 1 ? 'forge-top-1' : ''}`}
+            data-spark-id={player.sparkId}
+            data-tutorial={tutorialIndex != null ? `player-card-${tutorialIndex}` : undefined}
             onClick={() => onSelect(player)}
         >
+            {/* Fire/Frost overlays */}
+            {tier === 'blazing' && (
+                <>
+                    <div className="forge-fire-overlay" />
+                    <div className="forge-fire-bottom-glow" />
+                </>
+            )}
+            {tier === 'cooling' && (
+                <>
+                    <div className="forge-frost-overlay" />
+                    <div className="forge-frost-top-glow" />
+                </>
+            )}
+
+            {/* Rank badge */}
+            {rank && rank <= 3 && (
+                <div className={`absolute top-2 right-2 z-10 forge-rank-badge forge-rank-badge-${rank}`}>
+                    {rank === 1 ? (
+                        <div className="flex items-center gap-1">
+                            <Crown size={16} />
+                            <span className="forge-head text-sm font-bold tracking-wider">{RANK_LABELS[rank]}</span>
+                        </div>
+                    ) : (
+                        <span className="forge-head text-sm font-bold tracking-wider">{RANK_LABELS[rank]}</span>
+                    )}
+                </div>
+            )}
+
             {/* Top heat bar */}
             <div className="h-[3px] bg-[var(--forge-surface)]">
                 <div className="h-full forge-heat-fill transition-all" />
             </div>
 
-            <div className="p-4">
+            <div className="p-4 relative z-[1]">
                 {/* Top row: avatar + name */}
                 <div className="flex items-center gap-2.5 mb-2.5">
                     <div
-                        className="w-11 h-11 flex-shrink-0 forge-clip-hex flex items-center justify-center font-extrabold text-xs text-white"
+                        className="w-12 h-12 flex-shrink-0 forge-clip-hex flex items-center justify-center font-extrabold text-xs text-white"
                         style={{
-                            background: player.godImageUrl
-                                ? `url(${player.godImageUrl}) center/cover`
+                            background: avatarUrl
+                                ? `url(${avatarUrl}) center/cover`
                                 : `linear-gradient(135deg, ${teamColor}80, ${teamColor})`,
                             textShadow: '0 1px 4px rgba(0,0,0,0.5)',
                         }}
                     >
-                        {!player.godImageUrl && initials}
+                        {!avatarUrl && initials}
                     </div>
                     <div>
-                        <div className="forge-body text-[1.1rem] font-bold">{player.playerName}</div>
+                        <a
+                            href={profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="forge-body text-[1.1rem] font-bold forge-profile-link block"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {player.playerName}
+                        </a>
                         <div className="text-[0.85rem] text-[var(--forge-text-dim)] flex items-center gap-1 mt-px">
-                            <TeamLogo slug={player.teamSlug} name={player.teamName} size={12} color={player.teamColor} />
+                            <TeamLogo slug={player.teamSlug} name={player.teamName} size={16} color={player.teamColor} />
                             {player.teamName}
                             {player.role && (
                                 <span className="forge-head text-[0.7rem] font-semibold tracking-wider ml-1">{player.role}</span>
@@ -93,7 +138,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                     </div>
                     <div className="flex-1 text-center py-1.5 bg-[var(--forge-surface)]">
                         <div className="forge-num text-[0.95rem] flex items-center justify-center gap-1">
-                            <img src={sparkIcon} alt="" className="w-3.5 h-3.5 object-contain" />
+                            <img src={sparkIcon} alt="" className="w-8 h-8 object-contain forge-spark-icon" />
                             {player.totalSparks}
                         </div>
                         <div className="text-[0.65rem] uppercase tracking-wider text-[var(--forge-text-dim)]">Sparks</div>
@@ -109,21 +154,22 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                     <div className="flex gap-1">
                         <button
                             onClick={e => { e.stopPropagation(); onFuel(player) }}
-                            className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn forge-btn-fuel flex items-center justify-center gap-1"
+                            data-tutorial="fuel-btn"
+                            className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn forge-btn-fuel flex items-center justify-center gap-1.5"
                             style={{
                                 background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
                                 boxShadow: '0 2px 10px rgba(232,101,32,0.25)',
                             }}
                         >
-                            <Flame size={12} />
+                            <Flame size={14} />
                             Fuel
                         </button>
-                        {player.holding && player.holding.sparks > 0 && (
+                        {player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
                             <button
                                 onClick={e => { e.stopPropagation(); onCool(player) }}
-                                className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-clip-btn forge-btn-cool flex items-center justify-center gap-1"
+                                className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-clip-btn forge-btn-cool flex items-center justify-center gap-1.5"
                             >
-                                <Snowflake size={12} />
+                                <Snowflake size={14} />
                                 Cool
                             </button>
                         )}

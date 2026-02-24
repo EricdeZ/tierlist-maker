@@ -1,6 +1,7 @@
 import ScrimCard from './ScrimCard'
 
-export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
+export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores, activeDivisions }) {
+    const pendingScrims = scrims.filter(s => s.status === 'pending_confirmation')
     const openScrims = scrims.filter(s => s.status === 'open' && !incomingScrims.some(i => i.id === s.id))
     const upcomingScrims = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) >= new Date())
     const needsReport = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) < new Date() && !s.outcome)
@@ -16,8 +17,10 @@ export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, curr
                     <ScrimCard key={s.id} scrim={s} showActions captainTeams={captainTeams} currentUserId={currentUserId}
                         onAccept={onAccept} onCancel={onCancel} onDecline={onDecline}
                         onReportOutcome={onReportOutcome} onDisputeOutcome={onDisputeOutcome}
+                        onConfirmAccept={onConfirmAccept} onDenyAccept={onDenyAccept}
                         actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
-                        isChallenge={challenge || !!s.challengedTeamId} reliabilityScores={reliabilityScores} />
+                        isChallenge={challenge || !!s.challengedTeamId} reliabilityScores={reliabilityScores}
+                        activeDivisions={activeDivisions} />
                 ))}
             </div>
         </fieldset>
@@ -25,6 +28,7 @@ export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, curr
 
     return (
         <div className="flex flex-col gap-3">
+            <Section title="Pending Confirmation" items={pendingScrims} />
             <Section title="Incoming Challenges" items={incomingScrims} challenge />
             {needsReport.length > 0 && <Section title="Needs Report" items={needsReport} />}
             <Section title="Your Open Requests" items={openScrims} />

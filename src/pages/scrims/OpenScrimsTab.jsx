@@ -1,6 +1,6 @@
 import ScrimCard from './ScrimCard'
 
-export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, uniqueLeagues, uniqueTiers, onAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
+export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, regionFilter, setRegionFilter, divisionFilter, setDivisionFilter, uniqueLeagues, uniqueTiers, activeDivisions, onAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
     return (
         <div>
             {scrims.length > 0 && (
@@ -14,6 +14,17 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
                         <option value="">All Tiers</option>
                         {uniqueTiers.map(t => <option key={t} value={t}>Tier {t}</option>)}
                     </select>
+                    <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className="xp-select">
+                        <option value="">All Regions</option>
+                        <option value="NA">NA</option>
+                        <option value="EU">EU</option>
+                    </select>
+                    <select value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="xp-select">
+                        <option value="">All Divisions</option>
+                        {(activeDivisions || []).map(d => (
+                            <option key={d.id} value={d.id}>{d.name} ({d.leagueName})</option>
+                        ))}
+                    </select>
                 </div>
             )}
             <div className="flex flex-col gap-0.5">
@@ -21,7 +32,7 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
                     <ScrimCard key={scrim.id} scrim={scrim} showActions={!!user} captainTeams={captainTeams}
                         currentUserId={currentUserId} onAccept={onAccept} onCancel={() => {}} onDecline={() => {}}
                         actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
-                        isChallenge={false} reliabilityScores={reliabilityScores} />
+                        isChallenge={false} reliabilityScores={reliabilityScores} activeDivisions={activeDivisions} />
                 ))}
             </div>
             {scrims.length === 0 && (

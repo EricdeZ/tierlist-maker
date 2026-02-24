@@ -247,14 +247,20 @@ export async function executeCool(tx, userId, sparkId, numSparks) {
     `
     if (!market || market.status !== 'open') throw new Error('Market is not open')
 
-    // Check user holds enough
+    // Check user holds enough (excluding non-coolable tutorial Sparks)
     const [holding] = await tx`
-        SELECT sparks, total_invested FROM spark_holdings
+        SELECT sparks, total_invested, tutorial_sparks FROM spark_holdings
         WHERE user_id = ${userId} AND spark_id = ${sparkId}
         FOR UPDATE
     `
     if (!holding || holding.sparks < numSparks) {
         throw new Error('Not enough Sparks to cool')
+    }
+    const coolableSparks = holding.sparks - (holding.tutorial_sparks || 0)
+    if (numSparks > coolableSparks) {
+        throw new Error(coolableSparks > 0
+            ? `Only ${coolableSparks} Sparks can be cooled (${holding.tutorial_sparks} are free tutorial Sparks)`
+            : 'Tutorial Sparks cannot be cooled')
     }
 
     // Calculate proceeds: each Spark sold at decreasing price (stepped)
@@ -454,6 +460,27 @@ export async function updateForgeAfterMatch(sql, matchId) {
             `
         }
     }
+
+    // Track forge_perf_updates_held for users with holdings in this market (fire-and-forget)
+    try {
+        const holdingUsers = await sql`
+            SELECT DISTINCT sh.user_id
+            FROM spark_holdings sh
+            JOIN player_sparks ps ON sh.spark_id = ps.id
+            WHERE ps.market_id = ${market.id} AND sh.sparks > 0
+        `
+        for (const u of holdingUsers) {
+            // Record perf update marker
+            await grantPassion(sql, u.user_id, 'forge_perf_update', 0, 'Perf update while holding')
+            const [{ count }] = await sql`
+                SELECT COUNT(*)::integer as count FROM passion_transactions
+                WHERE user_id = ${u.user_id} AND type = 'forge_perf_update'
+            `
+            await pushChallengeProgress(sql, u.user_id, { forge_perf_updates_held: count })
+        }
+    } catch (err) {
+        console.error('Forge perf update challenge tracking failed:', err)
+    }
 }
 
 // ═══════════════════════════════════════════════════
@@ -474,19 +501,36 @@ export async function liquidateMarket(sql, marketId) {
     // Get all holdings with their spark info
     const holdings = await sql`
         SELECT sh.id, sh.user_id, sh.spark_id, sh.sparks, sh.total_invested,
-               ps.current_price
+               sh.tutorial_sparks, ps.current_price
         FROM spark_holdings sh
         JOIN player_sparks ps ON sh.spark_id = ps.id
         WHERE ps.market_id = ${marketId} AND sh.sparks > 0
     `
 
     for (const h of holdings) {
-        const proceeds = Math.round(Number(h.current_price) * h.sparks)
-        const profit = proceeds - Math.round(Number(h.total_invested))
+        const price = Number(h.current_price)
+        const tutorialSparks = h.tutorial_sparks || 0
+        const regularSparks = h.sparks - tutorialSparks
+
+        // Regular Sparks: full liquidation value (no tax)
+        const regularProceeds = Math.round(price * regularSparks)
+
+        // Tutorial Sparks: profit only (current value minus cost basis)
+        // Cost basis per tutorial spark = total_invested * (tutorialSparks / total sparks)
+        const tutorialValue = Math.round(price * tutorialSparks)
+        const tutorialCostBasis = h.sparks > 0
+            ? Math.round(Number(h.total_invested) * (tutorialSparks / h.sparks))
+            : 0
+        const tutorialProfit = Math.max(0, tutorialValue - tutorialCostBasis)
+
+        const proceeds = regularProceeds + tutorialProfit
+        const totalProfit = proceeds - Math.round(Number(h.total_invested)) + tutorialCostBasis
 
         // Grant Passion (no tax on liquidation)
-        await grantPassion(sql, h.user_id, 'forge_liquidate', proceeds,
-            `Season ended — auto-liquidated ${h.sparks} Spark${h.sparks > 1 ? 's' : ''}`, String(h.spark_id))
+        if (proceeds > 0) {
+            await grantPassion(sql, h.user_id, 'forge_liquidate', proceeds,
+                `Season ended — auto-liquidated ${h.sparks} Spark${h.sparks > 1 ? 's' : ''}${tutorialSparks ? ` (${tutorialSparks} tutorial)` : ''}`, String(h.spark_id))
+        }
 
         // Record transaction
         await sql`
@@ -500,7 +544,7 @@ export async function liquidateMarket(sql, marketId) {
         // Push challenge progress
         try {
             const stats = { sparks_cooled: h.sparks }
-            if (profit > 0) stats.forge_profit = profit
+            if (totalProfit > 0) stats.forge_profit = totalProfit
             await pushChallengeProgress(sql, h.user_id, stats)
         } catch (err) {
             console.error(`Challenge push (liquidation) failed for user ${h.user_id}:`, err)

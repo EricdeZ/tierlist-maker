@@ -21,15 +21,15 @@ class Ember {
     reset() {
         this.x = Math.random() * this.w
         this.y = this.h + 30
-        this.r = Math.random() * 1.2 + 0.3
-        this.vy = Math.random() * 0.3 + 0.06
-        this.vx = (Math.random() - 0.5) * 0.08
+        this.r = Math.random() * 2.0 + 0.5
+        this.vy = Math.random() * 0.5 + 0.12
+        this.vx = (Math.random() - 0.5) * 0.12
         this.wobble = Math.random() * 6.28
-        this.wobbleSpeed = Math.random() * 0.01 + 0.002
-        this.wobbleAmp = Math.random() * 0.1 + 0.03
-        this.alpha = Math.random() * 0.2 + 0.04
+        this.wobbleSpeed = Math.random() * 0.015 + 0.003
+        this.wobbleAmp = Math.random() * 0.15 + 0.05
+        this.alpha = Math.random() * 0.35 + 0.08
         this.life = 1
-        this.decay = Math.random() * 0.001 + 0.0003
+        this.decay = Math.random() * 0.0008 + 0.0002
         this.color = this.colors[Math.random() * this.colors.length | 0]
     }
 
@@ -76,7 +76,7 @@ export function createEmberSystem(canvas) {
         const displayW = canvas.offsetWidth
         const displayH = canvas.offsetHeight
         // Re-init embers with new bounds
-        embers = Array.from({ length: 30 }, () => new Ember(displayW, displayH, EMBER_COLORS))
+        embers = Array.from({ length: 55 }, () => new Ember(displayW, displayH, EMBER_COLORS))
     }
 
     function animate(timestamp) {
@@ -94,7 +94,7 @@ export function createEmberSystem(canvas) {
             displayW * 0.5, displayH + 40, 0,
             displayW * 0.5, displayH + 40, displayH * 0.4,
         )
-        grd.addColorStop(0, 'rgba(150,45,5,0.02)')
+        grd.addColorStop(0, 'rgba(180,55,5,0.06)')
         grd.addColorStop(1, 'transparent')
         ctx.fillStyle = grd
         ctx.fillRect(0, 0, displayW, displayH)
@@ -240,4 +240,157 @@ export function drawSparkline(canvas, data, { lineColor, fillColor }) {
     ctx.shadowBlur = 6
     ctx.shadowColor = lineColor
     ctx.fill()
+}
+
+
+/* ═══════════════════════════════════════════════════
+   Portfolio Chart — Interactive with event markers
+   Returns { getEventAt(canvasX, canvasY) } for click/hover
+   ═══════════════════════════════════════════════════ */
+
+const EVENT_COLORS = {
+    fuel: '#e86520',
+    tutorial_fuel: '#e86520',
+    cool: '#4499bb',
+    performance: '#f0c840',
+    init: '#888888',
+}
+
+export function drawPortfolioChart(canvas, timeline, opts = {}) {
+    if (!canvas || !timeline || timeline.length < 2) return null
+
+    const parent = canvas.parentElement
+    const dpr = window.devicePixelRatio || 1
+    const w = parent.offsetWidth
+    const h = parent.offsetHeight
+
+    canvas.style.width = '100%'
+    canvas.style.height = '100%'
+    canvas.width = w * dpr
+    canvas.height = h * dpr
+
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+
+    const padTop = 20
+    const padBottom = 24
+    const padLeft = 8
+    const padRight = 8
+    const chartW = w - padLeft - padRight
+    const chartH = h - padTop - padBottom
+
+    const prices = timeline.map(t => t.value)
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    const range = max - min || 1
+
+    const points = timeline.map((t, i) => ({
+        x: padLeft + (i / (timeline.length - 1)) * chartW,
+        y: padTop + (1 - (t.value - min) / range) * chartH,
+        ...t,
+    }))
+
+    // Fill gradient
+    const lineColor = opts.lineColor || '#e86520'
+    const fillColor = opts.fillColor || 'rgba(232,101,32,0.15)'
+    const gradient = ctx.createLinearGradient(0, padTop, 0, h - padBottom)
+    gradient.addColorStop(0, fillColor)
+    gradient.addColorStop(1, 'transparent')
+
+    ctx.beginPath()
+    points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+    ctx.lineTo(points[points.length - 1].x, h - padBottom)
+    ctx.lineTo(points[0].x, h - padBottom)
+    ctx.closePath()
+    ctx.fillStyle = gradient
+    ctx.fill()
+
+    // Line
+    ctx.beginPath()
+    points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+    ctx.strokeStyle = lineColor
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // Event dots (skip 'init' triggers — they just clutter)
+    const eventPoints = []
+    for (const pt of points) {
+        if (pt.trigger && pt.trigger !== 'init') {
+            const color = EVENT_COLORS[pt.trigger] || '#888'
+            const radius = pt.trigger === 'performance' ? 4 : 5
+            ctx.beginPath()
+            ctx.arc(pt.x, pt.y, radius, 0, 6.28)
+            ctx.fillStyle = color
+            ctx.shadowBlur = 8
+            ctx.shadowColor = color
+            ctx.fill()
+            ctx.shadowBlur = 0
+            // White inner ring
+            ctx.beginPath()
+            ctx.arc(pt.x, pt.y, radius - 1.5, 0, 6.28)
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+            ctx.lineWidth = 0.8
+            ctx.stroke()
+            eventPoints.push({ ...pt, radius: radius + 4 }) // hit area slightly larger
+        }
+    }
+
+    // End dot
+    const last = points[points.length - 1]
+    ctx.beginPath()
+    ctx.arc(last.x, last.y, 3, 0, 6.28)
+    ctx.fillStyle = lineColor
+    ctx.shadowBlur = 8
+    ctx.shadowColor = lineColor
+    ctx.fill()
+    ctx.shadowBlur = 0
+
+    // Price labels at top/bottom
+    ctx.font = '10px monospace'
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'
+    ctx.textAlign = 'left'
+    ctx.fillText(Math.round(max).toLocaleString(), padLeft + 2, padTop - 4)
+    ctx.fillText(Math.round(min).toLocaleString(), padLeft + 2, h - padBottom + 14)
+
+    // Return hit-test function
+    return {
+        getEventAt(canvasX, canvasY) {
+            for (const ep of eventPoints) {
+                const dx = canvasX - ep.x
+                const dy = canvasY - ep.y
+                if (dx * dx + dy * dy <= ep.radius * ep.radius) {
+                    return {
+                        trigger: ep.trigger,
+                        value: ep.value,
+                        playerName: ep.playerName,
+                        createdAt: ep.createdAt,
+                        x: ep.x,
+                        y: ep.y,
+                    }
+                }
+            }
+            // Return nearest point on line for hover tooltip
+            let closest = null
+            let minDist = Infinity
+            for (const pt of points) {
+                const dist = Math.abs(canvasX - pt.x)
+                if (dist < minDist) {
+                    minDist = dist
+                    closest = pt
+                }
+            }
+            if (closest && minDist < 20) {
+                return {
+                    trigger: closest.trigger || null,
+                    value: closest.value,
+                    playerName: closest.playerName,
+                    createdAt: closest.createdAt,
+                    x: closest.x,
+                    y: closest.y,
+                    isLine: true,
+                }
+            }
+            return null
+        },
+    }
 }

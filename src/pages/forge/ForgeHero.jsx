@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { Flame, Snowflake } from 'lucide-react'
+import { Flame, Snowflake, Shuffle } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
 import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
+import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, onFuel, onCool }) {
+export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onFuel, onCool, onRandom }) {
     const chartRef = useRef(null)
     const nameRef = useRef(null)
     const prevPlayerRef = useRef(null)
@@ -49,6 +50,10 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const changeLabel = changeView === '7d' ? '7d Change' : '24h Change'
+    const avatarUrl = usePlayerAvatar(player)
+    const profileUrl = seasonSlugs
+        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
+        : `/profile/${player.playerSlug}`
 
     return (
         <div className="forge-hero relative mb-4 bg-[var(--forge-panel)] border border-[var(--forge-edge)] overflow-hidden min-h-[200px] flex">
@@ -59,14 +64,14 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
             <div
                 className="absolute top-0 right-0 w-1/2 h-full pointer-events-none"
                 style={{
-                    background: 'linear-gradient(135deg, transparent 0%, rgba(232,101,32,0.02) 40%, rgba(255,61,0,0.05) 100%)',
+                    background: 'linear-gradient(135deg, transparent 0%, rgba(232,101,32,0.03) 40%, rgba(255,61,0,0.06) 100%)',
                     clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0% 100%)',
                 }}
             />
 
             {/* God/team color faded background */}
             <div
-                className="absolute top-0 right-0 w-[280px] h-full pointer-events-none opacity-12 hover:opacity-18 transition-opacity"
+                className="absolute top-0 right-0 w-[280px] h-full pointer-events-none opacity-15 hover:opacity-22 transition-opacity"
                 style={{
                     background: `linear-gradient(135deg, ${teamColor}40, ${teamColor}80)`,
                     maskImage: 'linear-gradient(90deg, transparent, black 40%)',
@@ -82,11 +87,23 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                     {tier === 'blazing' ? 'Hottest Spark' : 'Selected Spark'}
                 </div>
 
+                {/* Random button */}
+                {onRandom && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onRandom() }}
+                        className="absolute top-3 right-4 z-10 flex items-center gap-1.5 px-2.5 py-1 text-[var(--forge-text-dim)] hover:text-[var(--forge-flame-bright)] hover:bg-[var(--forge-flame)]/8 border border-transparent hover:border-[var(--forge-flame)]/20 transition-all forge-head text-[0.75rem] tracking-wider"
+                        title="Random player"
+                    >
+                        <Shuffle size={13} />
+                        Random
+                    </button>
+                )}
+
                 {/* Hex avatar */}
                 <div className="w-24 h-24 flex-shrink-0 relative">
                     {/* Glow */}
                     <div className="absolute -inset-5 rounded-full forge-hex-glow"
-                        style={{ background: 'radial-gradient(circle, rgba(232,101,32,0.2), transparent 70%)' }}
+                        style={{ background: 'radial-gradient(circle, rgba(232,101,32,0.25), transparent 70%)' }}
                     />
                     {/* Spinning border */}
                     <div className="absolute -inset-[5px] forge-clip-hex forge-hex-outer" />
@@ -94,26 +111,30 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                     <div
                         className="relative w-full h-full forge-clip-hex flex items-center justify-center text-2xl font-extrabold text-white z-[1]"
                         style={{
-                            background: player.godImageUrl
-                                ? `url(${player.godImageUrl}) center/cover`
+                            background: avatarUrl
+                                ? `url(${avatarUrl}) center/cover`
                                 : `linear-gradient(135deg, ${teamColor}90, ${teamColor})`,
                             textShadow: '0 2px 8px rgba(0,0,0,0.6)',
                         }}
                     >
-                        {!player.godImageUrl && initials}
+                        {!avatarUrl && initials}
                     </div>
                 </div>
 
                 {/* Info */}
                 <div className="flex-1">
-                    <div
+                    <a
                         ref={nameRef}
-                        className="forge-head text-[2.6rem] font-bold tracking-wide leading-none mb-1"
+                        href={profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="forge-head text-[2.6rem] font-bold tracking-wide leading-none mb-1 forge-profile-link block"
+                        onClick={e => e.stopPropagation()}
                     >
                         {player.playerName}
-                    </div>
+                    </a>
                     <div className="flex items-center gap-2 text-[1rem] text-[var(--forge-text-mid)] mb-3.5">
-                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={18} color={player.teamColor} />
+                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={22} color={player.teamColor} />
                         <span>{player.teamName}</span>
                         {player.role && (
                             <span className="forge-head text-[0.8rem] font-semibold tracking-wider px-2 py-0.5 bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)]">
@@ -142,7 +163,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                             <div className="forge-head text-[0.75rem] font-medium tracking-wider text-[var(--forge-text-dim)] mt-0.5">{changeLabel}</div>
                         </div>
                         {player.perfMultiplier != null && (
-                            <div>
+                            <div data-tutorial="hero-perf">
                                 <div className="forge-num text-[1.9rem] leading-none" style={{
                                     background: 'linear-gradient(180deg, var(--forge-gold-bright), var(--forge-flame))',
                                     WebkitBackgroundClip: 'text',
@@ -155,7 +176,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                         )}
                         <div>
                             <div className="forge-num text-[1.9rem] leading-none text-[var(--forge-text)] flex items-center gap-1.5">
-                                <img src={sparkIcon} alt="" className="w-5 h-5 object-contain inline -mt-0.5" />
+                                <img src={sparkIcon} alt="" className="w-10 h-10 object-contain forge-spark-icon-lg" />
                                 {player.totalSparks}
                             </div>
                             <div className="forge-head text-[0.75rem] font-medium tracking-wider text-[var(--forge-text-dim)] mt-0.5">Sparks</div>
@@ -174,7 +195,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                                 boxShadow: '0 4px 20px rgba(232,101,32,0.3)',
                             }}
                         >
-                            <Flame size={16} />
+                            <Flame size={18} />
                             Fuel This Spark
                         </button>
                         {player.holding && player.holding.sparks > 0 && (
@@ -182,7 +203,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                                 onClick={() => onCool(player)}
                                 className="forge-clip-btn forge-btn-cool forge-head text-[1rem] font-bold tracking-wider px-5 py-3 text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/20 flex items-center gap-2"
                             >
-                                <Snowflake size={16} />
+                                <Snowflake size={18} />
                                 Cool
                             </button>
                         )}
@@ -191,7 +212,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
             </div>
 
             {/* Hero sparkline background */}
-            <div className="absolute bottom-0 right-0 w-[45%] h-[70px] opacity-35 pointer-events-none">
+            <div className="absolute bottom-0 right-0 w-[45%] h-[70px] opacity-40 pointer-events-none">
                 <canvas ref={chartRef} />
             </div>
         </div>

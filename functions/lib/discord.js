@@ -150,6 +150,37 @@ export async function sendDM(discordUserId, { content, embeds }) {
 }
 
 /**
+ * Send a DM and return the channel + message IDs for tracking.
+ * Returns { channelId, messageId } on success, null on failure.
+ */
+export async function sendDMWithReturn(discordUserId, { content, embeds }) {
+    try {
+        const hdrs = { ...getDiscordHeaders(), 'Content-Type': 'application/json' }
+
+        const chanRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
+            method: 'POST',
+            headers: hdrs,
+            body: JSON.stringify({ recipient_id: discordUserId }),
+        })
+        if (!chanRes.ok) return null
+        const channel = await chanRes.json()
+
+        const msgRes = await fetch(`${DISCORD_API}/channels/${channel.id}/messages`, {
+            method: 'POST',
+            headers: hdrs,
+            body: JSON.stringify({ content, embeds }),
+        })
+        if (!msgRes.ok) return null
+        const msg = await msgRes.json()
+
+        return { channelId: channel.id, messageId: msg.id }
+    } catch (err) {
+        console.error('sendDMWithReturn error:', err.message || err)
+        return null
+    }
+}
+
+/**
  * Send a message to a Discord webhook.
  * @param {string} webhookUrl - Full Discord webhook URL
  * @param {object} options - { content, embeds }

@@ -19,7 +19,7 @@ export default function ForgeToast({ message, onDone }) {
 
     return (
         <div className={`forge-toast ${phase}`}>
-            <img src={sparkIcon} alt="" className="w-5 h-5 object-contain" />
+            <img src={sparkIcon} alt="" className="w-8 h-8 object-contain" />
             <span>{message}</span>
         </div>
     )

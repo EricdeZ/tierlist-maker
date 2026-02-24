@@ -3,7 +3,7 @@ import passionCoin from '../../assets/passion/passion.png'
 import sparkIcon from '../../assets/spark.png'
 import forgeLogo from '../../assets/forge.png'
 
-export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserId }) {
+export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserId, seasonSlugs }) {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
@@ -29,6 +29,11 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
         <div className="max-w-2xl mx-auto space-y-[2px] forge-stagger">
             {leaderboard.map((entry) => {
                 const isMe = entry.userId === currentUserId
+                const profileUrl = entry.playerSlug
+                    ? (seasonSlugs
+                        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${entry.playerSlug}`
+                        : `/profile/${entry.playerSlug}`)
+                    : null
 
                 return (
                     <div
@@ -53,11 +58,11 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                             <img
                                 src={`https://cdn.discordapp.com/avatars/${entry.discordId}/${entry.avatar}.png?size=32`}
                                 alt=""
-                                className="w-9 h-9 forge-clip-hex flex-shrink-0"
+                                className="w-10 h-10 forge-clip-hex flex-shrink-0"
                             />
                         ) : (
                             <div
-                                className="w-9 h-9 forge-clip-hex flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                                className="w-10 h-10 forge-clip-hex flex-shrink-0 flex items-center justify-center text-xs font-bold"
                                 style={{ background: 'var(--forge-edge)' }}
                             >
                                 {(entry.username || '?')[0]}
@@ -67,28 +72,41 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                             <div className="forge-body font-bold text-base truncate">
-                                {entry.username || 'Unknown'}
+                                {profileUrl ? (
+                                    <a
+                                        href={profileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="forge-profile-link"
+                                    >
+                                        {entry.username || 'Unknown'}
+                                    </a>
+                                ) : (
+                                    entry.username || 'Unknown'
+                                )}
                                 {isMe && <span className="text-[var(--forge-flame-bright)] text-sm ml-1">(you)</span>}
                             </div>
                             <div className="text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
                                 <span className="forge-num">{entry.holdingsCount}</span> player{entry.holdingsCount !== 1 ? 's' : ''}
                                 {' '}&middot;{' '}
-                                <img src={sparkIcon} alt="" className="w-3 h-3 object-contain inline" />
+                                <img src={sparkIcon} alt="" className="w-6 h-6 object-contain forge-spark-icon" />
                                 <span className="forge-num">{entry.totalSparks}</span> Spark{entry.totalSparks !== 1 ? 's' : ''}
                             </div>
                         </div>
 
-                        {/* Value */}
+                        {/* Profit */}
                         <div className="text-right">
-                            <div className="flex items-center gap-1 justify-end">
+                            <div className={`flex items-center gap-1 justify-end forge-num text-base ${
+                                entry.totalProfit >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'
+                            }`}>
                                 <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
-                                <span className="forge-num text-base text-[var(--forge-gold-bright)]">
-                                    {entry.portfolioValue.toLocaleString()}
-                                </span>
+                                {entry.totalProfit >= 0 ? '+' : ''}{entry.totalProfit.toLocaleString()}
                             </div>
-                            <div className={`forge-num text-sm ${entry.pl >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}`}>
-                                {entry.pl >= 0 ? '+' : ''}{entry.pl.toLocaleString()}
-                            </div>
+                            {entry.portfolioValue > 0 && (
+                                <div className="forge-num text-sm text-[var(--forge-text-dim)]">
+                                    Holdings: {entry.portfolioValue.toLocaleString()}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )

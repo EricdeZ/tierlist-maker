@@ -5,12 +5,14 @@ import { pushChallengeProgress } from '../lib/challenges.js'
 import { logAudit } from '../lib/audit.js'
 import {
     FORGE_CONFIG,
+    calcPrice,
     ensureMarket,
     ensurePlayerSparks,
     executeFuel,
     executeCool,
     liquidateMarket,
 } from '../lib/forge.js'
+import { grantPassion } from '../lib/passion.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -40,6 +42,10 @@ const handler = async (event) => {
                     return await getLeaderboard(sql, params)
                 case 'history':
                     return await getHistory(sql, params)
+                case 'batch-history':
+                    return await getBatchHistory(sql, params)
+                case 'tutorial-status':
+                    return await getTutorialStatus(sql, user, params)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -57,6 +63,8 @@ const handler = async (event) => {
                     return await adminToggleStatus(sql, event, user, body)
                 case 'liquidate':
                     return await adminLiquidate(sql, event, user, body)
+                case 'tutorial-fuel':
+                    return await tutorialFuel(sql, user, body)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -83,6 +91,9 @@ async function getMarket(sql, user, params, event) {
     const market = await ensureMarket(sql, seasonId)
     await ensurePlayerSparks(sql, market.id, seasonId)
 
+    // Track daily Forge visit for challenge progress (fire-and-forget, non-blocking)
+    trackForgeVisit(sql, user.id).catch(() => {})
+
     // Get all player sparks with player/team info + most-played god image
     const sparks = await sql`
         SELECT
@@ -91,7 +102,11 @@ async function getMarket(sql, user, params, event) {
             p.name as player_name, p.slug as player_slug,
             lp.role, lp.team_id,
             t.name as team_name, t.slug as team_slug, t.color as team_color,
-            mpg.god_image_url
+            mpg.god_image_url,
+            u_avatar.discord_id as player_discord_id,
+            u_avatar.discord_avatar as player_discord_avatar,
+            u_avatar.id as user_id_linked,
+            cs.best_streak
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
         JOIN players p ON lp.player_id = p.id
@@ -106,6 +121,8 @@ async function getMarket(sql, user, params, event) {
             ORDER BY COUNT(*) DESC
             LIMIT 1
         ) mpg ON true
+        LEFT JOIN users u_avatar ON u_avatar.linked_player_id = p.id
+        LEFT JOIN coinflip_streaks cs ON cs.user_id = u_avatar.id
         WHERE ps.market_id = ${market.id}
           AND lp.is_active = true
           AND LOWER(COALESCE(lp.role, '')) != 'sub'
@@ -117,7 +134,7 @@ async function getMarket(sql, user, params, event) {
     let userHoldings = []
     if (sparkIds.length > 0) {
         userHoldings = await sql`
-            SELECT spark_id, sparks, total_invested
+            SELECT spark_id, sparks, total_invested, tutorial_sparks
             FROM spark_holdings
             WHERE user_id = ${user.id} AND spark_id = ANY(${sparkIds})
         `
@@ -129,6 +146,7 @@ async function getMarket(sql, user, params, event) {
         holdingsMap[h.spark_id] = {
             sparks: h.sparks,
             totalInvested: Number(h.total_invested),
+            tutorialSparks: h.tutorial_sparks || 0,
         }
     }
 
@@ -172,6 +190,17 @@ async function getMarket(sql, user, params, event) {
     `
     const userTeamId = userTeamRow?.team_id || null
 
+    // Count free Starter Sparks remaining for this user in this market
+    const [{ total_used: freeUsed }] = await sql`
+        SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
+        FROM spark_transactions st
+        JOIN player_sparks ps ON st.spark_id = ps.id
+        WHERE st.user_id = ${user.id}
+          AND st.type = 'tutorial_fuel'
+          AND ps.market_id = ${market.id}
+    `
+    const freeSparksRemaining = Math.max(0, 3 - freeUsed)
+
     const result = sparks.map(s => {
         const holding = holdingsMap[s.spark_id] || null
         const price24hAgo = priceChangeMap[s.spark_id]
@@ -200,6 +229,11 @@ async function getMarket(sql, user, params, event) {
             priceChange7d,
             holding,
             godImageUrl: s.god_image_url || null,
+            discordAvatarUrl: s.player_discord_id && s.player_discord_avatar
+                ? `https://cdn.discordapp.com/avatars/${s.player_discord_id}/${s.player_discord_avatar}.png?size=64`
+                : null,
+            isConnected: s.user_id_linked != null,
+            bestStreak: s.best_streak || 0,
         }
     })
 
@@ -215,6 +249,7 @@ async function getMarket(sql, user, params, event) {
             },
             players: result,
             userTeamId,
+            freeSparksRemaining,
         }),
     }
 }
@@ -258,7 +293,7 @@ async function getPortfolio(sql, user, params) {
     // Get holdings with player/price info
     const holdings = await sql`
         SELECT
-            sh.spark_id, sh.sparks, sh.total_invested,
+            sh.spark_id, sh.sparks, sh.total_invested, sh.tutorial_sparks,
             ps.current_price, ps.total_sparks, ps.perf_multiplier,
             p.name as player_name, p.slug as player_slug,
             lp.role,
@@ -281,6 +316,8 @@ async function getPortfolio(sql, user, params) {
         const value = Math.round(currentPrice * h.sparks)
         const avgBuyPrice = h.sparks > 0 ? invested / h.sparks : 0
         const unrealizedPL = value - Math.round(invested)
+        const tutorialSparks = h.tutorial_sparks || 0
+        const coolableSparks = h.sparks - tutorialSparks
 
         totalValue += value
         totalInvested += invested
@@ -294,6 +331,8 @@ async function getPortfolio(sql, user, params) {
             teamSlug: h.team_slug,
             teamColor: h.team_color,
             sparks: h.sparks,
+            tutorialSparks,
+            coolableSparks,
             avgBuyPrice: Math.round(avgBuyPrice * 100) / 100,
             currentPrice,
             currentValue: value,
@@ -366,7 +405,8 @@ async function getPortfolio(sql, user, params) {
 
 
 // ═══════════════════════════════════════════════════
-// GET: Leaderboard — top investors by portfolio value
+// GET: Leaderboard — top investors by total profit
+// Profit = current holdings value + realized proceeds (cool/liquidate) − all fuel costs (incl. tutorial)
 // ═══════════════════════════════════════════════════
 async function getLeaderboard(sql, params) {
     const { seasonId } = params
@@ -382,23 +422,42 @@ async function getLeaderboard(sql, params) {
     }
 
     const leaders = await sql`
+        WITH user_transactions AS (
+            SELECT
+                st.user_id,
+                COALESCE(SUM(CASE WHEN st.type IN ('cool', 'liquidate') THEN st.total_cost ELSE 0 END), 0) as realized_proceeds,
+                COALESCE(SUM(CASE WHEN st.type IN ('fuel', 'tutorial_fuel') THEN st.total_cost ELSE 0 END), 0) as fuel_costs
+            FROM spark_transactions st
+            JOIN player_sparks ps ON st.spark_id = ps.id
+            WHERE ps.market_id = ${market.id}
+            GROUP BY st.user_id
+        ),
+        user_holdings AS (
+            SELECT
+                sh.user_id,
+                SUM(sh.sparks * ps.current_price)::integer as portfolio_value,
+                COUNT(DISTINCT sh.spark_id)::integer as holdings_count,
+                SUM(sh.sparks)::integer as total_sparks
+            FROM spark_holdings sh
+            JOIN player_sparks ps ON sh.spark_id = ps.id
+            WHERE ps.market_id = ${market.id} AND sh.sparks > 0
+            GROUP BY sh.user_id
+        )
         SELECT
-            sh.user_id,
+            COALESCE(uh.user_id, ut.user_id) as user_id,
             u.discord_username,
             u.discord_avatar,
             u.discord_id,
             pl.slug as player_slug,
-            SUM(sh.sparks * ps.current_price)::integer as portfolio_value,
-            SUM(sh.total_invested)::integer as total_invested,
-            COUNT(DISTINCT sh.spark_id)::integer as holdings_count,
-            SUM(sh.sparks)::integer as total_sparks
-        FROM spark_holdings sh
-        JOIN player_sparks ps ON sh.spark_id = ps.id
-        JOIN users u ON sh.user_id = u.id
+            COALESCE(uh.portfolio_value, 0)::integer as portfolio_value,
+            COALESCE(uh.holdings_count, 0)::integer as holdings_count,
+            COALESCE(uh.total_sparks, 0)::integer as total_sparks,
+            (COALESCE(uh.portfolio_value, 0) + COALESCE(ut.realized_proceeds, 0) - COALESCE(ut.fuel_costs, 0))::integer as total_profit
+        FROM user_holdings uh
+        FULL OUTER JOIN user_transactions ut ON uh.user_id = ut.user_id
+        JOIN users u ON COALESCE(uh.user_id, ut.user_id) = u.id
         LEFT JOIN players pl ON u.linked_player_id = pl.id
-        WHERE ps.market_id = ${market.id} AND sh.sparks > 0
-        GROUP BY sh.user_id, u.discord_username, u.discord_avatar, u.discord_id, pl.slug
-        ORDER BY portfolio_value DESC
+        ORDER BY total_profit DESC
         LIMIT 50
     `
 
@@ -414,10 +473,9 @@ async function getLeaderboard(sql, params) {
                 discordId: l.discord_id,
                 playerSlug: l.player_slug,
                 portfolioValue: l.portfolio_value,
-                totalInvested: l.total_invested,
                 holdingsCount: l.holdings_count,
                 totalSparks: l.total_sparks,
-                pl: l.portfolio_value - l.total_invested,
+                totalProfit: l.total_profit,
             })),
         }),
     }
@@ -450,6 +508,42 @@ async function getHistory(sql, params) {
                 createdAt: h.created_at,
             })),
         }),
+    }
+}
+
+async function getBatchHistory(sql, params) {
+    const { sparkIds } = params
+    if (!sparkIds) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkIds is required' }) }
+    }
+
+    const ids = sparkIds.split(',').map(Number).filter(n => n > 0)
+    if (ids.length === 0 || ids.length > 50) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Provide 1-50 valid sparkIds' }) }
+    }
+
+    const rows = await sql`
+        SELECT spark_id, price, trigger, created_at
+        FROM spark_price_history
+        WHERE spark_id = ANY(${ids})
+        ORDER BY spark_id, created_at ASC
+    `
+
+    const histories = {}
+    for (const r of rows) {
+        const sid = r.spark_id
+        if (!histories[sid]) histories[sid] = []
+        histories[sid].push({
+            price: Number(r.price),
+            trigger: r.trigger,
+            createdAt: r.created_at,
+        })
+    }
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ histories }),
     }
 }
 
@@ -500,7 +594,7 @@ async function fuel(sql, user, body) {
         // Push challenge progress (fire-and-forget)
         const [{ count: fuelCount }] = await sql`
             SELECT COUNT(*)::integer as count FROM spark_transactions
-            WHERE user_id = ${user.id} AND type = 'fuel'
+            WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
         `
         pushChallengeProgress(sql, user.id, { sparks_fueled: fuelCount })
             .catch(err => console.error('Challenge push (fuel) failed:', err))
@@ -580,11 +674,11 @@ async function cool(sql, user, body) {
                 FROM spark_transactions st
                 WHERE st.user_id = ${user.id} AND st.type IN ('cool', 'liquidate')
             `
-            // Rough total profit = total cool proceeds - total fuel costs
+            // Rough total profit = total cool proceeds - total fuel costs (including tutorial fuel)
             const [{ invested }] = await sql`
                 SELECT COALESCE(SUM(st.total_cost), 0)::integer as invested
                 FROM spark_transactions st
-                WHERE st.user_id = ${user.id} AND st.type = 'fuel'
+                WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel')
             `
             const netProfit = Math.max(total - invested, 0)
             stats.forge_profit = netProfit
@@ -697,6 +791,236 @@ async function adminLiquidate(sql, event, user, body) {
         headers,
         body: JSON.stringify({ success: true, message: 'Market liquidated' }),
     }
+}
+
+
+// ═══════════════════════════════════════════════════
+// GET: Tutorial status — check if user has completed the forge tutorial
+// Scoped per market (league/season) via reference_id = market_id
+// ═══════════════════════════════════════════════════
+async function getTutorialStatus(sql, user, params) {
+    const { seasonId } = params
+    if (!seasonId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId is required' }) }
+    }
+
+    // Find the market for this season
+    const [market] = await sql`
+        SELECT id FROM forge_markets WHERE season_id = ${seasonId} LIMIT 1
+    `
+    if (!market) {
+        return { statusCode: 200, headers, body: JSON.stringify({ completed: false, freeSparksRemaining: 3 }) }
+    }
+
+    const [done] = await sql`
+        SELECT 1 FROM passion_transactions
+        WHERE user_id = ${user.id} AND type = 'forge_tutorial_grant'
+          AND reference_id = ${String(market.id)}
+        LIMIT 1
+    `
+
+    // Count free sparks used
+    const [{ total_used }] = await sql`
+        SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
+        FROM spark_transactions st
+        JOIN player_sparks ps ON st.spark_id = ps.id
+        WHERE st.user_id = ${user.id}
+          AND st.type = 'tutorial_fuel'
+          AND ps.market_id = ${market.id}
+    `
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+            completed: !!done,
+            freeSparksRemaining: Math.max(0, 3 - total_used),
+        }),
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// POST: Tutorial fuel — grant 1 free Starter Spark (up to 3 per market)
+// First call sets tutorial completion marker; subsequent calls just grant free sparks
+// ═══════════════════════════════════════════════════
+async function tutorialFuel(sql, user, body) {
+    const { sparkId } = body
+    if (!sparkId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId is required' }) }
+    }
+
+    const MAX_FREE_SPARKS = 3
+
+    try {
+        const result = await transaction(async (tx) => {
+            // Lock player_sparks row
+            const [stock] = await tx`
+                SELECT id, current_price, total_sparks, perf_multiplier, market_id
+                FROM player_sparks WHERE id = ${sparkId} FOR UPDATE
+            `
+            if (!stock) throw new Error('Player spark not found')
+
+            // Check market is open
+            const [market] = await tx`
+                SELECT status, base_price FROM forge_markets WHERE id = ${stock.market_id}
+            `
+            if (!market || market.status !== 'open') throw new Error('Market is not open')
+
+            // Count free sparks already used in this market
+            const [{ total_used }] = await tx`
+                SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
+                FROM spark_transactions st
+                JOIN player_sparks ps ON st.spark_id = ps.id
+                WHERE st.user_id = ${user.id}
+                  AND st.type = 'tutorial_fuel'
+                  AND ps.market_id = ${stock.market_id}
+            `
+            if (total_used >= MAX_FREE_SPARKS) {
+                throw new Error('All Starter Sparks have been used')
+            }
+
+            // Check own-team restriction (owners bypass)
+            const [isOwnerCheck] = await tx`
+                SELECT 1 FROM user_roles ur
+                JOIN role_permissions rp ON rp.role_id = ur.role_id
+                WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
+                LIMIT 1
+            `
+            if (!isOwnerCheck) {
+                const [ownTeamCheck] = await tx`
+                    SELECT 1 FROM player_sparks ps_check
+                    JOIN league_players lp ON ps_check.league_player_id = lp.id
+                    WHERE ps_check.id = ${sparkId}
+                      AND lp.team_id IN (
+                          SELECT lp2.team_id FROM league_players lp2
+                          JOIN teams t ON t.id = lp2.team_id
+                          WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                            AND lp2.is_active = true
+                      )
+                `
+                if (ownTeamCheck) throw new Error('You cannot fuel players on your own team')
+            }
+
+            // Calculate theoretical cost for 1 spark — used as cost basis
+            const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks)
+            const theoreticalCost = Math.round(price)
+
+            // Update player_sparks (bonding curve updates normally)
+            const newTotalSparks = stock.total_sparks + 1
+            const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks)
+            await tx`
+                UPDATE player_sparks SET
+                    total_sparks = ${newTotalSparks},
+                    current_price = ${newPrice},
+                    updated_at = NOW()
+                WHERE id = ${sparkId}
+            `
+
+            // Upsert holding — tutorial_sparks are non-coolable, cost basis = theoretical price
+            await tx`
+                INSERT INTO spark_holdings (user_id, spark_id, sparks, total_invested, tutorial_sparks)
+                VALUES (${user.id}, ${sparkId}, 1, ${theoreticalCost}, 1)
+                ON CONFLICT (user_id, spark_id) DO UPDATE SET
+                    sparks = spark_holdings.sparks + 1,
+                    total_invested = spark_holdings.total_invested + ${theoreticalCost},
+                    tutorial_sparks = spark_holdings.tutorial_sparks + 1,
+                    updated_at = NOW()
+            `
+
+            // Record transaction with type 'tutorial_fuel'
+            await tx`
+                INSERT INTO spark_transactions (user_id, spark_id, type, sparks, price_per_spark, total_cost)
+                VALUES (${user.id}, ${sparkId}, 'tutorial_fuel', 1, ${newPrice}, ${theoreticalCost})
+            `
+
+            // Price history snapshot
+            await tx`
+                INSERT INTO spark_price_history (spark_id, price, trigger)
+                VALUES (${sparkId}, ${newPrice}, 'fuel')
+            `
+
+            // Set completion marker only on first use (tutorial completion)
+            const isFirstUse = total_used === 0
+            if (isFirstUse) {
+                await grantPassion(tx, user.id, 'forge_tutorial_grant', 0,
+                    'Forge tutorial: Starter Spark granted', String(stock.market_id))
+            }
+
+            const freeSparksRemaining = MAX_FREE_SPARKS - total_used - 1
+            return { newPrice: Number(newPrice), theoreticalCost, sparks: 1, freeSparksRemaining, isFirstUse }
+        })
+
+        // Push challenge progress (fire-and-forget)
+        const stats = { sparks_fueled: 1 }
+        if (result.isFirstUse) stats.forge_tutorial_completed = 1
+        pushChallengeProgress(sql, user.id, stats)
+            .catch(err => console.error('Challenge push (tutorial fuel) failed:', err))
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                success: true,
+                newPrice: result.newPrice,
+                savedCost: result.theoreticalCost,
+                sparks: result.sparks,
+                freeSparksRemaining: result.freeSparksRemaining,
+            }),
+        }
+    } catch (err) {
+        if (err.message.includes('not found') || err.message.includes('not open') || err.message.includes('Starter Sparks') || err.message.includes('own team')) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: err.message }) }
+        }
+        throw err
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Helper: Track daily Forge visit + holding days for challenges
+// Uses 0-amount passion_transactions as visit markers (daily cooldown)
+// ═══════════════════════════════════════════════════
+async function trackForgeVisit(sql, userId) {
+    // Check if already visited today
+    const [visited] = await sql`
+        SELECT 1 FROM passion_transactions
+        WHERE user_id = ${userId} AND type = 'forge_daily_visit'
+          AND created_at >= CURRENT_DATE
+        LIMIT 1
+    `
+    if (visited) return
+
+    // Record today's visit
+    await grantPassion(sql, userId, 'forge_daily_visit', 0, 'Forge visit')
+
+    // Count total distinct visit days
+    const [{ count: visitDays }] = await sql`
+        SELECT COUNT(DISTINCT DATE(created_at))::integer as count
+        FROM passion_transactions
+        WHERE user_id = ${userId} AND type = 'forge_daily_visit'
+    `
+
+    const stats = { forge_days_visited: visitDays }
+
+    // If user has any holdings, also count as a holding day
+    const [hasHoldings] = await sql`
+        SELECT 1 FROM spark_holdings WHERE user_id = ${userId} AND sparks > 0 LIMIT 1
+    `
+    if (hasHoldings) {
+        // Record holding day marker
+        await grantPassion(sql, userId, 'forge_holding_day', 0, 'Forge holding day')
+
+        const [{ count: holdingDays }] = await sql`
+            SELECT COUNT(DISTINCT DATE(created_at))::integer as count
+            FROM passion_transactions
+            WHERE user_id = ${userId} AND type = 'forge_holding_day'
+        `
+        stats.forge_days_holding = holdingDays
+    }
+
+    // Push challenge progress
+    await pushChallengeProgress(sql, userId, stats)
 }
 
 

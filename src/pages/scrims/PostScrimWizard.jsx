@@ -28,6 +28,15 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         return tiers.sort((a, b) => a - b)
     })
 
+    // New: Division/Region/Confirmation state
+    const [filterMode, setFilterMode] = useState('tier') // 'tier' | 'division'
+    const [acceptableDivisions, setAcceptableDivisions] = useState([])
+    const [activeDivisions, setActiveDivisions] = useState([])
+    const [region, setRegion] = useState(() => {
+        return captainTeams[0]?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA'
+    })
+    const [requiresConfirmation, setRequiresConfirmation] = useState(false)
+
     // UI state
     const [teamSearch, setTeamSearch] = useState('')
     const [showTeamPicker, setShowTeamPicker] = useState(false)
@@ -38,7 +47,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     const [postSuccess, setPostSuccess] = useState(false)
     const [leagues, setLeagues] = useState([])
 
-    // Update acceptable tiers when team changes
+    // Update acceptable tiers + region when team changes
     useEffect(() => {
         const team = captainTeams.find(t => t.teamId === Number(teamId))
         const tier = team?.divisionTier
@@ -46,11 +55,13 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         const tiers = [tier]
         if (tier > 1) tiers.push(tier - 1)
         setAcceptableTiers(tiers.sort((a, b) => a - b))
+        setRegion(team?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA')
     }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Fetch leagues for banned content dropdown
+    // Fetch leagues for banned content dropdown + active divisions for filter
     useEffect(() => {
         leagueService.getAll().then(data => setLeagues(data || [])).catch(() => {})
+        scrimService.getActiveDivisions().then(data => setActiveDivisions(data.divisions || [])).catch(() => {})
     }, [])
 
     const selectedTeam = captainTeams.find(t => t.teamId === Number(teamId))
@@ -108,13 +119,14 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         { title: 'Time', subtitle: 'Set Time (EST)' },
         { title: 'Settings', subtitle: 'Pick Mode & Bans' },
         { title: 'Opponent', subtitle: 'Challenge & Tiers' },
+        { title: 'Region', subtitle: 'Region & Confirmation' },
         { title: 'Review', subtitle: 'Notes & Confirm' },
     ]
 
     const canAdvance = () => {
         if (step === 0) return !!teamId
         if (step === 1) return !!selectedDate
-        if (step === 4) return acceptableTiers.length > 0
+        if (step === 4) return filterMode === 'tier' ? acceptableTiers.length > 0 : acceptableDivisions.length > 0
         return true
     }
 
@@ -137,6 +149,22 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         )
     }
 
+    const toggleDivision = (divId) => {
+        setAcceptableDivisions(prev =>
+            prev.includes(divId) ? prev.filter(d => d !== divId) : [...prev, divId]
+        )
+    }
+
+    // Group active divisions by league for display
+    const divisionsByLeague = useMemo(() => {
+        const map = {}
+        for (const d of activeDivisions) {
+            if (!map[d.leagueName]) map[d.leagueName] = []
+            map[d.leagueName].push(d)
+        }
+        return map
+    }, [activeDivisions])
+
     const assembleScheduledDate = () => {
         const h = Number(timeHour)
         const hour24 = timeAmPm === 'AM' ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12)
@@ -154,7 +182,10 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                 banned_content_league: bannedContentLeague || null,
                 notes: notes || null,
                 challenged_team_id: challengedTeamId ? Number(challengedTeamId) : null,
-                acceptable_tiers: acceptableTiers.length < 5 ? acceptableTiers : null,
+                acceptable_tiers: filterMode === 'tier' && acceptableTiers.length < 5 ? acceptableTiers : null,
+                acceptable_divisions: filterMode === 'division' ? acceptableDivisions : null,
+                region,
+                requires_confirmation: requiresConfirmation,
             })
             setPostSuccess(true)
         } catch (err) {
@@ -171,6 +202,9 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         setPickMode('regular'); setBannedContentLeague('')
         setChallengedTeamId(''); setNotes('')
         setAcceptableTiers([1, 2, 3, 4, 5])
+        setFilterMode('tier'); setAcceptableDivisions([])
+        setRegion(captainTeams[0]?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA')
+        setRequiresConfirmation(false)
         setTeamSearch(''); setShowTeamPicker(false)
         setPostError(null); setPostSuccess(false)
     }
@@ -378,37 +412,122 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                             </fieldset>
 
                             <fieldset className="xp-fieldset">
-                                <legend className="xp-fieldset-legend">Acceptable Tiers</legend>
-                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
-                                    Select which division tiers you are willing to accept scrims from.
+                                <legend className="xp-fieldset-legend">Acceptable Opponents</legend>
+                                <div className="flex gap-2 mb-2">
+                                    <button type="button" onClick={() => setFilterMode('tier')}
+                                        className={`xp-btn ${filterMode === 'tier' ? 'xp-btn-primary' : ''}`}
+                                        style={{ fontSize: 10, padding: '2px 10px' }}>
+                                        Filter by Tier
+                                    </button>
+                                    <button type="button" onClick={() => setFilterMode('division')}
+                                        className={`xp-btn ${filterMode === 'division' ? 'xp-btn-primary' : ''}`}
+                                        style={{ fontSize: 10, padding: '2px 10px' }}>
+                                        Filter by Division
+                                    </button>
                                 </div>
-                                <div className="flex flex-col gap-1">
-                                    {[1, 2, 3, 4, 5].map(tier => {
-                                        const img = getDivisionImage(null, null, tier)
-                                        return (
-                                            <label key={tier} className="xp-checkbox-label">
-                                                <input type="checkbox" checked={acceptableTiers.includes(tier)}
-                                                    onChange={() => toggleTier(tier)} className="xp-checkbox" />
-                                                {img && <img src={img} alt="" style={{ width: 16, height: 16 }} />}
-                                                <span className="xp-text">
-                                                    Tier {tier} — {RANK_LABELS[tier]}
-                                                    {tierDivisions[tier] && <span style={{ color: '#666' }}> ({tierDivisions[tier].join(', ')})</span>}
-                                                </span>
-                                            </label>
-                                        )
-                                    })}
-                                </div>
-                                {acceptableTiers.length === 0 && (
-                                    <div className="xp-text" style={{ fontSize: 10, color: '#800000', marginTop: 4 }}>
-                                        You must select at least one tier.
-                                    </div>
+
+                                {filterMode === 'tier' && (
+                                    <>
+                                        <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                            Select which division tiers you are willing to accept scrims from.
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            {[1, 2, 3, 4, 5].map(tier => {
+                                                const img = getDivisionImage(null, null, tier)
+                                                return (
+                                                    <label key={tier} className="xp-checkbox-label">
+                                                        <input type="checkbox" checked={acceptableTiers.includes(tier)}
+                                                            onChange={() => toggleTier(tier)} className="xp-checkbox" />
+                                                        {img && <img src={img} alt="" style={{ width: 16, height: 16 }} />}
+                                                        <span className="xp-text">
+                                                            Tier {tier} — {RANK_LABELS[tier]}
+                                                            {tierDivisions[tier] && <span style={{ color: '#666' }}> ({tierDivisions[tier].join(', ')})</span>}
+                                                        </span>
+                                                    </label>
+                                                )
+                                            })}
+                                        </div>
+                                        {acceptableTiers.length === 0 && (
+                                            <div className="xp-text" style={{ fontSize: 10, color: '#800000', marginTop: 4 }}>
+                                                You must select at least one tier.
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {filterMode === 'division' && (
+                                    <>
+                                        <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                            Select which divisions you are willing to accept scrims from.
+                                        </div>
+                                        {Object.entries(divisionsByLeague).map(([leagueName, divs]) => (
+                                            <div key={leagueName} style={{ marginBottom: 6 }}>
+                                                <div className="xp-text" style={{ fontWeight: 700, fontSize: 11, marginBottom: 2 }}>
+                                                    {leagueName}
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    {divs.map(d => {
+                                                        const img = d.tier ? getDivisionImage(null, null, d.tier) : null
+                                                        return (
+                                                            <label key={d.id} className="xp-checkbox-label">
+                                                                <input type="checkbox" checked={acceptableDivisions.includes(d.id)}
+                                                                    onChange={() => toggleDivision(d.id)} className="xp-checkbox" />
+                                                                {img && <img src={img} alt="" style={{ width: 14, height: 14 }} />}
+                                                                <span className="xp-text">
+                                                                    {d.name}{d.tier ? ` (${RANK_LABELS[d.tier]})` : ''}
+                                                                </span>
+                                                            </label>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {acceptableDivisions.length === 0 && (
+                                            <div className="xp-text" style={{ fontSize: 10, color: '#800000', marginTop: 4 }}>
+                                                You must select at least one division.
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </fieldset>
                         </div>
                     )}
 
-                    {/* ── Step 5: Notes & Review ── */}
+                    {/* ── Step 5: Region & Confirmation ── */}
                     {step === 5 && (
+                        <div>
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Region</legend>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                                    Select the region for this scrim. This helps opponents find matches in their timezone.
+                                </div>
+                                <div className="flex gap-3">
+                                    {['NA', 'EU'].map(r => (
+                                        <label key={r} className="xp-radio-label">
+                                            <input type="radio" name="wiz_region" checked={region === r}
+                                                onChange={() => setRegion(r)} className="xp-radio" />
+                                            <span className="xp-text">{r === 'NA' ? 'North America (NA)' : 'Europe (EU)'}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Confirmation Preference</legend>
+                                <label className="xp-checkbox-label">
+                                    <input type="checkbox" checked={requiresConfirmation}
+                                        onChange={e => setRequiresConfirmation(e.target.checked)} className="xp-checkbox" />
+                                    <span className="xp-text">Require my confirmation before accepting</span>
+                                </label>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 20 }}>
+                                    When enabled, teams who accept your scrim must wait for you to confirm via the web or Discord DM before the scrim is official.
+                                </div>
+                            </fieldset>
+                        </div>
+                    )}
+
+                    {/* ── Step 6: Notes & Review ── */}
+                    {step === 6 && (
                         <div>
                             <fieldset className="xp-fieldset">
                                 <legend className="xp-fieldset-legend">Notes (optional)</legend>
@@ -448,6 +567,14 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                         <span className="xp-text">{bannedContentLeague || 'None'}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Region:</span>
+                                        <span className="xp-text">{region}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Confirm:</span>
+                                        <span className="xp-text">{requiresConfirmation ? 'Required' : 'Auto-accept'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Opponent:</span>
                                         {challengedTeam ? (
                                             <span className="flex items-center gap-1">
@@ -459,9 +586,14 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Tiers:</span>
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>
+                                            {filterMode === 'tier' ? 'Tiers:' : 'Divisions:'}
+                                        </span>
                                         <span className="xp-text">
-                                            {acceptableTiers.length === 5 ? 'All tiers' : acceptableTiers.map(t => RANK_LABELS[t]).join(', ')}
+                                            {filterMode === 'tier'
+                                                ? (acceptableTiers.length === 5 ? 'All tiers' : acceptableTiers.map(t => RANK_LABELS[t]).join(', '))
+                                                : acceptableDivisions.map(id => activeDivisions.find(d => d.id === id)?.name).filter(Boolean).join(', ')
+                                            }
                                         </span>
                                     </div>
                                     {notes && (
@@ -494,7 +626,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                     )}
                 </div>
                 <div className="flex gap-2">
-                    {step < 5 ? (
+                    {step < 6 ? (
                         <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="xp-btn xp-btn-primary">
                             Next &gt;
                         </button>

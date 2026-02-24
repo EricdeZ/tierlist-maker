@@ -1,11 +1,12 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search, ChevronDown, Flame, Trophy } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import { SORT_OPTIONS } from './forgeConstants'
 import ForgeHero from './ForgeHero'
 import ForgePlayerCard from './ForgePlayerCard'
 import ForgePlayerRow from './ForgePlayerRow'
 import forgeLogo from '../../assets/forge.png'
+import sparkIcon from '../../assets/spark.png'
 
 function TeamFilterDropdown({ teams, value, onChange }) {
     const [open, setOpen] = useState(false)
@@ -69,8 +70,8 @@ export default function ForgeMarketTab({
     players, allPlayers, teams,
     search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
-    changeView,
-    onFuel, onCool, onSelectPlayer,
+    changeView, freeSparksRemaining, seasonSlugs,
+    onFuel, onCool, onSelectPlayer, onRandomPlayer,
 }) {
     if (loading) {
         return (
@@ -99,13 +100,13 @@ export default function ForgeMarketTab({
             .slice(0, 3)
     }, [allPlayers])
 
-    // Remaining players for table (excluding top 3 if unfiltered)
+    // Remaining players for table (excluding top 3 when cards are visible)
     const tableRows = useMemo(() => {
         const top3Ids = new Set(top3.map(p => p.sparkId))
-        // If user is searching/filtering, show all matching; otherwise exclude top 3
-        if (search.trim() || teamFilter) return players
+        // Team filter hides Top Performers, so show all; otherwise exclude top 3
+        if (teamFilter) return players
         return players.filter(p => !top3Ids.has(p.sparkId))
-    }, [players, top3, search, teamFilter])
+    }, [players, top3, teamFilter])
 
     return (
         <div>
@@ -118,22 +119,44 @@ export default function ForgeMarketTab({
                     userTeamId={userTeamId}
                     isOwner={isOwner}
                     changeView={changeView}
+                    seasonSlugs={seasonSlugs}
                     onFuel={onFuel}
                     onCool={onCool}
+                    onRandom={onRandomPlayer}
                 />
             )}
 
-            {/* Top Performers section */}
-            {!search.trim() && !teamFilter && (
-                <>
-                    <div className="relative pb-1.5 mb-2.5 border-b border-[var(--forge-border)]">
-                        <h2 className="forge-head text-lg font-bold tracking-wider text-[var(--forge-text-mid)]">
-                            Top Performers
-                        </h2>
-                        <div className="forge-section-accent" />
+            {/* Starter Sparks banner */}
+            {freeSparksRemaining > 0 && (
+                <div className="mb-4 p-3 bg-[var(--forge-flame)]/5 border border-[var(--forge-flame)]/15 flex items-center gap-3">
+                    <img
+                        src={sparkIcon}
+                        alt=""
+                        className="w-12 h-12 object-contain flex-shrink-0 forge-spark-icon-lg"
+                    />
+                    <div>
+                        <span className="forge-head text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
+                            {freeSparksRemaining} Starter Spark{freeSparksRemaining !== 1 ? 's' : ''} Available
+                        </span>
+                        <span className="forge-body text-sm text-[var(--forge-text-mid)] ml-2">
+                            — Fuel any player for free!
+                        </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5 forge-stagger">
-                        {top3.map(p => (
+                </div>
+            )}
+
+            {/* Top Performers section */}
+            {!teamFilter && (
+                <>
+                    <div className="forge-top-header relative pb-2 mb-3 border-b border-[var(--forge-border)]">
+                        <h2 className="forge-head text-xl font-bold tracking-wider flex items-center gap-2">
+                            <Flame size={18} className="text-[var(--forge-flame)]" style={{ filter: 'drop-shadow(0 0 6px rgba(232,101,32,0.4))' }} />
+                            <span className="text-[var(--forge-flame-bright)]">Top Performers</span>
+                            <Trophy size={16} className="text-[var(--forge-gold-bright)] ml-1" />
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 forge-stagger">
+                        {top3.map((p, i) => (
                             <ForgePlayerCard
                                 key={p.sparkId}
                                 player={p}
@@ -142,9 +165,12 @@ export default function ForgeMarketTab({
                                 userTeamId={userTeamId}
                                 isOwner={isOwner}
                                 changeView={changeView}
+                                seasonSlugs={seasonSlugs}
                                 onSelect={onSelectPlayer}
                                 onFuel={onFuel}
                                 onCool={onCool}
+                                tutorialIndex={i === 0 ? 0 : undefined}
+                                rank={i + 1}
                             />
                         ))}
                     </div>
@@ -165,6 +191,7 @@ export default function ForgeMarketTab({
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search players, teams..."
+                    data-tutorial="search-input"
                     className="flex-1 py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-lg outline-none focus:border-[var(--forge-flame)]/40 transition-colors placeholder:text-[var(--forge-text-dim)]"
                 />
 
@@ -196,6 +223,7 @@ export default function ForgeMarketTab({
                         userTeamId={userTeamId}
                         isOwner={isOwner}
                         changeView={changeView}
+                        seasonSlugs={seasonSlugs}
                         onSelect={onSelectPlayer}
                         onFuel={onFuel}
                         onCool={onCool}

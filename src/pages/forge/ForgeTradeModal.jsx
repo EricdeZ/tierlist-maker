@@ -5,16 +5,20 @@ import sparkIcon from '../../assets/spark.png'
 
 export default function ForgeTradeModal({
     player, mode, amount, setAmount, balance,
-    trading, result, error, onExecute, onClose, onFuelSuccess,
+    trading, result, error, freeSparksRemaining,
+    onExecute, onFreeFuel, onClose,
 }) {
     const isFuel = mode === 'fuel'
+    const hasFreeSparks = isFuel && freeSparksRemaining > 0
     const estimatedCost = isFuel
         ? Math.round(player.currentPrice * amount * (1 + 0.005 * amount))
         : null
     const estimatedProceeds = !isFuel && player.currentPrice
         ? Math.round(player.currentPrice * amount * 0.9)
         : null
-    const maxSparks = !isFuel && player.holding ? player.holding.sparks : 10
+    const maxSparks = !isFuel && player.holding
+        ? (player.holding.coolableSparks != null ? player.holding.coolableSparks : player.holding.sparks)
+        : 10
 
     return (
         <div
@@ -61,13 +65,25 @@ export default function ForgeTradeModal({
                             : 'bg-[var(--forge-cool)]/8 border-[var(--forge-cool)]/25'
                     }`}>
                         <div className="forge-head text-base font-bold tracking-wider mb-1">
-                            {isFuel ? 'Fueled!' : 'Cooled!'}
+                            {result.isFreeSpark ? 'Starter Spark Used!' : (isFuel ? 'Fueled!' : 'Cooled!')}
                         </div>
                         {isFuel ? (
-                            <div className="text-sm text-[var(--forge-text-mid)]">
-                                Spent <strong className="forge-num text-[var(--forge-flame-bright)]">{result.totalCost?.toLocaleString()}</strong> Passion.
-                                New value: <strong className="forge-num text-[var(--forge-flame-bright)]">{Math.round(result.newPrice).toLocaleString()}</strong>
-                            </div>
+                            result.isFreeSpark ? (
+                                <div className="text-sm text-[var(--forge-text-mid)]">
+                                    Free Starter Spark applied!
+                                    New value: <strong className="forge-num text-[var(--forge-flame-bright)]">{Math.round(result.newPrice).toLocaleString()}</strong>
+                                    {result.freeSparksRemaining > 0 && (
+                                        <span className="text-[var(--forge-gold)]">
+                                            {' '}&mdash; {result.freeSparksRemaining} Starter Spark{result.freeSparksRemaining !== 1 ? 's' : ''} left
+                                        </span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-[var(--forge-text-mid)]">
+                                    Spent <strong className="forge-num text-[var(--forge-flame-bright)]">{result.totalCost?.toLocaleString()}</strong> Passion.
+                                    New value: <strong className="forge-num text-[var(--forge-flame-bright)]">{Math.round(result.newPrice).toLocaleString()}</strong>
+                                </div>
+                            )
                         ) : (
                             <div className="text-sm text-[var(--forge-text-mid)]">
                                 Received <strong className="forge-num text-[var(--forge-gain)]">{result.netProceeds?.toLocaleString()}</strong> Passion
@@ -89,8 +105,41 @@ export default function ForgeTradeModal({
                     </div>
                 )}
 
-                {/* Amount selector */}
-                {!result && (
+                {/* Free Starter Spark mode */}
+                {!result && hasFreeSparks && (
+                    <>
+                        <div className="mb-4 p-3 bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/25">
+                            <div className="flex items-center gap-2 mb-1">
+                                <img src={sparkIcon} alt="" className="w-6 h-6 object-contain" style={{ filter: 'drop-shadow(0 0 6px rgba(232,101,32,0.5))' }} />
+                                <span className="forge-head text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
+                                    {freeSparksRemaining} STARTER SPARK{freeSparksRemaining !== 1 ? 'S' : ''} LEFT
+                                </span>
+                            </div>
+                            <div className="forge-body text-sm text-[var(--forge-text-mid)] leading-relaxed">
+                                Fuel 1 free Spark on this player. Starter Sparks can't be cooled, but you keep any profit at season end.
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => onFreeFuel(player.sparkId)}
+                            disabled={trading}
+                            className="w-full py-3 forge-head text-base font-bold tracking-wider text-white disabled:opacity-50 forge-clip-btn forge-btn-fuel"
+                            style={{
+                                background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
+                                boxShadow: '0 2px 12px rgba(232,101,32,0.25)',
+                            }}
+                        >
+                            {trading ? 'Fueling...' : 'Use Starter Spark (FREE)'}
+                        </button>
+
+                        <div className="forge-head text-center text-[0.7rem] text-[var(--forge-text-dim)] tracking-wider mt-3 mb-3">
+                            &mdash; OR FUEL WITH PASSION &mdash;
+                        </div>
+                    </>
+                )}
+
+                {/* Amount selector (normal Passion-based trading) */}
+                {!result && !hasFreeSparks && (
                     <>
                         <div className="mb-4">
                             <label className="forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-text-dim)] mb-2 block">
@@ -106,7 +155,7 @@ export default function ForgeTradeModal({
                                 </button>
                                 <div className="flex-1 text-center flex items-center justify-center gap-2">
                                     <span className="forge-num text-4xl">{amount}</span>
-                                    <img src={sparkIcon} alt="" className="w-6 h-6 object-contain" />
+                                    <img src={sparkIcon} alt="" className="w-9 h-9 object-contain" />
                                     <span className="forge-head text-sm text-[var(--forge-text-dim)]">
                                         Spark{amount !== 1 ? 's' : ''}
                                     </span>
@@ -166,6 +215,61 @@ export default function ForgeTradeModal({
                                 ? (isFuel ? 'Fueling...' : 'Cooling...')
                                 : (isFuel ? `Fuel ${amount} Spark${amount !== 1 ? 's' : ''}` : `Cool ${amount} Spark${amount !== 1 ? 's' : ''}`)
                             }
+                        </button>
+                    </>
+                )}
+
+                {/* Passion fuel option shown below free spark section */}
+                {!result && hasFreeSparks && (
+                    <>
+                        <div className="mb-4">
+                            <label className="forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-text-dim)] mb-2 block">
+                                Sparks to fuel
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setAmount(Math.max(1, amount - 1))}
+                                    className="p-2 bg-[var(--forge-surface)] hover:bg-[var(--forge-edge)] disabled:opacity-30 transition-colors forge-clip-btn"
+                                    disabled={amount <= 1}
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                                <div className="flex-1 text-center flex items-center justify-center gap-2">
+                                    <span className="forge-num text-4xl">{amount}</span>
+                                    <img src={sparkIcon} alt="" className="w-9 h-9 object-contain" />
+                                    <span className="forge-head text-sm text-[var(--forge-text-dim)]">
+                                        Spark{amount !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setAmount(Math.min(10, amount + 1))}
+                                    className="p-2 bg-[var(--forge-surface)] hover:bg-[var(--forge-edge)] disabled:opacity-30 transition-colors forge-clip-btn"
+                                    disabled={amount >= 10}
+                                >
+                                    <ChevronUp size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mb-4 p-3 bg-[var(--forge-surface)]">
+                            <div className="flex items-center justify-between text-base">
+                                <span className="forge-head text-sm tracking-wider text-[var(--forge-text-dim)]">Estimated cost</span>
+                                <span className="flex items-center gap-1 forge-num text-[var(--forge-flame-bright)]">
+                                    <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
+                                    ~{estimatedCost?.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={onExecute}
+                            disabled={trading}
+                            className="w-full py-3 forge-head text-base font-bold tracking-wider text-white disabled:opacity-50 forge-clip-btn forge-btn-fuel"
+                            style={{
+                                background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
+                            }}
+                        >
+                            {trading ? 'Fueling...' : `Fuel ${amount} Spark${amount !== 1 ? 's' : ''}`}
                         </button>
                     </>
                 )}
