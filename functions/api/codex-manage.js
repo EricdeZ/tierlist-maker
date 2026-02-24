@@ -131,7 +131,7 @@ const handler = async (event) => {
 async function createField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const finalSlug = slug?.trim() ? slugify(slug.trim()) : slugify(name.trim())
-    const type = ['text', 'number', 'boolean', 'group'].includes(field_type) ? field_type : 'text'
+    const type = ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type) ? field_type : 'text'
     const finalOptions = type === 'group' ? validateGroupOptions(options) : null
     const [row] = await sql`
         INSERT INTO codex_fields (slug, name, icon_url, description, field_type, required, sort_order, options)
@@ -149,7 +149,7 @@ async function updateField(sql, { id, name, slug, icon_url, description, field_t
     if (slug !== undefined) updates.slug = slugify(slug.trim())
     if (icon_url !== undefined) updates.icon_url = icon_url || null
     if (description !== undefined) updates.description = description || null
-    if (field_type !== undefined && ['text', 'number', 'boolean', 'group'].includes(field_type)) updates.field_type = field_type
+    if (field_type !== undefined && ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type)) updates.field_type = field_type
     if (required !== undefined) updates.required = !!required
     if (sort_order !== undefined) updates.sort_order = sort_order
     if (options !== undefined) updates.options = updates.field_type === 'group' || field_type === 'group' ? JSON.stringify(validateGroupOptions(options)) : null
@@ -297,7 +297,7 @@ async function updateImageCategory(sql, { id, category }, admin) {
 async function createGodField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const finalSlug = slug?.trim() ? slugify(slug.trim()) : slugify(name.trim())
-    const type = ['text', 'number', 'boolean', 'group'].includes(field_type) ? field_type : 'text'
+    const type = ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type) ? field_type : 'text'
     const finalOptions = type === 'group' ? validateGroupOptions(options) : null
     const [row] = await sql`
         INSERT INTO codex_god_fields (slug, name, icon_url, description, field_type, required, sort_order, options)
@@ -315,7 +315,7 @@ async function updateGodField(sql, { id, name, slug, icon_url, description, fiel
     if (slug !== undefined) updates.slug = slugify(slug.trim())
     if (icon_url !== undefined) updates.icon_url = icon_url || null
     if (description !== undefined) updates.description = description || null
-    if (field_type !== undefined && ['text', 'number', 'boolean', 'group'].includes(field_type)) updates.field_type = field_type
+    if (field_type !== undefined && ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type)) updates.field_type = field_type
     if (required !== undefined) updates.required = !!required
     if (sort_order !== undefined) updates.sort_order = sort_order
     if (options !== undefined) updates.options = updates.field_type === 'group' || field_type === 'group' ? JSON.stringify(validateGroupOptions(options)) : null
@@ -543,7 +543,7 @@ function validateGroupOptions(options) {
         .map(sf => ({
             key: sf.key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_'),
             label: sf.label.trim(),
-            type: ['text', 'number', 'boolean'].includes(sf.type) ? sf.type : 'text'
+            type: ['text', 'number', 'boolean', 'percentage'].includes(sf.type) ? sf.type : 'text'
         }))
     if (subFields.length === 0) return null
     const keys = new Set()

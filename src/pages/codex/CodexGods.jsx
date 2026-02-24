@@ -510,6 +510,7 @@ export default function CodexGods() {
                                             <option value="text">Text</option>
                                             <option value="number">Number</option>
                                             <option value="boolean">Boolean</option>
+                                            <option value="percentage">Percentage</option>
                                             <option value="group">Group</option>
                                         </select>
                                     </div>
@@ -839,13 +840,16 @@ export default function CodexGods() {
                                                                     <span className="text-sm text-(--color-text)">{(godForm.field_values[field.slug] || {})[sf.key] ? 'Yes' : 'No'}</span>
                                                                 </label>
                                                             ) : (
-                                                                <input
-                                                                    type={sf.type === 'number' ? 'number' : 'text'}
-                                                                    value={(godForm.field_values[field.slug] || {})[sf.key] ?? ''}
-                                                                    onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
-                                                                    className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
-                                                                    placeholder={sf.label}
-                                                                />
+                                                                <div className={sf.type === 'percentage' ? 'relative' : ''}>
+                                                                    <input
+                                                                        type={sf.type === 'number' || sf.type === 'percentage' ? 'number' : 'text'}
+                                                                        value={(godForm.field_values[field.slug] || {})[sf.key] ?? ''}
+                                                                        onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
+                                                                        className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${sf.type === 'percentage' ? ' pr-7' : ''}`}
+                                                                        placeholder={sf.label}
+                                                                    />
+                                                                    {sf.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-secondary)/40 text-sm">%</span>}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     ))}
@@ -859,13 +863,16 @@ export default function CodexGods() {
                                                     <span className="text-sm text-(--color-text)">{godForm.field_values[field.slug] ? 'Yes' : 'No'}</span>
                                                 </label>
                                             ) : (
-                                                <input
-                                                    type={field.field_type === 'number' ? 'number' : 'text'}
-                                                    value={godForm.field_values[field.slug] ?? ''}
-                                                    onChange={e => setGodFieldValue(field.slug, e.target.value)}
-                                                    className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
-                                                    placeholder={field.description || field.name}
-                                                />
+                                                <div className={field.field_type === 'percentage' ? 'relative' : ''}>
+                                                    <input
+                                                        type={field.field_type === 'number' || field.field_type === 'percentage' ? 'number' : 'text'}
+                                                        value={godForm.field_values[field.slug] ?? ''}
+                                                        onChange={e => setGodFieldValue(field.slug, e.target.value)}
+                                                        className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${field.field_type === 'percentage' ? ' pr-7' : ''}`}
+                                                        placeholder={field.description || field.name}
+                                                    />
+                                                    {field.field_type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-secondary)/40 text-sm">%</span>}
+                                                </div>
                                             )}
                                         </div>
                                     ))}
@@ -998,12 +1005,14 @@ export default function CodexGods() {
                                                                     })
                                                                     .map(sf => {
                                                                         const v = (god.field_values[field.slug] || {})[sf.key]
-                                                                        return `${sf.label}: ${sf.type === 'boolean' ? (v ? 'Yes' : 'No') : v}`
+                                                                        return `${sf.label}: ${sf.type === 'boolean' ? (v ? 'Yes' : 'No') : sf.type === 'percentage' ? `${v}%` : v}`
                                                                     })
                                                                     .join(' / ')
                                                                 : field.field_type === 'boolean'
                                                                     ? (god.field_values[field.slug] ? 'Yes' : 'No')
-                                                                    : god.field_values[field.slug]
+                                                                    : field.field_type === 'percentage'
+                                                                        ? `${god.field_values[field.slug]}%`
+                                                                        : god.field_values[field.slug]
                                                             }
                                                         </span>
                                                     </span>
