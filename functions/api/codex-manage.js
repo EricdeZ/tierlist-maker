@@ -128,21 +128,21 @@ const handler = async (event) => {
 
 // ── Fields ──
 
-async function createField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
+async function createField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const finalSlug = slug?.trim() ? slugify(slug.trim()) : slugify(name.trim())
     const type = ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type) ? field_type : 'text'
     const finalOptions = type === 'group' ? validateGroupOptions(options) : null
     const [row] = await sql`
-        INSERT INTO codex_fields (slug, name, icon_url, description, field_type, required, sort_order, options)
-        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null})
+        INSERT INTO codex_fields (slug, name, icon_url, description, field_type, required, sort_order, options, sentence_template)
+        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null}, ${sentence_template || null})
         RETURNING *
     `
     await logAudit(sql, admin, { action: 'create-codex-field', endpoint: 'codex-manage', targetType: 'codex_field', targetId: row.id, details: { name: row.name, slug: row.slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, field: row }) }
 }
 
-async function updateField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
+async function updateField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const updates = {}
     if (name !== undefined) updates.name = name.trim()
@@ -153,6 +153,7 @@ async function updateField(sql, { id, name, slug, icon_url, description, field_t
     if (required !== undefined) updates.required = !!required
     if (sort_order !== undefined) updates.sort_order = sort_order
     if (options !== undefined) updates.options = updates.field_type === 'group' || field_type === 'group' ? JSON.stringify(validateGroupOptions(options)) : null
+    if (sentence_template !== undefined) updates.sentence_template = sentence_template || null
 
     const [row] = await sql`
         UPDATE codex_fields SET
@@ -163,7 +164,8 @@ async function updateField(sql, { id, name, slug, icon_url, description, field_t
             field_type = COALESCE(${updates.field_type ?? null}, field_type),
             required = COALESCE(${updates.required ?? null}, required),
             sort_order = COALESCE(${updates.sort_order ?? null}, sort_order),
-            options = COALESCE(${updates.options !== undefined ? updates.options : null}::jsonb, options)
+            options = COALESCE(${updates.options !== undefined ? updates.options : null}::jsonb, options),
+            sentence_template = ${updates.sentence_template !== undefined ? updates.sentence_template : null}
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Field not found' }) }

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { codexService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Swords, Tag, Settings2, X, Link2, FolderTree, ImagePlus } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Swords, Tag, Settings2, X, Link2, FolderTree, ImagePlus, Copy } from 'lucide-react'
 import CodexImagePicker from '../../components/codex/CodexImagePicker'
+import { describeFieldValue } from '../../utils/codexFieldDescriptors'
 
 function buildCategoryTree(categories, parentId = null) {
     return categories
@@ -74,7 +75,7 @@ export default function CodexGods() {
     // ── Field CRUD ──
 
     const startFieldCreate = () => {
-        setFieldForm({ slug: '', name: '', icon_url: '', description: '', field_type: 'text', required: false, sort_order: fields.length })
+        setFieldForm({ slug: '', name: '', icon_url: '', description: '', field_type: 'text', required: false, sort_order: fields.length, sentence_template: '' })
     }
 
     const startFieldEdit = (field) => {
@@ -540,6 +541,12 @@ export default function CodexGods() {
                                                             <option value="number">Number</option>
                                                             <option value="boolean">Boolean</option>
                                                         </select>
+                                                        <button type="button" onClick={() => {
+                                                                if (sf.key) setFieldForm(p => ({ ...p, sentence_template: (p.sentence_template || '') + `{${sf.key}}` }))
+                                                            }}
+                                                            className="p-1 rounded hover:bg-(--color-accent)/10 text-(--color-text-secondary) hover:text-(--color-accent) transition-colors cursor-pointer" title={sf.key ? `Insert {${sf.key}}` : 'Set a label first'}>
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </button>
                                                         <button type="button" onClick={() => removeSubField(idx)}
                                                             className="p-1 rounded hover:bg-red-500/10 text-(--color-text-secondary) hover:text-red-400 transition-colors cursor-pointer">
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -553,6 +560,18 @@ export default function CodexGods() {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                                <div className="mt-3">
+                                    <label className="block text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">Sentence Template</label>
+                                    <textarea value={fieldForm.sentence_template || ''} onChange={e => setFieldForm(p => ({ ...p, sentence_template: e.target.value }))}
+                                        className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent) resize-y min-h-[40px] font-mono"
+                                        placeholder={fieldForm.field_type === 'group' ? 'e.g. Grants a shield of [{flat_shield}][ + {percentage_max_health_shield}% of max health]' : 'e.g. {value} meters'}
+                                        rows={2} />
+                                    <p className="text-[10px] text-(--color-text-secondary)/40 mt-0.5">
+                                        Use <code className="bg-white/5 px-1 rounded">{'{key}'}</code> for values.
+                                        Wrap in <code className="bg-white/5 px-1 rounded">[...]</code> for conditional sections (hidden if value is empty).
+                                        For booleans: <code className="bg-white/5 px-1 rounded">{'{key:text if true}'}</code>
+                                    </p>
                                 </div>
                                 <label className="flex items-center gap-2 mt-3 cursor-pointer">
                                     <input type="checkbox" checked={fieldForm.required} onChange={e => setFieldForm(p => ({ ...p, required: e.target.checked }))}
@@ -874,6 +893,10 @@ export default function CodexGods() {
                                                     {field.field_type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-secondary)/40 text-sm">%</span>}
                                                 </div>
                                             )}
+                                            {(() => {
+                                                const preview = describeFieldValue(field, godForm.field_values[field.slug])
+                                                return preview ? <div className="mt-1 text-xs text-(--color-accent)/60 italic">{preview}</div> : null
+                                            })()}
                                         </div>
                                     ))}
                                 </div>
@@ -997,23 +1020,7 @@ export default function CodexGods() {
                                                         {field.icon_url && <img src={field.icon_url} alt="" className="w-3 h-3 rounded inline mr-0.5 -mt-0.5" />}
                                                         <span className="text-(--color-text-secondary)/40">{field.name}:</span>{' '}
                                                         <span className="text-(--color-text-secondary)">
-                                                            {field.field_type === 'group' && field.options?.sub_fields
-                                                                ? field.options.sub_fields
-                                                                    .filter(sf => {
-                                                                        const v = (god.field_values[field.slug] || {})[sf.key]
-                                                                        return sf.type === 'boolean' ? v !== undefined : !!v
-                                                                    })
-                                                                    .map(sf => {
-                                                                        const v = (god.field_values[field.slug] || {})[sf.key]
-                                                                        return `${sf.label}: ${sf.type === 'boolean' ? (v ? 'Yes' : 'No') : sf.type === 'percentage' ? `${v}%` : v}`
-                                                                    })
-                                                                    .join(' / ')
-                                                                : field.field_type === 'boolean'
-                                                                    ? (god.field_values[field.slug] ? 'Yes' : 'No')
-                                                                    : field.field_type === 'percentage'
-                                                                        ? `${god.field_values[field.slug]}%`
-                                                                        : god.field_values[field.slug]
-                                                            }
+                                                            {describeFieldValue(field, god.field_values[field.slug])}
                                                         </span>
                                                     </span>
                                                 ))}
