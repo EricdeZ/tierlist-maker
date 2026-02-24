@@ -346,6 +346,7 @@ export default function CodexItems() {
                                                             <option value="text">Text</option>
                                                             <option value="number">Number</option>
                                                             <option value="boolean">Boolean</option>
+                                                            <option value="percentage">Percentage</option>
                                                         </select>
                                                         <button type="button" onClick={() => removeSubField(idx)}
                                                             className="p-1 rounded hover:bg-red-500/10 text-(--color-text-secondary) hover:text-red-400 transition-colors cursor-pointer">
