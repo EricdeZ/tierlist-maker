@@ -403,7 +403,7 @@ export default function MatchupDetail() {
                             className={`matchup-enter-left matchup-team-btn flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 rounded-2xl flex-1 max-w-[220px] ${
                                 canInteract ? 'cursor-pointer' : 'cursor-default'
                             } ${selectedTeam === t1.id ? 'matchup-team-selected' : ''}`}>
-                            <TeamLogo slug={t1.slug} name={t1.name} size={64} className="sm:!w-[96px] sm:!h-[96px]" />
+                            <TeamLogo slug={t1.slug} name={t1.name} size={64} className="sm:!w-[96px] sm:!h-[96px]" color={t1.color} />
                             <div className="text-center">
                                 <div className={`font-heading font-bold text-base sm:text-xl transition-colors ${selectedTeam === t1.id ? 'text-[#f8c56a]' : 'text-white'}`}>
                                     {t1.name}
@@ -429,7 +429,7 @@ export default function MatchupDetail() {
                             className={`matchup-enter-right matchup-team-btn flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 rounded-2xl flex-1 max-w-[220px] ${
                                 canInteract ? 'cursor-pointer' : 'cursor-default'
                             } ${selectedTeam === t2.id ? 'matchup-team-selected' : ''}`}>
-                            <TeamLogo slug={t2.slug} name={t2.name} size={64} className="sm:!w-[96px] sm:!h-[96px]" />
+                            <TeamLogo slug={t2.slug} name={t2.name} size={64} className="sm:!w-[96px] sm:!h-[96px]" color={t2.color} />
                             <div className="text-center">
                                 <div className={`font-heading font-bold text-base sm:text-xl transition-colors ${selectedTeam === t2.id ? 'text-[#f8c56a]' : 'text-white'}`}>
                                     {t2.name}
@@ -512,12 +512,12 @@ export default function MatchupDetail() {
                         {/* Team name headers */}
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <TeamLogo slug={t1.slug} name={t1.name} size={20} />
+                                <TeamLogo slug={t1.slug} name={t1.name} size={20} color={t1.color} />
                                 <span className="text-xs font-bold text-white/70">{t1.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-white/70">{t2.name}</span>
-                                <TeamLogo slug={t2.slug} name={t2.name} size={20} />
+                                <TeamLogo slug={t2.slug} name={t2.name} size={20} color={t2.color} />
                             </div>
                         </div>
 
@@ -544,13 +544,13 @@ export default function MatchupDetail() {
                         {/* Desktop header */}
                         <div className="hidden md:flex items-center justify-between mb-3 px-2">
                             <div className="flex items-center gap-2">
-                                <TeamLogo slug={t1.slug} name={t1.name} size={18} />
+                                <TeamLogo slug={t1.slug} name={t1.name} size={18} color={t1.color} />
                                 <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">{t1.name}</span>
                             </div>
                             <span className="text-[10px] font-bold text-white/25 uppercase tracking-wider">Role</span>
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">{t2.name}</span>
-                                <TeamLogo slug={t2.slug} name={t2.name} size={18} />
+                                <TeamLogo slug={t2.slug} name={t2.name} size={18} color={t2.color} />
                             </div>
                         </div>
 
@@ -763,7 +763,7 @@ function RecentFormColumn({ team, matches }) {
     return (
         <div>
             <div className="flex items-center gap-2 mb-3">
-                <TeamLogo slug={team.slug} name={team.name} size={20} />
+                <TeamLogo slug={team.slug} name={team.name} size={20} color={team.color} />
                 <span className="text-xs font-bold text-white/70">{team.name}</span>
                 {streak.count >= 2 && (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${

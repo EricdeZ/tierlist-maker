@@ -145,7 +145,7 @@ const tools = [
     },
     {
         title: 'League Manager',
-        description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status, manage teams, and configure the structure of your competition.',
+        description: 'Manage the league hierarchy — create and edit leagues, divisions, and seasons. Toggle season active status and configure the structure of your competition.',
         path: '/admin/leagues',
         permission: 'league_manage',
         globalOnly: true,
@@ -158,6 +158,21 @@ const tools = [
         border: 'border-rose-500/20 hover:border-rose-500/40',
         iconColor: 'text-rose-400',
         btnClass: 'bg-rose-600 hover:bg-rose-700',
+    },
+    {
+        title: 'Team Manager',
+        description: 'Create, edit, and delete teams across seasons. Upload team icons, manage team colors and slugs, and copy teams between seasons.',
+        path: '/admin/teams',
+        permission: 'team_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+            </svg>
+        ),
+        accent: 'from-emerald-500/20 to-emerald-600/5',
+        border: 'border-emerald-500/20 hover:border-emerald-500/40',
+        iconColor: 'text-emerald-400',
+        btnClass: 'bg-emerald-600 hover:bg-emerald-700',
     },
     {
         title: 'User Manager',

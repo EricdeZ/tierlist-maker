@@ -352,6 +352,73 @@ export const orgService = {
     },
 }
 
+export const codexService = {
+    async getAll() {
+        return apiCall('codex-manage')
+    },
+    // Fields
+    async createField(data) {
+        return apiPost('codex-manage', {}, { action: 'create-field', ...data })
+    },
+    async updateField(data) {
+        return apiPost('codex-manage', {}, { action: 'update-field', ...data })
+    },
+    async deleteField(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-field', id })
+    },
+    // Tags
+    async createTag(data) {
+        return apiPost('codex-manage', {}, { action: 'create-tag', ...data })
+    },
+    async updateTag(data) {
+        return apiPost('codex-manage', {}, { action: 'update-tag', ...data })
+    },
+    async deleteTag(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-tag', id })
+    },
+    // Items
+    async createItem(data) {
+        return apiPost('codex-manage', {}, { action: 'create-item', ...data })
+    },
+    async updateItem(data) {
+        return apiPost('codex-manage', {}, { action: 'update-item', ...data })
+    },
+    async deleteItem(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-item', id })
+    },
+    // Images
+    async getImages(category) {
+        return apiCall('codex-upload', category ? { category } : {})
+    },
+    async uploadImage(file, category) {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (category) formData.append('category', category)
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch(`${API_BASE}/codex-upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Upload failed')
+        return data
+    },
+    async deleteImage(id) {
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch(`${API_BASE}/codex-upload?id=${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Delete failed')
+        return data
+    },
+    async updateImageCategory(id, category) {
+        return apiPost('codex-manage', {}, { action: 'update-image-category', id, category })
+    },
+}
+
 export const forgeService = {
     async getMarket(seasonId) {
         return apiCall('forge', { action: 'market', seasonId })

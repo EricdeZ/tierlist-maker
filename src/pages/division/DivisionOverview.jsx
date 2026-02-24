@@ -444,7 +444,7 @@ const DivisionOverview = () => {
                                     />
                                     {/* Content */}
                                     <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
-                                        <TeamLogo slug={team.slug} name={team.name} size={28} />
+                                        <TeamLogo slug={team.slug} name={team.name} size={28} logoUrl={team.logo_url} color={team.color} />
                                         <div className="flex-1 min-w-0">
                                             <div className="font-heading text-sm font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
                                                 {team.name}

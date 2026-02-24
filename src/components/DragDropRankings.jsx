@@ -741,7 +741,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                                         className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded mb-1 flex items-center gap-1.5"
                                         style={{ backgroundColor: team.color, color: teamTextColor }}
                                     >
-                                        <TeamLogo slug={team.id} name={team.name} size={14} />
+                                        <TeamLogo slug={team.id} name={team.name} size={14} color={team.color} />
                                         {team.name}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
@@ -1099,7 +1099,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                                             style={{ backgroundColor: team.color, color: teamTextColor }}
                                             title={team.name}
                                         >
-                                            <TeamLogo slug={team.id} name={team.name} size={16} />
+                                            <TeamLogo slug={team.id} name={team.name} size={16} color={team.color} />
                                             {team.name}
                                         </h4>
                                         <div className="space-y-1">
@@ -1363,7 +1363,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                                         style={{ backgroundColor: team.color, color: teamTextColor }}
                                         title={team.name}
                                     >
-                                        <TeamLogo slug={team.id} name={team.name} size={16} />
+                                        <TeamLogo slug={team.id} name={team.name} size={16} color={team.color} />
                                         {team.name}
                                     </h4>
                                     <div className="space-y-1">

@@ -228,7 +228,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                             </div>
                             {captainTeams.length === 1 ? (
                                 <div className="xp-team-card flex items-center gap-3 p-2" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
-                                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={28} />
+                                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={28} color={captainTeams[0].teamColor} />
                                     <div>
                                         <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{captainTeams[0].teamName}</div>
                                         <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName}</div>
@@ -346,7 +346,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                 </div>
                                 {challengedTeam ? (
                                     <div className="xp-challenged-team flex items-center gap-2 p-1.5" style={{ background: '#e0c8ff', border: '1px solid #8055c0' }}>
-                                        <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={20} />
+                                        <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={20} color={challengedTeam.color} />
                                         <div className="flex-1">
                                             <div className="xp-text xp-challenged-team-name" style={{ fontWeight: 700, color: '#400080' }}>{challengedTeam.name}</div>
                                             <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#666' }}>{challengedTeam.leagueName} &middot; {challengedTeam.divisionName}</div>
@@ -361,7 +361,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                             <div className="xp-listbox absolute z-10 w-full" style={{ maxHeight: 160, overflowY: 'auto' }}>
                                                 {filteredChallengeTeams.slice(0, 20).map(team => (
                                                     <button key={team.id} type="button" onClick={() => { setChallengedTeamId(String(team.id)); setShowTeamPicker(false); setTeamSearch('') }} className="xp-listbox-item">
-                                                        <TeamLogo slug={team.slug} name={team.name} size={16} />
+                                                        <TeamLogo slug={team.slug} name={team.name} size={16} color={team.color} />
                                                         <div>
                                                             <div className="xp-text" style={{ fontWeight: 500 }}>{team.name}</div>
                                                             <div className="xp-text" style={{ fontSize: 10, color: '#666' }}>{team.leagueName} &middot; {team.divisionName}</div>
@@ -422,7 +422,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                 <div className="flex flex-col gap-1.5">
                                     <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Team:</span>
-                                        {selectedTeam && <TeamLogo slug={selectedTeam.teamSlug} name={selectedTeam.teamName} size={16} />}
+                                        {selectedTeam && <TeamLogo slug={selectedTeam.teamSlug} name={selectedTeam.teamName} size={16} color={selectedTeam.teamColor} />}
                                         <span className="xp-text">{selectedTeam?.teamName}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -451,7 +451,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Opponent:</span>
                                         {challengedTeam ? (
                                             <span className="flex items-center gap-1">
-                                                <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={14} />
+                                                <TeamLogo slug={challengedTeam.slug} name={challengedTeam.name} size={14} color={challengedTeam.color} />
                                                 <span className="xp-text" style={{ color: '#400080' }}>{challengedTeam.name}</span>
                                             </span>
                                         ) : (

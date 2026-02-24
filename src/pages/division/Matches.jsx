@@ -165,7 +165,7 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
             <div className="hidden md:flex items-center min-h-[60px]">
                 {/* Team 1 side */}
                 <div className={`flex-1 flex items-center gap-3 px-5 py-3 ${isCompleted && !team1Won ? 'opacity-40' : ''}`}>
-                    <TeamLogo slug={match.team1_slug} name={match.team1_name} size={28} />
+                    <TeamLogo slug={match.team1_slug} name={match.team1_name} size={28} color={match.team1_color} />
                     <div
                         className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
                         style={{
@@ -239,7 +239,7 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                             ringOffsetColor: 'transparent',
                         }}
                     />
-                    <TeamLogo slug={match.team2_slug} name={match.team2_name} size={28} />
+                    <TeamLogo slug={match.team2_slug} name={match.team2_name} size={28} color={match.team2_color} />
                 </div>
 
                 {/* View arrow for completed */}
@@ -297,7 +297,7 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                                     : ''
                         }`}
                     >
-                        <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} />
+                        <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} color={match.team1_color} />
                         <div
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: match.team1_color }}
@@ -327,7 +327,7 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                                     : ''
                         }`}
                     >
-                        <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} />
+                        <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} color={match.team2_color} />
                         <div
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: match.team2_color }}

@@ -1049,13 +1049,13 @@ function ResultsTab({
 
                                     <div className="flex items-center justify-evenly">
                                         <div className="flex flex-col items-center text-center md:flex-row md:text-left gap-1.5 md:gap-3 flex-1">
-                                            <TeamLogo slug={t1.slug} name={t1.name} size={28} className="md:!w-[36px] md:!h-[36px] flex-shrink-0" />
+                                            <TeamLogo slug={t1.slug} name={t1.name} size={28} color={t1.color} className="md:!w-[36px] md:!h-[36px] flex-shrink-0" />
                                             <span className={`text-xs md:text-sm font-bold ${match.winnerTeamId === t1.id ? 'text-green-400' : 'text-white'}`}>{t1.name}</span>
                                             {match.winnerTeamId === t1.id && <span className="text-[9px] font-bold text-green-400">WIN</span>}
                                         </div>
                                         <span className="pred-vs text-xs md:text-sm px-1 md:px-3">VS</span>
                                         <div className="flex flex-col items-center text-center md:flex-row-reverse md:text-right gap-1.5 md:gap-3 flex-1">
-                                            <TeamLogo slug={t2.slug} name={t2.name} size={28} className="md:!w-[36px] md:!h-[36px] flex-shrink-0" />
+                                            <TeamLogo slug={t2.slug} name={t2.name} size={28} color={t2.color} className="md:!w-[36px] md:!h-[36px] flex-shrink-0" />
                                             <span className={`text-xs md:text-sm font-bold ${match.winnerTeamId === t2.id ? 'text-green-400' : 'text-white'}`}>{t2.name}</span>
                                             {match.winnerTeamId === t2.id && <span className="text-[9px] font-bold text-green-400">WIN</span>}
                                         </div>
@@ -1234,7 +1234,7 @@ function FeaturedTeamSide({ team, selected, onPick, disabled, align }) {
             className={`group pred-team-btn flex flex-col items-center text-center md:flex-row md:items-center md:gap-4 gap-2 p-3 sm:p-4 rounded-xl flex-1 ${
                 !isTeam1 ? 'md:flex-row-reverse md:text-right' : 'md:text-left'
             } ${disabled ? 'cursor-default' : 'cursor-pointer'} ${selected ? 'pred-selected' : ''}`}>
-            <TeamLogo slug={team.slug} name={team.name} size={64} className="md:!w-[88px] md:!h-[88px] flex-shrink-0" />
+            <TeamLogo slug={team.slug} name={team.name} size={64} color={team.color} className="md:!w-[88px] md:!h-[88px] flex-shrink-0" />
 
             <div>
                 <div className={`font-heading font-bold text-sm md:text-xl transition-colors duration-200 ${
@@ -1348,7 +1348,7 @@ function MatchCard({ match, index, user, login, passion, onPredictionMade }) {
                         className={`pred-team-btn flex-1 flex flex-col items-center text-center md:flex-row md:items-center md:text-left gap-1.5 md:gap-3 py-2.5 px-2 md:px-3 rounded-xl ${
                             canInteract ? 'cursor-pointer' : 'cursor-default'
                         } ${selectedTeam === t1.id ? 'pred-selected' : ''}`}>
-                        <TeamLogo slug={t1.slug} name={t1.name} size={32} className="md:!w-[40px] md:!h-[40px] flex-shrink-0" />
+                        <TeamLogo slug={t1.slug} name={t1.name} size={32} color={t1.color} className="md:!w-[40px] md:!h-[40px] flex-shrink-0" />
                         <div className="min-w-0 md:flex-1">
                             <div className={`text-xs md:text-sm font-bold truncate ${
                                 selectedTeam === t1.id ? 'text-[#f8c56a]' : 'text-white'
@@ -1365,7 +1365,7 @@ function MatchCard({ match, index, user, login, passion, onPredictionMade }) {
                         className={`pred-team-btn flex-1 flex flex-col items-center text-center md:flex-row-reverse md:items-center md:text-right gap-1.5 md:gap-3 py-2.5 px-2 md:px-3 rounded-xl ${
                             canInteract ? 'cursor-pointer' : 'cursor-default'
                         } ${selectedTeam === t2.id ? 'pred-selected' : ''}`}>
-                        <TeamLogo slug={t2.slug} name={t2.name} size={32} className="md:!w-[40px] md:!h-[40px] flex-shrink-0" />
+                        <TeamLogo slug={t2.slug} name={t2.name} size={32} color={t2.color} className="md:!w-[40px] md:!h-[40px] flex-shrink-0" />
                         <div className="min-w-0 md:flex-1 md:text-right">
                             <div className={`text-xs md:text-sm font-bold truncate ${
                                 selectedTeam === t2.id ? 'text-[#f8c56a]' : 'text-white'
@@ -1424,7 +1424,7 @@ function TeamStatBlock({ team }) {
     return (
         <div>
             <div className="flex items-center justify-center gap-2 mb-2">
-                <TeamLogo slug={team.slug} name={team.name} size={20} />
+                <TeamLogo slug={team.slug} name={team.name} size={20} color={team.color} />
                 <span className="text-xs font-bold text-white">{team.name}</span>
             </div>
             <div className="grid grid-cols-3 gap-1">

@@ -80,7 +80,7 @@ const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 async function getCaptainTeams(sql, userId) {
     return sql`
-        SELECT lp.team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo,
+        SELECT lp.team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
                t.season_id, s.name as season_name,
                d.name as division_name, d.tier as division_tier, d.slug as division_slug,
                l.id as league_id, l.name as league_name, l.slug as league_slug
@@ -100,7 +100,7 @@ async function getCaptainTeams(sql, userId) {
 // ═══════════════════════════════════════════════════
 async function getMyTeams(sql, userId) {
     return sql`
-        SELECT lp.team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo,
+        SELECT lp.team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
                t.season_id, s.name as season_name,
                d.name as division_name, d.tier as division_tier, d.slug as division_slug,
                l.id as league_id, l.name as league_name, l.slug as league_slug
@@ -135,7 +135,7 @@ async function hasScrimManagePermission(sql, userId) {
 // ═══════════════════════════════════════════════════
 async function getAllActiveTeamsForScrimManage(sql) {
     return sql`
-        SELECT t.id as team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo,
+        SELECT t.id as team_id, t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
                t.season_id, s.name as season_name,
                d.name as division_name, d.tier as division_tier, d.slug as division_slug,
                l.id as league_id, l.name as league_name, l.slug as league_slug
@@ -370,6 +370,7 @@ async function getMyScrims(sql, event) {
                 teamName: t.team_name,
                 teamSlug: t.team_slug,
                 teamLogo: t.team_logo,
+                teamColor: t.team_color,
                 divisionName: t.division_name,
                 divisionTier: t.division_tier,
                 leagueName: t.league_name,
@@ -466,6 +467,7 @@ async function getCaptainTeamsAction(sql, event) {
                 teamName: t.team_name,
                 teamSlug: t.team_slug,
                 teamLogo: t.team_logo,
+                teamColor: t.team_color,
                 divisionName: t.division_name,
                 divisionTier: t.division_tier,
                 divisionSlug: t.division_slug,

@@ -571,7 +571,7 @@ const LeagueOverview = () => {
                                     className="group"
                                     title={team.name}
                                 >
-                                    <TeamLogo slug={team.slug} name={team.name} size={48} className="transition-transform duration-300 group-hover:scale-110" />
+                                    <TeamLogo slug={team.slug} name={team.name} size={48} className="transition-transform duration-300 group-hover:scale-110" color={team.color} />
                                 </div>
                             ))}
                         </div>
@@ -727,7 +727,7 @@ const LeagueOverview = () => {
                                                                     key={team.slug}
                                                                     className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-300"
                                                                 >
-                                                                    <TeamLogo slug={team.slug} name={team.name} size={22} />
+                                                                    <TeamLogo slug={team.slug} name={team.name} size={22} color={team.color} />
                                                                 </div>
                                                             ))}
                                                             {divTeams.length > 8 && (

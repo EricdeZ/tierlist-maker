@@ -1,10 +1,9 @@
 // src/pages/admin/LeagueManager.jsx
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, Copy, MessageCircle, Flag, ImagePlus } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, MessageCircle, Flag } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
-import TeamLogo from '../../components/TeamLogo'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
@@ -27,9 +26,6 @@ export default function LeagueManager() {
 
     // Confirm modal
     const [confirmModal, setConfirmModal] = useState(null)
-
-    // Copy teams modal: { targetSeasonId, sourceSeasonId?, selectedTeamIds: Set }
-    const [copyModal, setCopyModal] = useState(null)
 
     // Toast
     const [toast, setToast] = useState(null)
@@ -132,19 +128,6 @@ export default function LeagueManager() {
                 } catch (e) { showToast('error', e.message) }
             },
         })
-    }
-
-    // ─── Copy teams from another season ───
-    const handleCopyTeams = async () => {
-        if (!copyModal?.sourceSeasonId || !copyModal?.selectedTeamIds?.size) return
-        const teamIds = [...copyModal.selectedTeamIds]
-        const targetId = copyModal.targetSeasonId
-        setCopyModal(null)
-        try {
-            const result = await doAction({ action: 'copy-teams', source_season_id: copyModal.sourceSeasonId, target_season_id: targetId, team_ids: teamIds })
-            showToast('success', `Copied ${result.count} team${result.count !== 1 ? 's' : ''}`)
-            fetchData()
-        } catch (e) { showToast('error', e.message) }
     }
 
     // ─── Toggle expand ───
@@ -252,99 +235,6 @@ export default function LeagueManager() {
                             <button onClick={() => setConfirmModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
                             <button onClick={confirmModal.onConfirm} className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white ${confirmModal.danger ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}>Confirm</button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Copy Teams Modal */}
-            {copyModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
-                        <h3 className="text-sm font-bold text-[var(--color-text)] mb-3 flex items-center gap-2">
-                            <Copy className="w-4 h-4 text-[var(--color-accent)]" />
-                            Copy Teams
-                        </h3>
-
-                        {!copyModal.sourceSeasonId ? (
-                            <>
-                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">Select a season to copy teams from:</p>
-                                <div className="max-h-60 overflow-y-auto space-y-0.5 mb-3">
-                                    {allSeasons
-                                        .filter(s => s.id !== copyModal.targetSeasonId && s.teamCount > 0)
-                                        .map(s => (
-                                            <button
-                                                key={s.id}
-                                                onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: s.id, selectedTeamIds: new Set(teamsBySeason[s.id]?.map(t => t.id) || []) }))}
-                                                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs hover:bg-white/5 transition-colors"
-                                            >
-                                                <span className="text-[var(--color-text)] truncate">{s.label}</span>
-                                                <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{s.teamCount} team{s.teamCount !== 1 ? 's' : ''}</span>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: null, selectedTeamIds: new Set() }))}
-                                    className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] mb-2 flex items-center gap-1"
-                                >
-                                    ← Change season
-                                </button>
-                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                                    Select teams to copy ({copyModal.selectedTeamIds.size} selected):
-                                </p>
-                                <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
-                                    {(teamsBySeason[copyModal.sourceSeasonId] || []).map(team => (
-                                        <label key={team.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs">
-                                            <input
-                                                type="checkbox"
-                                                checked={copyModal.selectedTeamIds.has(team.id)}
-                                                onChange={() => setCopyModal(prev => {
-                                                    const next = new Set(prev.selectedTeamIds)
-                                                    if (next.has(team.id)) next.delete(team.id); else next.add(team.id)
-                                                    return { ...prev, selectedTeamIds: next }
-                                                })}
-                                                className="accent-[var(--color-accent)]"
-                                            />
-                                            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
-                                            <span className="text-[var(--color-text)]">{team.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <button
-                                        onClick={() => {
-                                            const all = teamsBySeason[copyModal.sourceSeasonId]?.map(t => t.id) || []
-                                            setCopyModal(prev => ({
-                                                ...prev,
-                                                selectedTeamIds: prev.selectedTeamIds.size === all.length ? new Set() : new Set(all)
-                                            }))
-                                        }}
-                                        className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                                    >
-                                        {copyModal.selectedTeamIds.size === (teamsBySeason[copyModal.sourceSeasonId]?.length || 0) ? 'Deselect all' : 'Select all'}
-                                    </button>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
-                                        <button
-                                            onClick={handleCopyTeams}
-                                            disabled={copyModal.selectedTeamIds.size === 0}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                            Copy {copyModal.selectedTeamIds.size} team{copyModal.selectedTeamIds.size !== 1 ? 's' : ''}
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {!copyModal.sourceSeasonId && (
-                            <div className="flex justify-end">
-                                <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
@@ -533,80 +423,6 @@ export default function LeagueManager() {
                                                                         )}
                                                                     </div>
 
-                                                                    {/* Teams */}
-                                                                    {seasonExpanded && (
-                                                                        <div className="pl-28 pr-4 pb-2 space-y-1">
-                                                                            {teams.length === 0 && (
-                                                                                <p className="text-xs text-[var(--color-text-secondary)] opacity-50 py-1">No teams yet</p>
-                                                                            )}
-                                                                            {teams.map(team => {
-                                                                                const pc = playerCountMap[team.id] || 0
-                                                                                return editItem?.type === 'team' && editItem.id === team.id ? (
-                                                                                    <div key={team.id} className="flex items-center gap-2 py-1">
-                                                                                        <TeamIconUpload
-                                                                                            teamId={team.id}
-                                                                                            currentUrl={team.logo_url}
-                                                                                            teamSlug={team.slug}
-                                                                                            onComplete={(type, msg) => { showToast(type, msg); fetchData() }}
-                                                                                        />
-                                                                                        <InlineEdit
-                                                                                            fields={[
-                                                                                                { key: 'name', label: 'Name', value: editItem.name },
-                                                                                                { key: 'color', label: 'Color', value: editItem.color, type: 'color', small: true },
-                                                                                                { key: 'slug', label: 'Slug', value: editItem.slug },
-                                                                                            ]}
-                                                                                            onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
-                                                                                            onSave={handleSaveEdit}
-                                                                                            onCancel={() => setEditItem(null)}
-                                                                                            saving={saving}
-                                                                                        />
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div key={team.id} className="flex items-center gap-2 py-1 group">
-                                                                                        <TeamLogo slug={team.slug} name={team.name} size={16} logoUrl={team.logo_url} />
-                                                                                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
-                                                                                        <span className="text-xs text-[var(--color-text)]">{team.name}</span>
-                                                                                        <span className="text-[10px] text-[var(--color-text-secondary)]">/{team.slug}</span>
-                                                                                        <span className="text-[10px] text-[var(--color-text-secondary)]">{pc} player{pc !== 1 ? 's' : ''}</span>
-                                                                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-                                                                                            <IconBtn icon={Pencil} title="Edit" size="xs" onClick={() => setEditItem({ type: 'team', id: team.id, name: team.name, color: team.color, slug: team.slug })} />
-                                                                                            <IconBtn icon={Trash2} title="Delete" size="xs" onClick={() => handleDelete('team', team.id, team.name)} danger />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )
-                                                                            })}
-
-                                                                            {/* Add team */}
-                                                                            {createItem?.type === 'team' && createItem.season_id === season.id ? (
-                                                                                <div className="flex items-center gap-2 py-1">
-                                                                                    <InlineEdit
-                                                                                        fields={[
-                                                                                            { key: 'name', label: 'Team name', value: createItem.name || '' },
-                                                                                            { key: 'color', label: 'Color', value: createItem.color || '#3b82f6', type: 'color', small: true },
-                                                                                        ]}
-                                                                                        onChange={(k, v) => setCreateItem(prev => ({ ...prev, [k]: v }))}
-                                                                                        onSave={handleSaveCreate}
-                                                                                        onCancel={() => setCreateItem(null)}
-                                                                                        saving={saving}
-                                                                                    />
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="flex items-center gap-3 py-1">
-                                                                                    <button
-                                                                                        onClick={() => setCreateItem({ type: 'team', season_id: season.id, name: '', color: '#3b82f6' })}
-                                                                                        className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-                                                                                    >
-                                                                                        <Plus className="w-3 h-3" /> Add team
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => setCopyModal({ targetSeasonId: season.id, sourceSeasonId: null, selectedTeamIds: new Set() })}
-                                                                                        className="flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-                                                                                    >
-                                                                                        <Copy className="w-3 h-3" /> Copy from season...
-                                                                                    </button>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             )
@@ -704,95 +520,6 @@ export default function LeagueManager() {
                     </button>
                 )}
             </div>
-        </div>
-    )
-}
-
-// ═══════════════════════════════════════════════════
-// TEAM ICON UPLOAD
-// ═══════════════════════════════════════════════════
-function TeamIconUpload({ teamId, currentUrl, teamSlug, onComplete }) {
-    const [uploading, setUploading] = useState(false)
-    const fileRef = useRef(null)
-
-    const handleUpload = async (e) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        if (file.size > 512 * 1024) {
-            onComplete?.('error', 'Image must be under 512KB')
-            return
-        }
-        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-            onComplete?.('error', 'Only JPEG, PNG, WebP, and GIF allowed')
-            return
-        }
-
-        setUploading(true)
-        try {
-            const formData = new FormData()
-            formData.append('teamId', teamId)
-            formData.append('file', file)
-
-            const token = localStorage.getItem('auth_token')
-            const res = await fetch(`${API}/team-upload`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Upload failed')
-            onComplete?.('success', 'Icon uploaded')
-        } catch (err) {
-            onComplete?.('error', err.message)
-        } finally {
-            setUploading(false)
-            if (fileRef.current) fileRef.current.value = ''
-        }
-    }
-
-    const handleRemove = async () => {
-        setUploading(true)
-        try {
-            const token = localStorage.getItem('auth_token')
-            const res = await fetch(`${API}/team-upload?teamId=${teamId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Remove failed')
-            onComplete?.('success', 'Icon removed')
-        } catch (err) {
-            onComplete?.('error', err.message)
-        } finally {
-            setUploading(false)
-        }
-    }
-
-    return (
-        <div className="flex items-center gap-1.5">
-            {currentUrl ? (
-                <img src={currentUrl} className="w-6 h-6 rounded object-cover border border-white/10" alt="" />
-            ) : (
-                <TeamLogo slug={teamSlug} size={24} />
-            )}
-            <input type="file" ref={fileRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleUpload} />
-            <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-            >
-                {uploading ? '...' : currentUrl ? 'Change' : 'Upload'}
-            </button>
-            {currentUrl && (
-                <button
-                    onClick={handleRemove}
-                    disabled={uploading}
-                    className="text-[10px] text-red-400/70 hover:text-red-300 transition-colors"
-                >
-                    Remove
-                </button>
-            )}
         </div>
     )
 }

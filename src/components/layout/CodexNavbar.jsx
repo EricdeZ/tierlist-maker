@@ -46,6 +46,26 @@ export default function CodexNavbar() {
                         >
                             Dashboard
                         </Link>
+                        <Link
+                            to="/codex/items"
+                            className={`text-xs font-bold uppercase px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+                                location.pathname.startsWith('/codex/items')
+                                    ? 'text-(--color-accent) bg-(--color-accent)/10'
+                                    : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5'
+                            }`}
+                        >
+                            Items
+                        </Link>
+                        <Link
+                            to="/codex/images"
+                            className={`text-xs font-bold uppercase px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+                                location.pathname.startsWith('/codex/images')
+                                    ? 'text-(--color-accent) bg-(--color-accent)/10'
+                                    : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5'
+                            }`}
+                        >
+                            Images
+                        </Link>
 
                         <div className="border-l border-white/10 mx-1 h-5" />
                         <div className="flex items-center gap-1">

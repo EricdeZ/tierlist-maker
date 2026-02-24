@@ -28,7 +28,7 @@ export default function XpBlacklistWindow({ captainTeams, allTeams, blacklist, o
             )}
             {captainTeams.length === 1 && (
                 <div className="flex items-center gap-2 mb-2">
-                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={18} />
+                    <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={18} color={captainTeams[0].teamColor} />
                     <span className="xp-text" style={{ fontWeight: 700, fontSize: 12 }}>{captainTeams[0].teamName}</span>
                     <span className="xp-text" style={{ fontSize: 9, color: '#666' }}>{captainTeams[0].divisionName}{captainTeams[0].divisionTier ? ` (${RANK_LABELS[captainTeams[0].divisionTier] || 'Tier ' + captainTeams[0].divisionTier})` : ''}</span>
                 </div>
@@ -43,7 +43,7 @@ export default function XpBlacklistWindow({ captainTeams, allTeams, blacklist, o
                     {teamBlacklist.map(entry => (
                         <div key={entry.id} className="xp-blacklist-item flex items-center gap-2 p-1.5"
                              style={{ borderBottom: '1px solid #e0e0e0' }}>
-                            <TeamLogo slug={entry.blockedTeamSlug} name={entry.blockedTeamName} size={18} />
+                            <TeamLogo slug={entry.blockedTeamSlug} name={entry.blockedTeamName} size={18} color={entry.blockedTeamColor} />
                             <div className="flex-1 min-w-0">
                                 <div className="xp-text" style={{ fontWeight: 600, fontSize: 11 }}>{entry.blockedTeamName}</div>
                                 <div className="xp-text xp-text-muted" style={{ fontSize: 9, color: '#666' }}>
@@ -75,7 +75,7 @@ export default function XpBlacklistWindow({ captainTeams, allTeams, blacklist, o
                                     setSearchQuery('')
                                     setShowSearch(false)
                                 }} className="xp-listbox-item">
-                                    <TeamLogo slug={team.slug} name={team.name} size={14} />
+                                    <TeamLogo slug={team.slug} name={team.name} size={14} color={team.color} />
                                     <span className="xp-text" style={{ fontSize: 11 }}>{team.name}</span>
                                     <span className="xp-text" style={{ fontSize: 9, color: '#888', marginLeft: 'auto' }}>{team.divisionName}{team.divisionTier ? ` (${RANK_LABELS[team.divisionTier] || 'T' + team.divisionTier})` : ''}</span>
                                 </button>

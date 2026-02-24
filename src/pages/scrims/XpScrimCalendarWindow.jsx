@@ -128,7 +128,7 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
                             {selectedScrims.map(s => (
                                 <div key={s.id} className="xp-cal-scrim-item">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <TeamLogo slug={s.teamSlug} name={s.teamName} size={18} />
+                                        <TeamLogo slug={s.teamSlug} name={s.teamName} size={18} color={s.teamColor} />
                                         <span className="xp-text" style={{ fontWeight: 700 }}>{s.teamName}</span>
                                         {s.status === 'accepted' ? (
                                             <span className="xp-badge xp-badge-green" style={{ fontSize: 9 }}>Confirmed</span>
@@ -144,7 +144,7 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
                                     {s.status === 'accepted' && s.acceptedTeamName && (
                                         <div className="flex items-center gap-1 mt-0.5">
                                             <span className="xp-text" style={{ fontSize: 10, color: '#2d8212' }}>vs</span>
-                                            <TeamLogo slug={s.acceptedTeamSlug} name={s.acceptedTeamName} size={14} />
+                                            <TeamLogo slug={s.acceptedTeamSlug} name={s.acceptedTeamName} size={14} color={s.acceptedTeamColor} />
                                             <span className="xp-text" style={{ fontSize: 11, fontWeight: 600, color: '#2d8212' }}>{s.acceptedTeamName}</span>
                                         </div>
                                     )}

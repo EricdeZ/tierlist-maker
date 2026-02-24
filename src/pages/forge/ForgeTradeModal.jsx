@@ -45,7 +45,7 @@ export default function ForgeTradeModal({
                             ? <Flame className="text-[var(--forge-flame)]" size={20} />
                             : <Snowflake className="text-[var(--forge-cool)]" size={20} />
                         }
-                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={20} />
+                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={20} color={player.teamColor} />
                         {isFuel ? 'Fuel' : 'Cool'} {player.playerName}
                     </h3>
                     <button onClick={onClose} className="p-1 hover:bg-white/5 rounded transition-colors">

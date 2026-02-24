@@ -1,12 +1,11 @@
-// Team icon upload endpoint — uses custom onRequest (not adapt) for multipart form handling
+// Codex image upload endpoint — uses custom onRequest (not adapt) for multipart form handling
 import { getDB, adminHeaders } from '../lib/db.js'
-import { requireAnyPermission } from '../lib/auth.js'
+import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_SIZE = 512 * 1024 // 512KB
 const EXT_MAP = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
-const ALL_EXTS = Object.values(EXT_MAP)
 
 function validateMagicBytes(bytes, mimeType) {
     if (bytes.length < 4) return false
@@ -49,23 +48,40 @@ export async function onRequest(context) {
         return new Response(null, { status: 204, headers: adminHeaders })
     }
 
-    // Auth — require team_manage or league_manage permission
-    const result = await requireAnyPermission(event, ['team_manage', 'league_manage'])
-    if (!result) return json({ error: 'Unauthorized' }, 401)
-    const admin = result.user
+    // Auth — require codex_edit permission
+    const admin = await requirePermission(event, 'codex_edit')
+    if (!admin) return json({ error: 'Unauthorized' }, 401)
 
     const sql = getDB()
-    const bucket = env.TEAM_ICONS
+    const bucket = env.TEAM_ICONS // Reuse same R2 bucket with codex/ prefix
 
+    if (request.method === 'GET') {
+        return handleList(sql, url)
+    }
     if (request.method === 'POST') {
         return handleUpload(request, sql, bucket, admin)
     }
     if (request.method === 'DELETE') {
-        const teamId = url.searchParams.get('teamId')
-        return handleDelete(sql, bucket, admin, teamId)
+        const id = url.searchParams.get('id')
+        return handleDelete(sql, bucket, admin, id)
     }
 
     return json({ error: 'Method not allowed' }, 405)
+}
+
+async function handleList(sql, url) {
+    const category = url.searchParams.get('category')
+
+    let images
+    if (category) {
+        images = await sql`SELECT * FROM codex_images WHERE category = ${category} ORDER BY created_at DESC`
+    } else {
+        images = await sql`SELECT * FROM codex_images ORDER BY created_at DESC`
+    }
+
+    const categories = await sql`SELECT DISTINCT category FROM codex_images WHERE category IS NOT NULL ORDER BY category`
+
+    return json({ images, categories: categories.map(c => c.category) })
 }
 
 async function handleUpload(request, sql, bucket, admin) {
@@ -76,15 +92,10 @@ async function handleUpload(request, sql, bucket, admin) {
         return json({ error: 'Invalid multipart form data' }, 400)
     }
 
-    const teamId = formData.get('teamId')
     const file = formData.get('file')
+    const category = formData.get('category') || null
 
-    if (!teamId) return json({ error: 'teamId required' }, 400)
     if (!file || typeof file === 'string') return json({ error: 'file required' }, 400)
-
-    // Validate team exists
-    const [team] = await sql`SELECT id FROM teams WHERE id = ${parseInt(teamId)}`
-    if (!team) return json({ error: 'Team not found' }, 404)
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -103,58 +114,54 @@ async function handleUpload(request, sql, bucket, admin) {
     }
 
     const ext = EXT_MAP[file.type]
-    const key = `team-icons/${team.id}.${ext}`
+    const filename = file.name || `image.${ext}`
 
-    // Remove old icons with different extensions
-    for (const e of ALL_EXTS) {
-        if (e !== ext) {
-            await bucket.delete(`team-icons/${team.id}.${e}`)
-        }
-    }
+    // Insert DB row first to get the ID for the R2 key
+    const [row] = await sql`
+        INSERT INTO codex_images (filename, url, category, uploaded_by)
+        VALUES (${filename}, '', ${category}, ${admin.id})
+        RETURNING id
+    `
+
+    const key = `codex/${row.id}.${ext}`
 
     // Upload to R2
     await bucket.put(key, bytes, {
         httpMetadata: { contentType: file.type },
     })
 
-    // Build URL with cache buster
+    // Build URL with cache buster and update the row
     const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}?v=${Date.now()}`
-
-    // Update DB
-    await sql`UPDATE teams SET logo_url = ${publicUrl}, updated_at = NOW() WHERE id = ${team.id}`
+    await sql`UPDATE codex_images SET url = ${publicUrl} WHERE id = ${row.id}`
 
     logAudit(sql, admin, {
-        action: 'upload-team-icon', endpoint: 'team-upload',
-        targetType: 'team', targetId: team.id, details: { url: publicUrl },
+        action: 'upload-codex-image', endpoint: 'codex-upload',
+        targetType: 'codex_image', targetId: row.id, details: { filename, category },
     })
 
-    return json({ success: true, logoUrl: publicUrl })
+    return json({ success: true, image: { id: row.id, filename, url: publicUrl, category } })
 }
 
-async function handleDelete(sql, bucket, admin, teamId) {
-    if (!teamId) return json({ error: 'teamId required' }, 400)
+async function handleDelete(sql, bucket, admin, id) {
+    if (!id) return json({ error: 'id required' }, 400)
 
-    const [team] = await sql`SELECT id, logo_url FROM teams WHERE id = ${parseInt(teamId)}`
-    if (!team) return json({ error: 'Team not found' }, 404)
-    if (!team.logo_url) return json({ error: 'Team has no icon' }, 400)
+    const [image] = await sql`SELECT id, url, filename FROM codex_images WHERE id = ${parseInt(id)}`
+    if (!image) return json({ error: 'Image not found' }, 404)
 
-    // Extract R2 key from URL (team-icons/42.webp?v=...)
+    // Delete from R2
     try {
-        const urlPath = new URL(team.logo_url).pathname
+        const urlPath = new URL(image.url).pathname
         const key = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
         await bucket.delete(key)
     } catch {
-        // Best-effort cleanup — delete all possible extensions
-        for (const e of ALL_EXTS) {
-            await bucket.delete(`team-icons/${team.id}.${e}`)
-        }
+        // Best-effort — URL might be malformed
     }
 
-    await sql`UPDATE teams SET logo_url = NULL, updated_at = NOW() WHERE id = ${team.id}`
+    await sql`DELETE FROM codex_images WHERE id = ${image.id}`
 
     logAudit(sql, admin, {
-        action: 'delete-team-icon', endpoint: 'team-upload',
-        targetType: 'team', targetId: team.id,
+        action: 'delete-codex-image', endpoint: 'codex-upload',
+        targetType: 'codex_image', targetId: image.id, details: { filename: image.filename },
     })
 
     return json({ success: true })

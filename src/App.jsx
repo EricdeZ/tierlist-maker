@@ -62,10 +62,13 @@ import ScrimPlanner from "./pages/ScrimPlanner.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
+import TeamManager from "./pages/admin/TeamManager.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
 import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
+import CodexItems from "./pages/codex/CodexItems.jsx";
+import CodexImages from "./pages/codex/CodexImages.jsx";
 
 function App() {
     return (
@@ -101,11 +104,14 @@ function App() {
                                 <Route path="data-reports" element={<ProtectedRoute requiredPermission="league_manage"><DataReportManager /></ProtectedRoute>} />
                                 <Route path="orgs" element={<ProtectedRoute requiredPermission="league_manage"><OrgManager /></ProtectedRoute>} />
                                 <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />
+                                <Route path="teams" element={<ProtectedRoute requiredPermission="team_manage"><TeamManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Codex pages (nested under CodexLayout with shared navbar) */}
                             <Route path="codex" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><CodexLayout /></ProtectedRoute>}>
                                 <Route index element={<CodexDashboard />} />
+                                <Route path="items" element={<CodexItems />} />
+                                <Route path="images" element={<CodexImages />} />
                             </Route>
 
                             {/* Passion pages */}

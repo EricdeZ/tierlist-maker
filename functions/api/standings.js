@@ -16,6 +16,7 @@ const handler = async (event) => {
                     t.name,
                     t.color,
                     t.slug,
+                    t.logo_url,
                     COUNT(DISTINCT m.id) FILTER (WHERE m.is_completed) as matches_played,
                     COUNT(DISTINCT m.id) FILTER (WHERE m.winner_team_id = t.id) as match_wins,
                     COUNT(DISTINCT m.id) FILTER (WHERE m.is_completed AND m.winner_team_id IS NOT NULL AND m.winner_team_id != t.id) as match_losses,
@@ -31,7 +32,7 @@ const handler = async (event) => {
                     AND g.is_completed = true
                     AND (m.team1_id = t.id OR m.team2_id = t.id)
                 WHERE t.season_id = ${seasonId}
-                GROUP BY t.id, t.name, t.color, t.slug
+                GROUP BY t.id, t.name, t.color, t.slug, t.logo_url
                 ORDER BY match_wins DESC, game_wins DESC, match_losses ASC
             `
 

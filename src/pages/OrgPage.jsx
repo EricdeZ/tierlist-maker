@@ -97,7 +97,7 @@ const OrgPage = () => {
                     <div className="flex items-center gap-5">
                         {/* Org logo — single team logo */}
                         <div className="shrink-0">
-                            <TeamLogo slug={org.slug} name={org.name} size={80} className="sm:!w-24 sm:!h-24" />
+                            <TeamLogo slug={org.slug} name={org.name} size={80} className="sm:!w-24 sm:!h-24" color={org.color} />
                         </div>
 
                         <div>
@@ -172,7 +172,7 @@ const OrgPage = () => {
                                     className="group flex items-center gap-4 rounded-xl border border-white/10 bg-(--color-secondary) p-4 hover:border-white/20 transition-all duration-200"
                                 >
                                     {/* Team logo */}
-                                    <TeamLogo slug={team.slug} name={team.name} size={40} />
+                                    <TeamLogo slug={team.slug} name={team.name} size={40} color={team.color} />
 
                                     {/* Color bar */}
                                     <div

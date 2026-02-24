@@ -268,7 +268,7 @@ const PlayerProfile = () => {
                 <div className="flex items-center gap-3">
                     {team && (
                         <Link to={`${basePath}/teams/${team.slug}`} className="flex items-center gap-2 flex-shrink-0">
-                            <TeamLogo slug={team.slug} name={team.name} size={36} />
+                            <TeamLogo slug={team.slug} name={team.name} size={36} color={team.color} />
                             <div className="w-2.5 h-10 rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: team.color }} />
                         </Link>
                     )}
@@ -544,7 +544,7 @@ const PlayerProfile = () => {
                                                             to={`${basePath}/teams/${opponent.slug}`}
                                                             className="flex items-center gap-2 group"
                                                         >
-                                                            <TeamLogo slug={opponent.slug} name={opponent.name} size={18} />
+                                                            <TeamLogo slug={opponent.slug} name={opponent.name} size={18} color={opponent.color} />
                                                             <div
                                                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                                                 style={{ backgroundColor: opponent.color }}

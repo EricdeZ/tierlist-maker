@@ -123,7 +123,7 @@ const Teams = () => {
                                         className="flex-shrink-0 rounded-lg p-1.5"
                                         style={{ backgroundColor: `${team.color}18` }}
                                     >
-                                        <TeamLogo slug={team.slug} name={team.name} size={36} />
+                                        <TeamLogo slug={team.slug} name={team.name} size={36} logoUrl={team.logo_url} color={team.color} />
                                     </div>
                                     <div className="min-w-0">
                                         <h3 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">

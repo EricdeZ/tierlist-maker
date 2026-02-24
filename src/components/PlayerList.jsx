@@ -485,7 +485,7 @@ const PlayerList = () => {
                                                     backgroundColor: `${player.team.color}15`,
                                                 }}
                                             >
-                                                <TeamLogo slug={tSlug} name={player.team.name} size={14} />
+                                                <TeamLogo slug={tSlug} name={player.team.name} size={14} color={player.team.color} />
                                                 <span
                                                     className="w-2 h-2 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: player.team.color }}

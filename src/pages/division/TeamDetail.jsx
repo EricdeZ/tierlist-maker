@@ -136,7 +136,7 @@ const TeamDetail = () => {
             {/* Team Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <div className="flex items-center gap-4">
-                    <TeamLogo slug={team.slug} name={team.name} size={56} />
+                    <TeamLogo slug={team.slug} name={team.name} size={56} logoUrl={team.logo_url} color={team.color} />
                     <div className="w-4 h-14 rounded" style={{ backgroundColor: team.color }} />
                     <div className="flex-1">
                         <h1 className="font-heading text-3xl font-bold text-(--color-text)">
@@ -366,7 +366,7 @@ const TeamDetail = () => {
                                             <span className="text-sm text-(--color-text-secondary)">vs</span>
                                             {!match.is_completed ? (
                                                 <Link to={`${basePath}/teams/${opponent.teamSlug}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
+                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} color={opponent.color} />
                                                     <div
                                                         className="w-3 h-3 rounded-full flex-shrink-0"
                                                         style={{ backgroundColor: opponent.color }}
@@ -377,7 +377,7 @@ const TeamDetail = () => {
                                                 </Link>
                                             ) : (
                                                 <div className="flex items-center gap-2">
-                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} />
+                                                    <TeamLogo slug={opponent.teamSlug} name={opponent.name} size={20} color={opponent.color} />
                                                     <div
                                                         className="w-3 h-3 rounded-full flex-shrink-0"
                                                         style={{ backgroundColor: opponent.color }}

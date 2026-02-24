@@ -34,7 +34,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
             <div className="xp-scrim-layout">
                 {/* Header: Team logo + name + challenge badge */}
                 <div className="xp-scrim-header">
-                    <TeamLogo slug={scrim.teamSlug} name={scrim.teamName} size={47} />
+                    <TeamLogo slug={scrim.teamSlug} name={scrim.teamName} size={47} color={scrim.teamColor} />
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {teamUrl ? (
@@ -110,7 +110,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <Target size={11} style={{ color: '#6a3ea1', flexShrink: 0 }} />
                             <span className="xp-text" style={{ fontSize: 11, color: '#6a3ea1' }}>Challenging:</span>
-                            <TeamLogo slug={scrim.challengedTeamSlug} name={scrim.challengedTeamName} size={14} />
+                            <TeamLogo slug={scrim.challengedTeamSlug} name={scrim.challengedTeamName} size={14} color={scrim.challengedTeamColor} />
                             {scrim.challengedLeagueName && scrim.challengedTeamSlug ? (
                                 <a href={`/${scrim.challengedLeagueName}`} target="_blank" rel="noopener noreferrer" className="xp-team-link" style={{ fontSize: 11, color: '#6a3ea1' }}>{scrim.challengedTeamName}</a>
                             ) : (
@@ -124,7 +124,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <Check size={11} style={{ color: '#2d8212', flexShrink: 0 }} />
                             <span className="xp-text" style={{ fontSize: 11, color: '#2d8212' }}>Accepted by:</span>
-                            <TeamLogo slug={scrim.acceptedTeamSlug} name={scrim.acceptedTeamName} size={16} />
+                            <TeamLogo slug={scrim.acceptedTeamSlug} name={scrim.acceptedTeamName} size={16} color={scrim.acceptedTeamColor} />
                             {scrim.acceptedLeagueName && scrim.acceptedDivisionSlug ? (
                                 <a href={`/${scrim.acceptedLeagueName}/${scrim.acceptedDivisionSlug}/teams/${scrim.acceptedTeamSlug}`} target="_blank" rel="noopener noreferrer" className="xp-team-link" style={{ fontSize: 11, color: '#2d8212' }}>{scrim.acceptedTeamName}</a>
                             ) : (
@@ -158,7 +158,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                                         <div className="xp-text" style={{ fontSize: 10, padding: '2px 6px', color: '#555' }}>Accept as:</div>
                                         {acceptableTeams.map(t => (
                                             <button key={t.teamId} onClick={() => { onAccept(scrim.id, t.teamId); setAcceptModal(null) }} className="xp-listbox-item">
-                                                <TeamLogo slug={t.teamSlug} name={t.teamName} size={14} />
+                                                <TeamLogo slug={t.teamSlug} name={t.teamName} size={14} color={t.teamColor} />
                                                 <span>{t.teamName}{t.divisionName ? ` — ${t.divisionName}` : ''}</span>
                                             </button>
                                         ))}

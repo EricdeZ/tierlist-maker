@@ -129,7 +129,7 @@ const Standings = () => {
                                                 to={`${basePath}/teams/${team.slug}`}
                                                 className="flex items-center gap-3 group"
                                             >
-                                                <TeamLogo slug={team.slug} name={team.name} size={24} />
+                                                <TeamLogo slug={team.slug} name={team.name} size={24} logoUrl={team.logo_url} color={team.color} />
                                                 <div
                                                     className="w-3 h-3 rounded-full flex-shrink-0"
                                                     style={{ backgroundColor: team.color }}

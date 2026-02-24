@@ -53,7 +53,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                     <div>
                         <div className="forge-body text-[1.1rem] font-bold">{player.playerName}</div>
                         <div className="text-[0.85rem] text-[var(--forge-text-dim)] flex items-center gap-1 mt-px">
-                            <TeamLogo slug={player.teamSlug} name={player.teamName} size={12} />
+                            <TeamLogo slug={player.teamSlug} name={player.teamName} size={12} color={player.teamColor} />
                             {player.teamName}
                             {player.role && (
                                 <span className="forge-head text-[0.7rem] font-semibold tracking-wider ml-1">{player.role}</span>

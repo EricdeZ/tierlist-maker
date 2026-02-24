@@ -29,7 +29,7 @@ function TeamFilterDropdown({ teams, value, onChange }) {
             >
                 {selectedTeam ? (
                     <>
-                        <TeamLogo slug={selectedTeam.slug} name={selectedTeam.name} size={16} />
+                        <TeamLogo slug={selectedTeam.slug} name={selectedTeam.name} size={16} color={selectedTeam.color} />
                         <span>{selectedTeam.name}</span>
                     </>
                 ) : (
@@ -55,7 +55,7 @@ function TeamFilterDropdown({ teams, value, onChange }) {
                                 value === t.slug ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
                             }`}
                         >
-                            <TeamLogo slug={t.slug} name={t.name} size={16} />
+                            <TeamLogo slug={t.slug} name={t.name} size={16} color={t.color} />
                             <span>{t.name}</span>
                         </button>
                     ))}

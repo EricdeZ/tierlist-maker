@@ -1,22 +1,63 @@
+import { Link } from 'react-router-dom'
 import PageTitle from '../../components/PageTitle'
+import { Package, ImagePlus } from 'lucide-react'
 
 export default function CodexDashboard() {
     return (
         <div className="max-w-4xl mx-auto pb-8 px-4">
             <PageTitle title="Codex" noindex />
 
-            <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-6">
-                    <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                    </svg>
-                </div>
-                <h1 className="font-heading text-2xl sm:text-3xl font-bold text-(--color-text) mb-3">
-                    Codex Dashboard
-                </h1>
-                <p className="text-(--color-text-secondary) text-sm sm:text-base max-w-md mx-auto">
-                    The Codex is under construction. Content editing tools will appear here soon.
-                </p>
+            <div className="mb-6">
+                <h1 className="font-heading text-2xl sm:text-3xl font-bold text-(--color-text) mb-1">Codex Dashboard</h1>
+                <p className="text-(--color-text-secondary) text-sm">Manage game data and content for the Codex.</p>
+            </div>
+
+            <div className="grid gap-4">
+                <Link
+                    to="/codex/items"
+                    className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-amber-500/20 to-amber-600/5 border-amber-500/20 hover:border-amber-500/40 transition-colors"
+                    style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}
+                >
+                    <div className="p-4 sm:p-6 flex items-start gap-3 sm:gap-5">
+                        <div className="shrink-0 mt-0.5 text-amber-400">
+                            <Package className="w-7 h-7" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-heading text-lg sm:text-xl font-semibold text-(--color-text) mb-1">Items</h2>
+                            <p className="hidden sm:block text-sm text-(--color-text-secondary) leading-relaxed">
+                                Manage SMITE items with custom fields and tags. Define item attributes, categorize with tags, and build the full item database.
+                            </p>
+                        </div>
+                        <div className="hidden sm:flex shrink-0 items-center">
+                            <span className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors">
+                                Open
+                            </span>
+                        </div>
+                    </div>
+                </Link>
+
+                <Link
+                    to="/codex/images"
+                    className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-violet-500/20 to-violet-600/5 border-violet-500/20 hover:border-violet-500/40 transition-colors"
+                    style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}
+                >
+                    <div className="p-4 sm:p-6 flex items-start gap-3 sm:gap-5">
+                        <div className="shrink-0 mt-0.5 text-violet-400">
+                            <ImagePlus className="w-7 h-7" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-heading text-lg sm:text-xl font-semibold text-(--color-text) mb-1">Images</h2>
+                            <p className="hidden sm:block text-sm text-(--color-text-secondary) leading-relaxed">
+                                Upload and organize images for the Codex. Categorize uploads and use them as icons for items, fields, and other content.
+                            </p>
+                        </div>
+                        <div className="hidden sm:flex shrink-0 items-center">
+                            <span className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors">
+                                Open
+                            </span>
+                        </div>
+                    </div>
+                </Link>
             </div>
         </div>
     )

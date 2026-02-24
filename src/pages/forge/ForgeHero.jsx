@@ -113,7 +113,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                         {player.playerName}
                     </div>
                     <div className="flex items-center gap-2 text-[1rem] text-[var(--forge-text-mid)] mb-3.5">
-                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={18} />
+                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={18} color={player.teamColor} />
                         <span>{player.teamName}</span>
                         {player.role && (
                             <span className="forge-head text-[0.8rem] font-semibold tracking-wider px-2 py-0.5 bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)]">

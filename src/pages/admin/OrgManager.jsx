@@ -243,7 +243,7 @@ const OrgManager = () => {
                                         <div className="space-y-1 mb-3">
                                             {orgTeams.map(t => (
                                                 <div key={t.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-white/[0.02]">
-                                                    <TeamLogo slug={t.slug} name={t.name} size={20} />
+                                                    <TeamLogo slug={t.slug} name={t.name} size={20} color={t.color} />
                                                     <div
                                                         className="w-2 h-2 rounded-full shrink-0"
                                                         style={{ backgroundColor: t.color }}
@@ -311,7 +311,7 @@ const OrgManager = () => {
                         <div className="divide-y divide-white/5">
                             {unassignedTeams.map(t => (
                                 <div key={t.id} className="flex items-center gap-3 px-4 py-3">
-                                    <TeamLogo slug={t.slug} name={t.name} size={20} />
+                                    <TeamLogo slug={t.slug} name={t.name} size={20} color={t.color} />
                                     <div
                                         className="w-2 h-2 rounded-full shrink-0"
                                         style={{ backgroundColor: t.color }}

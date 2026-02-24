@@ -87,12 +87,12 @@ export default function ForgePortfolioTab({ portfolio, loading, onCool }) {
                             {/* Heat bar */}
                             <div className="w-1 h-10 rounded-sm forge-heat-bar" />
 
-                            <TeamLogo slug={h.teamSlug} name={h.teamName} size={28} />
+                            <TeamLogo slug={h.teamSlug} name={h.teamName} size={28} color={h.teamColor} />
 
                             <div className="flex-1 min-w-0">
                                 <div className="forge-body font-bold text-base">{h.playerName}</div>
                                 <div className="text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
-                                    <TeamLogo slug={h.teamSlug} name={h.teamName} size={14} />
+                                    <TeamLogo slug={h.teamSlug} name={h.teamName} size={14} color={h.teamColor} />
                                     <span style={{ color: h.teamColor }}>{h.teamName}</span>
                                     {h.role && <span className="opacity-60"> &middot; {h.role}</span>}
                                     <span className="opacity-60 flex items-center gap-0.5">

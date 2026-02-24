@@ -64,7 +64,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                     )}
                 </div>
                 <div className="text-[0.95rem] text-[var(--forge-text-dim)] flex items-center gap-1 mt-px">
-                    <TeamLogo slug={player.teamSlug} name={player.teamName} size={12} />
+                    <TeamLogo slug={player.teamSlug} name={player.teamName} size={12} color={player.teamColor} />
                     <span style={{ color: teamColor }}>{player.teamName}</span>
                     {player.role && (
                         <span className="forge-head text-[0.7rem] font-semibold tracking-wider ml-1">{player.role}</span>
