@@ -137,6 +137,39 @@ export default function CodexItems() {
         setItemForm(prev => ({ ...prev, field_values: { ...prev.field_values, [slug]: value } }))
     }
 
+    const setGroupSubValue = (fieldSlug, subKey, value) => {
+        setItemForm(prev => ({
+            ...prev,
+            field_values: {
+                ...prev.field_values,
+                [fieldSlug]: { ...(prev.field_values[fieldSlug] || {}), [subKey]: value }
+            }
+        }))
+    }
+
+    // Sub-field builder helpers for group fields
+    const updateSubField = (idx, key, value) => {
+        setFieldForm(prev => {
+            const subFields = [...(prev.options?.sub_fields || [])]
+            subFields[idx] = { ...subFields[idx], [key]: value }
+            return { ...prev, options: { ...prev.options, sub_fields: subFields } }
+        })
+    }
+
+    const addSubField = () => {
+        setFieldForm(prev => ({
+            ...prev,
+            options: { ...prev.options, sub_fields: [...(prev.options?.sub_fields || []), { key: '', label: '', type: 'number' }] }
+        }))
+    }
+
+    const removeSubField = (idx) => {
+        setFieldForm(prev => ({
+            ...prev,
+            options: { ...prev.options, sub_fields: (prev.options?.sub_fields || []).filter((_, i) => i !== idx) }
+        }))
+    }
+
     const toggleItemTag = (tagId) => {
         setItemForm(prev => ({
             ...prev,
@@ -223,7 +256,15 @@ export default function CodexItems() {
                                         {field.icon_url && <img src={field.icon_url} alt="" className="w-4 h-4 rounded" />}
                                         <span className="text-sm font-medium text-(--color-text)">{field.name}</span>
                                         <code className="text-xs text-(--color-text-secondary)/50 bg-white/5 px-1.5 py-0.5 rounded">{field.slug}</code>
-                                        <span className="text-xs text-(--color-text-secondary) bg-white/5 px-1.5 py-0.5 rounded">{field.field_type}</span>
+                                        <span className="text-xs text-(--color-text-secondary) bg-white/5 px-1.5 py-0.5 rounded">
+                                            {field.field_type}
+                                            {field.field_type === 'group' && field.options?.sub_fields && (
+                                                <span className="text-(--color-text-secondary)/40 ml-1">({field.options.sub_fields.length})</span>
+                                            )}
+                                        </span>
+                                        {field.field_type === 'group' && field.options?.sub_fields && (
+                                            <span className="text-xs text-(--color-text-secondary)/30">[{field.options.sub_fields.map(sf => sf.label).join(', ')}]</span>
+                                        )}
                                         {field.required && <span className="text-xs text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">required</span>}
                                         {field.description && <span className="text-xs text-(--color-text-secondary)/40 truncate flex-1">{field.description}</span>}
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0">
@@ -265,10 +306,17 @@ export default function CodexItems() {
                                     </div>
                                     <div>
                                         <label className="block text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">Type</label>
-                                        <select value={fieldForm.field_type} onChange={e => setFieldForm(p => ({ ...p, field_type: e.target.value }))}
+                                        <select value={fieldForm.field_type} onChange={e => {
+                                            const newType = e.target.value
+                                            setFieldForm(p => ({
+                                                ...p, field_type: newType,
+                                                options: newType === 'group' ? (p.options || { sub_fields: [{ key: '', label: '', type: 'number' }] }) : null
+                                            }))
+                                        }}
                                             className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent) cursor-pointer">
                                             <option value="text">Text</option>
                                             <option value="number">Number</option>
+                                            <option value="group">Group</option>
                                         </select>
                                     </div>
                                     <div>
@@ -276,6 +324,39 @@ export default function CodexItems() {
                                         <input type="number" value={fieldForm.sort_order} onChange={e => setFieldForm(p => ({ ...p, sort_order: parseInt(e.target.value) || 0 }))}
                                             className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)" />
                                     </div>
+                                    {fieldForm.field_type === 'group' && (
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">Sub-fields</label>
+                                            <div className="space-y-2">
+                                                {(fieldForm.options?.sub_fields || []).map((sf, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2">
+                                                        <input type="text" placeholder="Label" value={sf.label}
+                                                            onChange={e => {
+                                                                const label = e.target.value
+                                                                const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+                                                                updateSubField(idx, 'label', label)
+                                                                updateSubField(idx, 'key', key)
+                                                            }}
+                                                            className="flex-1 px-2 py-1.5 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-xs focus:outline-none focus:border-(--color-accent)" />
+                                                        <select value={sf.type}
+                                                            onChange={e => updateSubField(idx, 'type', e.target.value)}
+                                                            className="w-24 px-2 py-1.5 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-xs focus:outline-none focus:border-(--color-accent) cursor-pointer">
+                                                            <option value="text">Text</option>
+                                                            <option value="number">Number</option>
+                                                        </select>
+                                                        <button type="button" onClick={() => removeSubField(idx)}
+                                                            className="p-1 rounded hover:bg-red-500/10 text-(--color-text-secondary) hover:text-red-400 transition-colors cursor-pointer">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button type="button" onClick={addSubField}
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-(--color-accent) hover:bg-(--color-accent)/10 transition-colors cursor-pointer">
+                                                    <Plus className="w-3 h-3" /> Add Sub-field
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <label className="flex items-center gap-2 mt-3 cursor-pointer">
                                     <input type="checkbox" checked={fieldForm.required} onChange={e => setFieldForm(p => ({ ...p, required: e.target.checked }))}
@@ -446,19 +527,36 @@ export default function CodexItems() {
                                 <h4 className="text-xs text-(--color-text-secondary) uppercase tracking-wider mb-2 font-semibold">Custom Fields</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {fields.map(field => (
-                                        <div key={field.id}>
+                                        <div key={field.id} className={field.field_type === 'group' ? 'sm:col-span-2 lg:col-span-3' : ''}>
                                             <label className="flex items-center gap-1.5 text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">
                                                 {field.icon_url && <img src={field.icon_url} alt="" className="w-3.5 h-3.5 rounded" />}
                                                 {field.name}
                                                 {field.required && <span className="text-amber-400">*</span>}
                                             </label>
-                                            <input
-                                                type={field.field_type === 'number' ? 'number' : 'text'}
-                                                value={itemForm.field_values[field.slug] ?? ''}
-                                                onChange={e => setItemFieldValue(field.slug, e.target.value)}
-                                                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
-                                                placeholder={field.description || field.name}
-                                            />
+                                            {field.field_type === 'group' && field.options?.sub_fields ? (
+                                                <div className="flex gap-2">
+                                                    {field.options.sub_fields.map(sf => (
+                                                        <div key={sf.key} className="flex-1">
+                                                            <label className="block text-[10px] text-(--color-text-secondary)/60 mb-0.5">{sf.label}</label>
+                                                            <input
+                                                                type={sf.type === 'number' ? 'number' : 'text'}
+                                                                value={(itemForm.field_values[field.slug] || {})[sf.key] ?? ''}
+                                                                onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
+                                                                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
+                                                                placeholder={sf.label}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type={field.field_type === 'number' ? 'number' : 'text'}
+                                                    value={itemForm.field_values[field.slug] ?? ''}
+                                                    onChange={e => setItemFieldValue(field.slug, e.target.value)}
+                                                    className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)"
+                                                    placeholder={field.description || field.name}
+                                                />
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -535,11 +633,23 @@ export default function CodexItems() {
                                     {/* Field values preview */}
                                     {fields.length > 0 && Object.keys(item.field_values || {}).length > 0 && (
                                         <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                                            {fields.filter(f => item.field_values[f.slug] !== undefined && item.field_values[f.slug] !== '').map(field => (
+                                            {fields.filter(f => {
+                                                const val = item.field_values[f.slug]
+                                                if (f.field_type === 'group') return val && typeof val === 'object' && Object.values(val).some(v => v !== '' && v != null)
+                                                return val !== undefined && val !== ''
+                                            }).map(field => (
                                                 <span key={field.slug} className="text-xs text-(--color-text-secondary)/50">
                                                     {field.icon_url && <img src={field.icon_url} alt="" className="w-3 h-3 rounded inline mr-0.5 -mt-0.5" />}
                                                     <span className="text-(--color-text-secondary)/40">{field.name}:</span>{' '}
-                                                    <span className="text-(--color-text-secondary)">{item.field_values[field.slug]}</span>
+                                                    <span className="text-(--color-text-secondary)">
+                                                        {field.field_type === 'group' && field.options?.sub_fields
+                                                            ? field.options.sub_fields
+                                                                .filter(sf => (item.field_values[field.slug] || {})[sf.key])
+                                                                .map(sf => `${sf.label}: ${(item.field_values[field.slug] || {})[sf.key]}`)
+                                                                .join(' / ')
+                                                            : item.field_values[field.slug]
+                                                        }
+                                                    </span>
                                                 </span>
                                             ))}
                                         </div>
