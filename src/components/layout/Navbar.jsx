@@ -6,7 +6,8 @@ import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
 import ReporterBell from '../ReporterBell'
-import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown, Calendar } from 'lucide-react'
+import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown, Calendar, Flame } from 'lucide-react'
+import { FEATURE_FLAGS } from '../../config/featureFlags'
 
 const tools = [
     { to: '/tierlist',      icon: ListOrdered,  label: 'Tier List' },
@@ -15,6 +16,7 @@ const tools = [
     { to: '/scrims',        icon: Calendar,     label: 'Scrims' },
     { to: '/coinflip',      icon: Coins,        label: 'Coin Flip' },
     { to: '/shop',          icon: ShoppingBag,  label: 'Passion Shop' },
+    ...(FEATURE_FLAGS.FORGE_RELEASED ? [{ to: '/forge', icon: Flame, label: 'Fantasy Forge' }] : []),
 ]
 
 /**

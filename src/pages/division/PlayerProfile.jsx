@@ -19,6 +19,7 @@ import forgeLogo from '../../assets/forge.png'
 import { drawSparkline } from '../forge/forgeCanvas'
 import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from '../forge/forgeConstants'
 import '../forge/forge.css'
+import { FEATURE_FLAGS } from '../../config/featureFlags'
 
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -593,7 +594,7 @@ const PlayerProfile = () => {
                         )}
 
                         {/* Fantasy Forge Banner */}
-                        {forgeSpark && (
+                        {forgeSpark && FEATURE_FLAGS.FORGE_RELEASED && (
                             <ForgeBanner spark={forgeSpark} leagueSlug={leagueSlug} divisionSlug={divisionSlug} />
                         )}
 

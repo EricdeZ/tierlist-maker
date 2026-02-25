@@ -107,15 +107,15 @@ function useTargetRect(selector, active) {
             }
         }
 
-        // Initial measurement with delay for DOM paint
-        const timer = setTimeout(measure, 80)
-
-        // Observe resizes
+        // Scroll target to the center of the viewport so content below (e.g. search results) stays visible
         const el = document.querySelector(selector)
         if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
             observerRef.current = new ResizeObserver(measure)
             observerRef.current.observe(el)
         }
+
+        const timer = setTimeout(measure, 350)
 
         window.addEventListener('scroll', measure, true)
         window.addEventListener('resize', measure)
@@ -133,7 +133,10 @@ function useTargetRect(selector, active) {
 
 function getTooltipStyle(placement, rect) {
     const pad = 16
-    const isMobile = window.innerWidth < 768
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const isMobile = vw < 768
+    const tooltipW = isMobile ? Math.min(360, vw - pad * 2) : 360
 
     // Center placement (no target) — uses inset+margin instead of transform
     // because the tooltip-in animation overrides transform via fill-forwards
@@ -148,37 +151,66 @@ function getTooltipStyle(placement, rect) {
         }
     }
 
-    const effectivePlacement = isMobile ? 'bottom' : placement
+    // Pick the best placement that actually has room
+    let pick = placement
+    if (isMobile) {
+        const spaceBelow = vh - (rect.top + rect.height + pad)
+        pick = spaceBelow >= 200 ? 'bottom' : 'top'
+    } else {
+        const spaceR = vw - (rect.left + rect.width + pad)
+        const spaceL = rect.left - pad
+        const spaceB = vh - (rect.top + rect.height + pad)
 
-    switch (effectivePlacement) {
+        switch (placement) {
+            case 'right':
+                if (spaceR < 200) pick = spaceL >= 200 ? 'left' : spaceB >= 200 ? 'bottom' : 'top'
+                break
+            case 'left':
+                if (spaceL < 200) pick = spaceR >= 200 ? 'right' : spaceB >= 200 ? 'bottom' : 'top'
+                break
+            case 'bottom':
+                if (spaceB < 200) pick = 'top'
+                break
+            case 'top':
+                if (rect.top - pad < 200) pick = 'bottom'
+                break
+        }
+    }
+
+    // Horizontal center for top/bottom, clamped to viewport
+    const centerLeft = isMobile
+        ? Math.max(pad, (vw - tooltipW) / 2)
+        : Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, vw - tooltipW - pad))
+
+    switch (pick) {
         case 'right':
             return {
                 position: 'fixed',
-                top: Math.max(pad, rect.top),
+                top: Math.max(pad, Math.min(rect.top, vh - 300)),
                 left: rect.left + rect.width + pad,
-                maxWidth: Math.min(360, window.innerWidth - rect.left - rect.width - pad * 2),
+                maxWidth: Math.min(tooltipW, vw - rect.left - rect.width - pad * 2),
             }
         case 'left':
             return {
                 position: 'fixed',
-                top: Math.max(pad, rect.top),
-                right: window.innerWidth - rect.left + pad,
-                maxWidth: Math.min(360, rect.left - pad * 2),
+                top: Math.max(pad, Math.min(rect.top, vh - 300)),
+                right: vw - rect.left + pad,
+                maxWidth: Math.min(tooltipW, rect.left - pad * 2),
             }
         case 'top':
             return {
                 position: 'fixed',
-                bottom: window.innerHeight - rect.top + pad,
-                left: Math.max(pad, rect.left + rect.width / 2 - 180),
-                maxWidth: '360px',
+                bottom: vh - rect.top + pad,
+                left: centerLeft,
+                maxWidth: tooltipW,
             }
         case 'bottom':
         default:
             return {
                 position: 'fixed',
                 top: rect.top + rect.height + pad,
-                left: Math.max(pad, rect.left + rect.width / 2 - 180),
-                maxWidth: '360px',
+                left: centerLeft,
+                maxWidth: tooltipW,
             }
     }
 }
@@ -242,11 +274,19 @@ export default function ForgeTutorial({
     const targetSelector = status === 'active' ? getStepTarget(currentStep?.id, tutorialPlayer) : null
     const targetRect = useTargetRect(targetSelector, status === 'active')
 
-    // ── Block scroll while tutorial is active ──
+    // ── Prevent user scroll while allowing programmatic scrollIntoView ──
     useEffect(() => {
         if (status !== 'active') return
-        document.body.style.overflow = 'hidden'
-        return () => { document.body.style.overflow = '' }
+        const prevent = (e) => {
+            if (e.target.closest?.('.forge-tutorial-tooltip')) return
+            e.preventDefault()
+        }
+        document.addEventListener('wheel', prevent, { passive: false })
+        document.addEventListener('touchmove', prevent, { passive: false })
+        return () => {
+            document.removeEventListener('wheel', prevent)
+            document.removeEventListener('touchmove', prevent)
+        }
     }, [status])
 
     // ── Check tutorial status on mount / handle replay ──
@@ -270,6 +310,15 @@ export default function ForgeTutorial({
         })
         return () => { cancelled = true }
     }, [seasonId, isReplay])
+
+    // ── Auto-focus search input on the search step ──
+    useEffect(() => {
+        if (status !== 'active' || step !== 1) return
+        const timer = setTimeout(() => {
+            document.querySelector('[data-tutorial="search-input"]')?.focus()
+        }, 400)
+        return () => clearTimeout(timer)
+    }, [status, step])
 
     // ── Monitor search results for step 1 (search) ──
     const [ownTeamBlocked, setOwnTeamBlocked] = useState(false)
@@ -578,15 +627,6 @@ export default function ForgeTutorial({
                     ))}
                 </div>
 
-                {/* Skip link */}
-                {!currentStep.isComplete && (
-                    <button
-                        onClick={dismiss}
-                        className="block mx-auto mt-3 forge-body text-xs text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)] transition-colors"
-                    >
-                        Skip tutorial
-                    </button>
-                )}
             </div>
         </div>,
         document.body,

@@ -13,6 +13,7 @@ import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
     ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus
 } from 'lucide-react'
+import { FEATURE_FLAGS } from '../../config/featureFlags'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
     const [expanded, setExpanded] = useState(defaultOpen)
@@ -499,6 +500,11 @@ export default function GlobalSidebar() {
                             <SidebarLink to="/twitch" icon={Tv} active={isActive('/twitch')}>
                                 Featured Stream
                             </SidebarLink>
+                            {FEATURE_FLAGS.FORGE_RELEASED && (
+                                <SidebarLink to="/forge" icon={Flame} active={isActive('/forge')}>
+                                    Fantasy Forge
+                                </SidebarLink>
+                            )}
                         </SidebarSection>
 
                         {/* Support & Feedback */}

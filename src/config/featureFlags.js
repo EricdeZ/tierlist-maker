@@ -6,6 +6,7 @@
  */
 export const FEATURE_FLAGS = {
     ENABLE_EXPORT_IMPORT: true,    // Export/import functionality
+    FORGE_RELEASED: false,         // Fantasy Forge publicly visible
 }
 
 /**

@@ -872,6 +872,15 @@
     background: var(--forge-edge);
 }
 
+/* Mobile tutorial tooltip */
+@media (max-width: 767px) {
+    .forge-tutorial-tooltip {
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
     .forge-tutorial-overlay,
