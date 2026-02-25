@@ -16,6 +16,9 @@ export const PERF_KEYS = [
 // Scrim stat keys that map to challenges (tracked by user_id, not player_id)
 export const SCRIM_KEYS = ['scrims_posted', 'scrims_completed']
 
+// Referral stat keys (tracked by user_id)
+export const REFERRAL_KEYS = ['friends_referred']
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -390,6 +393,49 @@ export async function getScrimStats(sql, userId) {
  */
 export async function recalcScrimChallenges(sql, userId) {
     const stats = await getScrimStats(sql, userId)
+    const statKeys = Object.keys(stats)
+
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+          AND (uc.completed IS NULL OR uc.completed = false)
+    `
+
+    if (challenges.length === 0) return
+
+    const challengeIds = challenges.map(c => c.id)
+    const currentValues = challenges.map(c => Number(stats[c.stat_key] || 0))
+
+    await sql`
+        INSERT INTO user_challenges (user_id, challenge_id, current_value)
+        SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+        ON CONFLICT (user_id, challenge_id)
+        DO UPDATE SET current_value = EXCLUDED.current_value
+    `
+}
+
+
+/**
+ * Get referral stats for a user (total referrals made, both types).
+ */
+export async function getReferralStats(sql, userId) {
+    const [{ count }] = await sql`
+        SELECT COUNT(*)::integer as count FROM referrals
+        WHERE referrer_id = ${userId}
+    `
+    return { friends_referred: count }
+}
+
+
+/**
+ * Lazy recalc for referral challenges. Called on challenges page load
+ * when stale data is detected for REFERRAL_KEYS.
+ * No revocations needed — referral counts only go up.
+ */
+export async function recalcReferralChallenges(sql, userId) {
+    const stats = await getReferralStats(sql, userId)
     const statKeys = Object.keys(stats)
 
     const challenges = await sql`

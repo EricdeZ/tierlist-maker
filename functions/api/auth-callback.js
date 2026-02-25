@@ -3,6 +3,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers } from '../lib/db.js'
 import { signToken } from '../lib/auth.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
+import { generateReferralCode, processWebsiteReferral } from '../lib/referrals.js'
 
 const handler = async (event) => {
     const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
@@ -75,15 +76,35 @@ const handler = async (event) => {
 
         const sql = getDB()
 
-        // 3. Upsert user in database
+        // Extract referral code from returnPath (if present) and strip it
+        let refCode = null
+        try {
+            const returnUrl = new URL(returnPath, 'http://localhost')
+            refCode = returnUrl.searchParams.get('ref')
+            if (refCode) {
+                returnUrl.searchParams.delete('ref')
+                returnPath = returnUrl.pathname + (returnUrl.search || '')
+            }
+        } catch { /* ignore parse errors */ }
+
+        // 3. Upsert user in database (CTE detects new vs returning)
+        const referralCode = generateReferralCode()
         const [user] = await sql`
-            INSERT INTO users (discord_id, discord_username, discord_avatar)
-            VALUES (${discordId}, ${username}, ${avatar})
-            ON CONFLICT (discord_id) DO UPDATE SET
-                discord_username = EXCLUDED.discord_username,
-                discord_avatar = EXCLUDED.discord_avatar,
-                updated_at = NOW()
-            RETURNING *
+            WITH existing AS (
+                SELECT id FROM users WHERE discord_id = ${discordId}
+            ),
+            upserted AS (
+                INSERT INTO users (discord_id, discord_username, discord_avatar, referral_code)
+                VALUES (${discordId}, ${username}, ${avatar}, ${referralCode})
+                ON CONFLICT (discord_id) DO UPDATE SET
+                    discord_username = EXCLUDED.discord_username,
+                    discord_avatar = EXCLUDED.discord_avatar,
+                    updated_at = NOW()
+                RETURNING *
+            )
+            SELECT u.*, (e.id IS NULL) as is_new_user
+            FROM upserted u
+            LEFT JOIN existing e ON true
         `
 
         // 4. Bootstrap admin if discord_id matches env var
@@ -107,6 +128,20 @@ const handler = async (event) => {
         // 5. Push discord_linked challenge progress (fire-and-forget)
         pushChallengeProgress(sql, user.id, { discord_linked: 1 })
             .catch(err => console.error('Challenge push (discord_linked) failed:', err))
+
+        // 5b. Process website referral if new user + valid ref code
+        if (user.is_new_user && refCode) {
+            event.waitUntil(
+                (async () => {
+                    const [referrer] = await sql`
+                        SELECT id FROM users WHERE referral_code = ${refCode}
+                    `
+                    if (referrer) {
+                        await processWebsiteReferral(sql, referrer.id, user.id)
+                    }
+                })().catch(err => console.error('Website referral processing failed:', err))
+            )
+        }
 
         // 6. Auto-match player profile if not already linked
         if (!user.linked_player_id) {

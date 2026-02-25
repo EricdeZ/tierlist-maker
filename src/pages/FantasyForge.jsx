@@ -105,6 +105,31 @@ export default function FantasyForge() {
 
     // Free Starter Sparks tracking
     const [freeSparksRemaining, setFreeSparksRemaining] = useState(0)
+    const [referralSparksAvailable, setReferralSparksAvailable] = useState(0)
+
+    // Capture forge_ref from URL and auto-claim when logged in
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        const forgeRef = params.get('forge_ref')
+        if (forgeRef) {
+            localStorage.setItem('pending_forge_referral', forgeRef)
+            params.delete('forge_ref')
+            navigate(location.pathname + (params.toString() ? `?${params}` : ''), { replace: true })
+        }
+    }, [location.search, navigate, location.pathname])
+
+    useEffect(() => {
+        if (!user) return
+        const pendingRef = localStorage.getItem('pending_forge_referral')
+        if (!pendingRef) return
+        localStorage.removeItem('pending_forge_referral')
+        forgeService.claimForgeReferral(pendingRef)
+            .then(() => {
+                setReferralSparksAvailable(1)
+                setToastMessage('Forge referral claimed! You earned 1 free Referral Spark.')
+            })
+            .catch(() => { /* already referred or invalid code */ })
+    }, [user])
 
     // Forge-specific UI state
     const [featuredPlayer, setFeaturedPlayer] = useState(null)
@@ -247,6 +272,7 @@ export default function FantasyForge() {
                 setPlayers(data.players || [])
                 setUserTeamId(data.userTeamId || null)
                 setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
+                setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
             } else if (activeTab === 'portfolio') {
                 if (!user) { setLoading(false); return }
                 const data = await forgeService.getPortfolio(seasonId)
@@ -440,6 +466,25 @@ export default function FantasyForge() {
             setTimeout(() => loadData(), 500)
         } catch (err) {
             setTradeError(err.message || 'Failed to use Starter Spark')
+        } finally {
+            setTrading(false)
+        }
+    }
+
+    // ── Free Referral Spark fuel (from trade modal) ──
+    const executeReferralFuel = async (sparkId) => {
+        setTrading(true)
+        setTradeError(null)
+        setTradeResult(null)
+
+        try {
+            const result = await forgeService.referralFuel(sparkId)
+            setReferralSparksAvailable(prev => Math.max(0, prev - 1))
+            setTradeResult({ ...result, isReferralSpark: true })
+            triggerFuelSpectacle(tradeModal.player.playerName, 1)
+            setTimeout(() => loadData(), 500)
+        } catch (err) {
+            setTradeError(err.message || 'Failed to use Referral Spark')
         } finally {
             setTrading(false)
         }
@@ -765,6 +810,7 @@ export default function FantasyForge() {
                             isOwner={isOwner}
                             changeView={changeView}
                             freeSparksRemaining={freeSparksRemaining}
+                            referralSparksAvailable={referralSparksAvailable}
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
@@ -829,8 +875,10 @@ export default function FantasyForge() {
                     result={tradeResult}
                     error={tradeError}
                     freeSparksRemaining={freeSparksRemaining}
+                    referralSparksAvailable={referralSparksAvailable}
                     onExecute={executeTrade}
                     onFreeFuel={executeFreeFuel}
+                    onReferralFuel={executeReferralFuel}
                     onClose={() => setTradeModal(null)}
                 />
             )}

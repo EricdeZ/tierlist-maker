@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus
 } from 'lucide-react'
 
 function SidebarSection({ icon: Icon, label, defaultOpen = false, children, badge }) {
@@ -475,6 +475,11 @@ export default function GlobalSidebar() {
                             >
                                 Passion Shop
                             </SidebarLink>
+                            {user && (
+                                <SidebarLink to="/referral" icon={UserPlus} active={isActive('/referral')}>
+                                    Refer a Friend
+                                </SidebarLink>
+                            )}
                         </SidebarSection>
 
                         {/* Tools section */}

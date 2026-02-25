@@ -6,10 +6,12 @@ import sparkIcon from '../../assets/spark.png'
 export default function ForgeTradeModal({
     player, mode, amount, setAmount, balance,
     trading, result, error, freeSparksRemaining,
-    onExecute, onFreeFuel, onClose,
+    referralSparksAvailable = 0,
+    onExecute, onFreeFuel, onReferralFuel, onClose,
 }) {
     const isFuel = mode === 'fuel'
     const hasFreeSparks = isFuel && freeSparksRemaining > 0
+    const hasReferralSparks = isFuel && !hasFreeSparks && referralSparksAvailable > 0
     const estimatedCost = isFuel
         ? Math.round(player.currentPrice * amount * (1 + 0.005 * amount))
         : null
@@ -65,14 +67,14 @@ export default function ForgeTradeModal({
                             : 'bg-[var(--forge-cool)]/8 border-[var(--forge-cool)]/25'
                     }`}>
                         <div className="forge-head text-base font-bold tracking-wider mb-1">
-                            {result.isFreeSpark ? 'Starter Spark Used!' : (isFuel ? 'Fueled!' : 'Cooled!')}
+                            {result.isFreeSpark ? 'Starter Spark Used!' : result.isReferralSpark ? 'Referral Spark Used!' : (isFuel ? 'Fueled!' : 'Cooled!')}
                         </div>
                         {isFuel ? (
-                            result.isFreeSpark ? (
+                            (result.isFreeSpark || result.isReferralSpark) ? (
                                 <div className="text-sm text-[var(--forge-text-mid)]">
-                                    Free Starter Spark applied!
-                                    New value: <strong className="forge-num text-[var(--forge-flame-bright)]">{Math.round(result.newPrice).toLocaleString()}</strong>
-                                    {result.freeSparksRemaining > 0 && (
+                                    {result.isReferralSpark ? 'Referral Spark applied!' : 'Free Starter Spark applied!'}
+                                    {' '}New value: <strong className="forge-num text-[var(--forge-flame-bright)]">{Math.round(result.newPrice).toLocaleString()}</strong>
+                                    {result.isFreeSpark && result.freeSparksRemaining > 0 && (
                                         <span className="text-[var(--forge-gold)]">
                                             {' '}&mdash; {result.freeSparksRemaining} Starter Spark{result.freeSparksRemaining !== 1 ? 's' : ''} left
                                         </span>
@@ -138,8 +140,41 @@ export default function ForgeTradeModal({
                     </>
                 )}
 
+                {/* Free Referral Spark mode */}
+                {!result && hasReferralSparks && (
+                    <>
+                        <div className="mb-4 p-3 bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/25">
+                            <div className="flex items-center gap-2 mb-1">
+                                <img src={sparkIcon} alt="" className="w-6 h-6 object-contain" style={{ filter: 'drop-shadow(0 0 6px rgba(232,101,32,0.5))' }} />
+                                <span className="forge-head text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
+                                    {referralSparksAvailable} REFERRAL SPARK{referralSparksAvailable !== 1 ? 'S' : ''} AVAILABLE
+                                </span>
+                            </div>
+                            <div className="forge-body text-sm text-[var(--forge-text-mid)] leading-relaxed">
+                                Use your free Referral Spark on any player. Like Starter Sparks, these can't be cooled but you keep any profit at season end.
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => onReferralFuel(player.sparkId)}
+                            disabled={trading}
+                            className="w-full py-3 forge-head text-base font-bold tracking-wider text-white disabled:opacity-50 forge-clip-btn forge-btn-fuel"
+                            style={{
+                                background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
+                                boxShadow: '0 2px 12px rgba(232,101,32,0.25)',
+                            }}
+                        >
+                            {trading ? 'Fueling...' : 'Use Referral Spark (FREE)'}
+                        </button>
+
+                        <div className="forge-head text-center text-[0.7rem] text-[var(--forge-text-dim)] tracking-wider mt-3 mb-3">
+                            &mdash; OR FUEL WITH PASSION &mdash;
+                        </div>
+                    </>
+                )}
+
                 {/* Amount selector (normal Passion-based trading) */}
-                {!result && !hasFreeSparks && (
+                {!result && !hasFreeSparks && !hasReferralSparks && (
                     <>
                         <div className="mb-4">
                             <label className="forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-text-dim)] mb-2 block">
@@ -220,7 +255,7 @@ export default function ForgeTradeModal({
                 )}
 
                 {/* Passion fuel option shown below free spark section */}
-                {!result && hasFreeSparks && (
+                {!result && (hasFreeSparks || hasReferralSparks) && (
                     <>
                         <div className="mb-4">
                             <label className="forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-text-dim)] mb-2 block">

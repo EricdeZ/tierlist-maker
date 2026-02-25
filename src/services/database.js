@@ -524,6 +524,28 @@ export const forgeService = {
     async tutorialFuel(sparkId) {
         return apiPost('forge', { action: 'tutorial-fuel' }, { sparkId })
     },
+
+    async claimForgeReferral(refCode) {
+        return apiPost('forge', { action: 'claim-forge-referral' }, { refCode })
+    },
+
+    async referralFuel(sparkId) {
+        return apiPost('forge', { action: 'referral-fuel' }, { sparkId })
+    },
+}
+
+export const referralService = {
+    async getMyStats() {
+        return apiCall('referrals', { action: 'my-stats' })
+    },
+
+    async validateCode(code) {
+        return apiCall('referrals', { action: 'validate-code', code })
+    },
+
+    async claimReferral(code, type) {
+        return apiPost('referrals', { action: 'claim' }, { code, type })
+    },
 }
 
 export const predictionsService = {

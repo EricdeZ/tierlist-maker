@@ -47,6 +47,7 @@ import PassionLeaderboard from "./pages/PassionLeaderboard.jsx";
 import Challenges from "./pages/Challenges.jsx";
 import CoinFlip from "./pages/CoinFlip.jsx";
 import PassionShop from "./pages/PassionShop.jsx";
+import ReferralPage from "./pages/ReferralPage.jsx";
 import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
 import DebugTools from "./pages/admin/DebugTools.jsx";
 import DataReportManager from "./pages/admin/DataReportManager.jsx";
@@ -127,6 +128,7 @@ function App() {
                             <Route path="challenges" element={<Challenges />} />
                             <Route path="coinflip" element={<CoinFlip />} />
                             <Route path="shop" element={<PassionShop />} />
+                            <Route path="referral" element={<ReferralPage />} />
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />

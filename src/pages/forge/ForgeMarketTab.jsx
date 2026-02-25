@@ -70,7 +70,7 @@ export default function ForgeMarketTab({
     players, allPlayers, teams,
     search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
-    changeView, freeSparksRemaining, seasonSlugs,
+    changeView, freeSparksRemaining, referralSparksAvailable = 0, seasonSlugs,
     onFuel, onCool, onSelectPlayer, onRandomPlayer,
 }) {
     if (loading) {
@@ -132,6 +132,25 @@ export default function ForgeMarketTab({
                     <div>
                         <span className="forge-head text-xs sm:text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
                             {freeSparksRemaining} Starter Spark{freeSparksRemaining !== 1 ? 's' : ''} Available
+                        </span>
+                        <span className="forge-body text-xs sm:text-sm text-[var(--forge-text-mid)] ml-1 sm:ml-2">
+                            — Fuel any player for free!
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Referral Sparks banner */}
+            {referralSparksAvailable > 0 && freeSparksRemaining <= 0 && (
+                <div className="mb-4 p-2.5 sm:p-3 bg-[var(--forge-flame)]/5 border border-[var(--forge-flame)]/15 flex items-center gap-2 sm:gap-3">
+                    <img
+                        src={sparkIcon}
+                        alt=""
+                        className="w-8 h-8 sm:w-12 sm:h-12 object-contain flex-shrink-0 forge-spark-icon-lg"
+                    />
+                    <div>
+                        <span className="forge-head text-xs sm:text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
+                            {referralSparksAvailable} Referral Spark{referralSparksAvailable !== 1 ? 's' : ''} Available
                         </span>
                         <span className="forge-body text-xs sm:text-sm text-[var(--forge-text-mid)] ml-1 sm:ml-2">
                             — Fuel any player for free!

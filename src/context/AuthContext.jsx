@@ -37,6 +37,22 @@ export const AuthProvider = ({ children }) => {
             const clean = params.toString()
             window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
         }
+
+        // Capture referral codes from URL and persist in localStorage
+        const refCode = params.get('ref')
+        if (refCode) {
+            localStorage.setItem('pending_referral', refCode)
+            params.delete('ref')
+            const clean = params.toString()
+            window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
+        }
+        const forgeRefCode = params.get('forge_ref')
+        if (forgeRefCode) {
+            localStorage.setItem('pending_forge_referral', forgeRefCode)
+            params.delete('forge_ref')
+            const clean = params.toString()
+            window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
+        }
     }, [])
 
     // Sync database.js impersonation on mount and when impersonateId changes
@@ -106,7 +122,16 @@ export const AuthProvider = ({ children }) => {
         // Derive redirect_uri from current origin so it always matches the callback
         const redirectUri = `${window.location.origin}/api/auth-callback`
         // Pass origin + path as state so callback redirects back to the correct host
-        const returnPath = window.location.pathname + window.location.search
+        let returnPath = window.location.pathname + window.location.search
+
+        // Thread pending referral code through OAuth state
+        const pendingRef = localStorage.getItem('pending_referral')
+        if (pendingRef) {
+            const sep = returnPath.includes('?') ? '&' : '?'
+            returnPath += `${sep}ref=${pendingRef}`
+            localStorage.removeItem('pending_referral')
+        }
+
         const state = encodeURIComponent(window.location.origin + returnPath)
         const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`
         window.location.href = url
