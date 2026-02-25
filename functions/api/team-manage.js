@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { deleteR2Object } from '../lib/r2.js'
 
 function slugify(str) {
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'item'
@@ -146,11 +147,7 @@ async function deleteTeam(sql, { id }, admin, env) {
 
     // Clean up R2 icon if it exists
     if (row.logo_url && env?.TEAM_ICONS) {
-        try {
-            const urlPath = new URL(row.logo_url).pathname
-            const key = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-            env.TEAM_ICONS.delete(key).catch(() => {})
-        } catch { /* best-effort */ }
+        try { await deleteR2Object(env.TEAM_ICONS, row.logo_url) } catch { /* best-effort */ }
     }
 
     await logAudit(sql, admin, { action: 'delete-team', endpoint: 'team-manage', targetType: 'team', targetId: id, details: { name: row.name } })

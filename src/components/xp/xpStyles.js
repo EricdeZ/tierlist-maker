@@ -582,6 +582,17 @@ const XP_STYLES = `
     padding: 0 !important;
 }
 
+/* ── Scrim Challenges Window ── */
+.xp-scrim-challenges-window {
+    z-index: 13;
+    width: 310px !important;
+    max-height: 420px !important;
+}
+.xp-scrim-challenges-window .xp-window-body {
+    padding: 0 !important;
+    overflow-y: auto;
+}
+
 /* ── Impersonation Window ── */
 .xp-impersonate-window {
     z-index: 14;
@@ -687,6 +698,7 @@ const XP_STYLES = `
     .xp-dino-window { display: none !important; }
     .xp-coinflip-window { display: none !important; }
     .xp-scrim-cal-window { display: none !important; }
+    .xp-scrim-challenges-window { display: none !important; }
     .xp-help-window { display: none !important; }
     .xp-post-window {
         position: relative !important;

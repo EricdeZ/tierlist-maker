@@ -13,7 +13,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
     const isOpen = marketStatus === 'open'
-    const isOwnTeam = !isOwner && userTeamId && player.teamId === userTeamId
+    const isOwnTeam = userTeamId && player.teamId === userTeamId
     const isUp = change > 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
@@ -164,7 +164,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                             <Flame size={14} />
                             Fuel
                         </button>
-                        {player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
+                        {player.holding && player.holding.sparks > 0 && (
                             <button
                                 onClick={e => { e.stopPropagation(); onCool(player) }}
                                 className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-clip-btn forge-btn-cool flex items-center justify-center gap-1.5"

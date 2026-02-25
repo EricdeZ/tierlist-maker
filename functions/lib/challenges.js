@@ -13,6 +13,9 @@ export const PERF_KEYS = [
     'games_in_tier_1', 'total_wins',
 ]
 
+// Scrim stat keys that map to challenges (tracked by user_id, not player_id)
+export const SCRIM_KEYS = ['scrims_posted', 'scrims_completed']
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -351,4 +354,61 @@ export async function recalcMatchChallenges(sql, affectedUsers) {
 
     const userIds = affectedUsers.map(u => u.user_id)
     await invalidatePerformanceChallenges(sql, userIds, true)
+}
+
+
+/**
+ * Get scrim stats for a user (by user_id, not player_id).
+ * Returns counts of scrims posted and completed.
+ */
+export async function getScrimStats(sql, userId) {
+    const [[posted], [completed]] = await Promise.all([
+        sql`
+            SELECT COUNT(*)::integer as count
+            FROM scrim_requests
+            WHERE user_id = ${userId} AND status != 'cancelled'
+        `,
+        sql`
+            SELECT COUNT(*)::integer as count
+            FROM scrim_requests
+            WHERE (user_id = ${userId} OR accepted_user_id = ${userId})
+              AND status = 'completed'
+        `,
+    ])
+
+    return {
+        scrims_posted: Number(posted.count),
+        scrims_completed: Number(completed.count),
+    }
+}
+
+
+/**
+ * Lazy recalc for scrim challenges. Called on challenges page load
+ * when stale data is detected for SCRIM_KEYS.
+ * No revocations needed — scrim counts only go up.
+ */
+export async function recalcScrimChallenges(sql, userId) {
+    const stats = await getScrimStats(sql, userId)
+    const statKeys = Object.keys(stats)
+
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+          AND (uc.completed IS NULL OR uc.completed = false)
+    `
+
+    if (challenges.length === 0) return
+
+    const challengeIds = challenges.map(c => c.id)
+    const currentValues = challenges.map(c => Number(stats[c.stat_key] || 0))
+
+    await sql`
+        INSERT INTO user_challenges (user_id, challenge_id, current_value)
+        SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+        ON CONFLICT (user_id, challenge_id)
+        DO UPDATE SET current_value = EXCLUDED.current_value
+    `
 }

@@ -6,7 +6,7 @@ import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import xpBg from '../assets/xp-bg.jpg'
-import { Plus, Search, Shield, Ban, Swords } from 'lucide-react'
+import { Plus, Search, Shield, Ban, Swords, Trophy } from 'lucide-react'
 import DraggableXpWindow from '../components/xp/DraggableXpWindow'
 import XpProgressBar from '../components/xp/XpProgressBar'
 import XpDinoGame from '../components/xp/XpDinoGame'
@@ -21,6 +21,7 @@ import XpScrimHelpWindow from './scrims/XpScrimHelpWindow'
 import XpBlacklistWindow from './scrims/XpBlacklistWindow'
 import XpScrimCalendarWindow from './scrims/XpScrimCalendarWindow'
 import PostScrimWizard from './scrims/PostScrimWizard'
+import XpScrimChallengesWindow from './scrims/XpScrimChallengesWindow'
 
 export default function ScrimPlanner() {
     const { user, login, hasPermission } = useAuth()
@@ -79,7 +80,7 @@ export default function ScrimPlanner() {
 
     // Reset mobile tab when auth state changes
     useEffect(() => {
-        if (!user && (mobileTab === 'my' || mobileTab === 'post' || mobileTab === 'blacklist'))
+        if (!user && (mobileTab === 'my' || mobileTab === 'post' || mobileTab === 'blacklist' || mobileTab === 'challenges'))
             setMobileTab('open')
     }, [user]) // eslint-disable-line
     useEffect(() => {
@@ -342,6 +343,7 @@ export default function ScrimPlanner() {
         const mobileTabs = [
             { key: 'open', label: 'Open', icon: Search },
             ...(user ? [{ key: 'my', label: 'My Scrims', icon: Shield }] : []),
+            ...(user ? [{ key: 'challenges', label: 'Challenges', icon: Trophy }] : []),
             ...(isCaptain ? [{ key: 'post', label: 'Post', icon: Plus }] : []),
             ...(isCaptain ? [{ key: 'blacklist', label: 'Blacklist', icon: Ban }] : []),
         ]
@@ -398,6 +400,15 @@ export default function ScrimPlanner() {
                                         captainTeams={captainTeams} allTeams={allTeams} myScrims={myScrims}
                                         onSuccess={() => { loadOpenScrims(); loadMyScrims(); setMobileTab('my') }}
                                     />
+                                )}
+                                {mobileTab === 'challenges' && user && (
+                                    <div>
+                                        <div className="sm-section-header">
+                                            <h2 className="sm-section-title">Scrim Challenges</h2>
+                                            <p className="sm-section-sub">Earn Passion by posting and completing scrims.</p>
+                                        </div>
+                                        <XpScrimChallengesWindow />
+                                    </div>
                                 )}
                                 {mobileTab === 'blacklist' && (
                                     <div>
@@ -514,6 +525,22 @@ export default function ScrimPlanner() {
                             onAdd={handleBlacklistAdd}
                             onRemove={handleBlacklistRemove}
                         />
+                    </DraggableXpWindow>
+                )}
+
+                {/* ═══ SCRIM CHALLENGES WINDOW ═══ */}
+                {user && (
+                    <DraggableXpWindow
+                        title="Scrim Challenges"
+                        icon="&#127942;"
+                        defaultX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 340) : 400}
+                        defaultY={340}
+                        className="xp-scrim-challenges-window"
+                        resizable={false}
+                        minimized={!!minimizedWindows.challenges}
+                        onMinimize={(v) => setWinMinimized('challenges', v)}
+                    >
+                        <XpScrimChallengesWindow />
                     </DraggableXpWindow>
                 )}
 
@@ -712,6 +739,15 @@ export default function ScrimPlanner() {
                         >
                             <span style={{ fontSize: 12 }}>&#128197;</span>
                             <span>Calendar</span>
+                        </button>
+                    )}
+                    {user && (
+                        <button
+                            className={`xp-taskbar-window-btn ${minimizedWindows.challenges ? 'xp-taskbar-window-minimized' : 'xp-taskbar-window-active'}`}
+                            onClick={() => setWinMinimized('challenges', !minimizedWindows.challenges)}
+                        >
+                            <span style={{ fontSize: 12 }}>&#127942;</span>
+                            <span>Challenges</span>
                         </button>
                     )}
                     {showPostWindow && (

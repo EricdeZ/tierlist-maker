@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS forge_markets (
     id          serial PRIMARY KEY,
     season_id   integer NOT NULL UNIQUE REFERENCES seasons(id) ON DELETE CASCADE,
     status      varchar(20) NOT NULL DEFAULT 'open',
-    base_price  integer NOT NULL DEFAULT 100,
+    base_price  integer NOT NULL DEFAULT 50,
     created_at  timestamptz NOT NULL DEFAULT NOW(),
     closed_at   timestamptz
 );
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS player_sparks (
     id               serial PRIMARY KEY,
     market_id        integer NOT NULL REFERENCES forge_markets(id) ON DELETE CASCADE,
     league_player_id integer NOT NULL REFERENCES league_players(id) ON DELETE CASCADE,
-    current_price    numeric(10,2) NOT NULL DEFAULT 100.00,
+    current_price    numeric(10,2) NOT NULL DEFAULT 50.00,
     total_sparks     integer NOT NULL DEFAULT 0,
     perf_multiplier  numeric(6,4) NOT NULL DEFAULT 1.0000,
     last_perf_update timestamptz,

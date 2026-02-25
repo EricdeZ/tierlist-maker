@@ -26,7 +26,7 @@ function TeamFilterDropdown({ teams, value, onChange }) {
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 py-2 px-3 bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] forge-body text-lg cursor-pointer hover:border-[var(--forge-border-lt)] transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 py-2 px-3 bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] forge-body text-sm sm:text-lg cursor-pointer hover:border-[var(--forge-border-lt)] transition-colors whitespace-nowrap"
             >
                 {selectedTeam ? (
                     <>
@@ -76,7 +76,7 @@ export default function ForgeMarketTab({
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
-                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
+                <img src={forgeLogo} alt="" className="w-24 h-24 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading the Forge...</div>
                 <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
                     <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
@@ -100,13 +100,8 @@ export default function ForgeMarketTab({
             .slice(0, 3)
     }, [allPlayers])
 
-    // Remaining players for table (excluding top 3 when cards are visible)
-    const tableRows = useMemo(() => {
-        const top3Ids = new Set(top3.map(p => p.sparkId))
-        // Team filter hides Top Performers, so show all; otherwise exclude top 3
-        if (teamFilter) return players
-        return players.filter(p => !top3Ids.has(p.sparkId))
-    }, [players, top3, teamFilter])
+    // All players for the table (top performers also appear in cards above)
+    const tableRows = players
 
     return (
         <div>
@@ -128,17 +123,17 @@ export default function ForgeMarketTab({
 
             {/* Starter Sparks banner */}
             {freeSparksRemaining > 0 && (
-                <div className="mb-4 p-3 bg-[var(--forge-flame)]/5 border border-[var(--forge-flame)]/15 flex items-center gap-3">
+                <div className="mb-4 p-2.5 sm:p-3 bg-[var(--forge-flame)]/5 border border-[var(--forge-flame)]/15 flex items-center gap-2 sm:gap-3">
                     <img
                         src={sparkIcon}
                         alt=""
-                        className="w-12 h-12 object-contain flex-shrink-0 forge-spark-icon-lg"
+                        className="w-8 h-8 sm:w-12 sm:h-12 object-contain flex-shrink-0 forge-spark-icon-lg"
                     />
                     <div>
-                        <span className="forge-head text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
+                        <span className="forge-head text-xs sm:text-sm font-bold tracking-wider text-[var(--forge-flame-bright)]">
                             {freeSparksRemaining} Starter Spark{freeSparksRemaining !== 1 ? 's' : ''} Available
                         </span>
-                        <span className="forge-body text-sm text-[var(--forge-text-mid)] ml-2">
+                        <span className="forge-body text-xs sm:text-sm text-[var(--forge-text-mid)] ml-1 sm:ml-2">
                             — Fuel any player for free!
                         </span>
                     </div>
@@ -185,14 +180,14 @@ export default function ForgeMarketTab({
                 <div className="forge-section-accent" />
             </div>
 
-            <div className="flex gap-1.5 mb-3">
+            <div className="flex flex-wrap gap-1.5 mb-3">
                 <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search players, teams..."
                     data-tutorial="search-input"
-                    className="flex-1 py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-lg outline-none focus:border-[var(--forge-flame)]/40 transition-colors placeholder:text-[var(--forge-text-dim)]"
+                    className="flex-1 min-w-[150px] py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-base sm:text-lg outline-none focus:border-[var(--forge-flame)]/40 transition-colors placeholder:text-[var(--forge-text-dim)]"
                 />
 
                 <TeamFilterDropdown
@@ -204,7 +199,7 @@ export default function ForgeMarketTab({
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="py-2 px-3 bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] forge-body text-lg cursor-pointer hover:border-[var(--forge-border-lt)]"
+                    className="py-2 px-3 bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] forge-body text-sm sm:text-lg cursor-pointer hover:border-[var(--forge-border-lt)]"
                 >
                     {SORT_OPTIONS.map(o => (
                         <option key={o.key} value={o.key}>{o.label}</option>

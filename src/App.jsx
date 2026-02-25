@@ -57,12 +57,16 @@ import AGLSignup from "./pages/AGLSignup.jsx";
 import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
+import ForgePlayerPage from "./pages/forge/ForgePlayerPage.jsx";
 import GodTierList from "./pages/GodTierList.jsx";
 import ScrimPlanner from "./pages/ScrimPlanner.jsx";
+import TheArcade from "./pages/TheArcade.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
 import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
 import TeamManager from "./pages/admin/TeamManager.jsx";
+import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
+import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -106,6 +110,8 @@ function App() {
                                 <Route path="orgs" element={<ProtectedRoute requiredPermission="league_manage"><OrgManager /></ProtectedRoute>} />
                                 <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />
                                 <Route path="teams" element={<ProtectedRoute requiredPermission="team_manage"><TeamManager /></ProtectedRoute>} />
+                                <Route path="leaguestaff" element={<ProtectedRoute requiredPermission="league_staff_manage"><LeagueStaff /></ProtectedRoute>} />
+                                <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Codex pages (nested under CodexLayout with shared navbar) */}
@@ -125,7 +131,13 @@ function App() {
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug/portfolio" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug/leaderboard" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug/challenges" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
                             <Route path="scrims" element={<ScrimPlanner />} />
+                            <Route path="arcade" element={<TheArcade />} />
+                            <Route path="arcade/:lobbyId" element={<TheArcade />} />
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
 

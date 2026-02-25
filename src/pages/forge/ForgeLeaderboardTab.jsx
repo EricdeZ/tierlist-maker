@@ -7,7 +7,7 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
-                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
+                <img src={forgeLogo} alt="" className="w-24 h-24 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading leaderboard...</div>
                 <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
                     <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
@@ -38,14 +38,14 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                 return (
                     <div
                         key={entry.userId}
-                        className={`forge-lb-row flex items-center gap-3 p-3 ${
+                        className={`forge-lb-row flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 ${
                             isMe
                                 ? 'bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/25'
                                 : 'bg-[var(--forge-panel)] border border-transparent'
                         }`}
                     >
                         {/* Position */}
-                        <div className={`w-10 text-center forge-num text-xl ${
+                        <div className={`w-8 sm:w-10 text-center forge-num text-base sm:text-xl ${
                             entry.position === 1 ? 'text-yellow-400' :
                             entry.position === 2 ? 'text-gray-300' :
                             entry.position === 3 ? 'text-amber-600' : 'text-[var(--forge-text-dim)]'
@@ -58,11 +58,11 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                             <img
                                 src={`https://cdn.discordapp.com/avatars/${entry.discordId}/${entry.avatar}.png?size=32`}
                                 alt=""
-                                className="w-10 h-10 forge-clip-hex flex-shrink-0"
+                                className="w-8 h-8 sm:w-10 sm:h-10 forge-clip-hex flex-shrink-0"
                             />
                         ) : (
                             <div
-                                className="w-10 h-10 forge-clip-hex flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                                className="w-8 h-8 sm:w-10 sm:h-10 forge-clip-hex flex-shrink-0 flex items-center justify-center text-xs font-bold"
                                 style={{ background: 'var(--forge-edge)' }}
                             >
                                 {(entry.username || '?')[0]}
@@ -71,7 +71,7 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                            <div className="forge-body font-bold text-base truncate">
+                            <div className="forge-body font-bold text-sm sm:text-base truncate">
                                 {profileUrl ? (
                                     <a
                                         href={profileUrl}
@@ -86,25 +86,25 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                                 )}
                                 {isMe && <span className="text-[var(--forge-flame-bright)] text-sm ml-1">(you)</span>}
                             </div>
-                            <div className="text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
+                            <div className="text-xs sm:text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
                                 <span className="forge-num">{entry.holdingsCount}</span> player{entry.holdingsCount !== 1 ? 's' : ''}
                                 {' '}&middot;{' '}
-                                <img src={sparkIcon} alt="" className="w-6 h-6 object-contain forge-spark-icon" />
-                                <span className="forge-num">{entry.totalSparks}</span> Spark{entry.totalSparks !== 1 ? 's' : ''}
+                                <img src={sparkIcon} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain forge-spark-icon" />
+                                <span className="forge-num">{entry.totalSparks}</span> <span className="hidden sm:inline">Spark{entry.totalSparks !== 1 ? 's' : ''}</span>
                             </div>
                         </div>
 
                         {/* Profit */}
-                        <div className="text-right">
-                            <div className={`flex items-center gap-1 justify-end forge-num text-base ${
+                        <div className="text-right flex-shrink-0">
+                            <div className={`flex items-center gap-1 justify-end forge-num text-sm sm:text-base ${
                                 entry.totalProfit >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'
                             }`}>
                                 <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
                                 {entry.totalProfit >= 0 ? '+' : ''}{entry.totalProfit.toLocaleString()}
                             </div>
                             {entry.portfolioValue > 0 && (
-                                <div className="forge-num text-sm text-[var(--forge-text-dim)]">
-                                    Holdings: {entry.portfolioValue.toLocaleString()}
+                                <div className="forge-num text-xs sm:text-sm text-[var(--forge-text-dim)]">
+                                    <span className="hidden sm:inline">Holdings: </span>{entry.portfolioValue.toLocaleString()}
                                 </div>
                             )}
                         </div>

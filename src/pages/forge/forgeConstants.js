@@ -1,9 +1,10 @@
-import { Flame, Zap, Trophy } from 'lucide-react'
+import { Flame, Zap, Trophy, Target } from 'lucide-react'
 
 export const TABS = [
     { key: 'market', label: 'The Forge', icon: Flame },
     { key: 'portfolio', label: 'My Sparks', icon: Zap },
     { key: 'leaderboard', label: 'Hall of Flame', icon: Trophy },
+    { key: 'challenges', label: 'Contracts', icon: Target },
 ]
 
 export const SORT_OPTIONS = [
@@ -19,7 +20,7 @@ export const SORT_OPTIONS = [
 export function getHeatTier(priceChange) {
     if (priceChange == null) return 'warm'
     if (priceChange > 10) return 'blazing'
-    if (priceChange > 0) return 'warm'
+    if (priceChange >= 0) return 'warm'
     return 'cooling'
 }
 
@@ -57,7 +58,7 @@ export const SPARK_COLORS = {
 }
 
 // Fallback history for players with no data — flat line at 100
-export const FALLBACK_HISTORY = [100, 100, 100, 100, 100, 100, 100, 100]
+export const FALLBACK_HISTORY = [50, 50, 50, 50, 50, 50, 50, 50]
 
 // Burst particle color palette (RGB arrays)
 export const BURST_COLORS = [

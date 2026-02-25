@@ -1,6 +1,7 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, headers, adminHeaders } from '../lib/db.js'
 import { requireAuth, requirePermission } from '../lib/auth.js'
+import { pushChallengeProgress, getScrimStats } from '../lib/challenges.js'
 import {
     listScrims, fetchMyScrims, fetchIncoming, getEligibleTeams,
     fetchAllActiveTeams, fetchTeamReliability, fetchBlacklist,
@@ -59,16 +60,32 @@ const handler = async (event) => {
             const body = event.body ? JSON.parse(event.body) : {}
 
             switch (action) {
-                case 'create':
-                    return postResult(await createScrim(sql, user, body))
+                case 'create': {
+                    const result = await createScrim(sql, user, body)
+                    if (!result.error) {
+                        const push = getScrimStats(sql, user.id).then(stats =>
+                            pushChallengeProgress(sql, user.id, stats)
+                        ).catch(err => console.error('Scrim challenge push failed:', err))
+                        if (event.waitUntil) event.waitUntil(push)
+                    }
+                    return postResult(result)
+                }
                 case 'accept':
                     return postResult(await acceptScrim(sql, user, body, event.waitUntil))
                 case 'cancel':
                     return postResult(await cancelScrim(sql, user, body))
                 case 'decline':
                     return postResult(await declineScrim(sql, user, body))
-                case 'report-outcome':
-                    return postResult(await reportOutcome(sql, user, body))
+                case 'report-outcome': {
+                    const result = await reportOutcome(sql, user, body)
+                    if (!result.error && body.outcome === 'completed') {
+                        const push = getScrimStats(sql, user.id).then(stats =>
+                            pushChallengeProgress(sql, user.id, stats)
+                        ).catch(err => console.error('Scrim challenge push failed:', err))
+                        if (event.waitUntil) event.waitUntil(push)
+                    }
+                    return postResult(result)
+                }
                 case 'dispute-outcome':
                     return postResult(await disputeOutcome(sql, user, body))
                 case 'blacklist-add':

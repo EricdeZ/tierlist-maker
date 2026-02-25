@@ -56,15 +56,15 @@ const handler = async (event) => {
 
             switch (action) {
                 case 'fuel':
-                    return await fuel(sql, user, body)
+                    return await fuel(sql, user, body, event)
                 case 'cool':
-                    return await cool(sql, user, body)
+                    return await cool(sql, user, body, event)
                 case 'toggle-status':
                     return await adminToggleStatus(sql, event, user, body)
                 case 'liquidate':
                     return await adminLiquidate(sql, event, user, body)
                 case 'tutorial-fuel':
-                    return await tutorialFuel(sql, user, body)
+                    return await tutorialFuel(sql, user, body, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -91,8 +91,8 @@ async function getMarket(sql, user, params, event) {
     const market = await ensureMarket(sql, seasonId)
     await ensurePlayerSparks(sql, market.id, seasonId)
 
-    // Track daily Forge visit for challenge progress (fire-and-forget, non-blocking)
-    trackForgeVisit(sql, user.id).catch(() => {})
+    // Track daily Forge visit for challenge progress (background, survives response)
+    event.waitUntil(trackForgeVisit(sql, user.id).catch(() => {}))
 
     // Get all player sparks with player/team info + most-played god image
     const sparks = await sql`
@@ -551,7 +551,7 @@ async function getBatchHistory(sql, params) {
 // ═══════════════════════════════════════════════════
 // POST: Fuel (buy) Sparks
 // ═══════════════════════════════════════════════════
-async function fuel(sql, user, body) {
+async function fuel(sql, user, body, event) {
     const { sparkId, sparks: rawSparks } = body
     const numSparks = parseInt(rawSparks)
 
@@ -591,13 +591,16 @@ async function fuel(sql, user, body) {
             return await executeFuel(tx, user.id, sparkId, numSparks)
         })
 
-        // Push challenge progress (fire-and-forget)
-        const [{ count: fuelCount }] = await sql`
-            SELECT COUNT(*)::integer as count FROM spark_transactions
-            WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
-        `
-        pushChallengeProgress(sql, user.id, { sparks_fueled: fuelCount })
-            .catch(err => console.error('Challenge push (fuel) failed:', err))
+        // Push challenge progress (background, survives response)
+        event.waitUntil(
+            (async () => {
+                const [{ count: fuelCount }] = await sql`
+                    SELECT COUNT(*)::integer as count FROM spark_transactions
+                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
+                `
+                await pushChallengeProgress(sql, user.id, { sparks_fueled: fuelCount })
+            })().catch(err => console.error('Challenge push (fuel) failed:', err))
+        )
 
         return {
             statusCode: 200,
@@ -621,7 +624,7 @@ async function fuel(sql, user, body) {
 // ═══════════════════════════════════════════════════
 // POST: Cool (sell) Sparks
 // ═══════════════════════════════════════════════════
-async function cool(sql, user, body) {
+async function cool(sql, user, body, event) {
     const { sparkId, sparks: rawSparks } = body
     const numSparks = parseInt(rawSparks)
 
@@ -658,33 +661,34 @@ async function cool(sql, user, body) {
             return await executeCool(tx, user.id, sparkId, numSparks)
         })
 
-        // Push challenge progress (fire-and-forget)
-        const [{ count: coolCount }] = await sql`
-            SELECT COUNT(*)::integer as count FROM spark_transactions
-            WHERE user_id = ${user.id} AND type IN ('cool', 'liquidate')
-        `
-        const stats = { sparks_cooled: coolCount }
-        if (result.profit > 0) {
-            // Sum all realized profit for the user
-            const [{ total }] = await sql`
-                SELECT COALESCE(SUM(
-                    CASE WHEN st.type IN ('cool', 'liquidate')
-                    THEN st.total_cost ELSE 0 END
-                ), 0)::integer as total
-                FROM spark_transactions st
-                WHERE st.user_id = ${user.id} AND st.type IN ('cool', 'liquidate')
-            `
-            // Rough total profit = total cool proceeds - total fuel costs (including tutorial fuel)
-            const [{ invested }] = await sql`
-                SELECT COALESCE(SUM(st.total_cost), 0)::integer as invested
-                FROM spark_transactions st
-                WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel')
-            `
-            const netProfit = Math.max(total - invested, 0)
-            stats.forge_profit = netProfit
-        }
-        pushChallengeProgress(sql, user.id, stats)
-            .catch(err => console.error('Challenge push (cool) failed:', err))
+        // Push challenge progress (background, survives response)
+        event.waitUntil(
+            (async () => {
+                const [{ count: coolCount }] = await sql`
+                    SELECT COUNT(*)::integer as count FROM spark_transactions
+                    WHERE user_id = ${user.id} AND type IN ('cool', 'liquidate')
+                `
+                const stats = { sparks_cooled: coolCount }
+                if (result.profit > 0) {
+                    const [{ total }] = await sql`
+                        SELECT COALESCE(SUM(
+                            CASE WHEN st.type IN ('cool', 'liquidate')
+                            THEN st.total_cost ELSE 0 END
+                        ), 0)::integer as total
+                        FROM spark_transactions st
+                        WHERE st.user_id = ${user.id} AND st.type IN ('cool', 'liquidate')
+                    `
+                    const [{ invested }] = await sql`
+                        SELECT COALESCE(SUM(st.total_cost), 0)::integer as invested
+                        FROM spark_transactions st
+                        WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel')
+                    `
+                    const netProfit = Math.max(total - invested, 0)
+                    stats.forge_profit = netProfit
+                }
+                await pushChallengeProgress(sql, user.id, stats)
+            })().catch(err => console.error('Challenge push (cool) failed:', err))
+        )
 
         return {
             statusCode: 200,
@@ -844,7 +848,7 @@ async function getTutorialStatus(sql, user, params) {
 // POST: Tutorial fuel — grant 1 free Starter Spark (up to 3 per market)
 // First call sets tutorial completion marker; subsequent calls just grant free sparks
 // ═══════════════════════════════════════════════════
-async function tutorialFuel(sql, user, body) {
+async function tutorialFuel(sql, user, body, event) {
     const { sparkId } = body
     if (!sparkId) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId is required' }) }
@@ -951,11 +955,18 @@ async function tutorialFuel(sql, user, body) {
             return { newPrice: Number(newPrice), theoreticalCost, sparks: 1, freeSparksRemaining, isFirstUse }
         })
 
-        // Push challenge progress (fire-and-forget)
-        const stats = { sparks_fueled: 1 }
-        if (result.isFirstUse) stats.forge_tutorial_completed = 1
-        pushChallengeProgress(sql, user.id, stats)
-            .catch(err => console.error('Challenge push (tutorial fuel) failed:', err))
+        // Push challenge progress (background, survives response)
+        event.waitUntil(
+            (async () => {
+                const [{ count: fuelCount }] = await sql`
+                    SELECT COUNT(*)::integer as count FROM spark_transactions
+                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
+                `
+                const stats = { sparks_fueled: fuelCount }
+                if (result.isFirstUse) stats.forge_tutorial_completed = 1
+                await pushChallengeProgress(sql, user.id, stats)
+            })().catch(err => console.error('Challenge push (tutorial fuel) failed:', err))
+        )
 
         return {
             statusCode: 200,

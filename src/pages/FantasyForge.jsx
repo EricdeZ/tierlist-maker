@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { forgeService, leagueService } from '../services/database'
@@ -15,6 +15,7 @@ import { createEmberSystem, fireBurst } from './forge/forgeCanvas'
 import ForgeMarketTab from './forge/ForgeMarketTab'
 import ForgePortfolioTab from './forge/ForgePortfolioTab'
 import ForgeLeaderboardTab from './forge/ForgeLeaderboardTab'
+import ForgeChallengesTab from './forge/ForgeChallengesTab'
 import ForgeTradeModal from './forge/ForgeTradeModal'
 import ForgeToast from './forge/ForgeToast'
 import ForgeTutorial from './forge/ForgeTutorial'
@@ -26,9 +27,15 @@ const CHANGE_VIEW_KEY = 'smite2_forge_change_view'
 export default function FantasyForge() {
     const { leagueSlug: urlLeagueSlug, divisionSlug: urlDivisionSlug } = useParams()
     const navigate = useNavigate()
+    const location = useLocation()
     const { user, login, loading: authLoading, hasPermission } = useAuth()
     const { balance, refreshBalance } = usePassion()
-    const [activeTab, setActiveTab] = useState('market')
+
+    // Derive active tab from URL path
+    const activeTab = location.pathname.endsWith('/portfolio') ? 'portfolio'
+        : location.pathname.endsWith('/leaderboard') ? 'leaderboard'
+        : location.pathname.endsWith('/challenges') ? 'challenges'
+        : 'market'
     const [loading, setLoading] = useState(true)
     const [seasonsLoaded, setSeasonsLoaded] = useState(false)
     const [initialDataLoaded, setInitialDataLoaded] = useState(false)
@@ -79,16 +86,20 @@ export default function FantasyForge() {
         setSeasonIdRaw(id)
         if (id) {
             localStorage.setItem(SEASON_KEY, String(id))
-            // Update URL to match selected season
+            // Update URL to match selected season, preserving tab suffix
             const list = allSeasons || seasons
             const s = list.find(s => s.id === id)
             if (s) {
-                navigate(`/forge/${s.leagueSlug}/${s.divisionSlug}`, { replace: true })
+                const base = `/forge/${s.leagueSlug}/${s.divisionSlug}`
+                const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
+                    : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
+                    : ''
+                navigate(base + suffix, { replace: true })
             }
         } else {
             localStorage.removeItem(SEASON_KEY)
         }
-    }, [seasons, navigate])
+    }, [seasons, navigate, location.pathname])
     const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false)
     const seasonDropdownRef = useRef(null)
 
@@ -202,9 +213,15 @@ export default function FantasyForge() {
                 if (urlMatch) {
                     setSeasonId(urlMatch.id, allSeasons)
                 } else if (savedId && visible.find(s => s.id === savedId)) {
-                    // Keep localStorage selection, but sync URL
+                    // Keep localStorage selection, but sync URL (preserve tab suffix)
                     const saved = visible.find(s => s.id === savedId)
-                    if (saved) navigate(`/forge/${saved.leagueSlug}/${saved.divisionSlug}`, { replace: true })
+                    if (saved) {
+                        const base = `/forge/${saved.leagueSlug}/${saved.divisionSlug}`
+                        const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
+                            : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
+                            : ''
+                        navigate(base + suffix, { replace: true })
+                    }
                 } else if (visible.length > 0) {
                     setSeasonId(visible[0].id, allSeasons)
                 }
@@ -292,6 +309,21 @@ export default function FantasyForge() {
     // ── Selected season info for profile links ──
     const selectedSeason = useMemo(() => visibleSeasons.find(s => s.id === seasonId), [visibleSeasons, seasonId])
 
+    // ── Tab navigation helper ──
+    const getTabPath = useCallback((tabKey) => {
+        const s = selectedSeason
+        if (!s) return '/forge'
+        const base = `/forge/${s.leagueSlug}/${s.divisionSlug}`
+        if (tabKey === 'portfolio') return `${base}/portfolio`
+        if (tabKey === 'leaderboard') return `${base}/leaderboard`
+        if (tabKey === 'challenges') return `${base}/challenges`
+        return base
+    }, [selectedSeason])
+
+    const navigateTab = useCallback((tabKey) => {
+        navigate(getTabPath(tabKey), { replace: true })
+    }, [navigate, getTabPath])
+
     // ── Unique teams for filter ──
     const teams = useMemo(() => {
         const map = {}
@@ -333,10 +365,16 @@ export default function FantasyForge() {
         return list
     }, [players, search, teamFilter, sortBy, changeView])
 
-    // ── Select player for hero ──
-    const handleSelectPlayer = (player) => {
+    // ── Select player for hero (used by tutorial) ──
+    const handleSelectFeatured = (player) => {
         setFeaturedPlayer(player)
         loadPlayerHistory(player.sparkId)
+    }
+
+    // ── Navigate to player detail page ──
+    const handleSelectPlayer = (player) => {
+        if (!selectedSeason) return
+        navigate(`/forge/${selectedSeason.leagueSlug}/${selectedSeason.divisionSlug}/player/${player.playerSlug}`)
     }
 
     // ── Random player for hero (excluding current) ──
@@ -470,7 +508,7 @@ export default function FantasyForge() {
                     <img
                         src={forgeLogo}
                         alt="Fantasy Forge"
-                        className="w-20 h-20 object-contain forge-logo-float forge-logo-glow mb-4"
+                        className="w-40 h-40 object-contain forge-logo-float forge-logo-glow mb-4"
                     />
                     <div className="forge-head text-lg font-semibold tracking-wider text-[var(--forge-text-mid)]">
                         Igniting the Forge...
@@ -493,7 +531,7 @@ export default function FantasyForge() {
                     <img
                         src={forgeLogo}
                         alt="Fantasy Forge"
-                        className="w-24 h-24 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow"
+                        className="w-48 h-48 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow"
                     />
                     <h2 className="forge-head text-3xl font-bold tracking-wider mb-2">Fantasy Forge</h2>
                     <p className="forge-body text-[var(--forge-text-mid)] mb-6">
@@ -541,38 +579,36 @@ export default function FantasyForge() {
 
             <div ref={containerRef} className="relative" style={{ zIndex: 1 }}>
                 {/* Slim fiery hero banner */}
-                <div className="forge-banner h-32 flex items-end justify-center pb-3">
+                <div className="forge-banner h-44 flex items-end justify-center pb-3">
                     <div className="relative z-10 flex items-center gap-3">
-                        <Flame size={22} className="text-[var(--forge-flame-bright)]" style={{ filter: 'drop-shadow(0 0 8px rgba(255,170,51,0.6))' }} />
                         <img
                             src={forgeLogo}
                             alt=""
-                            className="w-8 h-8 object-contain"
+                            className="w-16 h-16 object-contain"
                             style={{ filter: 'drop-shadow(0 0 10px rgba(232,101,32,0.6))' }}
                         />
                         <div className="forge-head text-2xl font-bold tracking-[0.25em] text-white" style={{ textShadow: '0 0 20px rgba(232,101,32,0.5)' }}>
                             Fantasy <span className="text-[var(--forge-flame-bright)]">Forge</span>
                         </div>
-                        <Flame size={22} className="text-[var(--forge-flame-bright)]" style={{ filter: 'drop-shadow(0 0 8px rgba(255,170,51,0.6))' }} />
                     </div>
                 </div>
 
-                <div className="max-w-[1300px] mx-auto px-5 pt-5 pb-20">
+                <div className="max-w-[1300px] mx-auto px-3 sm:px-5 pt-20 pb-20">
 
                     {/* Top bar: brand + controls */}
-                    <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[var(--forge-border)] relative">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[var(--forge-border)] relative">
                         <div className="absolute bottom-[-1px] left-0 w-[200px] h-[2px]" style={{ background: 'linear-gradient(90deg, var(--forge-flame), transparent)' }} />
                         <div className="flex items-center gap-2.5">
                             <img
                                 src={forgeLogo}
                                 alt="Forge"
-                                className="w-9 h-9 object-contain forge-logo-glow"
+                                className="w-10 h-10 sm:w-18 sm:h-18 object-contain forge-logo-glow"
                             />
-                            <div className="forge-head text-[1.6rem] font-bold tracking-wider">
+                            <div className="forge-head text-lg sm:text-[1.6rem] font-bold tracking-wider">
                                 Fantasy <span className="text-[var(--forge-flame-bright)]">Forge</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                             {/* Season selector */}
                             {visibleSeasons.length > 1 && (() => {
                                 const selected = visibleSeasons.find(s => s.id === seasonId)
@@ -635,10 +671,10 @@ export default function FantasyForge() {
                                 </span>
                             </button>
 
-                            {/* Replay tutorial */}
-                            {!tutorialReplay && (
+                            {/* Replay tutorial (only on market tab) */}
+                            {activeTab === 'market' && !tutorialReplay && (
                                 <button
-                                    onClick={() => { setTutorialReplay(true); setActiveTab('market') }}
+                                    onClick={() => setTutorialReplay(true)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--forge-text-dim)] hover:text-[var(--forge-flame-bright)] hover:bg-[var(--forge-flame)]/8 border border-transparent hover:border-[var(--forge-flame)]/20 transition-all forge-head text-[0.75rem] tracking-wider"
                                     title="Replay tutorial"
                                 >
@@ -678,25 +714,30 @@ export default function FantasyForge() {
 
                     {/* Tabs */}
                     <div className="flex gap-0 mb-4">
-                        {TABS.map(tab => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
-                                className={`px-6 py-2.5 forge-head text-lg font-semibold tracking-wider relative transition-all ${
-                                    activeTab === tab.key
-                                        ? 'text-[var(--forge-flame-bright)] forge-tab-active'
-                                        : 'text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)] hover:bg-[var(--forge-flame)]/3'
-                                }`}
-                            >
-                                {tab.label}
-                                {activeTab === tab.key && (
-                                    <span
-                                        className="absolute bottom-0 left-3 right-3 h-[2px] forge-tab-underline"
-                                        style={{ background: 'var(--forge-flame)', boxShadow: '0 0 10px rgba(232,101,32,0.4)' }}
-                                    />
-                                )}
-                            </button>
-                        ))}
+                        {TABS.map(tab => {
+                            const Icon = tab.icon
+                            return (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => navigateTab(tab.key)}
+                                    className={`flex-1 sm:flex-none px-2 sm:px-6 py-2.5 forge-head text-xs sm:text-lg font-semibold tracking-wider relative transition-all flex items-center justify-center sm:justify-start gap-1.5 ${
+                                        activeTab === tab.key
+                                            ? 'text-[var(--forge-flame-bright)] forge-tab-active'
+                                            : 'text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)] hover:bg-[var(--forge-flame)]/3'
+                                    }`}
+                                >
+                                    <Icon size={16} className="sm:hidden flex-shrink-0" />
+                                    <span className="hidden sm:inline">{tab.label}</span>
+                                    <span className="sm:hidden">{tab.key === 'market' ? 'Forge' : tab.key === 'portfolio' ? 'Sparks' : tab.key === 'leaderboard' ? 'Flame' : 'Contracts'}</span>
+                                    {activeTab === tab.key && (
+                                        <span
+                                            className="absolute bottom-0 left-2 right-2 sm:left-3 sm:right-3 h-[2px] forge-tab-underline"
+                                            style={{ background: 'var(--forge-flame)', boxShadow: '0 0 10px rgba(232,101,32,0.4)' }}
+                                        />
+                                    )}
+                                </button>
+                            )
+                        })}
                     </div>
 
                     {/* Error */}
@@ -750,6 +791,10 @@ export default function FantasyForge() {
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                         />
                     )}
+
+                    {activeTab === 'challenges' && (
+                        <ForgeChallengesTab loading={loading} />
+                    )}
                 </div>
             </div>
 
@@ -760,7 +805,7 @@ export default function FantasyForge() {
                     seasonId={seasonId}
                     marketOpen={market?.status === 'open'}
                     onTutorialFuel={handleTutorialFuel}
-                    onSelectFeatured={handleSelectPlayer}
+                    onSelectFeatured={handleSelectFeatured}
                     onComplete={handleTutorialComplete}
                     search={search}
                     setSearch={setSearch}

@@ -39,7 +39,7 @@ function HoldingSparkline({ historyData }) {
         const last = data[data.length - 1]
         const first = data[0]
         const change = first > 0 ? ((last - first) / first) * 100 : 0
-        const tier = change > 10 ? 'blazing' : change > 0 ? 'warm' : 'cooling'
+        const tier = change > 10 ? 'blazing' : change >= 0 ? 'warm' : 'cooling'
         const colors = hasData ? SPARK_COLORS[tier] : SPARK_COLORS.neutral
         drawSparkline(ref.current, data, { lineColor: colors.line, fillColor: colors.fill })
     }, [data, hasData])
@@ -167,7 +167,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
-                <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-float opacity-40 mb-3" />
+                <img src={forgeLogo} alt="" className="w-24 h-24 object-contain forge-logo-float opacity-40 mb-3" />
                 <div className="forge-head text-[var(--forge-text-dim)] text-lg tracking-wider">Loading your Sparks...</div>
                 <div className="w-32 h-1 mt-2 rounded-full overflow-hidden bg-[var(--forge-edge)]">
                     <div className="h-full forge-shimmer rounded-full" style={{ background: 'var(--forge-flame)' }} />
@@ -192,7 +192,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
         <div>
             {/* Portfolio stat strip */}
             {stats && (
-                <div className="flex gap-[2px] mb-4 bg-[var(--forge-border)]">
+                <div className="forge-stat-strip flex gap-[2px] mb-4 bg-[var(--forge-border)]">
                     <StatBlock label="Portfolio" value={stats.totalValue} icon={Wallet} />
                     <StatBlock label="Invested" value={stats.totalInvested} />
                     <StatBlock
@@ -298,15 +298,15 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                     return (
                         <div
                             key={h.sparkId}
-                            className={`forge-${tier} forge-holding flex items-center gap-3 p-3 bg-[var(--forge-panel)] border border-transparent`}
+                            className={`forge-${tier} forge-holding flex flex-wrap items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-[var(--forge-panel)] border border-transparent`}
                         >
                             {/* Heat bar */}
-                            <div className="w-1 h-10 rounded-sm forge-heat-bar" />
+                            <div className="w-1 h-10 rounded-sm forge-heat-bar hidden sm:block" />
 
-                            <TeamLogo slug={h.teamSlug} name={h.teamName} size={32} color={h.teamColor} />
+                            <TeamLogo slug={h.teamSlug} name={h.teamName} size={28} color={h.teamColor} />
 
                             <div className="flex-1 min-w-0">
-                                <div className="forge-body font-bold text-base">
+                                <div className="forge-body font-bold text-sm sm:text-base truncate">
                                     {profileUrl ? (
                                         <a
                                             href={profileUrl}
@@ -318,17 +318,15 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                                         </a>
                                     ) : h.playerName}
                                 </div>
-                                <div className="text-sm text-[var(--forge-text-dim)] flex items-center gap-1">
-                                    <TeamLogo slug={h.teamSlug} name={h.teamName} size={16} color={h.teamColor} />
-                                    <span style={{ color: h.teamColor }}>{h.teamName}</span>
-                                    {h.role && <span className="opacity-60"> &middot; {h.role}</span>}
+                                <div className="text-xs sm:text-sm text-[var(--forge-text-dim)] flex items-center gap-1 flex-wrap">
+                                    <span style={{ color: h.teamColor }} className="truncate">{h.teamName}</span>
                                     <span className="opacity-60 flex items-center gap-0.5">
                                         &middot;
-                                        <img src={sparkIcon} alt="" className="w-6 h-6 object-contain forge-spark-icon" />
-                                        <span className="forge-num">{h.sparks}</span> Spark{h.sparks !== 1 ? 's' : ''}
+                                        <img src={sparkIcon} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain forge-spark-icon" />
+                                        <span className="forge-num">{h.sparks}</span>
                                     </span>
                                     {h.tutorialSparks > 0 && (
-                                        <span className="forge-head text-[0.65rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 ml-1">
+                                        <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1">
                                             {h.tutorialSparks} free
                                         </span>
                                     )}
@@ -341,8 +339,8 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                             </div>
 
                             {/* % change */}
-                            <div className="text-center w-16 flex-shrink-0">
-                                <span className={`forge-num text-sm px-1.5 py-0.5 rounded-sm ${
+                            <div className="text-center flex-shrink-0">
+                                <span className={`forge-num text-xs sm:text-sm px-1.5 py-0.5 rounded-sm ${
                                     isUp ? 'text-[var(--forge-gain)] bg-[var(--forge-gain)]/6'
                                     : isDown ? 'text-[var(--forge-loss)] bg-[var(--forge-loss)]/6'
                                     : 'text-white'
@@ -352,12 +350,12 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                             </div>
 
                             {/* Value + P&L */}
-                            <div className="text-right w-20 flex-shrink-0">
+                            <div className="text-right flex-shrink-0">
                                 <div className="flex items-center gap-1 justify-end">
                                     <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
-                                    <span className="forge-num text-base forge-price-text">{h.currentValue.toLocaleString()}</span>
+                                    <span className="forge-num text-sm sm:text-base forge-price-text">{h.currentValue.toLocaleString()}</span>
                                 </div>
-                                <div className={`forge-num text-sm ${h.unrealizedPL >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}`}>
+                                <div className={`forge-num text-xs sm:text-sm ${h.unrealizedPL >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}`}>
                                     {h.unrealizedPL >= 0 ? '+' : ''}{h.unrealizedPL.toLocaleString()}
                                 </div>
                             </div>
@@ -365,17 +363,17 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                             {h.coolableSparks > 0 ? (
                                 <button
                                     onClick={() => onCool(h.sparkId, h.playerName, { sparks: h.sparks, coolableSparks: h.coolableSparks })}
-                                    className="p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] forge-btn-cool forge-clip-btn flex items-center gap-1"
+                                    className="p-1.5 sm:p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] forge-btn-cool forge-clip-btn flex items-center gap-1"
                                     title={h.tutorialSparks > 0 ? `Cool up to ${h.coolableSparks} Sparks` : 'Cool'}
                                 >
-                                    <Snowflake size={16} />
+                                    <Snowflake size={14} />
                                 </button>
                             ) : (
                                 <div
-                                    className="p-2 bg-[var(--forge-edge)]/30 text-[var(--forge-text-dim)] opacity-40 forge-clip-btn"
+                                    className="p-1.5 sm:p-2 bg-[var(--forge-edge)]/30 text-[var(--forge-text-dim)] opacity-40 forge-clip-btn"
                                     title="Free Sparks cannot be cooled"
                                 >
-                                    <Snowflake size={16} />
+                                    <Snowflake size={14} />
                                 </div>
                             )}
                         </div>
@@ -394,7 +392,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                     </div>
                     <div className="space-y-1">
                         {portfolio.transactions.map(t => (
-                            <div key={t.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--forge-panel)]/40 text-base hover:bg-[var(--forge-panel)]/60 transition-colors">
+                            <div key={t.id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 bg-[var(--forge-panel)]/40 text-sm sm:text-base hover:bg-[var(--forge-panel)]/60 transition-colors">
                                 {(t.type === 'fuel' || t.type === 'tutorial_fuel') ? (
                                     <Flame size={16} className="text-[var(--forge-flame)] flex-shrink-0" />
                                 ) : (

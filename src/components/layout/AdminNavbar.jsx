@@ -28,6 +28,7 @@ const morePages = [
     { path: '/admin/users',          label: 'Users',           permission: 'user_manage',     globalOnly: true },
     { path: '/admin/claims',         label: 'Claims',          permission: 'claim_manage',    globalOnly: true },
     { path: '/admin/data-reports',   label: 'Data Reports',    permission: 'league_manage',   globalOnly: true },
+    { path: '/admin/leaguestaff',    label: 'League Staff',    permission: 'league_staff_manage' },
     { path: '/admin/permissions',    label: 'Permissions',     permission: 'permission_manage' },
     { path: '/admin/auditlog',       label: 'Audit Log',       permission: 'audit_log_view' },
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },

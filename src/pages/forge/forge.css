@@ -258,7 +258,7 @@
         #8b3000, #3d1600, #1a0800, #0d0400
     );
     background-size: 400% 100%;
-    animation: forge-banner-flow 8s ease infinite;
+    animation: forge-banner-flow 20s ease infinite;
     position: relative;
     overflow: hidden;
 }
@@ -703,6 +703,38 @@
 
 
 /* ═══════════════════════════════════════════════════
+   FORGE CHALLENGES (CONTRACTS)
+   ═══════════════════════════════════════════════════ */
+
+@keyframes forge-challenge-shimmer {
+    0%, 100% { transform: translateX(-100%) skewX(-15deg); }
+    50% { transform: translateX(350%) skewX(-15deg); }
+}
+
+@keyframes forge-progress-fill {
+    0% { width: 0%; }
+}
+
+@keyframes forge-challenge-glow {
+    0% { box-shadow: 0 0 0 0 rgba(232, 101, 32, 0); }
+    30% { box-shadow: 0 0 20px 3px rgba(232, 101, 32, 0.25); }
+    100% { box-shadow: 0 0 0 0 rgba(232, 101, 32, 0); }
+}
+
+.forge-challenge-claimable {
+    animation: forge-challenge-glow 3s ease-in-out infinite;
+}
+
+.forge-challenge-card {
+    transition: border-color 0.2s, transform 0.15s;
+}
+
+.forge-challenge-card:hover {
+    border-color: var(--forge-border-lt);
+}
+
+
+/* ═══════════════════════════════════════════════════
    REDUCED MOTION
    ═══════════════════════════════════════════════════ */
 
@@ -718,7 +750,8 @@
     .forge-spark-icon,
     .forge-spark-icon-lg,
     .forge-rank-badge,
-    .forge-banner {
+    .forge-banner,
+    .forge-challenge-claimable {
         animation: none !important;
     }
 
@@ -902,4 +935,56 @@
     width: 80px;
     height: 28px;
     flex-shrink: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVE
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+    /* Player row: simplify grid to essential columns */
+    .forge-player-row {
+        grid-template-columns: 4px 40px 1fr auto auto !important;
+    }
+    .forge-col-badge,
+    .forge-col-sparkline,
+    .forge-col-delta {
+        display: none !important;
+    }
+
+    /* Hero: stack vertically */
+    .forge-hero {
+        min-height: auto !important;
+    }
+
+    /* Tabs: horizontal scroll */
+    .forge-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .forge-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Portfolio stat strip: 2x2 grid */
+    .forge-stat-strip {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px;
+    }
+
+    /* Holdings: allow wrapping */
+    .forge-holding {
+        flex-wrap: wrap;
+    }
+    .forge-holding-sparkline {
+        display: none;
+    }
+
+    /* Portfolio chart */
+    .forge-portfolio-chart {
+        height: 160px;
+    }
 }

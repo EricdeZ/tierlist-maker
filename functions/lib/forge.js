@@ -7,7 +7,7 @@ import { pushChallengeProgress } from './challenges.js'
 // Configuration
 // ═══════════════════════════════════════════════════
 export const FORGE_CONFIG = {
-    BASE_PRICE: 100,
+    BASE_PRICE: 50,
     SUPPLY_FACTOR: 0.01,       // 1% price increase per outstanding Spark
     COOLING_TAX: 0.10,         // 10% fee on selling
     PRICE_FLOOR: 10,

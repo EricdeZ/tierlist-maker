@@ -497,7 +497,7 @@ export default function ForgeTutorial({
                         {currentStep.isComplete ? (
                             <img src={sparkIcon} alt="" className="w-16 h-16 object-contain" style={{ filter: 'drop-shadow(0 0 12px rgba(232,101,32,0.5))' }} />
                         ) : (
-                            <img src={forgeLogo} alt="" className="w-12 h-12 object-contain forge-logo-glow" />
+                            <img src={forgeLogo} alt="" className="w-24 h-24 object-contain forge-logo-glow" />
                         )}
                     </div>
                 )}

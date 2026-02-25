@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Pencil, Trash2, Check, X, Copy, ImagePlus, Users } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Plus, Pencil, Trash2, Check, X, Copy, Users } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import TeamLogo from '../../components/TeamLogo'
+import ImageUpload from '../../components/ImageUpload'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
@@ -13,7 +14,7 @@ export default function TeamManager() {
     const [selectedSeasonId, setSelectedSeasonId] = useState(null)
     const [editItem, setEditItem] = useState(null)
     const [createItem, setCreateItem] = useState(null)
-    const [saving, setSaving] = useState(false)
+    const [saving, setSaving] = useState(false)  // false | 'saving' | 'uploading'
     const [confirmModal, setConfirmModal] = useState(null)
     const [copyModal, setCopyModal] = useState(null)
 
@@ -99,7 +100,7 @@ export default function TeamManager() {
     // ─── Handlers ───
     const handleSaveEdit = async () => {
         if (!editItem) return
-        setSaving(true)
+        setSaving('saving')
         try {
             await doAction({ action: 'update-team', ...editItem })
             showToast('success', 'Team updated')
@@ -111,9 +112,28 @@ export default function TeamManager() {
 
     const handleSaveCreate = async () => {
         if (!createItem) return
-        setSaving(true)
+        setSaving('saving')
         try {
-            await doAction({ action: 'create-team', ...createItem })
+            const { iconFile, ...payload } = createItem
+            const result = await doAction({ action: 'create-team', ...payload })
+            if (iconFile && result.team?.id) {
+                setSaving('uploading')
+                try {
+                    const formData = new FormData()
+                    formData.append('teamId', result.team.id)
+                    formData.append('file', iconFile)
+                    const token = localStorage.getItem('auth_token')
+                    const res = await fetch(`${API}/team-upload`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: formData,
+                    })
+                    if (!res.ok) {
+                        const d = await res.json()
+                        showToast('error', `Team created but icon failed: ${d.error || 'Upload failed'}`)
+                    }
+                } catch { showToast('error', 'Team created but icon upload failed') }
+            }
             showToast('success', 'Team created')
             setCreateItem(null)
             fetchData()
@@ -317,6 +337,11 @@ export default function TeamManager() {
                 <div className="bg-[var(--color-secondary)] border border-emerald-500/20 rounded-xl p-4 mb-4">
                     <p className="text-xs text-[var(--color-text-secondary)] mb-3">New team</p>
                     <div className="flex items-end gap-3 flex-wrap">
+                        <ImageUpload
+                            file={createItem.iconFile}
+                            onChange={file => setCreateItem(prev => ({ ...prev, iconFile: file }))}
+                            onError={msg => showToast('error', msg)}
+                        />
                         <div>
                             <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Name</label>
                             <input
@@ -339,13 +364,20 @@ export default function TeamManager() {
                                 className="w-8 h-8 rounded border border-white/10 cursor-pointer"
                             />
                         </div>
-                        <div className="flex gap-1">
-                            <button onClick={handleSaveCreate} disabled={saving} className="p-1.5 rounded text-green-400 hover:bg-green-500/10 disabled:opacity-40" title="Save">
-                                <Check className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => setCreateItem(null)} className="p-1.5 rounded text-[var(--color-text-secondary)] hover:bg-white/5" title="Cancel">
-                                <X className="w-4 h-4" />
-                            </button>
+                        <div className="flex items-center gap-2">
+                            {saving && (
+                                <span className="text-[10px] text-[var(--color-text-secondary)] animate-pulse">
+                                    {saving === 'uploading' ? 'Uploading icon...' : 'Creating...'}
+                                </span>
+                            )}
+                            <div className="flex gap-1">
+                                <button onClick={handleSaveCreate} disabled={saving} className="p-1.5 rounded text-green-400 hover:bg-green-500/10 disabled:opacity-40" title="Save">
+                                    <Check className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => setCreateItem(null)} disabled={saving} className="p-1.5 rounded text-[var(--color-text-secondary)] hover:bg-white/5 disabled:opacity-40" title="Cancel">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -368,12 +400,36 @@ export default function TeamManager() {
                             <div key={team.id} className={`bg-[var(--color-secondary)] border rounded-xl p-4 transition-colors ${isEditing ? 'border-emerald-500/30' : 'border-white/10'}`}>
                                 {isEditing ? (
                                     <div className="flex items-end gap-3 flex-wrap">
-                                        <TeamIconUpload
-                                            teamId={team.id}
+                                        <ImageUpload
                                             currentUrl={team.logo_url}
-                                            teamSlug={team.slug}
-                                            teamColor={team.color}
-                                            onComplete={(type, msg) => { showToast(type, msg); fetchData() }}
+                                            uploadFn={async (file) => {
+                                                const formData = new FormData()
+                                                formData.append('teamId', team.id)
+                                                formData.append('file', file)
+                                                const token = localStorage.getItem('auth_token')
+                                                const res = await fetch(`${API}/team-upload`, {
+                                                    method: 'POST',
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                    body: formData,
+                                                })
+                                                if (!res.ok) {
+                                                    const d = await res.json()
+                                                    throw new Error(d.error || 'Upload failed')
+                                                }
+                                            }}
+                                            onRemove={async () => {
+                                                const token = localStorage.getItem('auth_token')
+                                                const res = await fetch(`${API}/team-upload?teamId=${team.id}`, {
+                                                    method: 'DELETE',
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                })
+                                                if (!res.ok) {
+                                                    const d = await res.json()
+                                                    throw new Error(d.error || 'Remove failed')
+                                                }
+                                            }}
+                                            onComplete={() => fetchData()}
+                                            onError={msg => showToast('error', msg)}
                                         />
                                         <div>
                                             <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Name</label>
@@ -452,96 +508,3 @@ export default function TeamManager() {
     )
 }
 
-// ═══════════════════════════════════════════════════
-// TEAM ICON UPLOAD
-// ═══════════════════════════════════════════════════
-function TeamIconUpload({ teamId, currentUrl, teamSlug, teamColor, onComplete }) {
-    const [uploading, setUploading] = useState(false)
-    const fileRef = useRef(null)
-
-    const handleUpload = async (e) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        if (file.size > 512 * 1024) {
-            onComplete?.('error', 'Image must be under 512KB')
-            return
-        }
-        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-            onComplete?.('error', 'Only JPEG, PNG, WebP, and GIF allowed')
-            return
-        }
-
-        setUploading(true)
-        try {
-            const formData = new FormData()
-            formData.append('teamId', teamId)
-            formData.append('file', file)
-
-            const token = localStorage.getItem('auth_token')
-            const res = await fetch(`${API}/team-upload`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Upload failed')
-            onComplete?.('success', 'Icon uploaded')
-        } catch (err) {
-            onComplete?.('error', err.message)
-        } finally {
-            setUploading(false)
-            if (fileRef.current) fileRef.current.value = ''
-        }
-    }
-
-    const handleRemove = async () => {
-        setUploading(true)
-        try {
-            const token = localStorage.getItem('auth_token')
-            const res = await fetch(`${API}/team-upload?teamId=${teamId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Remove failed')
-            onComplete?.('success', 'Icon removed')
-        } catch (err) {
-            onComplete?.('error', err.message)
-        } finally {
-            setUploading(false)
-        }
-    }
-
-    return (
-        <div className="flex flex-col items-center gap-1">
-            {currentUrl ? (
-                <img src={currentUrl} className="w-10 h-10 rounded-lg object-cover border border-white/10" alt="" />
-            ) : (
-                <TeamLogo slug={teamSlug} size={40} color={teamColor} />
-                || <div className="w-10 h-10 rounded-lg border border-dashed border-white/20 flex items-center justify-center">
-                    <ImagePlus className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                </div>
-            )}
-            <input type="file" ref={fileRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleUpload} />
-            <div className="flex gap-1">
-                <button
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploading}
-                    className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-                >
-                    {uploading ? '...' : currentUrl ? 'Change' : 'Upload'}
-                </button>
-                {currentUrl && (
-                    <button
-                        onClick={handleRemove}
-                        disabled={uploading}
-                        className="text-[10px] text-red-400/70 hover:text-red-300 transition-colors"
-                    >
-                        Remove
-                    </button>
-                )}
-            </div>
-        </div>
-    )
-}

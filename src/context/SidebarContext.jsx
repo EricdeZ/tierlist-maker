@@ -19,8 +19,8 @@ export const SidebarProvider = ({ children }) => {
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key !== ' ') return
-            // SmiteRunner uses spacebar for jump — never hijack it
-            if (document.querySelector('[data-smiterunner]')) return
+            // SmiteRunner / Arcade game uses spacebar — never hijack it
+            if (document.querySelector('[data-smiterunner]') || document.querySelector('[data-arcade-game]')) return
             // Always allow spacebar to close an open sidebar
             if (!isOpenRef.current) {
                 const tag = e.target.tagName

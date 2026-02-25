@@ -152,3 +152,6 @@ claude_images
 bash.exe.stackdump
 deno.lock
 /.claude/settings.local.json
+git-temp/
+scripts/video-generator/output/
+scripts/video-generator/.tmp/

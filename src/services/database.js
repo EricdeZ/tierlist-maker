@@ -649,3 +649,66 @@ export const scrimService = {
     },
 }
 
+export const arcadeNpcService = {
+    async list() { return apiCall('arcade-npcs', { action: 'list' }) },
+    async adminList() { return apiCall('arcade-npcs', { action: 'admin-list' }) },
+    async create(data) { return apiPost('arcade-npcs', { action: 'create' }, data) },
+    async update(data) { return apiPost('arcade-npcs', { action: 'update' }, data) },
+    async toggle(id) { return apiPost('arcade-npcs', { action: 'toggle' }, { id }) },
+    async remove(id) { return apiPost('arcade-npcs', { action: 'delete' }, { id }) },
+}
+
+export const inhouseService = {
+    async list(filters = {}) {
+        return apiCall('inhouse', { action: 'list', ...filters })
+    },
+    async getDetail(lobbyId) {
+        return apiCall('inhouse', { action: 'detail', lobbyId })
+    },
+    async getDraftState(lobbyId) {
+        return apiCall('inhouse', { action: 'draft-state', lobbyId })
+    },
+    async getLeaderboard(sort) {
+        return apiCall('inhouse', { action: 'leaderboard', sort })
+    },
+    async getMyStats() {
+        return apiCall('inhouse', { action: 'my-stats' })
+    },
+    async getPlayerStats(userId) {
+        return apiCall('inhouse', { action: 'player-stats', userId })
+    },
+    async getMyLobbies() {
+        return apiCall('inhouse', { action: 'my-lobbies' })
+    },
+    async create(data) {
+        return apiPost('inhouse', { action: 'create' }, data)
+    },
+    async join(data) {
+        return apiPost('inhouse', { action: 'join' }, data)
+    },
+    async leave(lobbyId) {
+        return apiPost('inhouse', { action: 'leave' }, { lobbyId })
+    },
+    async kick(data) {
+        return apiPost('inhouse', { action: 'kick' }, data)
+    },
+    async cancel(lobbyId) {
+        return apiPost('inhouse', { action: 'cancel' }, { lobbyId })
+    },
+    async setCaptains(data) {
+        return apiPost('inhouse', { action: 'set-captains' }, data)
+    },
+    async startDraft(lobbyId) {
+        return apiPost('inhouse', { action: 'start-draft' }, { lobbyId })
+    },
+    async draftPick(data) {
+        return apiPost('inhouse', { action: 'draft-pick' }, data)
+    },
+    async startVoting(lobbyId) {
+        return apiPost('inhouse', { action: 'start-voting' }, { lobbyId })
+    },
+    async vote(data) {
+        return apiPost('inhouse', { action: 'vote' }, data)
+    },
+}
+
