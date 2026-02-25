@@ -18,6 +18,7 @@ const primaryTabs = [
 
 const morePages = [
     { path: '/admin/discord-review', label: 'Discord Review',  permission: 'match_report' },
+    { path: '/admin/roster-sync',    label: 'Roster Sync',    permission: 'roster_manage' },
     { path: '/admin/matches',        label: 'Match Manager',   permission: ['match_manage', 'match_manage_own'] },
     { path: '/admin/rosters',        label: 'Rosters',         permission: 'roster_manage' },
     { path: '/admin/players',        label: 'Players',         permission: 'player_manage',   globalOnly: true },

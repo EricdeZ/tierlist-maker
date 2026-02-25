@@ -65,6 +65,7 @@ export default function FantasyForge() {
     // Portfolio state
     const [portfolio, setPortfolio] = useState(null)
     const [portfolioHistories, setPortfolioHistories] = useState(null)
+    const [portfolioTimeline, setPortfolioTimeline] = useState(null)
 
     // Leaderboard state
     const [leaderboard, setLeaderboard] = useState([])
@@ -277,7 +278,10 @@ export default function FantasyForge() {
                 if (!user) { setLoading(false); return }
                 const data = await forgeService.getPortfolio(seasonId)
                 setPortfolio(data)
-                // Load batch history for holdings
+                // Load batch history for holdings + portfolio timeline in parallel
+                const timelinePromise = forgeService.getPortfolioTimeline(seasonId).then(res => {
+                    setPortfolioTimeline(res.timeline || [])
+                }).catch(() => setPortfolioTimeline([]))
                 if (data.holdings?.length > 0) {
                     const sparkIds = data.holdings.map(h => h.sparkId)
                     forgeService.getBatchHistory(sparkIds).then(res => {
@@ -286,6 +290,7 @@ export default function FantasyForge() {
                 } else {
                     setPortfolioHistories({})
                 }
+                await timelinePromise
             } else if (activeTab === 'leaderboard') {
                 const data = await forgeService.getLeaderboard(seasonId)
                 setLeaderboard(data.leaderboard || [])
@@ -823,6 +828,7 @@ export default function FantasyForge() {
                         <ForgePortfolioTab
                             portfolio={portfolio}
                             portfolioHistories={portfolioHistories}
+                            portfolioTimeline={portfolioTimeline}
                             loading={loading}
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}

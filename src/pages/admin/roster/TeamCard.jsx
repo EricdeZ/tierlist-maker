@@ -38,13 +38,13 @@ export function TeamCard({
                     </h3>
                 </div>
                 <span className="text-xs text-[var(--color-text-secondary)]">
-                    {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').length} players
+                    {team.players.filter(p => showSubs || p.roster_status !== 'sub').length} players
                 </span>
             </div>
 
             {/* Player list */}
             <div className="px-3 pb-2 space-y-1 min-h-[120px]">
-                {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').map(player => (
+                {team.players.filter(p => showSubs || p.roster_status !== 'sub').map(player => (
                     <PlayerRow
                         key={player.league_player_id}
                         player={player}
@@ -71,7 +71,7 @@ export function TeamCard({
                     />
                 ))}
 
-                {team.players.filter(p => showSubs || p.role?.toLowerCase() !== 'sub').length === 0 && (
+                {team.players.filter(p => showSubs || p.roster_status !== 'sub').length === 0 && (
                     <div className="text-center py-6 text-sm text-[var(--color-text-secondary)]/50 italic">
                         No active players
                     </div>

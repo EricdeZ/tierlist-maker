@@ -63,8 +63,8 @@ const Teams = () => {
     const getTeamPlayers = (teamId) =>
         (players?.filter(p => p.team_id === teamId) || [])
             .sort((a, b) => {
-                if (a.is_captain && !b.is_captain) return -1
-                if (!a.is_captain && b.is_captain) return 1
+                if (a.roster_status === 'captain' && b.roster_status !== 'captain') return -1
+                if (a.roster_status !== 'captain' && b.roster_status === 'captain') return 1
                 return a.name.localeCompare(b.name)
             })
 
@@ -163,7 +163,7 @@ const Teams = () => {
                                             className="text-sm text-(--color-text-secondary) flex items-center justify-between hover:text-(--color-accent) transition-colors py-0.5 group"
                                         >
                                             <span className="flex items-center gap-1.5">
-                                                {player.is_captain && (
+                                                {player.roster_status === 'captain' && (
                                                     <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
                                                 )}
                                                 {player.name}

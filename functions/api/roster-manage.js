@@ -86,7 +86,7 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'role required' }) }
     }
 
-    const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'sub', 'fill']
+    const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'fill']
     if (!validRoles.includes(role.toLowerCase())) {
         return {
             statusCode: 400,
@@ -153,9 +153,9 @@ async function transferPlayer(sql, { league_player_id, new_team_id }, admin, eve
 
     const [updated] = await sql`
         UPDATE league_players
-        SET team_id = ${new_team_id}, is_captain = false, updated_at = NOW()
+        SET team_id = ${new_team_id}, roster_status = 'member', updated_at = NOW()
         WHERE id = ${league_player_id}
-        RETURNING id, team_id, is_captain
+        RETURNING id, team_id, roster_status
     `
 
     await logAudit(sql, admin, { action: 'transfer-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { new_team_id, team_name: team.name } })
@@ -181,9 +181,9 @@ async function dropPlayer(sql, { league_player_id }, admin, event) {
 
     const [updated] = await sql`
         UPDATE league_players
-        SET is_active = false, is_captain = false, updated_at = NOW()
+        SET is_active = false, roster_status = 'member', updated_at = NOW()
         WHERE id = ${league_player_id}
-        RETURNING id, is_active, is_captain
+        RETURNING id, is_active, roster_status
     `
 
     if (!updated) {
@@ -635,15 +635,15 @@ async function setCaptain(sql, { league_player_id }, admin, event) {
     // Remove captain from all players on same team+season
     await sql`
         UPDATE league_players
-        SET is_captain = false, updated_at = NOW()
-        WHERE team_id = ${lp.team_id} AND season_id = ${lp.season_id} AND is_captain = true
+        SET roster_status = 'member', updated_at = NOW()
+        WHERE team_id = ${lp.team_id} AND season_id = ${lp.season_id} AND roster_status = 'captain'
     `
 
     const [updated] = await sql`
         UPDATE league_players
-        SET is_captain = true, updated_at = NOW()
+        SET roster_status = 'captain', updated_at = NOW()
         WHERE id = ${league_player_id}
-        RETURNING id, is_captain
+        RETURNING id, roster_status
     `
 
     await logAudit(sql, admin, {

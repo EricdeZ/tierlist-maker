@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Zap, Flame, Snowflake, Wallet } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
@@ -69,72 +69,21 @@ function getHoldingChange(holding, historyData) {
 const TRIGGER_LABELS = {
     fuel: 'Fueled',
     tutorial_fuel: 'Starter Spark',
+    referral_fuel: 'Referral Spark',
     cool: 'Cooled',
+    liquidate: 'Liquidated',
     performance: 'Performance Update',
     init: 'Initial Price',
 }
 
-export default function ForgePortfolioTab({ portfolio, portfolioHistories, loading, seasonSlugs, onCool }) {
+export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, onCool }) {
     const chartRef = useRef(null)
     const chartInteraction = useRef(null)
     const [tooltip, setTooltip] = useState(null)
 
-    // Build composite portfolio timeline from all holdings' histories
-    const portfolioTimeline = useMemo(() => {
-        if (!portfolio?.holdings?.length || !portfolioHistories) return null
-
-        // Collect all events from all holdings, tagged with player info
-        const allEvents = []
-        for (const h of portfolio.holdings) {
-            const hist = portfolioHistories[h.sparkId]
-            if (!hist?.length) continue
-            for (const entry of hist) {
-                allEvents.push({
-                    sparkId: h.sparkId,
-                    playerName: h.playerName,
-                    value: entry.price * h.sparks,
-                    price: entry.price,
-                    trigger: entry.trigger,
-                    createdAt: entry.createdAt,
-                    sparks: h.sparks,
-                })
-            }
-        }
-
-        if (allEvents.length < 2) return null
-
-        // Sort by time and build composite timeline
-        allEvents.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-
-        // Build cumulative portfolio value at each event point
-        // Track last known price for each sparkId
-        const lastPrice = {}
-        const timeline = []
-
-        for (const ev of allEvents) {
-            lastPrice[ev.sparkId] = ev.price
-
-            // Calculate total portfolio value at this point
-            let totalValue = 0
-            for (const h of portfolio.holdings) {
-                const p = lastPrice[h.sparkId] || h.currentPrice
-                totalValue += p * h.sparks
-            }
-
-            timeline.push({
-                value: Math.round(totalValue),
-                trigger: ev.trigger,
-                playerName: ev.playerName,
-                createdAt: ev.createdAt,
-            })
-        }
-
-        return timeline
-    }, [portfolio, portfolioHistories])
-
-    // Draw the big portfolio chart
+    // Draw the portfolio chart from server-provided timeline
     useEffect(() => {
-        if (!chartRef.current || !portfolioTimeline) return
+        if (!chartRef.current || !portfolioTimeline?.length || portfolioTimeline.length < 2) return
         chartInteraction.current = drawPortfolioChart(chartRef.current, portfolioTimeline, {
             lineColor: '#e86520',
             fillColor: 'rgba(232,101,32,0.15)',
@@ -152,7 +101,8 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                 x: hit.x,
                 y: hit.y - 12,
                 trigger: hit.trigger,
-                value: hit.value,
+                worth: hit.worth,
+                basis: hit.basis,
                 playerName: hit.playerName,
                 createdAt: hit.createdAt,
                 isLine: hit.isLine,
@@ -211,12 +161,12 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
             )}
 
             {/* Big Interactive Portfolio Chart */}
-            {portfolioTimeline && (
+            {portfolioTimeline?.length >= 2 && (
                 <>
                     <div className="relative pb-1.5 mb-2 border-b border-[var(--forge-border)]">
                         <h2 className="forge-head text-base font-bold tracking-wider text-[var(--forge-text-mid)] flex items-center gap-2">
                             <Zap size={14} className="text-[var(--forge-flame)]" />
-                            Portfolio Value Over Time
+                            Portfolio Worth vs Invested
                         </h2>
                         <div className="forge-section-accent" />
                     </div>
@@ -231,16 +181,19 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                                 className="forge-chart-tooltip"
                                 style={{
                                     left: Math.min(Math.max(tooltip.x, 60), chartRef.current?.parentElement?.offsetWidth - 60 || 9999),
-                                    top: Math.max(tooltip.y - 48, 4),
+                                    top: Math.max(tooltip.y - 58, 4),
                                 }}
                             >
                                 <div className="forge-num text-sm text-[var(--forge-gold-bright)]">
-                                    {Math.round(tooltip.value).toLocaleString()} Heat
+                                    {Math.round(tooltip.worth).toLocaleString()} Worth
+                                </div>
+                                <div className="forge-num text-xs text-[var(--forge-text-dim)]">
+                                    {Math.round(tooltip.basis).toLocaleString()} Invested
                                 </div>
                                 {tooltip.trigger && !tooltip.isLine && (
                                     <div className="flex items-center gap-1 mt-0.5">
-                                        {(tooltip.trigger === 'fuel' || tooltip.trigger === 'tutorial_fuel') && <Flame size={11} className="text-[var(--forge-flame)]" />}
-                                        {tooltip.trigger === 'cool' && <Snowflake size={11} className="text-[var(--forge-cool)]" />}
+                                        {(tooltip.trigger === 'fuel' || tooltip.trigger === 'tutorial_fuel' || tooltip.trigger === 'referral_fuel') && <Flame size={11} className="text-[var(--forge-flame)]" />}
+                                        {(tooltip.trigger === 'cool' || tooltip.trigger === 'liquidate') && <Snowflake size={11} className="text-[var(--forge-cool)]" />}
                                         {tooltip.trigger === 'performance' && <Zap size={11} className="text-[var(--forge-gold)]" />}
                                         <span className="text-[var(--forge-text-mid)] text-xs">
                                             {TRIGGER_LABELS[tooltip.trigger] || tooltip.trigger}
@@ -267,6 +220,9 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, loadi
                             </span>
                             <span className="flex items-center gap-1">
                                 <span className="w-2 h-2 rounded-full bg-[var(--forge-gold)]" /> Perf
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <span className="w-5 h-0 border-t border-dashed border-white/30" /> Invested
                             </span>
                         </div>
                     </div>

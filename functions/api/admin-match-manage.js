@@ -3,6 +3,7 @@ import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requireAnyPermission, getLeagueIdFromSeason, getLeagueIdFromMatch } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
+import { recalcForgePerformance } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -195,8 +196,9 @@ async function deleteMatch(sql, body, admin, isOwnOnly, event) {
         if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
-    // Capture affected users BEFORE deletion (join chain breaks after)
+    // Capture affected users and season BEFORE deletion (join chain breaks after)
     const affectedUsers = await getMatchAffectedUsers(sql, match_id)
+    const [matchRow] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
 
     await transaction(async (tx) => {
         // Reset any linked scheduled_match back to 'scheduled' before deleting
@@ -215,6 +217,14 @@ async function deleteMatch(sql, body, admin, isOwnOnly, event) {
     // Recalculate challenge progress and revoke if needed (fire-and-forget)
     recalcMatchChallenges(sql, affectedUsers)
         .catch(err => console.error('Challenge recalc after match delete failed:', err))
+
+    // Recalculate forge performance scores (fire-and-forget)
+    if (matchRow) {
+        event.waitUntil(
+            recalcForgePerformance(sql, matchRow.season_id)
+                .catch(err => console.error('Forge recalc after match delete failed:', err))
+        )
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match deleted' }) }
 }
@@ -264,6 +274,15 @@ async function deleteGame(sql, body, admin, isOwnOnly, event) {
     recalcMatchChallenges(sql, affectedUsers)
         .catch(err => console.error('Challenge recalc after game delete failed:', err))
 
+    // Recalculate forge performance scores (fire-and-forget)
+    const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
+    if (matchForForge) {
+        event.waitUntil(
+            recalcForgePerformance(sql, matchForForge.season_id)
+                .catch(err => console.error('Forge recalc after game delete failed:', err))
+        )
+    }
+
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game deleted' }) }
 }
 
@@ -297,6 +316,15 @@ async function updateMatch(sql, body, admin, isOwnOnly, event) {
     `
 
     await logAudit(sql, admin, { action: 'update-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id, details: { date, week, team1_id, team2_id } })
+
+    // Recalculate forge performance scores (date changes affect recency weights)
+    const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
+    if (matchForForge) {
+        event.waitUntil(
+            recalcForgePerformance(sql, matchForForge.season_id)
+                .catch(err => console.error('Forge recalc after match update failed:', err))
+        )
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match updated' }) }
 }
@@ -359,6 +387,15 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
     getMatchAffectedUsers(sql, match_id)
         .then(users => recalcMatchChallenges(sql, users))
         .catch(err => console.error('Challenge recalc after game save failed:', err))
+
+    // Recalculate forge performance scores (fire-and-forget)
+    const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
+    if (matchForForge) {
+        event.waitUntil(
+            recalcForgePerformance(sql, matchForForge.season_id)
+                .catch(err => console.error('Forge recalc after game save failed:', err))
+        )
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game saved' }) }
 }

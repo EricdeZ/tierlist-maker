@@ -94,7 +94,7 @@ const handler = async (event) => {
                         p.tracker_url,
                         lp.role,
                         lp.secondary_role,
-                        lp.is_captain,
+                        lp.roster_status,
                         t.name as team_name,
                         t.color as team_color,
                         COALESCE(pa.games_played, 0) as games_played,
@@ -116,7 +116,7 @@ const handler = async (event) => {
                     LEFT JOIN player_agg pa ON pa.league_player_id = lp.id
                     WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
-                      AND LOWER(lp.role) != 'sub'
+                      AND lp.roster_status != 'sub'
                     ORDER BY total_kills DESC
                 `
 
@@ -149,7 +149,7 @@ const handler = async (event) => {
                 FROM league_players 
                 WHERE season_id = ${seasonId} 
                   AND is_active = true
-                  AND LOWER(role) != 'sub'
+                  AND roster_status != 'sub'
             `
 
             const [gameStats] = await sql`

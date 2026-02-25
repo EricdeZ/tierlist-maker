@@ -66,9 +66,11 @@ const handler = async (event) => {
  */
 async function updatePlayerRoles(sql, matchId) {
     const players = await sql`
-        SELECT DISTINCT league_player_id FROM player_game_stats
-        WHERE game_id IN (SELECT id FROM games WHERE match_id = ${matchId})
-        AND role_played IS NOT NULL
+        SELECT DISTINCT pgs.league_player_id FROM player_game_stats pgs
+        JOIN league_players lp ON lp.id = pgs.league_player_id
+        WHERE pgs.game_id IN (SELECT id FROM games WHERE match_id = ${matchId})
+        AND pgs.role_played IS NOT NULL
+        AND lp.roster_status != 'sub'
     `
 
     for (const { league_player_id } of players) {
@@ -267,9 +269,11 @@ async function submitMatch(sql, body, admin, event) {
                 .catch(err => console.error('Prediction resolution failed:', err))
         }
 
-        // Update Fantasy Forge player prices based on match performance (fire-and-forget)
-        updateForgeAfterMatch(sql, result.match_id)
-            .catch(err => console.error('Forge price update failed:', err))
+        // Recalculate Fantasy Forge performance scores for the season (fire-and-forget)
+        event.waitUntil(
+            updateForgeAfterMatch(sql, result.match_id)
+                .catch(err => console.error('Forge price update failed:', err))
+        )
 
         // Update league_player roles based on recent games played (fire-and-forget)
         updatePlayerRoles(sql, result.match_id)
@@ -438,7 +442,7 @@ async function resolveLeaguePlayerId(tx, player, teamId, seasonId, cache) {
 
     // Create league_player as sub
     const [newLp] = await tx`
-        INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
+        INSERT INTO league_players (player_id, team_id, season_id, roster_status, is_active)
         VALUES (${playerId}, ${teamId}, ${seasonId}, 'sub', true)
         RETURNING id
     `

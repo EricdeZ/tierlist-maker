@@ -233,7 +233,7 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                             Fuel
                         </button>
                     )}
-                    {isOpen && player.holding && player.holding.sparks > 0 && (
+                    {isOpen && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
                         <button
                             onClick={e => { e.stopPropagation(); onCool(player) }}
                             className="py-1.5 px-3 forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/8 border border-[var(--forge-cool)]/20 cursor-pointer forge-clip-btn forge-btn-cool flex items-center gap-1"

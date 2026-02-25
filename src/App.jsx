@@ -68,6 +68,7 @@ import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
 import TeamManager from "./pages/admin/TeamManager.jsx";
 import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
 import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
+import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -112,6 +113,7 @@ function App() {
                                 <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />
                                 <Route path="teams" element={<ProtectedRoute requiredPermission="team_manage"><TeamManager /></ProtectedRoute>} />
                                 <Route path="leaguestaff" element={<ProtectedRoute requiredPermission="league_staff_manage"><LeagueStaff /></ProtectedRoute>} />
+                                <Route path="roster-sync" element={<ProtectedRoute requiredPermission="roster_manage"><DiscordRosterSync /></ProtectedRoute>} />
                                 <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
                             </Route>
 

@@ -56,16 +56,16 @@ export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarge
                 <button
                     onClick={(e) => {
                         e.stopPropagation()
-                        if (!player.is_captain) {
+                        if (player.roster_status !== 'captain') {
                             onSetCaptain(player.league_player_id, player.name, teamId)
                         }
                     }}
                     className={`shrink-0 transition-all ${
-                        player.is_captain
+                        player.roster_status === 'captain'
                             ? 'text-yellow-400 opacity-100'
                             : 'text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-30 hover:!opacity-70 hover:!text-yellow-400'
                     }`}
-                    title={player.is_captain ? 'Team Captain' : 'Set as Captain'}
+                    title={player.roster_status === 'captain' ? 'Team Captain' : 'Set as Captain'}
                 >
                     <Crown className="w-4 h-4" />
                 </button>

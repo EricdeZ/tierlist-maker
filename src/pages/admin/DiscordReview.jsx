@@ -625,7 +625,7 @@ function MembersTab({ teamGroups, summary }) {
                         No teams with Discord role mappings found.
                     </p>
                     <Link
-                        to="/admin/discord"
+                        to="/admin/roster-sync"
                         className="inline-block mt-3 px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] text-white hover:opacity-90 transition"
                     >
                         Configure Team Roles

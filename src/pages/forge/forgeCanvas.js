@@ -251,11 +251,17 @@ export function drawSparkline(canvas, data, { lineColor, fillColor }) {
 const EVENT_COLORS = {
     fuel: '#e86520',
     tutorial_fuel: '#e86520',
+    referral_fuel: '#e86520',
     cool: '#4499bb',
+    liquidate: '#4499bb',
     performance: '#f0c840',
     init: '#888888',
 }
 
+/**
+ * Draw a dual-series portfolio chart: worth line (solid) + cost basis line (dashed).
+ * Timeline items: { worth, basis, trigger, playerName, t }
+ */
 export function drawPortfolioChart(canvas, timeline, opts = {}) {
     if (!canvas || !timeline || timeline.length < 2) return null
 
@@ -279,42 +285,52 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
     const chartW = w - padLeft - padRight
     const chartH = h - padTop - padBottom
 
-    const prices = timeline.map(t => t.value)
-    const min = Math.min(...prices)
-    const max = Math.max(...prices)
+    // Scale encompasses both series
+    const allValues = timeline.flatMap(t => [t.worth, t.basis])
+    const min = Math.min(...allValues)
+    const max = Math.max(...allValues)
     const range = max - min || 1
 
-    const points = timeline.map((t, i) => ({
-        x: padLeft + (i / (timeline.length - 1)) * chartW,
-        y: padTop + (1 - (t.value - min) / range) * chartH,
-        ...t,
-    }))
+    const toY = (v) => padTop + (1 - (v - min) / range) * chartH
+    const toX = (i) => padLeft + (i / (timeline.length - 1)) * chartW
 
-    // Fill gradient
-    const lineColor = opts.lineColor || '#e86520'
-    const fillColor = opts.fillColor || 'rgba(232,101,32,0.15)'
+    const worthPts = timeline.map((t, i) => ({ x: toX(i), y: toY(t.worth), ...t }))
+    const basisPts = timeline.map((t, i) => ({ x: toX(i), y: toY(t.basis), ...t }))
+
+    // ── Worth fill gradient ──
+    const worthColor = opts.lineColor || '#e86520'
     const gradient = ctx.createLinearGradient(0, padTop, 0, h - padBottom)
-    gradient.addColorStop(0, fillColor)
+    gradient.addColorStop(0, opts.fillColor || 'rgba(232,101,32,0.15)')
     gradient.addColorStop(1, 'transparent')
 
     ctx.beginPath()
-    points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
-    ctx.lineTo(points[points.length - 1].x, h - padBottom)
-    ctx.lineTo(points[0].x, h - padBottom)
+    worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+    ctx.lineTo(worthPts[worthPts.length - 1].x, h - padBottom)
+    ctx.lineTo(worthPts[0].x, h - padBottom)
     ctx.closePath()
     ctx.fillStyle = gradient
     ctx.fill()
 
-    // Line
+    // ── Cost basis line (dashed) ──
+    ctx.save()
+    ctx.setLineDash([6, 4])
     ctx.beginPath()
-    points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
-    ctx.strokeStyle = lineColor
+    basisPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    ctx.restore()
+
+    // ── Worth line (solid) ──
+    ctx.beginPath()
+    worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+    ctx.strokeStyle = worthColor
     ctx.lineWidth = 2
     ctx.stroke()
 
-    // Event dots (skip 'init' triggers — they just clutter)
+    // ── Event dots (skip init and performance-only clutter) ──
     const eventPoints = []
-    for (const pt of points) {
+    for (const pt of worthPts) {
         if (pt.trigger && pt.trigger !== 'init') {
             const color = EVENT_COLORS[pt.trigger] || '#888'
             const radius = pt.trigger === 'performance' ? 4 : 5
@@ -325,34 +341,33 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
             ctx.shadowColor = color
             ctx.fill()
             ctx.shadowBlur = 0
-            // White inner ring
             ctx.beginPath()
             ctx.arc(pt.x, pt.y, radius - 1.5, 0, 6.28)
             ctx.strokeStyle = 'rgba(255,255,255,0.5)'
             ctx.lineWidth = 0.8
             ctx.stroke()
-            eventPoints.push({ ...pt, radius: radius + 4 }) // hit area slightly larger
+            eventPoints.push({ ...pt, radius: radius + 4 })
         }
     }
 
-    // End dot
-    const last = points[points.length - 1]
+    // ── End dot ──
+    const last = worthPts[worthPts.length - 1]
     ctx.beginPath()
     ctx.arc(last.x, last.y, 3, 0, 6.28)
-    ctx.fillStyle = lineColor
+    ctx.fillStyle = worthColor
     ctx.shadowBlur = 8
-    ctx.shadowColor = lineColor
+    ctx.shadowColor = worthColor
     ctx.fill()
     ctx.shadowBlur = 0
 
-    // Price labels at top/bottom
+    // ── Y-axis labels ──
     ctx.font = '10px monospace'
     ctx.fillStyle = 'rgba(255,255,255,0.4)'
     ctx.textAlign = 'left'
     ctx.fillText(Math.round(max).toLocaleString(), padLeft + 2, padTop - 4)
     ctx.fillText(Math.round(min).toLocaleString(), padLeft + 2, h - padBottom + 14)
 
-    // Return hit-test function
+    // ── Hit-test for hover ──
     return {
         getEventAt(canvasX, canvasY) {
             for (const ep of eventPoints) {
@@ -361,18 +376,18 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
                 if (dx * dx + dy * dy <= ep.radius * ep.radius) {
                     return {
                         trigger: ep.trigger,
-                        value: ep.value,
+                        worth: ep.worth,
+                        basis: ep.basis,
                         playerName: ep.playerName,
-                        createdAt: ep.createdAt,
+                        createdAt: ep.t,
                         x: ep.x,
                         y: ep.y,
                     }
                 }
             }
-            // Return nearest point on line for hover tooltip
             let closest = null
             let minDist = Infinity
-            for (const pt of points) {
+            for (const pt of worthPts) {
                 const dist = Math.abs(canvasX - pt.x)
                 if (dist < minDist) {
                     minDist = dist
@@ -382,9 +397,10 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
             if (closest && minDist < 20) {
                 return {
                     trigger: closest.trigger || null,
-                    value: closest.value,
+                    worth: closest.worth,
+                    basis: closest.basis,
                     playerName: closest.playerName,
-                    createdAt: closest.createdAt,
+                    createdAt: closest.t,
                     x: closest.x,
                     y: closest.y,
                     isLine: true,

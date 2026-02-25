@@ -1,0 +1,72 @@
+export default {
+    title: 'Scheduling a Match',
+    baseUrl: 'http://localhost:5173',
+
+    steps: [
+        {
+            narrate: 'Scheduling games ahead of time makes reporting results much easier. But even if a game already happened, scheduling it after the fact helps you catch up faster.',
+            action: 'navigate',
+            url: 'http://localhost:5173/admin/schedule',
+            pauseAfter: 600,
+        },
+        {
+            narrate: 'Select your season to get started.',
+            action: 'select',
+            selector: 'select',
+            value: 'Upper',
+            highlight: true,
+            pauseAfter: 400,
+        },
+        {
+            narrate: 'Set the date and optionally a week number. Best-of defaults to three.',
+            action: 'type',
+            selector: 'input[type="date"]',
+            value: '2026-03-07',
+            highlight: true,
+            pauseAfter: 400,
+        },
+        {
+            action: 'type',
+            selector: 'input[placeholder="—"]',
+            value: '1',
+            pauseAfter: 300,
+        },
+        {
+            narrate: 'Pick both teams from the dropdowns.',
+            action: 'select',
+            selector: 'select',
+            selectorIndex: 1,
+            value: 'Sunset Foxes',
+            highlight: true,
+            pauseAfter: 400,
+        },
+        {
+            action: 'select',
+            selector: 'select',
+            selectorIndex: 2,
+            value: 'Midnight Ravens',
+            highlight: true,
+            pauseAfter: 400,
+        },
+        {
+            narrate: 'Hit Schedule Match to lock it in.',
+            action: 'click',
+            selector: 'button:has-text("Schedule Match")',
+            highlight: true,
+            pauseAfter: 800,
+        },
+        {
+            narrate: 'Use plus one week to quickly queue up the next week. The date and week number auto-increment so you can schedule a full season in seconds.',
+            action: 'click',
+            selector: 'button:has-text("+ 1 Week")',
+            highlight: true,
+            pauseAfter: 600,
+        },
+        {
+            narrate: 'Your matches appear below, grouped by week. You can edit, delete, or change the status of any match at any time.',
+            action: 'scroll',
+            scrollY: 600,
+            pauseAfter: 800,
+        },
+    ],
+}

@@ -4,6 +4,7 @@ import { execSync } from 'child_process'
 
 const TTS_MODEL = 'tts-1-hd'
 const TTS_VOICE = 'nova'
+const TTS_SPEED = 1.15
 
 export async function generateAllAudio(steps, tmpDir) {
     const results = []
@@ -51,6 +52,7 @@ async function generateAudio(text, outputPath) {
             model: TTS_MODEL,
             input: text,
             voice: TTS_VOICE,
+            speed: TTS_SPEED,
             response_format: 'mp3',
         }),
     })

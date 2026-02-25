@@ -497,6 +497,10 @@ export const forgeService = {
         return apiCall('forge', { action: 'batch-history', sparkIds: sparkIds.join(',') })
     },
 
+    async getPortfolioTimeline(seasonId) {
+        return apiCall('forge', { action: 'portfolio-timeline', seasonId })
+    },
+
     async getMarketStatuses() {
         return apiCall('forge', { action: 'market-statuses' })
     },

@@ -70,11 +70,11 @@ const TeamDetail = () => {
                             : (totalKills + (totalAssists / 2)) / totalDeaths
                         const winRate = gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0
 
-                        return { ...s, gamesPlayed, wins, totalKills, totalDeaths, totalAssists, kda, winRate, is_captain: pInfo?.is_captain || false }
+                        return { ...s, gamesPlayed, wins, totalKills, totalDeaths, totalAssists, kda, winRate, roster_status: pInfo?.roster_status || 'member' }
                     })
                     .sort((a, b) => {
-                        if (a.is_captain && !b.is_captain) return -1
-                        if (!a.is_captain && b.is_captain) return 1
+                        if (a.roster_status === 'captain' && b.roster_status !== 'captain') return -1
+                        if (a.roster_status !== 'captain' && b.roster_status === 'captain') return 1
                         return 0
                     })
 
@@ -235,7 +235,7 @@ const TeamDetail = () => {
                                                     to={`${basePath}/players/${slug}`}
                                                     className="text-sm font-semibold text-(--color-text) hover:text-(--color-accent) transition-colors inline-flex items-center gap-1.5"
                                                 >
-                                                    {player.is_captain && (
+                                                    {player.roster_status === 'captain' && (
                                                         <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
                                                     )}
                                                     {player.name}

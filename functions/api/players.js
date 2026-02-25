@@ -21,7 +21,7 @@ const handler = async (event, context) => {
                         lp.role,
                         lp.secondary_role,
                         lp.is_active,
-                        lp.is_captain,
+                        lp.roster_status,
                         t.id as team_id,
                         t.name as team_name,
                         t.color as team_color,
@@ -31,8 +31,8 @@ const handler = async (event, context) => {
                     LEFT JOIN teams t ON lp.team_id = t.id
                     WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
-                      AND LOWER(lp.role) != 'sub'
-                    ORDER BY t.name, CASE WHEN lp.is_captain THEN 0 ELSE 1 END, p.name
+                      AND lp.roster_status != 'sub'
+                    ORDER BY t.name, CASE WHEN lp.roster_status = 'captain' THEN 0 ELSE 1 END, p.name
                 `
 
                 return {

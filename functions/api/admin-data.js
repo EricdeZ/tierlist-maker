@@ -63,7 +63,7 @@ const handler = async (event) => {
         const players = await sql`
             SELECT
                 p.id as player_id, p.name, p.slug,
-                lp.id as league_player_id, lp.team_id, lp.season_id, lp.role, lp.is_captain,
+                lp.id as league_player_id, lp.team_id, lp.season_id, lp.role, lp.roster_status,
                 t.name as team_name, t.color as team_color, t.slug as team_slug
             FROM league_players lp
             JOIN players p ON lp.player_id = p.id

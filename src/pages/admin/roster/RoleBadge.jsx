@@ -1,6 +1,6 @@
 // src/pages/admin/roster/RoleBadge.jsx
 import { useState, useEffect, useRef } from 'react'
-import { ROLES, ROLE_LABELS, ROLE_COLORS } from './constants'
+import { ROLES, ROLE_COLORS } from './constants'
 
 export function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
     const [editing, setEditing] = useState(false)
@@ -25,7 +25,7 @@ export function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                 className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 transition-opacity hover:opacity-80 ${colorClass}`}
                 title="Click to change role"
             >
-                {ROLE_LABELS[(role || '').toLowerCase()] || role || 'Fill'}
+                {role || 'Fill'}
             </button>
 
             {editing && (
@@ -51,7 +51,7 @@ export function RoleBadge({ role, leaguePlayerId, playerName, onRoleChange }) {
                                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5'
                             }`}
                         >
-                            <span>{ROLE_LABELS[r.toLowerCase()] || r}</span>
+                            <span>{r}</span>
                             {r.toLowerCase() === roleLower && <span>✓</span>}
                         </button>
                     ))}

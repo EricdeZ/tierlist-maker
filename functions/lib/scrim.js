@@ -116,7 +116,7 @@ export async function getCaptainTeams(sql, userId) {
         JOIN divisions d ON d.id = s.division_id
         JOIN leagues l ON l.id = s.league_id
         WHERE lp.player_id = (SELECT linked_player_id FROM users WHERE id = ${userId})
-          AND lp.is_captain = true AND lp.is_active = true AND s.is_active = true
+          AND lp.roster_status = 'captain' AND lp.is_active = true AND s.is_active = true
     `
 }
 

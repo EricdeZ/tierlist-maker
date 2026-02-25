@@ -47,6 +47,8 @@ const handler = async (event) => {
                     return await getBatchHistory(sql, params)
                 case 'tutorial-status':
                     return await getTutorialStatus(sql, user, params)
+                case 'portfolio-timeline':
+                    return await getPortfolioTimeline(sql, user, params)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -130,7 +132,7 @@ async function getMarket(sql, user, params, event) {
         LEFT JOIN coinflip_streaks cs ON cs.user_id = u_avatar.id
         WHERE ps.market_id = ${market.id}
           AND lp.is_active = true
-          AND LOWER(COALESCE(lp.role, '')) != 'sub'
+          AND lp.roster_status != 'sub'
         ORDER BY ps.current_price DESC
     `
 
@@ -195,14 +197,18 @@ async function getMarket(sql, user, params, event) {
     `
     const userTeamId = userTeamRow?.team_id || null
 
-    // Count free Starter Sparks remaining for this user in this market
+    // Count free Starter Sparks remaining across all markets in this league
     const [{ total_used: freeUsed }] = await sql`
         SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
         FROM spark_transactions st
         JOIN player_sparks ps ON st.spark_id = ps.id
         WHERE st.user_id = ${user.id}
           AND st.type = 'tutorial_fuel'
-          AND ps.market_id = ${market.id}
+          AND ps.market_id IN (
+              SELECT fm.id FROM forge_markets fm
+              JOIN seasons s ON fm.season_id = s.id
+              WHERE s.league_id = (SELECT league_id FROM seasons WHERE id = ${seasonId})
+          )
     `
     const freeSparksRemaining = Math.max(0, 3 - freeUsed)
 
@@ -411,6 +417,144 @@ async function getPortfolio(sql, user, params) {
                 createdAt: t.created_at,
             })),
         }),
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// GET: Portfolio timeline — reconstruct portfolio worth + cost basis over time
+// Replays user transactions against price history to build accurate dual series
+// ═══════════════════════════════════════════════════
+async function getPortfolioTimeline(sql, user, params) {
+    const { seasonId } = params
+    if (!seasonId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId is required' }) }
+    }
+
+    const [market] = await sql`
+        SELECT id FROM forge_markets WHERE season_id = ${seasonId}
+    `
+    if (!market) {
+        return { statusCode: 200, headers, body: JSON.stringify({ timeline: [] }) }
+    }
+
+    // 1. Get all user transactions for this market
+    const txns = await sql`
+        SELECT st.spark_id, st.type, st.sparks, st.total_cost, st.created_at,
+               p.name as player_name
+        FROM spark_transactions st
+        JOIN player_sparks ps ON st.spark_id = ps.id
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        JOIN players p ON lp.player_id = p.id
+        WHERE st.user_id = ${user.id} AND ps.market_id = ${market.id}
+        ORDER BY st.created_at ASC
+    `
+
+    if (txns.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ timeline: [] }) }
+    }
+
+    // Collect all sparkIds the user ever interacted with
+    const sparkIdSet = new Set(txns.map(t => t.spark_id))
+    const sparkIds = [...sparkIdSet]
+
+    // 2. Get price history for all relevant sparks
+    const priceHistory = await sql`
+        SELECT spark_id, price, trigger, created_at
+        FROM spark_price_history
+        WHERE spark_id = ANY(${sparkIds})
+        ORDER BY created_at ASC
+    `
+
+    // 3. Get player names for price history events (for sparkIds we already know)
+    const sparkPlayerNames = {}
+    for (const t of txns) {
+        sparkPlayerNames[t.spark_id] = t.player_name
+    }
+
+    // 4. Merge transactions and price events into one chronological stream
+    const events = []
+
+    for (const t of txns) {
+        events.push({
+            time: new Date(t.created_at),
+            kind: 'txn',
+            sparkId: t.spark_id,
+            type: t.type,
+            sparks: t.sparks,
+            totalCost: t.total_cost,
+            playerName: t.player_name,
+        })
+    }
+
+    for (const p of priceHistory) {
+        events.push({
+            time: new Date(p.created_at),
+            kind: 'price',
+            sparkId: p.spark_id,
+            price: Number(p.price),
+            trigger: p.trigger,
+            playerName: sparkPlayerNames[p.spark_id] || null,
+        })
+    }
+
+    // Sort chronologically (txns before price events at same timestamp so position updates first)
+    events.sort((a, b) => {
+        const dt = a.time - b.time
+        if (dt !== 0) return dt
+        return (a.kind === 'txn' ? 0 : 1) - (b.kind === 'txn' ? 0 : 1)
+    })
+
+    // 5. Replay forward
+    const positions = {}   // sparkId → numSparks held
+    const lastPrice = {}   // sparkId → latest known price
+    let costBasis = 0      // cumulative: fuel adds cost, cool subtracts proceeds
+
+    const timeline = []
+
+    for (const ev of events) {
+        if (ev.kind === 'txn') {
+            const isBuy = ev.type === 'fuel' || ev.type === 'tutorial_fuel' || ev.type === 'referral_fuel'
+            const isSell = ev.type === 'cool' || ev.type === 'liquidate'
+
+            if (isBuy) {
+                positions[ev.sparkId] = (positions[ev.sparkId] || 0) + ev.sparks
+                costBasis += ev.totalCost
+            } else if (isSell) {
+                positions[ev.sparkId] = Math.max(0, (positions[ev.sparkId] || 0) - ev.sparks)
+                costBasis -= ev.totalCost
+            }
+        }
+
+        if (ev.kind === 'price') {
+            lastPrice[ev.sparkId] = ev.price
+        }
+
+        // Only emit timeline points after the user has at least one position
+        const hasPosition = Object.values(positions).some(n => n > 0)
+        if (!hasPosition && costBasis <= 0) continue
+
+        // Calculate current portfolio worth
+        let worth = 0
+        for (const sid of sparkIds) {
+            const qty = positions[sid] || 0
+            const price = lastPrice[sid] || 0
+            worth += qty * price
+        }
+
+        timeline.push({
+            t: ev.time.toISOString(),
+            worth: Math.round(worth),
+            basis: Math.max(0, Math.round(costBasis)),
+            trigger: ev.kind === 'txn' ? ev.type : ev.trigger,
+            playerName: ev.playerName,
+        })
+    }
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ timeline }),
     }
 }
 
@@ -811,7 +955,7 @@ async function adminLiquidate(sql, event, user, body) {
 
 // ═══════════════════════════════════════════════════
 // GET: Tutorial status — check if user has completed the forge tutorial
-// Scoped per market (league/season) via reference_id = market_id
+// Scoped per league: 3 free Starter Sparks shared across all divisions in the league
 // ═══════════════════════════════════════════════════
 async function getTutorialStatus(sql, user, params) {
     const { seasonId } = params
@@ -819,29 +963,33 @@ async function getTutorialStatus(sql, user, params) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId is required' }) }
     }
 
-    // Find the market for this season
-    const [market] = await sql`
-        SELECT id FROM forge_markets WHERE season_id = ${seasonId} LIMIT 1
+    // Find all markets in the same league as the requested season
+    const leagueMarkets = await sql`
+        SELECT fm.id FROM forge_markets fm
+        JOIN seasons s ON fm.season_id = s.id
+        WHERE s.league_id = (SELECT league_id FROM seasons WHERE id = ${seasonId})
     `
-    if (!market) {
+    if (!leagueMarkets.length) {
         return { statusCode: 200, headers, body: JSON.stringify({ completed: false, freeSparksRemaining: 3 }) }
     }
+
+    const marketIds = leagueMarkets.map(m => m.id)
 
     const [done] = await sql`
         SELECT 1 FROM passion_transactions
         WHERE user_id = ${user.id} AND type = 'forge_tutorial_grant'
-          AND reference_id = ${String(market.id)}
+          AND reference_id = ANY(${marketIds.map(String)})
         LIMIT 1
     `
 
-    // Count free sparks used
+    // Count free sparks used across all markets in the league
     const [{ total_used }] = await sql`
         SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
         FROM spark_transactions st
         JOIN player_sparks ps ON st.spark_id = ps.id
         WHERE st.user_id = ${user.id}
           AND st.type = 'tutorial_fuel'
-          AND ps.market_id = ${market.id}
+          AND ps.market_id = ANY(${marketIds})
     `
 
     return {
@@ -856,7 +1004,7 @@ async function getTutorialStatus(sql, user, params) {
 
 
 // ═══════════════════════════════════════════════════
-// POST: Tutorial fuel — grant 1 free Starter Spark (up to 3 per market)
+// POST: Tutorial fuel — grant 1 free Starter Spark (up to 3 per league)
 // First call sets tutorial completion marker; subsequent calls just grant free sparks
 // ═══════════════════════════════════════════════════
 async function tutorialFuel(sql, user, body, event) {
@@ -882,14 +1030,26 @@ async function tutorialFuel(sql, user, body, event) {
             `
             if (!market || market.status !== 'open') throw new Error('Market is not open')
 
-            // Count free sparks already used in this market
+            // Find all markets in the same league
+            const leagueMarkets = await tx`
+                SELECT fm.id FROM forge_markets fm
+                JOIN seasons s ON fm.season_id = s.id
+                WHERE s.league_id = (
+                    SELECT s2.league_id FROM forge_markets fm2
+                    JOIN seasons s2 ON fm2.season_id = s2.id
+                    WHERE fm2.id = ${stock.market_id}
+                )
+            `
+            const leagueMarketIds = leagueMarkets.map(m => m.id)
+
+            // Count free sparks already used across all markets in this league
             const [{ total_used }] = await tx`
                 SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
                 FROM spark_transactions st
                 JOIN player_sparks ps ON st.spark_id = ps.id
                 WHERE st.user_id = ${user.id}
                   AND st.type = 'tutorial_fuel'
-                  AND ps.market_id = ${stock.market_id}
+                  AND ps.market_id = ANY(${leagueMarketIds})
             `
             if (total_used >= MAX_FREE_SPARKS) {
                 throw new Error('All Starter Sparks have been used')

@@ -652,7 +652,7 @@ async function getMatchupDetail(sql, event, params) {
             WHERE lp.team_id IN (${t1Id}, ${t2Id})
               AND lp.season_id = ${seasonId}
               AND lp.is_active = true
-              AND LOWER(COALESCE(lp.role, '')) != 'sub'
+              AND lp.roster_status != 'sub'
             GROUP BY p.id, p.name, p.slug, lp.role, lp.team_id, lp.id
             ORDER BY lp.team_id, lp.role
         `,

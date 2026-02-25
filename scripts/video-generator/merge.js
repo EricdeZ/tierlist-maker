@@ -2,7 +2,7 @@ import { execSync } from 'child_process'
 import { resolve } from 'path'
 import { writeFileSync } from 'fs'
 
-export async function mergeAudioVideo(audioFiles, videoPath, outputPath, steps) {
+export async function mergeAudioVideo(audioFiles, videoPath, outputPath, steps, stepTimings) {
     const dir = resolve(videoPath, '..')
     const concatListPath = resolve(dir, 'concat.txt')
     const fullAudioPath = resolve(dir, 'full-audio.mp3')
@@ -12,14 +12,17 @@ export async function mergeAudioVideo(audioFiles, videoPath, outputPath, steps) 
     for (let i = 0; i < audioFiles.length; i++) {
         const audio = audioFiles[i]
         const step = steps[i]
-        const pauseAfter = step.pauseAfter || 0
+        const actualMs = stepTimings?.[i]
 
         if (audio.filePath) {
             entries.push(`file '${audio.filePath.replace(/\\/g, '/')}'`)
         }
 
-        // Add silence for pauseAfter or for non-narrated steps
-        const silenceMs = audio.filePath ? pauseAfter : (step.duration || 1000)
+        // Silence = actual recording time minus audio clip duration
+        // Falls back to pauseAfter if no timing data available
+        const silenceMs = actualMs
+            ? Math.max(0, (audio.filePath ? actualMs - audio.duration : actualMs))
+            : (audio.filePath ? (step.pauseAfter || 0) : (step.duration || 1000))
         if (silenceMs > 0) {
             const silencePath = resolve(dir, `silence_${i}.mp3`)
             const silenceSec = (silenceMs / 1000).toFixed(3)

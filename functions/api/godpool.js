@@ -130,7 +130,7 @@ async function getGodpool(sql, event) {
                     AND viewer_lp.season_id = owner_lp.season_id
                     AND viewer_lp.player_id = ${viewerUser.linked_player_id}
                 WHERE owner_lp.player_id = ${owner.player_id}
-                  AND LOWER(COALESCE(owner_lp.role, '')) != 'sub'
+                  AND owner_lp.roster_status != 'sub'
                 LIMIT 1
             `
 

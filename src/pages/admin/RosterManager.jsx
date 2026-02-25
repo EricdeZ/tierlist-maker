@@ -142,7 +142,7 @@ export default function RosterManager() {
         )
         return new Set(
             (adminData.players || [])
-                .filter(p => leagueSeasonIds.has(p.season_id) && p.role?.toLowerCase() !== 'sub')
+                .filter(p => leagueSeasonIds.has(p.season_id) && p.roster_status !== 'sub')
                 .map(p => p.player_id)
         )
     }, [selectedSeason, adminData, seasons])
@@ -299,7 +299,7 @@ export default function RosterManager() {
                 if (idx >= 0) {
                     const [moved] = fromTeam.players.splice(idx, 1)
                     moved.team_id = targetTeamId
-                    moved.is_captain = false
+                    moved.roster_status = 'member'
                     toTeam.players.push(moved)
                     toTeam.players.sort(playerSort)
                 }
@@ -355,9 +355,9 @@ export default function RosterManager() {
                     const playerA = teamA.players[idxA]
                     const playerB = teamB.players[idxB]
                     playerA.team_id = targetPlayer.team_id
-                    playerA.is_captain = false
+                    playerA.roster_status = 'member'
                     playerB.team_id = draggedPlayer.fromTeamId
-                    playerB.is_captain = false
+                    playerB.roster_status = 'member'
                     teamA.players[idxA] = playerB
                     teamB.players[idxB] = playerA
                     teamA.players.sort(playerSort)
@@ -415,9 +415,9 @@ export default function RosterManager() {
             const next = structuredClone(prev)
             const team = next.find(t => String(t.team_id) === String(teamId))
             if (team) {
-                team.players.forEach(p => { p.is_captain = false })
+                team.players.forEach(p => { if (p.roster_status === 'captain') p.roster_status = 'member' })
                 const player = team.players.find(p => p.league_player_id === leaguePlayerId)
-                if (player) player.is_captain = true
+                if (player) player.roster_status = 'captain'
                 team.players.sort(playerSort)
             }
             return next

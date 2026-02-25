@@ -398,8 +398,9 @@ export async function recalcForgePerformance(sql, seasonId) {
         JOIN matches m ON g.match_id = m.id
         JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
         WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
           AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
-          AND LOWER(COALESCE(pgs.role_played, lp.role)) NOT IN ('sub', 'fill')
+          AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
         GROUP BY LOWER(COALESCE(pgs.role_played, lp.role))
     `
 
@@ -446,8 +447,9 @@ export async function recalcForgePerformance(sql, seasonId) {
         JOIN matches m ON g.match_id = m.id
         JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
         WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
           AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
-          AND LOWER(COALESCE(pgs.role_played, lp.role)) NOT IN ('sub', 'fill')
+          AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
         ORDER BY m.date ASC, g.id ASC
     `
 

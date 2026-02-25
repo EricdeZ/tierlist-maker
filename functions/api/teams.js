@@ -26,7 +26,7 @@ const handler = async (event, context) => {
                 LEFT JOIN league_players lp
                     ON t.id = lp.team_id
                     AND lp.is_active = true
-                    AND LOWER(lp.role) != 'sub'
+                    AND lp.roster_status != 'sub'
                 LEFT JOIN organizations o ON t.organization_id = o.id
                 WHERE t.season_id = ${seasonId}
                 GROUP BY t.id, t.season_id, t.name, t.color, t.slug, t.logo_url,
