@@ -3,8 +3,25 @@ import { useAuth } from '../context/AuthContext'
 import { referralService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
+import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Check, Users, Flame, Link as LinkIcon, UserCheck } from 'lucide-react'
 import passionCoin from '../assets/passion/passion.png'
+
+function extractCode(input) {
+    const trimmed = input.trim()
+    // Try to extract from a URL (ref= or forge_ref= param)
+    try {
+        const url = new URL(trimmed)
+        const ref = url.searchParams.get('ref') || url.searchParams.get('forge_ref')
+        if (ref) return ref
+    } catch { /* not a URL */ }
+    // Try query string fragment like ?ref=CODE or ?forge_ref=CODE
+    const refMatch = trimmed.match(/[?&](?:ref|forge_ref)=([A-Za-z0-9]+)/)
+    if (refMatch) return refMatch[1]
+    // Treat as raw code (strip whitespace, take first 8 alphanumeric chars)
+    const raw = trimmed.replace(/[^A-Za-z0-9]/g, '')
+    return raw.slice(0, 8)
+}
 
 export default function ReferralPage() {
     const { user, login } = useAuth()
@@ -17,7 +34,8 @@ export default function ReferralPage() {
     const [claiming, setClaiming] = useState({})
 
     const claimCode = async (type) => {
-        const code = type === 'website' ? websiteCode.trim() : forgeCode.trim()
+        const raw = type === 'website' ? websiteCode : forgeCode
+        const code = extractCode(raw)
         if (!code) return
         setClaiming(prev => ({ ...prev, [type]: true }))
         setClaimError(prev => ({ ...prev, [type]: null }))
@@ -65,7 +83,7 @@ export default function ReferralPage() {
         <>
             <PageTitle title="Refer a Friend" />
             <Navbar />
-            <div className="max-w-2xl mx-auto px-4 py-8">
+            <div className="max-w-2xl mx-auto px-4 pt-24 pb-8">
                 <h1 className="text-3xl font-bold mb-2">Refer a Friend</h1>
                 <p className="text-(--color-text-secondary)/60 mb-8">
                     Share your referral links and earn rewards when friends join.
@@ -83,31 +101,24 @@ export default function ReferralPage() {
                     <div className="text-center py-12 text-(--color-text-secondary)/50">Loading...</div>
                 ) : stats ? (
                     <div className="space-y-6">
-                        {/* Referral Code */}
-                        <div className="bg-(--color-secondary) border border-white/[0.06] rounded-lg p-5">
-                            <div className="text-xs font-semibold uppercase tracking-wider text-(--color-text-secondary)/50 mb-2">Your Referral Code</div>
-                            <div className="flex items-center gap-3">
-                                <code className="text-2xl font-bold tracking-widest flex-1">{stats.referralCode}</code>
-                                <button
-                                    onClick={() => copyToClipboard(stats.referralCode, 'code')}
-                                    className="p-2 hover:bg-white/5 rounded transition-colors"
-                                    title="Copy code"
-                                >
-                                    {copiedField === 'code' ? <Check size={18} className="text-green-400" /> : <Copy size={18} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Shareable Links */}
+                        {/* Share Links with QR Codes */}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="bg-(--color-secondary) border border-white/[0.06] rounded-lg p-5">
                                 <div className="flex items-center gap-2 mb-3">
                                     <Users size={16} className="text-blue-400" />
                                     <span className="text-sm font-semibold uppercase tracking-wider">Website Referral</span>
                                 </div>
-                                <p className="text-xs text-(--color-text-secondary)/50 mb-3">
+                                <p className="text-xs text-(--color-text-secondary)/50 mb-4">
                                     New users get <strong>50 Passion</strong>, you get <strong>25 Passion</strong>
                                 </p>
+                                <div className="flex justify-center mb-4">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <QRCodeSVG value={websiteLink} size={140} />
+                                    </div>
+                                </div>
+                                <div className="text-xs text-(--color-text-secondary)/30 text-center mb-3 font-mono truncate px-2">
+                                    {websiteLink}
+                                </div>
                                 <button
                                     onClick={() => copyToClipboard(websiteLink, 'website')}
                                     className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 rounded text-sm transition-colors"
@@ -115,7 +126,7 @@ export default function ReferralPage() {
                                     {copiedField === 'website' ? (
                                         <><Check size={14} className="text-green-400" /> Copied!</>
                                     ) : (
-                                        <><LinkIcon size={14} /> Copy Website Link</>
+                                        <><LinkIcon size={14} /> Copy Link</>
                                     )}
                                 </button>
                             </div>
@@ -125,9 +136,17 @@ export default function ReferralPage() {
                                     <Flame size={16} className="text-orange-400" />
                                     <span className="text-sm font-semibold uppercase tracking-wider">Forge Referral</span>
                                 </div>
-                                <p className="text-xs text-(--color-text-secondary)/50 mb-3">
+                                <p className="text-xs text-(--color-text-secondary)/50 mb-4">
                                     Both you and your friend get <strong>1 free Spark</strong>
                                 </p>
+                                <div className="flex justify-center mb-4">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <QRCodeSVG value={forgeLink} size={140} />
+                                    </div>
+                                </div>
+                                <div className="text-xs text-(--color-text-secondary)/30 text-center mb-3 font-mono truncate px-2">
+                                    {forgeLink}
+                                </div>
                                 <button
                                     onClick={() => copyToClipboard(forgeLink, 'forge')}
                                     className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/25 rounded text-sm transition-colors"
@@ -135,7 +154,7 @@ export default function ReferralPage() {
                                     {copiedField === 'forge' ? (
                                         <><Check size={14} className="text-green-400" /> Copied!</>
                                     ) : (
-                                        <><LinkIcon size={14} /> Copy Forge Link</>
+                                        <><LinkIcon size={14} /> Copy Link</>
                                     )}
                                 </button>
                             </div>
@@ -188,8 +207,7 @@ export default function ReferralPage() {
                                                 type="text"
                                                 value={websiteCode}
                                                 onChange={e => setWebsiteCode(e.target.value)}
-                                                placeholder="Enter code"
-                                                maxLength={8}
+                                                placeholder="Code or link"
                                                 className="flex-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded text-sm placeholder:text-(--color-text-secondary)/30 focus:outline-none focus:border-blue-500/50"
                                             />
                                             <button
@@ -230,8 +248,7 @@ export default function ReferralPage() {
                                                 type="text"
                                                 value={forgeCode}
                                                 onChange={e => setForgeCode(e.target.value)}
-                                                placeholder="Enter code"
-                                                maxLength={8}
+                                                placeholder="Code or link"
                                                 className="flex-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded text-sm placeholder:text-(--color-text-secondary)/30 focus:outline-none focus:border-orange-500/50"
                                             />
                                             <button
@@ -283,14 +300,14 @@ export default function ReferralPage() {
                                 <div className="flex gap-3">
                                     <Users size={16} className="text-blue-400 flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <strong className="text-(--color-text)">Website Referral</strong> — Share your link. When someone signs up through it,
+                                        <strong className="text-(--color-text)">Website Referral</strong> — Share your link or QR code. When someone signs up through it,
                                         they get 50 Passion as a welcome bonus and you earn 25 Passion.
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
                                     <Flame size={16} className="text-orange-400 flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <strong className="text-(--color-text)">Forge Referral</strong> — Share your Forge link. When someone visits the Forge for the first time
+                                        <strong className="text-(--color-text)">Forge Referral</strong> — Share your Forge link or QR code. When someone visits the Forge for the first time
                                         through it, you both get 1 free Spark to invest in any player.
                                     </div>
                                 </div>
