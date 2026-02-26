@@ -32,6 +32,7 @@ export default function ForgePlayerPage() {
     const [player, setPlayer] = useState(null)
     const [historyData, setHistoryData] = useState([])
     const [freeSparksRemaining, setFreeSparksRemaining] = useState(0)
+    const [referralSparksAvailable, setReferralSparksAvailable] = useState(0)
     const [tutorialCompleted, setTutorialCompleted] = useState(null)
     const [userTeamId, setUserTeamId] = useState(null)
     const [isOwner, setIsOwner] = useState(false)
@@ -93,6 +94,7 @@ export default function ForgePlayerPage() {
                 setUserTeamId(marketData.userTeamId || null)
                 setIsOwner(marketData.isOwner || false)
                 setFreeSparksRemaining(marketData.freeSparksRemaining ?? 0)
+                setReferralSparksAvailable(marketData.referralSparksAvailable ?? 0)
                 setTutorialCompleted(tutStatus.completed)
 
                 const found = (marketData.players || []).find(p => p.playerSlug === playerSlug)
@@ -199,6 +201,31 @@ export default function ForgePlayerPage() {
             }, 500)
         } catch (err) {
             setTradeError(err.message || 'Failed to use Starter Spark')
+        } finally {
+            setTrading(false)
+        }
+    }
+
+    const executeReferralFuel = async (sparkId) => {
+        setTrading(true)
+        setTradeError(null)
+        setTradeResult(null)
+        try {
+            const result = await forgeService.referralFuel(sparkId)
+            setReferralSparksAvailable(prev => Math.max(0, prev - 1))
+            setTradeResult({ ...result, isReferralSpark: true })
+            setToastMessage(`Referral Spark Fueled! +1 to ${player.playerName}`)
+            setTimeout(async () => {
+                const data = await forgeService.getMarket(seasonId)
+                const updated = (data.players || []).find(p => p.playerSlug === playerSlug)
+                if (updated) setPlayer(updated)
+                setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
+                setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
+                const hist = await forgeService.getHistory(updated?.sparkId || player.sparkId)
+                setHistoryData(hist.history || [])
+            }, 500)
+        } catch (err) {
+            setTradeError(err.message || 'Failed to use Referral Spark')
         } finally {
             setTrading(false)
         }
@@ -439,8 +466,10 @@ export default function ForgePlayerPage() {
                     result={tradeResult}
                     error={tradeError}
                     freeSparksRemaining={freeSparksRemaining}
+                    referralSparksAvailable={referralSparksAvailable}
                     onExecute={executeTrade}
                     onFreeFuel={executeFreeFuel}
+                    onReferralFuel={executeReferralFuel}
                     onClose={() => setTradeModal(null)}
                 />
             )}
