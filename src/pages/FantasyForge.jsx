@@ -6,7 +6,7 @@ import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import forgeLogo from '../assets/forge.png'
-import { ChevronDown, RotateCcw, Flame } from 'lucide-react'
+import { ChevronDown, RotateCcw, Flame, X } from 'lucide-react'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
 
@@ -19,6 +19,7 @@ import ForgeChallengesTab from './forge/ForgeChallengesTab'
 import ForgeTradeModal from './forge/ForgeTradeModal'
 import ForgeToast from './forge/ForgeToast'
 import ForgeTutorial from './forge/ForgeTutorial'
+import ForgeSpotlight from './forge/ForgeSpotlight'
 import './forge/forge.css'
 
 const SEASON_KEY = 'smite2_forge_season'
@@ -68,6 +69,12 @@ export default function FantasyForge() {
     const [search, setSearch] = useState('')
     const [sortBy, setSortBy] = useState('price-desc')
     const [teamFilter, setTeamFilter] = useState('')
+
+    // Spotlight state (floating stats window on desktop)
+    const [spotlightPlayer, setSpotlightPlayer] = useState(null)
+    const [spotlightPos, setSpotlightPos] = useState({ x: window.innerWidth - 280, y: 120 })
+    const [isDraggingSpotlight, setIsDraggingSpotlight] = useState(false)
+    const spotlightDragOffset = useRef({ x: 0, y: 0 })
 
     // Portfolio state
     const [portfolio, setPortfolio] = useState(null)
@@ -267,7 +274,7 @@ export default function FantasyForge() {
                     .filter(Boolean)
                 setLeagueOptions(leagueOpts)
 
-                // Priority: 1) league-wide URL, 2) division URL slugs, 3) saved league, 4) saved season, 5) first visible
+                // Priority: 1) league-wide URL, 2) division URL slugs, 3) default to all-divisions, 4) first visible season
                 const isLeagueUrl = urlLeagueSlug && !urlDivisionSlug
                 const urlLeagueOpt = isLeagueUrl ? leagueOpts.find(l => l.leagueSlug === urlLeagueSlug) : null
 
@@ -278,23 +285,10 @@ export default function FantasyForge() {
                     const urlMatch = urlLeagueSlug && urlDivisionSlug
                         ? visible.find(s => s.leagueSlug === urlLeagueSlug && s.divisionSlug === urlDivisionSlug)
                         : null
-                    const savedId = seasonId
-                    const savedLeague = (() => { try { return JSON.parse(localStorage.getItem('smite2_forge_league')) } catch { return null } })()
                     if (urlMatch) {
                         setSeasonId(urlMatch.id, allSeasons)
-                    } else if (savedLeague && leagueOpts.find(l => l.leagueId === savedLeague.leagueId)) {
-                        selectLeagueWide(savedLeague.leagueId, savedLeague.leagueSlug)
-                    } else if (savedId && visible.find(s => s.id === savedId)) {
-                        const saved = visible.find(s => s.id === savedId)
-                        if (saved) {
-                            const base = `/forge/${saved.leagueSlug}/${saved.divisionSlug}`
-                            const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
-                                : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
-                                : ''
-                            navigate(base + suffix, { replace: true })
-                        }
                     } else if (leagueOpts.length > 0) {
-                        // Default new users to all-divisions view
+                        // Always default to all-divisions view
                         selectLeagueWide(leagueOpts[0].leagueId, leagueOpts[0].leagueSlug)
                     } else if (visible.length > 0) {
                         setSeasonId(visible[0].id, allSeasons)
@@ -316,10 +310,18 @@ export default function FantasyForge() {
         return visible.filter(s => s.leagueId === leagueWideId)
     }, [leagueWideId, seasons, isOwner])
 
+    // ── Track what we last loaded so we know when to show loading vs silent refresh ──
+    const lastLoadRef = useRef({ tab: null, seasonId: null, leagueWideId: null })
+
     // ── Load data based on active tab ──
     const loadData = useCallback(async () => {
         if (!seasonId && !leagueWideId) return
-        setLoading(true)
+
+        // Only show loading spinner when tab/season/league changes, not on silent refetches
+        const prev = lastLoadRef.current
+        const hardChange = prev.tab !== activeTab || prev.seasonId !== seasonId || prev.leagueWideId !== leagueWideId
+        lastLoadRef.current = { tab: activeTab, seasonId, leagueWideId }
+        if (hardChange) setLoading(true)
         setError(null)
 
         try {
@@ -392,8 +394,36 @@ export default function FantasyForge() {
                         forgeService.getBatchHistory(sparkIds).then(res => {
                             setPortfolioHistories(res.histories || {})
                         }).catch(() => setPortfolioHistories({}))
+
+                        // Fetch and merge timelines from all seasons (awaited so chart renders before loading ends)
+                        const timelineResults = await Promise.all(
+                            leagueSeasons.map(s =>
+                                forgeService.getPortfolioTimeline(s.id)
+                                    .then(res => ({ seasonId: s.id, timeline: res.timeline || [] }))
+                                    .catch(() => ({ seasonId: s.id, timeline: [] }))
+                            )
+                        )
+                        const allEvents = []
+                        for (const { seasonId, timeline } of timelineResults) {
+                            for (const point of timeline) {
+                                allEvents.push({ ...point, seasonId })
+                            }
+                        }
+                        allEvents.sort((a, b) => new Date(a.t) - new Date(b.t))
+                        const latestWorth = {}
+                        const latestBasis = {}
+                        const merged = []
+                        for (const ev of allEvents) {
+                            latestWorth[ev.seasonId] = ev.worth
+                            latestBasis[ev.seasonId] = ev.basis
+                            const totalWorth = Object.values(latestWorth).reduce((s, v) => s + v, 0)
+                            const totalBasis = Object.values(latestBasis).reduce((s, v) => s + v, 0)
+                            merged.push({ t: ev.t, worth: totalWorth, basis: totalBasis, trigger: ev.trigger, playerName: ev.playerName })
+                        }
+                        setPortfolioTimeline(merged)
                     } else {
                         setPortfolioHistories({})
+                        setPortfolioTimeline([])
                     }
                 } else if (activeTab === 'leaderboard') {
                     const results = await Promise.all(leagueSeasons.map(s => forgeService.getLeaderboard(s.id).catch(() => null)))
@@ -569,6 +599,29 @@ export default function FantasyForge() {
         if (!selectedSeason) return
         navigate(`/forge/${selectedSeason.leagueSlug}/${selectedSeason.divisionSlug}/player/${player.playerSlug}`)
     }
+
+    // ── Spotlight: show floating stats window on desktop click ──
+    const handleSpotlightPlayer = useCallback((player) => {
+        setSpotlightPlayer(prev => prev?.sparkId === player.sparkId ? null : player)
+    }, [])
+
+    // Spotlight dragging
+    useEffect(() => {
+        if (!isDraggingSpotlight) return
+        const onMouseMove = (e) => {
+            setSpotlightPos({
+                x: Math.max(0, Math.min(window.innerWidth - 240, e.clientX - spotlightDragOffset.current.x)),
+                y: Math.max(0, Math.min(window.innerHeight - 100, e.clientY - spotlightDragOffset.current.y)),
+            })
+        }
+        const onMouseUp = () => setIsDraggingSpotlight(false)
+        window.addEventListener('mousemove', onMouseMove)
+        window.addEventListener('mouseup', onMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove)
+            window.removeEventListener('mouseup', onMouseUp)
+        }
+    }, [isDraggingSpotlight])
 
     // ── Random player for hero (excluding current) ──
     const handleRandomPlayer = useCallback(() => {
@@ -1027,6 +1080,7 @@ export default function FantasyForge() {
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
+                            onSpotlightPlayer={handleSpotlightPlayer}
                             onRandomPlayer={handleRandomPlayer}
                         />
                     )}
@@ -1072,9 +1126,27 @@ export default function FantasyForge() {
                     setSearch={setSearch}
                     filteredPlayers={filteredPlayers}
                     userTeamId={userTeamId}
+                    userTeamBySeasonId={isLeagueWide ? userTeamBySeasonId : null}
                     isOwner={isOwner}
                     isReplay={tutorialReplay}
                     onReplayComplete={() => setTutorialReplay(false)}
+                />
+            )}
+
+            {/* Floating Spotlight (desktop) */}
+            {spotlightPlayer && (
+                <ForgeSpotlight
+                    player={spotlightPlayer}
+                    pos={spotlightPos}
+                    isDragging={isDraggingSpotlight}
+                    dragOffset={spotlightDragOffset}
+                    changeView={changeView}
+                    onStartDrag={() => setIsDraggingSpotlight(true)}
+                    onClose={() => setSpotlightPlayer(null)}
+                    onViewProfile={() => {
+                        handleSelectPlayer(spotlightPlayer)
+                        setSpotlightPlayer(null)
+                    }}
                 />
             )}
 

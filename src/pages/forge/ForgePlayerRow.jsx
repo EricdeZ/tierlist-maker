@@ -8,7 +8,7 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
+export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
     const chartRef = useRef(null)
     const mobileChartRef = useRef(null)
     const [expanded, setExpanded] = useState(false)
@@ -55,6 +55,8 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
         // On mobile, toggle expanded view instead of navigating
         if (window.innerWidth < 640) {
             setExpanded(prev => !prev)
+        } else if (onSpotlight) {
+            onSpotlight(player)
         } else {
             onSelect(player)
         }

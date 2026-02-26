@@ -11,10 +11,62 @@ export const FORGE_CONFIG = {
     SUPPLY_FACTOR: 0.01,       // 1% price increase per outstanding Spark
     COOLING_TAX: 0.10,         // 10% fee on selling
     PRICE_FLOOR: 10,
-    PERF_DAMPENING: 0.50,      // how aggressively each game adjusts multiplier
-    PERF_CLAMP_MIN: 0.5,
-    PERF_CLAMP_MAX: 2.0,
+}
+
+// Performance tuning defaults (overridden by forge_config DB table when available)
+const PERF_DEFAULTS = {
+    GAME_DECAY: 0.75,          // per-game regression toward 1.0
+    SUPPLY_WEIGHT: 0.01,       // how much supply mutes score deviation
+    INACTIVITY_DECAY: 0.85,    // per-week multiplicative decay for inactive players
+    PERF_FLOOR: 0.10,          // hard floor on multiplier
+    PERF_CEILING: 2.50,        // soft ceiling asymptote
+    COMPRESS_K: 0.65,          // compression aggressiveness above 1.0
+    OPPONENT_WEIGHT: 0.30,     // how much opponent quality affects score
+    TEAMMATE_WEIGHT: 0.15,     // how much teammate quality affects score (inverse — strong team = slight penalty)
+    GOD_WEIGHT: 0.10,          // how much god meta affects score
+    WIN_BONUS: 0.05,           // flat multiplier boost for winning the game
     DECAY_HALF_LIFE: 7,        // days for 50% recency decay on role averages
+    PERFORMANCE_APPROVAL: true, // when true, updates queue for approval instead of applying
+}
+
+const MS_PER_DAY = 86400000
+
+/**
+ * Load performance config from forge_config table, falling back to defaults.
+ */
+export async function loadForgeConfig(sql) {
+    try {
+        const [row] = await sql`SELECT * FROM forge_config LIMIT 1`
+        if (!row) return { ...PERF_DEFAULTS }
+        return {
+            GAME_DECAY:      Number(row.game_decay)      || PERF_DEFAULTS.GAME_DECAY,
+            SUPPLY_WEIGHT:   Number(row.supply_weight)    || PERF_DEFAULTS.SUPPLY_WEIGHT,
+            INACTIVITY_DECAY: Number(row.inactivity_decay) || PERF_DEFAULTS.INACTIVITY_DECAY,
+            PERF_FLOOR:      Number(row.perf_floor)       || PERF_DEFAULTS.PERF_FLOOR,
+            PERF_CEILING:    Number(row.perf_ceiling)     || PERF_DEFAULTS.PERF_CEILING,
+            COMPRESS_K:      Number(row.compress_k)       || PERF_DEFAULTS.COMPRESS_K,
+            OPPONENT_WEIGHT: Number(row.opponent_weight)  || PERF_DEFAULTS.OPPONENT_WEIGHT,
+            TEAMMATE_WEIGHT: Number(row.teammate_weight)  || PERF_DEFAULTS.TEAMMATE_WEIGHT,
+            GOD_WEIGHT:      Number(row.god_weight)       || PERF_DEFAULTS.GOD_WEIGHT,
+            WIN_BONUS:       Number(row.win_bonus)        || PERF_DEFAULTS.WIN_BONUS,
+            DECAY_HALF_LIFE: Number(row.decay_half_life)  || PERF_DEFAULTS.DECAY_HALF_LIFE,
+            PERFORMANCE_APPROVAL: row.performance_approval ?? PERF_DEFAULTS.PERFORMANCE_APPROVAL,
+        }
+    } catch {
+        return { ...PERF_DEFAULTS }
+    }
+}
+
+/**
+ * Asymmetric multiplier compression.
+ * Above 1.0: exponential curve toward ceiling (gains compress).
+ * Below 1.0: raw pass-through to hard floor (losses hit full force).
+ */
+function compressMultiplier(raw, cfg) {
+    if (raw >= 1.0) {
+        return 1 + (cfg.PERF_CEILING - 1) * (1 - Math.exp(-cfg.COMPRESS_K * (raw - 1)))
+    }
+    return Math.max(raw, cfg.PERF_FLOOR)
 }
 
 const ROLE_WEIGHTS = {
@@ -352,16 +404,24 @@ export async function updateForgeAfterMatch(sql, matchId) {
 /**
  * Full-season performance recalculation.
  * Replays all games chronologically for every player who has played,
- * building up perf_multiplier from 1.0 game by game.
- * Role averages are season-wide, recency-weighted (50% decay per week).
+ * building up perf_multiplier from 1.0 game by game using compounding heat.
+ *
+ * Features:
+ * - Supply-weighted expectations (popular players are harder to pump)
+ * - Asymmetric compression (soft ceiling, hard floor — Forge is a Passion drain)
+ * - Inactivity decay (non-playing players trend toward the floor)
+ * - Opponent quality factor (beating strong teams counts for more)
+ * - God meta factor (strong gods raise expectations)
+ * - All tuning constants loaded from forge_config DB table
  */
 export async function recalcForgePerformance(sql, seasonId) {
     const [market] = await sql`
-        SELECT id, base_price, status FROM forge_markets WHERE season_id = ${seasonId}
+        SELECT id, base_price, status, created_at FROM forge_markets WHERE season_id = ${seasonId}
     `
     if (!market || market.status !== 'open') return
 
-    const halfLife = FORGE_CONFIG.DECAY_HALF_LIFE
+    const cfg = await loadForgeConfig(sql)
+    const halfLife = cfg.DECAY_HALF_LIFE
 
     // Query 1: Recency-weighted role averages (all roles in one query)
     const roleAvgRows = await sql`
@@ -419,7 +479,7 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     if (Object.keys(roleAvgMap).length === 0) return
 
-    // Query 2: All player game stats for the season, ordered chronologically
+    // Query 2: All player game stats + game_id, team_side, god_played for opponent/god factors
     const allGames = await sql`
         WITH team_kills AS (
             SELECT pgs_tk.game_id, pgs_tk.team_side, SUM(pgs_tk.kills) as total_kills
@@ -432,7 +492,10 @@ export async function recalcForgePerformance(sql, seasonId) {
         )
         SELECT
             pgs.league_player_id,
+            g.id as game_id,
+            pgs.team_side,
             LOWER(COALESCE(pgs.role_played, lp.role)) as role,
+            pgs.god_played,
             pgs.kills, pgs.deaths, pgs.assists,
             COALESCE(NULLIF(pgs.damage, 0), 0) as damage,
             COALESCE(NULLIF(pgs.mitigated, 0), 0) as mitigated,
@@ -440,7 +503,11 @@ export async function recalcForgePerformance(sql, seasonId) {
                 THEN (pgs.kills + pgs.assists)::numeric / tk.total_kills
                 ELSE 0
             END as kp,
-            m.date as match_date
+            m.date as match_date,
+            CASE WHEN (pgs.team_side = 1 AND g.winner_team_id = m.team1_id)
+                   OR (pgs.team_side = 2 AND g.winner_team_id = m.team2_id)
+                 THEN true ELSE false
+            END as won
         FROM player_game_stats pgs
         JOIN league_players lp ON pgs.league_player_id = lp.id
         JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
@@ -455,6 +522,8 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     if (allGames.length === 0) return
 
+    // ── Pre-computation: player strengths, god averages, opponent lookup ──
+
     // Group games by player
     const playerGamesMap = new Map()
     for (const game of allGames) {
@@ -464,50 +533,214 @@ export async function recalcForgePerformance(sql, seasonId) {
         playerGamesMap.get(game.league_player_id).push(game)
     }
 
-    // Get all spark rows for this market (for batch updates)
+    const now = Date.now()
+
+    // Pre-compute per-player recency-weighted composite score (for opponent factor)
+    const playerStrengthMap = new Map()
+    for (const [lpId, games] of playerGamesMap) {
+        let totalWeight = 0, weightedScore = 0
+        for (const game of games) {
+            const avgs = roleAvgMap[game.role]
+            if (!avgs) continue
+            const score = calcCompositeScore(
+                { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                  kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                avgs, game.role
+            )
+            const daysAgo = (now - new Date(game.match_date).getTime()) / MS_PER_DAY
+            const weight = Math.pow(0.5, daysAgo / halfLife)
+            weightedScore += score * weight
+            totalWeight += weight
+        }
+        playerStrengthMap.set(lpId, totalWeight > 0 ? weightedScore / totalWeight : 1.0)
+    }
+
+    // Pre-compute per-god-per-role recency-weighted composite score (for god meta factor)
+    const godScores = {}  // "godName:role" -> { totalWeight, weightedScore }
+    for (const game of allGames) {
+        const godName = (game.god_played || '').toLowerCase().trim()
+        if (!godName) continue
+        const avgs = roleAvgMap[game.role]
+        if (!avgs) continue
+        const score = calcCompositeScore(
+            { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+              kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+            avgs, game.role
+        )
+        const daysAgo = (now - new Date(game.match_date).getTime()) / MS_PER_DAY
+        const weight = Math.pow(0.5, daysAgo / halfLife)
+        const godKey = `${godName}:${game.role}`
+        if (!godScores[godKey]) godScores[godKey] = { totalWeight: 0, weightedScore: 0 }
+        godScores[godKey].totalWeight += weight
+        godScores[godKey].weightedScore += score * weight
+    }
+    const godAvgMap = {}
+    for (const [key, data] of Object.entries(godScores)) {
+        godAvgMap[key] = data.totalWeight > 0 ? data.weightedScore / data.totalWeight : 1.0
+    }
+
+    // Build opponent lookup: for each (game_id, team_side), list of opposing player IDs
+    const gameTeamPlayers = new Map()  // "gameId:teamSide" -> [league_player_id, ...]
+    for (const game of allGames) {
+        const key = `${game.game_id}:${game.team_side}`
+        if (!gameTeamPlayers.has(key)) gameTeamPlayers.set(key, [])
+        gameTeamPlayers.get(key).push(game.league_player_id)
+    }
+
+    function getTeamStrength(gameId, teamSide, excludeLpId) {
+        const players = gameTeamPlayers.get(`${gameId}:${teamSide}`) || []
+        const teammates = excludeLpId ? players.filter(id => id !== excludeLpId) : players
+        if (teammates.length === 0) return 1.0
+        let sum = 0
+        for (const lpId of teammates) sum += (playerStrengthMap.get(lpId) || 1.0)
+        return sum / teammates.length
+    }
+
+    // ── Get spark rows for batch updates ──
+
     const sparks = await sql`
         SELECT id, league_player_id, total_sparks
         FROM player_sparks WHERE market_id = ${market.id}
     `
     const sparkMap = new Map(sparks.map(s => [s.league_player_id, s]))
 
-    // Replay each player's season and collect updates
+    // ── Replay each player's season with compounding heat ──
+
     const updates = []
+    const processedSparkIds = new Set()
+    const seasonStartDate = new Date(allGames[0].match_date).getTime()
 
     for (const [lpId, games] of playerGamesMap) {
         const spark = sparkMap.get(lpId)
         if (!spark) continue
+        processedSparkIds.add(spark.id)
 
         let multiplier = 1.0
+        let lastGameTime = null
 
         for (const game of games) {
             const avgs = roleAvgMap[game.role]
             if (!avgs) continue
 
-            const score = calcCompositeScore(
-                {
-                    kills:     Number(game.kills),
-                    deaths:    Number(game.deaths),
-                    assists:   Number(game.assists),
-                    kp:        Number(game.kp),
-                    damage:    Number(game.damage),
-                    mitigated: Number(game.mitigated),
-                },
-                avgs,
-                game.role
+            const gameTime = new Date(game.match_date).getTime()
+
+            // 1. Inactivity decay between games (multiplicative — trends toward floor)
+            if (lastGameTime !== null) {
+                const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
+                const weeksGap = Math.floor(dayGap / 7)
+                if (weeksGap > 0) {
+                    multiplier = compressMultiplier(
+                        multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksGap), cfg
+                    )
+                }
+            }
+
+            // 2. Per-game regression toward 1.0
+            const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
+
+            // 3. Raw composite score
+            const rawScore = calcCompositeScore(
+                { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                  kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                avgs, game.role
             )
 
-            const expected = Math.max(multiplier, 0.1)
-            const ratio = score / expected
-            multiplier = multiplier * (1 + FORGE_CONFIG.PERF_DAMPENING * (ratio - 1))
-            multiplier = Math.max(FORGE_CONFIG.PERF_CLAMP_MIN, Math.min(multiplier, FORGE_CONFIG.PERF_CLAMP_MAX))
+            // 4. Supply-dampened heat
+            const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
+
+            // 5. Opponent quality factor (strong opponents = boost)
+            const oppSide = game.team_side === 1 ? 2 : 1
+            const oppStrength = getTeamStrength(game.game_id, oppSide)
+            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
+
+            // 6. Teammate quality factor (strong teammates = slight penalty, you're being carried)
+            const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
+            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
+
+            // 7. God meta factor — compare your score to the god+role average
+            const godName = (game.god_played || '').toLowerCase().trim()
+            const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
+            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
+
+            // 8. Win bonus
+            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1.0
+
+            // 9. Compound + compress
+            multiplier = compressMultiplier(decayed * heat * oppFactor * teamFactor * godFactor * winFactor, cfg)
+            lastGameTime = gameTime
+        }
+
+        // 8. Final inactivity decay (last game → today)
+        if (lastGameTime !== null) {
+            const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
+            const weeksInactive = Math.floor(daysSinceLast / 7)
+            if (weeksInactive > 0) {
+                multiplier = compressMultiplier(
+                    multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
+                )
+            }
         }
 
         const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks)
         updates.push({ sparkId: spark.id, multiplier, newPrice })
     }
 
+    // 9. Process 0-game players: inactivity decay from season start
+    for (const spark of sparks) {
+        if (processedSparkIds.has(spark.id)) continue
+        const daysSinceStart = (now - seasonStartDate) / MS_PER_DAY
+        const weeksInactive = Math.floor(daysSinceStart / 7)
+        if (weeksInactive <= 0) continue
+        const multiplier = compressMultiplier(
+            Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
+        )
+        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks)
+        updates.push({ sparkId: spark.id, multiplier, newPrice })
+    }
+
     if (updates.length === 0) return
+
+    // ── Approval gate: queue or apply immediately ──
+
+    if (cfg.PERFORMANCE_APPROVAL) {
+        // Delete any existing pending rows for this market (full replay = replace)
+        await sql`DELETE FROM forge_pending_updates WHERE market_id = ${market.id}`
+
+        // Fetch current multiplier/price and player names for display
+        const currentSparks = await sql`
+            SELECT ps.id, ps.perf_multiplier, ps.current_price,
+                   COALESCE(u.display_name, u.username, 'Unknown') as player_name
+            FROM player_sparks ps
+            JOIN league_players lp ON ps.league_player_id = lp.id
+            JOIN users u ON lp.user_id = u.id
+            WHERE ps.market_id = ${market.id}
+        `
+        const currentMap = new Map(currentSparks.map(s => [s.id, s]))
+
+        // Batch insert pending updates
+        const pSparkIds = updates.map(u => u.sparkId)
+        const pMarketIds = updates.map(() => market.id)
+        const pNames = updates.map(u => currentMap.get(u.sparkId)?.player_name || 'Unknown')
+        const pOldMults = updates.map(u => Number(currentMap.get(u.sparkId)?.perf_multiplier) || 1.0)
+        const pNewMults = updates.map(u => u.multiplier)
+        const pOldPrices = updates.map(u => Number(currentMap.get(u.sparkId)?.current_price) || 0)
+        const pNewPrices = updates.map(u => u.newPrice)
+
+        await sql`
+            INSERT INTO forge_pending_updates (market_id, spark_id, player_name, old_multiplier, new_multiplier, old_price, new_price)
+            SELECT
+                UNNEST(${pMarketIds}::int[]),
+                UNNEST(${pSparkIds}::int[]),
+                UNNEST(${pNames}::text[]),
+                UNNEST(${pOldMults}::numeric[]),
+                UNNEST(${pNewMults}::numeric[]),
+                UNNEST(${pOldPrices}::numeric[]),
+                UNNEST(${pNewPrices}::numeric[])
+        `
+        return // Skip applying — wait for admin approval
+    }
+
+    // ── Apply immediately (approval off) ──
 
     // Batch UPDATE all player_sparks
     const sparkIds = updates.map(u => u.sparkId)

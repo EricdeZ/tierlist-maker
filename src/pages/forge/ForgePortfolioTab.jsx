@@ -58,7 +58,7 @@ function formatEventTime(dateStr) {
         ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-function getHoldingChange(holding, historyData) {
+function getHoldingChange(holding) {
     // % change based on average buy price vs current price
     if (holding.avgBuyPrice > 0) {
         return ((holding.currentPrice - holding.avgBuyPrice) / holding.avgBuyPrice) * 100
@@ -76,10 +76,29 @@ const TRIGGER_LABELS = {
     init: 'Initial Price',
 }
 
+const CHART_LAYERS_KEY = 'smite2_forge_chart_layers'
+const DEFAULT_LAYERS = { worth: true, invested: true, fuel: true, cool: true, perf: true }
+
+function loadChartLayers() {
+    try {
+        const stored = localStorage.getItem(CHART_LAYERS_KEY)
+        return stored ? { ...DEFAULT_LAYERS, ...JSON.parse(stored) } : DEFAULT_LAYERS
+    } catch { return DEFAULT_LAYERS }
+}
+
 export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, onCool }) {
     const chartRef = useRef(null)
     const chartInteraction = useRef(null)
     const [tooltip, setTooltip] = useState(null)
+    const [chartLayers, setChartLayers] = useState(loadChartLayers)
+
+    const toggleLayer = (key) => {
+        setChartLayers(prev => {
+            const next = { ...prev, [key]: !prev[key] }
+            localStorage.setItem(CHART_LAYERS_KEY, JSON.stringify(next))
+            return next
+        })
+    }
 
     // Draw the portfolio chart from server-provided timeline
     useEffect(() => {
@@ -87,8 +106,13 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
         chartInteraction.current = drawPortfolioChart(chartRef.current, portfolioTimeline, {
             lineColor: '#e86520',
             fillColor: 'rgba(232,101,32,0.15)',
+            showWorth: chartLayers.worth,
+            showBasis: chartLayers.invested,
+            showFuel: chartLayers.fuel,
+            showCool: chartLayers.cool,
+            showPerf: chartLayers.perf,
         })
-    }, [portfolioTimeline])
+    }, [portfolioTimeline, chartLayers])
 
     const handleChartMove = useCallback((e) => {
         if (!chartInteraction.current || !chartRef.current) return
@@ -210,20 +234,32 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 )}
                             </div>
                         )}
-                        {/* Chart legend */}
-                        <div className="absolute bottom-1 right-2 flex items-center gap-3 text-[0.6rem] text-[var(--forge-text-dim)] forge-head tracking-wider">
-                            <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-[var(--forge-flame)]" /> Fuel
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-[var(--forge-cool)]" /> Cool
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-[var(--forge-gold)]" /> Perf
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-5 h-0 border-t border-dashed border-white/30" /> Invested
-                            </span>
+                        {/* Chart layer toggles */}
+                        <div className="absolute bottom-1 right-2 flex items-center gap-1 forge-head tracking-wider">
+                            {[
+                                { key: 'worth', label: 'Worth', color: 'var(--forge-flame)', swatch: 'line' },
+                                { key: 'invested', label: 'Invested', color: 'rgba(255,255,255,0.4)', swatch: 'dashed' },
+                                { key: 'fuel', label: 'Fuel', color: 'var(--forge-flame)' },
+                                { key: 'cool', label: 'Cool', color: 'var(--forge-cool)' },
+                                { key: 'perf', label: 'Perf', color: 'var(--forge-gold)' },
+                            ].map(l => (
+                                <button
+                                    key={l.key}
+                                    onClick={() => toggleLayer(l.key)}
+                                    className={`flex items-center gap-1 px-1.5 py-0.5 text-[0.6rem] cursor-pointer transition-opacity ${
+                                        chartLayers[l.key] ? 'opacity-100' : 'opacity-30'
+                                    }`}
+                                >
+                                    {l.swatch === 'line' ? (
+                                        <span className="w-3 h-0 border-t-2" style={{ borderColor: l.color }} />
+                                    ) : l.swatch === 'dashed' ? (
+                                        <span className="w-4 h-0 border-t border-dashed" style={{ borderColor: l.color }} />
+                                    ) : (
+                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                                    )}
+                                    <span style={{ color: chartLayers[l.key] ? l.color : 'var(--forge-text-dim)' }}>{l.label}</span>
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </>
@@ -356,24 +392,24 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                     <div className="space-y-1">
                         {portfolio.transactions.map(t => (
                             <div key={t.id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 bg-[var(--forge-panel)]/40 text-sm sm:text-base hover:bg-[var(--forge-panel)]/60 transition-colors">
-                                {(t.type === 'fuel' || t.type === 'tutorial_fuel') ? (
+                                {(t.type === 'fuel' || t.type === 'tutorial_fuel' || t.type === 'referral_fuel') ? (
                                     <Flame size={16} className="text-[var(--forge-flame)] flex-shrink-0" />
                                 ) : (
                                     <Snowflake size={16} className="text-[var(--forge-cool)] flex-shrink-0" />
                                 )}
                                 <span className="forge-body flex-1 min-w-0 truncate">
-                                    {t.type === 'tutorial_fuel' ? 'Starter Spark' : t.type === 'fuel' ? 'Fueled' : t.type === 'cool' ? 'Cooled' : 'Liquidated'} {t.playerName}
+                                    {t.type === 'tutorial_fuel' ? 'Starter Spark' : t.type === 'referral_fuel' ? 'Referral Spark' : t.type === 'fuel' ? 'Fueled' : t.type === 'cool' ? 'Cooled' : 'Liquidated'} {t.playerName}
                                     <span className="opacity-50 inline-flex items-center gap-0.5 ml-1">
                                         (<img src={sparkIcon} alt="" className="w-6 h-6 object-contain inline" />
                                         <span className="forge-num">{t.sparks}</span> Spark{t.sparks !== 1 ? 's' : ''})
                                     </span>
                                 </span>
                                 <span className={`forge-num font-medium ${
-                                    t.type === 'tutorial_fuel' ? 'text-[var(--forge-flame-bright)]'
+                                    (t.type === 'tutorial_fuel' || t.type === 'referral_fuel') ? 'text-[var(--forge-flame-bright)]'
                                     : t.type === 'fuel' ? 'text-[var(--forge-loss)]'
                                     : 'text-[var(--forge-gain)]'
                                 }`}>
-                                    {t.type === 'tutorial_fuel' ? 'FREE' : `${t.type === 'fuel' ? '-' : '+'}${t.totalCost.toLocaleString()}`}
+                                    {(t.type === 'tutorial_fuel' || t.type === 'referral_fuel') ? 'FREE' : `${t.type === 'fuel' ? '-' : '+'}${t.totalCost.toLocaleString()}`}
                                 </span>
                             </div>
                         ))}

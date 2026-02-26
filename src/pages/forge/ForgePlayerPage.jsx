@@ -121,15 +121,17 @@ export default function ForgePlayerPage() {
     useEffect(() => {
         if (!chartRef.current || !historyData.length) return
         const timeline = historyData.map(h => ({
-            value: h.price,
+            worth: h.price,
+            basis: h.price,
             trigger: h.trigger,
-            createdAt: h.createdAt,
+            t: h.createdAt,
             playerName: player?.playerName,
         }))
         if (timeline.length >= 2) {
             chartInteraction.current = drawPortfolioChart(chartRef.current, timeline, {
                 lineColor: FORGE_COLORS.flame,
                 fillColor: 'rgba(232,101,32,0.15)',
+                showBasis: false,
             })
         }
     }, [historyData, player])
@@ -422,7 +424,7 @@ export default function ForgePlayerPage() {
                                         top: Math.max(tooltip.y - 48, 4),
                                     }}>
                                         <div className="forge-num text-sm text-[var(--forge-gold-bright)]">
-                                            {Math.round(tooltip.value).toLocaleString()} Heat
+                                            {Math.round(tooltip.worth).toLocaleString()} Heat
                                         </div>
                                         {tooltip.trigger && !tooltip.isLine && (
                                             <div className="flex items-center gap-1 mt-0.5">

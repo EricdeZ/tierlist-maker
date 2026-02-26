@@ -72,7 +72,7 @@ export default function ForgeMarketTab({
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
     changeView, freeSparksRemaining, referralSparksAvailable = 0, seasonSlugs,
     isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds,
-    onFuel, onCool, onSelectPlayer, onRandomPlayer,
+    onFuel, onCool, onSelectPlayer, onSpotlightPlayer, onRandomPlayer,
 }) {
     if (loading) {
         return (
@@ -241,7 +241,7 @@ export default function ForgeMarketTab({
             </div>
 
             {/* Player rows */}
-            <div className="flex flex-col gap-[2px] forge-stagger">
+            <div className="flex flex-col gap-[2px] forge-stagger" style={{ minHeight: '80vh' }}>
                 {tableRows.map(p => (
                     <ForgePlayerRow
                         key={p.sparkId}
@@ -257,6 +257,7 @@ export default function ForgeMarketTab({
                         userTeamBySeasonId={userTeamBySeasonId}
                         openMarketIds={openMarketIds}
                         onSelect={onSelectPlayer}
+                        onSpotlight={onSpotlightPlayer}
                         onFuel={onFuel}
                         onCool={onCool}
                     />

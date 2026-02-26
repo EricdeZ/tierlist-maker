@@ -63,15 +63,14 @@ export function createEmberSystem(canvas) {
     }
 
     const ctx = canvas.getContext('2d')
-    let w = 0, h = 0
     let embers = []
     let animId = null
     let lastFrame = 0
     const FPS_INTERVAL = 1000 / 20 // cap at 20fps
 
     function resize() {
-        w = canvas.width = canvas.offsetWidth * window.devicePixelRatio
-        h = canvas.height = canvas.offsetHeight * window.devicePixelRatio
+        canvas.width = canvas.offsetWidth * window.devicePixelRatio
+        canvas.height = canvas.offsetHeight * window.devicePixelRatio
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
         const displayW = canvas.offsetWidth
         const displayH = canvas.offsetHeight
@@ -285,53 +284,88 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
     const chartW = w - padLeft - padRight
     const chartH = h - padTop - padBottom
 
-    // Scale encompasses both series
-    const allValues = timeline.flatMap(t => [t.worth, t.basis])
-    const min = Math.min(...allValues)
-    const max = Math.max(...allValues)
-    const range = max - min || 1
+    // Layer visibility
+    const showWorth = opts.showWorth !== false
+    const showBasis = opts.showBasis !== false
+    const showFuel = opts.showFuel !== false
+    const showCool = opts.showCool !== false
+    const showPerf = opts.showPerf !== false
 
-    const toY = (v) => padTop + (1 - (v - min) / range) * chartH
-    const toX = (i) => padLeft + (i / (timeline.length - 1)) * chartW
+    // Coerce values — guard against undefined/null/NaN
+    const safeNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+
+    // Scale encompasses visible series
+    const allValues = []
+    for (const t of timeline) {
+        if (showWorth) allValues.push(safeNum(t.worth))
+        if (showBasis) allValues.push(safeNum(t.basis))
+    }
+    if (allValues.length === 0) allValues.push(0, 1)
+    let min = Math.min(...allValues)
+    let max = Math.max(...allValues)
+    const flat = min === max
+    if (flat) {
+        // Add 5% padding so the line isn't pinned to an edge
+        const pad5 = Math.max(Math.abs(min) * 0.05, 1)
+        min -= pad5
+        max += pad5
+    }
+    const range = max - min
+
+    const toY = (v) => { const n = safeNum(v); return padTop + (1 - (n - min) / range) * chartH }
+    const toX = (i) => padLeft + (i / Math.max(timeline.length - 1, 1)) * chartW
 
     const worthPts = timeline.map((t, i) => ({ x: toX(i), y: toY(t.worth), ...t }))
     const basisPts = timeline.map((t, i) => ({ x: toX(i), y: toY(t.basis), ...t }))
 
-    // ── Worth fill gradient ──
     const worthColor = opts.lineColor || '#e86520'
-    const gradient = ctx.createLinearGradient(0, padTop, 0, h - padBottom)
-    gradient.addColorStop(0, opts.fillColor || 'rgba(232,101,32,0.15)')
-    gradient.addColorStop(1, 'transparent')
 
-    ctx.beginPath()
-    worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
-    ctx.lineTo(worthPts[worthPts.length - 1].x, h - padBottom)
-    ctx.lineTo(worthPts[0].x, h - padBottom)
-    ctx.closePath()
-    ctx.fillStyle = gradient
-    ctx.fill()
+    // ── Worth fill gradient ──
+    if (showWorth) {
+        const gradient = ctx.createLinearGradient(0, padTop, 0, h - padBottom)
+        gradient.addColorStop(0, opts.fillColor || 'rgba(232,101,32,0.15)')
+        gradient.addColorStop(1, 'transparent')
+
+        ctx.beginPath()
+        worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+        ctx.lineTo(worthPts[worthPts.length - 1].x, h - padBottom)
+        ctx.lineTo(worthPts[0].x, h - padBottom)
+        ctx.closePath()
+        ctx.fillStyle = gradient
+        ctx.fill()
+    }
 
     // ── Cost basis line (dashed) ──
-    ctx.save()
-    ctx.setLineDash([6, 4])
-    ctx.beginPath()
-    basisPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-    ctx.lineWidth = 1.5
-    ctx.stroke()
-    ctx.restore()
+    if (showBasis) {
+        ctx.save()
+        ctx.setLineDash([6, 4])
+        ctx.beginPath()
+        basisPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.restore()
+    }
 
     // ── Worth line (solid) ──
-    ctx.beginPath()
-    worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
-    ctx.strokeStyle = worthColor
-    ctx.lineWidth = 2
-    ctx.stroke()
+    if (showWorth) {
+        ctx.beginPath()
+        worthPts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
+        ctx.strokeStyle = worthColor
+        ctx.lineWidth = 2
+        ctx.stroke()
+    }
 
-    // ── Event dots (skip init and performance-only clutter) ──
+    // ── Determine which event types to show ──
+    const visibleTriggers = new Set()
+    if (showFuel) { visibleTriggers.add('fuel'); visibleTriggers.add('tutorial_fuel'); visibleTriggers.add('referral_fuel') }
+    if (showCool) { visibleTriggers.add('cool'); visibleTriggers.add('liquidate') }
+    if (showPerf) visibleTriggers.add('performance')
+
+    // ── Event dots ──
     const eventPoints = []
     for (const pt of worthPts) {
-        if (pt.trigger && pt.trigger !== 'init') {
+        if (pt.trigger && pt.trigger !== 'init' && visibleTriggers.has(pt.trigger)) {
             const color = EVENT_COLORS[pt.trigger] || '#888'
             const radius = pt.trigger === 'performance' ? 4 : 5
             ctx.beginPath()
@@ -351,21 +385,29 @@ export function drawPortfolioChart(canvas, timeline, opts = {}) {
     }
 
     // ── End dot ──
-    const last = worthPts[worthPts.length - 1]
-    ctx.beginPath()
-    ctx.arc(last.x, last.y, 3, 0, 6.28)
-    ctx.fillStyle = worthColor
-    ctx.shadowBlur = 8
-    ctx.shadowColor = worthColor
-    ctx.fill()
-    ctx.shadowBlur = 0
+    if (showWorth) {
+        const last = worthPts[worthPts.length - 1]
+        ctx.beginPath()
+        ctx.arc(last.x, last.y, 3, 0, 6.28)
+        ctx.fillStyle = worthColor
+        ctx.shadowBlur = 8
+        ctx.shadowColor = worthColor
+        ctx.fill()
+        ctx.shadowBlur = 0
+    }
 
     // ── Y-axis labels ──
     ctx.font = '10px monospace'
     ctx.fillStyle = 'rgba(255,255,255,0.4)'
     ctx.textAlign = 'left'
-    ctx.fillText(Math.round(max).toLocaleString(), padLeft + 2, padTop - 4)
-    ctx.fillText(Math.round(min).toLocaleString(), padLeft + 2, h - padBottom + 14)
+    if (flat) {
+        // Single centered label when all values are the same
+        const actualVal = allValues[0] + (max - min) / 2 // recover the original value
+        ctx.fillText(Math.round(actualVal).toLocaleString(), padLeft + 2, padTop + chartH / 2 + 3)
+    } else {
+        ctx.fillText(Math.round(max).toLocaleString(), padLeft + 2, padTop - 4)
+        ctx.fillText(Math.round(min).toLocaleString(), padLeft + 2, h - padBottom + 14)
+    }
 
     // ── Hit-test for hover ──
     return {

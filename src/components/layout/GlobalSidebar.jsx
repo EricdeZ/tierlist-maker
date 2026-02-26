@@ -357,12 +357,14 @@ export default function GlobalSidebar() {
                                         <span className="text-[#5865F2]">Claim Your Profile</span>
                                     </SidebarLink>
                                 )}
-                                <SidebarLink
-                                    icon={LogOut}
-                                    onClick={() => { close(); logout() }}
-                                >
-                                    <span className="text-red-400">Log Out</span>
-                                </SidebarLink>
+                                {FEATURE_FLAGS.FORGE_RELEASED && (
+                                    <SidebarLink to="/forge" active={isActive('/forge')}>
+                                        <span className="flex items-center gap-3">
+                                            <Flame className="w-4 h-4 shrink-0 text-orange-400" />
+                                            Fantasy Forge
+                                        </span>
+                                    </SidebarLink>
+                                )}
                             </SidebarSection>
                         )}
 
@@ -500,11 +502,6 @@ export default function GlobalSidebar() {
                             <SidebarLink to="/twitch" icon={Tv} active={isActive('/twitch')}>
                                 Featured Stream
                             </SidebarLink>
-                            {FEATURE_FLAGS.FORGE_RELEASED && (
-                                <SidebarLink to="/forge" icon={Flame} active={isActive('/forge')}>
-                                    Fantasy Forge
-                                </SidebarLink>
-                            )}
                         </SidebarSection>
 
                         {/* Support & Feedback */}
@@ -546,6 +543,19 @@ export default function GlobalSidebar() {
                                     Dashboard
                                 </SidebarLink>
                             </SidebarSection>
+                        )}
+
+                        {/* Log Out — bottom */}
+                        {user && (
+                            <>
+                                <div className="border-b border-white/5 my-2 mx-3" />
+                                <SidebarLink
+                                    icon={LogOut}
+                                    onClick={() => { close(); logout() }}
+                                >
+                                    <span className="text-red-400">Log Out</span>
+                                </SidebarLink>
+                            </>
                         )}
                     </div>
                     </div>{/* end scroll wrapper */}

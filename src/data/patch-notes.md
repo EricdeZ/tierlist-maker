@@ -1,22 +1,30 @@
 # What's New
 
-## [Scrim Planner](/scrims)
-- Challenge rival teams or post open scrims for anyone to accept
-- Pick your mode: Regular, Fearless, Fearless Picks, or Fearless Bans
-- Retro Windows XP-themed UI with a built-in calendar and tier picker
-- Track outcomes, manage your blacklist, and settle disputes with the coin flip
+## [Fantasy Forge](/forge) — Now Live!
+- Invest Sparks in players you believe in — prices rise and fall based on demand
+- Track your portfolio with interactive charts showing worth vs. cost basis over time
+- Compete on the leaderboard for highest profit across the season
+- Browse all divisions at once with the league-wide view
+- Earn 3 free starter Sparks per league plus bonus Sparks through referrals
+- Built-in tutorial walks you through your first trades
 
-## [God Tier List](/god-tierlist)
-- Drop every god into S/A/B/C/D/F tiers and share your hot takes
-- Save it to your profile — keep it private, share with your team, or go public
+## [Refer-a-Friend](/referral)
+- Share your referral code or QR code to invite friends
+- Website referrals: you get 25 Passion, they get 50
+- Forge referrals: both of you get a free Spark
+- Unlock up to 7 tiered referral challenges for bonus rewards
 
-## Per-Game Role Tracking
-- Every match now records your role (Solo, Jungle, Mid, Support, ADC)
-- Role-specific stats and breakdowns are coming soon
+## [Scrim Planner](/scrims) — Upgraded
+- Redesigned wizard and card layout for creating and browsing scrims
+- Scrim challenges now award XP rewards
 
-## [Support Us](/support)
-- Loving the Companion? Help keep it running — check out the [Support](/support) page
-- Got ideas or bugs? Hit us up through [Feedback](/feedback)
+## Improvements
+- **God Tier List** — renamable title saved per tier list
+- **Draft Simulator** — undo button and localStorage persistence
+- **Per-Game Stats** — toggle per-game breakdowns on team roster tables
+- **Schedule** — edit form now appears inline next to the match row
+- **Sidebar** — press `Space` to toggle (hint shown on desktop)
+- **Faster Loading** — Forge page loads in parallel instead of waterfall
 
 ---
 

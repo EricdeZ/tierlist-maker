@@ -113,7 +113,8 @@ async function getMarket(sql, user, params, event) {
             u_avatar.discord_id as player_discord_id,
             u_avatar.discord_avatar as player_discord_avatar,
             u_avatar.id as user_id_linked,
-            cs.best_streak
+            cs.best_streak,
+            pstats.games_played, pstats.wins, pstats.avg_kills, pstats.avg_deaths, pstats.avg_assists
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
         JOIN players p ON lp.player_id = p.id
@@ -128,6 +129,20 @@ async function getMarket(sql, user, params, event) {
             ORDER BY COUNT(*) DESC
             LIMIT 1
         ) mpg ON true
+        LEFT JOIN LATERAL (
+            SELECT
+                COUNT(DISTINCT pgs.game_id)::integer as games_played,
+                COUNT(DISTINCT pgs.game_id) FILTER (
+                    WHERE g.winner_team_id = CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END
+                )::integer as wins,
+                COALESCE(AVG(pgs.kills), 0) as avg_kills,
+                COALESCE(AVG(pgs.deaths), 0) as avg_deaths,
+                COALESCE(AVG(pgs.assists), 0) as avg_assists
+            FROM player_game_stats pgs
+            JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+            JOIN matches m ON g.match_id = m.id
+            WHERE pgs.league_player_id = lp.id
+        ) pstats ON true
         LEFT JOIN users u_avatar ON u_avatar.linked_player_id = p.id
         LEFT JOIN coinflip_streaks cs ON cs.user_id = u_avatar.id
         WHERE ps.market_id = ${market.id}
@@ -250,6 +265,11 @@ async function getMarket(sql, user, params, event) {
                 : null,
             isConnected: s.user_id_linked != null,
             bestStreak: s.best_streak || 0,
+            gamesPlayed: s.games_played || 0,
+            wins: s.wins || 0,
+            avgKills: Number(s.avg_kills) || 0,
+            avgDeaths: Number(s.avg_deaths) || 0,
+            avgAssists: Number(s.avg_assists) || 0,
         }
     })
 
@@ -717,28 +737,20 @@ async function fuel(sql, user, body, event) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 10 Sparks per transaction' }) }
     }
 
-    // Prevent trading own team's players (owners bypass)
-    const [isOwner] = await sql`
-        SELECT 1 FROM user_roles ur
-        JOIN role_permissions rp ON rp.role_id = ur.role_id
-        WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
-        LIMIT 1
+    // Prevent trading own team's players
+    const [ownTeamCheck] = await sql`
+        SELECT 1 FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        WHERE ps.id = ${sparkId}
+          AND lp.team_id IN (
+              SELECT lp2.team_id FROM league_players lp2
+              JOIN teams t ON t.id = lp2.team_id
+              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                AND lp2.is_active = true
+          )
     `
-    if (!isOwner) {
-        const [ownTeamCheck] = await sql`
-            SELECT 1 FROM player_sparks ps
-            JOIN league_players lp ON ps.league_player_id = lp.id
-            WHERE ps.id = ${sparkId}
-              AND lp.team_id IN (
-                  SELECT lp2.team_id FROM league_players lp2
-                  JOIN teams t ON t.id = lp2.team_id
-                  WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                    AND lp2.is_active = true
-              )
-        `
-        if (ownTeamCheck) {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot fuel players on your own team' }) }
-        }
+    if (ownTeamCheck) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot fuel players on your own team' }) }
     }
 
     try {
@@ -787,28 +799,20 @@ async function cool(sql, user, body, event) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId and sparks (>= 1) are required' }) }
     }
 
-    // Prevent trading own team's players (owners bypass)
-    const [isOwnerCool] = await sql`
-        SELECT 1 FROM user_roles ur
-        JOIN role_permissions rp ON rp.role_id = ur.role_id
-        WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
-        LIMIT 1
+    // Prevent trading own team's players
+    const [ownTeamCoolCheck] = await sql`
+        SELECT 1 FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        WHERE ps.id = ${sparkId}
+          AND lp.team_id IN (
+              SELECT lp2.team_id FROM league_players lp2
+              JOIN teams t ON t.id = lp2.team_id
+              WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                AND lp2.is_active = true
+          )
     `
-    if (!isOwnerCool) {
-        const [ownTeamCheck] = await sql`
-            SELECT 1 FROM player_sparks ps
-            JOIN league_players lp ON ps.league_player_id = lp.id
-            WHERE ps.id = ${sparkId}
-              AND lp.team_id IN (
-                  SELECT lp2.team_id FROM league_players lp2
-                  JOIN teams t ON t.id = lp2.team_id
-                  WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                    AND lp2.is_active = true
-              )
-        `
-        if (ownTeamCheck) {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot cool players on your own team' }) }
-        }
+    if (ownTeamCoolCheck) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'You cannot cool players on your own team' }) }
     }
 
     try {
@@ -1055,27 +1059,19 @@ async function tutorialFuel(sql, user, body, event) {
                 throw new Error('All Starter Sparks have been used')
             }
 
-            // Check own-team restriction (owners bypass)
-            const [isOwnerCheck] = await tx`
-                SELECT 1 FROM user_roles ur
-                JOIN role_permissions rp ON rp.role_id = ur.role_id
-                WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
-                LIMIT 1
+            // Check own-team restriction
+            const [ownTeamCheck] = await tx`
+                SELECT 1 FROM player_sparks ps_check
+                JOIN league_players lp ON ps_check.league_player_id = lp.id
+                WHERE ps_check.id = ${sparkId}
+                  AND lp.team_id IN (
+                      SELECT lp2.team_id FROM league_players lp2
+                      JOIN teams t ON t.id = lp2.team_id
+                      WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                        AND lp2.is_active = true
+                  )
             `
-            if (!isOwnerCheck) {
-                const [ownTeamCheck] = await tx`
-                    SELECT 1 FROM player_sparks ps_check
-                    JOIN league_players lp ON ps_check.league_player_id = lp.id
-                    WHERE ps_check.id = ${sparkId}
-                      AND lp.team_id IN (
-                          SELECT lp2.team_id FROM league_players lp2
-                          JOIN teams t ON t.id = lp2.team_id
-                          WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                            AND lp2.is_active = true
-                      )
-                `
-                if (ownTeamCheck) throw new Error('You cannot fuel players on your own team')
-            }
+            if (ownTeamCheck) throw new Error('You cannot fuel players on your own team')
 
             // Calculate theoretical cost for 1 spark — used as cost basis
             const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks)
@@ -1220,26 +1216,18 @@ async function referralFuel(sql, user, body, event) {
             `
             if (!market || market.status !== 'open') throw new Error('Market is not open')
 
-            // Check own-team restriction (owners bypass)
-            const [isOwnerCheck] = await tx`
-                SELECT 1 FROM user_roles ur
-                JOIN role_permissions rp ON rp.role_id = ur.role_id
-                WHERE ur.user_id = ${user.id} AND rp.permission_key = 'permission_manage'
-                LIMIT 1
+            // Check own-team restriction
+            const [ownTeamRefCheck] = await tx`
+                SELECT 1 FROM player_sparks ps_check
+                JOIN league_players lp ON ps_check.league_player_id = lp.id
+                WHERE ps_check.id = ${sparkId}
+                  AND lp.team_id IN (
+                      SELECT lp2.team_id FROM league_players lp2
+                      WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+                        AND lp2.is_active = true
+                  )
             `
-            if (!isOwnerCheck) {
-                const [ownTeamCheck] = await tx`
-                    SELECT 1 FROM player_sparks ps_check
-                    JOIN league_players lp ON ps_check.league_player_id = lp.id
-                    WHERE ps_check.id = ${sparkId}
-                      AND lp.team_id IN (
-                          SELECT lp2.team_id FROM league_players lp2
-                          WHERE lp2.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
-                            AND lp2.is_active = true
-                      )
-                `
-                if (ownTeamCheck) throw new Error('You cannot fuel players on your own team')
-            }
+            if (ownTeamRefCheck) throw new Error('You cannot fuel players on your own team')
 
             // Calculate theoretical cost for 1 spark (cost basis)
             const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks)
