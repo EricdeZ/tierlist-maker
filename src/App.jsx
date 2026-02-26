@@ -140,6 +140,7 @@ function App() {
                             <Route path="forge/:leagueSlug" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/portfolio" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/leaderboard" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/challenges" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/portfolio" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/leaderboard" element={<FantasyForge />} />

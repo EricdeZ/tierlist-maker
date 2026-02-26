@@ -533,6 +533,7 @@ export default function FantasyForge() {
             const base = `/forge/${selectedLeagueOption.leagueSlug}`
             if (tabKey === 'portfolio') return `${base}/portfolio`
             if (tabKey === 'leaderboard') return `${base}/leaderboard`
+            if (tabKey === 'challenges') return `${base}/challenges`
             return base
         }
         const s = selectedSeason
