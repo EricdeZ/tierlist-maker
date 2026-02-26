@@ -255,12 +255,14 @@ export default function FantasyForge() {
                     : allSeasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
 
                 const leagueDivCounts = {}
+                const leagueHasOpen = {}
                 for (const s of visible) {
                     if (!leagueDivCounts[s.leagueSlug]) leagueDivCounts[s.leagueSlug] = new Set()
                     leagueDivCounts[s.leagueSlug].add(s.divisionSlug)
+                    if (s.forgeStatus === 'open') leagueHasOpen[s.leagueSlug] = true
                 }
                 const leagueOpts = Object.entries(leagueDivCounts)
-                    .filter(([, divs]) => divs.size > 1)
+                    .filter(([slug, divs]) => divs.size > 1 && (ownerNow || leagueHasOpen[slug]))
                     .map(([slug]) => leagueMap[slug])
                     .filter(Boolean)
                 setLeagueOptions(leagueOpts)
