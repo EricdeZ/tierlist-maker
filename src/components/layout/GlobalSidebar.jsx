@@ -332,7 +332,20 @@ export default function GlobalSidebar() {
                         >
                             Home
                         </SidebarLink>
-                        <div className="border-b border-white/5 my-2 mx-3" />
+                        {FEATURE_FLAGS.FORGE_RELEASED && (
+                            <>
+                                <SidebarLink to={isActive('/forge') ? location.pathname : '/forge'} active={isActive('/forge')}>
+                                    <span className="flex items-center gap-3">
+                                        <Flame className="w-4 h-4 shrink-0 text-orange-400" />
+                                        Fantasy Forge
+                                    </span>
+                                </SidebarLink>
+                                <div className="border-b border-white/5 my-2 mx-3" />
+                            </>
+                        )}
+                        {!FEATURE_FLAGS.FORGE_RELEASED && (
+                            <div className="border-b border-white/5 my-2 mx-3" />
+                        )}
 
                         {/* Profile section — logged in only */}
                         {user && (
@@ -355,14 +368,6 @@ export default function GlobalSidebar() {
                                         }}
                                     >
                                         <span className="text-[#5865F2]">Claim Your Profile</span>
-                                    </SidebarLink>
-                                )}
-                                {FEATURE_FLAGS.FORGE_RELEASED && (
-                                    <SidebarLink to={isActive('/forge') ? location.pathname : '/forge'} active={isActive('/forge')}>
-                                        <span className="flex items-center gap-3">
-                                            <Flame className="w-4 h-4 shrink-0 text-orange-400" />
-                                            Fantasy Forge
-                                        </span>
                                     </SidebarLink>
                                 )}
                             </SidebarSection>
