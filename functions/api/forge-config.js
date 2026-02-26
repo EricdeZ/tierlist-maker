@@ -9,6 +9,7 @@ const NUMERIC_KEYS = [
     'perf_floor', 'perf_ceiling', 'compress_k',
     'opponent_weight', 'teammate_weight', 'god_weight',
     'win_bonus', 'decay_half_life',
+    'sell_pressure_half_life', 'sell_pressure_factor',
 ]
 
 const handler = async (event) => {
@@ -169,6 +170,8 @@ const handler = async (event) => {
                     god_weight = ${merged.god_weight},
                     win_bonus = ${merged.win_bonus},
                     decay_half_life = ${merged.decay_half_life},
+                    sell_pressure_half_life = ${merged.sell_pressure_half_life},
+                    sell_pressure_factor = ${merged.sell_pressure_factor},
                     performance_approval = ${merged.performance_approval},
                     updated_at = NOW()
                 WHERE id = 1

@@ -249,6 +249,10 @@ export default function FantasyForge() {
                 }
 
                 allSeasons.sort((a, b) => {
+                    // Open forge markets first, then closed, then ended/other
+                    const statusOrder = s => s.forgeStatus === 'open' ? 0 : s.forgeStatus === 'closed' ? 1 : 2
+                    const so = statusOrder(a) - statusOrder(b)
+                    if (so !== 0) return so
                     if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
                     return a.leagueName.localeCompare(b.leagueName) || a.divisionName.localeCompare(b.divisionName)
                 })
@@ -272,6 +276,7 @@ export default function FantasyForge() {
                     .filter(([slug, divs]) => divs.size > 1 && (ownerNow || leagueHasOpen[slug]))
                     .map(([slug]) => leagueMap[slug])
                     .filter(Boolean)
+                    .sort((a, b) => (leagueHasOpen[b.leagueSlug] ? 1 : 0) - (leagueHasOpen[a.leagueSlug] ? 1 : 0))
                 setLeagueOptions(leagueOpts)
 
                 // Priority: 1) league-wide URL, 2) division URL slugs, 3) default to all-divisions, 4) first visible season
@@ -918,18 +923,28 @@ export default function FantasyForge() {
                                                     return (
                                                         <div key={slug}>
                                                             {/* League-wide "All Divisions" option */}
-                                                            {leagueOpt && (
-                                                                <button
-                                                                    onClick={() => { selectLeagueWide(leagueOpt.leagueId, leagueOpt.leagueSlug); setSeasonDropdownOpen(false) }}
-                                                                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
-                                                                        isLeagueWide && leagueWideId === leagueOpt.leagueId ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
-                                                                    }`}
-                                                                >
-                                                                    {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
-                                                                    <Flame size={14} className="text-[var(--forge-flame)] flex-shrink-0" />
-                                                                    <span className="flex-1 font-semibold">{leagueOpt.leagueName} — All Divisions</span>
-                                                                </button>
-                                                            )}
+                                                            {leagueOpt && (() => {
+                                                                const allClosed = leagueSeasons.length > 0 && leagueSeasons.every(s => s.forgeStatus === 'closed')
+                                                                const allEnded = !allClosed && leagueSeasons.length > 0 && leagueSeasons.every(s => s.forgeStatus === 'closed' || s.forgeStatus === 'ended' || s.forgeStatus === 'liquidated')
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => { selectLeagueWide(leagueOpt.leagueId, leagueOpt.leagueSlug); setSeasonDropdownOpen(false) }}
+                                                                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
+                                                                            isLeagueWide && leagueWideId === leagueOpt.leagueId ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
+                                                                        }`}
+                                                                    >
+                                                                        {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                                        <Flame size={14} className="text-[var(--forge-flame)] flex-shrink-0" />
+                                                                        <span className="flex-1 font-semibold">{leagueOpt.leagueName} — All Divisions</span>
+                                                                        {isOwner && allClosed && (
+                                                                            <span className="forge-head text-[0.75rem] tracking-wider text-[var(--forge-loss)]">Closed</span>
+                                                                        )}
+                                                                        {isOwner && allEnded && (
+                                                                            <span className="forge-head text-[0.75rem] tracking-wider text-[var(--forge-text-dim)]">Ended</span>
+                                                                        )}
+                                                                    </button>
+                                                                )
+                                                            })()}
                                                             {/* Individual division entries */}
                                                             {leagueSeasons.map(s => {
                                                                 const dLogo = getDivisionImage(s.leagueSlug, s.divisionSlug, s.divisionTier)
@@ -989,8 +1004,18 @@ export default function FantasyForge() {
                                 </button>
                             )}
 
-                            {/* Market status */}
-                            {market?.status === 'open' && (
+                            {/* Market status — league-wide */}
+                            {isLeagueWide && openMarketIds.length > 0 && (
+                                <div className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_8px_var(--forge-gain)]" style={{ animation: 'forge-blink 2s infinite' }} />
+                                    Open
+                                </div>
+                            )}
+                            {isLeagueWide && openMarketIds.length === 0 && players.length > 0 && (
+                                <span className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-loss)]">Closed</span>
+                            )}
+                            {/* Market status — single division */}
+                            {!isLeagueWide && market?.status === 'open' && (
                                 isOwner ? (
                                     <button onClick={toggleMarketStatus} className="flex items-center gap-1.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-gain)] cursor-pointer hover:opacity-80 transition-opacity" title="Click to close market">
                                         <span className="w-1.5 h-1.5 rounded-full bg-[var(--forge-gain)] shadow-[0_0_8px_var(--forge-gain)]" style={{ animation: 'forge-blink 2s infinite' }} />
@@ -1020,7 +1045,7 @@ export default function FantasyForge() {
 
                     {/* Tabs */}
                     <div className="flex gap-0 mb-4">
-                        {TABS.filter(tab => !isLeagueWide || tab.key !== 'challenges').map(tab => {
+                        {TABS.map(tab => {
                             const Icon = tab.icon
                             return (
                                 <button
@@ -1107,7 +1132,7 @@ export default function FantasyForge() {
                         />
                     )}
 
-                    {!isLeagueWide && activeTab === 'challenges' && (
+                    {activeTab === 'challenges' && (
                         <ForgeChallengesTab loading={loading} />
                     )}
                 </div>

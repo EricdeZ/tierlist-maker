@@ -6,6 +6,7 @@ import { logAudit } from '../lib/audit.js'
 import {
     FORGE_CONFIG,
     calcPrice,
+    decaySellPressure,
     ensureMarket,
     ensurePlayerSparks,
     executeFuel,
@@ -105,6 +106,7 @@ async function getMarket(sql, user, params, event) {
     const sparks = await sql`
         SELECT
             ps.id as spark_id, ps.current_price, ps.total_sparks, ps.perf_multiplier,
+            ps.sell_pressure, ps.sell_pressure_updated_at,
             ps.last_perf_update, ps.updated_at,
             p.name as player_name, p.slug as player_slug,
             lp.role, lp.team_id,
@@ -173,20 +175,27 @@ async function getMarket(sql, user, params, event) {
     }
 
     // Get 24h and 7d price changes from history
+    // Falls back to earliest available price when no entry exists before the cutoff
     const [priceChanges24h, priceChanges7d] = sparkIds.length > 0 ? await Promise.all([
         sql`
             SELECT DISTINCT ON (spark_id) spark_id, price
             FROM spark_price_history
             WHERE spark_id = ANY(${sparkIds})
-              AND created_at <= NOW() - INTERVAL '24 hours'
-            ORDER BY spark_id, created_at DESC
+            ORDER BY spark_id,
+              CASE WHEN created_at <= NOW() - INTERVAL '24 hours' THEN 0 ELSE 1 END,
+              CASE WHEN created_at <= NOW() - INTERVAL '24 hours'
+                   THEN -extract(epoch FROM created_at)
+                   ELSE extract(epoch FROM created_at) END
         `,
         sql`
             SELECT DISTINCT ON (spark_id) spark_id, price
             FROM spark_price_history
             WHERE spark_id = ANY(${sparkIds})
-              AND created_at <= NOW() - INTERVAL '7 days'
-            ORDER BY spark_id, created_at DESC
+            ORDER BY spark_id,
+              CASE WHEN created_at <= NOW() - INTERVAL '7 days' THEN 0 ELSE 1 END,
+              CASE WHEN created_at <= NOW() - INTERVAL '7 days'
+                   THEN -extract(epoch FROM created_at)
+                   ELSE extract(epoch FROM created_at) END
         `,
     ]) : [[], []]
 
@@ -236,7 +245,9 @@ async function getMarket(sql, user, params, event) {
         const holding = holdingsMap[s.spark_id] || null
         const price24hAgo = priceChangeMap[s.spark_id]
         const price7dAgo = priceChange7dMap[s.spark_id]
-        const currentPrice = Number(s.current_price)
+        // Compute real-time price with decayed sell pressure
+        const dp = decaySellPressure(Number(s.sell_pressure), s.sell_pressure_updated_at)
+        const currentPrice = Math.round(calcPrice(market.base_price, Number(s.perf_multiplier), s.total_sparks, dp) * 100) / 100
         const priceChange = price24hAgo
             ? Math.round((currentPrice - price24hAgo) / price24hAgo * 10000) / 100
             : null
@@ -321,7 +332,7 @@ async function getPortfolio(sql, user, params) {
     }
 
     const [market] = await sql`
-        SELECT id FROM forge_markets WHERE season_id = ${seasonId}
+        SELECT id, base_price FROM forge_markets WHERE season_id = ${seasonId}
     `
     if (!market) {
         return { statusCode: 200, headers, body: JSON.stringify({ holdings: [], stats: null }) }
@@ -332,6 +343,7 @@ async function getPortfolio(sql, user, params) {
         SELECT
             sh.spark_id, sh.sparks, sh.total_invested, sh.tutorial_sparks,
             ps.current_price, ps.total_sparks, ps.perf_multiplier,
+            ps.sell_pressure, ps.sell_pressure_updated_at,
             p.name as player_name, p.slug as player_slug,
             lp.role,
             t.name as team_name, t.slug as team_slug, t.color as team_color
@@ -348,7 +360,9 @@ async function getPortfolio(sql, user, params) {
     let totalInvested = 0
 
     const holdingsList = holdings.map(h => {
-        const currentPrice = Number(h.current_price)
+        // Compute real-time price with decayed sell pressure
+        const dp = decaySellPressure(Number(h.sell_pressure), h.sell_pressure_updated_at)
+        const currentPrice = Math.round(calcPrice(market.base_price, Number(h.perf_multiplier), h.total_sparks, dp) * 100) / 100
         const invested = Number(h.total_invested)
         const value = Math.round(currentPrice * h.sparks)
         const avgBuyPrice = h.sparks > 0 ? invested / h.sparks : 0
@@ -1033,7 +1047,8 @@ async function tutorialFuel(sql, user, body, event) {
         const result = await transaction(async (tx) => {
             // Lock player_sparks row
             const [stock] = await tx`
-                SELECT id, current_price, total_sparks, perf_multiplier, market_id
+                SELECT id, current_price, total_sparks, perf_multiplier, market_id,
+                       sell_pressure, sell_pressure_updated_at
                 FROM player_sparks WHERE id = ${sparkId} FOR UPDATE
             `
             if (!stock) throw new Error('Player spark not found')
@@ -1084,16 +1099,19 @@ async function tutorialFuel(sql, user, body, event) {
             if (ownTeamCheck) throw new Error('You cannot fuel players on your own team')
 
             // Calculate theoretical cost for 1 spark — used as cost basis
-            const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks)
+            const dp = decaySellPressure(Number(stock.sell_pressure), stock.sell_pressure_updated_at)
+            const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks, dp)
             const theoreticalCost = Math.round(price)
 
-            // Update player_sparks (bonding curve updates normally)
+            // Update player_sparks (bonding curve updates normally, persist decayed sell pressure)
             const newTotalSparks = stock.total_sparks + 1
-            const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks)
+            const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, dp)
             await tx`
                 UPDATE player_sparks SET
                     total_sparks = ${newTotalSparks},
                     current_price = ${newPrice},
+                    sell_pressure = ${dp},
+                    sell_pressure_updated_at = ${dp > 0 ? new Date() : null},
                     updated_at = NOW()
                 WHERE id = ${sparkId}
             `
@@ -1139,7 +1157,7 @@ async function tutorialFuel(sql, user, body, event) {
                     SELECT COUNT(*)::integer as count FROM spark_transactions
                     WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel', 'referral_fuel')
                 `
-                const stats = { sparks_fueled: fuelCount }
+                const stats = { sparks_fueled: fuelCount, starter_sparks_used: 3 - result.freeSparksRemaining }
                 if (result.isFirstUse) stats.forge_tutorial_completed = 1
                 await pushChallengeProgress(sql, user.id, stats)
             })().catch(err => console.error('Challenge push (tutorial fuel) failed:', err))
@@ -1215,7 +1233,8 @@ async function referralFuel(sql, user, body, event) {
 
             // Lock player_sparks row
             const [stock] = await tx`
-                SELECT id, current_price, total_sparks, perf_multiplier, market_id
+                SELECT id, current_price, total_sparks, perf_multiplier, market_id,
+                       sell_pressure, sell_pressure_updated_at
                 FROM player_sparks WHERE id = ${sparkId} FOR UPDATE
             `
             if (!stock) throw new Error('Player spark not found')
@@ -1240,16 +1259,19 @@ async function referralFuel(sql, user, body, event) {
             if (ownTeamRefCheck) throw new Error('You cannot fuel players on your own team')
 
             // Calculate theoretical cost for 1 spark (cost basis)
-            const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks)
+            const dp = decaySellPressure(Number(stock.sell_pressure), stock.sell_pressure_updated_at)
+            const price = calcPrice(market.base_price, Number(stock.perf_multiplier), stock.total_sparks, dp)
             const theoreticalCost = Math.round(price)
 
-            // Update player_sparks (bonding curve updates normally)
+            // Update player_sparks (bonding curve updates normally, persist decayed sell pressure)
             const newTotalSparks = stock.total_sparks + 1
-            const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks)
+            const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, dp)
             await tx`
                 UPDATE player_sparks SET
                     total_sparks = ${newTotalSparks},
                     current_price = ${newPrice},
+                    sell_pressure = ${dp},
+                    sell_pressure_updated_at = ${dp > 0 ? new Date() : null},
                     updated_at = NOW()
                 WHERE id = ${sparkId}
             `

@@ -8,9 +8,11 @@ import { pushChallengeProgress } from './challenges.js'
 // ═══════════════════════════════════════════════════
 export const FORGE_CONFIG = {
     BASE_PRICE: 50,
-    SUPPLY_FACTOR: 0.01,       // 1% price increase per outstanding Spark
+    SUPPLY_FACTOR: 0.02,       // 2% price increase per outstanding Spark
     COOLING_TAX: 0.10,         // 10% fee on selling
     PRICE_FLOOR: 10,
+    SELL_PRESSURE_HALF_LIFE: 2, // days for sell pressure to halve
+    SELL_PRESSURE_FACTOR: 0.02, // price depression per unit of sell pressure
 }
 
 // Performance tuning defaults (overridden by forge_config DB table when available)
@@ -50,6 +52,8 @@ export async function loadForgeConfig(sql) {
             GOD_WEIGHT:      Number(row.god_weight)       || PERF_DEFAULTS.GOD_WEIGHT,
             WIN_BONUS:       Number(row.win_bonus)        || PERF_DEFAULTS.WIN_BONUS,
             DECAY_HALF_LIFE: Number(row.decay_half_life)  || PERF_DEFAULTS.DECAY_HALF_LIFE,
+            SELL_PRESSURE_HALF_LIFE: Number(row.sell_pressure_half_life) || FORGE_CONFIG.SELL_PRESSURE_HALF_LIFE,
+            SELL_PRESSURE_FACTOR: Number(row.sell_pressure_factor) || FORGE_CONFIG.SELL_PRESSURE_FACTOR,
             PERFORMANCE_APPROVAL: row.performance_approval ?? PERF_DEFAULTS.PERFORMANCE_APPROVAL,
         }
     } catch {
@@ -83,12 +87,26 @@ const DEFAULT_WEIGHTS = { kills: 0.20, deaths: 0.20, assists: 0.15, kp: 0.15, mi
 // ═══════════════════════════════════════════════════
 
 /**
+ * Decay sell pressure based on elapsed time since last update.
+ * Half-life decay: pressure × 0.5^(elapsedDays / halfLife)
+ */
+export function decaySellPressure(pressure, updatedAt) {
+    if (!pressure || pressure <= 0) return 0
+    if (!updatedAt) return pressure
+    const elapsedDays = (Date.now() - new Date(updatedAt).getTime()) / MS_PER_DAY
+    if (elapsedDays <= 0) return pressure
+    const halfLife = FORGE_CONFIG.SELL_PRESSURE_HALF_LIFE || 2
+    const decayed = pressure * Math.pow(0.5, elapsedDays / halfLife)
+    return decayed < 0.01 ? 0 : decayed
+}
+
+/**
  * Calculate price from the bonding curve.
- * price = basePrice × perfMultiplier × (1 + supplyFactor × totalSparks)
+ * price = basePrice × perfMultiplier × (1 + supplyFactor × totalSparks - sellPressureFactor × sellPressure)
  * Enforces a price floor.
  */
-export function calcPrice(basePrice, perfMultiplier, totalSparks) {
-    const raw = basePrice * perfMultiplier * (1 + FORGE_CONFIG.SUPPLY_FACTOR * totalSparks)
+export function calcPrice(basePrice, perfMultiplier, totalSparks, sellPressure = 0) {
+    const raw = basePrice * perfMultiplier * (1 + FORGE_CONFIG.SUPPLY_FACTOR * totalSparks - FORGE_CONFIG.SELL_PRESSURE_FACTOR * sellPressure)
     return Math.max(raw, FORGE_CONFIG.PRICE_FLOOR)
 }
 
@@ -204,7 +222,8 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
 export async function executeFuel(tx, userId, sparkId, numSparks) {
     // Lock the player_sparks row
     const [stock] = await tx`
-        SELECT id, current_price, total_sparks, perf_multiplier, market_id
+        SELECT id, current_price, total_sparks, perf_multiplier, market_id,
+               sell_pressure, sell_pressure_updated_at
         FROM player_sparks WHERE id = ${sparkId} FOR UPDATE
     `
     if (!stock) throw new Error('Player spark not found')
@@ -215,12 +234,15 @@ export async function executeFuel(tx, userId, sparkId, numSparks) {
     `
     if (!market || market.status !== 'open') throw new Error('Market is not open')
 
+    // Decay sell pressure to current time
+    const currentPressure = decaySellPressure(Number(stock.sell_pressure), stock.sell_pressure_updated_at)
+
     // Calculate cost: each Spark costs the current price at time of purchase
     // For multiple Sparks, price increases with each one (stepped)
     let totalCost = 0
     let currentSparks = stock.total_sparks
     for (let i = 0; i < numSparks; i++) {
-        const price = calcPrice(market.base_price, Number(stock.perf_multiplier), currentSparks)
+        const price = calcPrice(market.base_price, Number(stock.perf_multiplier), currentSparks, currentPressure)
         totalCost += Math.round(price)
         currentSparks++
     }
@@ -237,13 +259,15 @@ export async function executeFuel(tx, userId, sparkId, numSparks) {
     await grantPassion(tx, userId, 'forge_fuel', -totalCost,
         `Fueled player (${numSparks} Spark${numSparks > 1 ? 's' : ''})`, String(sparkId))
 
-    // Update player_sparks
+    // Update player_sparks (persist decayed sell pressure)
     const newTotalSparks = stock.total_sparks + numSparks
-    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks)
+    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, currentPressure)
     await tx`
         UPDATE player_sparks SET
             total_sparks = ${newTotalSparks},
             current_price = ${newPrice},
+            sell_pressure = ${currentPressure},
+            sell_pressure_updated_at = ${currentPressure > 0 ? new Date() : null},
             updated_at = NOW()
         WHERE id = ${sparkId}
     `
@@ -292,7 +316,8 @@ export async function executeFuel(tx, userId, sparkId, numSparks) {
 export async function executeCool(tx, userId, sparkId, numSparks) {
     // Lock the player_sparks row
     const [stock] = await tx`
-        SELECT id, current_price, total_sparks, perf_multiplier, market_id
+        SELECT id, current_price, total_sparks, perf_multiplier, market_id,
+               sell_pressure, sell_pressure_updated_at
         FROM player_sparks WHERE id = ${sparkId} FOR UPDATE
     `
     if (!stock) throw new Error('Player spark not found')
@@ -320,12 +345,17 @@ export async function executeCool(tx, userId, sparkId, numSparks) {
             : 'Free Sparks cannot be cooled')
     }
 
+    // Decay existing sell pressure, then add new pressure from this sell
+    const decayedPressure = decaySellPressure(Number(stock.sell_pressure), stock.sell_pressure_updated_at)
+    const newPressure = decayedPressure + numSparks
+
     // Calculate proceeds: each Spark sold at decreasing price (stepped)
+    // Use the NEW sell pressure so sellers feel the impact immediately
     let grossProceeds = 0
     let currentSparks = stock.total_sparks
     for (let i = 0; i < numSparks; i++) {
         currentSparks--
-        const price = calcPrice(market.base_price, Number(stock.perf_multiplier), currentSparks)
+        const price = calcPrice(market.base_price, Number(stock.perf_multiplier), currentSparks, newPressure)
         grossProceeds += Math.round(price)
     }
 
@@ -341,13 +371,15 @@ export async function executeCool(tx, userId, sparkId, numSparks) {
     await grantPassion(tx, userId, 'forge_cool', netProceeds,
         `Cooled player (${numSparks} Spark${numSparks > 1 ? 's' : ''}, ${coolingTax} tax)`, String(sparkId))
 
-    // Update player_sparks
+    // Update player_sparks (store new sell pressure)
     const newTotalSparks = stock.total_sparks - numSparks
-    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks)
+    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, newPressure)
     await tx`
         UPDATE player_sparks SET
             total_sparks = ${newTotalSparks},
             current_price = ${newPrice},
+            sell_pressure = ${newPressure},
+            sell_pressure_updated_at = NOW(),
             updated_at = NOW()
         WHERE id = ${sparkId}
     `
@@ -422,6 +454,10 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     const cfg = await loadForgeConfig(sql)
     const halfLife = cfg.DECAY_HALF_LIFE
+
+    // Apply DB-configurable sell pressure params to FORGE_CONFIG
+    FORGE_CONFIG.SELL_PRESSURE_HALF_LIFE = cfg.SELL_PRESSURE_HALF_LIFE
+    FORGE_CONFIG.SELL_PRESSURE_FACTOR = cfg.SELL_PRESSURE_FACTOR
 
     // Query 1: Recency-weighted role averages (all roles in one query)
     const roleAvgRows = await sql`
@@ -599,7 +635,7 @@ export async function recalcForgePerformance(sql, seasonId) {
     // ── Get spark rows for batch updates ──
 
     const sparks = await sql`
-        SELECT id, league_player_id, total_sparks
+        SELECT id, league_player_id, total_sparks, sell_pressure, sell_pressure_updated_at
         FROM player_sparks WHERE market_id = ${market.id}
     `
     const sparkMap = new Map(sparks.map(s => [s.league_player_id, s]))
@@ -681,8 +717,9 @@ export async function recalcForgePerformance(sql, seasonId) {
             }
         }
 
-        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks)
-        updates.push({ sparkId: spark.id, multiplier, newPrice })
+        const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
+        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
+        updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
     // 9. Process 0-game players: inactivity decay from season start
@@ -694,8 +731,9 @@ export async function recalcForgePerformance(sql, seasonId) {
         const multiplier = compressMultiplier(
             Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
         )
-        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks)
-        updates.push({ sparkId: spark.id, multiplier, newPrice })
+        const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
+        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
+        updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
     if (updates.length === 0) return
@@ -742,21 +780,25 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     // ── Apply immediately (approval off) ──
 
-    // Batch UPDATE all player_sparks
+    // Batch UPDATE all player_sparks (also persist decayed sell pressure)
     const sparkIds = updates.map(u => u.sparkId)
     const multipliers = updates.map(u => u.multiplier)
     const prices = updates.map(u => u.newPrice)
+    const pressures = updates.map(u => u.decayedPressure)
 
     await sql`
         UPDATE player_sparks AS ps SET
             perf_multiplier = v.mult,
             current_price = v.price,
+            sell_pressure = v.sp,
+            sell_pressure_updated_at = CASE WHEN v.sp > 0 THEN NOW() ELSE NULL END,
             last_perf_update = NOW(),
             updated_at = NOW()
         FROM (
             SELECT UNNEST(${sparkIds}::int[]) AS id,
                    UNNEST(${multipliers}::numeric[]) AS mult,
-                   UNNEST(${prices}::numeric[]) AS price
+                   UNNEST(${prices}::numeric[]) AS price,
+                   UNNEST(${pressures}::numeric[]) AS sp
         ) AS v
         WHERE ps.id = v.id
     `

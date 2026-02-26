@@ -20,6 +20,10 @@ INSERT INTO forge_config DEFAULT VALUES ON CONFLICT DO NOTHING;
 -- Performance update approval gate (temporary safety net)
 ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS performance_approval BOOLEAN NOT NULL DEFAULT true;
 
+-- Sell pressure tuning
+ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS sell_pressure_half_life NUMERIC(6,2) NOT NULL DEFAULT 2.00;
+ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS sell_pressure_factor NUMERIC(6,4) NOT NULL DEFAULT 0.0200;
+
 CREATE TABLE IF NOT EXISTS forge_pending_updates (
     id              SERIAL PRIMARY KEY,
     market_id       INTEGER NOT NULL,

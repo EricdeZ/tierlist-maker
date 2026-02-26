@@ -40,6 +40,10 @@ export default function Navbar({ title, branding, tabs }) {
     const bpShow = tabs ? 'nav:flex' : 'sm:flex'
     const bpHide = tabs ? 'nav:hidden' : 'sm:hidden'
 
+    // If already on a tool's route, link to current path so clicking doesn't reset state
+    const resolveToolTo = (tool) =>
+        location.pathname.startsWith(tool.to) ? location.pathname : tool.to
+
     const isActive = (item) => {
         if (item.exact) return location.pathname === item.path
         return location.pathname.startsWith(item.path)
@@ -189,7 +193,7 @@ export default function Navbar({ title, branding, tabs }) {
                                             {tools.map((tool) => (
                                                 <Link
                                                     key={tool.to}
-                                                    to={tool.to}
+                                                    to={resolveToolTo(tool)}
                                                     onClick={() => setToolsOpen(false)}
                                                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
                                                 >
@@ -297,7 +301,7 @@ export default function Navbar({ title, branding, tabs }) {
                         {tools.map((tool) => (
                             <Link
                                 key={tool.to}
-                                to={tool.to}
+                                to={resolveToolTo(tool)}
                                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
                             >
                                 <tool.icon className="w-4 h-4" />

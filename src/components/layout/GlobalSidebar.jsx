@@ -358,7 +358,7 @@ export default function GlobalSidebar() {
                                     </SidebarLink>
                                 )}
                                 {FEATURE_FLAGS.FORGE_RELEASED && (
-                                    <SidebarLink to="/forge" active={isActive('/forge')}>
+                                    <SidebarLink to={isActive('/forge') ? location.pathname : '/forge'} active={isActive('/forge')}>
                                         <span className="flex items-center gap-3">
                                             <Flame className="w-4 h-4 shrink-0 text-orange-400" />
                                             Fantasy Forge

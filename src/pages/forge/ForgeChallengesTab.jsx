@@ -11,6 +11,7 @@ const FORGE_STAT_KEYS = new Set([
     'sparks_fueled', 'sparks_cooled', 'forge_profit',
     'forge_days_visited', 'forge_tutorial_completed',
     'forge_perf_updates_held', 'forge_days_holding',
+    'starter_sparks_used',
 ])
 
 const STAT_ICONS = {
@@ -21,6 +22,7 @@ const STAT_ICONS = {
     forge_tutorial_completed: Award,
     forge_perf_updates_held: TrendingUp,
     forge_days_holding: Eye,
+    starter_sparks_used: Flame,
 }
 
 const STAT_LABELS = {
@@ -31,6 +33,7 @@ const STAT_LABELS = {
     forge_tutorial_completed: 'Tutorial',
     forge_perf_updates_held: 'Holding',
     forge_days_holding: 'Holding',
+    starter_sparks_used: 'Starter',
 }
 
 // Flying coins animation for claim

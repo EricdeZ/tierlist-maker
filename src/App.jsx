@@ -70,6 +70,7 @@ import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
 import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
+import Features from "./pages/Features.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -149,6 +150,7 @@ function App() {
                             <Route path="arcade/:lobbyId" element={<TheArcade />} />
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
+                            <Route path="features" element={<Features />} />
 
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />

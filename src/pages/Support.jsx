@@ -53,6 +53,45 @@ export default function Support() {
                     </p>
                 </div>
 
+                {/* Support Financially — moved to top */}
+                <div className="mb-8">
+                    <div
+                        className="relative overflow-hidden rounded-2xl border border-(--color-accent)/20 p-8 text-center"
+                        style={{ background: 'linear-gradient(135deg, rgba(248,197,106,0.05), var(--color-secondary), rgba(248,197,106,0.03))' }}
+                    >
+                        <div
+                            className="absolute top-0 right-0 w-48 h-48 opacity-10 pointer-events-none"
+                            style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
+                        />
+                        <div
+                            className="absolute bottom-0 left-0 w-48 h-48 opacity-10 pointer-events-none"
+                            style={{ background: 'radial-gradient(circle at bottom left, var(--color-accent), transparent 70%)' }}
+                        />
+
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-(--color-accent)/15 mb-4">
+                                <CoffeeIcon className="w-7 h-7 text-(--color-accent)" />
+                            </div>
+                            <h3 className="font-heading text-xl font-bold text-(--color-text) mb-3">
+                                Support smitecomp.com Financially
+                            </h3>
+                            <p className="text-sm text-(--color-text-secondary) leading-relaxed max-w-md mx-auto mb-6">
+                                This is a pure passion project. I'm going to keep building and maintaining it regardless — but if it could sustain itself, that would be amazing.
+                            </p>
+                            <a
+                                href="https://buymeacoffee.com/brudiv"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2.5 px-7 py-3 rounded-xl font-heading font-bold text-base transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-(--color-accent)/20"
+                                style={{ background: 'linear-gradient(135deg, #FFDD00, #FFB800)', color: '#1a1a1a' }}
+                            >
+                                <CoffeeIcon className="w-5 h-5" />
+                                Support smitecomp.com
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Cards */}
                 <div className="space-y-4">
                     {/* Report Bugs */}
@@ -154,45 +193,6 @@ export default function Support() {
                                 <DiscordIcon className="w-3.5 h-3.5" />
                                 <span className="font-medium">@brudif</span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Buy Me a Coffee */}
-                <div className="mt-10">
-                    <div
-                        className="relative overflow-hidden rounded-2xl border border-(--color-accent)/20 p-8 text-center"
-                        style={{ background: 'linear-gradient(135deg, rgba(248,197,106,0.05), var(--color-secondary), rgba(248,197,106,0.03))' }}
-                    >
-                        <div
-                            className="absolute top-0 right-0 w-48 h-48 opacity-10 pointer-events-none"
-                            style={{ background: 'radial-gradient(circle at top right, var(--color-accent), transparent 70%)' }}
-                        />
-                        <div
-                            className="absolute bottom-0 left-0 w-48 h-48 opacity-10 pointer-events-none"
-                            style={{ background: 'radial-gradient(circle at bottom left, var(--color-accent), transparent 70%)' }}
-                        />
-
-                        <div className="relative z-10">
-                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-(--color-accent)/15 mb-4">
-                                <CoffeeIcon className="w-7 h-7 text-(--color-accent)" />
-                            </div>
-                            <h3 className="font-heading text-xl font-bold text-(--color-text) mb-3">
-                                Buy Me a Coffee
-                            </h3>
-                            <p className="text-sm text-(--color-text-secondary) leading-relaxed max-w-md mx-auto mb-6">
-                                This is a pure passion project. I'm going to keep building and maintaining it regardless — but if it could sustain itself, that would be amazing.
-                            </p>
-                            <a
-                                href="https://buymeacoffee.com/brudiv"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2.5 px-7 py-3 rounded-xl font-heading font-bold text-base transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-(--color-accent)/20"
-                                style={{ background: 'linear-gradient(135deg, #FFDD00, #FFB800)', color: '#1a1a1a' }}
-                            >
-                                <CoffeeIcon className="w-5 h-5" />
-                                Support smitecomp.com
-                            </a>
                         </div>
                     </div>
                 </div>

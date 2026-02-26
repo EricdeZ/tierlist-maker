@@ -15,6 +15,8 @@ const CONFIG_FIELDS = [
     { key: 'god_weight', label: 'God Weight', description: 'How much god meta affects the score (strong god = slight penalty)', step: 0.01, min: 0, max: 1 },
     { key: 'win_bonus', label: 'Win Bonus', description: 'Flat multiplier boost for winning the game', step: 0.01, min: 0, max: 0.5 },
     { key: 'decay_half_life', label: 'Decay Half-Life', description: 'Days for 50% recency decay on role averages', step: 1, min: 1, max: 30 },
+    { key: 'sell_pressure_half_life', label: 'Sell Pressure Half-Life', description: 'Days for sell pressure to halve (lower = faster recovery after mass sells)', step: 0.5, min: 0.5, max: 14 },
+    { key: 'sell_pressure_factor', label: 'Sell Pressure Factor', description: 'Price depression per unit of sell pressure (matches supply factor for symmetry)', step: 0.005, min: 0, max: 0.1 },
 ]
 
 export default function ForgeConfig() {
