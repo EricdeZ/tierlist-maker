@@ -11,9 +11,10 @@ import SidebarTrigger from './SidebarTrigger'
 import GlobalSidebar from './GlobalSidebar'
 import StreamWidget from '../StreamWidget'
 import WhatsNewModal from '../WhatsNewModal'
+import GlobalToast from '../GlobalToast'
 
 const AppLayout = () => {
-    const { user, loading } = useAuth()
+    const { user, loading, notification, clearNotification } = useAuth()
     const location = useLocation()
 
     // League and division pages render their own navbar with UserMenu,
@@ -40,6 +41,7 @@ const AppLayout = () => {
                 <ClaimProfileModal />
                 <ReportDataIssueModal />
                 <WhatsNewModal />
+                <GlobalToast message={notification} onDone={clearNotification} />
             </div>
         </SidebarProvider>
     )

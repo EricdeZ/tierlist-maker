@@ -581,7 +581,7 @@ async function getLeaderboard(sql, params) {
             SELECT
                 st.user_id,
                 COALESCE(SUM(CASE WHEN st.type IN ('cool', 'liquidate') THEN st.total_cost ELSE 0 END), 0) as realized_proceeds,
-                COALESCE(SUM(CASE WHEN st.type IN ('fuel', 'tutorial_fuel') THEN st.total_cost ELSE 0 END), 0) as fuel_costs
+                COALESCE(SUM(CASE WHEN st.type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN st.total_cost ELSE 0 END), 0) as fuel_costs
             FROM spark_transactions st
             JOIN player_sparks ps ON st.spark_id = ps.id
             WHERE ps.market_id = ${market.id}
@@ -751,7 +751,7 @@ async function fuel(sql, user, body, event) {
             (async () => {
                 const [{ count: fuelCount }] = await sql`
                     SELECT COUNT(*)::integer as count FROM spark_transactions
-                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
+                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel', 'referral_fuel')
                 `
                 await pushChallengeProgress(sql, user.id, { sparks_fueled: fuelCount })
             })().catch(err => console.error('Challenge push (fuel) failed:', err))
@@ -836,7 +836,7 @@ async function cool(sql, user, body, event) {
                     const [{ invested }] = await sql`
                         SELECT COALESCE(SUM(st.total_cost), 0)::integer as invested
                         FROM spark_transactions st
-                        WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel')
+                        WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel', 'referral_fuel')
                     `
                     const netProfit = Math.max(total - invested, 0)
                     stats.forge_profit = netProfit
@@ -1131,7 +1131,7 @@ async function tutorialFuel(sql, user, body, event) {
             (async () => {
                 const [{ count: fuelCount }] = await sql`
                     SELECT COUNT(*)::integer as count FROM spark_transactions
-                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel')
+                    WHERE user_id = ${user.id} AND type IN ('fuel', 'tutorial_fuel', 'referral_fuel')
                 `
                 const stats = { sparks_fueled: fuelCount }
                 if (result.isFirstUse) stats.forge_tutorial_completed = 1

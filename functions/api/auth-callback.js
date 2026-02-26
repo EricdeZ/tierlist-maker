@@ -129,8 +129,8 @@ const handler = async (event) => {
         pushChallengeProgress(sql, user.id, { discord_linked: 1 })
             .catch(err => console.error('Challenge push (discord_linked) failed:', err))
 
-        // 5b. Process website referral if new user + valid ref code
-        if (user.is_new_user && refCode) {
+        // 5b. Process website referral if valid ref code (processWebsiteReferral handles duplicates/self-refer)
+        if (refCode) {
             event.waitUntil(
                 (async () => {
                     const [referrer] = await sql`

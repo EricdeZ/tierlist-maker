@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { setImpersonation, clearImpersonation } from '../services/database.js'
+import { setImpersonation, clearImpersonation, referralService } from '../services/database.js'
 
 const AuthContext = createContext(null)
 
@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }) => {
     const [impersonating, setImpersonating] = useState(false)
     const [realUser, setRealUser] = useState(null)
     const [impersonateId, setImpersonateId] = useState(() => localStorage.getItem('impersonate_user_id'))
+    const [notification, setNotification] = useState(null)
 
     // On mount: check URL for auth_token (from OAuth redirect)
     useEffect(() => {
@@ -113,6 +114,26 @@ export const AuthProvider = ({ children }) => {
         return () => { cancelled = true }
     }, [token, impersonateId])
 
+    // Auto-claim pending website referral for already-logged-in users
+    useEffect(() => {
+        if (!user) return
+        const pendingRef = localStorage.getItem('pending_referral')
+        if (!pendingRef) return
+        localStorage.removeItem('pending_referral')
+        referralService.claimReferral(pendingRef, 'website')
+            .then(() => setNotification('Referral claimed! You earned 50 Passion as a welcome bonus.'))
+            .catch(() => {}) // silently ignore (already referred, self-refer, etc.)
+    }, [user])
+
+    // Show notification for referrals claimed during OAuth signup flow
+    useEffect(() => {
+        if (!user) return
+        const flag = localStorage.getItem('referral_claimed_via_oauth')
+        if (!flag) return
+        localStorage.removeItem('referral_claimed_via_oauth')
+        setNotification('Referral claimed! You earned 50 Passion as a welcome bonus.')
+    }, [user])
+
     const login = useCallback(() => {
         const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID
         if (!clientId) {
@@ -130,6 +151,7 @@ export const AuthProvider = ({ children }) => {
             const sep = returnPath.includes('?') ? '&' : '?'
             returnPath += `${sep}ref=${pendingRef}`
             localStorage.removeItem('pending_referral')
+            localStorage.setItem('referral_claimed_via_oauth', '1')
         }
 
         const state = encodeURIComponent(window.location.origin + returnPath)
@@ -200,6 +222,8 @@ export const AuthProvider = ({ children }) => {
             realUser,
             startImpersonation,
             stopImpersonation,
+            notification,
+            clearNotification: () => setNotification(null),
         }}>
             {children}
         </AuthContext.Provider>
