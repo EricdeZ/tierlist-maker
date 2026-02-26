@@ -71,6 +71,7 @@ export default function ForgeMarketTab({
     search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
     changeView, freeSparksRemaining, referralSparksAvailable = 0, seasonSlugs,
+    isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds,
     onFuel, onCool, onSelectPlayer, onRandomPlayer,
 }) {
     if (loading) {
@@ -115,6 +116,10 @@ export default function ForgeMarketTab({
                     isOwner={isOwner}
                     changeView={changeView}
                     seasonSlugs={seasonSlugs}
+                    isLeagueWide={isLeagueWide}
+                    leagueSlug={leagueSlug}
+                    userTeamBySeasonId={userTeamBySeasonId}
+                    openMarketIds={openMarketIds}
                     onFuel={onFuel}
                     onCool={onCool}
                     onRandom={onRandomPlayer}
@@ -180,6 +185,10 @@ export default function ForgeMarketTab({
                                 isOwner={isOwner}
                                 changeView={changeView}
                                 seasonSlugs={seasonSlugs}
+                                isLeagueWide={isLeagueWide}
+                                leagueSlug={leagueSlug}
+                                userTeamBySeasonId={userTeamBySeasonId}
+                                openMarketIds={openMarketIds}
                                 onSelect={onSelectPlayer}
                                 onFuel={onFuel}
                                 onCool={onCool}
@@ -238,6 +247,10 @@ export default function ForgeMarketTab({
                         isOwner={isOwner}
                         changeView={changeView}
                         seasonSlugs={seasonSlugs}
+                        isLeagueWide={isLeagueWide}
+                        leagueSlug={leagueSlug}
+                        userTeamBySeasonId={userTeamBySeasonId}
+                        openMarketIds={openMarketIds}
                         onSelect={onSelectPlayer}
                         onFuel={onFuel}
                         onCool={onCool}

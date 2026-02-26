@@ -43,6 +43,13 @@ export default function FantasyForge() {
 
     const isOwner = hasPermission('permission_manage')
 
+    // League-wide mode: has leagueSlug in URL but no divisionSlug
+    const isLeagueWide = !!urlLeagueSlug && !urlDivisionSlug
+    const [leagueWideId, setLeagueWideId] = useState(null)
+    const [leagueOptions, setLeagueOptions] = useState([]) // [{ leagueId, leagueName, leagueSlug }]
+    const [userTeamBySeasonId, setUserTeamBySeasonId] = useState({})
+    const [openMarketIds, setOpenMarketIds] = useState([])
+
     // Change view toggle (24h vs 7d)
     const [changeView, setChangeView] = useState(() => {
         try { return localStorage.getItem(CHANGE_VIEW_KEY) || '24h' }
@@ -85,8 +92,10 @@ export default function FantasyForge() {
     })
     const setSeasonId = useCallback((id, allSeasons) => {
         setSeasonIdRaw(id)
+        setLeagueWideId(null)
         if (id) {
             localStorage.setItem(SEASON_KEY, String(id))
+            localStorage.removeItem('smite2_forge_league')
             // Update URL to match selected season, preserving tab suffix
             const list = allSeasons || seasons
             const s = list.find(s => s.id === id)
@@ -101,6 +110,17 @@ export default function FantasyForge() {
             localStorage.removeItem(SEASON_KEY)
         }
     }, [seasons, navigate, location.pathname])
+
+    const selectLeagueWide = useCallback((leagueId, leagueSlug) => {
+        setSeasonIdRaw(null)
+        setLeagueWideId(leagueId)
+        localStorage.removeItem(SEASON_KEY)
+        localStorage.setItem('smite2_forge_league', JSON.stringify({ leagueId, leagueSlug }))
+        const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
+            : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
+            : ''
+        navigate(`/forge/${leagueSlug}${suffix}`, { replace: true })
+    }, [navigate, location.pathname])
     const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false)
     const seasonDropdownRef = useRef(null)
 
@@ -198,14 +218,17 @@ export default function FantasyForge() {
                 )
 
                 const allSeasons = []
+                const leagueMap = {}
                 for (const full of fullLeagues) {
                     if (!full?.divisions) continue
+                    leagueMap[full.slug] = { leagueId: full.id, leagueName: full.name, leagueSlug: full.slug }
                     for (const div of full.divisions) {
                         for (const season of (div.seasons || [])) {
                             const forgeStatus = marketStatuses[season.id] || null
                             allSeasons.push({
                                 id: season.id,
                                 name: season.name,
+                                leagueId: full.id,
                                 leagueName: full.name,
                                 leagueSlug: full.slug,
                                 divisionName: div.name,
@@ -225,31 +248,52 @@ export default function FantasyForge() {
 
                 setSeasons(allSeasons)
 
-                // Filter to visible seasons (regular users only see open markets)
+                // Build league-wide options: one per league that has 2+ visible divisions
                 const ownerNow = hasPermission('permission_manage')
                 const visible = ownerNow
                     ? allSeasons
                     : allSeasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
 
-                // Priority: 1) URL slugs, 2) localStorage, 3) first visible
-                const urlMatch = urlLeagueSlug && urlDivisionSlug
-                    ? visible.find(s => s.leagueSlug === urlLeagueSlug && s.divisionSlug === urlDivisionSlug)
-                    : null
-                const savedId = seasonId
-                if (urlMatch) {
-                    setSeasonId(urlMatch.id, allSeasons)
-                } else if (savedId && visible.find(s => s.id === savedId)) {
-                    // Keep localStorage selection, but sync URL (preserve tab suffix)
-                    const saved = visible.find(s => s.id === savedId)
-                    if (saved) {
-                        const base = `/forge/${saved.leagueSlug}/${saved.divisionSlug}`
-                        const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
-                            : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
-                            : ''
-                        navigate(base + suffix, { replace: true })
+                const leagueDivCounts = {}
+                for (const s of visible) {
+                    if (!leagueDivCounts[s.leagueSlug]) leagueDivCounts[s.leagueSlug] = new Set()
+                    leagueDivCounts[s.leagueSlug].add(s.divisionSlug)
+                }
+                const leagueOpts = Object.entries(leagueDivCounts)
+                    .filter(([, divs]) => divs.size > 1)
+                    .map(([slug]) => leagueMap[slug])
+                    .filter(Boolean)
+                setLeagueOptions(leagueOpts)
+
+                // Priority: 1) league-wide URL, 2) division URL slugs, 3) saved league, 4) saved season, 5) first visible
+                const isLeagueUrl = urlLeagueSlug && !urlDivisionSlug
+                const urlLeagueOpt = isLeagueUrl ? leagueOpts.find(l => l.leagueSlug === urlLeagueSlug) : null
+
+                if (urlLeagueOpt) {
+                    setLeagueWideId(urlLeagueOpt.leagueId)
+                    setSeasonIdRaw(null)
+                } else {
+                    const urlMatch = urlLeagueSlug && urlDivisionSlug
+                        ? visible.find(s => s.leagueSlug === urlLeagueSlug && s.divisionSlug === urlDivisionSlug)
+                        : null
+                    const savedId = seasonId
+                    const savedLeague = (() => { try { return JSON.parse(localStorage.getItem('smite2_forge_league')) } catch { return null } })()
+                    if (urlMatch) {
+                        setSeasonId(urlMatch.id, allSeasons)
+                    } else if (savedLeague && leagueOpts.find(l => l.leagueId === savedLeague.leagueId)) {
+                        selectLeagueWide(savedLeague.leagueId, savedLeague.leagueSlug)
+                    } else if (savedId && visible.find(s => s.id === savedId)) {
+                        const saved = visible.find(s => s.id === savedId)
+                        if (saved) {
+                            const base = `/forge/${saved.leagueSlug}/${saved.divisionSlug}`
+                            const suffix = location.pathname.endsWith('/portfolio') ? '/portfolio'
+                                : location.pathname.endsWith('/leaderboard') ? '/leaderboard'
+                                : ''
+                            navigate(base + suffix, { replace: true })
+                        }
+                    } else if (visible.length > 0) {
+                        setSeasonId(visible[0].id, allSeasons)
                     }
-                } else if (visible.length > 0) {
-                    setSeasonId(visible[0].id, allSeasons)
                 }
             } catch (err) {
                 console.error('Failed to load seasons:', err)
@@ -260,40 +304,140 @@ export default function FantasyForge() {
         loadSeasons()
     }, [])
 
+    // ── Seasons for the current league (for league-wide mode) ──
+    const leagueSeasons = useMemo(() => {
+        if (!leagueWideId) return []
+        const visible = isOwner ? seasons : seasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
+        return visible.filter(s => s.leagueId === leagueWideId)
+    }, [leagueWideId, seasons, isOwner])
+
     // ── Load data based on active tab ──
     const loadData = useCallback(async () => {
-        if (!seasonId) return
+        if (!seasonId && !leagueWideId) return
         setLoading(true)
         setError(null)
 
         try {
-            if (activeTab === 'market') {
-                const data = await forgeService.getMarket(seasonId)
-                setMarket(data.market)
-                setPlayers(data.players || [])
-                setUserTeamId(data.userTeamId || null)
-                setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
-                setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
-            } else if (activeTab === 'portfolio') {
-                if (!user) { setLoading(false); return }
-                const data = await forgeService.getPortfolio(seasonId)
-                setPortfolio(data)
-                // Load batch history for holdings + portfolio timeline in parallel
-                const timelinePromise = forgeService.getPortfolioTimeline(seasonId).then(res => {
-                    setPortfolioTimeline(res.timeline || [])
-                }).catch(() => setPortfolioTimeline([]))
-                if (data.holdings?.length > 0) {
-                    const sparkIds = data.holdings.map(h => h.sparkId)
-                    forgeService.getBatchHistory(sparkIds).then(res => {
-                        setPortfolioHistories(res.histories || {})
-                    }).catch(() => setPortfolioHistories({}))
-                } else {
-                    setPortfolioHistories({})
+            if (leagueWideId && leagueSeasons.length > 0) {
+                // League-wide mode — fetch each division and merge
+                if (activeTab === 'market') {
+                    const results = await Promise.all(leagueSeasons.map(s => forgeService.getMarket(s.id).catch(() => null)))
+                    const allPlayers = []
+                    const teamBySeason = {}
+                    const openMktIds = []
+                    let freeRemaining = 0
+                    let refAvail = 0
+                    for (let i = 0; i < results.length; i++) {
+                        const data = results[i]
+                        if (!data) continue
+                        const si = leagueSeasons[i]
+                        if (data.market?.status === 'open') openMktIds.push(data.market.id)
+                        if (data.userTeamId) teamBySeason[si.id] = data.userTeamId
+                        freeRemaining = Math.max(freeRemaining, data.freeSparksRemaining ?? 0)
+                        refAvail = Math.max(refAvail, data.referralSparksAvailable ?? 0)
+                        for (const p of (data.players || [])) {
+                            allPlayers.push({
+                                ...p,
+                                divisionName: si.divisionName,
+                                divisionSlug: si.divisionSlug,
+                                divisionTier: si.divisionTier,
+                                seasonId: si.id,
+                                marketId: data.market?.id,
+                            })
+                        }
+                    }
+                    setMarket(null)
+                    setPlayers(allPlayers)
+                    setUserTeamBySeasonId(teamBySeason)
+                    setOpenMarketIds(openMktIds)
+                    setUserTeamId(null)
+                    setFreeSparksRemaining(freeRemaining)
+                    setReferralSparksAvailable(refAvail)
+                } else if (activeTab === 'portfolio') {
+                    if (!user) { setLoading(false); return }
+                    const results = await Promise.all(leagueSeasons.map(s => forgeService.getPortfolio(s.id).catch(() => null)))
+                    const allHoldings = []
+                    let totalValue = 0, totalInvested = 0
+                    const allTransactions = []
+                    for (let i = 0; i < results.length; i++) {
+                        const data = results[i]
+                        if (!data) continue
+                        const si = leagueSeasons[i]
+                        for (const h of (data.holdings || [])) {
+                            allHoldings.push({ ...h, divisionName: si.divisionName, divisionSlug: si.divisionSlug })
+                        }
+                        if (data.stats) {
+                            totalValue += data.stats.totalValue || 0
+                            totalInvested += data.stats.totalInvested || 0
+                        }
+                        for (const t of (data.transactions || [])) allTransactions.push(t)
+                    }
+                    allHoldings.sort((a, b) => b.currentValue - a.currentValue)
+                    allTransactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                    const totalPL = totalValue - totalInvested
+                    const plPct = totalInvested > 0 ? Math.round(totalPL / totalInvested * 10000) / 100 : 0
+                    setPortfolio({
+                        holdings: allHoldings,
+                        stats: { totalValue, totalInvested, unrealizedPL: totalPL, plPercent: plPct, holdingCount: allHoldings.length },
+                        transactions: allTransactions.slice(0, 20),
+                    })
+                    setPortfolioTimeline(null)
+                    if (allHoldings.length > 0) {
+                        const sparkIds = allHoldings.map(h => h.sparkId)
+                        forgeService.getBatchHistory(sparkIds).then(res => {
+                            setPortfolioHistories(res.histories || {})
+                        }).catch(() => setPortfolioHistories({}))
+                    } else {
+                        setPortfolioHistories({})
+                    }
+                } else if (activeTab === 'leaderboard') {
+                    const results = await Promise.all(leagueSeasons.map(s => forgeService.getLeaderboard(s.id).catch(() => null)))
+                    const userMap = {}
+                    for (const data of results) {
+                        if (!data) continue
+                        for (const entry of (data.leaderboard || [])) {
+                            if (!userMap[entry.userId]) {
+                                userMap[entry.userId] = { ...entry, totalProfit: 0, portfolioValue: 0, holdingsCount: 0, totalSparks: 0 }
+                            }
+                            userMap[entry.userId].totalProfit += entry.totalProfit
+                            userMap[entry.userId].portfolioValue += entry.portfolioValue
+                            userMap[entry.userId].holdingsCount += entry.holdingsCount
+                            userMap[entry.userId].totalSparks += entry.totalSparks
+                        }
+                    }
+                    const merged = Object.values(userMap).sort((a, b) => b.totalProfit - a.totalProfit).slice(0, 50)
+                    merged.forEach((e, i) => e.position = i + 1)
+                    setLeaderboard(merged)
                 }
-                await timelinePromise
-            } else if (activeTab === 'leaderboard') {
-                const data = await forgeService.getLeaderboard(seasonId)
-                setLeaderboard(data.leaderboard || [])
+            } else {
+                // Division-scoped mode
+                if (activeTab === 'market') {
+                    const data = await forgeService.getMarket(seasonId)
+                    setMarket(data.market)
+                    setPlayers(data.players || [])
+                    setUserTeamId(data.userTeamId || null)
+                    setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
+                    setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
+                } else if (activeTab === 'portfolio') {
+                    if (!user) { setLoading(false); return }
+                    const data = await forgeService.getPortfolio(seasonId)
+                    setPortfolio(data)
+                    const timelinePromise = forgeService.getPortfolioTimeline(seasonId).then(res => {
+                        setPortfolioTimeline(res.timeline || [])
+                    }).catch(() => setPortfolioTimeline([]))
+                    if (data.holdings?.length > 0) {
+                        const sparkIds = data.holdings.map(h => h.sparkId)
+                        forgeService.getBatchHistory(sparkIds).then(res => {
+                            setPortfolioHistories(res.histories || {})
+                        }).catch(() => setPortfolioHistories({}))
+                    } else {
+                        setPortfolioHistories({})
+                    }
+                    await timelinePromise
+                } else if (activeTab === 'leaderboard') {
+                    const data = await forgeService.getLeaderboard(seasonId)
+                    setLeaderboard(data.leaderboard || [])
+                }
             }
         } catch (err) {
             setError(err.message)
@@ -301,7 +445,7 @@ export default function FantasyForge() {
             setLoading(false)
             setInitialDataLoaded(true)
         }
-    }, [activeTab, seasonId, user])
+    }, [activeTab, seasonId, leagueWideId, leagueSeasons, user])
 
     useEffect(() => { loadData() }, [loadData])
 
@@ -340,8 +484,17 @@ export default function FantasyForge() {
     // ── Selected season info for profile links ──
     const selectedSeason = useMemo(() => visibleSeasons.find(s => s.id === seasonId), [visibleSeasons, seasonId])
 
+    // ── Selected league option (for league-wide mode) ──
+    const selectedLeagueOption = useMemo(() => leagueOptions.find(l => l.leagueId === leagueWideId), [leagueOptions, leagueWideId])
+
     // ── Tab navigation helper ──
     const getTabPath = useCallback((tabKey) => {
+        if (isLeagueWide && selectedLeagueOption) {
+            const base = `/forge/${selectedLeagueOption.leagueSlug}`
+            if (tabKey === 'portfolio') return `${base}/portfolio`
+            if (tabKey === 'leaderboard') return `${base}/leaderboard`
+            return base
+        }
         const s = selectedSeason
         if (!s) return '/forge'
         const base = `/forge/${s.leagueSlug}/${s.divisionSlug}`
@@ -349,7 +502,7 @@ export default function FantasyForge() {
         if (tabKey === 'leaderboard') return `${base}/leaderboard`
         if (tabKey === 'challenges') return `${base}/challenges`
         return base
-    }, [selectedSeason])
+    }, [selectedSeason, isLeagueWide, selectedLeagueOption])
 
     const navigateTab = useCallback((tabKey) => {
         navigate(getTabPath(tabKey), { replace: true })
@@ -404,6 +557,10 @@ export default function FantasyForge() {
 
     // ── Navigate to player detail page ──
     const handleSelectPlayer = (player) => {
+        if (isLeagueWide && player.divisionSlug) {
+            navigate(`/forge/${urlLeagueSlug}/${player.divisionSlug}/player/${player.playerSlug}`)
+            return
+        }
         if (!selectedSeason) return
         navigate(`/forge/${selectedSeason.leagueSlug}/${selectedSeason.divisionSlug}/player/${player.playerSlug}`)
     }
@@ -547,7 +704,7 @@ export default function FantasyForge() {
     }, [loadData])
 
     // ── Full-page loading screen while auth + seasons + initial data resolve ──
-    const isInitializing = authLoading || !seasonsLoaded || (!initialDataLoaded && !!seasonId)
+    const isInitializing = authLoading || !seasonsLoaded || (!initialDataLoaded && (!!seasonId || !!leagueWideId))
 
     if (isInitializing) {
         return (
@@ -660,10 +817,29 @@ export default function FantasyForge() {
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                             {/* Season selector */}
-                            {visibleSeasons.length > 1 && (() => {
-                                const selected = visibleSeasons.find(s => s.id === seasonId)
-                                const selectedLeagueLogo = selected ? getLeagueLogo(selected.leagueSlug) : null
+                            {(visibleSeasons.length > 1 || leagueOptions.length > 0) && (() => {
+                                const selected = isLeagueWide
+                                    ? null
+                                    : visibleSeasons.find(s => s.id === seasonId)
+                                const selectedLeagueLogo = isLeagueWide
+                                    ? getLeagueLogo(urlLeagueSlug)
+                                    : (selected ? getLeagueLogo(selected.leagueSlug) : null)
                                 const selectedDivLogo = selected ? getDivisionImage(selected.leagueSlug, selected.divisionSlug, selected.divisionTier) : null
+                                const selectedLabel = isLeagueWide
+                                    ? `${selectedLeagueOption?.leagueName || urlLeagueSlug} — All Divisions`
+                                    : (selected ? `${selected.leagueName} — ${selected.divisionName}` : 'Select Season')
+
+                                // Group seasons by league for dropdown
+                                const leagueSlugsOrdered = []
+                                const seasonsByLeague = {}
+                                for (const s of visibleSeasons) {
+                                    if (!seasonsByLeague[s.leagueSlug]) {
+                                        seasonsByLeague[s.leagueSlug] = []
+                                        leagueSlugsOrdered.push(s.leagueSlug)
+                                    }
+                                    seasonsByLeague[s.leagueSlug].push(s)
+                                }
+
                                 return (
                                     <div className="relative" ref={seasonDropdownRef}>
                                         <button
@@ -672,33 +848,55 @@ export default function FantasyForge() {
                                         >
                                             {selectedLeagueLogo && <img src={selectedLeagueLogo} alt="" className="w-5 h-5 object-contain" />}
                                             {selectedDivLogo && <img src={selectedDivLogo} alt="" className="w-5 h-5 object-contain" />}
-                                            <span>{selected ? `${selected.leagueName} — ${selected.divisionName}` : 'Select Season'}</span>
+                                            <span>{selectedLabel}</span>
                                             <ChevronDown size={14} className={`transition-transform ${seasonDropdownOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {seasonDropdownOpen && (
                                             <div className="absolute top-full right-0 mt-1 min-w-[280px] bg-[var(--color-primary)] border border-[var(--forge-border)] shadow-xl z-50 max-h-[350px] overflow-y-auto">
-                                                {visibleSeasons.map(s => {
-                                                    const lLogo = getLeagueLogo(s.leagueSlug)
-                                                    const dLogo = getDivisionImage(s.leagueSlug, s.divisionSlug, s.divisionTier)
+                                                {leagueSlugsOrdered.map(slug => {
+                                                    const leagueSeasons = seasonsByLeague[slug]
+                                                    const leagueOpt = leagueOptions.find(l => l.leagueSlug === slug)
+                                                    const lLogo = getLeagueLogo(slug)
                                                     return (
-                                                        <button
-                                                            key={s.id}
-                                                            onClick={() => { setSeasonId(s.id); setSeasonDropdownOpen(false) }}
-                                                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
-                                                                seasonId === s.id ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
-                                                            }`}
-                                                        >
-                                                            {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
-                                                            {dLogo && <img src={dLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
-                                                            <span className="flex-1">{s.leagueName} — {s.divisionName}</span>
-                                                            {isOwner && s.forgeStatus && s.forgeStatus !== 'open' && (
-                                                                <span className={`forge-head text-[0.75rem] tracking-wider ${
-                                                                    s.forgeStatus === 'closed' ? 'text-[var(--forge-loss)]' : 'text-[var(--forge-text-dim)]'
-                                                                }`}>
-                                                                    {s.forgeStatus === 'closed' ? 'Closed' : 'Ended'}
-                                                                </span>
+                                                        <div key={slug}>
+                                                            {/* League-wide "All Divisions" option */}
+                                                            {leagueOpt && (
+                                                                <button
+                                                                    onClick={() => { selectLeagueWide(leagueOpt.leagueId, leagueOpt.leagueSlug); setSeasonDropdownOpen(false) }}
+                                                                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
+                                                                        isLeagueWide && leagueWideId === leagueOpt.leagueId ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
+                                                                    }`}
+                                                                >
+                                                                    {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                                    <Flame size={14} className="text-[var(--forge-flame)] flex-shrink-0" />
+                                                                    <span className="flex-1 font-semibold">{leagueOpt.leagueName} — All Divisions</span>
+                                                                </button>
                                                             )}
-                                                        </button>
+                                                            {/* Individual division entries */}
+                                                            {leagueSeasons.map(s => {
+                                                                const dLogo = getDivisionImage(s.leagueSlug, s.divisionSlug, s.divisionTier)
+                                                                return (
+                                                                    <button
+                                                                        key={s.id}
+                                                                        onClick={() => { setSeasonId(s.id); setSeasonDropdownOpen(false) }}
+                                                                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-left forge-body text-base hover:bg-[var(--forge-surface)] transition-colors ${
+                                                                            !isLeagueWide && seasonId === s.id ? 'text-[var(--forge-flame-bright)]' : 'text-[var(--forge-text-mid)]'
+                                                                        }`}
+                                                                    >
+                                                                        {lLogo && <img src={lLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                                        {dLogo && <img src={dLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+                                                                        <span className="flex-1">{s.leagueName} — {s.divisionName}</span>
+                                                                        {isOwner && s.forgeStatus && s.forgeStatus !== 'open' && (
+                                                                            <span className={`forge-head text-[0.75rem] tracking-wider ${
+                                                                                s.forgeStatus === 'closed' ? 'text-[var(--forge-loss)]' : 'text-[var(--forge-text-dim)]'
+                                                                            }`}>
+                                                                                {s.forgeStatus === 'closed' ? 'Closed' : 'Ended'}
+                                                                            </span>
+                                                                        )}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
                                                     )
                                                 })}
                                             </div>
@@ -764,7 +962,7 @@ export default function FantasyForge() {
 
                     {/* Tabs */}
                     <div className="flex gap-0 mb-4">
-                        {TABS.map(tab => {
+                        {TABS.filter(tab => !isLeagueWide || tab.key !== 'challenges').map(tab => {
                             const Icon = tab.icon
                             return (
                                 <button
@@ -808,7 +1006,7 @@ export default function FantasyForge() {
                             teamFilter={teamFilter}
                             setTeamFilter={setTeamFilter}
                             loading={loading}
-                            marketStatus={market?.status}
+                            marketStatus={isLeagueWide ? 'open' : market?.status}
                             featuredPlayer={featuredPlayer}
                             historyData={historyData}
                             userTeamId={userTeamId}
@@ -817,6 +1015,10 @@ export default function FantasyForge() {
                             freeSparksRemaining={freeSparksRemaining}
                             referralSparksAvailable={referralSparksAvailable}
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
+                            isLeagueWide={isLeagueWide}
+                            leagueSlug={urlLeagueSlug}
+                            userTeamBySeasonId={userTeamBySeasonId}
+                            openMarketIds={openMarketIds}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
@@ -831,6 +1033,8 @@ export default function FantasyForge() {
                             portfolioTimeline={portfolioTimeline}
                             loading={loading}
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
+                            isLeagueWide={isLeagueWide}
+                            leagueSlug={urlLeagueSlug}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}
                         />
                     )}
@@ -844,7 +1048,7 @@ export default function FantasyForge() {
                         />
                     )}
 
-                    {activeTab === 'challenges' && (
+                    {!isLeagueWide && activeTab === 'challenges' && (
                         <ForgeChallengesTab loading={loading} />
                     )}
                 </div>

@@ -6,7 +6,7 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onFuel, onCool, onRandom }) {
+export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onFuel, onCool, onRandom, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
     const chartRef = useRef(null)
     const nameRef = useRef(null)
     const prevPlayerRef = useRef(null)
@@ -43,17 +43,23 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
 
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
-    const isOpen = marketStatus === 'open'
-    const isOwnTeam = userTeamId && player.teamId === userTeamId
+    const isOpen = isLeagueWide
+        ? (openMarketIds || []).includes(player.marketId)
+        : marketStatus === 'open'
+    const isOwnTeam = isLeagueWide
+        ? (userTeamBySeasonId?.[player.seasonId] && userTeamBySeasonId[player.seasonId] === player.teamId)
+        : (userTeamId && player.teamId === userTeamId)
     const isUp = change > 0
     const isDown = change < 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const changeLabel = changeView === '7d' ? '7d Change' : '24h Change'
     const avatarUrl = usePlayerAvatar(player)
-    const profileUrl = seasonSlugs
-        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
-        : `/profile/${player.playerSlug}`
+    const profileUrl = isLeagueWide && player.divisionSlug
+        ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
+        : seasonSlugs
+            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
+            : `/profile/${player.playerSlug}`
 
     return (
         <div className="forge-hero relative mb-4 bg-[var(--forge-panel)] border border-[var(--forge-edge)] overflow-hidden min-h-44 flex">

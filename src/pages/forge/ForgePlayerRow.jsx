@@ -8,23 +8,29 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool }) {
+export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
     const chartRef = useRef(null)
     const mobileChartRef = useRef(null)
     const [expanded, setExpanded] = useState(false)
 
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
-    const isOpen = marketStatus === 'open'
-    const isOwnTeam = userTeamId && player.teamId === userTeamId
+    const isOpen = isLeagueWide
+        ? (openMarketIds || []).includes(player.marketId)
+        : marketStatus === 'open'
+    const isOwnTeam = isLeagueWide
+        ? (userTeamBySeasonId?.[player.seasonId] && userTeamBySeasonId[player.seasonId] === player.teamId)
+        : (userTeamId && player.teamId === userTeamId)
     const isUp = change > 0
     const isDown = change < 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const avatarUrl = usePlayerAvatar(player)
-    const profileUrl = seasonSlugs
-        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
-        : `/profile/${player.playerSlug}`
+    const profileUrl = isLeagueWide && player.divisionSlug
+        ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
+        : seasonSlugs
+            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
+            : `/profile/${player.playerSlug}`
 
     const perfValue = player.perfMultiplier
     const perfColor = perfValue >= 1.5 ? 'text-[var(--forge-flame-bright)]'
@@ -142,6 +148,11 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                     <div className="hidden sm:flex text-[0.85rem] text-[var(--forge-text-dim)] items-center gap-1 mt-px overflow-hidden">
                         <TeamLogo slug={player.teamSlug} name={player.teamName} size={14} color={player.teamColor} className="flex-shrink-0" />
                         <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                        {isLeagueWide && player.divisionName && (
+                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
+                                {player.divisionName}
+                            </span>
+                        )}
                         {player.role && (
                             <span className="forge-head text-[0.65rem] font-semibold tracking-wider ml-0.5 opacity-70 flex-shrink-0">{player.role}</span>
                         )}
@@ -156,6 +167,11 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
                         <div className="flex items-center gap-1 overflow-hidden">
                             <TeamLogo slug={player.teamSlug} name={player.teamName} size={13} color={player.teamColor} className="flex-shrink-0" />
                             <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                            {isLeagueWide && player.divisionName && (
+                                <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-0.5 flex-shrink-0">
+                                    {player.divisionName}
+                                </span>
+                            )}
                         </div>
                         {(player.role || perfValue != null) && (
                             <div className="flex items-center gap-1.5 mt-0.5">

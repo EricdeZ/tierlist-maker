@@ -8,19 +8,25 @@ import { usePlayerAvatar } from './usePlayerAvatar'
 
 const RANK_LABELS = ['', '1st', '2nd', '3rd']
 
-export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, tutorialIndex, rank }) {
+export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, tutorialIndex, rank, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
     const chartRef = useRef(null)
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
-    const isOpen = marketStatus === 'open'
-    const isOwnTeam = userTeamId && player.teamId === userTeamId
+    const isOpen = isLeagueWide
+        ? (openMarketIds || []).includes(player.marketId)
+        : marketStatus === 'open'
+    const isOwnTeam = isLeagueWide
+        ? (userTeamBySeasonId?.[player.seasonId] && userTeamBySeasonId[player.seasonId] === player.teamId)
+        : (userTeamId && player.teamId === userTeamId)
     const isUp = change > 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const avatarUrl = usePlayerAvatar(player)
-    const profileUrl = seasonSlugs
-        ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
-        : `/profile/${player.playerSlug}`
+    const profileUrl = isLeagueWide && player.divisionSlug
+        ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
+        : seasonSlugs
+            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
+            : `/profile/${player.playerSlug}`
 
     // Draw sparkline (fallback to flat line at 100 if no data)
     useEffect(() => {
@@ -100,6 +106,11 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                         <div className="text-[0.85rem] text-[var(--forge-text-dim)] flex items-center gap-1 mt-px">
                             <TeamLogo slug={player.teamSlug} name={player.teamName} size={16} color={player.teamColor} />
                             {player.teamName}
+                            {isLeagueWide && player.divisionName && (
+                                <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
+                                    {player.divisionName}
+                                </span>
+                            )}
                             {player.role && (
                                 <span className="forge-head text-[0.7rem] font-semibold tracking-wider ml-1">{player.role}</span>
                             )}

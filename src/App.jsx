@@ -134,6 +134,9 @@ function App() {
                             <Route path="predictions" element={<Predictions />} />
                             <Route path="matchup/:scheduledMatchId" element={<MatchupDetail />} />
                             <Route path="forge" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/portfolio" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/leaderboard" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/portfolio" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/leaderboard" element={<FantasyForge />} />

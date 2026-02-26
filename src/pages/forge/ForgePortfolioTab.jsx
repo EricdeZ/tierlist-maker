@@ -76,7 +76,7 @@ const TRIGGER_LABELS = {
     init: 'Initial Price',
 }
 
-export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, onCool }) {
+export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, onCool }) {
     const chartRef = useRef(null)
     const chartInteraction = useRef(null)
     const [tooltip, setTooltip] = useState(null)
@@ -246,9 +246,11 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                     const isDown = change < 0
                     const histData = portfolioHistories?.[h.sparkId]
                     const profileUrl = h.playerSlug
-                        ? (seasonSlugs
-                            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${h.playerSlug}`
-                            : `/profile/${h.playerSlug}`)
+                        ? (isLeagueWide && h.divisionSlug
+                            ? `/${leagueSlug}/${h.divisionSlug}/players/${h.playerSlug}`
+                            : seasonSlugs
+                                ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${h.playerSlug}`
+                                : `/profile/${h.playerSlug}`)
                         : null
 
                     return (
@@ -276,6 +278,11 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 </div>
                                 <div className="text-xs sm:text-sm text-[var(--forge-text-dim)] flex items-center gap-1 flex-wrap">
                                     <span style={{ color: h.teamColor }} className="truncate">{h.teamName}</span>
+                                    {isLeagueWide && h.divisionName && (
+                                        <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
+                                            {h.divisionName}
+                                        </span>
+                                    )}
                                     <span className="opacity-60 flex items-center gap-0.5">
                                         &middot;
                                         <img src={sparkIcon} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain forge-spark-icon" />
