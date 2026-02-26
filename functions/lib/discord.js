@@ -68,7 +68,7 @@ export async function fetchGuildRoles(guildId) {
  * Returns array of member objects with user.id and roles[].
  * Requires GUILD_MEMBERS privileged intent.
  */
-export async function fetchGuildMembers(guildId, limit = 1000) {
+export async function fetchGuildMembers(guildId, limit = Infinity) {
     const allMembers = []
     let afterId = '0'
 

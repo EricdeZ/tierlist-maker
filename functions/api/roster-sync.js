@@ -81,13 +81,14 @@ async function syncRosters(sql, seasonId) {
         WHERE lp.season_id = ${seasonId} AND lp.is_active = true
     `
 
-    // 3. Resolve guild(s) for this season via discord_channels
+    // 3. Resolve guild(s) for the league (not just this division) via discord_channels
     const guildRows = await sql`
         SELECT DISTINCT dc.guild_id
         FROM discord_channels dc
         JOIN divisions d ON dc.division_id = d.id
-        JOIN seasons s ON s.division_id = d.id
-        WHERE s.id = ${seasonId} AND dc.is_active = true AND dc.guild_id IS NOT NULL
+        WHERE d.league_id = (
+            SELECT d2.league_id FROM seasons s2 JOIN divisions d2 ON s2.division_id = d2.id WHERE s2.id = ${seasonId}
+        ) AND dc.is_active = true AND dc.guild_id IS NOT NULL
     `
 
     if (!guildRows.length) {
@@ -158,52 +159,62 @@ async function syncRosters(sql, seasonId) {
 
         for (const lp of teamPlayers) {
             let hasRole = false
+            let matched = false // whether we found them in the guild at all
             let matchMethod = null
 
             // 1. Exact match by discord_id
-            if (lp.discord_id && membersWithRole.has(lp.discord_id)) {
-                hasRole = true
-                matchMethod = 'discord_id'
-                matchedDiscordIds.add(lp.discord_id)
+            if (lp.discord_id) {
+                if (membersWithRole.has(lp.discord_id)) {
+                    hasRole = true
+                    matched = true
+                    matchMethod = 'discord_id'
+                    matchedDiscordIds.add(lp.discord_id)
+                } else if (discordMemberById.has(lp.discord_id)) {
+                    matched = true
+                    matchMethod = 'discord_id'
+                    matchedDiscordIds.add(lp.discord_id)
+                }
             }
 
             // 2. Exact match by discord_name
-            if (!hasRole && lp.discord_name) {
+            if (!matched && lp.discord_name) {
                 const nameLower = lp.discord_name.toLowerCase()
                 const member = discordMemberByName.get(nameLower)
-                if (member && membersWithRole.has(member.user.id)) {
-                    hasRole = true
+                if (member) {
+                    matched = true
                     matchMethod = 'discord_name'
                     matchedDiscordIds.add(member.user.id)
+                    if (membersWithRole.has(member.user.id)) hasRole = true
                 }
             }
 
             // 3. Exact match by player name (smite name)
-            if (!hasRole && lp.player_name) {
+            if (!matched && lp.player_name) {
                 const nameLower = lp.player_name.toLowerCase()
                 const member = discordMemberByName.get(nameLower)
-                if (member && membersWithRole.has(member.user.id)) {
-                    hasRole = true
+                if (member) {
+                    matched = true
                     matchMethod = 'player_name'
                     matchedDiscordIds.add(member.user.id)
+                    if (membersWithRole.has(member.user.id)) hasRole = true
                 }
             }
 
             // 4. Fuzzy match by discord_name or player_name
-            if (!hasRole) {
+            if (!matched) {
                 const namesToTry = [lp.discord_name, lp.player_name].filter(Boolean)
                 for (const tryName of namesToTry) {
                     for (const [userId, memberNames] of allMemberNames) {
-                        if (!membersWithRole.has(userId)) continue
                         if (matchedDiscordIds.has(userId)) continue
                         if (memberNames.some(mn => fuzzyMatch(tryName, mn))) {
-                            hasRole = true
+                            matched = true
                             matchMethod = 'fuzzy'
                             matchedDiscordIds.add(userId)
+                            if (membersWithRole.has(userId)) hasRole = true
                             break
                         }
                     }
-                    if (hasRole) break
+                    if (matched) break
                 }
             }
 
@@ -222,17 +233,19 @@ async function syncRosters(sql, seasonId) {
                     matchMethod,
                 })
                 summary.promotes++
-            } else if (!hasRole && lp.roster_status !== 'sub') {
+            } else if (matched && !hasRole && lp.roster_status !== 'sub') {
+                // Found in guild but doesn't have the team role → demote
                 changes.push({
                     type: 'demote',
                     playerName: lp.player_name,
                     leaguePlayerId: lp.league_player_id,
                     from: lp.roster_status,
                     to: 'sub',
-                    matchMethod: null,
+                    matchMethod,
                 })
                 summary.demotes++
             } else {
+                // Not matched to any Discord member → leave unchanged
                 unchanged++
             }
         }
