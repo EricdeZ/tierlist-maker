@@ -291,6 +291,9 @@ export default function FantasyForge() {
                                 : ''
                             navigate(base + suffix, { replace: true })
                         }
+                    } else if (leagueOpts.length > 0) {
+                        // Default new users to all-divisions view
+                        selectLeagueWide(leagueOpts[0].leagueId, leagueOpts[0].leagueSlug)
                     } else if (visible.length > 0) {
                         setSeasonId(visible[0].id, allSeasons)
                     }
@@ -1058,8 +1061,8 @@ export default function FantasyForge() {
             {activeTab === 'market' && (
                 <ForgeTutorial
                     players={players}
-                    seasonId={seasonId}
-                    marketOpen={market?.status === 'open'}
+                    seasonId={seasonId || leagueSeasons[0]?.id || null}
+                    marketOpen={isLeagueWide ? openMarketIds.length > 0 : market?.status === 'open'}
                     onTutorialFuel={handleTutorialFuel}
                     onSelectFeatured={handleSelectFeatured}
                     onComplete={handleTutorialComplete}

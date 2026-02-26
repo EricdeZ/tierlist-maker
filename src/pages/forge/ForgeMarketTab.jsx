@@ -213,6 +213,11 @@ export default function ForgeMarketTab({
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
+                    onFocus={e => {
+                        if (window.innerWidth < 640) {
+                            setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+                        }
+                    }}
                     placeholder="Search players, teams..."
                     data-tutorial="search-input"
                     className="flex-1 min-w-[150px] py-2 px-3 bg-[var(--forge-surface)] border border-[var(--forge-border)] text-[var(--forge-text)] forge-body text-base sm:text-lg outline-none focus:border-[var(--forge-flame)]/40 transition-colors placeholder:text-[var(--forge-text-dim)]"
