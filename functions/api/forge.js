@@ -986,6 +986,16 @@ async function getTutorialStatus(sql, user, params) {
         LIMIT 1
     `
 
+    // Also consider tutorial done if user owns any sparks in this league
+    const [ownsSparks] = !done ? await sql`
+        SELECT 1 FROM spark_holdings sh
+        JOIN player_sparks ps ON sh.spark_id = ps.id
+        WHERE sh.user_id = ${user.id}
+          AND ps.market_id = ANY(${marketIds})
+          AND sh.sparks > 0
+        LIMIT 1
+    ` : [null]
+
     // Count free sparks used across all markets in the league
     const [{ total_used }] = await sql`
         SELECT COALESCE(SUM(st.sparks), 0)::integer as total_used
@@ -1000,7 +1010,7 @@ async function getTutorialStatus(sql, user, params) {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-            completed: !!done,
+            completed: !!(done || ownsSparks),
             freeSparksRemaining: Math.max(0, 3 - total_used),
         }),
     }
