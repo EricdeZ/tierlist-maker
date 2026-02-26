@@ -91,40 +91,56 @@ Built for SmiteComp — the competitive SMITE 2 companion.`,
         {
             narrate: 'Click Next to move to the date picker. Days with an orange dot already have a scrim scheduled for your team, so you can avoid double-booking.',
             action: 'click',
-            selector: '.xp-btn.xp-btn-primary',
-            pauseAfter: 1500,
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
+            pauseAfter: 1200,
         },
         {
-            narrate: 'Select any date on the calendar. If it overlaps with an existing scrim, you will get a warning dialog before proceeding.',
-            action: 'highlight',
-            selector: '.xp-wizard-content',
-            duration: 3500,
-            pauseAfter: 500,
+            narrate: 'Select any future date on the calendar. If it overlaps with an existing scrim, you will get a warning dialog before proceeding.',
+            action: 'click',
+            selector: '.xp-calendar-day:not(.xp-calendar-day-past):not(.xp-calendar-day-today):not(.xp-calendar-day-selected) >> nth=-1',
+            force: true,
+            pauseAfter: 1200,
         },
 
-        // Skip ahead to settings to show pick mode
+        // Advance past date → time
         {
-            narrate: 'After picking a date and time, step four lets you choose the pick mode for your scrim: Regular, Fearless, Fearless Picks, or Fearless Bans. You can also apply a league\'s banned content rules.',
+            narrate: 'Next up is the time picker. All times are in Eastern Standard Time. Select the hour, minute, and AM or PM.',
             action: 'click',
-            selector: '.xp-wizard-step-item:nth-child(4)',
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
+            pauseAfter: 1200,
+        },
+        // Advance past time → settings
+        {
+            narrate: 'Step four lets you choose the pick mode for your scrim: Regular, Fearless, Fearless Picks, or Fearless Bans. You can also apply a league\'s banned content rules.',
+            action: 'click',
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
             pauseAfter: 1500,
         },
+        // Advance past settings → opponent
         {
             narrate: 'Step five is where you decide who can accept your scrim. Leave it open for any team, or search for a specific opponent to send a direct challenge. You also filter which tiers or divisions are acceptable.',
             action: 'click',
-            selector: '.xp-wizard-step-item:nth-child(5)',
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
             pauseAfter: 1500,
         },
+        // Advance past opponent → region
         {
             narrate: 'Step six lets you select the region — North America or Europe — and optionally require your manual confirmation before a scrim is accepted.',
             action: 'click',
-            selector: '.xp-wizard-step-item:nth-child(6)',
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
             pauseAfter: 1500,
         },
+        // Advance past region → review
         {
             narrate: 'Finally, the review screen shows a full summary of your scrim. Add any notes for the opponent, then click Finish to post.',
             action: 'click',
-            selector: '.xp-wizard-step-item:nth-child(7)',
+            selector: '.xp-wizard-footer .xp-btn-primary',
+            force: true,
             pauseAfter: 1500,
         },
 
@@ -132,7 +148,8 @@ Built for SmiteComp — the competitive SMITE 2 companion.`,
         {
             narrate: 'Let us close the wizard and check out the other windows on the desktop.',
             action: 'click',
-            selector: '.xp-post-window .xp-close-btn',
+            selector: '.xp-post-window .xp-tbtn-x',
+            force: true,
             pauseAfter: 800,
         },
 

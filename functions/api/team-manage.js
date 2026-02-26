@@ -134,7 +134,7 @@ async function copyTeams(sql, { source_season_id, target_season_id, team_ids }, 
 
 async function deleteTeam(sql, { id }, admin, env) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
-    const [hasPlayers] = await sql`SELECT 1 FROM league_players WHERE team_id = ${id} LIMIT 1`
+    const [hasPlayers] = await sql`SELECT 1 FROM league_players WHERE team_id = ${id} AND is_active = true LIMIT 1`
     if (hasPlayers) {
         return { statusCode: 409, headers, body: JSON.stringify({ error: 'Cannot delete team that has players. Remove players first.' }) }
     }
