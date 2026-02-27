@@ -952,10 +952,34 @@
    ═══════════════════════════════════════════════════ */
 
 @media (max-width: 640px) {
-    /* Suppress border glow animation on rows outside top 10 */
-    .forge-heat-muted.forge-blazing.forge-player-row-wrapper,
-    .forge-heat-muted.forge-cooling.forge-player-row-wrapper {
+    /* Kill all player list animations on mobile */
+    .forge-stagger > * {
         animation: none !important;
+        opacity: 1;
+    }
+
+    .forge-blazing.forge-player-row-wrapper,
+    .forge-cooling.forge-player-row-wrapper {
+        animation: none !important;
+    }
+
+    .forge-player-row-wrapper .forge-fire-overlay,
+    .forge-player-row-wrapper .forge-fire-bottom-glow,
+    .forge-player-row-wrapper .forge-frost-overlay,
+    .forge-player-row-wrapper .forge-frost-top-glow {
+        display: none !important;
+    }
+
+    .forge-blazing .forge-heat-bar {
+        animation: none !important;
+    }
+
+    .forge-spark-icon {
+        animation: none !important;
+    }
+
+    .forge-player-row-wrapper {
+        transition: none !important;
     }
 
     /* Player row: simplify grid to essential columns */
