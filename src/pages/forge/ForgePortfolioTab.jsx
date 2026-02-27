@@ -314,6 +314,11 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 </div>
                                 <div className="text-xs sm:text-sm text-[var(--forge-text-dim)] flex items-center gap-1 flex-wrap">
                                     <span style={{ color: h.teamColor }} className="truncate">{h.teamName}</span>
+                                    {h.isFreeAgent && (
+                                        <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
+                                            FA
+                                        </span>
+                                    )}
                                     {isLeagueWide && h.divisionName && (
                                         <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
                                             {h.divisionName}

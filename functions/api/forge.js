@@ -346,7 +346,7 @@ async function getPortfolio(sql, user, params) {
             ps.current_price, ps.total_sparks, ps.perf_multiplier,
             ps.sell_pressure, ps.sell_pressure_updated_at,
             p.name as player_name, p.slug as player_slug,
-            lp.role,
+            lp.role, lp.is_active,
             t.name as team_name, t.slug as team_slug, t.color as team_color
         FROM spark_holdings sh
         JOIN player_sparks ps ON sh.spark_id = ps.id
@@ -382,6 +382,7 @@ async function getPortfolio(sql, user, params) {
             teamName: h.team_name,
             teamSlug: h.team_slug,
             teamColor: h.team_color,
+            isFreeAgent: !h.is_active,
             sparks: h.sparks,
             tutorialSparks,
             coolableSparks,
