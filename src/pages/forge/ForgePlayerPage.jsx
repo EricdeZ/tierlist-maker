@@ -238,7 +238,7 @@ export default function ForgePlayerPage() {
         return (
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
                 <Navbar title="Fantasy Forge" />
-                <PageTitle title="Fantasy Forge" />
+                <PageTitle title="Fantasy Forge" image="https://smitecomp.com/forge.png" />
                 <div className="flex flex-col items-center justify-center pt-48">
                     <img src={forgeLogo} alt="" className="w-40 h-40 object-contain forge-logo-float forge-logo-glow mb-4" />
                     <div className="forge-head text-lg font-semibold tracking-wider text-[var(--forge-text-mid)]">Loading Spark...</div>
@@ -254,7 +254,7 @@ export default function ForgePlayerPage() {
         return (
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
                 <Navbar title="Fantasy Forge" />
-                <PageTitle title="Fantasy Forge" />
+                <PageTitle title="Fantasy Forge" image="https://smitecomp.com/forge.png" />
                 <div className="max-w-lg mx-auto px-4 pt-32 text-center">
                     <img src={forgeLogo} alt="" className="w-48 h-48 object-contain mx-auto mb-6 forge-logo-float forge-logo-glow" />
                     <h2 className="forge-head text-3xl font-bold tracking-wider mb-2">Fantasy Forge</h2>
@@ -272,7 +272,7 @@ export default function ForgePlayerPage() {
         return (
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
                 <Navbar title="Fantasy Forge" />
-                <PageTitle title="Fantasy Forge" />
+                <PageTitle title="Fantasy Forge" image="https://smitecomp.com/forge.png" />
                 <div className="max-w-lg mx-auto px-4 pt-32 text-center">
                     <p className="text-[var(--forge-loss)]">{error || 'Player not found'}</p>
                     <Link to={`/forge/${leagueSlug}/${divisionSlug}`} className="text-[var(--forge-flame)] mt-4 inline-block">
@@ -293,7 +293,7 @@ export default function ForgePlayerPage() {
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text) relative overflow-hidden">
             <Navbar title="Fantasy Forge" />
-            <PageTitle title={`${player.playerName} — Fantasy Forge`} description={`${player.playerName}'s Spark profile in the Fantasy Forge`} />
+            <PageTitle title={`${player.playerName} — Fantasy Forge`} description={`${player.playerName}'s Spark profile in the Fantasy Forge. View spark price, bonding curve, and trade history.`} image="https://smitecomp.com/forge.png" />
 
             {/* Background ember canvas */}
             <canvas ref={bgCanvasRef} className="fixed inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }} />

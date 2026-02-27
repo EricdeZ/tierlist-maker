@@ -801,7 +801,7 @@ export default function FantasyForge() {
         return (
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
                 <Navbar title="Fantasy Forge" />
-                <PageTitle title="Fantasy Forge" description="Invest your Passion in players. Fuel the players you believe in." />
+                <PageTitle title="Fantasy Forge" description="Invest Sparks in competitive SMITE 2 players. Buy low, sell high as players perform. Track portfolios and climb leaderboards." image="https://smitecomp.com/forge.png" />
                 <div className="flex flex-col items-center justify-center pt-48">
                     <img
                         src={forgeLogo}
@@ -824,7 +824,7 @@ export default function FantasyForge() {
         return (
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
                 <Navbar title="Fantasy Forge" />
-                <PageTitle title="Fantasy Forge" description="Invest your Passion in players. Fuel the players you believe in." />
+                <PageTitle title="Fantasy Forge" description="Invest Sparks in competitive SMITE 2 players. Buy low, sell high as players perform. Track portfolios and climb leaderboards." image="https://smitecomp.com/forge.png" />
                 <div className="max-w-lg mx-auto px-4 pt-32 text-center">
                     <img
                         src={forgeLogo}
@@ -853,7 +853,7 @@ export default function FantasyForge() {
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text) relative overflow-hidden">
             <Navbar title="Fantasy Forge" />
-            <PageTitle title="Fantasy Forge" description="Invest your Passion in players. Fuel the players you believe in." />
+            <PageTitle title="Fantasy Forge" description="Invest Sparks in competitive SMITE 2 players. Buy low, sell high as players perform. Track portfolios and climb leaderboards." image="https://smitecomp.com/forge.png" />
 
             {/* Background ember canvas */}
             <canvas

@@ -29,7 +29,7 @@ function updateCanonical(url) {
     }
 }
 
-const PageTitle = ({ title, description, noindex }) => {
+const PageTitle = ({ title, description, image, noindex }) => {
     const fullTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME
     const canonicalUrl = `${SITE_URL}${window.location.pathname}`
 
@@ -48,12 +48,18 @@ const PageTitle = ({ title, description, noindex }) => {
             updateMetaTag('name', 'twitter:description', description)
         }
 
+        const ogImage = image || DEFAULT_IMAGE
+        updateMetaTag('property', 'og:image', ogImage)
+        updateMetaTag('name', 'twitter:image', ogImage)
+        updateMetaTag('property', 'og:image:alt', title || SITE_NAME)
+        updateMetaTag('name', 'twitter:image:alt', title || SITE_NAME)
+
         if (noindex) {
             updateMetaTag('name', 'robots', 'noindex, nofollow')
         } else {
             updateMetaTag('name', 'robots', 'index, follow')
         }
-    }, [fullTitle, description, noindex, canonicalUrl])
+    }, [fullTitle, description, image, noindex, canonicalUrl])
 
     return null
 }

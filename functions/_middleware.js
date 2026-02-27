@@ -7,7 +7,9 @@ const DEFAULT_DESCRIPTION =
 const DEFAULT_KEYWORDS =
     'SMITE 2, SMITE 2 stats, SMITE 2 tracker, SMITE 2 competitive, SMITE 2 esports, SMITE 2 builds, SMITE 2 gods, SMITE 2 tier list, SMITE 2 draft, SMITE 2 league, SMITE competitive, smitecomp'
 
-const RESERVED_PATHS = new Set(['draft', 'tierlist', 'admin', 'profile', 'api', 'assets', 'leaderboard', 'challenges', 'coinflip', 'shop', 'predictions', 'matchup', 'leagues', 'twitch'])
+const FORGE_IMAGE = `${SITE_URL}/forge.png`
+
+const RESERVED_PATHS = new Set(['draft', 'tierlist', 'admin', 'profile', 'api', 'assets', 'leaderboard', 'challenges', 'coinflip', 'shop', 'predictions', 'matchup', 'leagues', 'twitch', 'forge', 'org', 'god-tierlist', 'scrims', 'arcade', 'feedback', 'support', 'features', 'referral', 'agl'])
 
 const STATIC_ROUTES = {
     '/': {
@@ -34,16 +36,16 @@ const STATIC_ROUTES = {
         keywords: 'SMITE 2 leagues, SMITE 2 competitive leagues, SMITE 2 esports leagues, SMITE 2 community leagues, SMITE 2 divisions',
     },
     '/leaderboard': {
-        title: `Passion Coin Leaderboard | ${SITE_NAME}`,
+        title: `Passion Leaderboard | ${SITE_NAME}`,
         description:
-            'See who has earned the most Passion Coins on SMITE 2 Companion. Climb the ranks from Clay to Deity and prove your dedication to competitive SMITE 2.',
-        keywords: 'SMITE 2 leaderboard, SMITE 2 Companion leaderboard, Passion Coins, SMITE 2 rankings',
+            'See who has earned the most Passion on SMITE 2 Companion. Climb the ranks from Clay to Deity and prove your dedication to competitive SMITE 2.',
+        keywords: 'SMITE 2 leaderboard, SMITE 2 Companion leaderboard, Passion, SMITE 2 rankings',
     },
     '/challenges': {
-        title: `Challenges - Earn Passion Coins | ${SITE_NAME}`,
+        title: `Challenges - Earn Passion | ${SITE_NAME}`,
         description:
-            'Complete challenges to earn Passion Coins and climb the ranks on SMITE 2 Companion. Daily challenges, achievement badges, and career milestones.',
-        keywords: 'SMITE 2 challenges, SMITE 2 achievements, Passion Coins, SMITE 2 Companion challenges',
+            'Complete challenges to earn Passion and climb the ranks on SMITE 2 Companion. Daily challenges, achievement badges, and career milestones.',
+        keywords: 'SMITE 2 challenges, SMITE 2 achievements, Passion, SMITE 2 Companion challenges',
     },
     '/twitch': {
         title: `Featured SMITE 2 Stream | ${SITE_NAME}`,
@@ -58,8 +60,44 @@ const STATIC_ROUTES = {
     },
     '/shop': {
         title: `Passion Shop | ${SITE_NAME}`,
-        description: 'Spend your Passion Coins in the SMITE 2 Companion shop.',
-        keywords: 'SMITE 2 Companion shop, Passion Coins',
+        description: 'Spend your Passion in the SMITE 2 Companion shop. Unlock cosmetics, badges, and rewards.',
+        keywords: 'SMITE 2 Companion shop, Passion, SMITE 2 rewards',
+    },
+    '/forge': {
+        title: `Fantasy Forge - SMITE 2 Player Investment Market | ${SITE_NAME}`,
+        description:
+            'Invest Sparks in competitive SMITE 2 players. Buy low, sell high as players perform. Track portfolios, climb leaderboards, and prove your scouting eye.',
+        keywords: 'Fantasy Forge, SMITE 2 fantasy, SMITE 2 player market, SMITE 2 investment, Sparks, SMITE 2 competitive',
+        image: FORGE_IMAGE,
+    },
+    '/god-tierlist': {
+        title: `SMITE 2 God Tier List - Rank Every God | ${SITE_NAME}`,
+        description:
+            'Create your personal SMITE 2 god tier list. Rank gods from S to F tier and share your rankings with the community.',
+        keywords: 'SMITE 2 god tier list, SMITE 2 tier list, SMITE 2 god rankings, SMITE 2 meta, best SMITE 2 gods',
+    },
+    '/scrims': {
+        title: `Scrim Planner - Find SMITE 2 Scrimmages | ${SITE_NAME}`,
+        description:
+            'Post and browse SMITE 2 scrim requests. Captains can challenge teams directly or post open scrims for any team to accept.',
+        keywords: 'SMITE 2 scrims, SMITE 2 scrimmage, SMITE 2 practice, SMITE 2 scrim finder',
+    },
+    '/arcade': {
+        title: `The Arcade - SMITE 2 Mini-Games | ${SITE_NAME}`,
+        description:
+            'Play SMITE 2 themed arcade games. Earn XP, compete with friends, and climb the leaderboard.',
+        keywords: 'SMITE 2 arcade, SMITE 2 mini-games, SMITE 2 games',
+    },
+    '/features': {
+        title: `Features - Everything on ${SITE_NAME}`,
+        description:
+            'Explore all features of SMITE 2 Companion: live standings, stats tracking, draft simulator, Fantasy Forge, tier lists, challenges, and more.',
+        keywords: 'SMITE 2 Companion features, SMITE 2 tools, SMITE 2 stats platform',
+    },
+    '/referral': {
+        title: `Refer a Friend | ${SITE_NAME}`,
+        description: 'Invite friends to SMITE 2 Companion and earn Passion rewards for both of you.',
+        keywords: 'SMITE 2 Companion referral, refer a friend, Passion rewards',
     },
 }
 
@@ -259,13 +297,82 @@ async function resolveDivisionTeam(apiBase, leagueSlug, divisionSlug, teamSlug, 
     }
 }
 
+// ── Forge resolver ──
+
+async function resolveForge(apiBase, segments, path) {
+    // /forge — static route handles base
+    // /forge/:leagueSlug — league-scoped forge
+    // /forge/:leagueSlug/:divisionSlug — division-scoped forge
+    // /forge/:leagueSlug/:divisionSlug/player/:playerSlug — player page
+    const subPages = new Set(['portfolio', 'leaderboard', 'challenges', 'wiki'])
+
+    if (segments.length < 2) return null // handled by static route
+
+    const leagueSlug = segments[1]
+    const league = await apiFetch(apiBase, 'leagues', { slug: leagueSlug })
+    const leagueName = league?.name || titleCase(leagueSlug)
+
+    // /forge/:leagueSlug/subpage
+    if (segments.length === 2 || (segments.length === 3 && subPages.has(segments[2]))) {
+        const sub = segments[2] ? ` - ${titleCase(segments[2])}` : ''
+        return {
+            title: `Fantasy Forge${sub} - ${leagueName} | ${SITE_NAME}`,
+            description: `Fantasy Forge player investment market for ${leagueName}. Buy and sell shares in competitive SMITE 2 players based on their performance.`,
+            keywords: `Fantasy Forge, ${leagueName}, SMITE 2 fantasy, player market, Sparks`,
+            image: FORGE_IMAGE,
+            url: `${SITE_URL}${path}`,
+        }
+    }
+
+    const divisionSlug = segments[2]
+    const division = league?.divisions?.find((d) => d.slug === divisionSlug)
+    const divisionName = division?.name || titleCase(divisionSlug)
+
+    // /forge/:leagueSlug/:divisionSlug/player/:playerSlug
+    if (segments[3] === 'player' && segments[4]) {
+        const profileData = await apiFetch(apiBase, 'player-profile', { slug: segments[4] })
+        const playerName = profileData?.player?.name || titleCase(segments[4])
+        return {
+            title: `${playerName} - Fantasy Forge (${divisionName}) | ${SITE_NAME}`,
+            description: `${playerName}'s Fantasy Forge page in ${divisionName} (${leagueName}). View spark price, bonding curve, trade history, and performance stats.`,
+            keywords: `${playerName}, Fantasy Forge, ${divisionName}, ${leagueName}, SMITE 2 player market`,
+            image: FORGE_IMAGE,
+            url: `${SITE_URL}${path}`,
+        }
+    }
+
+    // /forge/:leagueSlug/:divisionSlug or /forge/:leagueSlug/:divisionSlug/subpage
+    const sub = segments[3] && subPages.has(segments[3]) ? ` - ${titleCase(segments[3])}` : ''
+    return {
+        title: `Fantasy Forge${sub} - ${divisionName} (${leagueName}) | ${SITE_NAME}`,
+        description: `Fantasy Forge player market for ${divisionName} in ${leagueName}. Invest Sparks in players, track your portfolio, and climb the leaderboard.`,
+        keywords: `Fantasy Forge, ${divisionName}, ${leagueName}, SMITE 2 fantasy, player market`,
+        image: FORGE_IMAGE,
+        url: `${SITE_URL}${path}`,
+    }
+}
+
+// ── Org resolver ──
+
+async function resolveOrg(apiBase, orgSlug, path) {
+    const orgName = titleCase(orgSlug)
+    return {
+        title: `${orgName} - Organization | ${SITE_NAME}`,
+        description: `${orgName} organization page on SMITE 2 Companion. View all teams, divisions, and player rosters across seasons.`,
+        keywords: `${orgName}, SMITE 2 organization, SMITE 2 team, SMITE 2 esports`,
+        image: DEFAULT_IMAGE,
+        url: `${SITE_URL}${path}`,
+    }
+}
+
 // ── Main resolver ──
 
 async function resolveOGTags(apiBase, path) {
     if (STATIC_ROUTES[path]) {
+        const route = STATIC_ROUTES[path]
         return {
-            ...STATIC_ROUTES[path],
-            image: DEFAULT_IMAGE,
+            ...route,
+            image: route.image || DEFAULT_IMAGE,
             url: `${SITE_URL}${path}`,
         }
     }
@@ -284,6 +391,16 @@ async function resolveOGTags(apiBase, path) {
 
     if (segments[0] === 'profile' && segments[1]) {
         return resolvePlayerProfile(apiBase, segments[1], path)
+    }
+
+    if (segments[0] === 'forge') {
+        const result = await resolveForge(apiBase, segments, path)
+        if (result) return result
+        return { ...STATIC_ROUTES['/forge'], image: FORGE_IMAGE, url: `${SITE_URL}${path}` }
+    }
+
+    if (segments[0] === 'org' && segments[1]) {
+        return resolveOrg(apiBase, segments[1], path)
     }
 
     if (RESERVED_PATHS.has(segments[0])) {
@@ -324,15 +441,19 @@ async function resolveOGTags(apiBase, path) {
 function injectOGTags(html, tags) {
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(tags.title)}</title>`)
 
+    const imageAlt = tags.title.replace(` | ${SITE_NAME}`, '')
+
     const replacements = [
         [/(<meta property="og:title" content=")[^"]*"/, `$1${escapeAttr(tags.title)}"`],
         [/(<meta property="og:description" content=")[^"]*"/, `$1${escapeAttr(tags.description)}"`],
         [/(<meta property="og:url" content=")[^"]*"/, `$1${escapeAttr(tags.url)}"`],
         [/(<meta property="og:image" content=")[^"]*"/, `$1${escapeAttr(tags.image)}"`],
+        [/(<meta property="og:image:alt" content=")[^"]*"/, `$1${escapeAttr(imageAlt)}"`],
         [/(<meta name="description" content=")[^"]*"/, `$1${escapeAttr(tags.description)}"`],
         [/(<meta name="twitter:title" content=")[^"]*"/, `$1${escapeAttr(tags.title)}"`],
         [/(<meta name="twitter:description" content=")[^"]*"/, `$1${escapeAttr(tags.description)}"`],
         [/(<meta name="twitter:image" content=")[^"]*"/, `$1${escapeAttr(tags.image)}"`],
+        [/(<meta name="twitter:image:alt" content=")[^"]*"/, `$1${escapeAttr(imageAlt)}"`],
         [/(<link rel="canonical" href=")[^"]*"/, `$1${escapeAttr(tags.url)}"`],
     ]
 

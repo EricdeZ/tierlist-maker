@@ -291,7 +291,7 @@ export default function Challenges() {
     return (
         <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
             <Navbar title="Challenges" />
-            <PageTitle title="Challenges - Earn Passion Coins" description="Complete challenges to earn Passion Coins and climb the ranks on SMITE 2 Companion. Daily challenges, achievement badges, and career milestones." />
+            <PageTitle title="Challenges - Earn Passion" description="Complete challenges to earn Passion and climb the ranks on SMITE 2 Companion. Daily challenges, achievement badges, and career milestones." />
 
             <div className="max-w-5xl mx-auto px-4 pt-24 pb-8">
 

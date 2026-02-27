@@ -1,0 +1,47 @@
+{
+  "name": "SMITE 2 Companion",
+  "short_name": "SmiteComp",
+  "description": "Stats, standings & tools for competitive SMITE 2 leagues",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1923",
+  "theme_color": "#0f1923",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/smitecomp.png",
+      "sizes": "630x630",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Draft Simulator",
+      "short_name": "Draft",
+      "url": "/draft",
+      "description": "Practice SMITE 2 picks and bans",
+      "icons": [{ "src": "/smitecomp.png", "sizes": "630x630", "type": "image/png" }]
+    },
+    {
+      "name": "Fantasy Forge",
+      "short_name": "Forge",
+      "url": "/forge",
+      "description": "Invest in competitive SMITE 2 players",
+      "icons": [{ "src": "/forge.png", "sizes": "512x512", "type": "image/png" }]
+    },
+    {
+      "name": "Leaderboard",
+      "short_name": "Rankings",
+      "url": "/leaderboard",
+      "description": "Passion leaderboard rankings"
+    },
+    {
+      "name": "Browse Leagues",
+      "short_name": "Leagues",
+      "url": "/leagues",
+      "description": "Browse all competitive SMITE 2 leagues"
+    }
+  ],
+  "categories": ["games", "sports", "entertainment"]
+}
