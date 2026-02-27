@@ -11,7 +11,7 @@ export const FORGE_CONFIG = {
     SUPPLY_FACTOR: 0.02,       // 2% price increase per outstanding Spark
     COOLING_TAX: 0.10,         // 10% fee on selling
     PRICE_FLOOR: 10,
-    SELL_PRESSURE_HALF_LIFE: 2, // days for sell pressure to halve
+    SELL_PRESSURE_HALF_LIFE: 1, // days for sell pressure to halve
     SELL_PRESSURE_FACTOR: 0.02, // price depression per unit of sell pressure
 }
 
