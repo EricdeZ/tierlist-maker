@@ -361,6 +361,20 @@ export default function FantasyForge() {
                     setUserTeamId(null)
                     setFreeSparksRemaining(freeRemaining)
                     setReferralSparksAvailable(refAvail)
+                    // Batch-load sparkline history (chunk into groups of 50)
+                    if (allPlayers.length > 0) {
+                        const ids = allPlayers.map(p => p.sparkId)
+                        const chunks = []
+                        for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50))
+                        Promise.all(chunks.map(c => forgeService.getBatchHistory(c).catch(() => ({ histories: {} })))).then(results => {
+                            const hist = {}
+                            for (const r of results) Object.assign(hist, r.histories || {})
+                            setPlayers(prev => prev.map(p => ({
+                                ...p,
+                                historyData: (hist[p.sparkId] || []).map(h => h.price),
+                            })))
+                        })
+                    }
                 } else if (activeTab === 'portfolio') {
                     if (!user) { setLoading(false); return }
                     const results = await Promise.all(leagueSeasons.map(s => forgeService.getPortfolio(s.id).catch(() => null)))
@@ -450,10 +464,22 @@ export default function FantasyForge() {
                 if (activeTab === 'market') {
                     const data = await forgeService.getMarket(seasonId)
                     setMarket(data.market)
-                    setPlayers(data.players || [])
+                    const marketPlayers = data.players || []
+                    setPlayers(marketPlayers)
                     setUserTeamId(data.userTeamId || null)
                     setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
                     setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
+                    // Batch-load sparkline history for player list
+                    if (marketPlayers.length > 0) {
+                        const ids = marketPlayers.map(p => p.sparkId)
+                        forgeService.getBatchHistory(ids).then(res => {
+                            const hist = res.histories || {}
+                            setPlayers(prev => prev.map(p => ({
+                                ...p,
+                                historyData: (hist[p.sparkId] || []).map(h => h.price),
+                            })))
+                        }).catch(() => {})
+                    }
                 } else if (activeTab === 'portfolio') {
                     if (!user) { setLoading(false); return }
                     const data = await forgeService.getPortfolio(seasonId)
