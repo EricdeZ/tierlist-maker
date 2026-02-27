@@ -8,10 +8,11 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
     const [mode, setMode] = useState('total') // 'total' | 'realized'
 
     const sorted = useMemo(() => {
-        if (mode === 'total') return leaderboard
-        return [...leaderboard]
-            .sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0))
-            .map((e, i) => ({ ...e, position: i + 1 }))
+        const list = [...leaderboard]
+        if (mode === 'realized') {
+            list.sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0))
+        }
+        return list.slice(0, 50).map((e, i) => ({ ...e, position: i + 1 }))
     }, [leaderboard, mode])
 
     if (loading) {

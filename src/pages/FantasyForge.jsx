@@ -458,7 +458,7 @@ export default function FantasyForge() {
                             userMap[entry.userId].totalSparks += entry.totalSparks
                         }
                     }
-                    const merged = Object.values(userMap).sort((a, b) => b.totalProfit - a.totalProfit).slice(0, 50)
+                    const merged = Object.values(userMap).sort((a, b) => b.totalProfit - a.totalProfit)
                     merged.forEach((e, i) => e.position = i + 1)
                     setLeaderboard(merged)
                 }

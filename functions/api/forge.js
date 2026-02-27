@@ -668,15 +668,15 @@ async function getLeaderboard(sql, params) {
         FULL OUTER JOIN user_transactions ut ON uh.user_id = ut.user_id
         JOIN users u ON COALESCE(uh.user_id, ut.user_id) = u.id
         LEFT JOIN players pl ON u.linked_player_id = pl.id
-        ORDER BY total_profit DESC
-        LIMIT 50
     `
 
     return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-            leaderboard: leaders.map((l, i) => ({
+            leaderboard: leaders
+                .sort((a, b) => b.total_profit - a.total_profit)
+                .map((l, i) => ({
                 position: i + 1,
                 userId: l.user_id,
                 username: l.discord_username,
