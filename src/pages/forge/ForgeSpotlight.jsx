@@ -83,9 +83,14 @@ export default function ForgeSpotlight({
                         {player.playerName}
                     </div>
                     <div className="flex items-center gap-1 text-[10px] text-white/70">
-                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={11} color={teamColor} />
-                        <span className="truncate">{player.teamName}</span>
-                        {player.isFreeAgent && <span className="opacity-50">FA</span>}
+                        {player.isFreeAgent ? (
+                            <span className="opacity-50">Free Agent</span>
+                        ) : (
+                            <>
+                                <TeamLogo slug={player.teamSlug} name={player.teamName} size={11} color={teamColor} />
+                                <span className="truncate">{player.teamName}</span>
+                            </>
+                        )}
                         {player.role && <span className="opacity-60">· {player.role}</span>}
                     </div>
                 </div>

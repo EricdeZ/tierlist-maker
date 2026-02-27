@@ -150,12 +150,13 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                     </div>
                     {/* Desktop: team + role + perf on one line */}
                     <div className="hidden sm:flex text-[0.85rem] text-[var(--forge-text-dim)] items-center gap-1 mt-px overflow-hidden">
-                        <TeamLogo slug={player.teamSlug} name={player.teamName} size={14} color={player.teamColor} className="flex-shrink-0" />
-                        <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
-                        {player.isFreeAgent && (
-                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
-                                FA
-                            </span>
+                        {player.isFreeAgent ? (
+                            <span className="forge-head text-[0.7rem] font-semibold tracking-wider text-[var(--forge-text-dim)] opacity-70 flex-shrink-0">Free Agent</span>
+                        ) : (
+                            <>
+                                <TeamLogo slug={player.teamSlug} name={player.teamName} size={14} color={player.teamColor} className="flex-shrink-0" />
+                                <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                            </>
                         )}
                         {isLeagueWide && player.divisionName && (
                             <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
@@ -174,12 +175,13 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                     {/* Mobile: team on line 1, role + perf on line 2 */}
                     <div className="sm:hidden text-[0.75rem] text-[var(--forge-text-dim)]">
                         <div className="flex items-center gap-1 overflow-hidden">
-                            <TeamLogo slug={player.teamSlug} name={player.teamName} size={13} color={player.teamColor} className="flex-shrink-0" />
-                            <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
-                            {player.isFreeAgent && (
-                                <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-0.5 flex-shrink-0">
-                                    FA
-                                </span>
+                            {player.isFreeAgent ? (
+                                <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] opacity-70 flex-shrink-0">Free Agent</span>
+                            ) : (
+                                <>
+                                    <TeamLogo slug={player.teamSlug} name={player.teamName} size={13} color={player.teamColor} className="flex-shrink-0" />
+                                    <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                                </>
                             )}
                             {isLeagueWide && player.divisionName && (
                                 <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-0.5 flex-shrink-0">

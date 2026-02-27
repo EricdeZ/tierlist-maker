@@ -297,7 +297,9 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                             {/* Heat bar */}
                             <div className="w-1 h-10 rounded-sm forge-heat-bar hidden sm:block" />
 
-                            <TeamLogo slug={h.teamSlug} name={h.teamName} size={28} color={h.teamColor} />
+                            {!h.isFreeAgent && (
+                                <TeamLogo slug={h.teamSlug} name={h.teamName} size={28} color={h.teamColor} />
+                            )}
 
                             <div className="flex-1 min-w-0">
                                 <div className="forge-body font-bold text-sm sm:text-base truncate">
@@ -313,11 +315,10 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                     ) : h.playerName}
                                 </div>
                                 <div className="text-xs sm:text-sm text-[var(--forge-text-dim)] flex items-center gap-1 flex-wrap">
-                                    <span style={{ color: h.teamColor }} className="truncate">{h.teamName}</span>
-                                    {h.isFreeAgent && (
-                                        <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
-                                            FA
-                                        </span>
+                                    {h.isFreeAgent ? (
+                                        <span className="forge-head text-[0.7rem] font-semibold tracking-wider opacity-70">Free Agent</span>
+                                    ) : (
+                                        <span style={{ color: h.teamColor }} className="truncate">{h.teamName}</span>
                                     )}
                                     {isLeagueWide && h.divisionName && (
                                         <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
