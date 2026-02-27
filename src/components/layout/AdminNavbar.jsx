@@ -34,6 +34,7 @@ const morePages = [
     { path: '/admin/auditlog',       label: 'Audit Log',       permission: 'audit_log_view' },
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },
     { path: '/admin/feedback',       label: 'Feedback',        permission: 'feedback_manage', globalOnly: true },
+    { path: '/admin/settings',       label: 'My Settings',     permission: null },
 ]
 
 export default function AdminNavbar() {

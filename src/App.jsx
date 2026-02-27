@@ -71,7 +71,9 @@ import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
 import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
+import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import Features from "./pages/Features.jsx";
+import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -88,6 +90,9 @@ function App() {
                 <ScrollToTop />
                 <ErrorBoundary>
                     <Routes>
+                        {/* Stream overlay — standalone, no app chrome */}
+                        <Route path="snooz/:week" element={<SnoozOverlay />} />
+
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector */}
                             <Route index element={<Homepage />} />
@@ -96,6 +101,7 @@ function App() {
                             <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLayout /></ProtectedRoute>}>
                                 <Route index element={<AdminLanding />} />
                                 <Route path="matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
+                                <Route path="matchreport/:scheduledMatchId" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
                                 <Route path="rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
                                 <Route path="matches" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
                                 <Route path="matches/:matchId" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
@@ -120,6 +126,7 @@ function App() {
                                 <Route path="leaguestaff" element={<ProtectedRoute requiredPermission="league_staff_manage"><LeagueStaff /></ProtectedRoute>} />
                                 <Route path="roster-sync" element={<ProtectedRoute requiredPermission="roster_manage"><DiscordRosterSync /></ProtectedRoute>} />
                                 <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
+                                <Route path="settings" element={<StaffSettings />} />
                             </Route>
 
                             {/* Codex pages (nested under CodexLayout with shared navbar) */}

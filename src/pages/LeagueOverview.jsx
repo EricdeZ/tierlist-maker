@@ -275,7 +275,7 @@ const LeagueOverview = () => {
                 ref={heroRef}
                 onMouseMove={handleHeroMove}
                 onMouseLeave={handleHeroLeave}
-                className="relative min-h-[80vh] flex items-center justify-center px-4 overflow-hidden"
+                className="relative min-h-[80vh] flex items-center justify-center px-4 pt-20 overflow-hidden"
             >
                 {/* BG Layer 1: Painted gradient blobs — like Predictions */}
                 <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 90% 50% at 50% 8%, ${leagueColor}30, transparent 65%)` }} />

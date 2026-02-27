@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Users, Search, Trash2, UserPlus } from 'lucide-react'
+import { Users, Search, Trash2, UserPlus, Settings2 } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 
@@ -16,6 +16,9 @@ export default function LeagueStaff() {
     const [adding, setAdding] = useState(null)
     const [confirmRemove, setConfirmRemove] = useState(null)
     const [toast, setToast] = useState(null)
+    const [editingDivisions, setEditingDivisions] = useState(null)
+    const [pendingDivisions, setPendingDivisions] = useState([])
+    const [savingDivisions, setSavingDivisions] = useState(false)
     const searchTimeout = useRef(null)
 
     const showToast = useCallback((type, message) => {
@@ -110,6 +113,39 @@ export default function LeagueStaff() {
         }
     }
 
+    const openDivisionEditor = (assignmentId) => {
+        const current = (data?.divisionAccess || [])
+            .filter(da => da.user_role_id === assignmentId)
+            .map(da => da.division_id)
+        setPendingDivisions(current)
+        setEditingDivisions(assignmentId)
+    }
+
+    const handleSaveDivisions = async () => {
+        setSavingDivisions(true)
+        try {
+            const res = await fetch(`${API}/league-staff`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    action: 'set-divisions',
+                    assignment_id: editingDivisions,
+                    division_ids: pendingDivisions,
+                }),
+            })
+            const d = await res.json()
+            if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
+            showToast('success', 'Division access updated')
+            setEditingDivisions(null)
+            fetchData()
+        } catch (e) {
+            showToast('error', e.message)
+        } finally {
+            setSavingDivisions(false)
+        }
+    }
+
+    const leagueDivisions = (data?.divisions || []).filter(d => d.league_id === selectedLeagueId)
     const leagueStaff = data?.staff?.filter(s => s.league_id === selectedLeagueId) || []
     const leagueAdmins = data?.admins?.filter(a => a.league_id === selectedLeagueId) || []
     const allMemberIds = new Set([...leagueStaff.map(s => s.user_id), ...leagueAdmins.map(a => a.user_id)])
@@ -255,35 +291,107 @@ export default function LeagueStaff() {
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {leagueStaff.map(s => (
-                                    <div key={s.assignment_id}
-                                        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-(--color-secondary) border border-white/5 hover:border-white/10 transition-colors">
-                                        {avatarUrl(s.discord_id, s.discord_avatar) ? (
-                                            <img src={avatarUrl(s.discord_id, s.discord_avatar)} alt=""
-                                                className="w-9 h-9 rounded-full" />
-                                        ) : (
-                                            <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-xs text-(--color-text-secondary)">
-                                                {s.discord_username?.[0]?.toUpperCase() || '?'}
+                                {leagueStaff.map(s => {
+                                    const staffDivs = (data?.divisionAccess || []).filter(da => da.user_role_id === s.assignment_id)
+                                    const isEditing = editingDivisions === s.assignment_id
+                                    return (
+                                        <div key={s.assignment_id}
+                                            className="rounded-xl bg-(--color-secondary) border border-white/5 hover:border-white/10 transition-colors">
+                                            <div className="flex items-center gap-3 px-4 py-3">
+                                                {avatarUrl(s.discord_id, s.discord_avatar) ? (
+                                                    <img src={avatarUrl(s.discord_id, s.discord_avatar)} alt=""
+                                                        className="w-9 h-9 rounded-full" />
+                                                ) : (
+                                                    <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-xs text-(--color-text-secondary)">
+                                                        {s.discord_username?.[0]?.toUpperCase() || '?'}
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-(--color-text) truncate">
+                                                        {s.discord_username}
+                                                    </div>
+                                                    <div className="text-xs text-(--color-text-secondary)">
+                                                        Added {new Date(s.created_at).toLocaleDateString()}
+                                                        {s.granted_by_username && <> by {s.granted_by_username}</>}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                                        {staffDivs.length === 0 ? (
+                                                            <span className="text-xs text-green-400/70">All Divisions</span>
+                                                        ) : (
+                                                            staffDivs.map(da => {
+                                                                const div = leagueDivisions.find(d => d.id === da.division_id)
+                                                                return div ? (
+                                                                    <span key={da.division_id}
+                                                                        className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300/80">
+                                                                        {div.name}
+                                                                    </span>
+                                                                ) : null
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {leagueDivisions.length > 0 && (
+                                                    <button
+                                                        onClick={() => isEditing ? setEditingDivisions(null) : openDivisionEditor(s.assignment_id)}
+                                                        className={`p-2 rounded-lg transition-colors ${isEditing
+                                                            ? 'text-amber-400 bg-amber-500/10'
+                                                            : 'text-(--color-text-secondary) hover:text-amber-400 hover:bg-amber-500/10'}`}
+                                                        title="Edit division access"
+                                                    >
+                                                        <Settings2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => setConfirmRemove({ assignment_id: s.assignment_id, username: s.discord_username })}
+                                                    className="p-2 rounded-lg text-(--color-text-secondary) hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                    title="Remove staff member"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-medium text-(--color-text) truncate">
-                                                {s.discord_username}
-                                            </div>
-                                            <div className="text-xs text-(--color-text-secondary)">
-                                                Added {new Date(s.created_at).toLocaleDateString()}
-                                                {s.granted_by_username && <> by {s.granted_by_username}</>}
-                                            </div>
+
+                                            {isEditing && (
+                                                <div className="px-4 pb-3 pt-1 border-t border-white/5">
+                                                    <div className="text-xs font-medium text-(--color-text-secondary) mb-2">Division Access</div>
+                                                    <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                                        <input type="checkbox"
+                                                            checked={pendingDivisions.length === 0}
+                                                            onChange={() => setPendingDivisions([])}
+                                                            className="rounded accent-amber-500" />
+                                                        <span className="text-sm text-(--color-text)">All Divisions</span>
+                                                    </label>
+                                                    <div className="grid grid-cols-2 gap-1 ml-1">
+                                                        {leagueDivisions.map(d => (
+                                                            <label key={d.id} className="flex items-center gap-2 cursor-pointer py-0.5">
+                                                                <input type="checkbox"
+                                                                    checked={pendingDivisions.includes(d.id)}
+                                                                    onChange={() => {
+                                                                        setPendingDivisions(prev =>
+                                                                            prev.includes(d.id)
+                                                                                ? prev.filter(id => id !== d.id)
+                                                                                : [...prev, d.id]
+                                                                        )
+                                                                    }}
+                                                                    className="rounded accent-amber-500" />
+                                                                <span className="text-sm text-(--color-text)">{d.name}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex gap-2 mt-3">
+                                                        <button onClick={handleSaveDivisions} disabled={savingDivisions}
+                                                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 transition-colors">
+                                                            {savingDivisions ? 'Saving...' : 'Save'}
+                                                        </button>
+                                                        <button onClick={() => setEditingDivisions(null)}
+                                                            className="px-3 py-1.5 rounded-lg text-xs text-(--color-text-secondary) bg-white/5 hover:bg-white/10 transition-colors">
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <button
-                                            onClick={() => setConfirmRemove({ assignment_id: s.assignment_id, username: s.discord_username })}
-                                            className="p-2 rounded-lg text-(--color-text-secondary) hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                            title="Remove staff member"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>

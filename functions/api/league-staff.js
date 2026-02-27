@@ -58,7 +58,23 @@ const handler = async (event) => {
                 ORDER BY u.id, ur.league_id, r.is_system DESC
             ` : []
 
-            return { statusCode: 200, headers, body: JSON.stringify({ leagues, staff, admins }) }
+            // Divisions for each league (for division-scoping UI)
+            const divisions = leagueIds.length > 0 ? await sql`
+                SELECT id, league_id, name, slug, tier
+                FROM divisions
+                WHERE league_id = ANY(${leagueIds})
+                ORDER BY league_id, tier ASC NULLS LAST, name ASC
+            ` : []
+
+            // Division access restrictions for staff
+            const staffRoleIds = staff.map(s => s.assignment_id)
+            const divisionAccess = staffRoleIds.length > 0 ? await sql`
+                SELECT user_role_id, division_id
+                FROM staff_division_access
+                WHERE user_role_id = ANY(${staffRoleIds})
+            ` : []
+
+            return { statusCode: 200, headers, body: JSON.stringify({ leagues, staff, admins, divisions, divisionAccess }) }
         }
 
         // ─── POST: actions ───
@@ -115,10 +131,6 @@ const handler = async (event) => {
                     return { statusCode: 409, headers, body: JSON.stringify({ error: 'User is already staff for this league' }) }
                 }
 
-                if (user_id === admin.id) {
-                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot add yourself as staff' }) }
-                }
-
                 const [assignment] = await sql`
                     INSERT INTO user_roles (user_id, role_id, league_id, granted_by)
                     VALUES (${user_id}, ${staffRole.id}, ${league_id}, ${admin.id})
@@ -171,6 +183,66 @@ const handler = async (event) => {
                     targetType: 'user_role',
                     targetId: assignment_id,
                     details: { user_id: assignment.user_id, league_id: assignment.league_id },
+                })
+
+                return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+            }
+
+            case 'set-divisions': {
+                const { assignment_id, division_ids } = body
+                if (!assignment_id) {
+                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'assignment_id required' }) }
+                }
+                if (!Array.isArray(division_ids)) {
+                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'division_ids must be an array' }) }
+                }
+
+                const [staffRole3] = await sql`SELECT id FROM roles WHERE name = 'League Staff' AND is_system = true`
+                if (!staffRole3) {
+                    return { statusCode: 500, headers, body: JSON.stringify({ error: 'League Staff role not found' }) }
+                }
+
+                const [assignment] = await sql`
+                    SELECT ur.id, ur.user_id, ur.league_id
+                    FROM user_roles ur
+                    WHERE ur.id = ${assignment_id} AND ur.role_id = ${staffRole3.id}
+                `
+                if (!assignment) {
+                    return { statusCode: 404, headers, body: JSON.stringify({ error: 'Staff assignment not found' }) }
+                }
+
+                const canManage = await requirePermission(event, 'league_staff_manage', assignment.league_id)
+                if (!canManage) {
+                    return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+                }
+
+                // Validate division_ids belong to this league
+                if (division_ids.length > 0) {
+                    const valid = await sql`
+                        SELECT id FROM divisions
+                        WHERE id = ANY(${division_ids}) AND league_id = ${assignment.league_id}
+                    `
+                    if (valid.length !== division_ids.length) {
+                        return { statusCode: 400, headers, body: JSON.stringify({ error: 'One or more divisions do not belong to this league' }) }
+                    }
+                }
+
+                // Replace: delete all existing, insert new
+                await sql`DELETE FROM staff_division_access WHERE user_role_id = ${assignment_id}`
+                if (division_ids.length > 0) {
+                    await sql`
+                        INSERT INTO staff_division_access (user_role_id, division_id)
+                        SELECT ${assignment_id}, unnest(${division_ids}::int[])
+                    `
+                }
+
+                await logAudit(sql, admin, {
+                    action: 'set-staff-divisions',
+                    endpoint: 'league-staff',
+                    leagueId: assignment.league_id,
+                    targetType: 'user_role',
+                    targetId: assignment_id,
+                    details: { user_id: assignment.user_id, division_ids },
                 })
 
                 return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }

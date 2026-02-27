@@ -7,7 +7,7 @@
  * 3. Scheduled match lookup → match team(s) + division + date proximity
  */
 
-import { sendWebhook } from './discord.js'
+import { sendWebhook, sendDM } from './discord.js'
 import { FEATURE_FLAGS } from '../../src/config/featureFlags.js'
 
 /**
@@ -287,6 +287,67 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
                     timestamp: new Date().toISOString(),
                 }],
             }).catch(err => console.error('discord-match: webhook failed:', err.message))
+        }
+    }
+
+    // 6. Send DM notifications to staff with match_report permission for this division
+    if (matchedScheduleIds.size > 0) {
+        try {
+            const [divRow] = await sql`
+                SELECT d.id as division_id, d.league_id, d.name as division_name
+                FROM divisions d WHERE d.id = ${channel.division_id}
+            `
+            if (divRow) {
+                // League Staff role members for this league, DMs enabled,
+                // and no division restriction excluding this division
+                const staffToNotify = await sql`
+                    SELECT DISTINCT u.discord_id, u.discord_username
+                    FROM user_roles ur
+                    JOIN roles r ON r.id = ur.role_id AND r.name = 'League Staff' AND r.is_system = true
+                    JOIN users u ON u.id = ur.user_id
+                    LEFT JOIN staff_notification_prefs snp ON snp.user_id = u.id
+                        AND (snp.league_id = ${divRow.league_id} OR snp.league_id IS NULL)
+                    WHERE ur.league_id = ${divRow.league_id}
+                      AND COALESCE(snp.notify_match_report, true) = true
+                      AND NOT EXISTS (
+                          SELECT 1 FROM staff_division_access sda
+                          WHERE sda.user_role_id = ur.id
+                          HAVING COUNT(*) > 0
+                             AND COUNT(*) FILTER (WHERE sda.division_id = ${divRow.division_id}) = 0
+                      )
+                `
+
+                for (const smId of matchedScheduleIds) {
+                    const sm = scheduledMatches.find(m => m.id === smId)
+                    if (!sm) continue
+
+                    const [countRow] = await sql`
+                        SELECT COUNT(*) as count FROM discord_queue
+                        WHERE suggested_match_id = ${smId} AND status = 'pending'
+                    `
+
+                    const reportUrl = `https://smitecomp.com/admin/matchreport/${smId}`
+                    const weekStr = sm.week ? ` — Week ${sm.week}` : ''
+                    const screenshots = countRow?.count || '?'
+                    const screenshotLabel = `${screenshots} screenshot${screenshots !== 1 ? 's' : ''}`
+
+                    const content = [
+                        `\`\`\`ansi`,
+                        `\u001b[1;33m⚡ Match Ready to Report\u001b[0m`,
+                        ``,
+                        `\u001b[1;37m${sm.team1_name}\u001b[0m \u001b[2;37mvs\u001b[0m \u001b[1;37m${sm.team2_name}\u001b[0m${weekStr}`,
+                        `\u001b[0;36m${divRow.division_name}\u001b[0m · \u001b[0;32m${screenshotLabel}\u001b[0m`,
+                        `\`\`\``,
+                        `<${reportUrl}>`,
+                    ].join('\n')
+
+                    for (const staff of staffToNotify) {
+                        sendDM(staff.discord_id, { content }).catch(() => {})
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('discord-match: staff DM notifications failed:', err.message)
         }
     }
 }

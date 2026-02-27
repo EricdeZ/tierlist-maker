@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers, adminHeaders } from '../lib/db.js'
 import { requireAuth, requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { sendDM } from '../lib/discord.js'
 
 const DAILY_LIMIT = 5
 const COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -176,6 +177,60 @@ async function submitReport(sql, event, { match_id, category, details }) {
         VALUES (${user.id}, ${match_id}, ${category}, ${details.trim()})
         RETURNING id, created_at
     `
+
+    // Fire-and-forget: DM staff about the new data report
+    const dmPromise = (async () => {
+        try {
+            // Resolve match → season → division → league
+            const [matchInfo] = await sql`
+                SELECT m.id, t1.name as team1_name, t2.name as team2_name,
+                       d.id as division_id, d.name as division_name, d.league_id
+                FROM matches m
+                JOIN seasons s ON m.season_id = s.id
+                JOIN divisions d ON s.division_id = d.id
+                JOIN teams t1 ON m.team1_id = t1.id
+                JOIN teams t2 ON m.team2_id = t2.id
+                WHERE m.id = ${match_id}
+            `
+            if (!matchInfo) return
+
+            const staffToNotify = await sql`
+                SELECT DISTINCT u.discord_id
+                FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id AND r.name = 'League Staff' AND r.is_system = true
+                JOIN users u ON u.id = ur.user_id
+                LEFT JOIN staff_notification_prefs snp ON snp.user_id = u.id
+                    AND (snp.league_id = ${matchInfo.league_id} OR snp.league_id IS NULL)
+                WHERE ur.league_id = ${matchInfo.league_id}
+                  AND COALESCE(snp.notify_data_report, true) = true
+                  AND NOT EXISTS (
+                      SELECT 1 FROM staff_division_access sda
+                      WHERE sda.user_role_id = ur.id
+                      HAVING COUNT(*) > 0
+                         AND COUNT(*) FILTER (WHERE sda.division_id = ${matchInfo.division_id}) = 0
+                  )
+            `
+
+            const categoryLabel = category.replace(/_/g, ' ')
+            const content = [
+                '```ansi',
+                '\u001b[1;31m📋 New Data Report\u001b[0m',
+                '',
+                `\u001b[1;37m${matchInfo.team1_name}\u001b[0m \u001b[2;37mvs\u001b[0m \u001b[1;37m${matchInfo.team2_name}\u001b[0m`,
+                `\u001b[0;36m${matchInfo.division_name}\u001b[0m · \u001b[0;33m${categoryLabel}\u001b[0m`,
+                '```',
+                `<https://smitecomp.com/admin/data-reports>`,
+            ].join('\n')
+
+            for (const staff of staffToNotify) {
+                sendDM(staff.discord_id, { content }).catch(() => {})
+            }
+        } catch (err) {
+            console.error('data-reports: staff DM notifications failed:', err.message)
+        }
+    })()
+
+    if (event.waitUntil) event.waitUntil(dmPromise)
 
     return {
         statusCode: 200,

@@ -15,7 +15,7 @@ import ChallengeNudge from '../ChallengeNudge'
 import GlobalToast from '../GlobalToast'
 
 const AppLayout = () => {
-    const { user, loading, notification, clearNotification } = useAuth()
+    const { user, loading, notification, clearNotification, impersonating, realUser, stopImpersonation } = useAuth()
     const location = useLocation()
 
     // League and division pages render their own navbar with UserMenu,
@@ -27,6 +27,21 @@ const AppLayout = () => {
     return (
         <SidebarProvider>
             <div className="min-h-screen bg-(--color-primary) text-(--color-text)">
+                {impersonating && (
+                    <div className="fixed top-0 left-0 right-0 z-[200] bg-amber-600 text-white text-center text-sm font-medium py-1.5 px-4 flex items-center justify-center gap-3">
+                        <span>
+                            Viewing as <strong>{user?.discord_username}</strong>
+                            {realUser && <span className="opacity-75"> (logged in as {realUser.discord_username})</span>}
+                        </span>
+                        <button
+                            onClick={stopImpersonation}
+                            className="px-2.5 py-0.5 rounded bg-red-700 hover:bg-red-800 text-xs font-semibold transition-colors"
+                        >
+                            Stop
+                        </button>
+                    </div>
+                )}
+                {impersonating && <div className="h-9" />}
                 <SidebarTrigger hideOnSmall={hasOwnNav} />
                 <GlobalSidebar />
                 {/* Global user menu — top right, hidden on pages with their own navbar */}

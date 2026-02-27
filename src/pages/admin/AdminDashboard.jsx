@@ -1,5 +1,6 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
 import DraggablePanel from '../../components/admin/DraggablePanel'
 import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
@@ -10,6 +11,9 @@ import { ErrorBanner } from './dashboard/FormControls'
 import { MatchReportCard } from './dashboard/MatchReportCard'
 
 export default function AdminDashboard() {
+    const { scheduledMatchId } = useParams()
+    const navigate = useNavigate()
+    const autoStartedRef = useRef(false)
     const [matchReports, setMatchReports] = useState(() => loadStorage())
     const [submitting, setSubmitting] = useState({}) // { [mrId]: true }
     const [submitResults, setSubmitResults] = useState({}) // { [mrId]: { success, error, data } }
@@ -167,6 +171,17 @@ export default function AdminDashboard() {
             setReadyMatchLoading(false)
         }
     }, [selectedSeasonId, fetchReadyMatches])
+
+    // Auto-open match report from URL param (e.g. /admin/matchreport/123)
+    useEffect(() => {
+        if (!scheduledMatchId || autoStartedRef.current || !readyMatches.length) return
+        const match = readyMatches.find(rm => rm.id === Number(scheduledMatchId))
+        if (match) {
+            autoStartedRef.current = true
+            startReadyReport(match)
+            navigate('/admin/matchreport', { replace: true })
+        }
+    }, [scheduledMatchId, readyMatches, startReadyReport, navigate])
 
     // ─── Start a forfeit report (skip screenshots) ───
     const startForfeitReport = useCallback((readyMatch) => {
