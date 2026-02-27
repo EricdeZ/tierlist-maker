@@ -381,9 +381,10 @@ export async function executeCool(tx, userId, sparkId, numSparks) {
     const costBasis = Number(holding.total_invested) * (numSparks / holding.sparks)
     const profit = netProceeds - Math.round(costBasis)
 
-    // Grant Passion (net of tax)
+    // Grant Passion (net of tax) — only profit counts toward lifetime/leaderboard
     await grantPassion(tx, userId, 'forge_cool', netProceeds,
-        `Cooled player (${numSparks} Spark${numSparks > 1 ? 's' : ''}, ${coolingTax} tax)`, String(sparkId))
+        `Cooled player (${numSparks} Spark${numSparks > 1 ? 's' : ''}, ${coolingTax} tax)`, String(sparkId),
+        Math.max(0, profit))
 
     // Update player_sparks (store new sell pressure)
     const newTotalSparks = stock.total_sparks - numSparks
@@ -891,14 +892,15 @@ export async function liquidateMarket(sql, marketId) {
         const proceeds = regularProceeds + freeProfit
         const totalProfit = proceeds - Math.round(Number(h.total_invested)) + freeCostBasis
 
-        // Grant Passion (no tax on liquidation)
+        // Grant Passion (no tax on liquidation) — only profit counts toward lifetime/leaderboard
         if (proceeds > 0) {
             const freeLabel = [
                 tutorialSparks && `${tutorialSparks} tutorial`,
                 referralSparks && `${referralSparks} referral`,
             ].filter(Boolean).join(', ')
             await grantPassion(sql, h.user_id, 'forge_liquidate', proceeds,
-                `Season ended — auto-liquidated ${h.sparks} Spark${h.sparks > 1 ? 's' : ''}${freeLabel ? ` (${freeLabel})` : ''}`, String(h.spark_id))
+                `Season ended — auto-liquidated ${h.sparks} Spark${h.sparks > 1 ? 's' : ''}${freeLabel ? ` (${freeLabel})` : ''}`, String(h.spark_id),
+                Math.max(0, totalProfit))
         }
 
         // Record transaction

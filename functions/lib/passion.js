@@ -84,9 +84,10 @@ export function formatRank(rank) {
  * @param {number} amount - positive to earn, negative to spend
  * @param {string} description
  * @param {string|null} referenceId
+ * @param {number|null} lifetimeAmount - if set, only this much counts toward total_earned (for forge: profit only)
  * @returns {{ balance, totalEarned, totalSpent }} updated balances
  */
-export async function grantPassion(sql, userId, type, amount, description, referenceId = null) {
+export async function grantPassion(sql, userId, type, amount, description, referenceId = null, lifetimeAmount = null) {
     // Ensure the balance row exists
     await sql`
         INSERT INTO passion_balances (user_id)
@@ -94,14 +95,15 @@ export async function grantPassion(sql, userId, type, amount, description, refer
         ON CONFLICT (user_id) DO NOTHING
     `
 
-    // Insert the transaction
+    // Insert the transaction (lifetime_amount tracks what counts toward leaderboard, e.g. profit-only for forge)
     await sql`
-        INSERT INTO passion_transactions (user_id, amount, type, description, reference_id)
-        VALUES (${userId}, ${amount}, ${type}, ${description}, ${referenceId})
+        INSERT INTO passion_transactions (user_id, amount, type, description, reference_id, lifetime_amount)
+        VALUES (${userId}, ${amount}, ${type}, ${description}, ${referenceId}, ${lifetimeAmount})
     `
 
     // Update balance
-    const earnDelta = amount > 0 ? amount : 0
+    const earnBase = lifetimeAmount !== null ? lifetimeAmount : amount
+    const earnDelta = earnBase > 0 ? earnBase : 0
     const spendDelta = amount < 0 ? Math.abs(amount) : 0
 
     const [updated] = await sql`
