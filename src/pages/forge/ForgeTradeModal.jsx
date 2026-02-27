@@ -53,6 +53,11 @@ export default function ForgeTradeModal({
                         }
                         <TeamLogo slug={player.teamSlug} name={player.teamName} size={20} color={player.teamColor} />
                         {isFuel ? 'Fuel' : 'Cool'} {player.playerName}
+                        {player.isFreeAgent && (
+                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
+                                FA
+                            </span>
+                        )}
                     </h3>
                     <button onClick={onClose} className="p-1 hover:bg-white/5 rounded transition-colors">
                         <X size={18} />
