@@ -159,6 +159,23 @@ function defaults(path) {
     }
 }
 
+function breadcrumbList(items) {
+    return {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: items.map((item, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: item.name,
+            item: item.url,
+        })),
+    }
+}
+
+const HOME_CRUMB = { name: 'Home', url: SITE_URL }
+const LEAGUES_CRUMB = { name: 'Leagues', url: `${SITE_URL}/leagues` }
+const FORGE_CRUMB = { name: 'Fantasy Forge', url: `${SITE_URL}/forge` }
+
 // ── Route resolvers ──
 
 async function resolveLeague(apiBase, leagueSlug, path) {
@@ -177,6 +194,7 @@ async function resolveLeague(apiBase, leagueSlug, path) {
         keywords: `${league.name}, SMITE 2 ${league.name}, SMITE 2 competitive league, SMITE 2 standings, SMITE 2 stats, ${activeDivs.map(d => d.name).join(', ')}`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, LEAGUES_CRUMB, { name: league.name, url: `${SITE_URL}${path}` }])],
     }
 }
 
@@ -192,12 +210,14 @@ async function resolveDivision(apiBase, leagueSlug, divisionSlug, path) {
     const teamCount = division.team_count || 0
     const playerCount = division.player_count || 0
 
+    const leagueUrl = `${SITE_URL}/${leagueSlug}`
     return {
         title: `${division.name} - ${league.name} | ${SITE_NAME}`,
         description: `${division.name} division of ${league.name}${seasonLabel}. ${teamCount} teams, ${playerCount} players. Live standings, match results, player stats, KDA, and rankings.`,
         keywords: `${division.name}, ${league.name}, SMITE 2 ${division.name}, SMITE 2 standings, SMITE 2 stats, SMITE 2 match history, SMITE 2 player stats`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, LEAGUES_CRUMB, { name: league.name, url: leagueUrl }, { name: division.name, url: `${SITE_URL}${path}` }])],
     }
 }
 
@@ -209,12 +229,15 @@ async function resolveDivisionSubPage(apiBase, leagueSlug, divisionSlug, subPage
     if (!division) return defaults(path)
 
     const sub = DIVISION_SUB_PAGES[subPage]
+    const leagueUrl = `${SITE_URL}/${leagueSlug}`
+    const divisionUrl = `${SITE_URL}/${leagueSlug}/${divisionSlug}`
     return {
         title: `${sub.label} - ${division.name} (${league.name}) | ${SITE_NAME}`,
         description: `View ${sub.desc} for the ${division.name} division of ${league.name}. Competitive SMITE 2 ${sub.label.toLowerCase()} updated after every match.`,
         keywords: `${division.name} ${sub.label.toLowerCase()}, ${league.name} ${sub.label.toLowerCase()}, SMITE 2 ${sub.label.toLowerCase()}, SMITE 2 ${division.name}`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, LEAGUES_CRUMB, { name: league.name, url: leagueUrl }, { name: division.name, url: divisionUrl }, { name: sub.label, url: `${SITE_URL}${path}` }])],
     }
 }
 
@@ -226,12 +249,36 @@ async function resolveMatch(apiBase, matchId, path) {
         ? ` (${match.team1_game_wins ?? 0}-${match.team2_game_wins ?? 0})`
         : ''
 
+    const matchUrl = `${SITE_URL}${path}`
+    const sportsEvent = {
+        '@context': 'https://schema.org',
+        '@type': 'SportsEvent',
+        name: `${match.team1_name} vs ${match.team2_name}`,
+        url: matchUrl,
+        eventStatus: match.is_completed ? 'https://schema.org/EventCompleted' : 'https://schema.org/EventScheduled',
+        competitor: [
+            { '@type': 'SportsTeam', name: match.team1_name },
+            { '@type': 'SportsTeam', name: match.team2_name },
+        ],
+    }
+
+    // Build breadcrumbs from path segments: /:leagueSlug/:divisionSlug/matches/:matchId
+    const segments = path.split('/').filter(Boolean)
+    const crumbs = [HOME_CRUMB, LEAGUES_CRUMB]
+    if (segments.length >= 2) {
+        crumbs.push({ name: titleCase(segments[0]), url: `${SITE_URL}/${segments[0]}` })
+        crumbs.push({ name: titleCase(segments[1]), url: `${SITE_URL}/${segments[0]}/${segments[1]}` })
+        crumbs.push({ name: 'Matches', url: `${SITE_URL}/${segments[0]}/${segments[1]}/matches` })
+    }
+    crumbs.push({ name: `${match.team1_name} vs ${match.team2_name}`, url: matchUrl })
+
     return {
         title: `${match.team1_name} vs ${match.team2_name}${score} | ${SITE_NAME}`,
         description: `${match.team1_name} vs ${match.team2_name}${score} match details. Game-by-game stats, player performances, KDA, damage, and mitigated for every player.`,
         keywords: `${match.team1_name}, ${match.team2_name}, SMITE 2 match, SMITE 2 stats, SMITE 2 competitive match`,
         image: DEFAULT_IMAGE,
-        url: `${SITE_URL}${path}`,
+        url: matchUrl,
+        jsonLd: [breadcrumbList(crumbs), sportsEvent],
     }
 }
 
@@ -251,12 +298,24 @@ async function resolvePlayerProfile(apiBase, playerSlug, path) {
         description = `${p.name} – ${gamesPlayed} games across ${leagueCount} league${leagueCount !== 1 ? 's' : ''}. KDA: ${kda}, Win Rate: ${winRate}%. Full match history and stats.`
     }
 
+    const profileUrl = `${SITE_URL}${path}`
+    const profilePage = {
+        '@context': 'https://schema.org',
+        '@type': 'ProfilePage',
+        mainEntity: {
+            '@type': 'Person',
+            name: p.name,
+            url: profileUrl,
+        },
+    }
+
     return {
         title: `${p.name} - SMITE 2 Player Profile & Stats | ${SITE_NAME}`,
         description,
         keywords: `${p.name}, ${p.name} SMITE 2, ${p.name} stats, SMITE 2 player profile, SMITE 2 player stats, SMITE 2 KDA`,
         image: DEFAULT_IMAGE,
-        url: `${SITE_URL}${path}`,
+        url: profileUrl,
+        jsonLd: [breadcrumbList([HOME_CRUMB, { name: p.name, url: profileUrl }]), profilePage],
     }
 }
 
@@ -271,12 +330,15 @@ async function resolveDivisionPlayer(apiBase, leagueSlug, divisionSlug, playerSl
     const divisionName = division?.name || titleCase(divisionSlug)
     const leagueName = league?.name || titleCase(leagueSlug)
 
+    const leagueUrl = `${SITE_URL}/${leagueSlug}`
+    const divisionUrl = `${SITE_URL}/${leagueSlug}/${divisionSlug}`
     return {
         title: `${playerName} - ${divisionName} Stats (${leagueName}) | ${SITE_NAME}`,
         description: `${playerName}'s stats and match history in the ${divisionName} division of ${leagueName}. KDA, damage, win rate, and game-by-game performance.`,
         keywords: `${playerName}, ${playerName} SMITE 2, ${divisionName}, ${leagueName}, SMITE 2 player stats`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, LEAGUES_CRUMB, { name: leagueName, url: leagueUrl }, { name: divisionName, url: divisionUrl }, { name: playerName, url: `${SITE_URL}${path}` }])],
     }
 }
 
@@ -288,12 +350,23 @@ async function resolveDivisionTeam(apiBase, leagueSlug, divisionSlug, teamSlug, 
     const leagueName = league?.name || titleCase(leagueSlug)
     const teamName = titleCase(teamSlug)
 
+    const leagueUrl = `${SITE_URL}/${leagueSlug}`
+    const divisionUrl = `${SITE_URL}/${leagueSlug}/${divisionSlug}`
+    const teamsUrl = `${SITE_URL}/${leagueSlug}/${divisionSlug}/teams`
+    const teamSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'SportsTeam',
+        name: teamName,
+        url: `${SITE_URL}${path}`,
+        memberOf: { '@type': 'SportsOrganization', name: leagueName },
+    }
     return {
         title: `${teamName} - ${divisionName} (${leagueName}) | ${SITE_NAME}`,
         description: `${teamName} roster, match history, and stats in the ${divisionName} division of ${leagueName}. View player performances and team record.`,
         keywords: `${teamName}, ${teamName} SMITE 2, ${divisionName}, ${leagueName}, SMITE 2 team`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, LEAGUES_CRUMB, { name: leagueName, url: leagueUrl }, { name: divisionName, url: divisionUrl }, { name: 'Teams', url: teamsUrl }, { name: teamName, url: `${SITE_URL}${path}` }]), teamSchema],
     }
 }
 
@@ -315,18 +388,23 @@ async function resolveForge(apiBase, segments, path) {
     // /forge/:leagueSlug/subpage
     if (segments.length === 2 || (segments.length === 3 && subPages.has(segments[2]))) {
         const sub = segments[2] ? ` - ${titleCase(segments[2])}` : ''
+        const crumbs = [HOME_CRUMB, FORGE_CRUMB, { name: leagueName, url: `${SITE_URL}${path}` }]
         return {
             title: `Fantasy Forge${sub} - ${leagueName} | ${SITE_NAME}`,
             description: `Fantasy Forge player investment market for ${leagueName}. Buy and sell shares in competitive SMITE 2 players based on their performance.`,
             keywords: `Fantasy Forge, ${leagueName}, SMITE 2 fantasy, player market, Sparks`,
             image: FORGE_IMAGE,
             url: `${SITE_URL}${path}`,
+            jsonLd: [breadcrumbList(crumbs)],
         }
     }
 
     const divisionSlug = segments[2]
     const division = league?.divisions?.find((d) => d.slug === divisionSlug)
     const divisionName = division?.name || titleCase(divisionSlug)
+
+    const forgeLeagueUrl = `${SITE_URL}/forge/${leagueSlug}`
+    const forgeDivUrl = `${SITE_URL}/forge/${leagueSlug}/${divisionSlug}`
 
     // /forge/:leagueSlug/:divisionSlug/player/:playerSlug
     if (segments[3] === 'player' && segments[4]) {
@@ -338,6 +416,7 @@ async function resolveForge(apiBase, segments, path) {
             keywords: `${playerName}, Fantasy Forge, ${divisionName}, ${leagueName}, SMITE 2 player market`,
             image: FORGE_IMAGE,
             url: `${SITE_URL}${path}`,
+            jsonLd: [breadcrumbList([HOME_CRUMB, FORGE_CRUMB, { name: leagueName, url: forgeLeagueUrl }, { name: divisionName, url: forgeDivUrl }, { name: playerName, url: `${SITE_URL}${path}` }])],
         }
     }
 
@@ -349,6 +428,7 @@ async function resolveForge(apiBase, segments, path) {
         keywords: `Fantasy Forge, ${divisionName}, ${leagueName}, SMITE 2 fantasy, player market`,
         image: FORGE_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, FORGE_CRUMB, { name: leagueName, url: forgeLeagueUrl }, { name: divisionName, url: forgeDivUrl }])],
     }
 }
 
@@ -362,6 +442,7 @@ async function resolveOrg(apiBase, orgSlug, path) {
         keywords: `${orgName}, SMITE 2 organization, SMITE 2 team, SMITE 2 esports`,
         image: DEFAULT_IMAGE,
         url: `${SITE_URL}${path}`,
+        jsonLd: [breadcrumbList([HOME_CRUMB, { name: orgName, url: `${SITE_URL}${path}` }])],
     }
 }
 
@@ -370,11 +451,17 @@ async function resolveOrg(apiBase, orgSlug, path) {
 async function resolveOGTags(apiBase, path) {
     if (STATIC_ROUTES[path]) {
         const route = STATIC_ROUTES[path]
-        return {
+        const result = {
             ...route,
             image: route.image || DEFAULT_IMAGE,
             url: `${SITE_URL}${path}`,
         }
+        // Add breadcrumbs for non-homepage static routes
+        if (path !== '/') {
+            const pageName = route.title.split(' | ')[0].split(' - ')[0]
+            result.jsonLd = [breadcrumbList([HOME_CRUMB, { name: pageName, url: `${SITE_URL}${path}` }])]
+        }
+        return result
     }
 
     if (path.startsWith('/admin')) {
@@ -474,6 +561,14 @@ function injectOGTags(html, tags) {
             /<meta name="robots" content="[^"]*"/,
             '<meta name="robots" content="noindex, nofollow"'
         )
+    }
+
+    // Inject JSON-LD structured data (breadcrumbs, SportsEvent, ProfilePage, etc.)
+    if (tags.jsonLd?.length) {
+        const scripts = tags.jsonLd
+            .map((obj) => `<script type="application/ld+json">${JSON.stringify(obj)}</script>`)
+            .join('\n    ')
+        html = html.replace('</head>', `    ${scripts}\n  </head>`)
     }
 
     return html
