@@ -81,17 +81,19 @@ export default function ForgeMarketTab({
             .slice(0, 3)
     }, [allPlayers])
 
-    // Progressive loading on mobile — render in batches to avoid choking
+    // Progressive loading on mobile only — render in batches to avoid choking
     const MOBILE_BATCH = 20
-    const [visibleCount, setVisibleCount] = useState(() => window.innerWidth < 640 ? MOBILE_BATCH : Infinity)
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+    const [visibleCount, setVisibleCount] = useState(() => isMobile ? MOBILE_BATCH : 0)
 
+    // Reset when filters change (mobile only)
     useEffect(() => {
-        setVisibleCount(window.innerWidth < 640 ? MOBILE_BATCH : Infinity)
+        if (isMobile) setVisibleCount(MOBILE_BATCH)
     }, [search, sortBy, teamFilter])
 
     const loadMore = useCallback(() => {
-        setVisibleCount(prev => Math.min(prev + MOBILE_BATCH, players.length))
-    }, [players.length])
+        setVisibleCount(prev => prev + MOBILE_BATCH)
+    }, [])
 
     if (loading) {
         return (
@@ -113,8 +115,8 @@ export default function ForgeMarketTab({
         )
     }
 
-    const tableRows = visibleCount < Infinity ? players.slice(0, visibleCount) : players
-    const hasMore = visibleCount < players.length
+    const tableRows = isMobile ? players.slice(0, visibleCount) : players
+    const hasMore = isMobile && visibleCount < players.length
 
     return (
         <div>
