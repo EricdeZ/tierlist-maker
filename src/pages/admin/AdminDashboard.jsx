@@ -168,6 +168,36 @@ export default function AdminDashboard() {
         }
     }, [selectedSeasonId, fetchReadyMatches])
 
+    // ─── Start a forfeit report (skip screenshots) ───
+    const startForfeitReport = useCallback((readyMatch) => {
+        const mrId = uid()
+        liveImagesRef.current[mrId] = []
+
+        setMatchReports(prev => [...prev, {
+            id: mrId,
+            text: '',
+            images: [],
+            status: 'review',
+            result: null,
+            editData: {
+                season_id: readyMatch.season_id,
+                team1_id: readyMatch.team1_id,
+                team2_id: readyMatch.team2_id,
+                team1_name: readyMatch.team1_name,
+                team2_name: readyMatch.team2_name,
+                week: readyMatch.week || null,
+                date: readyMatch.scheduled_date ? readyMatch.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
+                best_of: readyMatch.best_of || 3,
+                scheduled_match_id: readyMatch.id,
+                games: [{ winning_team_id: null, is_forfeit: true, team1_players: [], team2_players: [] }],
+            },
+            error: null,
+        }])
+
+        if (!selectedSeasonId) handleSeasonChange(String(readyMatch.season_id))
+        fetchReadyMatches()
+    }, [selectedSeasonId, fetchReadyMatches])
+
     const pollDiscord = useCallback(async () => {
         setDiscordPolling(true)
         try {
@@ -669,6 +699,14 @@ export default function AdminDashboard() {
                                             title="Unlink screenshots from this match"
                                         >
                                             Unlink
+                                        </button>
+                                        <button
+                                            onClick={() => startForfeitReport(rm)}
+                                            disabled={readyMatchLoading}
+                                            className="px-2 py-1 rounded-lg text-xs font-semibold border border-orange-500/40 text-orange-400 hover:bg-orange-500/15 disabled:opacity-50 transition"
+                                            title="Report as forfeit — skip screenshots"
+                                        >
+                                            FF
                                         </button>
                                         <button
                                             onClick={() => startReadyReport(rm)}

@@ -11,6 +11,7 @@ import SidebarTrigger from './SidebarTrigger'
 import GlobalSidebar from './GlobalSidebar'
 import StreamWidget from '../StreamWidget'
 import WhatsNewModal from '../WhatsNewModal'
+import ChallengeNudge from '../ChallengeNudge'
 import GlobalToast from '../GlobalToast'
 
 const AppLayout = () => {
@@ -41,6 +42,7 @@ const AppLayout = () => {
                 <ClaimProfileModal />
                 <ReportDataIssueModal />
                 <WhatsNewModal />
+                <ChallengeNudge />
                 <GlobalToast message={notification} onDone={clearNotification} />
             </div>
         </SidebarProvider>

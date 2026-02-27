@@ -256,10 +256,11 @@ export default function ForgeMarketTab({
 
             {/* Player rows */}
             <div className="flex flex-col gap-[2px] forge-stagger" style={{ minHeight: '80vh' }}>
-                {tableRows.map(p => (
+                {tableRows.map((p, i) => (
                     <ForgePlayerRow
                         key={p.sparkId}
                         player={p}
+                        listIndex={i}
                         selected={featuredPlayer?.sparkId === p.sparkId}
                         marketStatus={marketStatus}
                         userTeamId={userTeamId}

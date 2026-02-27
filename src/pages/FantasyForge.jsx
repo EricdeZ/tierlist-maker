@@ -471,16 +471,19 @@ export default function FantasyForge() {
                     setUserTeamId(data.userTeamId || null)
                     setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
                     setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
-                    // Batch-load sparkline history for player list
+                    // Batch-load sparkline history for player list (chunk into groups of 50)
                     if (marketPlayers.length > 0) {
                         const ids = marketPlayers.map(p => p.sparkId)
-                        forgeService.getBatchHistory(ids).then(res => {
-                            const hist = res.histories || {}
+                        const chunks = []
+                        for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50))
+                        Promise.all(chunks.map(c => forgeService.getBatchHistory(c).catch(() => ({ histories: {} })))).then(results => {
+                            const hist = {}
+                            for (const r of results) Object.assign(hist, r.histories || {})
                             setPlayers(prev => prev.map(p => ({
                                 ...p,
                                 historyData: (hist[p.sparkId] || []).map(h => h.price),
                             })))
-                        }).catch(() => {})
+                        })
                     }
                 } else if (activeTab === 'portfolio') {
                     if (!user) { setLoading(false); return }
@@ -578,7 +581,11 @@ export default function FantasyForge() {
     const teams = useMemo(() => {
         const map = {}
         players.forEach(p => { map[p.teamSlug] = { name: p.teamName, color: p.teamColor, slug: p.teamSlug } })
-        return Object.values(map).sort((a, b) => a.name.localeCompare(b.name))
+        const list = Object.values(map).sort((a, b) => a.name.localeCompare(b.name))
+        if (players.some(p => p.isFreeAgent)) {
+            list.push({ name: 'Free Agents', color: '#888', slug: 'fa' })
+        }
+        return list
     }, [players])
 
     // ── Filtered + sorted players ──
@@ -590,12 +597,17 @@ export default function FantasyForge() {
             list = list.filter(p =>
                 p.playerName.toLowerCase().includes(q) ||
                 p.teamName.toLowerCase().includes(q) ||
-                (p.role || '').toLowerCase().includes(q)
+                (p.role || '').toLowerCase().includes(q) ||
+                (p.isFreeAgent && ('free agent'.startsWith(q) || q === 'fa'))
             )
         }
 
         if (teamFilter) {
-            list = list.filter(p => p.teamSlug === teamFilter)
+            if (teamFilter === 'fa') {
+                list = list.filter(p => p.isFreeAgent)
+            } else {
+                list = list.filter(p => p.teamSlug === teamFilter)
+            }
         }
 
         const [key, dir] = sortBy.split('-')

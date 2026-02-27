@@ -142,6 +142,11 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                     <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-[1rem] text-[var(--forge-text-mid)] mb-2 sm:mb-3.5">
                         <TeamLogo slug={player.teamSlug} name={player.teamName} size={18} color={player.teamColor} />
                         <span className="truncate">{player.teamName}</span>
+                        {player.isFreeAgent && (
+                            <span className="forge-head text-[0.65rem] sm:text-[0.7rem] font-semibold tracking-wider px-1.5 py-0.5 bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 text-[var(--forge-text-dim)] flex-shrink-0">
+                                FA
+                            </span>
+                        )}
                         {player.role && (
                             <span className="forge-head text-[0.7rem] sm:text-[0.8rem] font-semibold tracking-wider px-1.5 sm:px-2 py-0.5 bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] flex-shrink-0">
                                 {player.role}

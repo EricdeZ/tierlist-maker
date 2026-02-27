@@ -90,6 +90,27 @@ export default function DebugTools() {
                 </div>
             </section>
 
+            {/* Challenge Nudge */}
+            <section className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
+                <h2 className="font-heading text-lg font-bold text-amber-400 mb-4">
+                    Challenge Nudge
+                </h2>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-sm font-medium text-(--color-text)">Show Challenge Nudge Modal</div>
+                        <div className="text-xs text-(--color-text-secondary) mt-0.5">
+                            The popup shown to users with 0 Passion and claimable challenges.
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-challenge-nudge'))}
+                        className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-(--color-primary) font-bold text-sm transition-colors shrink-0"
+                    >
+                        Trigger
+                    </button>
+                </div>
+            </section>
+
             {/* Current Passion State */}
             <section className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <h2 className="font-heading text-lg font-bold text-(--color-text) mb-4">

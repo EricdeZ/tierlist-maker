@@ -109,7 +109,7 @@ async function getMarket(sql, user, params, event) {
             ps.sell_pressure, ps.sell_pressure_updated_at,
             ps.last_perf_update, ps.updated_at,
             p.name as player_name, p.slug as player_slug,
-            lp.role, lp.team_id,
+            lp.role, lp.team_id, lp.is_active,
             t.name as team_name, t.slug as team_slug, t.color as team_color,
             mpg.god_image_url,
             u_avatar.discord_id as player_discord_id,
@@ -148,8 +148,8 @@ async function getMarket(sql, user, params, event) {
         LEFT JOIN users u_avatar ON u_avatar.linked_player_id = p.id
         LEFT JOIN coinflip_streaks cs ON cs.user_id = u_avatar.id
         WHERE ps.market_id = ${market.id}
-          AND lp.is_active = true
           AND lp.roster_status != 'sub'
+          AND (lp.is_active = true OR ps.total_sparks > 0)
         ORDER BY ps.current_price DESC
     `
 
@@ -274,6 +274,7 @@ async function getMarket(sql, user, params, event) {
             discordAvatarUrl: s.player_discord_id && s.player_discord_avatar
                 ? `https://cdn.discordapp.com/avatars/${s.player_discord_id}/${s.player_discord_avatar}.png?size=64`
                 : null,
+            isFreeAgent: !s.is_active,
             isConnected: s.user_id_linked != null,
             bestStreak: s.best_streak || 0,
             gamesPlayed: s.games_played || 0,

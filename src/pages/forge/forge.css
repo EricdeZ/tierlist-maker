@@ -952,6 +952,12 @@
    ═══════════════════════════════════════════════════ */
 
 @media (max-width: 640px) {
+    /* Suppress border glow animation on rows outside top 10 */
+    .forge-heat-muted.forge-blazing.forge-player-row-wrapper,
+    .forge-heat-muted.forge-cooling.forge-player-row-wrapper {
+        animation: none !important;
+    }
+
     /* Player row: simplify grid to essential columns */
     .forge-player-row {
         grid-template-columns: 4px 40px 1fr auto auto !important;

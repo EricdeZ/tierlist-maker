@@ -8,13 +8,14 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default memo(function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
+export default memo(function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds, listIndex }) {
     const chartRef = useRef(null)
     const mobileChartRef = useRef(null)
     const [expanded, setExpanded] = useState(false)
 
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
+    const showHeatEffects = listIndex == null || listIndex < 10
     const isOpen = isLeagueWide
         ? (openMarketIds || []).includes(player.marketId)
         : marketStatus === 'open'
@@ -67,20 +68,20 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
         <div
             className={`forge-${tier} forge-player-row-wrapper group bg-[var(--forge-panel)] border border-transparent cursor-pointer ${
                 selected ? 'forge-row-selected' : ''
-            }`}
+            }${!showHeatEffects ? ' forge-heat-muted' : ''}`}
             data-spark-id={player.sparkId}
         >
             {/* Fire/Frost overlays */}
             {tier === 'blazing' && (
                 <>
-                    <div className="forge-fire-overlay" />
-                    <div className="forge-fire-bottom-glow" />
+                    <div className={`forge-fire-overlay${!showHeatEffects ? ' hidden sm:block' : ''}`} />
+                    <div className={`forge-fire-bottom-glow${!showHeatEffects ? ' hidden sm:block' : ''}`} />
                 </>
             )}
             {tier === 'cooling' && (
                 <>
-                    <div className="forge-frost-overlay" />
-                    <div className="forge-frost-top-glow" />
+                    <div className={`forge-frost-overlay${!showHeatEffects ? ' hidden sm:block' : ''}`} />
+                    <div className={`forge-frost-top-glow${!showHeatEffects ? ' hidden sm:block' : ''}`} />
                 </>
             )}
 
@@ -151,6 +152,11 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                     <div className="hidden sm:flex text-[0.85rem] text-[var(--forge-text-dim)] items-center gap-1 mt-px overflow-hidden">
                         <TeamLogo slug={player.teamSlug} name={player.teamName} size={14} color={player.teamColor} className="flex-shrink-0" />
                         <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                        {player.isFreeAgent && (
+                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
+                                FA
+                            </span>
+                        )}
                         {isLeagueWide && player.divisionName && (
                             <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
                                 {player.divisionName}
@@ -170,6 +176,11 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                         <div className="flex items-center gap-1 overflow-hidden">
                             <TeamLogo slug={player.teamSlug} name={player.teamName} size={13} color={player.teamColor} className="flex-shrink-0" />
                             <span style={{ color: teamColor }} className="truncate">{player.teamName}</span>
+                            {player.isFreeAgent && (
+                                <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-0.5 flex-shrink-0">
+                                    FA
+                                </span>
+                            )}
                             {isLeagueWide && player.divisionName && (
                                 <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-0.5 flex-shrink-0">
                                     {player.divisionName}

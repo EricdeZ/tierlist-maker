@@ -106,6 +106,11 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                         <div className="text-[0.85rem] text-[var(--forge-text-dim)] flex items-center gap-1 mt-px">
                             <TeamLogo slug={player.teamSlug} name={player.teamName} size={16} color={player.teamColor} />
                             {player.teamName}
+                            {player.isFreeAgent && (
+                                <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-text-dim)] bg-[var(--forge-text-dim)]/10 border border-[var(--forge-text-dim)]/20 px-1 flex-shrink-0">
+                                    FA
+                                </span>
+                            )}
                             {isLeagueWide && player.divisionName && (
                                 <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1 flex-shrink-0">
                                     {player.divisionName}
