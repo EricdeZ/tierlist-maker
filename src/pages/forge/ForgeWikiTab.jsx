@@ -18,7 +18,9 @@ The goal is simple: build the most profitable portfolio by the time the season e
         title: 'Heat & Performance',
         content: `Every player has a Heat value — this is how much their Spark price has changed recently (24 hours or 7 days).
 
-Heat is driven by the player's on-field performance. After matches, each player's performance multiplier is updated based on their stats — kills, deaths, assists, damage, and more.
+Heat is driven by the player's on-field performance. After matches, each player's performance multiplier is updated based on their stats — kills, deaths, assists, damage, and more. Performances are role-based, meaning players are evaluated against others in the same role. A support player won't be penalized for having fewer kills than a carry — they're measured by the stats that matter for their position.
+
+Players who aren't playing in matches will see their Heat slowly decay over time. If a player goes inactive or sits out, their price will gradually drift downward. This means investing in benched or inactive players carries real risk — even if they were performing well before, the market won't wait for them.
 
 The key thing to understand: a player with high heat has high expectations baked into their price. A player at 150% heat is expected to keep performing at an elite level. If they have even a mediocre week, their price will drop. Meanwhile, an undervalued player with low or negative heat can surge with a single great performance.
 
