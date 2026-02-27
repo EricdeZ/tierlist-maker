@@ -204,6 +204,19 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
             `
         }
     }
+
+    // Backfill any sparks missing init entries (e.g. from race conditions)
+    await sql`
+        INSERT INTO spark_price_history (spark_id, price, trigger, created_at)
+        SELECT ps.id, fm.base_price, 'init', ps.created_at
+        FROM player_sparks ps
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        WHERE ps.market_id = ${marketId}
+          AND NOT EXISTS (
+              SELECT 1 FROM spark_price_history sph
+              WHERE sph.spark_id = ps.id AND sph.trigger = 'init'
+          )
+    `
 }
 
 // ═══════════════════════════════════════════════════

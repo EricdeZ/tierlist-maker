@@ -1,10 +1,11 @@
-import { Flame, Zap, Trophy, Target } from 'lucide-react'
+import { Flame, Zap, Trophy, Target, BookOpen } from 'lucide-react'
 
 export const TABS = [
     { key: 'market', label: 'The Forge', icon: Flame },
     { key: 'portfolio', label: 'My Sparks', icon: Zap },
     { key: 'leaderboard', label: 'Hall of Flame', icon: Trophy },
     { key: 'challenges', label: 'Contracts', icon: Target },
+    { key: 'wiki', label: 'Guide', icon: BookOpen },
 ]
 
 export const SORT_OPTIONS = [

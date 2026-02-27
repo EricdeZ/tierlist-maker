@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Crown } from 'lucide-react'
 import { RoleBadge } from './RoleBadge'
 
-export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onSetCaptain, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
+export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onSetCaptain, onDropPlayer, onPromoteSub, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
     const isPending = player.is_pending
@@ -131,6 +131,17 @@ export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarge
                                 >
                                     <span>↔</span> Manage Aliases
                                 </button>
+                                {player.roster_status === 'sub' && (
+                                    <button
+                                        onClick={() => {
+                                            setShowActions(false)
+                                            onPromoteSub(player.league_player_id, player.name, teamName)
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-green-400 hover:bg-green-500/10 transition-colors flex items-center gap-2"
+                                    >
+                                        <span>↑</span> Promote to Member
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => {
                                         setShowActions(false)

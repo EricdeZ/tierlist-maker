@@ -6,7 +6,7 @@ import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import forgeLogo from '../assets/forge.png'
-import { ChevronDown, RotateCcw, Flame, X } from 'lucide-react'
+import { ChevronDown, RotateCcw, Flame, X, BookOpen } from 'lucide-react'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
 
@@ -16,6 +16,7 @@ import ForgeMarketTab from './forge/ForgeMarketTab'
 import ForgePortfolioTab from './forge/ForgePortfolioTab'
 import ForgeLeaderboardTab from './forge/ForgeLeaderboardTab'
 import ForgeChallengesTab from './forge/ForgeChallengesTab'
+import ForgeWikiTab from './forge/ForgeWikiTab'
 import ForgeTradeModal from './forge/ForgeTradeModal'
 import ForgeToast from './forge/ForgeToast'
 import ForgeTutorial from './forge/ForgeTutorial'
@@ -36,6 +37,7 @@ export default function FantasyForge() {
     const activeTab = location.pathname.endsWith('/portfolio') ? 'portfolio'
         : location.pathname.endsWith('/leaderboard') ? 'leaderboard'
         : location.pathname.endsWith('/challenges') ? 'challenges'
+        : location.pathname.endsWith('/wiki') ? 'wiki'
         : 'market'
     const [loading, setLoading] = useState(true)
     const [seasonsLoaded, setSeasonsLoaded] = useState(false)
@@ -555,6 +557,7 @@ export default function FantasyForge() {
             if (tabKey === 'portfolio') return `${base}/portfolio`
             if (tabKey === 'leaderboard') return `${base}/leaderboard`
             if (tabKey === 'challenges') return `${base}/challenges`
+            if (tabKey === 'wiki') return `${base}/wiki`
             return base
         }
         const s = selectedSeason
@@ -563,6 +566,7 @@ export default function FantasyForge() {
         if (tabKey === 'portfolio') return `${base}/portfolio`
         if (tabKey === 'leaderboard') return `${base}/leaderboard`
         if (tabKey === 'challenges') return `${base}/challenges`
+        if (tabKey === 'wiki') return `${base}/wiki`
         return base
     }, [selectedSeason, isLeagueWide, selectedLeagueOption])
 
@@ -1064,12 +1068,24 @@ export default function FantasyForge() {
                             {market?.status === 'liquidated' && (
                                 <span className="forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-text-dim)]">Season Ended</span>
                             )}
+                            {/* Mobile Guide button */}
+                            <button
+                                onClick={() => navigateTab('wiki')}
+                                className={`sm:hidden flex items-center gap-1.5 px-2.5 py-1 rounded border forge-head text-[0.75rem] font-semibold tracking-wider transition-all ${
+                                    activeTab === 'wiki'
+                                        ? 'text-[var(--forge-flame-bright)] border-[var(--forge-flame)] bg-[var(--forge-flame)]/10'
+                                        : 'text-[var(--forge-text-dim)] border-[var(--forge-text-dim)]/30 hover:text-[var(--forge-text-mid)] hover:border-[var(--forge-text-dim)]/50'
+                                }`}
+                            >
+                                <BookOpen size={12} />
+                                Guide
+                            </button>
                         </div>
                     </div>
 
                     {/* Tabs */}
                     <div className="flex gap-0 mb-4">
-                        {TABS.map(tab => {
+                        {TABS.filter(t => t.key !== 'wiki').map(tab => {
                             const Icon = tab.icon
                             return (
                                 <button
@@ -1093,6 +1109,29 @@ export default function FantasyForge() {
                                 </button>
                             )
                         })}
+                        {/* Guide tab — always visible on desktop, hidden on mobile (shown next to status instead) */}
+                        {(() => {
+                            const wikiTab = TABS.find(t => t.key === 'wiki')
+                            const Icon = wikiTab.icon
+                            return (
+                                <button
+                                    onClick={() => navigateTab('wiki')}
+                                    className={`hidden sm:flex sm:flex-none px-6 py-2.5 forge-head text-lg font-semibold tracking-wider relative transition-all items-center justify-start gap-1.5 ${
+                                        activeTab === 'wiki'
+                                            ? 'text-[var(--forge-flame-bright)] forge-tab-active'
+                                            : 'text-[var(--forge-text-dim)] hover:text-[var(--forge-text-mid)] hover:bg-[var(--forge-flame)]/3'
+                                    }`}
+                                >
+                                    <span>{wikiTab.label}</span>
+                                    {activeTab === 'wiki' && (
+                                        <span
+                                            className="absolute bottom-0 left-3 right-3 h-[2px] forge-tab-underline"
+                                            style={{ background: 'var(--forge-flame)', boxShadow: '0 0 10px rgba(232,101,32,0.4)' }}
+                                        />
+                                    )}
+                                </button>
+                            )
+                        })()}
                     </div>
 
                     {/* Error */}
@@ -1158,6 +1197,10 @@ export default function FantasyForge() {
 
                     {activeTab === 'challenges' && (
                         <ForgeChallengesTab loading={loading} />
+                    )}
+
+                    {activeTab === 'wiki' && (
+                        <ForgeWikiTab />
                     )}
                 </div>
             </div>

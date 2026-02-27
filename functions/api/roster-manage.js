@@ -54,6 +54,8 @@ const handler = async (event) => {
                 return await renamePlayer(sql, body, admin, event)
             case 'set-captain':
                 return await setCaptain(sql, body, admin, event)
+            case 'promote-sub':
+                return await promoteSub(sql, body, admin, event)
             default:
                 return {
                     statusCode: 400,
@@ -658,6 +660,44 @@ async function setCaptain(sql, { league_player_id }, admin, event) {
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, updated }),
+    }
+}
+
+/**
+ * Promote a Rule 0-Sub to a regular member
+ */
+async function promoteSub(sql, { league_player_id }, admin, event) {
+    if (!league_player_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
+    const [lp] = await sql`
+        SELECT id, roster_status FROM league_players WHERE id = ${league_player_id}
+    `
+    if (!lp) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
+    }
+    if (lp.roster_status !== 'sub') {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Player is not a sub' }) }
+    }
+
+    const [updated] = await sql`
+        UPDATE league_players
+        SET roster_status = 'member', updated_at = NOW()
+        WHERE id = ${league_player_id}
+        RETURNING id, roster_status
+    `
+
+    await logAudit(sql, admin, { action: 'promote-sub', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, updated, message: 'Promoted to member' }),
     }
 }
 

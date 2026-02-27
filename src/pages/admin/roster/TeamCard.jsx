@@ -6,7 +6,7 @@ export function TeamCard({
     team, showSubs, isDragOver, hasDraggedPlayer, isSameTeam, dragOverPlayer, opLoading,
     onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd,
     onDropOnPlayer, onSetDragOverPlayer,
-    onRoleChange, onSetCaptain, onDropPlayer, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
+    onRoleChange, onSetCaptain, onDropPlayer, onPromoteSub, onRemovePendingAdd, onManageAliases, onRenamePlayer, onAddPlayer,
 }) {
     const isValidTarget = hasDraggedPlayer && !isSameTeam
 
@@ -56,7 +56,8 @@ export function TeamCard({
                         isLoading={
                             opLoading[`role_${player.league_player_id}`] ||
                             opLoading[`drop_${player.league_player_id}`] ||
-                            opLoading[`transfer_${player.league_player_id}`]
+                            opLoading[`transfer_${player.league_player_id}`] ||
+                            opLoading[`promote_${player.league_player_id}`]
                         }
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
@@ -65,6 +66,7 @@ export function TeamCard({
                         onRoleChange={onRoleChange}
                         onSetCaptain={onSetCaptain}
                         onDropPlayer={onDropPlayer}
+                        onPromoteSub={onPromoteSub}
                         onRemovePendingAdd={onRemovePendingAdd}
                         onManageAliases={onManageAliases}
                         onRenamePlayer={onRenamePlayer}

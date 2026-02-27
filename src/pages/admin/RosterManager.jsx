@@ -458,6 +458,28 @@ export default function RosterManager() {
         })
     }
 
+    // ─── Promote sub to member ───
+    const handlePromoteSub = (leaguePlayerId, playerName, teamName) => {
+        setConfirmModal({
+            title: 'Promote to Member',
+            message: `Promote ${playerName} from Rule 0-Sub to a full member on ${teamName}?`,
+            confirmLabel: 'Promote',
+            confirmColor: 'green',
+            onConfirm: async () => {
+                setConfirmModal(null)
+                try {
+                    await rosterAction(`promote_${leaguePlayerId}`, {
+                        action: 'promote-sub',
+                        league_player_id: leaguePlayerId,
+                    })
+                    showToast('success', `${playerName} promoted to member`)
+                } catch {
+                    // Error already toasted
+                }
+            },
+        })
+    }
+
     // ─── Save / Discard pending changes ───
     const handleSave = async () => {
         setSaving(true)
@@ -765,6 +787,7 @@ export default function RosterManager() {
                             onRoleChange={handleRoleChange}
                             onSetCaptain={handleSetCaptain}
                             onDropPlayer={handleDropPlayer}
+                            onPromoteSub={handlePromoteSub}
                             onRemovePendingAdd={handleRemovePendingAdd}
                             onManageAliases={(playerId, playerName) => setAliasModal({ playerId, playerName })}
                             onRenamePlayer={(playerId, playerName) => setRenameModal({ playerId, playerName })}

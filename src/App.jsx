@@ -143,10 +143,12 @@ function App() {
                             <Route path="forge/:leagueSlug/portfolio" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/leaderboard" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/challenges" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/portfolio" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/leaderboard" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/challenges" element={<FantasyForge />} />
+                            <Route path="forge/:leagueSlug/:divisionSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
                             <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="arcade" element={<TheArcade />} />
