@@ -449,9 +449,10 @@ export default function FantasyForge() {
                         if (!data) continue
                         for (const entry of (data.leaderboard || [])) {
                             if (!userMap[entry.userId]) {
-                                userMap[entry.userId] = { ...entry, totalProfit: 0, portfolioValue: 0, holdingsCount: 0, totalSparks: 0 }
+                                userMap[entry.userId] = { ...entry, totalProfit: 0, portfolioValue: 0, holdingsCount: 0, totalSparks: 0, realizedProfit: 0 }
                             }
                             userMap[entry.userId].totalProfit += entry.totalProfit
+                            userMap[entry.userId].realizedProfit += entry.realizedProfit ?? 0
                             userMap[entry.userId].portfolioValue += entry.portfolioValue
                             userMap[entry.userId].holdingsCount += entry.holdingsCount
                             userMap[entry.userId].totalSparks += entry.totalSparks

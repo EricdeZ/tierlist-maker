@@ -634,6 +634,7 @@ async function getLeaderboard(sql, params) {
                         1 + 0.02 * (ps.total_sparks::numeric - 1.5 * sh.sparks - 0.5)
                     )
                 ))::integer as sell_value,
+                COALESCE(SUM(sh.total_invested), 0)::integer as remaining_invested,
                 COUNT(DISTINCT sh.spark_id)::integer as holdings_count,
                 SUM(sh.sparks)::integer as total_sparks
             FROM spark_holdings sh
@@ -656,7 +657,13 @@ async function getLeaderboard(sql, params) {
                 - COALESCE(ut.regular_fuel_costs, 0)
                 - COALESCE(ut.free_fuel_costs, 0)
                 + COALESCE(ut.realized_proceeds, 0)
-            )::integer as total_profit
+            )::integer as total_profit,
+            (
+                COALESCE(ut.realized_proceeds, 0)
+                - COALESCE(ut.regular_fuel_costs, 0)
+                - COALESCE(ut.free_fuel_costs, 0)
+                + COALESCE(uh.remaining_invested, 0)
+            )::integer as realized_profit
         FROM user_holdings uh
         FULL OUTER JOIN user_transactions ut ON uh.user_id = ut.user_id
         JOIN users u ON COALESCE(uh.user_id, ut.user_id) = u.id
@@ -680,6 +687,7 @@ async function getLeaderboard(sql, params) {
                 holdingsCount: l.holdings_count,
                 totalSparks: l.total_sparks,
                 totalProfit: l.total_profit,
+                realizedProfit: l.realized_profit,
             })),
         }),
     }
