@@ -343,6 +343,11 @@ export default function GlobalSidebar() {
                                 <div className="border-b border-white/5 my-2 mx-3" />
                             </>
                         )}
+                        {user && (
+                            <SidebarLink to="/referral" icon={UserPlus} active={isActive('/referral')}>
+                                Refer a Friend
+                            </SidebarLink>
+                        )}
                         {!FEATURE_FLAGS.FORGE_RELEASED && (
                             <div className="border-b border-white/5 my-2 mx-3" />
                         )}
@@ -483,11 +488,6 @@ export default function GlobalSidebar() {
                             >
                                 Passion Shop
                             </SidebarLink>
-                            {user && (
-                                <SidebarLink to="/referral" icon={UserPlus} active={isActive('/referral')}>
-                                    Refer a Friend
-                                </SidebarLink>
-                            )}
                         </SidebarSection>
 
                         {/* Tools section */}
