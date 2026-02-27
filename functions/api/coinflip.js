@@ -53,11 +53,11 @@ const handler = async (event) => {
 // POST: Server-authoritative coin flip
 // ═══════════════════════════════════════════════════
 async function handleFlip(sql, user) {
-    // Rate limit: 1 flip per 2 seconds per user
+    // Rate limit: 1 flip per 1 second per user
     const [recent] = await sql`
         SELECT last_flip_at FROM coinflip_streaks
         WHERE user_id = ${user.id}
-          AND last_flip_at > NOW() - INTERVAL '2 seconds'
+          AND last_flip_at > NOW() - INTERVAL '1 second'
     `
     if (recent) {
         return {
