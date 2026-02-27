@@ -259,15 +259,16 @@ export async function executeFuel(tx, userId, sparkId, numSparks) {
     await grantPassion(tx, userId, 'forge_fuel', -totalCost,
         `Fueled player (${numSparks} Spark${numSparks > 1 ? 's' : ''})`, String(sparkId))
 
-    // Update player_sparks (persist decayed sell pressure)
+    // Update player_sparks — buying absorbs sell pressure (heals the dip)
     const newTotalSparks = stock.total_sparks + numSparks
-    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, currentPressure)
+    const healedPressure = Math.max(0, currentPressure - numSparks)
+    const newPrice = calcPrice(market.base_price, Number(stock.perf_multiplier), newTotalSparks, healedPressure)
     await tx`
         UPDATE player_sparks SET
             total_sparks = ${newTotalSparks},
             current_price = ${newPrice},
-            sell_pressure = ${currentPressure},
-            sell_pressure_updated_at = ${currentPressure > 0 ? new Date() : null},
+            sell_pressure = ${healedPressure},
+            sell_pressure_updated_at = ${healedPressure > 0 ? new Date() : null},
             updated_at = NOW()
         WHERE id = ${sparkId}
     `
