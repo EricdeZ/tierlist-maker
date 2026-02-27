@@ -615,7 +615,8 @@ async function getLeaderboard(sql, params) {
             SELECT
                 st.user_id,
                 COALESCE(SUM(CASE WHEN st.type IN ('cool', 'liquidate') THEN st.total_cost ELSE 0 END), 0) as realized_proceeds,
-                COALESCE(SUM(CASE WHEN st.type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN st.total_cost ELSE 0 END), 0) as fuel_costs
+                COALESCE(SUM(CASE WHEN st.type = 'fuel' THEN st.total_cost ELSE 0 END), 0) as regular_fuel_costs,
+                COALESCE(SUM(CASE WHEN st.type IN ('tutorial_fuel', 'referral_fuel') THEN st.total_cost ELSE 0 END), 0) as free_fuel_costs
             FROM spark_transactions st
             JOIN player_sparks ps ON st.spark_id = ps.id
             WHERE ps.market_id = ${market.id}
@@ -625,10 +626,17 @@ async function getLeaderboard(sql, params) {
             SELECT
                 sh.user_id,
                 SUM(sh.sparks * ps.current_price)::integer as portfolio_value,
+                SUM(GREATEST(
+                    sh.sparks * 10,
+                    sh.sparks * fm.base_price * ps.perf_multiplier * (
+                        1 + 0.02 * (ps.total_sparks::numeric - 1.5 * sh.sparks - 0.5)
+                    )
+                ))::integer as sell_value,
                 COUNT(DISTINCT sh.spark_id)::integer as holdings_count,
                 SUM(sh.sparks)::integer as total_sparks
             FROM spark_holdings sh
             JOIN player_sparks ps ON sh.spark_id = ps.id
+            JOIN forge_markets fm ON ps.market_id = fm.id
             WHERE ps.market_id = ${market.id} AND sh.sparks > 0
             GROUP BY sh.user_id
         )
@@ -641,7 +649,12 @@ async function getLeaderboard(sql, params) {
             COALESCE(uh.portfolio_value, 0)::integer as portfolio_value,
             COALESCE(uh.holdings_count, 0)::integer as holdings_count,
             COALESCE(uh.total_sparks, 0)::integer as total_sparks,
-            (COALESCE(uh.portfolio_value, 0) + COALESCE(ut.realized_proceeds, 0) - COALESCE(ut.fuel_costs, 0))::integer as total_profit
+            (
+                COALESCE(uh.sell_value, 0)
+                - COALESCE(ut.regular_fuel_costs, 0)
+                - COALESCE(ut.free_fuel_costs, 0)
+                + COALESCE(ut.realized_proceeds, 0)
+            )::integer as total_profit
         FROM user_holdings uh
         FULL OUTER JOIN user_transactions ut ON uh.user_id = ut.user_id
         JOIN users u ON COALESCE(uh.user_id, ut.user_id) = u.id

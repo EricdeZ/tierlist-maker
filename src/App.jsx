@@ -70,6 +70,7 @@ import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
 import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
+import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
 import Features from "./pages/Features.jsx";
 
 // Codex
@@ -111,6 +112,7 @@ function App() {
                                 <Route path="challenges" element={<ProtectedRoute requiredPermission="league_manage"><ChallengeManager /></ProtectedRoute>} />
                                 <Route path="debug" element={<ProtectedRoute requiredPermission="permission_manage"><DebugTools /></ProtectedRoute>} />
                                 <Route path="forge-config" element={<ProtectedRoute requiredPermission="league_manage"><ForgeConfig /></ProtectedRoute>} />
+                                <Route path="forge-admin" element={<ProtectedRoute requiredPermission="permission_manage"><ForgeAdmin /></ProtectedRoute>} />
                                 <Route path="data-reports" element={<ProtectedRoute requiredPermission="league_manage"><DataReportManager /></ProtectedRoute>} />
                                 <Route path="orgs" element={<ProtectedRoute requiredPermission="league_manage"><OrgManager /></ProtectedRoute>} />
                                 <Route path="feedback" element={<ProtectedRoute requiredPermission="feedback_manage"><FeedbackManager /></ProtectedRoute>} />

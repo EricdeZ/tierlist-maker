@@ -260,10 +260,7 @@ export default function FantasyForge() {
                 setSeasons(allSeasons)
 
                 // Build league-wide options: one per league that has 2+ visible divisions
-                const ownerNow = hasPermission('permission_manage')
-                const visible = ownerNow
-                    ? allSeasons
-                    : allSeasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
+                const visible = allSeasons.filter(s => s.forgeStatus === 'open')
 
                 const leagueDivCounts = {}
                 const leagueHasOpen = {}
@@ -273,7 +270,7 @@ export default function FantasyForge() {
                     if (s.forgeStatus === 'open') leagueHasOpen[s.leagueSlug] = true
                 }
                 const leagueOpts = Object.entries(leagueDivCounts)
-                    .filter(([slug, divs]) => divs.size > 1 && (ownerNow || leagueHasOpen[slug]))
+                    .filter(([slug, divs]) => divs.size > 1 && leagueHasOpen[slug])
                     .map(([slug]) => leagueMap[slug])
                     .filter(Boolean)
                     .sort((a, b) => (leagueHasOpen[b.leagueSlug] ? 1 : 0) - (leagueHasOpen[a.leagueSlug] ? 1 : 0))
@@ -311,9 +308,8 @@ export default function FantasyForge() {
     // ── Seasons for the current league (for league-wide mode) ──
     const leagueSeasons = useMemo(() => {
         if (!leagueWideId) return []
-        const visible = isOwner ? seasons : seasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
-        return visible.filter(s => s.leagueId === leagueWideId)
-    }, [leagueWideId, seasons, isOwner])
+        return seasons.filter(s => s.leagueId === leagueWideId && s.forgeStatus === 'open')
+    }, [leagueWideId, seasons])
 
     // ── Track what we last loaded so we know when to show loading vs silent refresh ──
     const lastLoadRef = useRef({ tab: null, seasonId: null, leagueWideId: null })
@@ -517,9 +513,8 @@ export default function FantasyForge() {
 
     // ── Visible seasons: owners see all, regular users only see open markets ──
     const visibleSeasons = useMemo(() => {
-        if (isOwner) return seasons
-        return seasons.filter(s => s.forgeStatus === 'open' || s.forgeStatus === null)
-    }, [seasons, isOwner])
+        return seasons.filter(s => s.forgeStatus === 'open')
+    }, [seasons])
 
     // ── Selected season info for profile links ──
     const selectedSeason = useMemo(() => visibleSeasons.find(s => s.id === seasonId), [visibleSeasons, seasonId])
