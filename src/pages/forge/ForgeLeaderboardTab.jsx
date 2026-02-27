@@ -13,8 +13,8 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
             list = list.filter(e => (e.realizedProfit ?? 0) !== 0)
             list.sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0))
         } else if (mode === 'losses') {
-            list = list.filter(e => e.totalProfit < 0)
-            list.sort((a, b) => a.totalProfit - b.totalProfit)
+            list = list.filter(e => (e.realizedProfit ?? 0) < 0)
+            list.sort((a, b) => (a.realizedProfit ?? 0) - (b.realizedProfit ?? 0))
         }
         return list.slice(0, 50).map((e, i) => ({ ...e, position: i + 1 }))
     }, [leaderboard, mode])
@@ -71,7 +71,7 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                             ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${entry.playerSlug}`
                             : `/profile/${entry.playerSlug}`)
                         : null
-                    const profit = mode === 'realized' ? (entry.realizedProfit ?? 0) : entry.totalProfit
+                    const profit = (mode === 'realized' || mode === 'losses') ? (entry.realizedProfit ?? 0) : entry.totalProfit
 
                     return (
                         <div
