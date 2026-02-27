@@ -58,7 +58,7 @@ class Ember {
 }
 
 export function createEmberSystem(canvas) {
-    if (prefersReducedMotion()) {
+    if (prefersReducedMotion() || window.innerWidth < 640) {
         return { start() {}, stop() {}, resize() {} }
     }
 
@@ -125,7 +125,7 @@ export function createEmberSystem(canvas) {
    ═══════════════════════════════════════════════════ */
 
 export function fireBurst(canvas, x, y, count = 40) {
-    if (prefersReducedMotion()) return
+    if (prefersReducedMotion() || window.innerWidth < 640) return
 
     const ctx = canvas.getContext('2d')
     const dpr = window.devicePixelRatio || 1

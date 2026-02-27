@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { Search, ChevronDown, Flame, Trophy } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import { SORT_OPTIONS } from './forgeConstants'
@@ -74,6 +74,25 @@ export default function ForgeMarketTab({
     isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds,
     onFuel, onCool, onSelectPlayer, onSpotlightPlayer, onRandomPlayer,
 }) {
+    // All hooks must be called before any early returns
+    const top3 = useMemo(() => {
+        return [...allPlayers]
+            .sort((a, b) => b.currentPrice - a.currentPrice)
+            .slice(0, 3)
+    }, [allPlayers])
+
+    // Progressive loading on mobile — render in batches to avoid choking
+    const MOBILE_BATCH = 20
+    const [visibleCount, setVisibleCount] = useState(() => window.innerWidth < 640 ? MOBILE_BATCH : Infinity)
+
+    useEffect(() => {
+        setVisibleCount(window.innerWidth < 640 ? MOBILE_BATCH : Infinity)
+    }, [search, sortBy, teamFilter])
+
+    const loadMore = useCallback(() => {
+        setVisibleCount(prev => Math.min(prev + MOBILE_BATCH, players.length))
+    }, [players.length])
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
@@ -94,15 +113,8 @@ export default function ForgeMarketTab({
         )
     }
 
-    // Top 3 by price for featured cards
-    const top3 = useMemo(() => {
-        return [...allPlayers]
-            .sort((a, b) => b.currentPrice - a.currentPrice)
-            .slice(0, 3)
-    }, [allPlayers])
-
-    // All players for the table (top performers also appear in cards above)
-    const tableRows = players
+    const tableRows = visibleCount < Infinity ? players.slice(0, visibleCount) : players
+    const hasMore = visibleCount < players.length
 
     return (
         <div>
@@ -263,6 +275,15 @@ export default function ForgeMarketTab({
                     />
                 ))}
             </div>
+
+            {hasMore && (
+                <button
+                    onClick={loadMore}
+                    className="w-full py-3 mt-1 forge-head text-sm font-semibold tracking-wider text-[var(--forge-flame-bright)] bg-[var(--forge-panel)] border border-[var(--forge-border)] cursor-pointer hover:bg-[var(--forge-surface)] transition-colors"
+                >
+                    Show More ({players.length - visibleCount} remaining)
+                </button>
+            )}
 
             {players.length === 0 && (
                 <div className="text-center py-8 text-[var(--forge-text-dim)]">

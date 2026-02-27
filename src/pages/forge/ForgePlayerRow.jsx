@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { Flame, Snowflake, ChevronDown } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
@@ -8,7 +8,7 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
+export default memo(function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
     const chartRef = useRef(null)
     const mobileChartRef = useRef(null)
     const [expanded, setExpanded] = useState(false)
@@ -38,15 +38,16 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
         : perfValue >= 0.7 ? 'text-[var(--forge-cool)]'
         : 'text-[var(--forge-loss)]'
 
-    // Draw compact sparkline
+    // Draw compact sparkline — skip on mobile unless expanded (canvas is heavy)
     useEffect(() => {
         const data = player.historyData?.length ? player.historyData : FALLBACK_HISTORY
         const hasData = player.historyData?.length > 0
         const colors = hasData ? SPARK_COLORS[tier] : SPARK_COLORS.neutral
-        if (chartRef.current) {
+        const isMobile = window.innerWidth < 640
+        if (chartRef.current && !isMobile) {
             drawSparkline(chartRef.current, data, { lineColor: colors.line, fillColor: colors.fill })
         }
-        if (mobileChartRef.current) {
+        if (mobileChartRef.current && expanded) {
             drawSparkline(mobileChartRef.current, data, { lineColor: colors.line, fillColor: colors.fill })
         }
     }, [player.historyData, tier, expanded])
@@ -294,4 +295,4 @@ export default function ForgePlayerRow({ player, selected, marketStatus, userTea
 
         </div>
     )
-}
+})

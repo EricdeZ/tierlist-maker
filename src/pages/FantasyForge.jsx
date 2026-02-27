@@ -731,21 +731,23 @@ export default function FantasyForge() {
 
     // ── Fuel spectacle: burst + shake + flash + toast ──
     const triggerFuelSpectacle = (playerName, sparkCount) => {
-        // 1. Fire burst at center of screen
-        if (fxCanvasRef.current) {
+        const isMobile = window.innerWidth < 640
+
+        // 1. Fire burst at center of screen (desktop only)
+        if (!isMobile && fxCanvasRef.current) {
             const cx = window.innerWidth / 2
             const cy = window.innerHeight / 2
             fireBurst(fxCanvasRef.current, cx, cy, 40)
         }
 
-        // 2. Screen flash
-        if (flashRef.current) {
+        // 2. Screen flash (desktop only)
+        if (!isMobile && flashRef.current) {
             flashRef.current.classList.add('active')
             setTimeout(() => flashRef.current?.classList.remove('active'), 150)
         }
 
-        // 3. Screen shake
-        if (containerRef.current) {
+        // 3. Screen shake (desktop only)
+        if (!isMobile && containerRef.current) {
             containerRef.current.classList.add('forge-shaking')
             setTimeout(() => containerRef.current?.classList.remove('forge-shaking'), 400)
         }
