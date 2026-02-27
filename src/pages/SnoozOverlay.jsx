@@ -459,8 +459,8 @@ const SnoozOverlay = () => {
                         <div className="bg-[#131d28] rounded-xl border border-white/[0.1] overflow-hidden flex flex-col h-full">
                             {/* Table header */}
                             <div className="flex items-center border-b border-white/[0.1] bg-[#0e1620]">
-                                <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30">Order</div>
-                                <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30">Chaos</div>
+                                <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30 text-center">Order</div>
+                                <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30 text-center">Chaos</div>
                                 {people.map(p => (
                                     <div key={p.id} className="flex-1 px-2 py-3 text-center text-sm font-black tracking-[0.1em] uppercase text-white/35 truncate">{p.name}</div>
                                 ))}
@@ -475,7 +475,7 @@ const SnoozOverlay = () => {
 
                                         <button
                                             onClick={() => handleTeamClick({ id: match.team1_id, name: match.team1_name, color: match.team1_color, slug: match.team1_slug, logo: match.team1_logo })}
-                                            className={`w-[280px] shrink-0 flex items-center gap-3 px-4 py-1 cursor-pointer transition-colors rounded-l ${selectedTeam?.team_id === match.team1_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                                            className={`w-[280px] shrink-0 grid grid-cols-[56px_1fr] items-center gap-3 px-4 py-1 cursor-pointer transition-colors rounded-l ${selectedTeam?.team_id === match.team1_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
                                         >
                                             <TeamLogo slug={match.team1_slug} name={match.team1_name} size={56} color={match.team1_color} logoUrl={match.team1_logo} />
                                             <div className="min-w-0">
@@ -488,7 +488,7 @@ const SnoozOverlay = () => {
 
                                         <button
                                             onClick={() => handleTeamClick({ id: match.team2_id, name: match.team2_name, color: match.team2_color, slug: match.team2_slug, logo: match.team2_logo })}
-                                            className={`w-[280px] shrink-0 flex items-center gap-3 px-4 py-1 cursor-pointer transition-colors ${selectedTeam?.team_id === match.team2_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                                            className={`w-[280px] shrink-0 grid grid-cols-[56px_1fr] items-center gap-3 px-4 py-1 cursor-pointer transition-colors ${selectedTeam?.team_id === match.team2_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
                                         >
                                             <TeamLogo slug={match.team2_slug} name={match.team2_name} size={56} color={match.team2_color} logoUrl={match.team2_logo} />
                                             <div className="min-w-0">
