@@ -200,6 +200,38 @@ export async function getPerformanceStats(sql, playerId) {
 
 
 /**
+ * Catch-up recalc for all users. Pushes current performance/scrim/referral stats
+ * into challenge progress without ever revoking completed challenges.
+ * Uses pushChallengeProgress which skips completed challenges entirely.
+ *
+ * @param {object} sql
+ * @param {Array<{user_id: number, linked_player_id: number}>} linkedUsers - users with linked players
+ * @returns {Promise<{updated: number, claimable: number}>}
+ */
+export async function catchupAllUsers(sql, linkedUsers) {
+    let updated = 0
+    let claimable = 0
+
+    // Performance challenges for users with linked players
+    for (const user of linkedUsers) {
+        const stats = await getPerformanceStats(sql, user.linked_player_id)
+        const newly = await pushChallengeProgress(sql, user.user_id, stats)
+        claimable += newly.length
+        updated++
+    }
+
+    // Scrim + referral for ALL authenticated users (no player link needed)
+    const allUsers = await sql`SELECT id FROM users`
+    for (const u of allUsers) {
+        await recalcScrimChallenges(sql, u.id)
+        await recalcReferralChallenges(sql, u.id)
+    }
+
+    return { updated, claimable }
+}
+
+
+/**
  * Find all users with linked players who participated in a given match.
  * Must be called BEFORE match/game deletion since the join chain breaks after.
  *

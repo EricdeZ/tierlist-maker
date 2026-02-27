@@ -59,6 +59,7 @@ export default function ChallengeManager() {
     const [error, setError] = useState(null)
     const [recalcing, setRecalcing] = useState(false)
     const [recalcResult, setRecalcResult] = useState(null)
+    const [catchingUp, setCatchingUp] = useState(false)
 
     const loadChallenges = async () => {
         try {
@@ -143,6 +144,21 @@ export default function ChallengeManager() {
         }
     }
 
+    const handleCatchupAll = async () => {
+        if (!confirm('Catch up challenge progress for all users? This can only award progress, never revoke.')) return
+        setCatchingUp(true)
+        setRecalcResult(null)
+        try {
+            const result = await challengeService.catchupAll()
+            const msg = `Caught up ${result.updated} users` + (result.claimable > 0 ? ` (${result.claimable} newly claimable)` : '')
+            setRecalcResult(msg)
+        } catch (err) {
+            setRecalcResult(`Error: ${err.message}`)
+        } finally {
+            setCatchingUp(false)
+        }
+    }
+
     const handleRecalcAll = async () => {
         if (!confirm('Recalculate all challenge progress for every user? This may take a moment.')) return
         setRecalcing(true)
@@ -167,8 +183,12 @@ export default function ChallengeManager() {
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-2xl font-bold">Challenge Manager</h1>
                     <div className="flex items-center gap-3">
+                        <button onClick={handleCatchupAll} disabled={catchingUp || recalcing}
+                            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-colors disabled:opacity-50">
+                            {catchingUp ? 'Catching up...' : 'Catch Up Progress'}
+                        </button>
                         {isOwner && (
-                            <button onClick={handleRecalcAll} disabled={recalcing}
+                            <button onClick={handleRecalcAll} disabled={recalcing || catchingUp}
                                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm transition-colors disabled:opacity-50">
                                 {recalcing ? 'Recalculating...' : 'Recalc All Progress'}
                             </button>

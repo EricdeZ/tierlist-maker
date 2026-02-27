@@ -281,6 +281,10 @@ export const challengeService = {
     async recalcAll() {
         return apiPost('challenge-manage', {}, { action: 'recalc-all' })
     },
+
+    async catchupAll() {
+        return apiPost('challenge-manage', {}, { action: 'catchup-all' })
+    },
 }
 
 export const siteConfigService = {

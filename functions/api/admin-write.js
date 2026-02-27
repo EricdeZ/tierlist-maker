@@ -260,13 +260,17 @@ async function submitMatch(sql, body, admin, event) {
         }
 
         // Push challenge progress for players in this match (fire-and-forget)
-        updateMatchChallenges(sql, result.match_id)
-            .catch(err => console.error('Match challenge update failed:', err))
+        event.waitUntil(
+            updateMatchChallenges(sql, result.match_id)
+                .catch(err => console.error('Match challenge update failed:', err))
+        )
 
         // Resolve predictions for this scheduled match (fire-and-forget)
         if (scheduled_match_id && winnerTeamId) {
-            resolvePredictions(sql, scheduled_match_id, winnerTeamId)
-                .catch(err => console.error('Prediction resolution failed:', err))
+            event.waitUntil(
+                resolvePredictions(sql, scheduled_match_id, winnerTeamId)
+                    .catch(err => console.error('Prediction resolution failed:', err))
+            )
         }
 
         // Recalculate Fantasy Forge performance scores for the season (fire-and-forget)
@@ -276,8 +280,10 @@ async function submitMatch(sql, body, admin, event) {
         )
 
         // Update league_player roles based on recent games played (fire-and-forget)
-        updatePlayerRoles(sql, result.match_id)
-            .catch(err => console.error('Player role update failed:', err))
+        event.waitUntil(
+            updatePlayerRoles(sql, result.match_id)
+                .catch(err => console.error('Player role update failed:', err))
+        )
 
         return {
             statusCode: 200,

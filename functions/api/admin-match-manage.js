@@ -215,8 +215,10 @@ async function deleteMatch(sql, body, admin, isOwnOnly, event) {
     await logAudit(sql, admin, { action: 'delete-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id })
 
     // Recalculate challenge progress and revoke if needed (fire-and-forget)
-    recalcMatchChallenges(sql, affectedUsers)
-        .catch(err => console.error('Challenge recalc after match delete failed:', err))
+    event.waitUntil(
+        recalcMatchChallenges(sql, affectedUsers)
+            .catch(err => console.error('Challenge recalc after match delete failed:', err))
+    )
 
     // Recalculate forge performance scores (fire-and-forget)
     if (matchRow) {
@@ -271,8 +273,10 @@ async function deleteGame(sql, body, admin, isOwnOnly, event) {
     await logAudit(sql, admin, { action: 'delete-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id } })
 
     // Recalculate challenge progress and revoke if needed (fire-and-forget)
-    recalcMatchChallenges(sql, affectedUsers)
-        .catch(err => console.error('Challenge recalc after game delete failed:', err))
+    event.waitUntil(
+        recalcMatchChallenges(sql, affectedUsers)
+            .catch(err => console.error('Challenge recalc after game delete failed:', err))
+    )
 
     // Recalculate forge performance scores (fire-and-forget)
     const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
@@ -384,9 +388,11 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
     await logAudit(sql, admin, { action: 'save-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id, winner_team_id } })
 
     // Recalculate challenge progress and revoke if needed (fire-and-forget)
-    getMatchAffectedUsers(sql, match_id)
-        .then(users => recalcMatchChallenges(sql, users))
-        .catch(err => console.error('Challenge recalc after game save failed:', err))
+    event.waitUntil(
+        getMatchAffectedUsers(sql, match_id)
+            .then(users => recalcMatchChallenges(sql, users))
+            .catch(err => console.error('Challenge recalc after game save failed:', err))
+    )
 
     // Recalculate forge performance scores (fire-and-forget)
     const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
