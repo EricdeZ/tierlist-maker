@@ -5,13 +5,16 @@ import sparkIcon from '../../assets/spark.png'
 import forgeLogo from '../../assets/forge.png'
 
 export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserId, seasonSlugs }) {
-    const [mode, setMode] = useState('total') // 'total' | 'realized'
+    const [mode, setMode] = useState('total') // 'total' | 'realized' | 'losses'
 
     const sorted = useMemo(() => {
         let list = [...leaderboard]
         if (mode === 'realized') {
             list = list.filter(e => (e.realizedProfit ?? 0) !== 0)
             list.sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0))
+        } else if (mode === 'losses') {
+            list = list.filter(e => e.totalProfit < 0)
+            list.sort((a, b) => a.totalProfit - b.totalProfit)
         }
         return list.slice(0, 50).map((e, i) => ({ ...e, position: i + 1 }))
     }, [leaderboard, mode])
@@ -44,6 +47,7 @@ export default function ForgeLeaderboardTab({ leaderboard, loading, currentUserI
                 {[
                     { key: 'total', label: 'Total' },
                     { key: 'realized', label: 'Realized' },
+                    { key: 'losses', label: 'L' },
                 ].map(opt => (
                     <button
                         key={opt.key}
