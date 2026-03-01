@@ -24,6 +24,12 @@ const handler = async (event) => {
         if (event.httpMethod === 'GET') {
             const type = (event.queryStringParameters || {}).type
 
+            if (type === 'wordle') {
+                const categories = await sql`SELECT * FROM wordle_categories ORDER BY name`
+                const tags = await sql`SELECT * FROM codex_god_tags ORDER BY name`
+                return { statusCode: 200, headers, body: JSON.stringify({ categories, tags }) }
+            }
+
             if (type === 'gods') {
                 const fields = await sql`SELECT * FROM codex_god_fields ORDER BY sort_order, id`
                 const tags = await sql`SELECT * FROM codex_god_tags ORDER BY name`
@@ -115,6 +121,10 @@ const handler = async (event) => {
             case 'remove-god-image': return await removeGodImage(sql, body, admin)
             case 'reorder-god-images': return await reorderGodImages(sql, body, admin)
             case 'update-god-image': return await updateGodImageCaption(sql, body, admin)
+            // Wordle Categories
+            case 'create-wordle-category': return await createWordleCategory(sql, body, admin)
+            case 'update-wordle-category': return await updateWordleCategory(sql, body, admin)
+            case 'delete-wordle-category': return await deleteWordleCategory(sql, body, admin)
             // Images
             case 'update-image-category': return await updateImageCategory(sql, body, admin)
             default:
@@ -534,6 +544,43 @@ async function updateGodImageCaption(sql, { id, caption }, admin) {
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'God image not found' }) }
     await logAudit(sql, admin, { action: 'update-codex-god-image', endpoint: 'codex-manage', targetType: 'codex_god_image', targetId: id, details: { caption } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, godImage: row }) }
+}
+
+// ── Wordle Categories ──
+
+async function createWordleCategory(sql, { name, tag_id, difficulty }, admin) {
+    if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
+    const diff = Math.max(1, Math.min(10, parseInt(difficulty) || 5))
+    const [row] = await sql`
+        INSERT INTO wordle_categories (name, tag_id, difficulty)
+        VALUES (${name.trim()}, ${tag_id || null}, ${diff})
+        RETURNING *
+    `
+    await logAudit(sql, admin, { action: 'create-wordle-category', endpoint: 'codex-manage', targetType: 'wordle_category', targetId: row.id, details: { name: row.name } })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, category: row }) }
+}
+
+async function updateWordleCategory(sql, { id, name, tag_id, difficulty }, admin) {
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    const diff = difficulty !== undefined ? Math.max(1, Math.min(10, parseInt(difficulty) || 5)) : undefined
+    const [row] = await sql`
+        UPDATE wordle_categories SET
+            name = COALESCE(${name?.trim() || null}, name),
+            tag_id = ${tag_id !== undefined ? (tag_id || null) : null},
+            difficulty = COALESCE(${diff ?? null}, difficulty)
+        WHERE id = ${id} RETURNING *
+    `
+    if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Category not found' }) }
+    await logAudit(sql, admin, { action: 'update-wordle-category', endpoint: 'codex-manage', targetType: 'wordle_category', targetId: id, details: { name, tag_id, difficulty } })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, category: row }) }
+}
+
+async function deleteWordleCategory(sql, { id }, admin) {
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    const [row] = await sql`DELETE FROM wordle_categories WHERE id = ${id} RETURNING id, name`
+    if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Category not found' }) }
+    await logAudit(sql, admin, { action: 'delete-wordle-category', endpoint: 'codex-manage', targetType: 'wordle_category', targetId: id, details: { name: row.name } })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
 
 // ── Helpers ──

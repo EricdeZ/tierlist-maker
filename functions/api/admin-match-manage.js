@@ -49,6 +49,8 @@ const handler = async (event) => {
                     return await updateMatch(sql, body, admin, isOwnOnly, event)
                 case 'save-game':
                     return await saveGame(sql, body, admin, isOwnOnly, event)
+                case 'transfer-match':
+                    return await transferMatch(sql, body, admin, isOwnOnly, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -404,6 +406,61 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Game saved' }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// POST: Transfer match to a different season
+// ═══════════════════════════════════════════════════
+async function transferMatch(sql, body, admin, isOwnOnly, event) {
+    const { match_id, target_season_id } = body
+    if (!match_id || !target_season_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id and target_season_id required' }) }
+    }
+
+    // Check permission on source league
+    const sourceLeagueId = await getLeagueIdFromMatch(match_id)
+    if (!sourceLeagueId || !await requireAnyPermission(event, ['match_manage'], sourceLeagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for source league' }) }
+    }
+
+    // Check permission on target league
+    const targetLeagueId = await getLeagueIdFromSeason(target_season_id)
+    if (!targetLeagueId || !await requireAnyPermission(event, ['match_manage'], targetLeagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for target league' }) }
+    }
+
+    // Get current season for forge recalc
+    const [matchRow] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
+    if (!matchRow) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Match not found' }) }
+    }
+    const oldSeasonId = matchRow.season_id
+
+    await sql`UPDATE matches SET season_id = ${target_season_id}, updated_at = NOW() WHERE id = ${match_id}`
+
+    await logAudit(sql, admin, {
+        action: 'transfer-match', endpoint: 'admin-match-manage',
+        targetType: 'match', targetId: match_id,
+        details: { from_season_id: oldSeasonId, to_season_id: target_season_id }
+    })
+
+    // Recalculate forge for both old and new seasons
+    event.waitUntil(
+        Promise.all([
+            recalcForgePerformance(sql, oldSeasonId).catch(err => console.error('Forge recalc (old season) failed:', err)),
+            recalcForgePerformance(sql, target_season_id).catch(err => console.error('Forge recalc (new season) failed:', err)),
+        ])
+    )
+
+    // Recalculate challenges for affected players
+    const affectedUsers = await getMatchAffectedUsers(sql, match_id)
+    event.waitUntil(
+        recalcMatchChallenges(sql, affectedUsers)
+            .catch(err => console.error('Challenge recalc after transfer failed:', err))
+    )
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match transferred' }) }
 }
 
 

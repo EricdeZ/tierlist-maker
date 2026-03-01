@@ -81,6 +81,7 @@ import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
 import CodexItems from "./pages/codex/CodexItems.jsx";
 import CodexGods from "./pages/codex/CodexGods.jsx";
 import CodexImages from "./pages/codex/CodexImages.jsx";
+import CodexWordle from "./pages/codex/CodexWordle.jsx";
 
 function App() {
     return (
@@ -134,6 +135,7 @@ function App() {
                                 <Route index element={<CodexDashboard />} />
                                 <Route path="items" element={<CodexItems />} />
                                 <Route path="gods" element={<CodexGods />} />
+                                <Route path="wordle" element={<CodexWordle />} />
                                 <Route path="images" element={<CodexImages />} />
                             </Route>
 

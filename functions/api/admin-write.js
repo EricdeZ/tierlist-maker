@@ -133,6 +133,18 @@ async function submitMatch(sql, body, admin, event) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
+    // Validate teams belong to this season
+    const teamCheck = await sql`
+        SELECT id FROM teams WHERE id IN (${team1_id}, ${team2_id}) AND season_id = ${season_id}
+    `
+    const foundIds = new Set(teamCheck.map(r => r.id))
+    if (!foundIds.has(team1_id)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Team 1 does not belong to the selected season' }) }
+    }
+    if (!foundIds.has(team2_id)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Team 2 does not belong to the selected season' }) }
+    }
+
     // Validate each game has a winner
     for (let i = 0; i < games.length; i++) {
         if (!games[i].winning_team_id) {

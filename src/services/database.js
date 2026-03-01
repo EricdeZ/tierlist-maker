@@ -285,6 +285,22 @@ export const challengeService = {
     async catchupAll() {
         return apiPost('challenge-manage', {}, { action: 'catchup-all' })
     },
+
+    async searchUsers(query) {
+        return apiPost('challenge-manage', {}, { action: 'search-users', query })
+    },
+
+    async getUserChallenges(userId) {
+        return apiPost('challenge-manage', {}, { action: 'user-challenges', userId })
+    },
+
+    async awardChallenge(userId, challengeId) {
+        return apiPost('challenge-manage', {}, { action: 'award-challenge', userId, challengeId })
+    },
+
+    async revokeUserChallenge(userId, challengeId) {
+        return apiPost('challenge-manage', {}, { action: 'revoke-user-challenge', userId, challengeId })
+    },
 }
 
 export const siteConfigService = {
@@ -477,6 +493,19 @@ export const codexService = {
     },
     async updateGodImageCaption(id, caption) {
         return apiPost('codex-manage', {}, { action: 'update-god-image', id, caption })
+    },
+    // Wordle Categories
+    async getWordleCategories() {
+        return apiCall('codex-manage', { type: 'wordle' })
+    },
+    async createWordleCategory(data) {
+        return apiPost('codex-manage', {}, { action: 'create-wordle-category', ...data })
+    },
+    async updateWordleCategory(data) {
+        return apiPost('codex-manage', {}, { action: 'update-wordle-category', ...data })
+    },
+    async deleteWordleCategory(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-wordle-category', id })
     },
 }
 

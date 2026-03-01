@@ -190,7 +190,7 @@ async function addChannel(sql, body, admin) {
 
 
 // ═══════════════════════════════════════════════════
-// POST: Remove (deactivate) a channel
+// POST: Remove (delete) a channel
 // ═══════════════════════════════════════════════════
 async function removeChannel(sql, body, admin) {
     const { id } = body
@@ -198,10 +198,7 @@ async function removeChannel(sql, body, admin) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     }
 
-    await sql`
-        UPDATE discord_channels SET is_active = false, updated_at = NOW()
-        WHERE id = ${id}
-    `
+    await sql`DELETE FROM discord_channels WHERE id = ${id}`
 
     await logAudit(sql, admin, {
         action: 'remove-discord-channel', endpoint: 'discord-queue',

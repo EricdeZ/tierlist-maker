@@ -7,6 +7,7 @@ import Navbar from '../components/layout/Navbar'
 import RankBanner from '../components/RankBanner'
 import { CHALLENGE_TIERS, TIER_MAP, getTierColor, getTierLabel } from '../config/challengeTiers'
 import passionCoin from '../assets/passion/passion.png'
+import uniqueIcon from '../assets/ranks/unique.png'
 
 const DiscordIcon = ({ className }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -83,8 +84,11 @@ function buildDisplayList(challenges, activeTier) {
     }
 
     // When filtering by a specific tier, show incomplete + claimable only
+    // Unique tier: always show all (including taken) as a showcase
     if (activeTier !== 'all') {
-        const tierChallenges = (challenges[activeTier] || []).filter(ch => !ch.completed || ch.claimable)
+        const tierChallenges = activeTier === 'unique'
+            ? (challenges[activeTier] || [])
+            : (challenges[activeTier] || []).filter(ch => !ch.completed || ch.claimable)
         return [...tierChallenges].sort((a, b) => {
             if (a.claimable && !b.claimable) return -1
             if (!a.claimable && b.claimable) return 1
@@ -108,6 +112,11 @@ function buildDisplayList(challenges, activeTier) {
         tiers.sort((a, b) => a.targetValue - b.targetValue)
         let shownNext = false
         for (const ch of tiers) {
+            // Always show unique challenges (even taken) as a showcase
+            if (ch.tier === 'unique') {
+                display.push(ch)
+                continue
+            }
             if (ch.completed) continue
             if (!shownNext) {
                 display.push(ch)
@@ -337,6 +346,19 @@ export default function Challenges() {
                     </div>
                 )}
 
+                {/* Unique tier disclaimer */}
+                {activeTier === 'unique' && !loading && (
+                    <div className="flex items-center gap-3 mb-6 px-5 py-4 rounded-xl border border-[#d4a539]/20 bg-[#d4a539]/[0.04]">
+                        <img src={uniqueIcon} alt="" className="w-8 h-8 shrink-0 object-contain" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold" style={{ color: '#d4a539' }}>Unique Challenges</p>
+                            <p className="text-xs text-(--color-text-secondary)/50">
+                                These challenges can only be claimed once — by one person, ever. Once taken, they are displayed here as a showcase.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Challenge grid */}
                 {loading ? (
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -361,6 +383,7 @@ export default function Challenges() {
                                 justClaimed={justClaimed[ch.id]}
                                 onClaim={handleClaim}
                                 isLoggedIn={!!user}
+                                userId={user?.id}
                                 showTierBadge={activeTier === 'all'}
                             />
                         ))}
@@ -409,11 +432,14 @@ export default function Challenges() {
 // ═══════════════════════════════════════════════════
 // Challenge Card
 // ═══════════════════════════════════════════════════
-function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim, isLoggedIn, showTierBadge }) {
+function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim, isLoggedIn, showTierBadge, userId }) {
     const pct = Math.round(ch.progress * 100)
     const tierColor = getTierColor(ch.tier)
     const isClaiming = claimingId === ch.id
     const isClaimable = isLoggedIn && ch.claimable && !justClaimed && !ch.completed
+    const holders = ch.holders
+    const isGrandfathered = holders?.some(h => h.userId === userId)
+    const takenByOther = ch.tier === 'unique' && holders?.length > 0 && !isGrandfathered
 
     return (
         <div
@@ -421,7 +447,7 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                 relative rounded-xl
                 bg-(--color-secondary) border border-white/[0.06]
                 overflow-hidden transition-all duration-300
-                ${ch.completed && !ch.claimable ? 'opacity-60' : ''}
+                ${(ch.completed && !ch.claimable) || takenByOther ? 'opacity-60' : ''}
                 ${isClaimable ? 'border-r-(--color-accent)/25 border-t-(--color-accent)/25 border-b-(--color-accent)/25' : ''}
             `}
             style={{
@@ -476,29 +502,96 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                         Repeatable
                     </span>
                 )}
+                {ch.tier === 'unique' && !holders?.length && (
+                    <span className="inline-block text-[10px] border rounded px-1.5 py-px mb-2" style={{ color: '#d4a539', borderColor: '#d4a53940' }}>
+                        Unclaimed
+                    </span>
+                )}
 
-                <div className="mt-3">
-                    <div className="flex justify-between items-baseline text-[11px] mb-1.5">
-                        <span className="text-(--color-text-secondary)/60 tabular-nums">
-                            {ch.currentValue?.toLocaleString()} / {ch.targetValue?.toLocaleString()}
-                        </span>
-                        <span className={`font-bold tabular-nums ${pct >= 100 ? 'text-(--color-accent)' : 'text-(--color-text-secondary)/60'}`}>
-                            {pct}%
-                        </span>
+                {/* Taken unique challenge — showcase layout */}
+                {takenByOther && holders?.length > 0 && (
+                    <div className="mt-3 rounded-lg px-3 py-3 bg-[#d4a539]/[0.06] border border-[#d4a539]/15">
+                        <div className="text-[10px] uppercase tracking-wider font-bold mb-2.5" style={{ color: '#d4a539' }}>
+                            Claimed by
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {holders.map(h => (
+                                <div key={h.userId} className="flex items-center gap-2.5">
+                                    {h.avatar && h.discordId ? (
+                                        <img
+                                            src={`https://cdn.discordapp.com/avatars/${h.discordId}/${h.avatar}.png?size=64`}
+                                            alt=""
+                                            className="w-7 h-7 rounded-full ring-2 ring-[#d4a539]/30"
+                                        />
+                                    ) : (
+                                        <div className="w-7 h-7 rounded-full bg-white/10 ring-2 ring-[#d4a539]/30" />
+                                    )}
+                                    <div>
+                                        <span className="text-sm font-bold" style={{ color: '#d4a539' }}>
+                                            {h.username}
+                                        </span>
+                                        {h.claimedAt && (
+                                            <span className="text-[10px] text-(--color-text-secondary)/40 ml-2">
+                                                {new Date(h.claimedAt).toLocaleDateString()}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="h-[5px] bg-white/[0.06] rounded-full overflow-hidden">
-                        <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                                width: `${pct}%`,
-                                background: ch.completed
-                                    ? 'rgba(74, 222, 128, 0.5)'
-                                    : `linear-gradient(90deg, ${tierColor}99, ${tierColor})`,
-                                animation: 'progress-fill 0.8s ease-out',
-                            }}
-                        />
+                )}
+
+                {/* Own holder display (grandfathered) */}
+                {!takenByOther && holders?.length > 0 && (
+                    <div className="flex flex-col gap-1.5 mb-2">
+                        {holders.map(h => (
+                            <div key={h.userId} className="flex items-center gap-2">
+                                {h.avatar && h.discordId ? (
+                                    <img
+                                        src={`https://cdn.discordapp.com/avatars/${h.discordId}/${h.avatar}.png?size=32`}
+                                        alt=""
+                                        className="w-5 h-5 rounded-full"
+                                    />
+                                ) : (
+                                    <div className="w-5 h-5 rounded-full bg-white/10" />
+                                )}
+                                <span className="text-[11px] font-bold" style={{ color: '#d4a539' }}>
+                                    {h.username}
+                                </span>
+                                <span className="text-[10px] text-(--color-text-secondary)/40">
+                                    {h.claimedAt ? new Date(h.claimedAt).toLocaleDateString() : ''}
+                                </span>
+                            </div>
+                        ))}
                     </div>
-                </div>
+                )}
+
+                {/* Progress bar — hidden for taken unique challenges */}
+                {!takenByOther && (
+                    <div className="mt-3">
+                        <div className="flex justify-between items-baseline text-[11px] mb-1.5">
+                            <span className="text-(--color-text-secondary)/60 tabular-nums">
+                                {ch.currentValue?.toLocaleString()} / {ch.targetValue?.toLocaleString()}
+                            </span>
+                            <span className={`font-bold tabular-nums ${pct >= 100 ? 'text-(--color-accent)' : 'text-(--color-text-secondary)/60'}`}>
+                                {pct}%
+                            </span>
+                        </div>
+                        <div className="h-[5px] bg-white/[0.06] rounded-full overflow-hidden">
+                            <div
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{
+                                    width: `${pct}%`,
+                                    background: ch.completed
+                                        ? 'rgba(74, 222, 128, 0.5)'
+                                        : `linear-gradient(90deg, ${tierColor}99, ${tierColor})`,
+                                    animation: 'progress-fill 0.8s ease-out',
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {isClaimable && (
                     <button
@@ -521,7 +614,7 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                     </div>
                 )}
 
-                {ch.completed && !justClaimed && (
+                {ch.completed && !justClaimed && !takenByOther && (
                     <div className="mt-3 flex items-center gap-2 text-xs text-green-400/70">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

@@ -4,7 +4,7 @@
 import { adminHeaders } from './db.js'
 
 export const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-export const MAX_SIZE = 512 * 1024 // 512KB
+export const MAX_SIZE = 2 * 1024 * 1024 // 2MB (client compresses before upload)
 export const EXT_MAP = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
 export const ALL_EXTS = Object.values(EXT_MAP)
 
@@ -33,7 +33,7 @@ export async function validateImageFile(file) {
         throw Object.assign(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'), { status: 415 })
     }
     if (file.size > MAX_SIZE) {
-        throw Object.assign(new Error('Image must be under 512KB'), { status: 413 })
+        throw Object.assign(new Error('Image must be under 2MB'), { status: 413 })
     }
     const bytes = new Uint8Array(await file.arrayBuffer())
     if (!validateMagicBytes(bytes, file.type)) {

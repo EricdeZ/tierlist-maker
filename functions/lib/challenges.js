@@ -36,7 +36,8 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
     const challenges = await sql`
         SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
                COALESCE(uc.current_value, 0)::integer as old_value,
-               COALESCE(uc.completed, false) as completed
+               COALESCE(uc.completed, false) as completed,
+               COALESCE(uc.admin_altered, false) as admin_altered
         FROM challenges c
         LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
         WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
@@ -48,7 +49,7 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
     const newlyClaimable = []
 
     for (const ch of challenges) {
-        if (ch.completed) continue
+        if (ch.completed || ch.admin_altered) continue
         const newValue = Number(currentStats[ch.stat_key] || 0)
 
         upsertRows.push([ch.id, newValue])
@@ -271,6 +272,7 @@ export async function invalidatePerformanceChallenges(sql, userIds, includeCompl
               AND uc.user_id = ANY(${userIds})
               AND c.is_active = true
               AND c.stat_key = ANY(${PERF_KEYS})
+              AND uc.admin_altered = false
         `
     } else {
         await sql`
@@ -281,6 +283,7 @@ export async function invalidatePerformanceChallenges(sql, userIds, includeCompl
               AND c.is_active = true
               AND c.stat_key = ANY(${PERF_KEYS})
               AND uc.completed = false
+              AND uc.admin_altered = false
         `
     }
 }
@@ -301,7 +304,8 @@ export async function recalcSingleUserChallenges(sql, userId, playerId) {
     const challenges = await sql`
         SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
                COALESCE(uc.current_value, 0)::integer as old_value,
-               COALESCE(uc.completed, false) as completed
+               COALESCE(uc.completed, false) as completed,
+               COALESCE(uc.admin_altered, false) as admin_altered
         FROM challenges c
         LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
         WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
@@ -313,6 +317,7 @@ export async function recalcSingleUserChallenges(sql, userId, playerId) {
     const revocations = []
 
     for (const ch of challenges) {
+        if (ch.admin_altered) continue
         const newValue = Number(stats[ch.stat_key] || 0)
         upsertRows.push([ch.id, newValue])
 

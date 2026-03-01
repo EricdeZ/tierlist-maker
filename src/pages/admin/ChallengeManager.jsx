@@ -1,9 +1,263 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { challengeService } from '../../services/database'
 import { CHALLENGE_TIERS, getTierColor, getTierLabel } from '../../config/challengeTiers'
 import { useAuth } from '../../context/AuthContext'
 import PageTitle from '../../components/PageTitle'
 import passionCoin from '../../assets/passion/passion.png'
+
+// ═══════════════════════════════════════════════════
+// Player Challenge Manager — search, view, award/revoke
+// ═══════════════════════════════════════════════════
+function PlayerChallengePanel() {
+    const [query, setQuery] = useState('')
+    const [searchResults, setSearchResults] = useState([])
+    const [searching, setSearching] = useState(false)
+    const [selectedUser, setSelectedUser] = useState(null)
+    const [userChallenges, setUserChallenges] = useState([])
+    const [loadingChallenges, setLoadingChallenges] = useState(false)
+    const [actionId, setActionId] = useState(null)
+    const [tierFilter, setTierFilter] = useState('all')
+    const searchTimeout = useRef(null)
+
+    const doSearch = useCallback(async (q) => {
+        if (q.length < 2) { setSearchResults([]); return }
+        setSearching(true)
+        try {
+            const data = await challengeService.searchUsers(q)
+            setSearchResults(data.users || [])
+        } catch (err) {
+            console.error('Search failed:', err)
+        } finally {
+            setSearching(false)
+        }
+    }, [])
+
+    const handleQueryChange = (val) => {
+        setQuery(val)
+        clearTimeout(searchTimeout.current)
+        searchTimeout.current = setTimeout(() => doSearch(val), 300)
+    }
+
+    const loadUserChallenges = async (user) => {
+        setSelectedUser(user)
+        setSearchResults([])
+        setQuery('')
+        setLoadingChallenges(true)
+        try {
+            const data = await challengeService.getUserChallenges(user.id)
+            setUserChallenges(data.challenges || [])
+        } catch (err) {
+            console.error('Failed to load user challenges:', err)
+        } finally {
+            setLoadingChallenges(false)
+        }
+    }
+
+    const handleAward = async (challengeId) => {
+        if (!confirm('Award this challenge? This grants Passion and flags it as admin-altered.')) return
+        setActionId(challengeId)
+        try {
+            await challengeService.awardChallenge(selectedUser.id, challengeId)
+            await loadUserChallenges(selectedUser)
+        } catch (err) {
+            alert(err.message)
+        } finally {
+            setActionId(null)
+        }
+    }
+
+    const handleRevoke = async (challengeId) => {
+        if (!confirm('Revoke this challenge? This deducts Passion and flags it as admin-altered.')) return
+        setActionId(challengeId)
+        try {
+            await challengeService.revokeUserChallenge(selectedUser.id, challengeId)
+            await loadUserChallenges(selectedUser)
+        } catch (err) {
+            alert(err.message)
+        } finally {
+            setActionId(null)
+        }
+    }
+
+    const avatarUrl = (u) =>
+        u.discord_avatar && u.discord_id
+            ? `https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.png?size=32`
+            : null
+
+    const filteredChallenges = tierFilter === 'all'
+        ? userChallenges
+        : userChallenges.filter(ch => ch.tier === tierFilter)
+
+    const availableTiers = [...new Set(userChallenges.map(ch => ch.tier))]
+
+    return (
+        <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-5 mb-6">
+            <h2 className="text-base font-bold mb-4">Player Challenges</h2>
+
+            {/* Search bar */}
+            <div className="relative mb-4">
+                <input
+                    value={query}
+                    onChange={e => handleQueryChange(e.target.value)}
+                    placeholder="Search by Discord username or player name..."
+                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50"
+                />
+                {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-(--color-text-secondary)">Searching...</div>
+                )}
+
+                {/* Search results dropdown */}
+                {searchResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-(--color-secondary) border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                        {searchResults.map(u => (
+                            <button
+                                key={u.id}
+                                onClick={() => loadUserChallenges(u)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left cursor-pointer"
+                            >
+                                {avatarUrl(u) ? (
+                                    <img src={avatarUrl(u)} alt="" className="w-6 h-6 rounded-full" />
+                                ) : (
+                                    <div className="w-6 h-6 rounded-full bg-white/10" />
+                                )}
+                                <div className="min-w-0">
+                                    <div className="text-sm font-medium truncate">{u.discord_username}</div>
+                                    {u.player_name && (
+                                        <div className="text-xs text-(--color-text-secondary)/60">{u.player_name}</div>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Selected user + challenges */}
+            {selectedUser && (
+                <div>
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                        <div className="flex items-center gap-3">
+                            {avatarUrl(selectedUser) ? (
+                                <img src={avatarUrl(selectedUser)} alt="" className="w-8 h-8 rounded-full" />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-white/10" />
+                            )}
+                            <div>
+                                <div className="font-bold text-sm">{selectedUser.discord_username}</div>
+                                {selectedUser.player_name && (
+                                    <div className="text-xs text-(--color-text-secondary)/60">{selectedUser.player_name}</div>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => { setSelectedUser(null); setUserChallenges([]) }}
+                            className="text-xs text-(--color-text-secondary) hover:text-white transition-colors"
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    {/* Tier filter */}
+                    {availableTiers.length > 1 && (
+                        <div className="flex gap-1.5 flex-wrap mb-4">
+                            <button
+                                onClick={() => setTierFilter('all')}
+                                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                                    tierFilter === 'all'
+                                        ? 'bg-(--color-accent) text-(--color-primary)'
+                                        : 'bg-white/[0.06] text-(--color-text-secondary)/70 hover:bg-white/10'
+                                }`}
+                            >
+                                All
+                            </button>
+                            {CHALLENGE_TIERS.filter(t => availableTiers.includes(t.key)).map(t => (
+                                <button
+                                    key={t.key}
+                                    onClick={() => setTierFilter(t.key)}
+                                    className="px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                                    style={
+                                        tierFilter === t.key
+                                            ? { backgroundColor: t.color, color: '#0a0f1a' }
+                                            : { backgroundColor: 'rgba(255,255,255,0.04)', color: `${t.color}cc` }
+                                    }
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {loadingChallenges ? (
+                        <div className="text-center py-6 text-(--color-text-secondary) text-sm">Loading challenges...</div>
+                    ) : (
+                        <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
+                            {filteredChallenges.map(ch => {
+                                const pct = Math.min(Math.round((ch.current_value / ch.target_value) * 100), 100)
+                                const tierColor = getTierColor(ch.tier)
+                                const isActing = actionId === ch.id
+
+                                return (
+                                    <div
+                                        key={ch.id}
+                                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                                        style={{ borderLeft: `3px solid ${tierColor}` }}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium truncate">{ch.title}</span>
+                                                {ch.admin_altered && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-px rounded bg-amber-500/15 text-amber-400 shrink-0">
+                                                        ALTERED
+                                                    </span>
+                                                )}
+                                                {ch.completed && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-px rounded bg-green-500/15 text-green-400 shrink-0">
+                                                        DONE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 mt-0.5">
+                                                <span className="text-[10px] text-(--color-text-secondary)/50">
+                                                    {ch.current_value?.toLocaleString()} / {ch.target_value?.toLocaleString()} ({pct}%)
+                                                </span>
+                                                <span className="text-[10px] font-bold" style={{ color: tierColor }}>
+                                                    {getTierLabel(ch.tier)}
+                                                </span>
+                                                <div className="flex items-center gap-0.5">
+                                                    <img src={passionCoin} alt="" className="w-3 h-3" />
+                                                    <span className="text-[10px] text-(--color-accent)">{ch.reward}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="shrink-0">
+                                            {ch.completed ? (
+                                                <button
+                                                    onClick={() => handleRevoke(ch.id)}
+                                                    disabled={isActing}
+                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {isActing ? '...' : 'Revoke'}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleAward(ch.id)}
+                                                    disabled={isActing}
+                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {isActing ? '...' : 'Award'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
 
 const CATEGORIES = ['engagement', 'league', 'performance', 'social']
 const TYPES = ['one_time', 'repeatable']
@@ -204,6 +458,8 @@ export default function ChallengeManager() {
                         {recalcResult}
                     </div>
                 )}
+
+                <PlayerChallengePanel />
 
                 {loading ? (
                     <div className="text-center py-12 text-(--color-text-secondary)">Loading...</div>

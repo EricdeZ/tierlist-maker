@@ -3,6 +3,7 @@ import { getDB, adminHeaders } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { grantPassion } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
+import { recalcForgePerformance, getPlayerBreakdown } from '../lib/forge.js'
 
 const NUMERIC_KEYS = [
     'game_decay', 'supply_weight', 'inactivity_decay',
@@ -24,7 +25,7 @@ const handler = async (event) => {
     try {
         // Pending/approve/reject actions: league_manage (global admin)
         // Config read/write: permission_manage (owner)
-        if (action === 'pending' || action === 'approve' || action === 'reject') {
+        if (action === 'pending' || action === 'approve' || action === 'reject' || action === 'recalc' || action === 'player-detail') {
             const admin = await requirePermission(event, 'league_manage')
             if (!admin) {
                 return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
@@ -43,6 +44,14 @@ const handler = async (event) => {
                     SELECT * FROM forge_pending_updates ORDER BY player_name ASC
                 `
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(pending) }
+            }
+
+            if (action === 'player-detail') {
+                const sparkId = Number(params.spark_id)
+                if (!sparkId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'spark_id required' }) }
+                const breakdown = await getPlayerBreakdown(sql, sparkId)
+                if (!breakdown) return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'Player not found' }) }
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(breakdown) }
             }
 
             const [config] = await sql`SELECT * FROM forge_config LIMIT 1`
@@ -87,31 +96,33 @@ const handler = async (event) => {
                     SELECT UNNEST(${sparkIds}::int[]), UNNEST(${prices}::numeric[]), 'performance'
                 `
 
-                // Track challenge progress for holders
-                const marketIds = [...new Set(pending.map(p => p.market_id))]
-                try {
-                    for (const marketId of marketIds) {
-                        const holdingUsers = await sql`
-                            SELECT DISTINCT sh.user_id
-                            FROM spark_holdings sh
-                            JOIN player_sparks ps ON sh.spark_id = ps.id
-                            WHERE ps.market_id = ${marketId} AND sh.sparks > 0
-                        `
-                        for (const u of holdingUsers) {
-                            await grantPassion(sql, u.user_id, 'forge_perf_update', 0, 'Perf update while holding')
-                            const [{ count }] = await sql`
-                                SELECT COUNT(*)::integer as count FROM passion_transactions
-                                WHERE user_id = ${u.user_id} AND type = 'forge_perf_update'
-                            `
-                            await pushChallengeProgress(sql, u.user_id, { forge_perf_updates_held: count })
-                        }
-                    }
-                } catch (err) {
-                    console.error('Forge approval challenge tracking failed:', err)
-                }
-
                 // Clear pending
                 await sql`DELETE FROM forge_pending_updates`
+
+                // Track challenge progress for holders (fire-and-forget — don't block response)
+                const marketIds = [...new Set(pending.map(p => p.market_id))]
+                event.waitUntil((async () => {
+                    try {
+                        for (const marketId of marketIds) {
+                            const holdingUsers = await sql`
+                                SELECT DISTINCT sh.user_id
+                                FROM spark_holdings sh
+                                JOIN player_sparks ps ON sh.spark_id = ps.id
+                                WHERE ps.market_id = ${marketId} AND sh.sparks > 0
+                            `
+                            for (const u of holdingUsers) {
+                                await grantPassion(sql, u.user_id, 'forge_perf_update', 0, 'Perf update while holding')
+                                const [{ count }] = await sql`
+                                    SELECT COUNT(*)::integer as count FROM passion_transactions
+                                    WHERE user_id = ${u.user_id} AND type = 'forge_perf_update'
+                                `
+                                await pushChallengeProgress(sql, u.user_id, { forge_perf_updates_held: count })
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Forge approval challenge tracking failed:', err)
+                    }
+                })())
 
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ applied: pending.length }) }
             }
@@ -119,6 +130,23 @@ const handler = async (event) => {
             if (action === 'reject') {
                 await sql`DELETE FROM forge_pending_updates`
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ rejected: true }) }
+            }
+
+            if (action === 'recalc') {
+                const body = event.body ? JSON.parse(event.body) : {}
+                let seasonId = body.season_id
+                if (!seasonId) {
+                    // Find the season with an open forge market
+                    const [openMarket] = await sql`
+                        SELECT season_id FROM forge_markets WHERE status = 'open' ORDER BY created_at DESC LIMIT 1
+                    `
+                    if (!openMarket) {
+                        return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ status: 'skipped', reason: 'no_open_market', detail: 'No open forge market found' }) }
+                    }
+                    seasonId = openMarket.season_id
+                }
+                const result = await recalcForgePerformance(sql, seasonId)
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result || { status: 'unknown' }) }
             }
 
             // ── Config update (owner only) ──

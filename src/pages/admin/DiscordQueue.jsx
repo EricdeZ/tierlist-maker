@@ -76,6 +76,7 @@ export default function DiscordQueue() {
     }
 
     const removeChannel = async (id) => {
+        if (!confirm('Remove this channel? This will also delete all its queued screenshots.')) return
         try {
             const res = await fetch(`${API}/discord-queue`, {
                 method: 'POST',
@@ -83,7 +84,7 @@ export default function DiscordQueue() {
                 body: JSON.stringify({ action: 'remove-channel', id }),
             })
             if (!res.ok) throw new Error((await res.json()).error)
-            showToast('success', 'Channel deactivated')
+            showToast('success', 'Channel removed')
             setChannels(prev => prev.filter(c => c.id !== id))
         } catch (err) {
             showToast('error', err.message)

@@ -57,6 +57,9 @@ async function listChallenges(sql, user) {
             ORDER BY sort_order, id
         `
 
+        // Fetch holders for unique challenges
+        const uniqueHolders = await getUniqueHolders(sql)
+
         const grouped = {}
         for (const ch of challenges) {
             if (!grouped[ch.tier]) grouped[ch.tier] = []
@@ -67,6 +70,7 @@ async function listChallenges(sql, user) {
                 tier: ch.tier, givesBadge: ch.gives_badge, badgeLabel: ch.badge_label,
                 currentValue: 0, completed: false, completedAt: null,
                 lastCompletedAt: null, canRepeat: false, claimable: false, progress: 0,
+                holders: uniqueHolders[ch.id] || null,
             })
         }
 
@@ -141,6 +145,9 @@ async function listChallenges(sql, user) {
         ORDER BY c.sort_order, c.id
     `
 
+    // Fetch holders for unique challenges
+    const uniqueHolders = await getUniqueHolders(sql)
+
     // Group by tier
     const grouped = {}
     let claimableCount = 0
@@ -148,7 +155,11 @@ async function listChallenges(sql, user) {
     for (const ch of challenges) {
         if (!grouped[ch.tier]) grouped[ch.tier] = []
 
-        const claimable = !ch.completed && Number(ch.current_value) >= Number(ch.target_value)
+        const holders = uniqueHolders[ch.id] || null
+        const isGrandfathered = holders?.some(h => h.userId === user.id)
+        const takenByOther = ch.tier === 'unique' && holders?.length > 0 && !isGrandfathered
+
+        const claimable = !takenByOther && !ch.completed && Number(ch.current_value) >= Number(ch.target_value)
 
         // For repeatable challenges, check if cooldown has elapsed
         let canRepeat = false
@@ -177,10 +188,38 @@ async function listChallenges(sql, user) {
             canRepeat,
             claimable,
             progress: Math.min(ch.current_value / ch.target_value, 1),
+            holders,
         })
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ challenges: grouped, claimableCount }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Unique challenge holders — who claimed each one
+// ═══════════════════════════════════════════════════
+async function getUniqueHolders(sql) {
+    const rows = await sql`
+        SELECT uc.challenge_id, u.id as user_id, u.discord_username, u.discord_avatar, u.discord_id, uc.completed_at
+        FROM user_challenges uc
+        JOIN challenges c ON c.id = uc.challenge_id
+        JOIN users u ON u.id = uc.user_id
+        WHERE c.tier = 'unique' AND c.is_active = true AND uc.completed = true
+        ORDER BY uc.completed_at ASC
+    `
+    const map = {}
+    for (const r of rows) {
+        if (!map[r.challenge_id]) map[r.challenge_id] = []
+        map[r.challenge_id].push({
+            userId: r.user_id,
+            username: r.discord_username,
+            avatar: r.discord_avatar,
+            discordId: r.discord_id,
+            claimedAt: r.completed_at,
+        })
+    }
+    return map
 }
 
 
@@ -197,12 +236,29 @@ async function claimChallenge(sql, user, event) {
 
     // Get challenge
     const [challenge] = await sql`
-        SELECT id, title, reward, target_value, type, gives_badge, badge_label
+        SELECT id, title, reward, target_value, type, tier, gives_badge, badge_label
         FROM challenges
         WHERE id = ${challengeId} AND is_active = true
     `
     if (!challenge) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Challenge not found' }) }
+    }
+
+    // Unique challenges: no new claims once someone holds it (existing holders are grandfathered)
+    if (challenge.tier === 'unique') {
+        const [alreadyHeld] = await sql`
+            SELECT 1 FROM user_challenges
+            WHERE challenge_id = ${challengeId} AND completed = true AND user_id = ${user.id}
+        `
+        if (!alreadyHeld) {
+            const [taken] = await sql`
+                SELECT 1 FROM user_challenges
+                WHERE challenge_id = ${challengeId} AND completed = true
+            `
+            if (taken) {
+                return { statusCode: 400, headers, body: JSON.stringify({ error: 'This unique challenge has already been claimed' }) }
+            }
+        }
     }
 
     // Get user progress

@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { mergeForgeHoldings, sellOwnTeamHoldings } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -468,6 +469,7 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin, e
         let statsReassigned = 0
         let lpsReassigned = 0
         let lpsDeleted = 0
+        let forgeRelinked = 0, forgeSold = 0, forgeRefunded = 0
 
         for (const slp of sourceLps) {
             // Check if target already has a league_player in this season
@@ -478,6 +480,14 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin, e
             `
 
             if (targetLp) {
+                // Relink/sell forge holdings before deleting the source LP
+                const forgeResult = await mergeForgeHoldings(tx, slp.id, targetLp.id)
+                if (forgeResult) {
+                    forgeRelinked += forgeResult.relinked
+                    forgeSold += forgeResult.sold
+                    forgeRefunded += forgeResult.refunded
+                }
+
                 // Reassign all player_game_stats from source LP to target LP
                 const reassigned = await tx`
                     UPDATE player_game_stats
@@ -500,14 +510,11 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin, e
 
         // Save the source name as an alias for the target (skip if same name)
         if (source.name.toLowerCase() !== target.name.toLowerCase()) {
-            try {
-                await tx`
-                    INSERT INTO player_aliases (player_id, alias)
-                    VALUES (${target_player_id}, ${source.name})
-                `
-            } catch (err) {
-                if (err.code !== '23505') throw err // ignore unique violation
-            }
+            await tx`
+                INSERT INTO player_aliases (player_id, alias)
+                VALUES (${target_player_id}, ${source.name})
+                ON CONFLICT DO NOTHING
+            `
         }
 
         // Move any existing aliases from source to target
@@ -520,8 +527,29 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin, e
         `
 
         // Re-point any user links and claim requests from source → target
-        await tx`UPDATE users SET linked_player_id = ${target_player_id} WHERE linked_player_id = ${source_player_id}`
+        const affectedUsers = await tx`
+            UPDATE users SET linked_player_id = ${target_player_id}
+            WHERE linked_player_id = ${source_player_id}
+            RETURNING id
+        `
         await tx`UPDATE claim_requests SET player_id = ${target_player_id} WHERE player_id = ${source_player_id}`
+
+        // Auto-sell any holdings that are now illegal (own-team) after the merge.
+        // Check both re-pointed users AND users already linked to the target,
+        // since re-parented LPs may have added new teams to the target's profile.
+        const usersToCheck = new Set(affectedUsers.map(u => u.id))
+        const targetLinkedUsers = await tx`
+            SELECT id FROM users WHERE linked_player_id = ${target_player_id}
+        `
+        for (const u of targetLinkedUsers) usersToCheck.add(u.id)
+
+        for (const userId of usersToCheck) {
+            const ownTeamResult = await sellOwnTeamHoldings(tx, userId)
+            if (ownTeamResult) {
+                forgeSold += ownTeamResult.sold
+                forgeRefunded += ownTeamResult.refunded
+            }
+        }
 
         // Delete the source player (CASCADE cleans up remaining aliases)
         await tx`DELETE FROM players WHERE id = ${source_player_id}`
@@ -532,6 +560,9 @@ async function mergePlayer(sql, { source_player_id, target_player_id }, admin, e
             stats_reassigned: statsReassigned,
             league_players_reassigned: lpsReassigned,
             league_players_deleted: lpsDeleted,
+            forge_relinked: forgeRelinked,
+            forge_sold: forgeSold,
+            forge_refunded: forgeRefunded,
         }
     })
 

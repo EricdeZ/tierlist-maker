@@ -161,8 +161,8 @@ export default function AdminDashboard() {
                 _readyQueueItems: queueItems,
             }])
 
-            // Auto-select season if not already
-            if (!selectedSeasonId) handleSeasonChange(String(readyMatch.season_id))
+            // Always switch to the correct season for this match
+            handleSeasonChange(String(readyMatch.season_id))
 
             fetchReadyMatches()
         } catch (err) {
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
         } finally {
             setReadyMatchLoading(false)
         }
-    }, [selectedSeasonId, fetchReadyMatches])
+    }, [fetchReadyMatches])
 
     // Auto-open match report from URL param (e.g. /admin/matchreport/123)
     useEffect(() => {
@@ -204,14 +204,14 @@ export default function AdminDashboard() {
                 date: readyMatch.scheduled_date ? readyMatch.scheduled_date.slice(0, 10) : new Date().toISOString().split('T')[0],
                 best_of: readyMatch.best_of || 3,
                 scheduled_match_id: readyMatch.id,
-                games: [{ winning_team_id: null, is_forfeit: true, team1_players: [], team2_players: [] }],
+                games: [{ winning_team_id: null, is_forfeit: true, left_players: [], right_players: [] }],
             },
             error: null,
         }])
 
-        if (!selectedSeasonId) handleSeasonChange(String(readyMatch.season_id))
+        handleSeasonChange(String(readyMatch.season_id))
         fetchReadyMatches()
-    }, [selectedSeasonId, fetchReadyMatches])
+    }, [fetchReadyMatches])
 
     const pollDiscord = useCallback(async () => {
         setDiscordPolling(true)
@@ -660,81 +660,93 @@ export default function AdminDashboard() {
                     <h2 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
                         Ready to Report
                     </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {readyMatches.map(rm => {
-                            const conf = rm.match_confidence || 'unknown'
-                            const isLow = conf === 'low'
-                            const isMedium = conf === 'medium'
-                            const confColor = isLow ? 'text-red-400' : isMedium ? 'text-amber-400' : 'text-green-400'
-                            const confBorder = isLow ? 'border-red-500/50' : isMedium ? 'border-amber-500/30' : 'border-[var(--color-border)]'
-                            const confLabel = isLow ? 'Low match' : isMedium ? 'Likely match' : 'Strong match'
-                            return (
-                            <div key={rm.id} className={`bg-[var(--color-card)] border rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors ${confBorder}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`w-2.5 h-2.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
-                                        <span className="text-xs text-[var(--color-text-secondary)]">
-                                            {rm.screenshot_count} screenshot{rm.screenshot_count !== 1 ? 's' : ''}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-[10px] font-semibold uppercase tracking-wide ${confColor}`} title={
-                                            isLow ? 'Matched by date only or weak signals — verify teams are correct'
-                                            : isMedium ? 'One team confirmed — double-check the opponent'
-                                            : 'Both teams confirmed via Discord roles or text'
-                                        }>
-                                            {confLabel}
-                                        </span>
-                                        {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Wk {rm.week}</span>}
-                                    </div>
-                                </div>
-                                {isLow && (
-                                    <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
-                                        <p className="text-[10px] text-red-400">
-                                            Needs review — verify this is the correct match before reporting
-                                        </p>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team1_color }} />
-                                    <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team1_name}</span>
-                                    <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
-                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team2_color }} />
-                                    <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team2_name}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-[var(--color-text-secondary)]">
-                                        {rm.division_name} &middot; {new Date(rm.scheduled_date).toLocaleDateString()}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button
-                                            onClick={() => unlinkReadyMatch(rm.id)}
-                                            disabled={readyMatchLoading}
-                                            className="px-2 py-1 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-red-500/50 hover:text-red-400 disabled:opacity-50 transition"
-                                            title="Unlink screenshots from this match"
-                                        >
-                                            Unlink
-                                        </button>
-                                        <button
-                                            onClick={() => startForfeitReport(rm)}
-                                            disabled={readyMatchLoading}
-                                            className="px-2 py-1 rounded-lg text-xs font-semibold border border-orange-500/40 text-orange-400 hover:bg-orange-500/15 disabled:opacity-50 transition"
-                                            title="Report as forfeit — skip screenshots"
-                                        >
-                                            FF
-                                        </button>
-                                        <button
-                                            onClick={() => startReadyReport(rm)}
-                                            disabled={readyMatchLoading}
-                                            className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
-                                        >
-                                            Report Match
-                                        </button>
-                                    </div>
+                    <div className="space-y-4">
+                        {Object.entries(readyMatches.reduce((acc, rm) => {
+                            const div = rm.division_name || 'Unknown'
+                            if (!acc[div]) acc[div] = []
+                            acc[div].push(rm)
+                            return acc
+                        }, {})).map(([divName, matches]) => (
+                            <div key={divName}>
+                                <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] mb-2">{divName}</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {matches.map(rm => {
+                                        const conf = rm.match_confidence || 'unknown'
+                                        const isLow = conf === 'low'
+                                        const isMedium = conf === 'medium'
+                                        const confColor = isLow ? 'text-red-400' : isMedium ? 'text-amber-400' : 'text-green-400'
+                                        const confBorder = isLow ? 'border-red-500/50' : isMedium ? 'border-amber-500/30' : 'border-[var(--color-border)]'
+                                        const confLabel = isLow ? 'Low match' : isMedium ? 'Likely match' : 'Strong match'
+                                        return (
+                                        <div key={rm.id} className={`bg-[var(--color-card)] border rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors ${confBorder}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
+                                                    <span className="text-xs text-[var(--color-text-secondary)]">
+                                                        {rm.screenshot_count} screenshot{rm.screenshot_count !== 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[10px] font-semibold uppercase tracking-wide ${confColor}`} title={
+                                                        isLow ? 'Matched by date only or weak signals — verify teams are correct'
+                                                        : isMedium ? 'One team confirmed — double-check the opponent'
+                                                        : 'Both teams confirmed via Discord roles or text'
+                                                    }>
+                                                        {confLabel}
+                                                    </span>
+                                                    {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Wk {rm.week}</span>}
+                                                </div>
+                                            </div>
+                                            {isLow && (
+                                                <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
+                                                    <p className="text-[10px] text-red-400">
+                                                        Needs review — verify this is the correct match before reporting
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team1_color }} />
+                                                <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team1_name}</span>
+                                                <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
+                                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rm.team2_color }} />
+                                                <span className="text-sm font-semibold text-[var(--color-text)] truncate">{rm.team2_name}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-[var(--color-text-secondary)]">
+                                                    {new Date(rm.scheduled_date).toLocaleDateString()}
+                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => unlinkReadyMatch(rm.id)}
+                                                        disabled={readyMatchLoading}
+                                                        className="px-2 py-1 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-red-500/50 hover:text-red-400 disabled:opacity-50 transition"
+                                                        title="Unlink screenshots from this match"
+                                                    >
+                                                        Unlink
+                                                    </button>
+                                                    <button
+                                                        onClick={() => startForfeitReport(rm)}
+                                                        disabled={readyMatchLoading}
+                                                        className="px-2 py-1 rounded-lg text-xs font-semibold border border-orange-500/40 text-orange-400 hover:bg-orange-500/15 disabled:opacity-50 transition"
+                                                        title="Report as forfeit — skip screenshots"
+                                                    >
+                                                        FF
+                                                    </button>
+                                                    <button
+                                                        onClick={() => startReadyReport(rm)}
+                                                        disabled={readyMatchLoading}
+                                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
+                                                    >
+                                                        Report Match
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
-                            )
-                        })}
+                        ))}
                     </div>
                     <div className="mt-2 px-1">
                         <p className="text-[10px] text-[var(--color-text-secondary)] italic">

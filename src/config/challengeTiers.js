@@ -9,6 +9,7 @@ function img(name) {
 
 export const CHALLENGE_TIERS = [
     { key: 'daily',    label: 'Daily',    color: '#94a3b8', image: null },
+    { key: 'unique',   label: 'Unique',   color: '#d4a539', image: img('unique') },
     { key: 'clay',     label: 'Clay',     color: '#a8876c', image: img('clay') },
     { key: 'amber',    label: 'Amber',    color: '#d4a04a', image: img('amber') },
     { key: 'bronze',   label: 'Bronze',   color: '#cd7f32', image: img('bronze') },

@@ -207,7 +207,7 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             // Date proximity: within 7 days (using raw abs diff for the filter)
             const schedDate = new Date(sm.scheduled_date)
             const daysDiff = Math.abs(msgDate - schedDate) / (1000 * 60 * 60 * 24)
-            return daysDiff <= 7
+            return daysDiff <= 5
         })
 
         let bestMatch = null
@@ -243,7 +243,7 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
             const dateMatches = scheduledMatches.filter(sm => {
                 const schedDate = new Date(sm.scheduled_date)
                 const daysDiff = Math.abs(msgDate - schedDate) / (1000 * 60 * 60 * 24)
-                return daysDiff <= 7
+                return daysDiff <= 5
             })
             if (dateMatches.length === 1) {
                 bestMatch = dateMatches[0]

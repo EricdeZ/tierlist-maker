@@ -246,6 +246,23 @@ export default function MatchManager() {
         }
     }, [doAction, showToast, fetchDetail, fetchMatches, selectedSeasonId])
 
+    // ─── Transfer match ───
+    const handleTransferMatch = useCallback(async (matchId, targetSeasonId) => {
+        setSaving(prev => ({ ...prev, transfer: true }))
+        try {
+            await doAction({ action: 'transfer-match', match_id: matchId, target_season_id: targetSeasonId })
+            showToast('success', 'Match transferred')
+            setExpandedMatchId(null)
+            setMatchDetail(null)
+            setEditData(null)
+            fetchMatches(selectedSeasonId)
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setSaving(prev => ({ ...prev, transfer: false }))
+        }
+    }, [doAction, showToast, fetchMatches, selectedSeasonId])
+
     // ─── Edit helpers ───
     const updateEditGame = useCallback((gameIdx, updater) => {
         setEditData(prev => {
@@ -390,10 +407,13 @@ export default function MatchManager() {
                                             gods={gods}
                                             adminData={adminData}
                                             saving={saving}
+                                            seasons={seasons}
+                                            selectedSeasonId={selectedSeasonId}
                                             onUpdateMatch={(updates) => handleUpdateMatch(m.id, updates)}
                                             onSaveGame={(gameId, game) => handleSaveGame(gameId, m.id, game)}
                                             onDeleteGame={(gameId) => handleDeleteGame(gameId, m.id)}
                                             onDeleteMatch={() => handleDeleteMatch(m.id)}
+                                            onTransferMatch={(targetSeasonId) => handleTransferMatch(m.id, targetSeasonId)}
                                             onEditGame={updateEditGame}
                                             onEditPlayer={updateEditPlayer}
                                         />
@@ -412,8 +432,10 @@ export default function MatchManager() {
 // ═══════════════════════════════════════════════════
 // MATCH EDITOR (expanded detail)
 // ═══════════════════════════════════════════════════
-function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, onUpdateMatch, onSaveGame, onDeleteGame, onDeleteMatch, onEditGame, onEditPlayer }) {
+function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, seasons, selectedSeasonId, onUpdateMatch, onSaveGame, onDeleteGame, onDeleteMatch, onTransferMatch, onEditGame, onEditPlayer }) {
     const [activeGame, setActiveGame] = useState(0)
+    const [transferOpen, setTransferOpen] = useState(false)
+    const [transferTarget, setTransferTarget] = useState('')
     const [matchFields, setMatchFields] = useState({
         date: editData.date ? editData.date.slice(0, 10) : '',
         week: editData.week || '',
@@ -464,7 +486,35 @@ function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, onUpda
                         {saving.match ? 'Saving...' : 'Save Match Info'}
                     </button>
                 )}
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    {transferOpen ? (
+                        <div className="flex items-center gap-2">
+                            <select value={transferTarget} onChange={e => setTransferTarget(e.target.value)}
+                                    className="rounded px-2 py-1.5 text-xs border"
+                                    style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}>
+                                <option value="">— Target Season —</option>
+                                {seasons.filter(s => s.season_id !== selectedSeasonId).map(s => (
+                                    <option key={s.season_id} value={s.season_id}>
+                                        {s.league_name} / {s.division_name} — {s.season_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button onClick={() => { if (transferTarget) onTransferMatch(parseInt(transferTarget)) }}
+                                    disabled={!transferTarget || saving.transfer}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50">
+                                {saving.transfer ? 'Transferring...' : 'Confirm'}
+                            </button>
+                            <button onClick={() => { setTransferOpen(false); setTransferTarget('') }}
+                                    className="px-2 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setTransferOpen(true)}
+                                className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20">
+                            Transfer
+                        </button>
+                    )}
                     <button onClick={onDeleteMatch}
                             className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:bg-red-500/10 border border-red-500/20">
                         Delete Match

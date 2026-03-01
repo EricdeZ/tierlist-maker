@@ -465,7 +465,8 @@ export async function recalcForgePerformance(sql, seasonId) {
     const [market] = await sql`
         SELECT id, base_price, status, created_at FROM forge_markets WHERE season_id = ${seasonId}
     `
-    if (!market || market.status !== 'open') return
+    if (!market) return { status: 'skipped', reason: 'no_market', detail: `No forge market for season ${seasonId}` }
+    if (market.status !== 'open') return { status: 'skipped', reason: 'market_closed', detail: `Market status is '${market.status}'` }
 
     const cfg = await loadForgeConfig(sql)
     const halfLife = cfg.DECAY_HALF_LIFE
@@ -528,7 +529,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         }
     }
 
-    if (Object.keys(roleAvgMap).length === 0) return
+    if (Object.keys(roleAvgMap).length === 0) return { status: 'skipped', reason: 'no_role_averages', detail: 'No valid role averages found (all players may be subs or have no role set)' }
 
     // Query 2: All player game stats + game_id, team_side, god_played for opponent/god factors
     const allGames = await sql`
@@ -544,6 +545,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         SELECT
             pgs.league_player_id,
             g.id as game_id,
+            m.id as match_id,
             pgs.team_side,
             LOWER(COALESCE(pgs.role_played, lp.role)) as role,
             pgs.god_played,
@@ -571,7 +573,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         ORDER BY m.date ASC, g.id ASC
     `
 
-    if (allGames.length === 0) return
+    if (allGames.length === 0) return { status: 'skipped', reason: 'no_games', detail: 'No completed games found for this season (players may all be subs or have no role)' }
 
     // ── Pre-computation: player strengths, god averages, opponent lookup ──
 
@@ -655,27 +657,42 @@ export async function recalcForgePerformance(sql, seasonId) {
     `
     const sparkMap = new Map(sparks.map(s => [s.league_player_id, s]))
 
-    // ── Replay each player's season with compounding heat ──
+    // ── Replay each player's games with compounding heat ──
+    // Only games AFTER the forge market opened affect multipliers.
+    // Pre-forge games still feed role averages, god expectations, and opponent quality above.
 
     const updates = []
     const processedSparkIds = new Set()
-    const seasonStartDate = new Date(allGames[0].match_date).getTime()
+    const marketStartTime = new Date(market.created_at).getTime()
 
     for (const [lpId, games] of playerGamesMap) {
         const spark = sparkMap.get(lpId)
         if (!spark) continue
-        processedSparkIds.add(spark.id)
 
         let multiplier = 1.0
         let lastGameTime = null
+        let hasPostForgeGames = false
 
+        // Group post-forge games into sets (matches) — factors are averaged per set
+        const sets = []
+        let currentSet = null
         for (const game of games) {
+            const gameTime = new Date(game.match_date).getTime()
+            if (gameTime < marketStartTime) continue
             const avgs = roleAvgMap[game.role]
             if (!avgs) continue
+            if (!currentSet || currentSet.matchId !== game.match_id) {
+                currentSet = { matchId: game.match_id, games: [], gameTime }
+                sets.push(currentSet)
+            }
+            currentSet.games.push({ game, avgs })
+        }
 
-            const gameTime = new Date(game.match_date).getTime()
+        for (const set of sets) {
+            hasPostForgeGames = true
+            const gameTime = set.gameTime
 
-            // 1. Inactivity decay between games (multiplicative — trends toward floor)
+            // 1. Inactivity decay between sets
             if (lastGameTime !== null) {
                 const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
                 const weeksGap = Math.floor(dayGap / 7)
@@ -686,42 +703,41 @@ export async function recalcForgePerformance(sql, seasonId) {
                 }
             }
 
-            // 2. Per-game regression toward 1.0
+            // 2. Per-set regression toward 1.0 (once per set, not per game)
             const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
 
-            // 3. Raw composite score
-            const rawScore = calcCompositeScore(
-                { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
-                  kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
-                avgs, game.role
-            )
+            // 3. Calculate per-game factors and average them across the set
+            let factorSum = 0
+            for (const { game, avgs } of set.games) {
+                const rawScore = calcCompositeScore(
+                    { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                      kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                    avgs, game.role
+                )
+                const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
+                const oppSide = game.team_side === 1 ? 2 : 1
+                const oppStrength = getTeamStrength(game.game_id, oppSide)
+                const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
+                const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
+                const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
+                const godName = (game.god_played || '').toLowerCase().trim()
+                const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
+                const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
+                const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
+                factorSum += heat * oppFactor * teamFactor * godFactor * winFactor
+            }
+            const avgFactor = factorSum / set.games.length
 
-            // 4. Supply-dampened heat
-            const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
-
-            // 5. Opponent quality factor (strong opponents = boost)
-            const oppSide = game.team_side === 1 ? 2 : 1
-            const oppStrength = getTeamStrength(game.game_id, oppSide)
-            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
-
-            // 6. Teammate quality factor (strong teammates = slight penalty, you're being carried)
-            const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
-            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
-
-            // 7. God meta factor — compare your score to the god+role average
-            const godName = (game.god_played || '').toLowerCase().trim()
-            const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
-            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
-
-            // 8. Win bonus
-            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1.0
-
-            // 9. Compound + compress
-            multiplier = compressMultiplier(decayed * heat * oppFactor * teamFactor * godFactor * winFactor, cfg)
+            // 4. Apply averaged set factor + compress
+            multiplier = compressMultiplier(decayed * avgFactor, cfg)
             lastGameTime = gameTime
         }
 
-        // 8. Final inactivity decay (last game → today)
+        // Players with only pre-forge games: let the 0-game loop handle them
+        if (!hasPostForgeGames) continue
+        processedSparkIds.add(spark.id)
+
+        // Final inactivity decay (last game → today)
         if (lastGameTime !== null) {
             const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
             const weeksInactive = Math.floor(daysSinceLast / 7)
@@ -737,11 +753,11 @@ export async function recalcForgePerformance(sql, seasonId) {
         updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
-    // 9. Process 0-game players: inactivity decay from season start
+    // Process players with no post-forge games: inactivity decay from market open
     for (const spark of sparks) {
         if (processedSparkIds.has(spark.id)) continue
-        const daysSinceStart = (now - seasonStartDate) / MS_PER_DAY
-        const weeksInactive = Math.floor(daysSinceStart / 7)
+        const daysSinceMarket = (now - marketStartTime) / MS_PER_DAY
+        const weeksInactive = Math.floor(daysSinceMarket / 7)
         if (weeksInactive <= 0) continue
         const multiplier = compressMultiplier(
             Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
@@ -751,7 +767,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
-    if (updates.length === 0) return
+    if (updates.length === 0) return { status: 'skipped', reason: 'no_updates', detail: `No spark records matched the ${playerGamesMap.size} players with games (sparks may not exist for these players)` }
 
     // ── Approval gate: queue or apply immediately ──
 
@@ -762,10 +778,10 @@ export async function recalcForgePerformance(sql, seasonId) {
         // Fetch current multiplier/price and player names for display
         const currentSparks = await sql`
             SELECT ps.id, ps.perf_multiplier, ps.current_price,
-                   COALESCE(u.display_name, u.username, 'Unknown') as player_name
+                   COALESCE(p.name, 'Unknown') as player_name
             FROM player_sparks ps
             JOIN league_players lp ON ps.league_player_id = lp.id
-            JOIN users u ON lp.user_id = u.id
+            JOIN players p ON lp.player_id = p.id
             WHERE ps.market_id = ${market.id}
         `
         const currentMap = new Map(currentSparks.map(s => [s.id, s]))
@@ -790,7 +806,7 @@ export async function recalcForgePerformance(sql, seasonId) {
                 UNNEST(${pOldPrices}::numeric[]),
                 UNNEST(${pNewPrices}::numeric[])
         `
-        return // Skip applying — wait for admin approval
+        return { status: 'queued', updates: updates.length, approval: true } // Skip applying — wait for admin approval
     }
 
     // ── Apply immediately (approval off) ──
@@ -846,6 +862,641 @@ export async function recalcForgePerformance(sql, seasonId) {
     } catch (err) {
         console.error('Forge perf update challenge tracking failed:', err)
     }
+
+    return { status: 'applied', updates: updates.length, approval: false }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Per-player breakdown (admin detail view)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Replay scoring for a single player and return per-game breakdown with all intermediate factors.
+ * Read-only — does not write to the database.
+ */
+export async function getPlayerBreakdown(sql, sparkId) {
+    const [spark] = await sql`
+        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.market_id,
+               ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier,
+               ps.current_price, fm.base_price, fm.created_at as market_created_at,
+               fm.season_id, COALESCE(p.name, 'Unknown') as player_name,
+               LOWER(COALESCE(lp.role, 'fill')) as player_role
+        FROM player_sparks ps
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        JOIN players p ON lp.player_id = p.id
+        WHERE ps.id = ${sparkId}
+    `
+    if (!spark) return null
+
+    const cfg = await loadForgeConfig(sql)
+    const halfLife = cfg.DECAY_HALF_LIFE
+    const seasonId = spark.season_id
+    const lpId = spark.league_player_id
+
+    // Role averages (same query as recalc)
+    const roleAvgRows = await sql`
+        WITH team_kills AS (
+            SELECT pgs_tk.game_id, pgs_tk.team_side, SUM(pgs_tk.kills) as total_kills
+            FROM player_game_stats pgs_tk
+            JOIN games g_tk ON pgs_tk.game_id = g_tk.id AND g_tk.is_completed = true
+            JOIN matches m_tk ON g_tk.match_id = m_tk.id
+            JOIN league_players lp_tk ON pgs_tk.league_player_id = lp_tk.id
+            WHERE lp_tk.season_id = ${seasonId}
+            GROUP BY pgs_tk.game_id, pgs_tk.team_side
+        )
+        SELECT
+            LOWER(COALESCE(pgs.role_played, lp.role)) as role,
+            SUM(pgs.kills * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric))
+                / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_kills,
+            SUM(pgs.deaths * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric))
+                / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_deaths,
+            SUM(pgs.assists * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric))
+                / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_assists,
+            SUM(
+                CASE WHEN tk.total_kills > 0
+                    THEN (pgs.kills + pgs.assists)::numeric / tk.total_kills * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)
+                    ELSE 0
+                END
+            ) / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_kp,
+            SUM(COALESCE(NULLIF(pgs.damage, 0), 0) * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric))
+                / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_damage,
+            SUM(COALESCE(NULLIF(pgs.mitigated, 0), 0) * POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric))
+                / NULLIF(SUM(POWER(0.5, (CURRENT_DATE - m.date) / ${halfLife}::numeric)), 0) as avg_mitigated
+        FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+        JOIN matches m ON g.match_id = m.id
+        JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
+        WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
+          AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
+          AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
+        GROUP BY LOWER(COALESCE(pgs.role_played, lp.role))
+    `
+
+    const roleAvgMap = {}
+    for (const r of roleAvgRows) {
+        if (!r.role) continue
+        roleAvgMap[r.role] = {
+            avgKills: Number(r.avg_kills) || 1.0,
+            avgDeaths: Number(r.avg_deaths) || 1.0,
+            avgAssists: Number(r.avg_assists) || 1.0,
+            avgKp: Number(r.avg_kp) || 0.5,
+            avgDamage: Number(r.avg_damage) || 1.0,
+            avgMitigated: Number(r.avg_mitigated) || 1.0,
+        }
+    }
+
+    // All games for season (needed for opponent/teammate/god context)
+    const allGames = await sql`
+        WITH team_kills AS (
+            SELECT pgs_tk.game_id, pgs_tk.team_side, SUM(pgs_tk.kills) as total_kills
+            FROM player_game_stats pgs_tk
+            JOIN games g_tk ON pgs_tk.game_id = g_tk.id AND g_tk.is_completed = true
+            JOIN matches m_tk ON g_tk.match_id = m_tk.id
+            JOIN league_players lp_tk ON pgs_tk.league_player_id = lp_tk.id
+            WHERE lp_tk.season_id = ${seasonId}
+            GROUP BY pgs_tk.game_id, pgs_tk.team_side
+        )
+        SELECT
+            pgs.league_player_id,
+            g.id as game_id,
+            m.id as match_id,
+            pgs.team_side,
+            LOWER(COALESCE(pgs.role_played, lp.role)) as role,
+            pgs.god_played,
+            pgs.kills, pgs.deaths, pgs.assists,
+            COALESCE(NULLIF(pgs.damage, 0), 0) as damage,
+            COALESCE(NULLIF(pgs.mitigated, 0), 0) as mitigated,
+            CASE WHEN tk.total_kills > 0
+                THEN (pgs.kills + pgs.assists)::numeric / tk.total_kills
+                ELSE 0
+            END as kp,
+            m.date as match_date,
+            CASE WHEN (pgs.team_side = 1 AND g.winner_team_id = m.team1_id)
+                   OR (pgs.team_side = 2 AND g.winner_team_id = m.team2_id)
+                 THEN true ELSE false
+            END as won,
+            COALESCE(p.name, 'Unknown') as player_name
+        FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        JOIN players p ON lp.player_id = p.id
+        JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+        JOIN matches m ON g.match_id = m.id
+        JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
+        WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
+          AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
+          AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
+        ORDER BY m.date ASC, g.id ASC
+    `
+
+    // Pre-compute maps (same as recalc)
+    const playerGamesMap = new Map()
+    for (const game of allGames) {
+        if (!playerGamesMap.has(game.league_player_id)) playerGamesMap.set(game.league_player_id, [])
+        playerGamesMap.get(game.league_player_id).push(game)
+    }
+
+    const now = Date.now()
+
+    const playerStrengthMap = new Map()
+    for (const [pid, games] of playerGamesMap) {
+        let totalWeight = 0, weightedScore = 0
+        for (const game of games) {
+            const avgs = roleAvgMap[game.role]
+            if (!avgs) continue
+            const score = calcCompositeScore(
+                { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                  kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                avgs, game.role
+            )
+            const daysAgo = (now - new Date(game.match_date).getTime()) / MS_PER_DAY
+            const weight = Math.pow(0.5, daysAgo / halfLife)
+            weightedScore += score * weight
+            totalWeight += weight
+        }
+        playerStrengthMap.set(pid, totalWeight > 0 ? weightedScore / totalWeight : 1.0)
+    }
+
+    const godScores = {}
+    for (const game of allGames) {
+        const godName = (game.god_played || '').toLowerCase().trim()
+        if (!godName) continue
+        const avgs = roleAvgMap[game.role]
+        if (!avgs) continue
+        const score = calcCompositeScore(
+            { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+              kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+            avgs, game.role
+        )
+        const daysAgo = (now - new Date(game.match_date).getTime()) / MS_PER_DAY
+        const weight = Math.pow(0.5, daysAgo / halfLife)
+        const godKey = `${godName}:${game.role}`
+        if (!godScores[godKey]) godScores[godKey] = { totalWeight: 0, weightedScore: 0 }
+        godScores[godKey].totalWeight += weight
+        godScores[godKey].weightedScore += score * weight
+    }
+    const godAvgMap = {}
+    for (const [key, data] of Object.entries(godScores)) {
+        godAvgMap[key] = data.totalWeight > 0 ? data.weightedScore / data.totalWeight : 1.0
+    }
+
+    const gameTeamPlayers = new Map()
+    for (const game of allGames) {
+        const key = `${game.game_id}:${game.team_side}`
+        if (!gameTeamPlayers.has(key)) gameTeamPlayers.set(key, [])
+        gameTeamPlayers.get(key).push(game.league_player_id)
+    }
+
+    function getTeamStrength(gameId, teamSide, excludeLpId) {
+        const players = gameTeamPlayers.get(`${gameId}:${teamSide}`) || []
+        const teammates = excludeLpId ? players.filter(id => id !== excludeLpId) : players
+        if (teammates.length === 0) return 1.0
+        let sum = 0
+        for (const id of teammates) sum += (playerStrengthMap.get(id) || 1.0)
+        return sum / teammates.length
+    }
+
+    // Build opponent name lookup for display
+    const gamePlayerNames = new Map()
+    for (const game of allGames) {
+        gamePlayerNames.set(game.league_player_id, game.player_name)
+    }
+
+    // Replay this player's games with full trace (averaged per set)
+    const playerGames = playerGamesMap.get(lpId) || []
+    const marketStartTime = new Date(spark.market_created_at).getTime()
+    const trace = []
+    let multiplier = 1.0
+    let lastGameTime = null
+
+    // Group into sets (matches)
+    const sets = []
+    let currentSet = null
+    for (const game of playerGames) {
+        const gameTime = new Date(game.match_date).getTime()
+        if (gameTime < marketStartTime) continue
+        const avgs = roleAvgMap[game.role]
+        if (!avgs) continue
+        if (!currentSet || currentSet.matchId !== game.match_id) {
+            currentSet = { matchId: game.match_id, gameData: [], gameTime }
+            sets.push(currentSet)
+        }
+        currentSet.gameData.push({ game, avgs })
+    }
+
+    for (const set of sets) {
+        const gameTime = set.gameTime
+        const multBeforeSet = multiplier
+
+        // 1. Inactivity decay (once per set)
+        let inactivityApplied = null
+        if (lastGameTime !== null) {
+            const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
+            const weeksGap = Math.floor(dayGap / 7)
+            if (weeksGap > 0) {
+                const factor = Math.pow(cfg.INACTIVITY_DECAY, weeksGap)
+                multiplier = compressMultiplier(multiplier * factor, cfg)
+                inactivityApplied = { weeks: weeksGap, factor, multAfter: multiplier }
+            }
+        }
+
+        // 2. Game decay (once per set)
+        const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
+
+        // 3. Build per-game entries and compute per-game factors
+        const setEntries = []
+        let factorSum = 0
+        for (const { game, avgs } of set.gameData) {
+            const entry = {
+                date: game.match_date,
+                god: game.god_played,
+                role: game.role,
+                won: game.won,
+                stats: {
+                    kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                    kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated),
+                },
+                roleAvgs: avgs,
+                multiplierBefore: multBeforeSet,
+            }
+
+            const rawScore = calcCompositeScore(entry.stats, avgs, game.role)
+            entry.rawScore = rawScore
+
+            // Normalized stat contributions for display
+            const w = ROLE_WEIGHTS[game.role] || DEFAULT_WEIGHTS
+            const normKills = avgs.avgKills > 0 ? entry.stats.kills / avgs.avgKills : 1.0
+            const playerDeaths = Math.max(entry.stats.deaths, 0.5)
+            const normDeaths = avgs.avgDeaths > 0 ? Math.min(avgs.avgDeaths / playerDeaths, 3.0) : 1.0
+            const normAssists = avgs.avgAssists > 0 ? entry.stats.assists / avgs.avgAssists : 1.0
+            const normKp = avgs.avgKp > 0 ? entry.stats.kp / avgs.avgKp : 1.0
+            const normDamage = avgs.avgDamage > 0 ? entry.stats.damage / avgs.avgDamage : 1.0
+            const normMitigated = avgs.avgMitigated > 0 ? entry.stats.mitigated / avgs.avgMitigated : 1.0
+            entry.statBreakdown = {
+                kills:     { norm: normKills, weight: w.kills || 0, contribution: (w.kills || 0) * normKills },
+                deaths:    { norm: normDeaths, weight: w.deaths || 0, contribution: (w.deaths || 0) * normDeaths },
+                assists:   { norm: normAssists, weight: w.assists || 0, contribution: (w.assists || 0) * normAssists },
+                kp:        { norm: normKp, weight: w.kp || 0, contribution: (w.kp || 0) * normKp },
+                damage:    { norm: normDamage, weight: w.damage || 0, contribution: (w.damage || 0) * normDamage },
+                mitigated: { norm: normMitigated, weight: w.mitigated || 0, contribution: (w.mitigated || 0) * normMitigated },
+            }
+
+            const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
+            entry.heat = heat
+
+            const oppSide = game.team_side === 1 ? 2 : 1
+            const oppStrength = getTeamStrength(game.game_id, oppSide)
+            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
+            const oppPlayers = (gameTeamPlayers.get(`${game.game_id}:${oppSide}`) || [])
+                .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
+            entry.opponent = { avgStrength: oppStrength, factor: oppFactor, players: oppPlayers }
+
+            const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
+            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
+            const teamPlayers = (gameTeamPlayers.get(`${game.game_id}:${game.team_side}`) || [])
+                .filter(id => id !== lpId)
+                .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
+            entry.teammate = { avgStrength: teamStrength, factor: teamFactor, players: teamPlayers }
+
+            const godName = (game.god_played || '').toLowerCase().trim()
+            const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
+            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
+            entry.godMeta = { godAvg: godRoleAvg, factor: godFactor }
+
+            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
+            entry.winFactor = winFactor
+
+            const gameFactor = heat * oppFactor * teamFactor * godFactor * winFactor
+            entry.gameFactor = gameFactor
+            factorSum += gameFactor
+
+            setEntries.push(entry)
+        }
+
+        // 4. Average factors across the set and apply
+        const avgFactor = factorSum / setEntries.length
+        const preCompression = decayed * avgFactor
+        multiplier = compressMultiplier(preCompression, cfg)
+
+        // Annotate entries with set info
+        for (let i = 0; i < setEntries.length; i++) {
+            const entry = setEntries[i]
+            entry.setGameCount = setEntries.length
+            entry.setPosition = i + 1
+            entry.isLastInSet = (i === setEntries.length - 1)
+            entry.inactivityDecay = (i === 0) ? inactivityApplied : null
+            entry.gameDecay = { before: multBeforeSet, after: decayed }
+            entry.setAvgFactor = avgFactor
+            entry.preCompression = preCompression
+            entry.multiplierAfter = multiplier
+            trace.push(entry)
+        }
+
+        lastGameTime = gameTime
+    }
+
+    // Final inactivity decay (last game → today)
+    let finalInactivityDecay = null
+    if (lastGameTime !== null) {
+        const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
+        const weeksInactive = Math.floor(daysSinceLast / 7)
+        if (weeksInactive > 0) {
+            const before = multiplier
+            multiplier = compressMultiplier(multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
+            finalInactivityDecay = { weeks: weeksInactive, before, after: multiplier }
+        }
+    }
+
+    return {
+        player: { name: spark.player_name, role: spark.player_role, totalSparks: spark.total_sparks },
+        roleAvgs: roleAvgMap,
+        config: {
+            GAME_DECAY: cfg.GAME_DECAY, SUPPLY_WEIGHT: cfg.SUPPLY_WEIGHT,
+            INACTIVITY_DECAY: cfg.INACTIVITY_DECAY, OPPONENT_WEIGHT: cfg.OPPONENT_WEIGHT,
+            TEAMMATE_WEIGHT: cfg.TEAMMATE_WEIGHT, GOD_WEIGHT: cfg.GOD_WEIGHT,
+            WIN_BONUS: cfg.WIN_BONUS, PERF_CEILING: cfg.PERF_CEILING,
+            COMPRESS_K: cfg.COMPRESS_K, PERF_FLOOR: cfg.PERF_FLOOR,
+        },
+        games: trace,
+        finalInactivityDecay,
+        finalMultiplier: multiplier,
+    }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Player merge — relink & auto-sell holdings
+// ═══════════════════════════════════════════════════
+
+/**
+ * Handle forge holdings when a source league_player is being deleted during merge.
+ * Non-illegal holdings get relinked to the target spark.
+ * Illegal holdings (own-team) get auto-sold with cooling tax + sell pressure.
+ * Illegal free sparks get refunded at current price (no tax) and deleted.
+ *
+ * @param {function} tx - transaction tagged template
+ * @param {number} sourceLpId - league_player being deleted
+ * @param {number} targetLpId - league_player being kept
+ * @returns {{ relinked, sold, refunded } | null}
+ */
+export async function mergeForgeHoldings(tx, sourceLpId, targetLpId) {
+    const [sourceSpark] = await tx`
+        SELECT ps.id, ps.current_price, ps.total_sparks, ps.perf_multiplier,
+               ps.market_id, ps.sell_pressure, ps.sell_pressure_updated_at,
+               fm.base_price, fm.status
+        FROM player_sparks ps
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        WHERE ps.league_player_id = ${sourceLpId}
+    `
+    if (!sourceSpark || sourceSpark.status !== 'open') return null
+
+    // Find or create target spark in the same market
+    let [targetSpark] = await tx`
+        SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at, perf_multiplier
+        FROM player_sparks
+        WHERE league_player_id = ${targetLpId} AND market_id = ${sourceSpark.market_id}
+        FOR UPDATE
+    `
+    if (!targetSpark) {
+        [targetSpark] = await tx`
+            INSERT INTO player_sparks (market_id, league_player_id, current_price)
+            VALUES (${sourceSpark.market_id}, ${targetLpId}, ${sourceSpark.base_price})
+            ON CONFLICT (market_id, league_player_id) DO NOTHING
+            RETURNING id, total_sparks, sell_pressure, sell_pressure_updated_at, perf_multiplier
+        `
+        if (!targetSpark) {
+            [targetSpark] = await tx`
+                SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at, perf_multiplier
+                FROM player_sparks
+                WHERE league_player_id = ${targetLpId} AND market_id = ${sourceSpark.market_id}
+                FOR UPDATE
+            `
+        }
+        await tx`
+            INSERT INTO spark_price_history (spark_id, price, trigger)
+            VALUES (${targetSpark.id}, ${sourceSpark.base_price}, 'init')
+        `
+    }
+
+    const [targetLp] = await tx`SELECT team_id FROM league_players WHERE id = ${targetLpId}`
+
+    const holdings = await tx`
+        SELECT sh.id, sh.user_id, sh.spark_id, sh.sparks, sh.total_invested,
+               sh.tutorial_sparks, sh.referral_sparks
+        FROM spark_holdings sh
+        WHERE sh.spark_id = ${sourceSpark.id} AND sh.sparks > 0
+    `
+    if (holdings.length === 0) return { relinked: 0, sold: 0, refunded: 0 }
+
+    let relinked = 0, sold = 0, refunded = 0
+    let totalSellPressure = 0
+    let totalRelinkedSparks = 0
+
+    const sourceDecayedPressure = decaySellPressure(Number(sourceSpark.sell_pressure), sourceSpark.sell_pressure_updated_at)
+    let runningSourceSparks = sourceSpark.total_sparks
+    let runningSellPressure = sourceDecayedPressure
+
+    for (const h of holdings) {
+        // Check if holder is on the target player's team
+        let isIllegal = false
+        if (targetLp?.team_id) {
+            const [check] = await tx`
+                SELECT 1 FROM league_players lp
+                JOIN users u ON u.linked_player_id = lp.player_id
+                WHERE u.id = ${h.user_id}
+                  AND lp.team_id = ${targetLp.team_id}
+                  AND lp.is_active = true
+                LIMIT 1
+            `
+            isIllegal = !!check
+        }
+
+        const freeSparks = (h.tutorial_sparks || 0) + (h.referral_sparks || 0)
+        const regularSparks = h.sparks - freeSparks
+
+        if (!isIllegal) {
+            // Relink to target spark
+            const [existing] = await tx`
+                SELECT id, sparks, total_invested, tutorial_sparks, referral_sparks
+                FROM spark_holdings
+                WHERE user_id = ${h.user_id} AND spark_id = ${targetSpark.id}
+            `
+
+            if (existing) {
+                await tx`
+                    UPDATE spark_holdings SET
+                        sparks = sparks + ${h.sparks},
+                        total_invested = total_invested + ${Number(h.total_invested)},
+                        tutorial_sparks = COALESCE(tutorial_sparks, 0) + ${h.tutorial_sparks || 0},
+                        referral_sparks = COALESCE(referral_sparks, 0) + ${h.referral_sparks || 0},
+                        updated_at = NOW()
+                    WHERE id = ${existing.id}
+                `
+                await tx`DELETE FROM spark_holdings WHERE id = ${h.id}`
+            } else {
+                await tx`
+                    UPDATE spark_holdings SET spark_id = ${targetSpark.id}, updated_at = NOW()
+                    WHERE id = ${h.id}
+                `
+            }
+
+            totalRelinkedSparks += h.sparks
+            relinked++
+        } else {
+            // Illegal — auto-sell regular sparks with cooling tax + sell pressure
+            if (regularSparks > 0) {
+                runningSellPressure += regularSparks
+                let grossProceeds = 0
+                for (let i = 0; i < regularSparks; i++) {
+                    runningSourceSparks--
+                    const price = calcPrice(sourceSpark.base_price, Number(sourceSpark.perf_multiplier), runningSourceSparks, runningSellPressure)
+                    grossProceeds += Math.round(price)
+                }
+
+                const coolingTax = Math.round(grossProceeds * FORGE_CONFIG.COOLING_TAX)
+                const netProceeds = grossProceeds - coolingTax
+                const costBasis = Number(h.total_invested) * (regularSparks / h.sparks)
+                const profit = netProceeds - Math.round(costBasis)
+
+                if (netProceeds > 0) {
+                    await grantPassion(tx, h.user_id, 'forge_cool', netProceeds,
+                        `Auto-sold ${regularSparks} Spark${regularSparks > 1 ? 's' : ''} (player merge, ${coolingTax} tax)`,
+                        String(targetSpark.id), Math.max(0, profit))
+                }
+
+                // Record on target spark for persistence (source will be cascade-deleted)
+                const avgPrice = regularSparks > 0 ? (grossProceeds / regularSparks).toFixed(2) : 0
+                await tx`
+                    INSERT INTO spark_transactions (user_id, spark_id, type, sparks, price_per_spark, total_cost)
+                    VALUES (${h.user_id}, ${targetSpark.id}, 'cool', ${regularSparks}, ${avgPrice}, ${netProceeds})
+                `
+
+                totalSellPressure += regularSparks
+                sold += regularSparks
+            }
+
+            if (freeSparks > 0) {
+                const refundValue = Math.round(Number(sourceSpark.current_price) * freeSparks)
+                if (refundValue > 0) {
+                    await grantPassion(tx, h.user_id, 'forge_merge_refund', refundValue,
+                        `Refunded ${freeSparks} free Spark${freeSparks > 1 ? 's' : ''} (player merge)`,
+                        String(targetSpark.id), 0)
+                }
+                refunded += freeSparks
+            }
+
+            await tx`DELETE FROM spark_holdings WHERE id = ${h.id}`
+        }
+    }
+
+    // Update target spark with relinked supply + sell pressure from auto-sells
+    if (totalRelinkedSparks > 0 || totalSellPressure > 0) {
+        const newTotalSparks = targetSpark.total_sparks + totalRelinkedSparks
+        const targetDecayed = decaySellPressure(Number(targetSpark.sell_pressure || 0), targetSpark.sell_pressure_updated_at)
+        const newPressure = targetDecayed + totalSellPressure
+        const newPrice = calcPrice(sourceSpark.base_price, Number(targetSpark.perf_multiplier), newTotalSparks, newPressure)
+
+        await tx`
+            UPDATE player_sparks SET
+                total_sparks = ${newTotalSparks},
+                current_price = ${newPrice},
+                sell_pressure = ${newPressure},
+                sell_pressure_updated_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ${targetSpark.id}
+        `
+
+        await tx`
+            INSERT INTO spark_price_history (spark_id, price, trigger)
+            VALUES (${targetSpark.id}, ${newPrice}, 'cool')
+        `
+    }
+
+    return { relinked, sold, refunded }
+}
+
+/**
+ * Auto-sell any holdings a user has in players on their own team.
+ * Called after linked_player_id changes (e.g., player merge).
+ * Regular sparks use normal cool mechanics (tax + sell pressure).
+ * Free sparks get refunded at current price and removed.
+ *
+ * @param {function} tx - transaction tagged template
+ * @param {number} userId
+ * @returns {{ sold, refunded } | null}
+ */
+export async function sellOwnTeamHoldings(tx, userId) {
+    const [user] = await tx`SELECT linked_player_id FROM users WHERE id = ${userId}`
+    if (!user?.linked_player_id) return null
+
+    // Use subquery instead of ANY(array) to avoid array parameter serialization issues with tx
+    const illegal = await tx`
+        SELECT sh.id, sh.user_id, sh.spark_id, sh.sparks, sh.total_invested,
+               sh.tutorial_sparks, sh.referral_sparks, ps.current_price
+        FROM spark_holdings sh
+        JOIN player_sparks ps ON sh.spark_id = ps.id
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        WHERE sh.user_id = ${userId}
+          AND sh.sparks > 0
+          AND fm.status = 'open'
+          AND lp.team_id IN (
+              SELECT DISTINCT lp2.team_id FROM league_players lp2
+              WHERE lp2.player_id = ${user.linked_player_id} AND lp2.is_active = true
+          )
+    `
+    if (illegal.length === 0) return null
+
+    let sold = 0, refunded = 0
+
+    for (const h of illegal) {
+        const freeSparks = (h.tutorial_sparks || 0) + (h.referral_sparks || 0)
+        const regularSparks = h.sparks - freeSparks
+
+        if (regularSparks > 0) {
+            await executeCool(tx, userId, h.spark_id, regularSparks)
+            sold += regularSparks
+        }
+
+        if (freeSparks > 0) {
+            const refundValue = Math.round(Number(h.current_price) * freeSparks)
+            if (refundValue > 0) {
+                await grantPassion(tx, userId, 'forge_merge_refund', refundValue,
+                    `Refunded ${freeSparks} free Spark${freeSparks > 1 ? 's' : ''} (team change)`,
+                    String(h.spark_id), 0)
+            }
+
+            // After executeCool, holding may still exist with just free sparks
+            const [remaining] = await tx`
+                SELECT id, sparks FROM spark_holdings
+                WHERE user_id = ${userId} AND spark_id = ${h.spark_id}
+            `
+            if (remaining) {
+                if (remaining.sparks <= freeSparks) {
+                    await tx`DELETE FROM spark_holdings WHERE id = ${remaining.id}`
+                } else {
+                    const freeCostBasis = h.sparks > 0 ? Number(h.total_invested) * (freeSparks / h.sparks) : 0
+                    await tx`
+                        UPDATE spark_holdings SET
+                            sparks = sparks - ${freeSparks},
+                            tutorial_sparks = 0,
+                            referral_sparks = 0,
+                            total_invested = GREATEST(0, total_invested - ${freeCostBasis}),
+                            updated_at = NOW()
+                        WHERE id = ${remaining.id}
+                    `
+                }
+            }
+
+            refunded += freeSparks
+        }
+    }
+
+    return { sold, refunded }
 }
 
 // ═══════════════════════════════════════════════════

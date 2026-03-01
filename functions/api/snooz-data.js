@@ -43,6 +43,12 @@ const handler = async (event) => {
             JOIN teams t2 ON sm.team2_id = t2.id
             WHERE sm.season_id = ${seasonId}
               AND sm.week = ${parseInt(week)}
+              AND NOT EXISTS (
+                SELECT 1 FROM matches m
+                WHERE m.season_id = sm.season_id AND m.week = sm.week
+                  AND ((m.team1_id = sm.team1_id AND m.team2_id = sm.team2_id)
+                    OR (m.team1_id = sm.team2_id AND m.team2_id = sm.team1_id))
+              )
             ORDER BY sm.scheduled_date ASC, sm.id ASC
         ` : []
 

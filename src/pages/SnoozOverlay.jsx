@@ -476,10 +476,14 @@ const SnoozOverlay = () => {
                                         <button
                                             onClick={() => handleTeamClick({ id: match.team1_id, name: match.team1_name, color: match.team1_color, slug: match.team1_slug, logo: match.team1_logo })}
                                             className={`w-[280px] shrink-0 grid grid-cols-[56px_1fr] items-center gap-3 px-4 py-1 cursor-pointer transition-colors rounded-l ${selectedTeam?.team_id === match.team1_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                                            style={{ opacity: match.is_completed && match.winner_team_id && match.winner_team_id !== match.team1_id ? 0.35 : undefined }}
                                         >
                                             <TeamLogo slug={match.team1_slug} name={match.team1_name} size={56} color={match.team1_color} logoUrl={match.team1_logo} />
                                             <div className="min-w-0">
-                                                <div className="text-base font-black text-white truncate">{match.team1_name}</div>
+                                                <div className="text-base font-black text-white truncate flex items-center gap-1.5">
+                                                    {match.team1_name}
+                                                    {match.is_completed && match.winner_team_id === match.team1_id && <Crown size={14} className="text-yellow-500 shrink-0" />}
+                                                </div>
                                                 <div className="text-xs font-mono tabular-nums">
                                                     {(() => { const r = standings.find(s => s.team_id === match.team1_id); return r ? <><span className="text-green-400">{r.wins}W</span><span className="text-white/25"> – </span><span className="text-red-400">{r.losses}L</span></> : '' })()}
                                                 </div>
@@ -489,10 +493,14 @@ const SnoozOverlay = () => {
                                         <button
                                             onClick={() => handleTeamClick({ id: match.team2_id, name: match.team2_name, color: match.team2_color, slug: match.team2_slug, logo: match.team2_logo })}
                                             className={`w-[280px] shrink-0 grid grid-cols-[56px_1fr] items-center gap-3 px-4 py-1 cursor-pointer transition-colors ${selectedTeam?.team_id === match.team2_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                                            style={{ opacity: match.is_completed && match.winner_team_id && match.winner_team_id !== match.team2_id ? 0.35 : undefined }}
                                         >
                                             <TeamLogo slug={match.team2_slug} name={match.team2_name} size={56} color={match.team2_color} logoUrl={match.team2_logo} />
                                             <div className="min-w-0">
-                                                <div className="text-base font-black text-white truncate">{match.team2_name}</div>
+                                                <div className="text-base font-black text-white truncate flex items-center gap-1.5">
+                                                    {match.team2_name}
+                                                    {match.is_completed && match.winner_team_id === match.team2_id && <Crown size={14} className="text-yellow-500 shrink-0" />}
+                                                </div>
                                                 <div className="text-xs font-mono tabular-nums">
                                                     {(() => { const r = standings.find(s => s.team_id === match.team2_id); return r ? <><span className="text-green-400">{r.wins}W</span><span className="text-white/25"> – </span><span className="text-red-400">{r.losses}L</span></> : '' })()}
                                                 </div>
@@ -503,6 +511,54 @@ const SnoozOverlay = () => {
                                             const pick = picks[`${match.id}_${person.id}`]
                                             const picked1 = pick === match.team1_id
                                             const picked2 = pick === match.team2_id
+                                            const hasPick = picked1 || picked2
+
+                                            if (match.is_completed && match.winner_team_id) {
+                                                const isWinner1 = match.winner_team_id === match.team1_id
+                                                const winnerName = isWinner1 ? match.team1_name : match.team2_name
+                                                const winnerColor = isWinner1 ? match.team1_color : match.team2_color
+                                                const wasCorrect = hasPick && pick === match.winner_team_id
+                                                const wasWrong = hasPick && pick !== match.winner_team_id
+                                                const displayName = wasWrong ? (picked1 ? match.team1_name : match.team2_name) : winnerName
+                                                const displayColor = wasWrong ? (picked1 ? match.team1_color : match.team2_color) : winnerColor
+
+                                                return (
+                                                    <div key={person.id} className="flex-1 px-1.5 flex items-center justify-center">
+                                                        <div className="w-full py-2 rounded text-sm font-bold text-center truncate px-1.5"
+                                                            style={{
+                                                                background: wasCorrect ? displayColor : wasWrong ? 'rgba(239,68,68,0.15)' : `${displayColor}30`,
+                                                                color: wasCorrect ? '#fff' : wasWrong ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.25)',
+                                                                boxShadow: wasCorrect ? `0 0 12px ${displayColor}40` : 'none',
+                                                                textShadow: wasCorrect ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
+                                                            }}>
+                                                            {wasCorrect && '\u2713 '}{wasWrong && '\u2717 '}{displayName}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            }
+
+                                            if (hasPick) {
+                                                const pickedColor = picked1 ? match.team1_color : match.team2_color
+                                                const pickedName = picked1 ? match.team1_name : match.team2_name
+                                                const otherTeamId = picked1 ? match.team2_id : match.team1_id
+                                                return (
+                                                    <div key={person.id} className="flex-1 px-1.5 flex items-center justify-center">
+                                                        <button
+                                                            onClick={() => handlePick(match.id, person.id, otherTeamId)}
+                                                            className="w-full py-2 rounded text-sm font-bold transition-all cursor-pointer truncate px-1.5"
+                                                            style={{
+                                                                background: pickedColor,
+                                                                color: '#fff',
+                                                                boxShadow: `0 0 12px ${pickedColor}40`,
+                                                                textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                                                            }}
+                                                            title={`Switch to ${picked1 ? match.team2_name : match.team1_name}`}
+                                                        >
+                                                            {pickedName}
+                                                        </button>
+                                                    </div>
+                                                )
+                                            }
 
                                             return (
                                                 <div key={person.id} className="flex-1 px-1.5 flex items-center justify-center gap-1">
@@ -510,27 +566,23 @@ const SnoozOverlay = () => {
                                                         onClick={() => handlePick(match.id, person.id, match.team1_id)}
                                                         className="flex-1 py-2 rounded text-sm font-bold transition-all cursor-pointer truncate px-1.5"
                                                         style={{
-                                                            background: picked1 ? match.team1_color : 'rgba(255,255,255,0.03)',
-                                                            color: picked1 ? '#fff' : 'rgba(255,255,255,0.15)',
-                                                            boxShadow: picked1 ? `0 0 12px ${match.team1_color}40` : 'none',
-                                                            textShadow: picked1 ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
+                                                            background: 'rgba(255,255,255,0.03)',
+                                                            color: 'rgba(255,255,255,0.15)',
                                                         }}
                                                         title={match.team1_name}
                                                     >
-                                                        {picked1 ? match.team1_name : '—'}
+                                                        {'\u2014'}
                                                     </button>
                                                     <button
                                                         onClick={() => handlePick(match.id, person.id, match.team2_id)}
                                                         className="flex-1 py-2 rounded text-sm font-bold transition-all cursor-pointer truncate px-1.5"
                                                         style={{
-                                                            background: picked2 ? match.team2_color : 'rgba(255,255,255,0.03)',
-                                                            color: picked2 ? '#fff' : 'rgba(255,255,255,0.15)',
-                                                            boxShadow: picked2 ? `0 0 12px ${match.team2_color}40` : 'none',
-                                                            textShadow: picked2 ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
+                                                            background: 'rgba(255,255,255,0.03)',
+                                                            color: 'rgba(255,255,255,0.15)',
                                                         }}
                                                         title={match.team2_name}
                                                     >
-                                                        {picked2 ? match.team2_name : '—'}
+                                                        {'\u2014'}
                                                     </button>
                                                 </div>
                                             )
