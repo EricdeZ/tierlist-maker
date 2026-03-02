@@ -6,7 +6,7 @@ import { pushChallengeProgress } from '../lib/challenges.js'
 import { recalcForgePerformance, getPlayerBreakdown } from '../lib/forge.js'
 
 const NUMERIC_KEYS = [
-    'game_decay', 'supply_weight', 'inactivity_decay',
+    'game_decay', 'supply_weight', 'expectation_weight', 'inactivity_decay',
     'perf_floor', 'perf_ceiling', 'compress_k',
     'opponent_weight', 'teammate_weight', 'god_weight',
     'win_bonus', 'decay_half_life',
@@ -172,13 +172,23 @@ const handler = async (event) => {
                 }
             }
 
-            // Handle boolean field
+            // Handle boolean fields
             if (body.performance_approval !== undefined) {
                 const val = !!body.performance_approval
                 merged.performance_approval = val
                 if (val !== current.performance_approval) hasUpdates = true
             } else {
                 merged.performance_approval = current.performance_approval
+            }
+
+            for (const boolKey of ['fueling_locked', 'cooling_locked']) {
+                if (body[boolKey] !== undefined) {
+                    const val = !!body[boolKey]
+                    merged[boolKey] = val
+                    if (val !== current[boolKey]) hasUpdates = true
+                } else {
+                    merged[boolKey] = current[boolKey]
+                }
             }
 
             if (!hasUpdates) {
@@ -189,6 +199,7 @@ const handler = async (event) => {
                 UPDATE forge_config SET
                     game_decay = ${merged.game_decay},
                     supply_weight = ${merged.supply_weight},
+                    expectation_weight = ${merged.expectation_weight},
                     inactivity_decay = ${merged.inactivity_decay},
                     perf_floor = ${merged.perf_floor},
                     perf_ceiling = ${merged.perf_ceiling},
@@ -201,6 +212,8 @@ const handler = async (event) => {
                     sell_pressure_half_life = ${merged.sell_pressure_half_life},
                     sell_pressure_factor = ${merged.sell_pressure_factor},
                     performance_approval = ${merged.performance_approval},
+                    fueling_locked = ${merged.fueling_locked},
+                    cooling_locked = ${merged.cooling_locked},
                     updated_at = NOW()
                 WHERE id = 1
             `

@@ -86,7 +86,7 @@ function loadChartLayers() {
     } catch { return DEFAULT_LAYERS }
 }
 
-export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, onCool }) {
+export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, coolingLocked, onCool }) {
     const chartRef = useRef(null)
     const chartInteraction = useRef(null)
     const [tooltip, setTooltip] = useState(null)
@@ -365,7 +365,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 </div>
                             </div>
 
-                            {h.coolableSparks > 0 ? (
+                            {!coolingLocked && h.coolableSparks > 0 ? (
                                 <button
                                     onClick={() => onCool(h.sparkId, h.playerName, { sparks: h.sparks, coolableSparks: h.coolableSparks })}
                                     className="p-1.5 sm:p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] forge-btn-cool forge-clip-btn flex items-center gap-1"
@@ -376,7 +376,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                             ) : (
                                 <div
                                     className="p-1.5 sm:p-2 bg-[var(--forge-edge)]/30 text-[var(--forge-text-dim)] opacity-40 forge-clip-btn"
-                                    title="Free Sparks cannot be cooled"
+                                    title={coolingLocked ? 'Cooling is currently locked' : 'Free Sparks cannot be cooled'}
                                 >
                                     <Snowflake size={14} />
                                 </div>

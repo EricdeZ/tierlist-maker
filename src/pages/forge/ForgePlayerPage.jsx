@@ -9,7 +9,7 @@ import forgeLogo from '../../assets/forge.png'
 import sparkIcon from '../../assets/spark.png'
 import passionCoin from '../../assets/passion/passion.png'
 import passiontailsImg from '../../assets/passion/passiontails.png'
-import { Flame, Snowflake, Zap, Trophy, Target } from 'lucide-react'
+import { Flame, Snowflake, Zap, Trophy, Target, Lock } from 'lucide-react'
 import { FORGE_COLORS } from './forgeConstants'
 import { createEmberSystem, drawPortfolioChart } from './forgeCanvas'
 import ForgeHero from './ForgeHero'
@@ -145,6 +145,18 @@ export default function ForgePlayerPage() {
 
     // Trade handlers
     const openTrade = (mode) => {
+        if (mode === 'fuel' && market?.fuelingLocked) {
+            setTradeModal({ player, mode })
+            setTradeError('Fueling is currently locked')
+            setTradeResult(null)
+            return
+        }
+        if (mode === 'cool' && market?.coolingLocked) {
+            setTradeModal({ player, mode })
+            setTradeError('Cooling is currently locked')
+            setTradeResult(null)
+            return
+        }
         setTradeModal({ player, mode })
         setTradeAmount(1)
         setTradeResult(null)
@@ -358,6 +370,29 @@ export default function ForgePlayerPage() {
                         </Link>
                     </div>
 
+                    {/* Lock banner */}
+                    {(market?.fuelingLocked || market?.coolingLocked) && (
+                        <div className="mb-4 p-3 sm:p-4 border border-amber-500/30 bg-amber-500/8 flex items-center gap-3">
+                            <Lock size={20} className="text-amber-400 flex-shrink-0" />
+                            <div>
+                                <div className="forge-head text-sm sm:text-base font-bold tracking-wider text-amber-400">
+                                    {market.fuelingLocked && market.coolingLocked
+                                        ? 'Trading Locked'
+                                        : market.fuelingLocked
+                                            ? 'Fueling Locked'
+                                            : 'Cooling Locked'}
+                                </div>
+                                <div className="forge-body text-xs sm:text-sm text-[var(--forge-text-mid)]">
+                                    {market.fuelingLocked && market.coolingLocked
+                                        ? 'All trading is temporarily suspended.'
+                                        : market.fuelingLocked
+                                            ? 'Buying Sparks is temporarily suspended.'
+                                            : 'Selling Sparks is temporarily suspended.'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Hero banner */}
                     <ForgeHero
                         player={player}
@@ -367,6 +402,8 @@ export default function ForgePlayerPage() {
                         isOwner={isOwner}
                         changeView={changeView}
                         seasonSlugs={{ leagueSlug, divisionSlug }}
+                        fuelingLocked={market?.fuelingLocked}
+                        coolingLocked={market?.coolingLocked}
                         onFuel={() => openTrade('fuel')}
                         onCool={() => openTrade('cool')}
                     />

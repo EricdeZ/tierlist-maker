@@ -19,6 +19,7 @@ export const FORGE_CONFIG = {
 const PERF_DEFAULTS = {
     GAME_DECAY: 0.75,          // per-game regression toward 1.0
     SUPPLY_WEIGHT: 0.01,       // how much supply mutes score deviation
+    EXPECTATION_WEIGHT: 0.002, // raises expected baseline per outstanding spark
     INACTIVITY_DECAY: 0.85,    // per-week multiplicative decay for inactive players
     PERF_FLOOR: 0.10,          // hard floor on multiplier
     PERF_CEILING: 2.50,        // soft ceiling asymptote
@@ -43,6 +44,7 @@ export async function loadForgeConfig(sql) {
         return {
             GAME_DECAY:      Number(row.game_decay)      || PERF_DEFAULTS.GAME_DECAY,
             SUPPLY_WEIGHT:   Number(row.supply_weight)    || PERF_DEFAULTS.SUPPLY_WEIGHT,
+            EXPECTATION_WEIGHT: Number(row.expectation_weight) ?? PERF_DEFAULTS.EXPECTATION_WEIGHT,
             INACTIVITY_DECAY: Number(row.inactivity_decay) || PERF_DEFAULTS.INACTIVITY_DECAY,
             PERF_FLOOR:      Number(row.perf_floor)       || PERF_DEFAULTS.PERF_FLOOR,
             PERF_CEILING:    Number(row.perf_ceiling)     || PERF_DEFAULTS.PERF_CEILING,
@@ -55,6 +57,8 @@ export async function loadForgeConfig(sql) {
             SELL_PRESSURE_HALF_LIFE: Number(row.sell_pressure_half_life) || FORGE_CONFIG.SELL_PRESSURE_HALF_LIFE,
             SELL_PRESSURE_FACTOR: Number(row.sell_pressure_factor) || FORGE_CONFIG.SELL_PRESSURE_FACTOR,
             PERFORMANCE_APPROVAL: row.performance_approval ?? PERF_DEFAULTS.PERFORMANCE_APPROVAL,
+            FUELING_LOCKED: row.fueling_locked ?? false,
+            COOLING_LOCKED: row.cooling_locked ?? false,
         }
     } catch {
         return { ...PERF_DEFAULTS }
@@ -449,6 +453,155 @@ export async function updateForgeAfterMatch(sql, matchId) {
 }
 
 /**
+ * Shared game replay logic used by both recalcForgePerformance and getPlayerBreakdown.
+ * Groups post-forge games into sets (matches), applies inactivity decay, game decay,
+ * heat with expectation weight, opponent/teammate/god/win factors, and compression.
+ *
+ * Returns { multiplier, trace, finalInactivityDecay, hasGames }
+ */
+function replayPlayerGames({ games, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames }) {
+    const halfLife = cfg.DECAY_HALF_LIFE
+    let multiplier = 1.0
+    let lastGameTime = null
+    let hasGames = false
+    const trace = []
+
+    // Group post-forge games into sets (matches)
+    const sets = []
+    let currentSet = null
+    for (const game of games) {
+        const gameTime = new Date(game.match_date).getTime()
+        if (gameTime < marketStartTime) continue
+        const avgs = roleAvgMap[game.role]
+        if (!avgs) continue
+        if (!currentSet || currentSet.matchId !== game.match_id) {
+            currentSet = { matchId: game.match_id, gameData: [], gameTime }
+            sets.push(currentSet)
+        }
+        currentSet.gameData.push({ game, avgs })
+    }
+
+    for (const set of sets) {
+        hasGames = true
+        const gameTime = set.gameTime
+        const multBeforeSet = multiplier
+
+        // 1. Inactivity decay between sets
+        let inactivityApplied = null
+        if (lastGameTime !== null) {
+            const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
+            const weeksGap = Math.floor(dayGap / 7)
+            if (weeksGap > 0) {
+                const factor = Math.pow(cfg.INACTIVITY_DECAY, weeksGap)
+                multiplier = compressMultiplier(multiplier * factor, cfg)
+                inactivityApplied = { weeks: weeksGap, factor, multAfter: multiplier }
+            }
+        }
+
+        // 2. Per-set regression toward 1.0
+        const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
+
+        // 3. Calculate per-game factors and average them across the set
+        const setEntries = []
+        let factorSum = 0
+        for (const { game, avgs } of set.gameData) {
+            const rawScore = calcCompositeScore(
+                { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                  kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                avgs, game.role
+            )
+            const expected = 1 + cfg.EXPECTATION_WEIGHT * spark.total_sparks
+            const heat = 1 + (rawScore - expected) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
+
+            const oppSide = game.team_side === 1 ? 2 : 1
+            const oppStrength = getTeamStrength(game.game_id, oppSide)
+            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
+            const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
+            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
+            const godName = (game.god_played || '').toLowerCase().trim()
+            const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
+            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
+            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
+
+            const gameFactor = heat * oppFactor * teamFactor * godFactor * winFactor
+            factorSum += gameFactor
+
+            // Build trace entry if display maps are provided
+            if (gameTeamPlayers && gamePlayerNames) {
+                const w = ROLE_WEIGHTS[game.role] || DEFAULT_WEIGHTS
+                const normKills = avgs.avgKills > 0 ? Number(game.kills) / avgs.avgKills : 1.0
+                const playerDeaths = Math.max(Number(game.deaths), 0.5)
+                const normDeaths = avgs.avgDeaths > 0 ? Math.min(avgs.avgDeaths / playerDeaths, 3.0) : 1.0
+                const normAssists = avgs.avgAssists > 0 ? Number(game.assists) / avgs.avgAssists : 1.0
+                const normKp = avgs.avgKp > 0 ? Number(game.kp) / avgs.avgKp : 1.0
+                const normDamage = avgs.avgDamage > 0 ? Number(game.damage) / avgs.avgDamage : 1.0
+                const normMitigated = avgs.avgMitigated > 0 ? Number(game.mitigated) / avgs.avgMitigated : 1.0
+
+                const oppPlayers = (gameTeamPlayers.get(`${game.game_id}:${oppSide}`) || [])
+                    .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
+                const teamPlayers = (gameTeamPlayers.get(`${game.game_id}:${game.team_side}`) || [])
+                    .filter(id => id !== lpId)
+                    .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
+
+                setEntries.push({
+                    date: game.match_date, god: game.god_played, role: game.role, won: game.won,
+                    stats: { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
+                             kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
+                    roleAvgs: avgs, multiplierBefore: multBeforeSet, rawScore, expected,
+                    statBreakdown: {
+                        kills:     { norm: normKills, weight: w.kills || 0, contribution: (w.kills || 0) * normKills },
+                        deaths:    { norm: normDeaths, weight: w.deaths || 0, contribution: (w.deaths || 0) * normDeaths },
+                        assists:   { norm: normAssists, weight: w.assists || 0, contribution: (w.assists || 0) * normAssists },
+                        kp:        { norm: normKp, weight: w.kp || 0, contribution: (w.kp || 0) * normKp },
+                        damage:    { norm: normDamage, weight: w.damage || 0, contribution: (w.damage || 0) * normDamage },
+                        mitigated: { norm: normMitigated, weight: w.mitigated || 0, contribution: (w.mitigated || 0) * normMitigated },
+                    },
+                    heat,
+                    opponent: { avgStrength: oppStrength, factor: oppFactor, players: oppPlayers },
+                    teammate: { avgStrength: teamStrength, factor: teamFactor, players: teamPlayers },
+                    godMeta: { godAvg: godRoleAvg, factor: godFactor },
+                    winFactor, gameFactor,
+                })
+            }
+        }
+
+        const avgFactor = factorSum / set.gameData.length
+        const preCompression = decayed * avgFactor
+        multiplier = compressMultiplier(preCompression, cfg)
+
+        // Annotate trace entries with set info
+        for (let i = 0; i < setEntries.length; i++) {
+            const entry = setEntries[i]
+            entry.setGameCount = setEntries.length
+            entry.setPosition = i + 1
+            entry.isLastInSet = (i === setEntries.length - 1)
+            entry.inactivityDecay = (i === 0) ? inactivityApplied : null
+            entry.gameDecay = { before: multBeforeSet, after: decayed }
+            entry.setAvgFactor = avgFactor
+            entry.preCompression = preCompression
+            entry.multiplierAfter = multiplier
+            trace.push(entry)
+        }
+
+        lastGameTime = gameTime
+    }
+
+    // Final inactivity decay (last game → today)
+    let finalInactivityDecay = null
+    if (lastGameTime !== null) {
+        const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
+        const weeksInactive = Math.floor(daysSinceLast / 7)
+        if (weeksInactive > 0) {
+            const before = multiplier
+            multiplier = compressMultiplier(multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
+            finalInactivityDecay = { weeks: weeksInactive, before, after: multiplier }
+        }
+    }
+
+    return { multiplier, trace, finalInactivityDecay, hasGames }
+}
+
+/**
  * Full-season performance recalculation.
  * Replays all games chronologically for every player who has played,
  * building up perf_multiplier from 1.0 game by game using compounding heat.
@@ -669,88 +822,16 @@ export async function recalcForgePerformance(sql, seasonId) {
         const spark = sparkMap.get(lpId)
         if (!spark) continue
 
-        let multiplier = 1.0
-        let lastGameTime = null
-        let hasPostForgeGames = false
+        const result = replayPlayerGames({
+            games, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+        })
 
-        // Group post-forge games into sets (matches) — factors are averaged per set
-        const sets = []
-        let currentSet = null
-        for (const game of games) {
-            const gameTime = new Date(game.match_date).getTime()
-            if (gameTime < marketStartTime) continue
-            const avgs = roleAvgMap[game.role]
-            if (!avgs) continue
-            if (!currentSet || currentSet.matchId !== game.match_id) {
-                currentSet = { matchId: game.match_id, games: [], gameTime }
-                sets.push(currentSet)
-            }
-            currentSet.games.push({ game, avgs })
-        }
-
-        for (const set of sets) {
-            hasPostForgeGames = true
-            const gameTime = set.gameTime
-
-            // 1. Inactivity decay between sets
-            if (lastGameTime !== null) {
-                const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
-                const weeksGap = Math.floor(dayGap / 7)
-                if (weeksGap > 0) {
-                    multiplier = compressMultiplier(
-                        multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksGap), cfg
-                    )
-                }
-            }
-
-            // 2. Per-set regression toward 1.0 (once per set, not per game)
-            const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
-
-            // 3. Calculate per-game factors and average them across the set
-            let factorSum = 0
-            for (const { game, avgs } of set.games) {
-                const rawScore = calcCompositeScore(
-                    { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
-                      kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
-                    avgs, game.role
-                )
-                const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
-                const oppSide = game.team_side === 1 ? 2 : 1
-                const oppStrength = getTeamStrength(game.game_id, oppSide)
-                const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
-                const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
-                const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
-                const godName = (game.god_played || '').toLowerCase().trim()
-                const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
-                const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
-                const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
-                factorSum += heat * oppFactor * teamFactor * godFactor * winFactor
-            }
-            const avgFactor = factorSum / set.games.length
-
-            // 4. Apply averaged set factor + compress
-            multiplier = compressMultiplier(decayed * avgFactor, cfg)
-            lastGameTime = gameTime
-        }
-
-        // Players with only pre-forge games: let the 0-game loop handle them
-        if (!hasPostForgeGames) continue
+        if (!result.hasGames) continue
         processedSparkIds.add(spark.id)
 
-        // Final inactivity decay (last game → today)
-        if (lastGameTime !== null) {
-            const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
-            const weeksInactive = Math.floor(daysSinceLast / 7)
-            if (weeksInactive > 0) {
-                multiplier = compressMultiplier(
-                    multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
-                )
-            }
-        }
-
         const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
-        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
-        updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
+        const newPrice = calcPrice(market.base_price, result.multiplier, spark.total_sparks, dp)
+        updates.push({ sparkId: spark.id, multiplier: result.multiplier, newPrice, decayedPressure: dp })
     }
 
     // Process players with no post-forge games: inactivity decay from market open
@@ -1066,164 +1147,29 @@ export async function getPlayerBreakdown(sql, sparkId) {
         gamePlayerNames.set(game.league_player_id, game.player_name)
     }
 
-    // Replay this player's games with full trace (averaged per set)
+    // Replay this player's games with full trace
     const playerGames = playerGamesMap.get(lpId) || []
     const marketStartTime = new Date(spark.market_created_at).getTime()
-    const trace = []
-    let multiplier = 1.0
-    let lastGameTime = null
 
-    // Group into sets (matches)
-    const sets = []
-    let currentSet = null
-    for (const game of playerGames) {
-        const gameTime = new Date(game.match_date).getTime()
-        if (gameTime < marketStartTime) continue
-        const avgs = roleAvgMap[game.role]
-        if (!avgs) continue
-        if (!currentSet || currentSet.matchId !== game.match_id) {
-            currentSet = { matchId: game.match_id, gameData: [], gameTime }
-            sets.push(currentSet)
-        }
-        currentSet.gameData.push({ game, avgs })
-    }
-
-    for (const set of sets) {
-        const gameTime = set.gameTime
-        const multBeforeSet = multiplier
-
-        // 1. Inactivity decay (once per set)
-        let inactivityApplied = null
-        if (lastGameTime !== null) {
-            const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
-            const weeksGap = Math.floor(dayGap / 7)
-            if (weeksGap > 0) {
-                const factor = Math.pow(cfg.INACTIVITY_DECAY, weeksGap)
-                multiplier = compressMultiplier(multiplier * factor, cfg)
-                inactivityApplied = { weeks: weeksGap, factor, multAfter: multiplier }
-            }
-        }
-
-        // 2. Game decay (once per set)
-        const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
-
-        // 3. Build per-game entries and compute per-game factors
-        const setEntries = []
-        let factorSum = 0
-        for (const { game, avgs } of set.gameData) {
-            const entry = {
-                date: game.match_date,
-                god: game.god_played,
-                role: game.role,
-                won: game.won,
-                stats: {
-                    kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
-                    kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated),
-                },
-                roleAvgs: avgs,
-                multiplierBefore: multBeforeSet,
-            }
-
-            const rawScore = calcCompositeScore(entry.stats, avgs, game.role)
-            entry.rawScore = rawScore
-
-            // Normalized stat contributions for display
-            const w = ROLE_WEIGHTS[game.role] || DEFAULT_WEIGHTS
-            const normKills = avgs.avgKills > 0 ? entry.stats.kills / avgs.avgKills : 1.0
-            const playerDeaths = Math.max(entry.stats.deaths, 0.5)
-            const normDeaths = avgs.avgDeaths > 0 ? Math.min(avgs.avgDeaths / playerDeaths, 3.0) : 1.0
-            const normAssists = avgs.avgAssists > 0 ? entry.stats.assists / avgs.avgAssists : 1.0
-            const normKp = avgs.avgKp > 0 ? entry.stats.kp / avgs.avgKp : 1.0
-            const normDamage = avgs.avgDamage > 0 ? entry.stats.damage / avgs.avgDamage : 1.0
-            const normMitigated = avgs.avgMitigated > 0 ? entry.stats.mitigated / avgs.avgMitigated : 1.0
-            entry.statBreakdown = {
-                kills:     { norm: normKills, weight: w.kills || 0, contribution: (w.kills || 0) * normKills },
-                deaths:    { norm: normDeaths, weight: w.deaths || 0, contribution: (w.deaths || 0) * normDeaths },
-                assists:   { norm: normAssists, weight: w.assists || 0, contribution: (w.assists || 0) * normAssists },
-                kp:        { norm: normKp, weight: w.kp || 0, contribution: (w.kp || 0) * normKp },
-                damage:    { norm: normDamage, weight: w.damage || 0, contribution: (w.damage || 0) * normDamage },
-                mitigated: { norm: normMitigated, weight: w.mitigated || 0, contribution: (w.mitigated || 0) * normMitigated },
-            }
-
-            const heat = 1 + (rawScore - 1) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
-            entry.heat = heat
-
-            const oppSide = game.team_side === 1 ? 2 : 1
-            const oppStrength = getTeamStrength(game.game_id, oppSide)
-            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
-            const oppPlayers = (gameTeamPlayers.get(`${game.game_id}:${oppSide}`) || [])
-                .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
-            entry.opponent = { avgStrength: oppStrength, factor: oppFactor, players: oppPlayers }
-
-            const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
-            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
-            const teamPlayers = (gameTeamPlayers.get(`${game.game_id}:${game.team_side}`) || [])
-                .filter(id => id !== lpId)
-                .map(id => ({ name: gamePlayerNames.get(id) || '?', strength: playerStrengthMap.get(id) || 1.0 }))
-            entry.teammate = { avgStrength: teamStrength, factor: teamFactor, players: teamPlayers }
-
-            const godName = (game.god_played || '').toLowerCase().trim()
-            const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
-            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
-            entry.godMeta = { godAvg: godRoleAvg, factor: godFactor }
-
-            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
-            entry.winFactor = winFactor
-
-            const gameFactor = heat * oppFactor * teamFactor * godFactor * winFactor
-            entry.gameFactor = gameFactor
-            factorSum += gameFactor
-
-            setEntries.push(entry)
-        }
-
-        // 4. Average factors across the set and apply
-        const avgFactor = factorSum / setEntries.length
-        const preCompression = decayed * avgFactor
-        multiplier = compressMultiplier(preCompression, cfg)
-
-        // Annotate entries with set info
-        for (let i = 0; i < setEntries.length; i++) {
-            const entry = setEntries[i]
-            entry.setGameCount = setEntries.length
-            entry.setPosition = i + 1
-            entry.isLastInSet = (i === setEntries.length - 1)
-            entry.inactivityDecay = (i === 0) ? inactivityApplied : null
-            entry.gameDecay = { before: multBeforeSet, after: decayed }
-            entry.setAvgFactor = avgFactor
-            entry.preCompression = preCompression
-            entry.multiplierAfter = multiplier
-            trace.push(entry)
-        }
-
-        lastGameTime = gameTime
-    }
-
-    // Final inactivity decay (last game → today)
-    let finalInactivityDecay = null
-    if (lastGameTime !== null) {
-        const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
-        const weeksInactive = Math.floor(daysSinceLast / 7)
-        if (weeksInactive > 0) {
-            const before = multiplier
-            multiplier = compressMultiplier(multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
-            finalInactivityDecay = { weeks: weeksInactive, before, after: multiplier }
-        }
-    }
+    const result = replayPlayerGames({
+        games: playerGames, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+        gameTeamPlayers, playerStrengthMap, gamePlayerNames,
+    })
 
     return {
         player: { name: spark.player_name, role: spark.player_role, totalSparks: spark.total_sparks },
         roleAvgs: roleAvgMap,
         config: {
             GAME_DECAY: cfg.GAME_DECAY, SUPPLY_WEIGHT: cfg.SUPPLY_WEIGHT,
+            EXPECTATION_WEIGHT: cfg.EXPECTATION_WEIGHT,
             INACTIVITY_DECAY: cfg.INACTIVITY_DECAY, OPPONENT_WEIGHT: cfg.OPPONENT_WEIGHT,
             TEAMMATE_WEIGHT: cfg.TEAMMATE_WEIGHT, GOD_WEIGHT: cfg.GOD_WEIGHT,
             WIN_BONUS: cfg.WIN_BONUS, PERF_CEILING: cfg.PERF_CEILING,
             COMPRESS_K: cfg.COMPRESS_K, PERF_FLOOR: cfg.PERF_FLOOR,
         },
-        games: trace,
-        finalInactivityDecay,
-        finalMultiplier: multiplier,
+        games: result.trace,
+        finalInactivityDecay: result.finalInactivityDecay,
+        finalMultiplier: result.multiplier,
     }
 }
 

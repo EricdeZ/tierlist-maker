@@ -21,8 +21,13 @@ INSERT INTO forge_config DEFAULT VALUES ON CONFLICT DO NOTHING;
 ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS performance_approval BOOLEAN NOT NULL DEFAULT true;
 
 -- Sell pressure tuning
+ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS expectation_weight NUMERIC(6,4) NOT NULL DEFAULT 0.0020;
 ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS sell_pressure_half_life NUMERIC(6,2) NOT NULL DEFAULT 2.00;
 ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS sell_pressure_factor NUMERIC(6,4) NOT NULL DEFAULT 0.0200;
+
+-- Market lock toggles (independently lock fueling or cooling)
+ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS fueling_locked BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE forge_config ADD COLUMN IF NOT EXISTS cooling_locked BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS forge_pending_updates (
     id              SERIAL PRIMARY KEY,

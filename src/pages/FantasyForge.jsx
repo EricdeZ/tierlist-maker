@@ -6,7 +6,7 @@ import { forgeService, leagueService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import forgeLogo from '../assets/forge.png'
-import { ChevronDown, RotateCcw, Flame, X, BookOpen } from 'lucide-react'
+import { ChevronDown, RotateCcw, Flame, X, BookOpen, Lock } from 'lucide-react'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
 
@@ -337,6 +337,7 @@ export default function FantasyForge() {
                     const openMktIds = []
                     let freeRemaining = 0
                     let refAvail = 0
+                    let lockFlags = null
                     for (let i = 0; i < results.length; i++) {
                         const data = results[i]
                         if (!data) continue
@@ -345,6 +346,7 @@ export default function FantasyForge() {
                         if (data.userTeamId) teamBySeason[si.id] = data.userTeamId
                         freeRemaining = Math.max(freeRemaining, data.freeSparksRemaining ?? 0)
                         refAvail = Math.max(refAvail, data.referralSparksAvailable ?? 0)
+                        if (!lockFlags && data.market) lockFlags = { fuelingLocked: data.market.fuelingLocked, coolingLocked: data.market.coolingLocked }
                         for (const p of (data.players || [])) {
                             allPlayers.push({
                                 ...p,
@@ -356,7 +358,7 @@ export default function FantasyForge() {
                             })
                         }
                     }
-                    setMarket(null)
+                    setMarket(lockFlags)
                     setPlayers(allPlayers)
                     setUserTeamBySeasonId(teamBySeason)
                     setOpenMarketIds(openMktIds)
@@ -679,6 +681,18 @@ export default function FantasyForge() {
 
     // ── Trade handlers ──
     const openTrade = (player, mode) => {
+        if (mode === 'fuel' && market?.fuelingLocked) {
+            setTradeModal({ player, mode })
+            setTradeError('Fueling is currently locked')
+            setTradeResult(null)
+            return
+        }
+        if (mode === 'cool' && market?.coolingLocked) {
+            setTradeModal({ player, mode })
+            setTradeError('Cooling is currently locked')
+            setTradeResult(null)
+            return
+        }
         setTradeModal({ player, mode })
         setTradeAmount(1)
         setTradeResult(null)
@@ -1147,6 +1161,29 @@ export default function FantasyForge() {
                         })()}
                     </div>
 
+                    {/* Lock banners */}
+                    {(market?.fuelingLocked || market?.coolingLocked) && (
+                        <div className="mb-4 p-3 sm:p-4 border border-amber-500/30 bg-amber-500/8 flex items-center gap-3">
+                            <Lock size={20} className="text-amber-400 flex-shrink-0" />
+                            <div>
+                                <div className="forge-head text-sm sm:text-base font-bold tracking-wider text-amber-400">
+                                    {market.fuelingLocked && market.coolingLocked
+                                        ? 'Trading Locked'
+                                        : market.fuelingLocked
+                                            ? 'Fueling Locked'
+                                            : 'Cooling Locked'}
+                                </div>
+                                <div className="forge-body text-xs sm:text-sm text-[var(--forge-text-mid)]">
+                                    {market.fuelingLocked && market.coolingLocked
+                                        ? 'All trading is temporarily suspended. You cannot fuel or cool Sparks right now.'
+                                        : market.fuelingLocked
+                                            ? 'Buying Sparks is temporarily suspended. You can still cool (sell) your existing Sparks.'
+                                            : 'Selling Sparks is temporarily suspended. You can still fuel (buy) new Sparks.'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Error */}
                     {error && (
                         <div className="text-center py-8 text-[var(--forge-loss)]">{error}</div>
@@ -1178,6 +1215,8 @@ export default function FantasyForge() {
                             leagueSlug={urlLeagueSlug}
                             userTeamBySeasonId={userTeamBySeasonId}
                             openMarketIds={openMarketIds}
+                            fuelingLocked={market?.fuelingLocked}
+                            coolingLocked={market?.coolingLocked}
                             onFuel={(p) => openTrade(p, 'fuel')}
                             onCool={(p) => openTrade(p, 'cool')}
                             onSelectPlayer={handleSelectPlayer}
@@ -1195,6 +1234,7 @@ export default function FantasyForge() {
                             seasonSlugs={selectedSeason ? { leagueSlug: selectedSeason.leagueSlug, divisionSlug: selectedSeason.divisionSlug } : null}
                             isLeagueWide={isLeagueWide}
                             leagueSlug={urlLeagueSlug}
+                            coolingLocked={market?.coolingLocked}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}
                         />
                     )}

@@ -8,7 +8,7 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default memo(function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds, listIndex }) {
+export default memo(function ForgePlayerRow({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onSpotlight, onFuel, onCool, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds, fuelingLocked, coolingLocked, listIndex }) {
     const chartRef = useRef(null)
     const mobileChartRef = useRef(null)
     const [expanded, setExpanded] = useState(false)
@@ -251,7 +251,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
 
                 {/* Actions */}
                 <div className="flex items-center justify-end gap-1 px-2">
-                    {isOpen && !isOwnTeam && (
+                    {isOpen && !isOwnTeam && !fuelingLocked && (
                         <button
                             onClick={e => { e.stopPropagation(); onFuel(player) }}
                             data-tutorial="fuel-btn"
@@ -265,7 +265,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                             Fuel
                         </button>
                     )}
-                    {isOpen && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
+                    {isOpen && !coolingLocked && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
                         <button
                             onClick={e => { e.stopPropagation(); onCool(player) }}
                             className="py-1.5 px-3 forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/8 border border-[var(--forge-cool)]/20 cursor-pointer forge-clip-btn forge-btn-cool flex items-center gap-1"

@@ -72,6 +72,7 @@ export default function ForgeMarketTab({
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
     changeView, freeSparksRemaining, referralSparksAvailable = 0, seasonSlugs,
     isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds,
+    fuelingLocked, coolingLocked,
     onFuel, onCool, onSelectPlayer, onSpotlightPlayer, onRandomPlayer,
 }) {
     // All hooks must be called before any early returns
@@ -134,6 +135,8 @@ export default function ForgeMarketTab({
                     leagueSlug={leagueSlug}
                     userTeamBySeasonId={userTeamBySeasonId}
                     openMarketIds={openMarketIds}
+                    fuelingLocked={fuelingLocked}
+                    coolingLocked={coolingLocked}
                     onFuel={onFuel}
                     onCool={onCool}
                     onRandom={onRandomPlayer}
@@ -203,6 +206,8 @@ export default function ForgeMarketTab({
                                 leagueSlug={leagueSlug}
                                 userTeamBySeasonId={userTeamBySeasonId}
                                 openMarketIds={openMarketIds}
+                                fuelingLocked={fuelingLocked}
+                                coolingLocked={coolingLocked}
                                 onSelect={onSelectPlayer}
                                 onFuel={onFuel}
                                 onCool={onCool}
@@ -271,6 +276,8 @@ export default function ForgeMarketTab({
                         leagueSlug={leagueSlug}
                         userTeamBySeasonId={userTeamBySeasonId}
                         openMarketIds={openMarketIds}
+                        fuelingLocked={fuelingLocked}
+                        coolingLocked={coolingLocked}
                         onSelect={onSelectPlayer}
                         onSpotlight={onSpotlightPlayer}
                         onFuel={onFuel}

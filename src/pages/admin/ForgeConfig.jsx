@@ -6,6 +6,7 @@ import PageTitle from '../../components/PageTitle'
 const CONFIG_FIELDS = [
     { key: 'game_decay', label: 'Game Decay', description: 'Per-game regression toward 1.0 — prevents runaway compounding', step: 0.01, min: 0, max: 1 },
     { key: 'supply_weight', label: 'Supply Weight', description: 'How much spark supply mutes score deviation (higher = popular players more stable)', step: 0.001, min: 0, max: 1 },
+    { key: 'expectation_weight', label: 'Expectation Weight', description: 'How much supply raises the "par" performance baseline — at 100 sparks with 0.002, a player needs 1.2 raw score just to break even', step: 0.001, min: 0, max: 0.05 },
     { key: 'inactivity_decay', label: 'Inactivity Decay', description: 'Per-week multiplicative decay for players who don\'t play', step: 0.01, min: 0, max: 1 },
     { key: 'perf_floor', label: 'Perf Floor', description: 'Hard floor on the performance multiplier', step: 0.01, min: 0, max: 1 },
     { key: 'perf_ceiling', label: 'Perf Ceiling', description: 'Soft ceiling asymptote (gains compress toward this, never reached)', step: 0.1, min: 1, max: 10 },
@@ -80,14 +81,25 @@ export default function ForgeConfig() {
         }))
     }
 
+    const handleToggleBool = (key) => {
+        setDraft(prev => ({
+            ...prev,
+            [key]: !(draft[key] !== undefined ? draft[key] : config?.[key])
+        }))
+    }
+
+    const BOOL_KEYS = ['performance_approval', 'fueling_locked', 'cooling_locked']
+
     const hasChanges = (() => {
         const numericChanged = Object.keys(draft).some(key => {
-            if (key === 'performance_approval') return false
+            if (BOOL_KEYS.includes(key)) return false
             const current = Number(config?.[key])
             const pending = Number(draft[key])
             return !isNaN(pending) && pending !== current
         })
-        const boolChanged = draft.performance_approval !== undefined && draft.performance_approval !== config?.performance_approval
+        const boolChanged = BOOL_KEYS.some(key =>
+            draft[key] !== undefined && draft[key] !== config?.[key]
+        )
         return numericChanged || boolChanged
     })()
 
@@ -98,8 +110,8 @@ export default function ForgeConfig() {
         try {
             const body = {}
             for (const [key, val] of Object.entries(draft)) {
-                if (key === 'performance_approval') {
-                    if (val !== config?.performance_approval) body.performance_approval = val
+                if (BOOL_KEYS.includes(key)) {
+                    if (val !== config?.[key]) body[key] = val
                     continue
                 }
                 const num = Number(val)
@@ -248,6 +260,37 @@ export default function ForgeConfig() {
                             }`} />
                         </button>
                     </div>
+
+                    {/* Market lock toggles */}
+                    {[
+                        { key: 'fueling_locked', label: 'Fueling Locked', desc: 'Prevents all fueling (buying Sparks) while enabled', color: 'orange' },
+                        { key: 'cooling_locked', label: 'Cooling Locked', desc: 'Prevents all cooling (selling Sparks) while enabled', color: 'blue' },
+                    ].map(toggle => {
+                        const isOn = draft[toggle.key] !== undefined ? draft[toggle.key] : config?.[toggle.key]
+                        const isModified = draft[toggle.key] !== undefined && draft[toggle.key] !== config?.[toggle.key]
+                        return (
+                            <div key={toggle.key} className="mb-4 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between" style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}>
+                                <div>
+                                    <div className={`text-sm font-medium ${isModified ? 'text-amber-400' : 'text-[var(--color-text)]'}`}>
+                                        {toggle.label}
+                                    </div>
+                                    <div className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                                        {toggle.desc}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleToggleBool(toggle.key)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        isOn ? 'bg-red-600' : 'bg-white/20'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        isOn ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                                </button>
+                            </div>
+                        )
+                    })}
 
                     <div className="rounded-xl border border-white/10 overflow-hidden" style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}>
                         <table className="w-full">
@@ -655,7 +698,7 @@ function GameDetail({ game: g, cfg }) {
                     <span className="font-medium">God meta:</span> {g.god} avg score = {g.godMeta.godAvg.toFixed(3)}, your raw = {g.rawScore.toFixed(3)} &rarr; factor {g.godMeta.factor.toFixed(4)}
                 </div>
                 <div>
-                    <span className="font-medium">Supply dampening:</span> heat = {g.heat.toFixed(4)} (raw {g.rawScore.toFixed(3)} muted by {Math.round(g.stats?.totalSparks || 0)} sparks)
+                    <span className="font-medium">Supply dampening:</span> heat = {g.heat.toFixed(4)} (raw {g.rawScore.toFixed(3)}{g.expected > 1.001 ? ` vs ${g.expected.toFixed(3)} expected` : ''}, muted by {Math.round(g.stats?.totalSparks || 0)} sparks)
                 </div>
             </div>
 

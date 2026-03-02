@@ -6,7 +6,7 @@ import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
 
-export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onFuel, onCool, onRandom, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
+export default function ForgeHero({ player, historyData, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onFuel, onCool, onRandom, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds, fuelingLocked, coolingLocked }) {
     const chartRef = useRef(null)
     const nameRef = useRef(null)
     const prevPlayerRef = useRef(null)
@@ -197,20 +197,22 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                 </div>
 
                 {/* Actions */}
-                {isOpen && !isOwnTeam && (
+                {isOpen && !isOwnTeam && (!fuelingLocked || !coolingLocked) && (
                     <div className="flex sm:flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
-                        <button
-                            onClick={() => onFuel(player)}
-                            className="forge-clip-btn forge-btn-fuel forge-head text-sm sm:text-[1rem] font-bold tracking-wider px-4 sm:px-5 py-2.5 sm:py-3 text-white flex items-center justify-center gap-2 flex-1 sm:flex-auto"
-                            style={{
-                                background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
-                                boxShadow: '0 4px 20px rgba(232,101,32,0.3)',
-                            }}
-                        >
-                            <Flame size={18} />
-                            Fuel This Spark
-                        </button>
-                        {player.holding && player.holding.sparks > 0 && (
+                        {!fuelingLocked && (
+                            <button
+                                onClick={() => onFuel(player)}
+                                className="forge-clip-btn forge-btn-fuel forge-head text-sm sm:text-[1rem] font-bold tracking-wider px-4 sm:px-5 py-2.5 sm:py-3 text-white flex items-center justify-center gap-2 flex-1 sm:flex-auto"
+                                style={{
+                                    background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
+                                    boxShadow: '0 4px 20px rgba(232,101,32,0.3)',
+                                }}
+                            >
+                                <Flame size={18} />
+                                Fuel This Spark
+                            </button>
+                        )}
+                        {!coolingLocked && player.holding && player.holding.sparks > 0 && (
                             <button
                                 onClick={() => onCool(player)}
                                 className="forge-clip-btn forge-btn-cool forge-head text-sm sm:text-[1rem] font-bold tracking-wider px-4 sm:px-5 py-2.5 sm:py-3 text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/20 flex items-center justify-center gap-2 flex-1 sm:flex-auto"

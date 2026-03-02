@@ -8,7 +8,7 @@ import { usePlayerAvatar } from './usePlayerAvatar'
 
 const RANK_LABELS = ['', '1st', '2nd', '3rd']
 
-export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, tutorialIndex, rank, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds }) {
+export default function ForgePlayerCard({ player, selected, marketStatus, userTeamId, isOwner, changeView, seasonSlugs, onSelect, onFuel, onCool, tutorialIndex, rank, isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds, fuelingLocked, coolingLocked }) {
     const chartRef = useRef(null)
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
@@ -167,21 +167,23 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                 </div>
 
                 {/* Action buttons */}
-                {isOpen && !isOwnTeam && (
+                {isOpen && !isOwnTeam && (!fuelingLocked || (!coolingLocked && player.holding?.sparks > 0)) && (
                     <div className="flex gap-1">
-                        <button
-                            onClick={e => { e.stopPropagation(); onFuel(player) }}
-                            data-tutorial="fuel-btn"
-                            className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn forge-btn-fuel flex items-center justify-center gap-1.5"
-                            style={{
-                                background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
-                                boxShadow: '0 2px 10px rgba(232,101,32,0.25)',
-                            }}
-                        >
-                            <Flame size={14} />
-                            Fuel
-                        </button>
-                        {player.holding && player.holding.sparks > 0 && (
+                        {!fuelingLocked && (
+                            <button
+                                onClick={e => { e.stopPropagation(); onFuel(player) }}
+                                data-tutorial="fuel-btn"
+                                className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-white cursor-pointer forge-clip-btn forge-btn-fuel flex items-center justify-center gap-1.5"
+                                style={{
+                                    background: 'linear-gradient(135deg, var(--forge-flame), var(--forge-ember))',
+                                    boxShadow: '0 2px 10px rgba(232,101,32,0.25)',
+                                }}
+                            >
+                                <Flame size={14} />
+                                Fuel
+                            </button>
+                        )}
+                        {!coolingLocked && player.holding && player.holding.sparks > 0 && (
                             <button
                                 onClick={e => { e.stopPropagation(); onCool(player) }}
                                 className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-clip-btn forge-btn-cool flex items-center justify-center gap-1.5"

@@ -4,7 +4,6 @@ import { requireAuth, requirePermission } from '../lib/auth.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
 import { logAudit } from '../lib/audit.js'
 import {
-    FORGE_CONFIG,
     calcPrice,
     decaySellPressure,
     ensureMarket,
@@ -12,6 +11,7 @@ import {
     executeFuel,
     executeCool,
     liquidateMarket,
+    loadForgeConfig,
 } from '../lib/forge.js'
 import { grantPassion } from '../lib/passion.js'
 import { processForgeReferral } from '../lib/referrals.js'
@@ -241,6 +241,9 @@ async function getMarket(sql, user, params, event) {
         SELECT forge_referral_sparks FROM users WHERE id = ${user.id}
     `
 
+    // Load lock flags for frontend
+    const forgeConfig = await loadForgeConfig(sql)
+
     const result = sparks.map(s => {
         const holding = holdingsMap[s.spark_id] || null
         const price24hAgo = priceChangeMap[s.spark_id]
@@ -294,6 +297,8 @@ async function getMarket(sql, user, params, event) {
                 seasonId: market.season_id,
                 status: market.status,
                 basePrice: market.base_price,
+                fuelingLocked: forgeConfig.FUELING_LOCKED,
+                coolingLocked: forgeConfig.COOLING_LOCKED,
             },
             players: result,
             userTeamId,
@@ -774,6 +779,12 @@ async function fuel(sql, user, body, event) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 10 Sparks per transaction' }) }
     }
 
+    // Check fueling lock
+    const cfg = await loadForgeConfig(sql)
+    if (cfg.FUELING_LOCKED) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Fueling is currently locked' }) }
+    }
+
     // Prevent trading own team's players
     const [ownTeamCheck] = await sql`
         SELECT 1 FROM player_sparks ps
@@ -834,6 +845,12 @@ async function cool(sql, user, body, event) {
 
     if (!sparkId || !numSparks || numSparks < 1) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId and sparks (>= 1) are required' }) }
+    }
+
+    // Check cooling lock
+    const cfg = await loadForgeConfig(sql)
+    if (cfg.COOLING_LOCKED) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cooling is currently locked' }) }
     }
 
     // Prevent trading own team's players
@@ -1064,6 +1081,12 @@ async function tutorialFuel(sql, user, body, event) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId is required' }) }
     }
 
+    // Check fueling lock
+    const cfg = await loadForgeConfig(sql)
+    if (cfg.FUELING_LOCKED) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Fueling is currently locked' }) }
+    }
+
     const MAX_FREE_SPARKS = 3
 
     try {
@@ -1242,6 +1265,12 @@ async function referralFuel(sql, user, body, event) {
     const { sparkId } = body
     if (!sparkId) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'sparkId is required' }) }
+    }
+
+    // Check fueling lock
+    const cfg = await loadForgeConfig(sql)
+    if (cfg.FUELING_LOCKED) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Fueling is currently locked' }) }
     }
 
     try {
