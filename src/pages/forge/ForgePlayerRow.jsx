@@ -104,6 +104,16 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                         {player.holding.sparks} held
                     </span>
                 )}
+                {player.holding?.tutorialSparks > 0 && (
+                    <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-0.5 flex-shrink-0">
+                        {player.holding.tutorialSparks}F
+                    </span>
+                )}
+                {player.holding?.referralSparks > 0 && (
+                    <span className="forge-head text-[0.55rem] font-semibold tracking-wider text-[var(--forge-gold-bright)] bg-[var(--forge-gold)]/8 border border-[var(--forge-gold)]/15 px-0.5 flex-shrink-0">
+                        {player.holding.referralSparks}R
+                    </span>
+                )}
             </div>
 
             {/* Compact row */}
@@ -148,6 +158,16 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                         {player.holding && player.holding.sparks > 0 && (
                             <span className="forge-num text-[0.7rem] text-[var(--forge-gold)] bg-[var(--forge-gold)]/8 border border-[var(--forge-gold)]/15 px-1 flex-shrink-0">
                                 {player.holding.sparks} held
+                            </span>
+                        )}
+                        {player.holding?.tutorialSparks > 0 && (
+                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-0.5 flex-shrink-0">
+                                {player.holding.tutorialSparks}F
+                            </span>
+                        )}
+                        {player.holding?.referralSparks > 0 && (
+                            <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-gold-bright)] bg-[var(--forge-gold)]/8 border border-[var(--forge-gold)]/15 px-0.5 flex-shrink-0">
+                                {player.holding.referralSparks}R
                             </span>
                         )}
                     </div>
@@ -281,7 +301,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                             Fuel
                         </button>
                     )}
-                    {isOpen && !coolingLocked && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0)) > 0 && (
+                    {isOpen && !coolingLocked && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0) - (player.holding.referralSparks || 0)) > 0 && (
                         <button
                             onClick={e => { e.stopPropagation(); onCool(player) }}
                             className="py-1.5 px-3 forge-head text-[0.75rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/8 border border-[var(--forge-cool)]/20 cursor-pointer forge-clip-btn forge-btn-cool flex items-center gap-1"

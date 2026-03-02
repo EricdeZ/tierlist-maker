@@ -358,9 +358,14 @@ export async function executeFuel(tx, userId, sparkId, numSparks) {
 
     // Get updated holding
     const [holding] = await tx`
-        SELECT sparks, total_invested FROM spark_holdings
+        SELECT sparks, total_invested, tutorial_sparks, referral_sparks FROM spark_holdings
         WHERE user_id = ${userId} AND spark_id = ${sparkId}
     `
+    if (holding) {
+        holding.tutorialSparks = holding.tutorial_sparks || 0
+        holding.referralSparks = holding.referral_sparks || 0
+        holding.coolableSparks = holding.sparks - holding.tutorialSparks - holding.referralSparks
+    }
 
     return { newPrice: Number(newPrice), totalCost, holding }
 }
@@ -475,9 +480,18 @@ export async function executeCool(tx, userId, sparkId, numSparks) {
     `
 
     // Updated holding (or null if fully cooled)
-    const updatedHolding = remainingSparks > 0
-        ? { sparks: remainingSparks, totalInvested: Math.max(remainingInvested, 0) }
-        : null
+    let updatedHolding = null
+    if (remainingSparks > 0) {
+        const tutorialSparks = holding.tutorial_sparks || 0
+        const referralSparks = holding.referral_sparks || 0
+        updatedHolding = {
+            sparks: remainingSparks,
+            totalInvested: Math.max(remainingInvested, 0),
+            tutorialSparks,
+            referralSparks,
+            coolableSparks: remainingSparks - tutorialSparks - referralSparks,
+        }
+    }
 
     return { newPrice: Number(newPrice), grossProceeds, coolingTax, netProceeds, holding: updatedHolding, profit }
 }
@@ -1564,9 +1578,14 @@ export async function liquidateMarket(sql, marketId) {
 
         // Push challenge progress
         try {
-            const stats = { sparks_cooled: h.sparks }
-            if (totalProfit > 0) stats.forge_profit = totalProfit
-            await pushChallengeProgress(sql, h.user_id, stats)
+            // Realized profit = sum of all profitable cool/liquidate passion transactions
+            const [{ realized }] = await sql`
+                SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
+                FROM passion_transactions
+                WHERE user_id = ${h.user_id} AND type IN ('forge_cool', 'forge_liquidate')
+                  AND lifetime_amount > 0
+            `
+            await pushChallengeProgress(sql, h.user_id, { sparks_cooled: h.sparks, forge_profit: realized })
         } catch (err) {
             console.error(`Challenge push (liquidation) failed for user ${h.user_id}:`, err)
         }

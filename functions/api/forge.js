@@ -158,7 +158,7 @@ async function getMarket(sql, user, params, event) {
     let userHoldings = []
     if (sparkIds.length > 0) {
         userHoldings = await sql`
-            SELECT spark_id, sparks, total_invested, tutorial_sparks
+            SELECT spark_id, sparks, total_invested, tutorial_sparks, referral_sparks
             FROM spark_holdings
             WHERE user_id = ${user.id} AND spark_id = ANY(${sparkIds})
         `
@@ -167,10 +167,14 @@ async function getMarket(sql, user, params, event) {
     // Build holdings map
     const holdingsMap = {}
     for (const h of userHoldings) {
+        const tutorialSparks = h.tutorial_sparks || 0
+        const referralSparks = h.referral_sparks || 0
         holdingsMap[h.spark_id] = {
             sparks: h.sparks,
             totalInvested: Number(h.total_invested),
-            tutorialSparks: h.tutorial_sparks || 0,
+            tutorialSparks,
+            referralSparks,
+            coolableSparks: h.sparks - tutorialSparks - referralSparks,
         }
     }
 
@@ -884,23 +888,15 @@ async function cool(sql, user, body, event) {
                     WHERE user_id = ${user.id} AND type IN ('cool', 'liquidate')
                 `
                 const stats = { sparks_cooled: coolCount }
-                if (result.profit > 0) {
-                    const [{ total }] = await sql`
-                        SELECT COALESCE(SUM(
-                            CASE WHEN st.type IN ('cool', 'liquidate')
-                            THEN st.total_cost ELSE 0 END
-                        ), 0)::integer as total
-                        FROM spark_transactions st
-                        WHERE st.user_id = ${user.id} AND st.type IN ('cool', 'liquidate')
-                    `
-                    const [{ invested }] = await sql`
-                        SELECT COALESCE(SUM(st.total_cost), 0)::integer as invested
-                        FROM spark_transactions st
-                        WHERE st.user_id = ${user.id} AND st.type IN ('fuel', 'tutorial_fuel', 'referral_fuel')
-                    `
-                    const netProfit = Math.max(total - invested, 0)
-                    stats.forge_profit = netProfit
-                }
+                // Realized profit = sum of profit from all cool/liquidate transactions
+                // (stored as lifetime_amount in passion_transactions by grantPassion)
+                const [{ realized }] = await sql`
+                    SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
+                    FROM passion_transactions
+                    WHERE user_id = ${user.id} AND type IN ('forge_cool', 'forge_liquidate')
+                      AND lifetime_amount > 0
+                `
+                stats.forge_profit = realized
                 await pushChallengeProgress(sql, user.id, stats)
             })().catch(err => console.error('Challenge push (cool) failed:', err))
         )

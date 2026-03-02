@@ -19,6 +19,9 @@ export const SCRIM_KEYS = ['scrims_posted', 'scrims_completed']
 // Referral stat keys (tracked by user_id)
 export const REFERRAL_KEYS = ['friends_referred']
 
+// Forge stat keys (tracked by user_id)
+export const FORGE_KEYS = ['sparks_fueled', 'sparks_cooled', 'forge_profit', 'forge_perf_updates_held', 'starter_sparks_used']
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -221,11 +224,12 @@ export async function catchupAllUsers(sql, linkedUsers) {
         updated++
     }
 
-    // Scrim + referral for ALL authenticated users (no player link needed)
+    // Scrim + referral + forge for ALL authenticated users (no player link needed)
     const allUsers = await sql`SELECT id FROM users`
     for (const u of allUsers) {
         await recalcScrimChallenges(sql, u.id)
         await recalcReferralChallenges(sql, u.id)
+        await recalcForgeChallenges(sql, u.id)
     }
 
     return { updated, claimable }
@@ -477,6 +481,80 @@ export async function getReferralStats(sql, userId) {
  */
 export async function recalcReferralChallenges(sql, userId) {
     const stats = await getReferralStats(sql, userId)
+    const statKeys = Object.keys(stats)
+
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+          AND (uc.completed IS NULL OR uc.completed = false)
+    `
+
+    if (challenges.length === 0) return
+
+    const challengeIds = challenges.map(c => c.id)
+    const currentValues = challenges.map(c => Number(stats[c.stat_key] || 0))
+
+    await sql`
+        INSERT INTO user_challenges (user_id, challenge_id, current_value)
+        SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+        ON CONFLICT (user_id, challenge_id)
+        DO UPDATE SET current_value = EXCLUDED.current_value
+    `
+}
+
+
+/**
+ * Get forge stats for a user (by user_id).
+ * Returns total sparks fueled, cooled, realized profit, perf updates held, starter sparks used.
+ */
+export async function getForgeStats(sql, userId) {
+    const [[fuelCool], [{ realized }], [{ perfHeld }], [{ starterUsed }]] = await Promise.all([
+        sql`
+            SELECT
+                COALESCE(SUM(sparks) FILTER (WHERE type = 'fuel'), 0)::integer as fueled,
+                COALESCE(SUM(sparks) FILTER (WHERE type = 'cool'), 0)::integer as cooled
+            FROM spark_transactions
+            WHERE user_id = ${userId}
+        `,
+        sql`
+            SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
+            FROM passion_transactions
+            WHERE user_id = ${userId} AND type IN ('forge_cool', 'forge_liquidate')
+              AND lifetime_amount > 0
+        `,
+        sql`
+            SELECT COUNT(*)::integer as "perfHeld"
+            FROM spark_holdings sh
+            JOIN forge_players fp ON fp.id = sh.forge_player_id
+            WHERE sh.user_id = ${userId} AND sh.sparks > 0
+              AND fp.perf_modifier IS NOT NULL AND fp.perf_modifier != 0
+        `,
+        sql`
+            SELECT (3 - COALESCE(free_sparks_remaining, 0))::integer as "starterUsed"
+            FROM forge_users
+            WHERE user_id = ${userId}
+        `,
+    ])
+
+    return {
+        sparks_fueled: fuelCool.fueled,
+        sparks_cooled: fuelCool.cooled,
+        forge_profit: realized,
+        forge_perf_updates_held: perfHeld,
+        starter_sparks_used: starterUsed,
+    }
+}
+
+
+/**
+ * Lazy recalc for forge challenges. Called on challenges page load
+ * when stale data is detected for FORGE_KEYS.
+ * No revocations needed — forge stats only go up (profit is realized total).
+ */
+export async function recalcForgeChallenges(sql, userId) {
+    const stats = await getForgeStats(sql, userId)
     const statKeys = Object.keys(stats)
 
     const challenges = await sql`

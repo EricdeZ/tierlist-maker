@@ -428,33 +428,33 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 )}
                             </div>
                         )}
-                        {/* Chart layer toggles */}
-                        <div className="absolute bottom-1 right-2 flex items-center gap-1 forge-head tracking-wider z-10">
-                            {[
-                                { key: 'worth', label: 'Worth', color: 'var(--forge-flame)', swatch: 'line' },
-                                { key: 'invested', label: 'Invested', color: 'rgba(255,255,255,0.4)', swatch: 'dashed' },
-                                { key: 'fuel', label: 'Fuel', color: 'var(--forge-flame)' },
-                                { key: 'cool', label: 'Cool', color: 'var(--forge-cool)' },
-                                { key: 'perf', label: 'Perf', color: 'var(--forge-gold)' },
-                            ].map(l => (
-                                <button
-                                    key={l.key}
-                                    onClick={() => toggleLayer(l.key)}
-                                    className={`flex items-center gap-1 px-1.5 py-0.5 text-[0.6rem] cursor-pointer transition-opacity ${
-                                        chartLayers[l.key] ? 'opacity-100' : 'opacity-30'
-                                    }`}
-                                >
-                                    {l.swatch === 'line' ? (
-                                        <span className="w-3 h-0 border-t-2" style={{ borderColor: l.color }} />
-                                    ) : l.swatch === 'dashed' ? (
-                                        <span className="w-4 h-0 border-t border-dashed" style={{ borderColor: l.color }} />
-                                    ) : (
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
-                                    )}
-                                    <span style={{ color: chartLayers[l.key] ? l.color : 'var(--forge-text-dim)' }}>{l.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                    </div>
+                    {/* Chart layer toggles — below chart */}
+                    <div className="flex items-center justify-end gap-1 mt-1 mb-3 forge-head tracking-wider">
+                        {[
+                            { key: 'worth', label: 'Worth', color: 'var(--forge-flame)', swatch: 'line' },
+                            { key: 'invested', label: 'Invested', color: 'rgba(255,255,255,0.4)', swatch: 'dashed' },
+                            { key: 'fuel', label: 'Fuel', color: 'var(--forge-flame)' },
+                            { key: 'cool', label: 'Cool', color: 'var(--forge-cool)' },
+                            { key: 'perf', label: 'Perf', color: 'var(--forge-gold)' },
+                        ].map(l => (
+                            <button
+                                key={l.key}
+                                onClick={() => toggleLayer(l.key)}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 text-[0.6rem] cursor-pointer transition-opacity ${
+                                    chartLayers[l.key] ? 'opacity-100' : 'opacity-30'
+                                }`}
+                            >
+                                {l.swatch === 'line' ? (
+                                    <span className="w-3 h-0 border-t-2" style={{ borderColor: l.color }} />
+                                ) : l.swatch === 'dashed' ? (
+                                    <span className="w-4 h-0 border-t border-dashed" style={{ borderColor: l.color }} />
+                                ) : (
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                                )}
+                                <span style={{ color: chartLayers[l.key] ? l.color : 'var(--forge-text-dim)' }}>{l.label}</span>
+                            </button>
+                        ))}
                     </div>
                 </>
             )}

@@ -2,7 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { grantPassion, getRank, getNextRank, formatRank } from '../lib/passion.js'
-import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, pushChallengeProgress } from '../lib/challenges.js'
+import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, pushChallengeProgress } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -130,6 +130,23 @@ async function listChallenges(sql, user) {
         }
     } catch (err) {
         console.error('Referral challenge recalc failed:', err)
+    }
+
+    // Lazy recalc for forge challenges (all authenticated users)
+    try {
+        const forgeStale = await sql`
+            SELECT c.id FROM challenges c
+            LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${user.id}
+            WHERE c.is_active = true
+              AND c.stat_key = ANY(${FORGE_KEYS})
+              AND (uc.current_value IS NULL OR uc.current_value < 0)
+            LIMIT 1
+        `
+        if (forgeStale.length > 0) {
+            await recalcForgeChallenges(sql, user.id)
+        }
+    } catch (err) {
+        console.error('Forge challenge recalc failed:', err)
     }
 
     const challenges = await sql`

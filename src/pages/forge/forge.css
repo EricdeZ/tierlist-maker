@@ -685,6 +685,7 @@
     background: linear-gradient(90deg, transparent, rgba(232, 101, 32, 0.06), transparent);
     opacity: 0;
     transition: opacity 0.2s;
+    pointer-events: none;
 }
 .forge-change-toggle:hover::after {
     opacity: 1;
@@ -1086,6 +1087,209 @@
         height: 180px;
     }
 }
+
+/* ═══════════════════════════════════════════════════
+   HOLD-TO-CHARGE BUTTON
+   ═══════════════════════════════════════════════════ */
+
+/* ── Charge shake — intensity driven by --shake ── */
+@keyframes forge-charge-shake {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(calc(-1px * var(--shake) * 7), calc(1px * var(--shake) * 5)); }
+    20% { transform: translate(calc(1px * var(--shake) * 5), calc(1px * var(--shake) * 3)); }
+    30% { transform: translate(calc(1px * var(--shake) * 7), calc(-1px * var(--shake) * 5)); }
+    40% { transform: translate(calc(-1px * var(--shake) * 3), calc(-1px * var(--shake) * 7)); }
+    50% { transform: translate(calc(-1px * var(--shake) * 5), calc(1px * var(--shake) * 7)); }
+    60% { transform: translate(calc(1px * var(--shake) * 7), calc(1px * var(--shake) * 3)); }
+    70% { transform: translate(calc(1px * var(--shake) * 5), calc(-1px * var(--shake) * 3)); }
+    80% { transform: translate(calc(-1px * var(--shake) * 7), calc(1px * var(--shake) * 5)); }
+    90% { transform: translate(calc(-1px * var(--shake) * 3), calc(-1px * var(--shake) * 5)); }
+}
+
+@keyframes forge-charge-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(calc(1 + var(--charge) * 0.04)); }
+}
+
+@keyframes forge-charge-ring-expand {
+    0% { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* ── Charge button wrapper ── */
+.forge-charge-wrapper {
+    overflow: visible;
+    isolation: isolate;
+}
+
+/* ── Base charge button ── */
+.forge-charge-btn {
+    --charge: 0;
+    --shake: 0;
+    --glow-angle: 0deg;
+    transition: box-shadow 0.15s, transform 0.15s;
+    z-index: 1;
+}
+
+.forge-charge-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+/* ── Active charging state ── */
+.forge-charge-active {
+    animation: forge-charge-shake 0.12s linear infinite, forge-charge-pulse 0.6s ease-in-out infinite;
+    cursor: grabbing !important;
+}
+
+/* ── Charge fill bar — sweeps left to right ── */
+.forge-charge-fill {
+    transform-origin: left center;
+    transform: scaleX(var(--charge, 0));
+    transition: none;
+    z-index: 0;
+}
+
+.forge-charge-fuel .forge-charge-fill {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 106, 0, 0.25),
+        rgba(255, 170, 51, 0.4),
+        rgba(255, 220, 100, 0.5)
+    );
+}
+
+.forge-charge-cool .forge-charge-fill {
+    background: linear-gradient(
+        90deg,
+        rgba(68, 153, 187, 0.25),
+        rgba(120, 200, 240, 0.4),
+        rgba(180, 230, 255, 0.5)
+    );
+}
+
+/* ── Rotating conic glow border ── */
+.forge-charge-glow {
+    opacity: calc(var(--charge, 0) * 0.9);
+    transition: none;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    filter: blur(3px);
+}
+
+.forge-charge-fuel .forge-charge-glow {
+    background: conic-gradient(
+        from var(--glow-angle, 0deg),
+        transparent,
+        var(--forge-flame-bright) 10%,
+        var(--forge-molten) 20%,
+        transparent 30%,
+        transparent 50%,
+        var(--forge-gold-bright) 60%,
+        var(--forge-flame) 70%,
+        transparent 80%
+    );
+}
+
+.forge-charge-cool .forge-charge-glow {
+    background: conic-gradient(
+        from var(--glow-angle, 0deg),
+        transparent,
+        #78d0f0 10%,
+        var(--forge-cool) 20%,
+        transparent 30%,
+        transparent 50%,
+        #b4e6ff 60%,
+        var(--forge-cool) 70%,
+        transparent 80%
+    );
+}
+
+/* ── Multi-layered box-shadow glow scaled by charge ── */
+.forge-charge-fuel.forge-charge-active {
+    box-shadow:
+        0 0 calc(8px * var(--charge)) rgba(232, 101, 32, calc(0.4 * var(--charge))),
+        0 0 calc(20px * var(--charge)) rgba(255, 106, 0, calc(0.3 * var(--charge))),
+        0 0 calc(45px * var(--charge)) rgba(255, 170, 51, calc(0.2 * var(--charge))),
+        0 0 calc(80px * var(--charge)) rgba(255, 140, 30, calc(0.1 * var(--charge)));
+}
+
+.forge-charge-cool.forge-charge-active {
+    box-shadow:
+        0 0 calc(8px * var(--charge)) rgba(68, 153, 187, calc(0.4 * var(--charge))),
+        0 0 calc(20px * var(--charge)) rgba(100, 190, 230, calc(0.3 * var(--charge))),
+        0 0 calc(45px * var(--charge)) rgba(140, 210, 245, calc(0.2 * var(--charge))),
+        0 0 calc(80px * var(--charge)) rgba(68, 153, 187, calc(0.1 * var(--charge)));
+}
+
+/* ── Icon glow during charge ── */
+.forge-charge-active .forge-charge-icon {
+    filter: drop-shadow(0 0 calc(4px + 8px * var(--charge)) currentColor);
+    transform: scale(calc(1 + var(--charge) * 0.3));
+    transition: none;
+}
+
+/* ── Label scale during charge ── */
+.forge-charge-active .forge-charge-label {
+    transform: scale(calc(1 + var(--charge) * 0.08));
+    text-shadow: 0 0 calc(var(--charge) * 15px) rgba(255, 255, 255, calc(var(--charge) * 0.5));
+    transition: none;
+}
+
+/* ── "HOLD TO CHARGE" hint ── */
+.forge-charge-hint {
+    transition: opacity 0.3s;
+}
+.forge-charge-label,
+.forge-charge-icon {
+    transition: opacity 0.3s;
+}
+.forge-charge-btn:hover:not(:disabled):not(.forge-charge-active) .forge-charge-hint {
+    opacity: 1;
+}
+.forge-charge-btn:hover:not(:disabled):not(.forge-charge-active) .forge-charge-label {
+    opacity: 0;
+}
+.forge-charge-btn:hover:not(:disabled):not(.forge-charge-active) .forge-charge-icon {
+    opacity: 0;
+}
+.forge-charge-active .forge-charge-hint {
+    opacity: 0 !important;
+}
+.forge-charge-active .forge-charge-label {
+    opacity: 1 !important;
+}
+
+/* ── Pulsing ring at high charge ── */
+.forge-charge-ring {
+    border: 2px solid transparent;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    opacity: 0;
+    transition: none;
+}
+
+.forge-charge-fuel.forge-charge-active .forge-charge-ring {
+    border-color: var(--forge-flame-bright);
+    opacity: calc(var(--charge) * 0.5);
+}
+
+.forge-charge-cool.forge-charge-active .forge-charge-ring {
+    border-color: #78d0f0;
+    opacity: calc(var(--charge) * 0.5);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    .forge-charge-active {
+        animation: none !important;
+    }
+    .forge-charge-btn {
+        /* Still show fill bar but no shake */
+    }
+    .forge-charge-active .forge-charge-icon {
+        filter: none;
+        transform: none;
+    }
+}
+
 
 /* Scrollbar hide utility */
 .scrollbar-hide {

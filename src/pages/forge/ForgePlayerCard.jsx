@@ -163,6 +163,16 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                     <div className="flex-1 text-center py-1.5 bg-[var(--forge-surface)]">
                         <div className="forge-num text-[0.95rem]">{player.holding?.sparks || '-'}</div>
                         <div className="text-[0.65rem] uppercase tracking-wider text-[var(--forge-text-dim)]">Held</div>
+                        {player.holding && (player.holding.tutorialSparks > 0 || player.holding.referralSparks > 0) && (
+                            <div className="flex items-center justify-center gap-1 mt-0.5">
+                                {player.holding.tutorialSparks > 0 && (
+                                    <span className="text-[0.55rem] text-[var(--forge-flame)] opacity-70">{player.holding.tutorialSparks}F</span>
+                                )}
+                                {player.holding.referralSparks > 0 && (
+                                    <span className="text-[0.55rem] text-[var(--forge-gold)] opacity-70">{player.holding.referralSparks}R</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -183,7 +193,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                                 Fuel
                             </button>
                         )}
-                        {!coolingLocked && player.holding && player.holding.sparks > 0 && (
+                        {!coolingLocked && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0) - (player.holding.referralSparks || 0)) > 0 && (
                             <button
                                 onClick={e => { e.stopPropagation(); onCool(player) }}
                                 className="flex-1 py-2 px-2.5 forge-head text-[0.85rem] font-semibold tracking-wider text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/15 cursor-pointer forge-clip-btn forge-btn-cool flex items-center justify-center gap-1.5"

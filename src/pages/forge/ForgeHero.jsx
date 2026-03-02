@@ -212,7 +212,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                                 Fuel This Spark
                             </button>
                         )}
-                        {!coolingLocked && player.holding && player.holding.sparks > 0 && (
+                        {!coolingLocked && player.holding && (player.holding.sparks - (player.holding.tutorialSparks || 0) - (player.holding.referralSparks || 0)) > 0 && (
                             <button
                                 onClick={() => onCool(player)}
                                 className="forge-clip-btn forge-btn-cool forge-head text-sm sm:text-[1rem] font-bold tracking-wider px-4 sm:px-5 py-2.5 sm:py-3 text-[var(--forge-cool)] bg-[var(--forge-cool)]/6 border border-[var(--forge-cool)]/20 flex items-center justify-center gap-2 flex-1 sm:flex-auto"
