@@ -41,7 +41,11 @@ const handler = async (event) => {
         if (event.httpMethod === 'GET') {
             if (action === 'pending') {
                 const pending = await sql`
-                    SELECT * FROM forge_pending_updates ORDER BY player_name ASC
+                    SELECT fpu.*, LOWER(COALESCE(lp.role, 'fill')) as role
+                    FROM forge_pending_updates fpu
+                    JOIN player_sparks ps ON fpu.spark_id = ps.id
+                    JOIN league_players lp ON ps.league_player_id = lp.id
+                    ORDER BY fpu.player_name ASC
                 `
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(pending) }
             }
@@ -49,7 +53,8 @@ const handler = async (event) => {
             if (action === 'player-detail') {
                 const sparkId = Number(params.spark_id)
                 if (!sparkId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'spark_id required' }) }
-                const breakdown = await getPlayerBreakdown(sql, sparkId)
+                const [pending] = await sql`SELECT recalc_at FROM forge_pending_updates WHERE spark_id = ${sparkId} LIMIT 1`
+                const breakdown = await getPlayerBreakdown(sql, sparkId, pending?.recalc_at)
                 if (!breakdown) return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'Player not found' }) }
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(breakdown) }
             }
@@ -99,6 +104,26 @@ const handler = async (event) => {
                 // Clear pending
                 await sql`DELETE FROM forge_pending_updates`
 
+                // Snapshot current per-game config values — locks them in for all games up to now
+                const [currentCfg] = await sql`
+                    SELECT expectation_weight, supply_weight, opponent_weight,
+                           teammate_weight, god_weight, win_bonus
+                    FROM forge_config LIMIT 1
+                `
+                if (currentCfg) {
+                    await sql`
+                        INSERT INTO forge_config_history (
+                            effective_from, expectation_weight, supply_weight,
+                            opponent_weight, teammate_weight, god_weight, win_bonus
+                        ) VALUES (
+                            NOW(),
+                            ${currentCfg.expectation_weight}, ${currentCfg.supply_weight},
+                            ${currentCfg.opponent_weight}, ${currentCfg.teammate_weight},
+                            ${currentCfg.god_weight}, ${currentCfg.win_bonus}
+                        )
+                    `
+                }
+
                 // Track challenge progress for holders (fire-and-forget — don't block response)
                 const marketIds = [...new Set(pending.map(p => p.market_id))]
                 event.waitUntil((async () => {
@@ -134,19 +159,25 @@ const handler = async (event) => {
 
             if (action === 'recalc') {
                 const body = event.body ? JSON.parse(event.body) : {}
-                let seasonId = body.season_id
-                if (!seasonId) {
-                    // Find the season with an open forge market
-                    const [openMarket] = await sql`
-                        SELECT season_id FROM forge_markets WHERE status = 'open' ORDER BY created_at DESC LIMIT 1
-                    `
-                    if (!openMarket) {
-                        return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ status: 'skipped', reason: 'no_open_market', detail: 'No open forge market found' }) }
-                    }
-                    seasonId = openMarket.season_id
+                if (body.season_id) {
+                    const result = await recalcForgePerformance(sql, body.season_id)
+                    return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result || { status: 'unknown' }) }
                 }
-                const result = await recalcForgePerformance(sql, seasonId)
-                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result || { status: 'unknown' }) }
+                // Recalc all open markets
+                const openMarkets = await sql`
+                    SELECT season_id FROM forge_markets WHERE status = 'open' ORDER BY created_at ASC
+                `
+                if (openMarkets.length === 0) {
+                    return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ status: 'skipped', reason: 'no_open_market', detail: 'No open forge market found' }) }
+                }
+                const results = []
+                let totalUpdates = 0
+                for (const m of openMarkets) {
+                    const result = await recalcForgePerformance(sql, m.season_id)
+                    results.push({ seasonId: m.season_id, ...result })
+                    totalUpdates += result?.updates || 0
+                }
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ status: 'queued', updates: totalUpdates, markets: results }) }
             }
 
             // ── Config update (owner only) ──

@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
-import { Search, ChevronDown, Flame, Trophy } from 'lucide-react'
+import { Search, ChevronDown, Flame, Trophy, TrendingUp } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import { SORT_OPTIONS } from './forgeConstants'
 import ForgeHero from './ForgeHero'
@@ -257,6 +257,18 @@ export default function ForgeMarketTab({
                         <option key={o.key} value={o.key}>{o.label}</option>
                     ))}
                 </select>
+
+                <button
+                    onClick={() => setSortBy(sortBy === 'perf-desc' ? 'price-desc' : 'perf-desc')}
+                    className={`hidden sm:flex items-center gap-1.5 py-2 px-3 forge-head text-sm font-semibold tracking-wider cursor-pointer transition-colors ${
+                        sortBy === 'perf-desc'
+                            ? 'bg-[var(--forge-flame)]/15 border border-[var(--forge-flame)]/40 text-[var(--forge-flame-bright)]'
+                            : 'bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] hover:border-[var(--forge-border-lt)]'
+                    }`}
+                >
+                    <TrendingUp size={14} />
+                    Sort by Performance
+                </button>
             </div>
 
             {/* Player rows */}

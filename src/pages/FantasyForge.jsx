@@ -69,7 +69,7 @@ export default function FantasyForge() {
     const [players, setPlayers] = useState([])
     const [userTeamId, setUserTeamId] = useState(null)
     const [search, setSearch] = useState('')
-    const [sortBy, setSortBy] = useState('price-desc')
+    const [sortBy, setSortBy] = useState('perf-desc')
     const [teamFilter, setTeamFilter] = useState('')
 
     // Spotlight state (floating stats window on desktop)
@@ -359,7 +359,11 @@ export default function FantasyForge() {
                         }
                     }
                     setMarket(lockFlags)
-                    setPlayers(allPlayers)
+                    setPlayers(prev => {
+                        const prevHist = {}
+                        for (const p of prev) if (p.historyData) prevHist[p.sparkId] = p.historyData
+                        return allPlayers.map(p => ({ ...p, historyData: prevHist[p.sparkId] }))
+                    })
                     setUserTeamBySeasonId(teamBySeason)
                     setOpenMarketIds(openMktIds)
                     setUserTeamId(null)
@@ -470,7 +474,11 @@ export default function FantasyForge() {
                     const data = await forgeService.getMarket(seasonId)
                     setMarket(data.market)
                     const marketPlayers = data.players || []
-                    setPlayers(marketPlayers)
+                    setPlayers(prev => {
+                        const prevHist = {}
+                        for (const p of prev) if (p.historyData) prevHist[p.sparkId] = p.historyData
+                        return marketPlayers.map(p => ({ ...p, historyData: prevHist[p.sparkId] }))
+                    })
                     setUserTeamId(data.userTeamId || null)
                     setFreeSparksRemaining(data.freeSparksRemaining ?? 0)
                     setReferralSparksAvailable(data.referralSparksAvailable ?? 0)
@@ -621,6 +629,7 @@ export default function FantasyForge() {
                 const cv = changeView === '7d' ? 'priceChange7d' : 'priceChange24h'
                 va = a[cv] ?? -999; vb = b[cv] ?? -999
             }
+            else if (key === 'perf') { va = a.perfMultiplier ?? 0; vb = b.perfMultiplier ?? 0 }
             else if (key === 'sparks') { va = a.totalSparks; vb = b.totalSparks }
             else if (key === 'name') { va = a.playerName; vb = b.playerName }
             if (typeof va === 'string') return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)

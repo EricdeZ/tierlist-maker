@@ -573,6 +573,54 @@
     background: rgba(232, 101, 32, 0.04) !important;
 }
 
+/* ── Performance multiplier effects ── */
+.forge-perf-shine {
+    animation: forge-perf-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes forge-perf-glow {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+}
+
+.forge-perf-fire {
+    overflow: visible;
+}
+
+.forge-perf-fire::before {
+    content: '';
+    position: absolute;
+    inset: -6px -8px;
+    background:
+        radial-gradient(ellipse at 30% 80%, rgba(255, 106, 0, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 70%, rgba(232, 101, 32, 0.25) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 40%, rgba(255, 170, 51, 0.15) 0%, transparent 55%);
+    animation: forge-perf-flicker 2s ease-in-out infinite;
+    pointer-events: none;
+    border-radius: 6px;
+    filter: blur(2px);
+}
+
+.forge-perf-fire::after {
+    content: '';
+    position: absolute;
+    inset: -3px -5px;
+    background:
+        radial-gradient(ellipse at 40% 90%, rgba(255, 60, 0, 0.2) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 50%, rgba(255, 140, 30, 0.12) 0%, transparent 50%);
+    animation: forge-perf-flicker 2s ease-in-out infinite reverse;
+    pointer-events: none;
+    border-radius: 4px;
+    filter: blur(1px);
+}
+
+@keyframes forge-perf-flicker {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    25% { opacity: 1; transform: scale(1.05, 1.08); }
+    50% { opacity: 0.7; transform: scale(0.97, 1.02); }
+    75% { opacity: 0.9; transform: scale(1.03, 0.96); }
+}
+
 /* ── Player row hover effects ── */
 .forge-player-row {
     transition: all 0.2s ease;
@@ -751,8 +799,14 @@
     .forge-spark-icon-lg,
     .forge-rank-badge,
     .forge-banner,
-    .forge-challenge-claimable {
+    .forge-challenge-claimable,
+    .forge-perf-shine {
         animation: none !important;
+    }
+
+    .forge-perf-fire::before,
+    .forge-perf-fire::after {
+        display: none;
     }
 
     .forge-blazing.forge-player-card,
@@ -987,6 +1041,7 @@
         grid-template-columns: 4px 40px 1fr auto auto !important;
     }
     .forge-col-badge,
+    .forge-col-perf,
     .forge-col-sparkline,
     .forge-col-delta {
         display: none !important;

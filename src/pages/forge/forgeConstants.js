@@ -13,6 +13,7 @@ export const SORT_OPTIONS = [
     { key: 'price-asc', label: 'Lowest Value' },
     { key: 'change-desc', label: 'Biggest Gainers' },
     { key: 'change-asc', label: 'Biggest Losers' },
+    { key: 'perf-desc', label: 'Best Performance' },
     { key: 'sparks-desc', label: 'Most Popular' },
     { key: 'name-asc', label: 'Name (A-Z)' },
 ]

@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { adminFetch } from '../../services/adminApi'
 import { useAuth } from '../../context/AuthContext'
 import PageTitle from '../../components/PageTitle'
+import soloIcon from '../../assets/roles/solo.webp'
+import jungleIcon from '../../assets/roles/jungle.webp'
+import midIcon from '../../assets/roles/mid.webp'
+import suppIcon from '../../assets/roles/supp.webp'
+import adcIcon from '../../assets/roles/adc.webp'
+
+const ROLE_ICONS = { solo: soloIcon, jungle: jungleIcon, mid: midIcon, support: suppIcon, adc: adcIcon }
 
 const CONFIG_FIELDS = [
     { key: 'game_decay', label: 'Game Decay', description: 'Per-game regression toward 1.0 — prevents runaway compounding', step: 0.01, min: 0, max: 1 },
@@ -40,6 +47,10 @@ export default function ForgeConfig() {
     const [expandedSparkId, setExpandedSparkId] = useState(null)
     const [breakdown, setBreakdown] = useState(null)
     const [breakdownLoading, setBreakdownLoading] = useState(false)
+    const [pendingSearch, setPendingSearch] = useState('')
+    const [showZeroDelta, setShowZeroDelta] = useState(false)
+    const [sortCol, setSortCol] = useState('delta')
+    const [sortDir, setSortDir] = useState('desc')
 
     useEffect(() => {
         loadPending()
@@ -206,7 +217,7 @@ export default function ForgeConfig() {
 
     if (loading && pendingLoading) {
         return (
-            <div className="max-w-3xl mx-auto p-4">
+            <div className="max-w-6xl mx-auto p-4">
                 <PageTitle title="Forge Config" noindex />
                 <div className="text-center text-[var(--color-text-secondary)] py-12">Loading...</div>
             </div>
@@ -216,7 +227,7 @@ export default function ForgeConfig() {
     const approvalOn = draft.performance_approval !== undefined ? draft.performance_approval : config?.performance_approval
 
     return (
-        <div className="max-w-3xl mx-auto pb-8 px-4">
+        <div className="max-w-6xl mx-auto pb-8 px-4">
             <PageTitle title="Forge Config" noindex />
 
             <div className="mb-6">
@@ -397,21 +408,73 @@ export default function ForgeConfig() {
                     </div>
                 ) : (
                     <>
+                        <div className="flex items-center gap-3 mb-3">
+                            <input
+                                type="text"
+                                placeholder="Search players..."
+                                value={pendingSearch}
+                                onChange={e => setPendingSearch(e.target.value)}
+                                className="flex-1 max-w-xs px-3 py-1.5 rounded-lg text-sm bg-white/5 border border-white/10 text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-orange-500/50"
+                            />
+                            <label className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={showZeroDelta}
+                                    onChange={e => setShowZeroDelta(e.target.checked)}
+                                    className="accent-orange-500"
+                                />
+                                Show 0% delta
+                            </label>
+                        </div>
                         <div className="rounded-xl border border-white/10 overflow-hidden" style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/10">
-                                            <th className="text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Player</th>
-                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Old Mult</th>
-                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">New Mult</th>
-                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Old Price</th>
-                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">New Price</th>
-                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Delta</th>
+                                            {[
+                                                { key: 'player', label: 'Player', align: 'left' },
+                                                { key: 'oldMult', label: 'Old Mult' },
+                                                { key: 'newMult', label: 'New Mult' },
+                                                { key: 'oldPrice', label: 'Old Price' },
+                                                { key: 'newPrice', label: 'New Price' },
+                                                { key: 'delta', label: 'Delta' },
+                                            ].map(col => (
+                                                <th
+                                                    key={col.key}
+                                                    onClick={() => { setSortDir(sortCol === col.key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc'); setSortCol(col.key) }}
+                                                    className={`${col.align === 'left' ? 'text-left' : 'text-right'} text-xs font-medium uppercase tracking-wider px-4 py-3 cursor-pointer select-none hover:text-[var(--color-text)] transition-colors ${sortCol === col.key ? 'text-orange-400' : 'text-[var(--color-text-secondary)]'}`}
+                                                >
+                                                    {col.label}{sortCol === col.key ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                                                </th>
+                                            ))}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {pending.map(row => {
+                                        {pending.filter(row => {
+                                            if (pendingSearch && !row.player_name.toLowerCase().includes(pendingSearch.toLowerCase())) return false
+                                            if (!showZeroDelta) {
+                                                const delta = Number(row.old_price) > 0 ? ((Number(row.new_price) - Number(row.old_price)) / Number(row.old_price) * 100) : 0
+                                                if (Math.abs(delta) < 0.05) return false
+                                            }
+                                            return true
+                                        }).sort((a, b) => {
+                                            const getValue = (row) => {
+                                                const oldPrice = Number(row.old_price)
+                                                const newPrice = Number(row.new_price)
+                                                switch (sortCol) {
+                                                    case 'player': return row.player_name.toLowerCase()
+                                                    case 'oldMult': return Number(row.old_multiplier)
+                                                    case 'newMult': return Number(row.new_multiplier)
+                                                    case 'oldPrice': return oldPrice
+                                                    case 'newPrice': return newPrice
+                                                    case 'delta': return oldPrice > 0 ? (newPrice - oldPrice) / oldPrice : 0
+                                                    default: return 0
+                                                }
+                                            }
+                                            const va = getValue(a), vb = getValue(b)
+                                            const cmp = sortCol === 'player' ? va.localeCompare(vb) : va - vb
+                                            return sortDir === 'asc' ? cmp : -cmp
+                                        }).map(row => {
                                             const oldMult = Number(row.old_multiplier)
                                             const newMult = Number(row.new_multiplier)
                                             const oldPrice = Number(row.old_price)
@@ -427,6 +490,7 @@ export default function ForgeConfig() {
                                                     >
                                                         <td className="px-4 py-2 text-sm text-[var(--color-text)]">
                                                             <span className={`inline-block w-3 text-[var(--color-text-secondary)] text-xs mr-1 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>&#9656;</span>
+                                                            {ROLE_ICONS[row.role] && <img src={ROLE_ICONS[row.role]} alt={row.role} className="inline-block w-4 h-4 mr-1.5 -mt-0.5 opacity-70" />}
                                                             {row.player_name}
                                                         </td>
                                                         <td className="px-4 py-2 text-sm text-right text-[var(--color-text-secondary)]">{oldMult.toFixed(4)}</td>
@@ -540,6 +604,7 @@ function PlayerBreakdown({ data }) {
                                 <th className="text-center px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">W/L</th>
                                 <th className="text-center px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">K/D/A</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Raw</th>
+                                <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Exp</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Heat</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Opp</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Team</th>
@@ -593,6 +658,14 @@ function GameRow({ game: g, index: i, cfg }) {
                 <td className={`px-2 py-1.5 text-right font-mono ${g.rawScore > 1.1 ? 'text-green-400' : g.rawScore < 0.9 ? 'text-red-400' : 'text-[var(--color-text)]'}`}>
                     {g.rawScore.toFixed(3)}
                 </td>
+                <td className="px-2 py-1.5 text-right font-mono text-[var(--color-text-secondary)]">
+                    {g.expected.toFixed(3)}
+                    {g.expImpact != null && Math.abs(g.expImpact) > 0.0001 && (
+                        <span className={`text-[10px] ml-0.5 ${g.expImpact > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {g.expImpact > 0 ? '+' : ''}{(g.expImpact * 100).toFixed(1)}%
+                        </span>
+                    )}
+                </td>
                 <td className={`px-2 py-1.5 text-right font-mono ${factorColor(g.heat)}`}>{fmtFactor(g.heat)}</td>
                 <td className={`px-2 py-1.5 text-right font-mono ${factorColor(g.opponent.factor)}`}>{fmtFactor(g.opponent.factor)}</td>
                 <td className={`px-2 py-1.5 text-right font-mono ${factorColor(g.teammate.factor)}`}>{fmtFactor(g.teammate.factor)}</td>
@@ -613,7 +686,7 @@ function GameRow({ game: g, index: i, cfg }) {
             </tr>
             {expanded && (
                 <tr>
-                    <td colSpan={13} className="bg-black/30 px-4 py-3">
+                    <td colSpan={14} className="bg-black/30 px-4 py-3">
                         <GameDetail game={g} cfg={cfg} />
                     </td>
                 </tr>
@@ -698,7 +771,7 @@ function GameDetail({ game: g, cfg }) {
                     <span className="font-medium">God meta:</span> {g.god} avg score = {g.godMeta.godAvg.toFixed(3)}, your raw = {g.rawScore.toFixed(3)} &rarr; factor {g.godMeta.factor.toFixed(4)}
                 </div>
                 <div>
-                    <span className="font-medium">Supply dampening:</span> heat = {g.heat.toFixed(4)} (raw {g.rawScore.toFixed(3)}{g.expected > 1.001 ? ` vs ${g.expected.toFixed(3)} expected` : ''}, muted by {Math.round(g.stats?.totalSparks || 0)} sparks)
+                    <span className="font-medium">Supply dampening:</span> heat = {g.heat.toFixed(4)} (raw {g.rawScore.toFixed(3)}{g.expected > 1.001 ? ` vs ${g.expected.toFixed(3)} expected` : ''}{g.expectationWeight != null ? ` @ weight ${g.expectationWeight}` : ''}, muted by {Math.round(g.stats?.totalSparks || 0)} sparks)
                 </div>
             </div>
 

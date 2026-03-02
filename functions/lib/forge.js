@@ -66,6 +66,50 @@ export async function loadForgeConfig(sql) {
 }
 
 /**
+ * Load time-versioned per-game config snapshots, sorted by effective_from ASC.
+ * Each snapshot contains the 6 per-game scoring weights that were in effect from that time.
+ */
+export async function loadForgeConfigHistory(sql) {
+    try {
+        const rows = await sql`
+            SELECT effective_from, expectation_weight, supply_weight,
+                   opponent_weight, teammate_weight, god_weight, win_bonus
+            FROM forge_config_history
+            ORDER BY effective_from ASC
+        `
+        if (rows.length === 0) {
+            return [{ effectiveFrom: 0, EXPECTATION_WEIGHT: PERF_DEFAULTS.EXPECTATION_WEIGHT,
+                SUPPLY_WEIGHT: PERF_DEFAULTS.SUPPLY_WEIGHT, OPPONENT_WEIGHT: PERF_DEFAULTS.OPPONENT_WEIGHT,
+                TEAMMATE_WEIGHT: PERF_DEFAULTS.TEAMMATE_WEIGHT, GOD_WEIGHT: PERF_DEFAULTS.GOD_WEIGHT,
+                WIN_BONUS: PERF_DEFAULTS.WIN_BONUS }]
+        }
+        return rows.map(r => ({
+            effectiveFrom: new Date(r.effective_from).getTime(),
+            EXPECTATION_WEIGHT: Number(r.expectation_weight),
+            SUPPLY_WEIGHT: Number(r.supply_weight),
+            OPPONENT_WEIGHT: Number(r.opponent_weight),
+            TEAMMATE_WEIGHT: Number(r.teammate_weight),
+            GOD_WEIGHT: Number(r.god_weight),
+            WIN_BONUS: Number(r.win_bonus),
+        }))
+    } catch {
+        return [{ effectiveFrom: 0, EXPECTATION_WEIGHT: PERF_DEFAULTS.EXPECTATION_WEIGHT,
+            SUPPLY_WEIGHT: PERF_DEFAULTS.SUPPLY_WEIGHT, OPPONENT_WEIGHT: PERF_DEFAULTS.OPPONENT_WEIGHT,
+            TEAMMATE_WEIGHT: PERF_DEFAULTS.TEAMMATE_WEIGHT, GOD_WEIGHT: PERF_DEFAULTS.GOD_WEIGHT,
+            WIN_BONUS: PERF_DEFAULTS.WIN_BONUS }]
+    }
+}
+
+function getCfgAtTime(configHistory, gameTimeMs, fallbackCfg) {
+    // Find the first approval that happened AFTER this game — that approval locked in config for it.
+    // If no approval exists after the game, use fallbackCfg (current live config).
+    for (const entry of configHistory) {
+        if (entry.effectiveFrom > gameTimeMs) return entry
+    }
+    return fallbackCfg
+}
+
+/**
  * Asymmetric multiplier compression.
  * Above 1.0: exponential curve toward ceiling (gains compress).
  * Below 1.0: raw pass-through to hard floor (losses hit full force).
@@ -459,7 +503,7 @@ export async function updateForgeAfterMatch(sql, matchId) {
  *
  * Returns { multiplier, trace, finalInactivityDecay, hasGames }
  */
-function replayPlayerGames({ games, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames }) {
+function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames }) {
     const halfLife = cfg.DECAY_HALF_LIFE
     let multiplier = 1.0
     let lastGameTime = null
@@ -505,23 +549,29 @@ function replayPlayerGames({ games, spark, cfg, marketStartTime, roleAvgMap, god
         const setEntries = []
         let factorSum = 0
         for (const { game, avgs } of set.gameData) {
+            const gameTimeMs = new Date(game.match_date).getTime()
+            const snap = getCfgAtTime(configHistory, gameTimeMs, cfg)
+
             const rawScore = calcCompositeScore(
                 { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
                   kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
                 avgs, game.role
             )
-            const expected = 1 + cfg.EXPECTATION_WEIGHT * spark.total_sparks
-            const heat = 1 + (rawScore - expected) / (1 + cfg.SUPPLY_WEIGHT * spark.total_sparks)
+            const expected = 1 + snap.EXPECTATION_WEIGHT * spark.total_sparks
+            const denom = 1 + snap.SUPPLY_WEIGHT * spark.total_sparks
+            const heat = 1 + (rawScore - expected) / denom
+            const heatWithoutExp = 1 + (rawScore - 1) / denom
+            const expImpact = heatWithoutExp !== 0 ? (heat / heatWithoutExp - 1) : 0
 
             const oppSide = game.team_side === 1 ? 2 : 1
             const oppStrength = getTeamStrength(game.game_id, oppSide)
-            const oppFactor = 1 + cfg.OPPONENT_WEIGHT * (oppStrength - 1)
+            const oppFactor = 1 + snap.OPPONENT_WEIGHT * (oppStrength - 1)
             const teamStrength = getTeamStrength(game.game_id, game.team_side, lpId)
-            const teamFactor = 1 + cfg.TEAMMATE_WEIGHT * (1.0 - teamStrength)
+            const teamFactor = 1 + snap.TEAMMATE_WEIGHT * (1.0 - teamStrength)
             const godName = (game.god_played || '').toLowerCase().trim()
             const godRoleAvg = godAvgMap[`${godName}:${game.role}`] || 1.0
-            const godFactor = 1 + cfg.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
-            const winFactor = game.won ? 1 + cfg.WIN_BONUS : 1 - cfg.WIN_BONUS
+            const godFactor = 1 + snap.GOD_WEIGHT * (rawScore / godRoleAvg - 1)
+            const winFactor = game.won ? 1 + snap.WIN_BONUS : 1 - snap.WIN_BONUS
 
             const gameFactor = heat * oppFactor * teamFactor * godFactor * winFactor
             factorSum += gameFactor
@@ -548,6 +598,7 @@ function replayPlayerGames({ games, spark, cfg, marketStartTime, roleAvgMap, god
                     stats: { kills: Number(game.kills), deaths: Number(game.deaths), assists: Number(game.assists),
                              kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
                     roleAvgs: avgs, multiplierBefore: multBeforeSet, rawScore, expected,
+                    expectationWeight: snap.EXPECTATION_WEIGHT, expImpact,
                     statBreakdown: {
                         kills:     { norm: normKills, weight: w.kills || 0, contribution: (w.kills || 0) * normKills },
                         deaths:    { norm: normDeaths, weight: w.deaths || 0, contribution: (w.deaths || 0) * normDeaths },
@@ -622,6 +673,7 @@ export async function recalcForgePerformance(sql, seasonId) {
     if (market.status !== 'open') return { status: 'skipped', reason: 'market_closed', detail: `Market status is '${market.status}'` }
 
     const cfg = await loadForgeConfig(sql)
+    const configHistory = await loadForgeConfigHistory(sql)
     const halfLife = cfg.DECAY_HALF_LIFE
 
     // Apply DB-configurable sell pressure params to FORGE_CONFIG
@@ -823,32 +875,30 @@ export async function recalcForgePerformance(sql, seasonId) {
         if (!spark) continue
 
         const result = replayPlayerGames({
-            games, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+            games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
         })
 
-        if (!result.hasGames) continue
         processedSparkIds.add(spark.id)
-
-        const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
-        const newPrice = calcPrice(market.base_price, result.multiplier, spark.total_sparks, dp)
-        updates.push({ sparkId: spark.id, multiplier: result.multiplier, newPrice, decayedPressure: dp })
-    }
-
-    // Process players with no post-forge games: inactivity decay from market open
-    for (const spark of sparks) {
-        if (processedSparkIds.has(spark.id)) continue
-        const daysSinceMarket = (now - marketStartTime) / MS_PER_DAY
-        const weeksInactive = Math.floor(daysSinceMarket / 7)
-        if (weeksInactive <= 0) continue
-        const multiplier = compressMultiplier(
-            Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg
-        )
+        const multiplier = result.hasGames ? result.multiplier : 1.0
         const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
         const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
         updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
-    if (updates.length === 0) return { status: 'skipped', reason: 'no_updates', detail: `No spark records matched the ${playerGamesMap.size} players with games (sparks may not exist for these players)` }
+    // Process players with sparks but no games in the season
+    for (const spark of sparks) {
+        if (processedSparkIds.has(spark.id)) continue
+        const daysSinceMarket = (now - marketStartTime) / MS_PER_DAY
+        const weeksInactive = Math.floor(daysSinceMarket / 7)
+        const multiplier = weeksInactive > 0
+            ? compressMultiplier(Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
+            : 1.0
+        const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
+        const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
+        updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
+    }
+
+    if (updates.length === 0) return { status: 'skipped', reason: 'no_updates', detail: `No spark records found for this market` }
 
     // ── Approval gate: queue or apply immediately ──
 
@@ -876,8 +926,9 @@ export async function recalcForgePerformance(sql, seasonId) {
         const pOldPrices = updates.map(u => Number(currentMap.get(u.sparkId)?.current_price) || 0)
         const pNewPrices = updates.map(u => u.newPrice)
 
+        const recalcAt = new Date(now).toISOString()
         await sql`
-            INSERT INTO forge_pending_updates (market_id, spark_id, player_name, old_multiplier, new_multiplier, old_price, new_price)
+            INSERT INTO forge_pending_updates (market_id, spark_id, player_name, old_multiplier, new_multiplier, old_price, new_price, recalc_at)
             SELECT
                 UNNEST(${pMarketIds}::int[]),
                 UNNEST(${pSparkIds}::int[]),
@@ -885,7 +936,8 @@ export async function recalcForgePerformance(sql, seasonId) {
                 UNNEST(${pOldMults}::numeric[]),
                 UNNEST(${pNewMults}::numeric[]),
                 UNNEST(${pOldPrices}::numeric[]),
-                UNNEST(${pNewPrices}::numeric[])
+                UNNEST(${pNewPrices}::numeric[]),
+                ${recalcAt}::timestamptz
         `
         return { status: 'queued', updates: updates.length, approval: true } // Skip applying — wait for admin approval
     }
@@ -956,7 +1008,7 @@ export async function recalcForgePerformance(sql, seasonId) {
  * Replay scoring for a single player and return per-game breakdown with all intermediate factors.
  * Read-only — does not write to the database.
  */
-export async function getPlayerBreakdown(sql, sparkId) {
+export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
     const [spark] = await sql`
         SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.market_id,
                ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier,
@@ -972,6 +1024,7 @@ export async function getPlayerBreakdown(sql, sparkId) {
     if (!spark) return null
 
     const cfg = await loadForgeConfig(sql)
+    const configHistory = await loadForgeConfigHistory(sql)
     const halfLife = cfg.DECAY_HALF_LIFE
     const seasonId = spark.season_id
     const lpId = spark.league_player_id
@@ -1081,7 +1134,7 @@ export async function getPlayerBreakdown(sql, sparkId) {
         playerGamesMap.get(game.league_player_id).push(game)
     }
 
-    const now = Date.now()
+    const now = recalcAt ? new Date(recalcAt).getTime() : Date.now()
 
     const playerStrengthMap = new Map()
     for (const [pid, games] of playerGamesMap) {
@@ -1152,7 +1205,7 @@ export async function getPlayerBreakdown(sql, sparkId) {
     const marketStartTime = new Date(spark.market_created_at).getTime()
 
     const result = replayPlayerGames({
-        games: playerGames, spark, cfg, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+        games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
         gameTeamPlayers, playerStrengthMap, gamePlayerNames,
     })
 

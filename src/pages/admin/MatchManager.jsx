@@ -376,6 +376,7 @@ export default function MatchManager() {
                                 onClick={() => toggleMatch(m.id)}
                                 className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors"
                             >
+                                <span className="text-xs text-[var(--color-text-secondary)] tabular-nums shrink-0 font-mono opacity-50 w-8 text-right">#{m.id}</span>
                                 <span className="text-xs text-[var(--color-text-secondary)] tabular-nums w-20 shrink-0">
                                     {m.date ? m.date.slice(0, 10) : 'No date'}
                                 </span>
@@ -532,7 +533,7 @@ function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, season
                                         ? 'bg-[var(--color-card)] text-[var(--color-text)] border border-b-0 border-[var(--color-border)]'
                                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
                                 }`}>
-                            Game {game.game_number}
+                            Game {game.game_number} <span className="opacity-40">#{game.id}</span>
                         </button>
                     ))}
                 </div>

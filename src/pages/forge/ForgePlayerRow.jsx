@@ -38,6 +38,9 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
         : perfValue >= 1.0 ? 'text-[var(--forge-gold)]'
         : perfValue >= 0.7 ? 'text-[var(--forge-cool)]'
         : 'text-[var(--forge-loss)]'
+    const perfOnFire = perfValue >= 1.5
+    // Shine intensity: 0 at 1.2, ramps to 1 at 1.5+
+    const perfShine = perfValue > 1.2 ? Math.min((perfValue - 1.2) / 0.3, 1) : 0
 
     // Draw compact sparkline — skip on mobile unless expanded (canvas is heavy)
     useEffect(() => {
@@ -107,7 +110,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
             <div
                 className="forge-player-row grid items-center py-1 sm:py-2.5 relative z-[2]"
                 style={{
-                    gridTemplateColumns: '4px 50px 1.4fr 80px 0.7fr 100px 0.5fr 140px',
+                    gridTemplateColumns: '4px 50px 1.3fr 70px 60px 0.7fr 100px 0.5fr 140px',
                 }}
                 onClick={handleRowClick}
             >
@@ -148,7 +151,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                             </span>
                         )}
                     </div>
-                    {/* Desktop: team + role + perf on one line */}
+                    {/* Desktop: team + role on one line */}
                     <div className="hidden sm:flex text-[0.85rem] text-[var(--forge-text-dim)] items-center gap-1 mt-px overflow-hidden">
                         {player.isFreeAgent ? (
                             <span className="forge-head text-[0.7rem] font-semibold tracking-wider text-[var(--forge-text-dim)] opacity-70 flex-shrink-0">Free Agent</span>
@@ -165,11 +168,6 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                         )}
                         {player.role && (
                             <span className="forge-head text-[0.65rem] font-semibold tracking-wider ml-0.5 opacity-70 flex-shrink-0">{player.role}</span>
-                        )}
-                        {perfValue != null && (
-                            <span className={`forge-num text-[0.8rem] ml-1 flex-shrink-0 ${perfColor}`}>
-                                {perfValue.toFixed(2)}x
-                            </span>
                         )}
                     </div>
                     {/* Mobile: team on line 1, role + perf on line 2 */}
@@ -202,6 +200,24 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* Performance multiplier — desktop only */}
+                <div className={`forge-col-perf flex flex-col items-center justify-center relative${perfOnFire ? ' forge-perf-fire' : ''}`}>
+                    {perfValue != null && (
+                        <>
+                            <span
+                                className={`forge-num text-[1.1rem] font-bold ${perfColor}${perfShine > 0 ? ' forge-perf-shine' : ''}`}
+                                style={perfShine > 0 ? {
+                                    textShadow: `0 0 ${6 + perfShine * 10}px rgba(255, 170, 51, ${perfShine * 0.7}), 0 0 ${perfShine * 24}px rgba(232, 101, 32, ${perfShine * 0.4})`,
+                                    filter: `brightness(${1 + perfShine * 0.3})`,
+                                } : undefined}
+                            >
+                                {perfValue.toFixed(2)}x
+                            </span>
+                            <span className="text-[0.55rem] text-[var(--forge-text-dim)] uppercase tracking-wider leading-none mt-0.5">Perf</span>
+                        </>
+                    )}
                 </div>
 
                 {/* Status badge column — Passionless or Coinflip champion */}
