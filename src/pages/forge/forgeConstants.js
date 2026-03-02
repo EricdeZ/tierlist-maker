@@ -18,6 +18,17 @@ export const SORT_OPTIONS = [
     { key: 'name-asc', label: 'Name (A-Z)' },
 ]
 
+export const HOLDINGS_SORT_OPTIONS = [
+    { key: 'value-desc', label: 'Value' },
+    { key: 'pl-desc', label: 'P&L' },
+    { key: 'change-desc', label: '% Change' },
+    { key: 'price-desc', label: 'Price' },
+    { key: 'sparks-desc', label: 'Sparks' },
+    { key: 'name-asc', label: 'Name' },
+]
+
+export const ROLES = ['Solo', 'Jungle', 'Mid', 'Support', 'ADC']
+
 // Heat tier thresholds based on price change (supports 24h or 7d)
 export function getHeatTier(priceChange) {
     if (priceChange == null) return 'warm'

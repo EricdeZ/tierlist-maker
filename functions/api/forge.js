@@ -347,7 +347,7 @@ async function getPortfolio(sql, user, params) {
     // Get holdings with player/price info
     const holdings = await sql`
         SELECT
-            sh.spark_id, sh.sparks, sh.total_invested, sh.tutorial_sparks,
+            sh.spark_id, sh.sparks, sh.total_invested, sh.tutorial_sparks, sh.referral_sparks,
             ps.current_price, ps.total_sparks, ps.perf_multiplier,
             ps.sell_pressure, ps.sell_pressure_updated_at,
             p.name as player_name, p.slug as player_slug,
@@ -374,7 +374,8 @@ async function getPortfolio(sql, user, params) {
         const avgBuyPrice = h.sparks > 0 ? invested / h.sparks : 0
         const unrealizedPL = value - Math.round(invested)
         const tutorialSparks = h.tutorial_sparks || 0
-        const coolableSparks = h.sparks - tutorialSparks
+        const referralSparks = h.referral_sparks || 0
+        const coolableSparks = h.sparks - tutorialSparks - referralSparks
 
         totalValue += value
         totalInvested += invested
@@ -390,6 +391,7 @@ async function getPortfolio(sql, user, params) {
             isFreeAgent: !h.is_active,
             sparks: h.sparks,
             tutorialSparks,
+            referralSparks,
             coolableSparks,
             avgBuyPrice: Math.round(avgBuyPrice * 100) / 100,
             currentPrice,

@@ -1,5 +1,5 @@
 import { adapt } from '../lib/adapter.js'
-import { getDB, adminHeaders as headers } from '../lib/db.js'
+import { getDB, transaction, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { recalcMatchChallenges, catchupAllUsers } from '../lib/challenges.js'
@@ -265,18 +265,22 @@ async function recalcAllChallenges(sql, admin, event) {
 // ═══════════════════════════════════════════════════
 // Catch up challenge progress for ALL users (give only, no revocations)
 // ═══════════════════════════════════════════════════
-async function catchupAllChallengesHandler(sql, admin) {
-    const users = await sql`
-        SELECT id as user_id, linked_player_id
-        FROM users
-        WHERE linked_player_id IS NOT NULL
-    `
+async function catchupAllChallengesHandler(_sql, admin) {
+    const result = await transaction(async (tx) => {
+        const users = await tx`
+            SELECT id as user_id, linked_player_id
+            FROM users
+            WHERE linked_player_id IS NOT NULL
+        `
 
-    const result = await catchupAllUsers(sql, users)
+        const r = await catchupAllUsers(tx, users)
 
-    await logAudit(sql, admin, {
-        action: 'catchup-all-challenges', endpoint: 'challenge-manage',
-        details: { usersProcessed: result.updated, newlyClaimable: result.claimable },
+        await logAudit(tx, admin, {
+            action: 'catchup-all-challenges', endpoint: 'challenge-manage',
+            details: { usersProcessed: r.updated, newlyClaimable: r.claimable },
+        })
+
+        return r
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, ...result }) }

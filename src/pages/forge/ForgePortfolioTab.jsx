@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Zap, Flame, Snowflake, Wallet } from 'lucide-react'
+import { createChart, LineSeries, LineStyle, CrosshairMode, createSeriesMarkers } from 'lightweight-charts'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
 import forgeLogo from '../../assets/forge.png'
 import passionCoin from '../../assets/passion/passion.png'
-import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
-import { drawSparkline, drawPortfolioChart } from './forgeCanvas'
+import { getHeatTier, SPARK_COLORS, FALLBACK_HISTORY, HOLDINGS_SORT_OPTIONS } from './forgeConstants'
+import { drawSparkline } from './forgeCanvas'
 
 function StatBlock({ label, value, icon: Icon, color, prefix = '', raw = false }) {
     return (
@@ -58,12 +59,35 @@ function formatEventTime(dateStr) {
         ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-function getHoldingChange(holding) {
-    // % change based on average buy price vs current price
-    if (holding.avgBuyPrice > 0) {
-        return ((holding.currentPrice - holding.avgBuyPrice) / holding.avgBuyPrice) * 100
+function getHoldingChange(holding, changeView, historyData) {
+    if (changeView === 'all' || !changeView) {
+        if (holding.avgBuyPrice > 0) {
+            return ((holding.currentPrice - holding.avgBuyPrice) / holding.avgBuyPrice) * 100
+        }
+        return 0
     }
-    return 0
+
+    if (!historyData || historyData.length === 0) {
+        if (holding.avgBuyPrice > 0) {
+            return ((holding.currentPrice - holding.avgBuyPrice) / holding.avgBuyPrice) * 100
+        }
+        return 0
+    }
+
+    const now = Date.now()
+    const cutoff = changeView === '24h' ? now - 86400_000 : now - 7 * 86400_000
+
+    let basePrice = null
+    for (let i = historyData.length - 1; i >= 0; i--) {
+        if (new Date(historyData[i].createdAt).getTime() <= cutoff) {
+            basePrice = historyData[i].price
+            break
+        }
+    }
+    if (basePrice == null) basePrice = historyData[0].price
+    if (basePrice <= 0) return 0
+
+    return ((holding.currentPrice - basePrice) / basePrice) * 100
 }
 
 const TRIGGER_LABELS = {
@@ -86,11 +110,37 @@ function loadChartLayers() {
     } catch { return DEFAULT_LAYERS }
 }
 
-export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, coolingLocked, onCool }) {
-    const chartRef = useRef(null)
-    const chartInteraction = useRef(null)
+function buildMarkers(timeline, chartLayers) {
+    const markers = []
+    for (const p of timeline) {
+        if (!p.trigger || p.trigger === 'init') continue
+        const isFuel = ['fuel', 'tutorial_fuel', 'referral_fuel'].includes(p.trigger)
+        const isCool = ['cool', 'liquidate'].includes(p.trigger)
+        const isPerf = p.trigger === 'performance'
+        if (isFuel && !chartLayers.fuel) continue
+        if (isCool && !chartLayers.cool) continue
+        if (isPerf && !chartLayers.perf) continue
+        markers.push({
+            time: Math.floor(new Date(p.t).getTime() / 1000),
+            position: isCool ? 'belowBar' : 'aboveBar',
+            color: isFuel ? '#e86520' : isCool ? '#4499bb' : '#f0c840',
+            shape: isPerf ? 'circle' : isFuel ? 'arrowUp' : 'arrowDown',
+            size: 0,
+        })
+    }
+    markers.sort((a, b) => a.time - b.time)
+    return markers
+}
+
+export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, coolingLocked, changeView, onCool }) {
+    const chartContainerRef = useRef(null)
+    const chartInstanceRef = useRef(null)
+    const worthSeriesRef = useRef(null)
+    const basisSeriesRef = useRef(null)
+    const markersRef = useRef(null)
     const [tooltip, setTooltip] = useState(null)
     const [chartLayers, setChartLayers] = useState(loadChartLayers)
+    const [holdingsSort, setHoldingsSort] = useState('value-desc')
 
     const toggleLayer = (key) => {
         setChartLayers(prev => {
@@ -100,43 +150,190 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
         })
     }
 
-    // Draw the portfolio chart from server-provided timeline
+    // Create / recreate the lightweight-charts instance when timeline data changes
     useEffect(() => {
-        if (!chartRef.current || !portfolioTimeline?.length || portfolioTimeline.length < 2) return
-        chartInteraction.current = drawPortfolioChart(chartRef.current, portfolioTimeline, {
-            lineColor: '#e86520',
-            fillColor: 'rgba(232,101,32,0.15)',
-            showWorth: chartLayers.worth,
-            showBasis: chartLayers.invested,
-            showFuel: chartLayers.fuel,
-            showCool: chartLayers.cool,
-            showPerf: chartLayers.perf,
-        })
-    }, [portfolioTimeline, chartLayers])
+        if (!chartContainerRef.current || !portfolioTimeline?.length || portfolioTimeline.length < 2) return
 
-    const handleChartMove = useCallback((e) => {
-        if (!chartInteraction.current || !chartRef.current) return
-        const rect = chartRef.current.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        const hit = chartInteraction.current.getEventAt(x, y)
-        if (hit) {
-            setTooltip({
-                x: hit.x,
-                y: hit.y - 12,
-                trigger: hit.trigger,
-                worth: hit.worth,
-                basis: hit.basis,
-                playerName: hit.playerName,
-                createdAt: hit.createdAt,
-                isLine: hit.isLine,
-            })
-        } else {
-            setTooltip(null)
+        // Dispose previous chart
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.remove()
+            chartInstanceRef.current = null
         }
-    }, [])
 
-    const handleChartLeave = useCallback(() => setTooltip(null), [])
+        const chart = createChart(chartContainerRef.current, {
+            layout: {
+                background: { color: 'transparent' },
+                textColor: '#999088',
+                fontFamily: 'Rajdhani, sans-serif',
+                fontSize: 11,
+            },
+            grid: {
+                vertLines: { color: 'rgba(34,34,34,0.5)' },
+                horzLines: { color: 'rgba(34,34,34,0.5)' },
+            },
+            crosshair: {
+                mode: CrosshairMode.Normal,
+                vertLine: { color: 'rgba(232,101,32,0.3)', style: LineStyle.Dashed, labelBackgroundColor: '#1a1410' },
+                horzLine: { color: 'rgba(232,101,32,0.3)', style: LineStyle.Dashed, labelBackgroundColor: '#1a1410' },
+            },
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false,
+                borderColor: 'rgba(34,34,34,0.8)',
+                fixLeftEdge: true,
+                fixRightEdge: true,
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(34,34,34,0.8)',
+            },
+            handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: false, vertTouchDrag: false },
+            handleScale: { mouseWheel: true, pinch: false, axisPressedMouseMove: true },
+        })
+
+        chartInstanceRef.current = chart
+
+        // Worth line (solid orange)
+        const worthSeries = chart.addSeries(LineSeries,{
+            color: '#e86520',
+            lineWidth: 2,
+            crosshairMarkerVisible: true,
+            crosshairMarkerRadius: 4,
+            crosshairMarkerBackgroundColor: '#e86520',
+            lastValueVisible: false,
+            priceLineVisible: false,
+            visible: chartLayers.worth,
+        })
+
+        // Cost basis line (dashed white)
+        const basisSeries = chart.addSeries(LineSeries,{
+            color: 'rgba(255,255,255,0.35)',
+            lineWidth: 1.5,
+            lineStyle: LineStyle.Dashed,
+            crosshairMarkerVisible: false,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            visible: chartLayers.invested,
+        })
+
+        // Convert timeline data — deduplicate timestamps by keeping the last entry per second
+        const worthMap = new Map()
+        const basisMap = new Map()
+        for (const p of portfolioTimeline) {
+            const time = Math.floor(new Date(p.t).getTime() / 1000)
+            worthMap.set(time, { time, value: p.worth })
+            basisMap.set(time, { time, value: p.basis })
+        }
+        const worthData = [...worthMap.values()].sort((a, b) => a.time - b.time)
+        const basisData = [...basisMap.values()].sort((a, b) => a.time - b.time)
+
+        worthSeries.setData(worthData)
+        basisSeries.setData(basisData)
+
+        // Event markers
+        markersRef.current = createSeriesMarkers(worthSeries, buildMarkers(portfolioTimeline, chartLayers))
+
+        worthSeriesRef.current = worthSeries
+        basisSeriesRef.current = basisSeries
+
+        // Custom tooltip via crosshair
+        chart.subscribeCrosshairMove((param) => {
+            if (!param.time || !param.point) {
+                setTooltip(null)
+                return
+            }
+            const worthValue = param.seriesData.get(worthSeries)
+            const basisValue = param.seriesData.get(basisSeries)
+            const ts = param.time
+            const match = portfolioTimeline.find(p =>
+                Math.floor(new Date(p.t).getTime() / 1000) === ts
+            )
+            setTooltip({
+                x: param.point.x,
+                y: param.point.y,
+                worth: worthValue?.value ?? 0,
+                basis: basisValue?.value ?? 0,
+                trigger: match?.trigger,
+                playerName: match?.playerName,
+                createdAt: match?.t,
+                isLine: !match?.trigger || match.trigger === 'init',
+            })
+        })
+
+        // Apply initial time range
+        if (changeView === 'all' || !changeView) {
+            chart.timeScale().fitContent()
+        } else {
+            const now = Math.floor(Date.now() / 1000)
+            const offset = changeView === '24h' ? 86400 : 7 * 86400
+            chart.timeScale().setVisibleRange({ from: now - offset, to: now })
+        }
+
+        // Resize observer
+        const resizeObserver = new ResizeObserver(() => {
+            if (chartContainerRef.current) {
+                chart.applyOptions({ width: chartContainerRef.current.clientWidth })
+            }
+        })
+        resizeObserver.observe(chartContainerRef.current)
+
+        return () => {
+            resizeObserver.disconnect()
+            chart.remove()
+            chartInstanceRef.current = null
+            worthSeriesRef.current = null
+            basisSeriesRef.current = null
+            markersRef.current = null
+        }
+    }, [portfolioTimeline])
+
+    // Update layer visibility without full chart recreation
+    useEffect(() => {
+        if (!chartInstanceRef.current) return
+        if (worthSeriesRef.current) {
+            worthSeriesRef.current.applyOptions({ visible: chartLayers.worth })
+        }
+        if (basisSeriesRef.current) {
+            basisSeriesRef.current.applyOptions({ visible: chartLayers.invested })
+        }
+        if (markersRef.current && portfolioTimeline) {
+            markersRef.current.setMarkers(buildMarkers(portfolioTimeline, chartLayers))
+        }
+    }, [chartLayers, portfolioTimeline])
+
+    // Update visible range when changeView changes (without recreating chart)
+    useEffect(() => {
+        if (!chartInstanceRef.current) return
+        const ts = chartInstanceRef.current.timeScale()
+        if (changeView === 'all' || !changeView) {
+            ts.fitContent()
+        } else {
+            const now = Math.floor(Date.now() / 1000)
+            const offset = changeView === '24h' ? 86400 : 7 * 86400
+            ts.setVisibleRange({ from: now - offset, to: now })
+        }
+    }, [changeView])
+
+    // Sorted holdings
+    const sortedHoldings = useMemo(() => {
+        if (!portfolio?.holdings) return []
+        const list = [...portfolio.holdings]
+        const [key, dir] = holdingsSort.split('-')
+        list.sort((a, b) => {
+            let va, vb
+            if (key === 'value') { va = a.currentValue; vb = b.currentValue }
+            else if (key === 'pl') { va = a.unrealizedPL; vb = b.unrealizedPL }
+            else if (key === 'change') {
+                va = getHoldingChange(a, changeView, portfolioHistories?.[a.sparkId])
+                vb = getHoldingChange(b, changeView, portfolioHistories?.[b.sparkId])
+            }
+            else if (key === 'price') { va = a.currentPrice; vb = b.currentPrice }
+            else if (key === 'sparks') { va = a.sparks; vb = b.sparks }
+            else if (key === 'name') { va = a.playerName; vb = b.playerName }
+            if (typeof va === 'string') return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+            return dir === 'asc' ? va - vb : vb - va
+        })
+        return list
+    }, [portfolio?.holdings, holdingsSort, changeView, portfolioHistories])
 
     if (loading) {
         return (
@@ -161,6 +358,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
     }
 
     const { stats } = portfolio
+    const changeLabel = changeView === '24h' ? '24h' : changeView === '7d' ? '7d' : 'all-time'
 
     return (
         <div>
@@ -184,7 +382,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                 </div>
             )}
 
-            {/* Big Interactive Portfolio Chart */}
+            {/* Interactive Portfolio Chart (lightweight-charts) */}
             {portfolioTimeline?.length >= 2 && (
                 <>
                     <div className="relative pb-1.5 mb-2 border-b border-[var(--forge-border)]">
@@ -194,17 +392,13 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                         </h2>
                         <div className="forge-section-accent" />
                     </div>
-                    <div className="forge-portfolio-chart">
-                        <canvas
-                            ref={chartRef}
-                            onMouseMove={handleChartMove}
-                            onMouseLeave={handleChartLeave}
-                        />
+                    <div className="forge-portfolio-chart relative" style={{ touchAction: 'none' }}>
+                        <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
                         {tooltip && (
                             <div
                                 className="forge-chart-tooltip"
                                 style={{
-                                    left: Math.min(Math.max(tooltip.x, 60), chartRef.current?.parentElement?.offsetWidth - 60 || 9999),
+                                    left: Math.min(Math.max(tooltip.x, 60), chartContainerRef.current?.offsetWidth - 60 || 9999),
                                     top: Math.max(tooltip.y - 58, 4),
                                 }}
                             >
@@ -235,7 +429,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                             </div>
                         )}
                         {/* Chart layer toggles */}
-                        <div className="absolute bottom-1 right-2 flex items-center gap-1 forge-head tracking-wider">
+                        <div className="absolute bottom-1 right-2 flex items-center gap-1 forge-head tracking-wider z-10">
                             {[
                                 { key: 'worth', label: 'Worth', color: 'var(--forge-flame)', swatch: 'line' },
                                 { key: 'invested', label: 'Invested', color: 'rgba(255,255,255,0.4)', swatch: 'dashed' },
@@ -265,18 +459,33 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                 </>
             )}
 
-            {/* Holdings header */}
-            <div className="relative pb-1.5 mb-2 border-b border-[var(--forge-border)]">
+            {/* Holdings header with sort controls */}
+            <div className="relative pb-1.5 mb-2 border-b border-[var(--forge-border)] flex items-center justify-between flex-wrap gap-1">
                 <h2 className="forge-head text-base font-bold tracking-wider text-[var(--forge-text-mid)]">
                     Holdings
                 </h2>
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+                    {HOLDINGS_SORT_OPTIONS.map(o => (
+                        <button
+                            key={o.key}
+                            onClick={() => setHoldingsSort(o.key)}
+                            className={`flex-shrink-0 px-2 py-0.5 forge-head text-[0.6rem] sm:text-xs font-semibold tracking-wider cursor-pointer transition-colors ${
+                                holdingsSort === o.key
+                                    ? 'bg-[var(--forge-flame)]/15 border border-[var(--forge-flame)]/40 text-[var(--forge-flame-bright)]'
+                                    : 'text-[var(--forge-text-dim)] border border-transparent hover:text-[var(--forge-text-mid)]'
+                            }`}
+                        >
+                            {o.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="forge-section-accent" />
             </div>
 
-            {/* Holdings with mini sparklines + % change */}
+            {/* Holdings with mini sparklines + % change + per-spark price */}
             <div className="space-y-[2px] forge-stagger">
-                {portfolio.holdings.map(h => {
-                    const change = getHoldingChange(h, portfolioHistories?.[h.sparkId])
+                {sortedHoldings.map(h => {
+                    const change = getHoldingChange(h, changeView, portfolioHistories?.[h.sparkId])
                     const tier = getHeatTier(change)
                     const isUp = change > 0
                     const isDown = change < 0
@@ -330,9 +539,18 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                         <img src={sparkIcon} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain forge-spark-icon" />
                                         <span className="forge-num">{h.sparks}</span>
                                     </span>
+                                    <span className="opacity-60 flex items-center gap-0.5 sm:hidden">
+                                        &middot;
+                                        <span className="forge-num">{Math.round(h.currentPrice).toLocaleString()}/ea</span>
+                                    </span>
                                     {h.tutorialSparks > 0 && (
                                         <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-flame)] bg-[var(--forge-flame)]/8 border border-[var(--forge-flame)]/15 px-1">
                                             {h.tutorialSparks} free
+                                        </span>
+                                    )}
+                                    {h.referralSparks > 0 && (
+                                        <span className="forge-head text-[0.6rem] font-semibold tracking-wider text-[var(--forge-gold)] bg-[var(--forge-gold)]/8 border border-[var(--forge-gold)]/15 px-1">
+                                            {h.referralSparks} referral
                                         </span>
                                     )}
                                 </div>
@@ -341,6 +559,17 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                             {/* Mini sparkline */}
                             <div className="hidden sm:block">
                                 <HoldingSparkline historyData={histData} />
+                            </div>
+
+                            {/* Per-spark price (desktop) */}
+                            <div className="text-center flex-shrink-0 hidden sm:block">
+                                <div className="flex items-center gap-0.5 justify-center">
+                                    <img src={passionCoin} alt="" className="w-3 h-3" />
+                                    <span className="forge-num text-xs text-[var(--forge-text-mid)]">
+                                        {Math.round(h.currentPrice).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="text-[0.55rem] text-[var(--forge-text-dim)] uppercase tracking-wider">per spark</div>
                             </div>
 
                             {/* % change */}
@@ -352,6 +581,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 }`}>
                                     {isUp ? '+' : ''}{change.toFixed(1)}%
                                 </span>
+                                <div className="text-[0.5rem] text-[var(--forge-text-dim)] mt-0.5">{changeLabel}</div>
                             </div>
 
                             {/* Value + P&L */}
@@ -369,7 +599,7 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 <button
                                     onClick={() => onCool(h.sparkId, h.playerName, { sparks: h.sparks, coolableSparks: h.coolableSparks })}
                                     className="p-1.5 sm:p-2 bg-[var(--forge-cool)]/8 text-[var(--forge-cool)] forge-btn-cool forge-clip-btn flex items-center gap-1"
-                                    title={h.tutorialSparks > 0 ? `Cool up to ${h.coolableSparks} Sparks` : 'Cool'}
+                                    title={(h.tutorialSparks > 0 || h.referralSparks > 0) ? `Cool up to ${h.coolableSparks} Sparks` : 'Cool'}
                                 >
                                     <Snowflake size={14} />
                                 </button>

@@ -379,8 +379,12 @@ export async function updateMatchChallenges(sql, matchId) {
     const affectedUsers = await getMatchAffectedUsers(sql, matchId)
     if (affectedUsers.length === 0) return
 
-    const userIds = affectedUsers.map(u => u.user_id)
-    await invalidatePerformanceChallenges(sql, userIds, false)
+    // Push actual stats instead of just invalidating — keeps progress current
+    // without requiring users to visit the challenges page
+    for (const user of affectedUsers) {
+        const stats = await getPerformanceStats(sql, user.linked_player_id)
+        await pushChallengeProgress(sql, user.user_id, stats)
+    }
 }
 
 

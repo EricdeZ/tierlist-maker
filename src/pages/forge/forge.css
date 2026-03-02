@@ -958,14 +958,18 @@
 .forge-portfolio-chart {
     position: relative;
     width: 100%;
-    height: 200px;
+    height: 480px;
     background: var(--forge-panel);
     border: 1px solid var(--forge-edge);
     margin-bottom: 1.5rem;
+    overflow: hidden;
 }
 
-.forge-portfolio-chart canvas {
-    cursor: crosshair;
+@media (min-width: 1536px) {
+    .forge-portfolio-chart {
+        width: calc(100% + 300px);
+        margin-left: -150px;
+    }
 }
 
 .forge-chart-tooltip {
@@ -1079,6 +1083,14 @@
 
     /* Portfolio chart */
     .forge-portfolio-chart {
-        height: 160px;
+        height: 180px;
     }
+}
+
+/* Scrollbar hide utility */
+.scrollbar-hide {
+    scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
 }

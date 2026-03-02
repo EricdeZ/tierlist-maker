@@ -402,6 +402,10 @@ export default function ChallengeManager() {
         if (!confirm('Catch up challenge progress for all users? This can only award progress, never revoke.')) return
         setCatchingUp(true)
         setRecalcResult(null)
+        const timeout = setTimeout(() => {
+            setCatchingUp(false)
+            setRecalcResult('Error: Request timed out — try again')
+        }, 120_000)
         try {
             const result = await challengeService.catchupAll()
             const msg = `Caught up ${result.updated} users` + (result.claimable > 0 ? ` (${result.claimable} newly claimable)` : '')
@@ -409,6 +413,7 @@ export default function ChallengeManager() {
         } catch (err) {
             setRecalcResult(`Error: ${err.message}`)
         } finally {
+            clearTimeout(timeout)
             setCatchingUp(false)
         }
     }

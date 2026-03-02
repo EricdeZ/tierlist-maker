@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { Search, ChevronDown, Flame, Trophy, TrendingUp } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
-import { SORT_OPTIONS } from './forgeConstants'
+import { SORT_OPTIONS, ROLES } from './forgeConstants'
 import ForgeHero from './ForgeHero'
 import ForgePlayerCard from './ForgePlayerCard'
 import ForgePlayerRow from './ForgePlayerRow'
@@ -68,7 +68,7 @@ function TeamFilterDropdown({ teams, value, onChange }) {
 
 export default function ForgeMarketTab({
     players, allPlayers, teams,
-    search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter,
+    search, setSearch, sortBy, setSortBy, teamFilter, setTeamFilter, roleFilter, setRoleFilter,
     loading, marketStatus, featuredPlayer, historyData, userTeamId, isOwner,
     changeView, freeSparksRemaining, referralSparksAvailable = 0, seasonSlugs,
     isLeagueWide, leagueSlug, userTeamBySeasonId, openMarketIds,
@@ -90,7 +90,7 @@ export default function ForgeMarketTab({
     // Reset when filters change (mobile only)
     useEffect(() => {
         if (isMobile) setVisibleCount(MOBILE_BATCH)
-    }, [search, sortBy, teamFilter])
+    }, [search, sortBy, teamFilter, roleFilter])
 
     const loadMore = useCallback(() => {
         setVisibleCount(prev => prev + MOBILE_BATCH)
@@ -269,6 +269,23 @@ export default function ForgeMarketTab({
                     <TrendingUp size={14} />
                     Sort by Performance
                 </button>
+            </div>
+
+            {/* Role filter chips */}
+            <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 scrollbar-hide">
+                {['', ...ROLES].map(role => (
+                    <button
+                        key={role || 'all'}
+                        onClick={() => setRoleFilter(role)}
+                        className={`flex-shrink-0 py-1 px-3 forge-head text-xs sm:text-sm font-semibold tracking-wider cursor-pointer transition-colors whitespace-nowrap ${
+                            roleFilter === role
+                                ? 'bg-[var(--forge-flame)]/15 border border-[var(--forge-flame)]/40 text-[var(--forge-flame-bright)]'
+                                : 'bg-[var(--forge-panel)] border border-[var(--forge-border)] text-[var(--forge-text-mid)] hover:border-[var(--forge-border-lt)]'
+                        }`}
+                    >
+                        {role || 'All Roles'}
+                    </button>
+                ))}
             </div>
 
             {/* Player rows */}

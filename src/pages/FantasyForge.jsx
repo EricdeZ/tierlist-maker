@@ -58,10 +58,9 @@ export default function FantasyForge() {
         try { return localStorage.getItem(CHANGE_VIEW_KEY) || '24h' }
         catch { return '24h' }
     })
-    const toggleChangeView = () => {
-        const next = changeView === '24h' ? '7d' : '24h'
-        setChangeView(next)
-        localStorage.setItem(CHANGE_VIEW_KEY, next)
+    const setChangeViewPersisted = (val) => {
+        setChangeView(val)
+        localStorage.setItem(CHANGE_VIEW_KEY, val)
     }
 
     // Market state
@@ -71,6 +70,7 @@ export default function FantasyForge() {
     const [search, setSearch] = useState('')
     const [sortBy, setSortBy] = useState('perf-desc')
     const [teamFilter, setTeamFilter] = useState('')
+    const [roleFilter, setRoleFilter] = useState('')
 
     // Spotlight state (floating stats window on desktop)
     const [spotlightPlayer, setSpotlightPlayer] = useState(null)
@@ -621,6 +621,10 @@ export default function FantasyForge() {
             }
         }
 
+        if (roleFilter) {
+            list = list.filter(p => (p.role || '').toLowerCase() === roleFilter.toLowerCase())
+        }
+
         const [key, dir] = sortBy.split('-')
         list.sort((a, b) => {
             let va, vb
@@ -637,7 +641,7 @@ export default function FantasyForge() {
         })
 
         return list
-    }, [players, search, teamFilter, sortBy, changeView])
+    }, [players, search, teamFilter, roleFilter, sortBy, changeView])
 
     // ── Select player for hero (used by tutorial) ──
     const handleSelectFeatured = (player) => {
@@ -1043,18 +1047,21 @@ export default function FantasyForge() {
                             })()}
 
                             {/* Change view toggle */}
-                            <button
-                                onClick={toggleChangeView}
-                                className="forge-change-toggle flex items-center forge-head text-[0.85rem] font-semibold tracking-wider cursor-pointer"
-                                title={`Showing ${changeView} change. Click to toggle.`}
-                            >
-                                <span className={`px-2.5 py-1.5 transition-all ${changeView === '24h' ? 'bg-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] border border-[var(--forge-flame)]/25' : 'bg-[var(--forge-panel)] text-[var(--forge-text-dim)] border border-[var(--forge-border)]'}`}>
-                                    24H
-                                </span>
-                                <span className={`px-2.5 py-1.5 transition-all ${changeView === '7d' ? 'bg-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] border border-[var(--forge-flame)]/25' : 'bg-[var(--forge-panel)] text-[var(--forge-text-dim)] border border-[var(--forge-border)]'}`}>
-                                    7D
-                                </span>
-                            </button>
+                            <div className="forge-change-toggle flex items-center forge-head text-[0.85rem] font-semibold tracking-wider">
+                                {['24h', '7d', 'all'].map(v => (
+                                    <button
+                                        key={v}
+                                        onClick={() => setChangeViewPersisted(v)}
+                                        className={`px-2.5 py-1.5 cursor-pointer transition-all ${
+                                            changeView === v
+                                                ? 'bg-[var(--forge-flame)]/15 text-[var(--forge-flame-bright)] border border-[var(--forge-flame)]/25'
+                                                : 'bg-[var(--forge-panel)] text-[var(--forge-text-dim)] border border-[var(--forge-border)]'
+                                        }`}
+                                    >
+                                        {v === 'all' ? 'ALL' : v.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
 
                             {/* Replay tutorial (only on market tab) */}
                             {activeTab === 'market' && !tutorialReplay && (
@@ -1210,6 +1217,8 @@ export default function FantasyForge() {
                             setSortBy={setSortBy}
                             teamFilter={teamFilter}
                             setTeamFilter={setTeamFilter}
+                            roleFilter={roleFilter}
+                            setRoleFilter={setRoleFilter}
                             loading={loading}
                             marketStatus={isLeagueWide ? 'open' : market?.status}
                             featuredPlayer={featuredPlayer}
@@ -1244,6 +1253,7 @@ export default function FantasyForge() {
                             isLeagueWide={isLeagueWide}
                             leagueSlug={urlLeagueSlug}
                             coolingLocked={market?.coolingLocked}
+                            changeView={changeView}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}
                         />
                     )}
