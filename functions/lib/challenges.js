@@ -22,6 +22,9 @@ export const REFERRAL_KEYS = ['friends_referred']
 // Forge stat keys (tracked by user_id)
 export const FORGE_KEYS = ['sparks_fueled', 'sparks_cooled', 'forge_profit', 'forge_perf_updates_held', 'starter_sparks_used']
 
+// Discord stat keys (tracked by user_id via discord_guild_members)
+export const DISCORD_KEYS = ['discord_joined']
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -241,7 +244,7 @@ export async function catchupAllUsers(sql, linkedUsers) {
  * Uses aggregate queries + single bulk upsert instead of per-user loops.
  */
 async function bulkRecalcNonPerfChallenges(sql) {
-    const allStatKeys = [...SCRIM_KEYS, ...REFERRAL_KEYS, ...FORGE_KEYS]
+    const allStatKeys = [...SCRIM_KEYS, ...REFERRAL_KEYS, ...FORGE_KEYS, ...DISCORD_KEYS]
     const challenges = await sql`
         SELECT id, stat_key FROM challenges
         WHERE is_active = true AND stat_key = ANY(${allStatKeys})
@@ -260,9 +263,10 @@ async function bulkRecalcNonPerfChallenges(sql) {
     const hasScrim = challenges.some(c => SCRIM_KEYS.includes(c.stat_key))
     const hasReferral = challenges.some(c => REFERRAL_KEYS.includes(c.stat_key))
     const hasForge = challenges.some(c => FORGE_KEYS.includes(c.stat_key))
+    const hasDiscord = challenges.some(c => DISCORD_KEYS.includes(c.stat_key))
 
     // Bulk stats — a few aggregate queries instead of per-user loops
-    const [scrimStats, referralStats, forgeStats] = await Promise.all([
+    const [scrimStats, referralStats, forgeStats, discordStats] = await Promise.all([
         hasScrim ? sql`
             WITH posted AS (
                 SELECT user_id, COUNT(*)::integer as scrims_posted
@@ -291,6 +295,11 @@ async function bulkRecalcNonPerfChallenges(sql) {
                 COALESCE(SUM(sparks) FILTER (WHERE type = 'cool'), 0)::integer as sparks_cooled,
                 COALESCE(SUM(sparks) FILTER (WHERE type = 'tutorial_fuel'), 0)::integer as starter_sparks_used
             FROM spark_transactions GROUP BY user_id
+        ` : [],
+        hasDiscord ? sql`
+            SELECT u.id as user_id, CASE WHEN dgm.discord_id IS NOT NULL THEN 1 ELSE 0 END::integer as discord_joined
+            FROM users u
+            JOIN discord_guild_members dgm ON dgm.discord_id = u.discord_id
         ` : [],
     ])
 
@@ -329,6 +338,7 @@ async function bulkRecalcNonPerfChallenges(sql) {
     for (const s of forgeStats) merge(s.user_id, { sparks_fueled: s.sparks_fueled, sparks_cooled: s.sparks_cooled, starter_sparks_used: s.starter_sparks_used })
     for (const s of forgeProfitStats) merge(s.user_id, { forge_profit: s.forge_profit })
     for (const s of forgePerfStats) merge(s.user_id, { forge_perf_updates_held: s.forge_perf_updates_held })
+    for (const s of discordStats) merge(s.user_id, { discord_joined: s.discord_joined })
 
     // Build bulk upsert arrays
     const upsertUserIds = []
@@ -687,6 +697,56 @@ export async function getForgeStats(sql, userId) {
  */
 export async function recalcForgeChallenges(sql, userId) {
     const stats = await getForgeStats(sql, userId)
+    const statKeys = Object.keys(stats)
+
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+          AND (uc.completed IS NULL OR uc.completed = false)
+    `
+
+    if (challenges.length === 0) return
+
+    const challengeIds = challenges.map(c => c.id)
+    const currentValues = challenges.map(c => Number(stats[c.stat_key] || 0))
+
+    await sql`
+        INSERT INTO user_challenges (user_id, challenge_id, current_value)
+        SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+        ON CONFLICT (user_id, challenge_id)
+        DO UPDATE SET current_value = EXCLUDED.current_value
+    `
+}
+
+
+/**
+ * Get Discord membership stats for a user.
+ * Checks if the user's discord_id exists in the discord_guild_members table.
+ */
+export async function getDiscordStats(sql, userId) {
+    const [{ count }] = await sql`
+        SELECT COUNT(*)::integer as count
+        FROM discord_guild_members dgm
+        JOIN users u ON u.discord_id = dgm.discord_id
+        WHERE u.id = ${userId}
+    `
+    return { discord_joined: count > 0 ? 1 : 0 }
+}
+
+
+/**
+ * Lazy recalc for Discord challenges. Called on challenges page load
+ * when stale data is detected for DISCORD_KEYS.
+ */
+export async function recalcDiscordChallenges(sql, userId) {
+    const stats = await getDiscordStats(sql, userId)
+
+    // Only upsert if user is in the guild — keeps current_value NULL so the
+    // stale check re-triggers on every page load until they actually join
+    if (stats.discord_joined === 0) return
+
     const statKeys = Object.keys(stats)
 
     const challenges = await sql`

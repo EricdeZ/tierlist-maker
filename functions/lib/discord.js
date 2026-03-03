@@ -97,6 +97,38 @@ export async function fetchGuildMembers(guildId, limit = Infinity) {
 }
 
 /**
+ * Fetch guild members using an explicit bot token (for bots not using DISCORD_BOT_TOKEN).
+ */
+export async function fetchGuildMembersWithToken(guildId, botToken, limit = Infinity) {
+    const allMembers = []
+    let afterId = '0'
+    const hdrs = { Authorization: `Bot ${botToken}` }
+
+    while (allMembers.length < limit) {
+        const batchSize = Math.min(1000, limit - allMembers.length)
+        const url = new URL(`${DISCORD_API}/guilds/${guildId}/members`)
+        url.searchParams.set('limit', String(batchSize))
+        url.searchParams.set('after', afterId)
+
+        const res = await fetch(url, { headers: hdrs })
+        if (!res.ok) {
+            const text = await res.text().catch(() => '')
+            throw new Error(`Discord API ${res.status}: ${text.slice(0, 200)}`)
+        }
+
+        const batch = await res.json()
+        if (!batch.length) break
+
+        allMembers.push(...batch)
+        afterId = batch[batch.length - 1].user.id
+
+        if (batch.length < batchSize) break
+    }
+
+    return allMembers
+}
+
+/**
  * Replace Discord role mentions (<@&ROLE_ID>) with readable @RoleName.
  * @param {string} content - Raw message content
  * @param {Map<string, string>} rolesMap - Map of roleId → roleName
@@ -195,6 +227,34 @@ export async function sendWebhook(webhookUrl, { content, embeds }) {
         const text = await res.text().catch(() => '')
         console.error(`Discord webhook failed ${res.status}: ${text.slice(0, 200)}`)
     }
+}
+
+/**
+ * Sync Discord guild members into the discord_guild_members table.
+ * Upserts current members and removes anyone no longer in the guild.
+ */
+export async function syncDiscordGuildMembers(sql, guildId, members) {
+    if (!members.length) return
+
+    const discordIds = members.map(m => m.user.id)
+    const usernames = members.map(m => m.user.username)
+    const joinedAts = members.map(m => m.joined_at || null)
+
+    await sql`
+        INSERT INTO discord_guild_members (discord_id, guild_id, discord_username, joined_at, synced_at)
+        SELECT unnest(${discordIds}::varchar[]), ${guildId}, unnest(${usernames}::varchar[]), unnest(${joinedAts}::timestamptz[]), NOW()
+        ON CONFLICT (discord_id) DO UPDATE SET
+            guild_id = EXCLUDED.guild_id,
+            discord_username = EXCLUDED.discord_username,
+            joined_at = EXCLUDED.joined_at,
+            synced_at = NOW()
+    `
+
+    // Remove members no longer in the guild
+    await sql`
+        DELETE FROM discord_guild_members
+        WHERE guild_id = ${guildId} AND discord_id != ALL(${discordIds}::varchar[])
+    `
 }
 
 function isImageAttachment(att) {
