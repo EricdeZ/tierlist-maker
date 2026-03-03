@@ -13,7 +13,7 @@ export default function PlayerManager() {
 
     // Filters
     const [search, setSearch] = useState('')
-    const [filterSeason, setFilterSeason] = useState('all') // 'all' | 'active' | 'free' | season_id
+    const [filterSeasons, setFilterSeasons] = useState(new Set()) // empty = all, or Set of 'active' | 'free' | season_id strings
     const [filterTeam, setFilterTeam] = useState('all')
     const [filterRole, setFilterRole] = useState('all')
     const [sortCol, setSortCol] = useState('name')
@@ -136,14 +136,16 @@ export default function PlayerManager() {
             )
         }
 
-        // Season filter
-        if (filterSeason === 'active') {
-            list = list.filter(p => p.activeRosters.length > 0)
-        } else if (filterSeason === 'free') {
-            list = list.filter(p => p.isFreeAgent)
-        } else if (filterSeason !== 'all') {
-            const sid = parseInt(filterSeason)
-            list = list.filter(p => p.rosters.some(r => r.season_id === sid))
+        // Season filter (multi-select toggles)
+        if (filterSeasons.size > 0) {
+            list = list.filter(p => {
+                for (const f of filterSeasons) {
+                    if (f === 'active' && p.activeRosters.length > 0) return true
+                    if (f === 'free' && p.isFreeAgent) return true
+                    if (f !== 'active' && f !== 'free' && p.rosters.some(r => r.season_id === parseInt(f))) return true
+                }
+                return false
+            })
         }
 
         // Team filter
@@ -176,16 +178,17 @@ export default function PlayerManager() {
         })
 
         return list
-    }, [enrichedPlayers, search, filterSeason, filterTeam, filterRole, sortCol, sortDir])
+    }, [enrichedPlayers, search, filterSeasons, filterTeam, filterRole, sortCol, sortDir])
 
     // ─── Teams for current season filter ───
     const teamsForFilter = useMemo(() => {
-        if (filterSeason === 'all' || filterSeason === 'active' || filterSeason === 'free') {
-            // Show teams from all active seasons
-            return allTeams.filter(t => data?.seasons.some(s => s.season_id === t.season_id && s.is_active))
+        const seasonIds = [...filterSeasons].filter(f => f !== 'active' && f !== 'free').map(Number)
+        if (seasonIds.length > 0) {
+            return allTeams.filter(t => seasonIds.includes(t.season_id))
         }
-        return allTeams.filter(t => t.season_id === parseInt(filterSeason))
-    }, [filterSeason, allTeams, data])
+        // No specific seasons selected — show teams from active seasons
+        return allTeams.filter(t => data?.seasons.some(s => s.season_id === t.season_id && s.is_active))
+    }, [filterSeasons, allTeams, data])
 
     // ─── Selection helpers ───
     const toggleSelect = (id) => {
@@ -466,22 +469,49 @@ export default function PlayerManager() {
                         )}
                     </div>
 
-                    {/* Season filter */}
-                    <select
-                        value={filterSeason}
-                        onChange={e => { setFilterSeason(e.target.value); setFilterTeam('all') }}
-                        className="rounded-lg px-3 py-2 text-sm border"
-                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
-                    >
-                        <option value="all">All Players</option>
-                        <option value="active">Active Season Only</option>
-                        <option value="free">Free Agents</option>
-                        {data?.seasons.map(s => (
-                            <option key={s.season_id} value={s.season_id}>
-                                {s.league_name} / {s.division_name} — {s.season_name}
-                            </option>
-                        ))}
-                    </select>
+                    {/* Season filter toggles */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                            { key: 'active', label: 'Active' },
+                            { key: 'free', label: 'Free Agents' },
+                            ...(data?.seasons || []).map(s => ({
+                                key: String(s.season_id),
+                                label: `${s.league_name} / ${s.division_name} — ${s.season_name}`,
+                            })),
+                        ].map(({ key, label }) => {
+                            const isOn = filterSeasons.has(key)
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => {
+                                        setFilterSeasons(prev => {
+                                            const next = new Set(prev)
+                                            if (next.has(key)) next.delete(key)
+                                            else next.add(key)
+                                            return next
+                                        })
+                                        setFilterTeam('all')
+                                    }}
+                                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                                        isOn
+                                            ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] border-[var(--color-accent)]/40'
+                                            : 'bg-white/5 text-[var(--color-text-secondary)] border-white/10 hover:bg-white/10'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            )
+                        })}
+                        {filterSeasons.size > 0 && (
+                            <button
+                                onClick={() => { setFilterSeasons(new Set()); setFilterTeam('all') }}
+                                className="px-2 py-1 rounded text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+                                title="Clear season filters"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
 
                     {/* Team filter */}
                     {teamsForFilter.length > 0 && (
