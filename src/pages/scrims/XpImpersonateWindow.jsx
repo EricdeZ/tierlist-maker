@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { scrimService } from '../../services/database'
 
-export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, onClear }) {
+export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, onClear, dark }) {
     const [searchQuery, setSearchQuery] = useState('')
     const [results, setResults] = useState([])
     const [searching, setSearching] = useState(false)
@@ -24,11 +24,11 @@ export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, o
     return (
         <div style={{ padding: 6 }}>
             {impersonatedUser && (
-                <div className="flex items-center gap-2 mb-2 p-1.5" style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 2 }}>
+                <div className="flex items-center gap-2 mb-2 p-1.5" style={{ background: dark ? 'rgba(255,193,7,0.08)' : '#fff3cd', border: dark ? '1px solid rgba(255,193,7,0.2)' : '1px solid #ffc107', borderRadius: dark ? 6 : 2 }}>
                     <span style={{ fontSize: 14 }}>&#128373;</span>
                     <div className="flex-1 min-w-0">
-                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 11 }}>Acting as: {impersonatedUser.discordUsername}</div>
-                        <div className="xp-text" style={{ fontSize: 9, color: '#666' }}>ID: {impersonatedUser.id}</div>
+                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 11, color: dark ? '#e0e6ed' : undefined }}>Acting as: {impersonatedUser.discordUsername}</div>
+                        <div className="xp-text" style={{ fontSize: 9, color: dark ? '#5a7a98' : '#666' }}>ID: {impersonatedUser.id}</div>
                     </div>
                     <button onClick={onClear} className="xp-btn xp-btn-danger" style={{ padding: '1px 8px', fontSize: 10 }}>
                         Stop
@@ -45,7 +45,7 @@ export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, o
                 style={{ fontSize: 11, marginBottom: 4 }}
             />
 
-            {searching && <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center' }}>Searching...</div>}
+            {searching && <div className="xp-text" style={{ fontSize: 10, color: dark ? '#5a7a98' : '#888', textAlign: 'center' }}>Searching...</div>}
 
             {!searching && results.length > 0 && (
                 <div className="xp-listbox" style={{ maxHeight: 160, overflowY: 'auto' }}>
@@ -55,7 +55,7 @@ export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, o
                             setSearchQuery('')
                             setResults([])
                         }} className="xp-listbox-item" style={{
-                            background: impersonatedUser?.id === u.id ? '#316ac5' : undefined,
+                            background: impersonatedUser?.id === u.id ? (dark ? 'rgba(79,160,232,0.2)' : '#316ac5') : undefined,
                             color: impersonatedUser?.id === u.id ? '#fff' : undefined,
                         }}>
                             <span className="xp-text" style={{ fontSize: 11 }}>{u.discordUsername}</span>
@@ -66,11 +66,11 @@ export default function XpImpersonateWindow({ impersonatedUser, onImpersonate, o
             )}
 
             {!searching && searchQuery && results.length === 0 && (
-                <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center', padding: '4px 0' }}>No users found</div>
+                <div className="xp-text" style={{ fontSize: 10, color: dark ? '#5a7a98' : '#888', textAlign: 'center', padding: '4px 0' }}>No users found</div>
             )}
 
             {!impersonatedUser && !searchQuery && (
-                <div className="xp-text" style={{ fontSize: 10, color: '#888', textAlign: 'center', padding: '8px 0' }}>
+                <div className="xp-text" style={{ fontSize: 10, color: dark ? '#5a7a98' : '#888', textAlign: 'center', padding: '8px 0' }}>
                     Search for a user to act as them.
                 </div>
             )}

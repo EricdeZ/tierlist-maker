@@ -1619,6 +1619,515 @@ const XP_STYLES = `
     border-radius: 6px !important;
     padding: 6px 8px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCRIM DASHBOARD — sd-* classes (desktop grid layout, dark theme)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sd-dashboard {
+    padding-bottom: 0 !important;
+}
+
+/* Hero */
+.sd-hero {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 18px 32px !important;
+    gap: 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+.sd-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.sd-hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Action buttons */
+.sd-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #8ca8c4;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-family: 'Lato', system-ui, sans-serif;
+    backdrop-filter: blur(8px);
+}
+.sd-action-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #c8d8e8;
+    border-color: rgba(255,255,255,0.15);
+    transform: translateY(-1px);
+}
+.sd-action-btn-primary {
+    background: linear-gradient(135deg, #4fa0e8, #3d7cc4);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(79, 160, 232, 0.25);
+}
+.sd-action-btn-primary:hover {
+    background: linear-gradient(135deg, #5cb0f0, #4a8ad0);
+    box-shadow: 0 4px 20px rgba(79, 160, 232, 0.35);
+    color: #fff;
+    border-color: transparent;
+}
+
+/* Theme toggle */
+.sd-theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #a89870;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-family: 'Lato', system-ui, sans-serif;
+}
+.sd-theme-toggle:hover {
+    background: rgba(180, 160, 100, 0.12);
+    color: #d0c090;
+    border-color: rgba(180, 160, 100, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Action required banner */
+.sd-action-bar {
+    margin: 0 32px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(240, 192, 64, 0.06), rgba(200, 140, 0, 0.04));
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Lato', system-ui, sans-serif;
+}
+.sd-action-bar:hover {
+    background: linear-gradient(135deg, rgba(240, 192, 64, 0.1), rgba(200, 140, 0, 0.06));
+}
+.sd-action-items {
+    flex: 1;
+    font-size: 12px;
+    color: #c8d0d8;
+}
+.sd-action-dot {
+    margin: 0 8px;
+    color: #555;
+}
+.sd-action-cta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4fa0e8;
+    white-space: nowrap;
+}
+
+/* Impersonation bar */
+.sd-impersonate-bar {
+    margin: 0 32px;
+    padding: 8px 16px;
+    background: rgba(200, 60, 60, 0.06);
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #f08080;
+    font-family: 'Lato', system-ui, sans-serif;
+}
+
+/* Dashboard grid */
+.sd-grid {
+    display: grid;
+    grid-template-columns: 1fr 370px;
+    gap: 28px;
+    padding: 24px 32px 48px;
+    max-width: 1440px;
+    margin: 0 auto;
+    width: 100%;
+    align-items: start;
+}
+.sd-no-sidebar {
+    grid-template-columns: 1fr !important;
+    max-width: 900px;
+}
+@media (max-width: 1100px) {
+    .sd-grid {
+        grid-template-columns: 1fr 320px;
+        gap: 20px;
+        padding: 16px 20px 36px;
+    }
+}
+@media (max-width: 900px) {
+    .sd-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Main content */
+.sd-main {
+    min-width: 0;
+}
+
+/* Tabs — underline style */
+.sd-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sd-tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #5a7a98;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Lato', system-ui, sans-serif;
+    margin-bottom: -1px;
+    position: relative;
+}
+.sd-tab:hover {
+    color: #8cb0d0;
+    background: transparent;
+}
+.sd-tab-active {
+    color: #4fa0e8 !important;
+    border-bottom-color: #4fa0e8;
+    background: transparent !important;
+}
+.sd-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgba(240, 192, 64, 0.15);
+    color: #f0c040;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Main content area — NO wrapper box */
+.sd-main-content {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    min-height: 300px;
+}
+
+.sd-login-cta {
+    text-align: center;
+    padding: 48px 16px;
+}
+
+/* ─── Scrim card overrides for dashboard ─────────────── */
+.sd-dashboard .xp-scrim-card {
+    background: rgba(255,255,255,0.025) !important;
+    border: none !important;
+    border-left: 3px solid rgba(79, 160, 232, 0.3) !important;
+    border-radius: 0 10px 10px 0 !important;
+    padding: 14px 16px !important;
+    margin-bottom: 6px !important;
+    box-shadow: none !important;
+    transition: all 0.2s !important;
+    position: relative !important;
+}
+.sd-dashboard .xp-scrim-card:hover {
+    background: rgba(255,255,255,0.05) !important;
+    border-left-color: #4fa0e8 !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.15) !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-header {
+    border-bottom-color: rgba(255,255,255,0.04) !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-footer {
+    border-top-color: rgba(255,255,255,0.04) !important;
+    background: transparent !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-actions {
+    border-top-color: rgba(255,255,255,0.04) !important;
+}
+
+/* ─── Fieldset overrides (My Scrims sections) ────────── */
+.sd-dashboard .xp-fieldset {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin-bottom: 16px !important;
+}
+.sd-dashboard .xp-fieldset-legend {
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
+    color: #5a7a98 !important;
+    margin-bottom: 8px !important;
+    padding: 0 !important;
+}
+
+/* Sidebar */
+.sd-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 80px;
+}
+
+/* Sidebar cards */
+.sd-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+.sd-card:hover {
+    border-color: rgba(255,255,255,0.1);
+}
+.sd-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: #8cb0d0;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Lato', system-ui, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.sd-card-header:hover {
+    background: rgba(255,255,255,0.02);
+}
+.sd-card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.sd-card-icon {
+    font-size: 14px;
+}
+.sd-card-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgba(79, 160, 232, 0.12);
+    color: #4fa0e8;
+    font-size: 10px;
+    font-weight: 700;
+}
+.sd-card-body {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Next up items */
+.sd-next-up-item {
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-radius: 0;
+    transition: background 0.15s;
+}
+.sd-next-up-item:last-child {
+    border-bottom: none;
+}
+.sd-next-up-item:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+/* Modal overlay */
+.sd-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 80px;
+    backdrop-filter: blur(6px);
+}
+.sd-modal {
+    background: #0f1c2a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    width: min(580px, 92vw);
+    max-height: calc(100vh - 120px);
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+}
+.sd-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-family: 'Montserrat', 'Lato', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #d0e4f8;
+}
+.sd-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    color: #8ca8c4;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.sd-modal-close:hover {
+    background: rgba(200, 60, 60, 0.15);
+    color: #f08080;
+}
+.sd-modal-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 4px;
+}
+
+/* Override filter row in dashboard */
+.sd-dashboard .xp-select {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #c8d8e8 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    border-radius: 6px !important;
+    transition: all 0.15s !important;
+}
+.sd-dashboard .xp-select:hover {
+    border-color: rgba(255,255,255,0.18) !important;
+}
+.sd-dashboard .xp-select:focus {
+    border-color: rgba(79, 160, 232, 0.4) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(79, 160, 232, 0.1) !important;
+}
+.sd-dashboard .xp-select option {
+    background: #1a2a3e;
+    color: #c8d8e8;
+}
+
+/* Filter row */
+.sd-dashboard .sd-filter-row {
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 12px !important;
+}
+.sd-dashboard .sd-filter-row .xp-text {
+    color: #5a7a98 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    font-size: 10px !important;
+}
+
+/* Dashboard button overrides */
+.sd-dashboard .xp-btn {
+    border-radius: 6px !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    transition: all 0.2s !important;
+}
+.sd-dashboard .xp-btn-primary {
+    background: linear-gradient(135deg, #4fa0e8, #3d7cc4) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(79, 160, 232, 0.2) !important;
+}
+.sd-dashboard .xp-btn-primary:hover {
+    box-shadow: 0 4px 16px rgba(79, 160, 232, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+.sd-dashboard .xp-btn-danger {
+    background: rgba(200, 60, 60, 0.12) !important;
+    border-color: rgba(200, 60, 60, 0.2) !important;
+    color: #f08080 !important;
+}
+
+/* Scrollbar for sidebar */
+.sd-card-body::-webkit-scrollbar { width: 4px; }
+.sd-card-body::-webkit-scrollbar-track { background: transparent; }
+.sd-card-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.sd-card-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* XP theme toggle button in taskbar */
+.xp-taskbar-theme-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    height: 24px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #f0ede1 0%, #d4d0c0 100%);
+    border: 1px outset #d4d0c8;
+    font-family: system-ui, Tahoma, sans-serif;
+    font-size: 11px;
+    color: #333;
+    cursor: pointer;
+    font-weight: 600;
+}
+.xp-taskbar-theme-btn:hover {
+    background: linear-gradient(180deg, #f8f4e8 0%, #dcd8c8 100%);
+}
+.xp-taskbar-theme-btn:active {
+    background: linear-gradient(180deg, #d0cdc0 0%, #c4c0b4 100%);
+    border-style: inset;
+}
 `
 
 export default XP_STYLES

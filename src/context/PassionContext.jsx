@@ -15,6 +15,7 @@ export const PassionProvider = ({ children }) => {
     const [longestStreak, setLongestStreak] = useState(0)
     const [canClaimDaily, setCanClaimDaily] = useState(false)
     const [claimableCount, setClaimableCount] = useState(0)
+    const [inDiscord, setInDiscord] = useState(false)
     const [loading, setLoading] = useState(true)
     const [rankUpInfo, setRankUpInfo] = useState(null)
     const [challengeNotifications, setChallengeNotifications] = useState([])
@@ -33,6 +34,7 @@ export const PassionProvider = ({ children }) => {
             setLongestStreak(data.longestStreak)
             setCanClaimDaily(data.canClaimDaily)
             setClaimableCount(data.claimableCount || 0)
+            setInDiscord(!!data.inDiscord)
         } catch (err) {
             console.error('Failed to fetch passion balance:', err)
         }
@@ -48,6 +50,7 @@ export const PassionProvider = ({ children }) => {
             setLongestStreak(0)
             setCanClaimDaily(false)
             setClaimableCount(0)
+            setInDiscord(false)
             setLoading(false)
             initialLoadDone.current = false
             return
@@ -138,6 +141,7 @@ export const PassionProvider = ({ children }) => {
             longestStreak,
             canClaimDaily,
             claimableCount,
+            inDiscord,
             rank,
             nextRank,
             loading,

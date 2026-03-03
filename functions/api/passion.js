@@ -91,15 +91,24 @@ async function getBalance(sql, user) {
         : null
     const canClaimDaily = lastClaimDate !== todayUTC
 
-    // Count claimable challenges
-    const [{ count: claimableCount }] = await sql`
-        SELECT COUNT(*) as count FROM user_challenges uc
-        JOIN challenges c ON c.id = uc.challenge_id
-        WHERE uc.user_id = ${user.id}
-          AND uc.completed = false
-          AND uc.current_value >= c.target_value
-          AND c.is_active = true
-    `
+    // Count claimable challenges + check Discord membership
+    const [[{ count: claimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
+        sql`
+            SELECT COUNT(*) as count FROM user_challenges uc
+            JOIN challenges c ON c.id = uc.challenge_id
+            WHERE uc.user_id = ${user.id}
+              AND uc.completed = false
+              AND uc.current_value >= c.target_value
+              AND c.is_active = true
+        `,
+        sql`
+            SELECT EXISTS(
+                SELECT 1 FROM discord_guild_members dgm
+                JOIN users u ON u.discord_id = dgm.discord_id
+                WHERE u.id = ${user.id}
+            ) as in_discord
+        `,
+    ])
 
     return {
         statusCode: 200,
@@ -112,6 +121,7 @@ async function getBalance(sql, user) {
             longestStreak: pb.longest_streak,
             canClaimDaily,
             claimableCount: parseInt(claimableCount),
+            inDiscord: inDiscord,
             lastDailyClaim: pb.last_daily_claim,
             rank: { name: rank.name, division: rank.division, display: formatRank(rank) },
             nextRank: nextRank

@@ -1,9 +1,9 @@
-export default function XpScrimHelpWindow() {
+export default function XpScrimHelpWindow({ dark }) {
     const sectionStyle = { marginBottom: 10 }
-    const headingStyle = { fontWeight: 700, fontSize: 12, color: '#003399', marginBottom: 3, borderBottom: '1px solid #ccc', paddingBottom: 2 }
-    const textStyle = { fontSize: 11, lineHeight: '1.5', color: '#222' }
-    const listStyle = { fontSize: 11, lineHeight: '1.6', color: '#222', paddingLeft: 16, margin: '2px 0' }
-    const warnStyle = { fontSize: 11, lineHeight: '1.5', color: '#cc0000', fontWeight: 600, background: '#fff0f0', border: '1px solid #ffcccc', padding: '4px 6px', borderRadius: 2, marginTop: 4 }
+    const headingStyle = { fontWeight: 700, fontSize: 12, color: dark ? '#4fa0e8' : '#003399', marginBottom: 3, borderBottom: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #ccc', paddingBottom: 2 }
+    const textStyle = { fontSize: 11, lineHeight: '1.5', color: dark ? '#c8d4e0' : '#222' }
+    const listStyle = { fontSize: 11, lineHeight: '1.6', color: dark ? '#c8d4e0' : '#222', paddingLeft: 16, margin: '2px 0' }
+    const warnStyle = { fontSize: 11, lineHeight: '1.5', color: dark ? '#f08080' : '#cc0000', fontWeight: 600, background: dark ? 'rgba(200,60,60,0.08)' : '#fff0f0', border: dark ? '1px solid rgba(200,60,60,0.15)' : '1px solid #ffcccc', padding: '4px 6px', borderRadius: dark ? 6 : 2, marginTop: 4 }
 
     return (
         <div style={{ padding: 8 }}>

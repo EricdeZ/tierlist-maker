@@ -316,6 +316,22 @@ const tools = [
         btnClass: 'bg-cyan-600 hover:bg-cyan-700',
     },
     {
+        title: 'Referral Manager',
+        description: 'Search for a user and view all players they\'ve referred. See website and Forge referral breakdowns.',
+        path: '/admin/referrals',
+        permission: 'league_manage',
+        globalOnly: true,
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.51a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.343 8.69" />
+            </svg>
+        ),
+        accent: 'from-sky-500/20 to-sky-600/5',
+        border: 'border-sky-500/20 hover:border-sky-500/40',
+        iconColor: 'text-sky-400',
+        btnClass: 'bg-sky-600 hover:bg-sky-700',
+    },
+    {
         title: 'Audit Log',
         description: 'View a chronological log of all admin actions. Filter by user, endpoint, action, and date range to track changes and investigate issues.',
         path: '/admin/auditlog',

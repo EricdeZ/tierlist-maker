@@ -61,6 +61,7 @@ import FantasyForge from "./pages/FantasyForge.jsx";
 import ForgePlayerPage from "./pages/forge/ForgePlayerPage.jsx";
 import GodTierList from "./pages/GodTierList.jsx";
 import ScrimPlanner from "./pages/ScrimPlanner.jsx";
+import MyTeams from "./pages/MyTeams.jsx";
 import TheArcade from "./pages/TheArcade.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import Support from "./pages/Support.jsx";
@@ -71,6 +72,7 @@ import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
 import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
+import ReferralManager from "./pages/admin/ReferralManager.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import Features from "./pages/Features.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
@@ -127,6 +129,7 @@ function App() {
                                 <Route path="leaguestaff" element={<ProtectedRoute requiredPermission="league_staff_manage"><LeagueStaff /></ProtectedRoute>} />
                                 <Route path="roster-sync" element={<ProtectedRoute requiredPermission="roster_manage"><DiscordRosterSync /></ProtectedRoute>} />
                                 <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
+                                <Route path="referrals" element={<ProtectedRoute requiredPermission="league_manage"><ReferralManager /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
                             </Route>
 
@@ -160,6 +163,8 @@ function App() {
                             <Route path="forge/:leagueSlug/:divisionSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
                             <Route path="scrims" element={<ScrimPlanner />} />
+                            <Route path="team" element={<MyTeams />} />
+                            <Route path="bring-your-own-team" element={<MyTeams />} />
                             <Route path="arcade" element={<TheArcade />} />
                             <Route path="arcade/:lobbyId" element={<TheArcade />} />
                             <Route path="feedback" element={<Feedback />} />

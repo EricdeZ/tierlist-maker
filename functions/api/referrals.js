@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, headers } from '../lib/db.js'
-import { requireAuth } from '../lib/auth.js'
+import { requireAuth, requirePermission } from '../lib/auth.js'
 import { processWebsiteReferral, processForgeReferral } from '../lib/referrals.js'
 
 const handler = async (event) => {
@@ -19,6 +19,12 @@ const handler = async (event) => {
                     return await getMyStats(sql, event)
                 case 'validate-code':
                     return await validateCode(sql, params)
+                case 'admin-top':
+                    return await adminTop(sql, event)
+                case 'admin-search':
+                    return await adminSearch(sql, event, params)
+                case 'admin-referrals':
+                    return await adminReferrals(sql, event, params)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -148,6 +154,79 @@ async function claimReferral(sql, event, body) {
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already have a Forge referrer or cannot self-refer' }) }
         }
         return { statusCode: 200, headers, body: JSON.stringify({ success: true, referrerUsername: (await sql`SELECT discord_username FROM users WHERE id = ${referrer.id}`)[0].discord_username }) }
+    }
+}
+
+async function adminTop(sql, event) {
+    await requirePermission(event, 'league_manage')
+    const top = await sql`
+        SELECT u.id, u.discord_username, u.referral_code,
+            COUNT(*)::integer as referral_count,
+            COUNT(*) FILTER (WHERE r.type = 'website')::integer as website_count,
+            COUNT(*) FILTER (WHERE r.type = 'forge')::integer as forge_count
+        FROM referrals r
+        JOIN users u ON u.id = r.referrer_id
+        GROUP BY u.id, u.discord_username, u.referral_code
+        ORDER BY referral_count DESC
+        LIMIT 10
+    `
+    return { statusCode: 200, headers, body: JSON.stringify({ top }) }
+}
+
+async function adminSearch(sql, event, params) {
+    await requirePermission(event, 'league_manage')
+    const q = (params.q || '').trim()
+    if (!q || q.length < 2) {
+        return { statusCode: 200, headers, body: JSON.stringify({ users: [] }) }
+    }
+    const users = await sql`
+        SELECT id, discord_username, referral_code,
+            (SELECT COUNT(*)::integer FROM referrals WHERE referrer_id = users.id) as referral_count
+        FROM users
+        WHERE discord_username ILIKE ${'%' + q + '%'}
+        ORDER BY referral_count DESC, discord_username
+        LIMIT 20
+    `
+    return { statusCode: 200, headers, body: JSON.stringify({ users }) }
+}
+
+async function adminReferrals(sql, event, params) {
+    await requirePermission(event, 'league_manage')
+    const userId = parseInt(params.userId)
+    if (!userId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'userId is required' }) }
+    }
+    const [referrer, referrals] = await Promise.all([
+        sql`
+            SELECT id, discord_username, referral_code, created_at
+            FROM users WHERE id = ${userId}
+        `,
+        sql`
+            SELECT r.id, r.type, r.rewarded, r.created_at,
+                u.discord_username as referee_username, u.id as referee_id
+            FROM referrals r
+            JOIN users u ON u.id = r.referee_id
+            WHERE r.referrer_id = ${userId}
+            ORDER BY r.created_at DESC
+        `,
+    ])
+    if (!referrer[0]) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'User not found' }) }
+    }
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+            user: referrer[0],
+            referrals: referrals.map(r => ({
+                id: r.id,
+                type: r.type,
+                rewarded: r.rewarded,
+                createdAt: r.created_at,
+                refereeUsername: r.referee_username,
+                refereeId: r.referee_id,
+            })),
+        }),
     }
 }
 

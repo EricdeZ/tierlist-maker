@@ -4,7 +4,7 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
     return (
         <div>
             {scrims.length > 0 && (
-                <div className="flex items-center gap-2 mb-2 flex-wrap" style={{ borderBottom: '1px solid #c0c0c0', paddingBottom: 6 }}>
+                <div className="sd-filter-row flex items-center gap-2 mb-2 flex-wrap" style={{ borderBottom: '1px solid #c0c0c0', paddingBottom: 6 }}>
                     <span className="xp-text" style={{ fontSize: 11, fontWeight: 700 }}>Filter:</span>
                     <select value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)} className="xp-select">
                         <option value="">All Leagues</option>

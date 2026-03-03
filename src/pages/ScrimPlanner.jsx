@@ -22,6 +22,10 @@ import XpBlacklistWindow from './scrims/XpBlacklistWindow'
 import XpScrimCalendarWindow from './scrims/XpScrimCalendarWindow'
 import PostScrimWizard from './scrims/PostScrimWizard'
 import XpScrimChallengesWindow from './scrims/XpScrimChallengesWindow'
+import ScrimDashboard from './scrims/ScrimDashboard'
+import { LayoutDashboard } from 'lucide-react'
+
+const THEME_KEY = 'scrim-planner-theme'
 
 export default function ScrimPlanner() {
     const { user, login, hasPermission } = useAuth()
@@ -64,6 +68,16 @@ export default function ScrimPlanner() {
     const isOwner = hasPermission('permission_manage')
 
     const isCaptain = captainTeams.length > 0
+
+    // ── Desktop theme toggle ──────────────────────────────────────
+    const [desktopTheme, setDesktopTheme] = useState(() => {
+        try { return localStorage.getItem(THEME_KEY) || 'dashboard' } catch { return 'dashboard' }
+    })
+    const toggleDesktopTheme = () => {
+        const next = desktopTheme === 'dashboard' ? 'xp' : 'dashboard'
+        setDesktopTheme(next)
+        try { localStorage.setItem(THEME_KEY, next) } catch {}
+    }
 
     // ── Mobile detection ──────────────────────────────────────────
     const [isMobile, setIsMobile] = useState(() =>
@@ -452,6 +466,42 @@ export default function ScrimPlanner() {
         )
     }
 
+    // ── Desktop Dashboard Layout ──────────────────────────────────
+    if (desktopTheme === 'dashboard') {
+        return (
+            <>
+                <PageTitle title="Scrim Planner" description="Find and schedule scrimmage matches." />
+                <Navbar />
+                <ScrimDashboard
+                    user={user} login={login} isCaptain={isCaptain} isOwner={isOwner}
+                    openScrims={filteredOpenScrims}
+                    leagueFilter={leagueFilter} setLeagueFilter={setLeagueFilter}
+                    tierFilter={tierFilter} setTierFilter={setTierFilter}
+                    regionFilter={regionFilter} setRegionFilter={setRegionFilter}
+                    divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
+                    uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
+                    activeDivisions={activeDivisions}
+                    myScrims={myScrims} incomingScrims={incomingScrims}
+                    captainTeams={captainTeams} myTeams={myTeams}
+                    onAccept={handleAccept} onCancel={handleCancel} onDecline={handleDecline}
+                    handleReportOutcome={handleReportOutcome} handleDisputeOutcome={handleDisputeOutcome}
+                    handleConfirmAccept={handleConfirmAccept} handleDenyAccept={handleDenyAccept}
+                    actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
+                    reliabilityScores={reliabilityScores}
+                    blacklist={blacklist} allTeams={allTeams}
+                    onBlacklistAdd={handleBlacklistAdd} onBlacklistRemove={handleBlacklistRemove}
+                    impersonatedUser={impersonatedUser}
+                    onImpersonate={handleImpersonate} onClearImpersonation={handleClearImpersonation}
+                    onPostSuccess={() => { loadOpenScrims(); loadMyScrims() }}
+                    loadOpenScrims={loadOpenScrims} loadMyScrims={loadMyScrims}
+                    onToggleTheme={toggleDesktopTheme}
+                    loading={loading} error={error}
+                />
+                <style>{XP_STYLES}</style>
+            </>
+        )
+    }
+
     // ── Desktop Layout (XP theme) ─────────────────────────────────
     return (
         <>
@@ -788,6 +838,12 @@ export default function ScrimPlanner() {
                     )}
 
                     <div className="flex-1" />
+
+                    {/* Theme toggle */}
+                    <button className="xp-taskbar-theme-btn" onClick={toggleDesktopTheme} title="Switch to Dashboard view">
+                        <LayoutDashboard size={12} />
+                        <span>Dashboard</span>
+                    </button>
 
                     {/* System tray */}
                     <div className="xp-tray">

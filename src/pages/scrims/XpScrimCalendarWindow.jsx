@@ -9,7 +9,7 @@ function toESTDateStr(isoStr) {
     return `${est.getFullYear()}-${String(est.getMonth() + 1).padStart(2, '0')}-${String(est.getDate()).padStart(2, '0')}`
 }
 
-export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
+export default function XpScrimCalendarWindow({ myScrims, myTeams, dark }) {
     const [viewMonth, setViewMonth] = useState(() => new Date())
     const [selectedDay, setSelectedDay] = useState(null)
 
@@ -48,13 +48,17 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Calendar grid */}
-            <div className="xp-calendar" style={{ maxWidth: 'none', border: 'none', borderBottom: '2px groove #d4d0c8' }}>
+            <div className="xp-calendar" style={{ maxWidth: 'none', border: 'none', borderBottom: dark ? '1px solid rgba(255,255,255,0.06)' : '2px groove #d4d0c8' }}>
                 <div className="xp-calendar-header">
-                    <button type="button" onClick={() => { setViewMonth(new Date(year, month - 1, 1)); setSelectedDay(null) }} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                    <button type="button" onClick={() => { setViewMonth(new Date(year, month - 1, 1)); setSelectedDay(null) }}
+                        className={dark ? undefined : 'xp-title-btn xp-tbtn-min'}
+                        style={dark ? { width: 22, height: 22, fontSize: 11, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: '#8cb0d0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' } : { width: 18, height: 18, fontSize: 11 }}>
                         <ChevronLeft size={12} />
                     </button>
-                    <span style={{ fontFamily: '"Pixelify Sans", system-ui', fontSize: 14 }}>{monthName} {year}</span>
-                    <button type="button" onClick={() => { setViewMonth(new Date(year, month + 1, 1)); setSelectedDay(null) }} className="xp-title-btn xp-tbtn-min" style={{ width: 18, height: 18, fontSize: 11 }}>
+                    <span style={{ fontFamily: dark ? "'Lato', system-ui, sans-serif" : '"Pixelify Sans", system-ui', fontSize: dark ? 13 : 14, fontWeight: dark ? 600 : undefined }}>{monthName} {year}</span>
+                    <button type="button" onClick={() => { setViewMonth(new Date(year, month + 1, 1)); setSelectedDay(null) }}
+                        className={dark ? undefined : 'xp-title-btn xp-tbtn-min'}
+                        style={dark ? { width: 22, height: 22, fontSize: 11, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: '#8cb0d0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' } : { width: 18, height: 18, fontSize: 11 }}>
                         <ChevronRight size={12} />
                     </button>
                 </div>
@@ -87,7 +91,7 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
                     })}
                 </div>
                 {/* Legend + Export */}
-                <div className="flex items-center gap-3 px-2 py-1.5" style={{ background: '#ece9d8', borderTop: '1px solid #c0c0c0' }}>
+                <div className="flex items-center gap-3 px-2 py-1.5" style={{ background: dark ? 'rgba(255,255,255,0.03)' : '#ece9d8', borderTop: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #c0c0c0' }}>
                     <div className="flex items-center gap-1">
                         <span className="xp-cal-dot xp-cal-dot-confirmed" style={{ position: 'static' }} />
                         <span className="xp-text" style={{ fontSize: 10 }}>Confirmed</span>
@@ -110,18 +114,18 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
             {/* Day detail panel */}
             <div className="xp-cal-detail" style={{ flex: 1, overflowY: 'auto', padding: 6, minHeight: 60 }}>
                 {!selectedDay && (
-                    <div className="xp-text" style={{ color: '#888', textAlign: 'center', paddingTop: 12 }}>
+                    <div className="xp-text" style={{ color: dark ? '#5a7a98' : '#888', textAlign: 'center', paddingTop: 12 }}>
                         Click a day to see scrim details.
                     </div>
                 )}
                 {selectedDay && selectedScrims.length === 0 && (
-                    <div className="xp-text" style={{ color: '#888', textAlign: 'center', paddingTop: 12 }}>
+                    <div className="xp-text" style={{ color: dark ? '#5a7a98' : '#888', textAlign: 'center', paddingTop: 12 }}>
                         No scrims on {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.
                     </div>
                 )}
                 {selectedDay && selectedScrims.length > 0 && (
                     <div>
-                        <div className="xp-text" style={{ fontWeight: 700, marginBottom: 4 }}>
+                        <div className="xp-text" style={{ fontWeight: 700, marginBottom: 4, color: dark ? '#e0e6ed' : undefined }}>
                             {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                         </div>
                         <div className="flex flex-col gap-1">
@@ -129,7 +133,7 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
                                 <div key={s.id} className="xp-cal-scrim-item">
                                     <div className="flex items-center gap-2 mb-0.5">
                                         <TeamLogo slug={s.teamSlug} name={s.teamName} size={18} color={s.teamColor} />
-                                        <span className="xp-text" style={{ fontWeight: 700 }}>{s.teamName}</span>
+                                        <span className="xp-text" style={{ fontWeight: 700, color: dark ? '#e0e6ed' : undefined }}>{s.teamName}</span>
                                         {s.status === 'accepted' ? (
                                             <span className="xp-badge xp-badge-green" style={{ fontSize: 9 }}>Confirmed</span>
                                         ) : (
@@ -137,25 +141,25 @@ export default function XpScrimCalendarWindow({ myScrims, myTeams }) {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                        <Clock size={10} style={{ color: '#555' }} />
-                                        <span className="xp-text" style={{ fontSize: 11 }}>{formatDateEST(s.scheduledDate)}</span>
+                                        <Clock size={10} style={{ color: dark ? '#5a7a98' : '#555' }} />
+                                        <span className="xp-text" style={{ fontSize: 11, color: dark ? '#c8d4e0' : undefined }}>{formatDateEST(s.scheduledDate)}</span>
                                         <span className={`xp-badge ${XP_PICK_BADGE[s.pickMode] || 'xp-badge-blue'}`} style={{ fontSize: 9 }}>{formatPickMode(s.pickMode)}</span>
                                     </div>
                                     {s.status === 'accepted' && s.acceptedTeamName && (
                                         <div className="flex items-center gap-1 mt-0.5">
-                                            <span className="xp-text" style={{ fontSize: 10, color: '#2d8212' }}>vs</span>
+                                            <span className="xp-text" style={{ fontSize: 10, color: dark ? '#6ce86c' : '#2d8212' }}>vs</span>
                                             <TeamLogo slug={s.acceptedTeamSlug} name={s.acceptedTeamName} size={14} color={s.acceptedTeamColor} />
-                                            <span className="xp-text" style={{ fontSize: 11, fontWeight: 600, color: '#2d8212' }}>{s.acceptedTeamName}</span>
+                                            <span className="xp-text" style={{ fontSize: 11, fontWeight: 600, color: dark ? '#6ce86c' : '#2d8212' }}>{s.acceptedTeamName}</span>
                                         </div>
                                     )}
                                     {s.challengedTeamName && s.status === 'open' && (
                                         <div className="flex items-center gap-1 mt-0.5">
-                                            <Target size={10} style={{ color: '#6a3ea1' }} />
-                                            <span className="xp-text" style={{ fontSize: 10, color: '#6a3ea1' }}>Challenging {s.challengedTeamName}</span>
+                                            <Target size={10} style={{ color: dark ? '#b090e0' : '#6a3ea1' }} />
+                                            <span className="xp-text" style={{ fontSize: 10, color: dark ? '#b090e0' : '#6a3ea1' }}>Challenging {s.challengedTeamName}</span>
                                         </div>
                                     )}
                                     {s.notes && (
-                                        <div className="xp-text" style={{ fontSize: 10, color: '#666', marginTop: 1 }}>
+                                        <div className="xp-text" style={{ fontSize: 10, color: dark ? '#7a8a9a' : '#666', marginTop: 1 }}>
                                             <MessageSquare size={9} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
                                             {s.notes}
                                         </div>

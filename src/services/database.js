@@ -781,3 +781,67 @@ export const inhouseService = {
     },
 }
 
+export const communityTeamService = {
+    async getMyTeams() {
+        return apiCall('community-teams', { action: 'my-teams' })
+    },
+    async getTeam(idOrSlug) {
+        return apiCall('community-teams', { action: 'team', id: idOrSlug })
+    },
+    async browse(tier) {
+        return apiCall('community-teams', { action: 'browse', tier })
+    },
+    async create(data) {
+        return apiPost('community-teams', { action: 'create' }, data)
+    },
+    async update(data) {
+        return apiPost('community-teams', { action: 'update' }, data)
+    },
+    async invite(teamId, userId) {
+        return apiPost('community-teams', { action: 'invite' }, { team_id: teamId, user_id: userId })
+    },
+    async generateLink(teamId) {
+        return apiPost('community-teams', { action: 'generate-link' }, { team_id: teamId })
+    },
+    async joinLink(code) {
+        return apiPost('community-teams', { action: 'join-link' }, { code })
+    },
+    async requestJoin(teamId) {
+        return apiPost('community-teams', { action: 'request' }, { team_id: teamId })
+    },
+    async respond(invitationId, accept) {
+        return apiPost('community-teams', { action: 'respond' }, { invitation_id: invitationId, accept })
+    },
+    async leave(teamId) {
+        return apiPost('community-teams', { action: 'leave' }, { team_id: teamId })
+    },
+    async disband(teamId) {
+        return apiPost('community-teams', { action: 'disband' }, { team_id: teamId })
+    },
+    async searchUsers(query) {
+        return apiCall('community-teams', { action: 'search-users', q: query })
+    },
+    async getPending() {
+        return apiCall('community-teams', { action: 'pending' })
+    },
+    async getDivisionsByTier(tier) {
+        return apiCall('community-teams', { action: 'divisions-by-tier', tier })
+    },
+    async uploadLogo(teamId, file) {
+        const formData = new FormData()
+        formData.append('teamId', String(teamId))
+        formData.append('file', file)
+        const token = localStorage.getItem('auth_token')
+        const hdrs = {}
+        if (token) hdrs.Authorization = `Bearer ${token}`
+        const res = await fetch(`${API_BASE}/community-team-upload`, {
+            method: 'POST',
+            headers: hdrs,
+            body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Upload failed')
+        return data
+    },
+}
+

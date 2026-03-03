@@ -42,7 +42,7 @@ function spawnFlyingCoins(sourceEl) {
     }
 }
 
-export default function XpScrimChallengesWindow() {
+export default function XpScrimChallengesWindow({ dark }) {
     const { user, login } = useAuth()
     const { refreshBalance } = usePassion()
     const [challenges, setChallenges] = useState([])
@@ -101,7 +101,7 @@ export default function XpScrimChallengesWindow() {
     if (!user) {
         return (
             <div style={{ padding: 10, textAlign: 'center' }}>
-                <div className="xp-text" style={{ fontSize: 11, color: '#444', marginBottom: 8 }}>
+                <div className="xp-text" style={{ fontSize: 11, color: dark ? '#5a7a98' : '#444', marginBottom: 8 }}>
                     Log in to track scrim challenge progress.
                 </div>
                 <button className="xp-btn xp-btn-primary" style={{ fontSize: 11 }} onClick={login}>
@@ -114,7 +114,7 @@ export default function XpScrimChallengesWindow() {
     if (loading) {
         return (
             <div style={{ padding: 12, textAlign: 'center' }}>
-                <div className="xp-text" style={{ fontSize: 11, color: '#666' }}>Loading challenges...</div>
+                <div className="xp-text" style={{ fontSize: 11, color: dark ? '#5a7a98' : '#666' }}>Loading challenges...</div>
             </div>
         )
     }
@@ -122,7 +122,7 @@ export default function XpScrimChallengesWindow() {
     if (challenges.length === 0) {
         return (
             <div style={{ padding: 12, textAlign: 'center' }}>
-                <div className="xp-text" style={{ fontSize: 11, color: '#666' }}>No scrim challenges available.</div>
+                <div className="xp-text" style={{ fontSize: 11, color: dark ? '#5a7a98' : '#666' }}>No scrim challenges available.</div>
             </div>
         )
     }
@@ -130,19 +130,42 @@ export default function XpScrimChallengesWindow() {
     const completed = challenges.filter(ch => ch.completed).length
     const claimable = challenges.filter(ch => ch.claimable).length
 
+    const d = dark
+    const c = {
+        summaryBg: d ? 'rgba(255,255,255,0.04)' : '#f0efe4',
+        summaryBorder: d ? '1px solid rgba(255,255,255,0.06)' : '1px solid #d4d0c8',
+        summaryText: d ? '#8899aa' : '#333',
+        claimableText: d ? '#6ce86c' : '#006600',
+        itemBorder: (claimable) => d
+            ? `1px solid ${claimable ? 'rgba(100,200,60,0.25)' : 'rgba(255,255,255,0.06)'}`
+            : `1px solid ${claimable ? '#4a0' : '#c0c0c0'}`,
+        itemBg: (completed, claimable) => d
+            ? (completed ? 'rgba(255,255,255,0.02)' : claimable ? 'rgba(100,200,60,0.04)' : 'rgba(255,255,255,0.025)')
+            : (completed ? '#f4f8f4' : claimable ? '#fffff0' : '#fafaf6'),
+        titleColor: d ? '#e0e6ed' : '#222',
+        rewardColor: d ? '#8899aa' : '#666',
+        descColor: d ? '#7a8a9a' : '#555',
+        barBg: d ? 'rgba(255,255,255,0.08)' : '#e0ddd4',
+        barBorder: d ? '1px solid rgba(255,255,255,0.06)' : '1px inset #c0c0c0',
+        barText: d ? '#c8d4e0' : '#333',
+        barShadow: d ? '0 0 2px rgba(0,0,0,0.5)' : '0 0 2px rgba(255,255,255,0.8)',
+        claimedColor: d ? '#6ce86c' : '#060',
+        tierFont: d ? "'Lato', system-ui, sans-serif" : '"Pixelify Sans", monospace',
+    }
+
     return (
         <div style={{ padding: 6 }}>
             {/* Summary bar */}
             <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '4px 6px', marginBottom: 6, background: '#f0efe4',
-                border: '1px solid #d4d0c8', fontSize: 10,
+                padding: '4px 6px', marginBottom: 6, background: c.summaryBg,
+                border: c.summaryBorder, fontSize: 10, borderRadius: d ? 6 : undefined,
             }}>
-                <span className="xp-text" style={{ color: '#333' }}>
+                <span className="xp-text" style={{ color: c.summaryText }}>
                     {completed}/{challenges.length} completed
                 </span>
                 {claimable > 0 && (
-                    <span className="xp-text" style={{ color: '#006600', fontWeight: 700 }}>
+                    <span className="xp-text" style={{ color: c.claimableText, fontWeight: 700 }}>
                         {claimable} ready to claim!
                     </span>
                 )}
@@ -158,10 +181,10 @@ export default function XpScrimChallengesWindow() {
 
                     return (
                         <div key={ch.id} style={{
-                            border: `1px solid ${isClaimable ? '#4a0' : '#c0c0c0'}`,
-                            background: ch.completed ? '#f4f8f4' : isClaimable ? '#fffff0' : '#fafaf6',
+                            border: c.itemBorder(isClaimable),
+                            background: c.itemBg(ch.completed, isClaimable),
                             padding: '5px 6px',
-                            borderRadius: 2,
+                            borderRadius: d ? 6 : 2,
                             opacity: ch.completed ? 0.65 : 1,
                         }}>
                             {/* Title row */}
@@ -169,21 +192,21 @@ export default function XpScrimChallengesWindow() {
                                 <span style={{
                                     display: 'inline-block', padding: '0 4px',
                                     background: tierColor, color: '#fff', fontSize: 9,
-                                    fontWeight: 700, borderRadius: 2, lineHeight: '15px',
+                                    fontWeight: 700, borderRadius: d ? 4 : 2, lineHeight: '15px',
                                     textShadow: '0 1px 1px rgba(0,0,0,0.3)',
-                                    fontFamily: '"Pixelify Sans", monospace',
+                                    fontFamily: c.tierFont,
                                 }}>
                                     {getTierLabel(ch.tier)}
                                 </span>
                                 <span className="xp-text" style={{
-                                    fontSize: 11, fontWeight: 600, color: '#222', flex: 1,
+                                    fontSize: 11, fontWeight: 600, color: c.titleColor, flex: 1,
                                 }}>
                                     {ch.title}
                                     {ch.givesBadge && <span style={{ color: tierColor, marginLeft: 3 }} title="Grants badge">★</span>}
                                 </span>
                                 <span style={{
                                     display: 'flex', alignItems: 'center', gap: 2,
-                                    fontSize: 10, color: '#666', fontWeight: 600,
+                                    fontSize: 10, color: c.rewardColor, fontWeight: 600,
                                 }}>
                                     <img src={passionCoin} alt="" style={{ width: 12, height: 12 }} />
                                     {ch.reward}
@@ -191,32 +214,33 @@ export default function XpScrimChallengesWindow() {
                             </div>
 
                             {/* Description */}
-                            <div className="xp-text" style={{ fontSize: 10, color: '#555', marginBottom: 3 }}>
+                            <div className="xp-text" style={{ fontSize: 10, color: c.descColor, marginBottom: 3 }}>
                                 {ch.description}
                             </div>
 
                             {/* Progress bar + claim */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <div style={{
-                                    flex: 1, height: 12, background: '#e0ddd4',
-                                    border: '1px inset #c0c0c0', borderRadius: 1, overflow: 'hidden',
+                                    flex: 1, height: 12, background: c.barBg,
+                                    border: c.barBorder, borderRadius: d ? 4 : 1, overflow: 'hidden',
                                     position: 'relative',
                                 }}>
                                     <div style={{
                                         width: `${progress * 100}%`,
                                         height: '100%',
                                         background: ch.completed
-                                            ? '#8c8'
+                                            ? (d ? 'rgba(100,200,100,0.4)' : '#8c8')
                                             : isClaimable
                                                 ? `linear-gradient(180deg, ${tierColor}cc, ${tierColor})`
                                                 : `linear-gradient(180deg, ${tierColor}88, ${tierColor}aa)`,
                                         transition: 'width 0.3s ease',
+                                        borderRadius: d ? 4 : 0,
                                     }} />
                                     <span style={{
                                         position: 'absolute', inset: 0, display: 'flex',
                                         alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 9, fontWeight: 600, color: '#333',
-                                        textShadow: '0 0 2px rgba(255,255,255,0.8)',
+                                        fontSize: 9, fontWeight: 600, color: c.barText,
+                                        textShadow: c.barShadow,
                                     }}>
                                         {ch.completed ? 'Completed' : `${ch.currentValue || 0} / ${ch.targetValue}`}
                                     </span>
@@ -234,7 +258,7 @@ export default function XpScrimChallengesWindow() {
                                     </button>
                                 )}
                                 {justClaimed && ch.completed && (
-                                    <span style={{ fontSize: 9, color: '#060', fontWeight: 700 }}>Claimed!</span>
+                                    <span style={{ fontSize: 9, color: c.claimedColor, fontWeight: 700 }}>Claimed!</span>
                                 )}
                             </div>
                         </div>
