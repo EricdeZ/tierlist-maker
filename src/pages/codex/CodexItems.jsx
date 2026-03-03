@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { codexService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Package, Tag, Settings2, X, Copy, GripVertical, Layers } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Package, Tag, Settings2, X, Copy, GripVertical, Layers, Save, Link2 } from 'lucide-react'
 import CodexImagePicker from '../../components/codex/CodexImagePicker'
 import { describeFieldValue } from '../../utils/codexFieldDescriptors'
 
@@ -27,6 +27,8 @@ export default function CodexItems() {
     const [itemForm, setItemForm] = useState(null)
     // Group type form
     const [groupTypeForm, setGroupTypeForm] = useState(null)
+    // Field popup (save-as-type / link-to-type)
+    const [fieldPopup, setFieldPopup] = useState(null)
 
     // Search/filter
     const [search, setSearch] = useState('')
@@ -246,6 +248,40 @@ export default function CodexItems() {
             subs.splice(toIdx, 0, moved)
             return { ...prev, sub_fields: subs }
         })
+    }
+
+    // ── Field popup actions (save-as-type / link-to-type) ──
+
+    const saveFieldAsType = async (field) => {
+        const name = fieldPopup?.name?.trim()
+        if (!name) return
+        setSaving(true)
+        try {
+            const subFields = field.options?.sub_fields || []
+            const result = await codexService.createGroupType({ name, sub_fields: subFields, sentence_template: field.sentence_template || null })
+            await codexService.updateField({ id: field.id, group_type_id: result.groupType.id })
+            setFieldPopup(null)
+            await fetchData()
+        } catch (err) {
+            alert('Error: ' + err.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const linkFieldToType = async (fieldId) => {
+        const typeId = fieldPopup?.typeId
+        if (!typeId) return
+        setSaving(true)
+        try {
+            await codexService.updateField({ id: fieldId, group_type_id: typeId })
+            setFieldPopup(null)
+            await fetchData()
+        } catch (err) {
+            alert('Error: ' + err.message)
+        } finally {
+            setSaving(false)
+        }
     }
 
     const startItemCopy = (item) => {
@@ -485,7 +521,7 @@ export default function CodexItems() {
                         {fields.length > 0 && (
                             <div className="space-y-1 mb-4">
                                 {fields.map(field => (
-                                    <div key={field.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.02] group">
+                                    <div key={field.id} className="relative flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.02] group">
                                         {field.icon_url && <img src={field.icon_url} alt="" className="w-4 h-4 rounded" />}
                                         <span className="text-sm font-medium text-(--color-text)">{field.name}</span>
                                         <code className="text-xs text-(--color-text-secondary)/50 bg-white/5 px-1.5 py-0.5 rounded">{field.slug}</code>
@@ -504,6 +540,18 @@ export default function CodexItems() {
                                         {field.required && <span className="text-xs text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">required</span>}
                                         {field.description && <span className="text-xs text-(--color-text-secondary)/40 truncate flex-1">{field.description}</span>}
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0">
+                                            {field.field_type === 'group' && !field._group_type_name && field.options?.sub_fields?.length > 0 && (
+                                                <button onClick={() => setFieldPopup({ fieldId: field.id, type: 'save', name: field.name })}
+                                                    className="p-1 rounded hover:bg-violet-500/10 text-(--color-text-secondary) hover:text-violet-400 transition-colors cursor-pointer" title="Save as Group Type">
+                                                    <Save className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            {field.field_type === 'group' && groupTypes.length > 0 && (
+                                                <button onClick={() => setFieldPopup({ fieldId: field.id, type: 'link', typeId: field.group_type_id || groupTypes[0]?.id })}
+                                                    className="p-1 rounded hover:bg-violet-500/10 text-(--color-text-secondary) hover:text-violet-400 transition-colors cursor-pointer" title="Link to Group Type">
+                                                    <Link2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                             <button onClick={() => startFieldEdit(field)} className="p-1 rounded hover:bg-white/10 text-(--color-text-secondary) hover:text-(--color-accent) transition-colors cursor-pointer" title="Edit">
                                                 <Pencil className="w-3.5 h-3.5" />
                                             </button>
@@ -511,6 +559,54 @@ export default function CodexItems() {
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
+
+                                        {/* Save as Group Type popup */}
+                                        {fieldPopup?.fieldId === field.id && fieldPopup.type === 'save' && (
+                                            <div className="absolute right-0 top-full mt-1 z-20 w-72 bg-(--color-secondary) border border-white/10 rounded-lg p-3 shadow-xl">
+                                                <h5 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-1">Save as Group Type</h5>
+                                                <p className="text-[11px] text-(--color-text-secondary)/60 mb-2">
+                                                    Creates a reusable Group Type from this field's sub-fields and links this field to it. Other fields can then use the same type.
+                                                </p>
+                                                <input type="text" value={fieldPopup.name || ''} onChange={e => setFieldPopup(p => ({ ...p, name: e.target.value }))}
+                                                    className="w-full px-2 py-1.5 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-violet-400 mb-2" placeholder="Type name" autoFocus />
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => saveFieldAsType(field)} disabled={saving || !fieldPopup.name?.trim()}
+                                                        className="px-3 py-1 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50">
+                                                        {saving ? 'Saving...' : 'Save'}
+                                                    </button>
+                                                    <button onClick={() => setFieldPopup(null)}
+                                                        className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-(--color-text-secondary) text-xs transition-colors cursor-pointer">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Link to Group Type popup */}
+                                        {fieldPopup?.fieldId === field.id && fieldPopup.type === 'link' && (
+                                            <div className="absolute right-0 top-full mt-1 z-20 w-72 bg-(--color-secondary) border border-white/10 rounded-lg p-3 shadow-xl">
+                                                <h5 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-1">Link to Group Type</h5>
+                                                <p className="text-[11px] text-(--color-text-secondary)/60 mb-2">
+                                                    This field will use the selected type's sub-fields. Updating the type will automatically update this field too.
+                                                </p>
+                                                <select value={fieldPopup.typeId || ''} onChange={e => setFieldPopup(p => ({ ...p, typeId: parseInt(e.target.value) }))}
+                                                    className="w-full px-2 py-1.5 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-violet-400 mb-2 cursor-pointer">
+                                                    {groupTypes.map(gt => (
+                                                        <option key={gt.id} value={gt.id}>{gt.name} — [{(Array.isArray(gt.sub_fields) ? gt.sub_fields : []).map(sf => sf.label).join(', ')}]</option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => linkFieldToType(field.id)} disabled={saving || !fieldPopup.typeId}
+                                                        className="px-3 py-1 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50">
+                                                        {saving ? 'Linking...' : 'Link'}
+                                                    </button>
+                                                    <button onClick={() => setFieldPopup(null)}
+                                                        className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-(--color-text-secondary) text-xs transition-colors cursor-pointer">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
