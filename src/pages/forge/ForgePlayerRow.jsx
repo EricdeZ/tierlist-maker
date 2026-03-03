@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Flame, Snowflake, ChevronDown } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
@@ -26,12 +27,13 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
     const isDown = change < 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
+    const navigate = useNavigate()
     const avatarUrl = usePlayerAvatar(player)
-    const profileUrl = isLeagueWide && player.divisionSlug
-        ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
+    const forgeProfileUrl = isLeagueWide && player.divisionSlug
+        ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}`
         : seasonSlugs
-            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
-            : `/profile/${player.playerSlug}`
+            ? `/forge/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/player/${player.playerSlug}`
+            : null
 
     const perfValue = player.perfMultiplier
     const perfColor = perfValue >= 1.5 ? 'text-[var(--forge-flame-bright)]'
@@ -91,11 +93,9 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
             {/* Mobile name row — full width so it never truncates badly */}
             <div className="sm:hidden flex items-center gap-2 px-2.5 pt-2 pb-0.5 relative z-[2]" onClick={handleRowClick}>
                 <a
-                    href={profileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={forgeProfileUrl}
                     className="forge-body text-[0.95rem] font-bold forge-profile-link truncate"
-                    onClick={e => e.stopPropagation()}
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); if (forgeProfileUrl) navigate(forgeProfileUrl) }}
                 >
                     {player.playerName}
                 </a>
@@ -147,11 +147,9 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                     {/* Name — desktop only (mobile has its own row above) */}
                     <div className="hidden sm:flex items-center gap-1.5">
                         <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={forgeProfileUrl}
                             className="forge-body text-[1.05rem] font-bold forge-profile-link truncate"
-                            onClick={e => e.stopPropagation()}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); if (forgeProfileUrl) navigate(forgeProfileUrl) }}
                         >
                             {player.playerName}
                         </a>

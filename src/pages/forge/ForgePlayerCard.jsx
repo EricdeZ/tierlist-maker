@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Flame, Snowflake, Crown } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
@@ -21,12 +22,13 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
     const isUp = change > 0
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
+    const navigate = useNavigate()
     const avatarUrl = usePlayerAvatar(player)
-    const profileUrl = isLeagueWide && player.divisionSlug
-        ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
+    const forgeProfileUrl = isLeagueWide && player.divisionSlug
+        ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}`
         : seasonSlugs
-            ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${player.playerSlug}`
-            : `/profile/${player.playerSlug}`
+            ? `/forge/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/player/${player.playerSlug}`
+            : null
 
     // Draw sparkline (fallback to flat line at 100 if no data)
     useEffect(() => {
@@ -95,11 +97,9 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                     </div>
                     <div>
                         <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={forgeProfileUrl}
                             className="forge-body text-[1.1rem] font-bold forge-profile-link block"
-                            onClick={e => e.stopPropagation()}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); if (forgeProfileUrl) navigate(forgeProfileUrl) }}
                         >
                             {player.playerName}
                         </a>

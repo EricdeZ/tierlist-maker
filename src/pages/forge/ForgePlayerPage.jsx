@@ -9,7 +9,7 @@ import forgeLogo from '../../assets/forge.png'
 import sparkIcon from '../../assets/spark.png'
 import passionCoin from '../../assets/passion/passion.png'
 import passiontailsImg from '../../assets/passion/passiontails.png'
-import { Flame, Snowflake, Zap, Trophy, Target, Lock } from 'lucide-react'
+import { Flame, Snowflake, Zap, Trophy, Target, Lock, User } from 'lucide-react'
 import { FORGE_COLORS } from './forgeConstants'
 import { createEmberSystem, drawPortfolioChart } from './forgeCanvas'
 import ForgeHero from './ForgeHero'
@@ -367,6 +367,13 @@ export default function ForgePlayerPage() {
                         >
                             <Target size={13} />
                             Contracts
+                        </Link>
+                        <Link
+                            to={`/${leagueSlug}/${divisionSlug}/players/${playerSlug}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--forge-panel)] border border-[var(--forge-border)] hover:border-[var(--forge-flame)]/30 text-[var(--forge-text-mid)] hover:text-[var(--forge-flame-bright)] transition-all forge-head text-[0.8rem] tracking-wider ml-auto"
+                        >
+                            <User size={13} />
+                            View Profile
                         </Link>
                     </div>
 
