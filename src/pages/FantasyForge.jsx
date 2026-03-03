@@ -385,7 +385,19 @@ export default function FantasyForge() {
                     }
                 } else if (activeTab === 'portfolio') {
                     if (!user) { setLoading(false); return }
-                    const results = await Promise.all(leagueSeasons.map(s => forgeService.getPortfolio(s.id).catch(() => null)))
+                    const [portfolioResults, marketResults] = await Promise.all([
+                        Promise.all(leagueSeasons.map(s => forgeService.getPortfolio(s.id).catch(() => null))),
+                        Promise.all(leagueSeasons.map(s => forgeService.getMarket(s.id).catch(() => null))),
+                    ])
+                    let freeRemaining = 0, refAvail = 0
+                    for (const data of marketResults) {
+                        if (!data) continue
+                        freeRemaining = Math.max(freeRemaining, data.freeSparksRemaining ?? 0)
+                        refAvail = Math.max(refAvail, data.referralSparksAvailable ?? 0)
+                    }
+                    setFreeSparksRemaining(freeRemaining)
+                    setReferralSparksAvailable(refAvail)
+                    const results = portfolioResults
                     const allHoldings = []
                     let totalValue = 0, totalInvested = 0
                     const allTransactions = []
@@ -498,7 +510,14 @@ export default function FantasyForge() {
                     }
                 } else if (activeTab === 'portfolio') {
                     if (!user) { setLoading(false); return }
-                    const data = await forgeService.getPortfolio(seasonId)
+                    const [data, marketData] = await Promise.all([
+                        forgeService.getPortfolio(seasonId),
+                        forgeService.getMarket(seasonId).catch(() => null),
+                    ])
+                    if (marketData) {
+                        setFreeSparksRemaining(marketData.freeSparksRemaining ?? 0)
+                        setReferralSparksAvailable(marketData.referralSparksAvailable ?? 0)
+                    }
                     setPortfolio(data)
                     const timelinePromise = forgeService.getPortfolioTimeline(seasonId).then(res => {
                         setPortfolioTimeline(res.timeline || [])
