@@ -114,6 +114,7 @@ export default function PlayerManager() {
                 isFreeAgent: activeRosters.length === 0,
                 seasonsPlayed: [...new Set(rosters.map(r => r.season_id))].length,
                 gameCountMap,
+                canDelete: totalGames === 0 && !p.discord_name,
             }
         })
 
@@ -344,6 +345,24 @@ export default function PlayerManager() {
             showToast('error', e.message)
         } finally {
             setMerging(false)
+        }
+    }
+
+    // ─── Delete player ───
+    const handleDeletePlayer = async (player) => {
+        if (!confirm(`Delete "${player.name}"? This will also remove their roster entries and aliases.`)) return
+        try {
+            const res = await fetch(`${API}/player-manage`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ action: 'delete-player', player_id: player.id }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.error)
+            showToast('success', `Deleted "${player.name}"`)
+            fetchData()
+        } catch (e) {
+            showToast('error', e.message)
         }
     }
 
@@ -580,6 +599,7 @@ export default function PlayerManager() {
                                     onToggleExpand={() => setExpandedId(prev => prev === p.id ? null : p.id)}
                                     onEdit={() => setEditPlayer({ id: p.id, name: p.name, discord_name: p.discord_name || '', tracker_url: p.tracker_url || '', main_role: p.main_role || '', secondary_role: p.secondary_role || '' })}
                                     onOpenAliases={() => setAliasPlayer(p)}
+                                    onDelete={p.canDelete ? () => handleDeletePlayer(p) : null}
                                 />
                             ))}
                         </tbody>
@@ -723,7 +743,7 @@ function SortHeader({ col, label, current, dir, onSort }) {
 // ═══════════════════════════════════════════════════
 // PLAYER ROW
 // ═══════════════════════════════════════════════════
-function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggleExpand, onEdit, onOpenAliases }) {
+function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggleExpand, onEdit, onOpenAliases, onDelete }) {
     const roleColors = {
         solo: 'bg-orange-500/20 text-orange-400',
         jungle: 'bg-red-500/20 text-red-400',
@@ -748,7 +768,18 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                                 : <ChevronRight className="w-3.5 h-3.5" />
                             }
                         </button>
-                        <span className="font-medium text-[var(--color-text)]">{p.name}</span>
+                        {p.current ? (
+                            <a
+                                href={`/${p.current.league_slug}/${p.current.division_slug}/players/${p.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors"
+                            >
+                                {p.name}
+                            </a>
+                        ) : (
+                            <span className="font-medium text-[var(--color-text)]">{p.name}</span>
+                        )}
                         {p.main_role && (
                             <span
                                 className={`text-[10px] px-1.5 py-0.5 rounded font-medium opacity-60 ${roleColors[p.main_role.toLowerCase()] || roleColors.fill}`}
@@ -818,13 +849,24 @@ function PlayerRow({ player: p, isSelected, isExpanded, onToggleSelect, onToggle
                     </div>
                 </td>
                 <td className="px-3 py-2">
-                    <button
-                        onClick={onEdit}
-                        className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
-                        title="Edit player info"
-                    >
-                        Edit
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onEdit}
+                            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors"
+                            title="Edit player info"
+                        >
+                            Edit
+                        </button>
+                        {onDelete && (
+                            <button
+                                onClick={onDelete}
+                                className="text-xs text-[var(--color-text-secondary)] hover:text-red-400 transition-colors"
+                                title="Delete player (no games, no discord)"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
                 </td>
             </tr>
 

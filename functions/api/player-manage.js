@@ -116,6 +116,8 @@ const handler = async (event) => {
                 return await updatePlayerInfo(sql, body, admin)
             case 'bulk-enroll-season':
                 return await bulkEnrollSeason(sql, body, admin)
+            case 'delete-player':
+                return await deletePlayer(sql, body, admin)
             default:
                 return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
         }
@@ -223,6 +225,45 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, ...results }),
+    }
+}
+
+async function deletePlayer(sql, { player_id }, admin) {
+    if (!player_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'player_id required' }) }
+    }
+
+    const [player] = await sql`SELECT id, name, discord_name FROM players WHERE id = ${player_id}`
+    if (!player) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
+    }
+
+    if (player.discord_name) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot delete player with linked discord' }) }
+    }
+
+    const [gameCount] = await sql`
+        SELECT COUNT(*) as count FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        WHERE lp.player_id = ${player_id}
+    `
+    if (parseInt(gameCount.count) > 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot delete player with game stats' }) }
+    }
+
+    const [linkedUser] = await sql`SELECT id FROM users WHERE linked_player_id = ${player_id} LIMIT 1`
+    if (linkedUser) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot delete player linked to a user account' }) }
+    }
+
+    await sql`DELETE FROM players WHERE id = ${player_id}`
+
+    await logAudit(sql, admin, { action: 'delete-player', endpoint: 'player-manage', targetType: 'player', targetId: player_id, details: { name: player.name } })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true }),
     }
 }
 
