@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { codexService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Swords, Tag, Settings2, X, Link2, FolderTree, ImagePlus, Copy, GripVertical } from 'lucide-react'
 import CodexImagePicker from '../../components/codex/CodexImagePicker'
 import { describeFieldValue } from '../../utils/codexFieldDescriptors'
+import aspectIcon from '../../assets/aspect.png'
 
 function buildCategoryTree(categories, parentId = null) {
     return categories
@@ -332,6 +333,34 @@ export default function CodexGods() {
         } catch (err) {
             alert('Error: ' + err.message)
         }
+    }
+
+    const isLongText = (val) => typeof val === 'string' && val.length > 50
+
+    const pendingFocus = useRef(null)
+
+    const trackFocus = (key, el) => {
+        if (!el) return
+        pendingFocus.current = { key, pos: el.selectionStart ?? el.value?.length ?? 0 }
+    }
+
+    const fieldRef = useCallback((key) => (el) => {
+        if (!el) return
+        if (el.tagName === 'TEXTAREA') {
+            el.style.height = 'auto'
+            el.style.height = el.scrollHeight + 'px'
+        }
+        if (pendingFocus.current?.key === key) {
+            const pos = pendingFocus.current.pos
+            pendingFocus.current = null
+            el.focus()
+            el.setSelectionRange(pos, pos)
+        }
+    }, [])
+
+    const autoResize = (el) => {
+        el.style.height = 'auto'
+        el.style.height = el.scrollHeight + 'px'
     }
 
     // ── Filtering ──
@@ -865,16 +894,19 @@ export default function CodexGods() {
                                 <h4 className="text-xs text-(--color-text-secondary) uppercase tracking-wider mb-2 font-semibold">Custom Fields</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {fields.map(field => (
-                                        <div key={field.id} className={field.field_type === 'group' ? 'sm:col-span-2 lg:col-span-3' : ''}>
+                                        <div key={field.id} className={field.field_type === 'group' ? 'sm:col-span-2 lg:col-span-3' : (field.field_type === 'text' && isLongText(godForm.field_values[field.slug])) ? 'sm:col-span-2 lg:col-span-3' : ''}>
                                             <label className="flex items-center gap-1.5 text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">
                                                 {field.icon_url && <img src={field.icon_url} alt="" className="w-3.5 h-3.5 rounded" />}
                                                 {field.name}
                                                 {field.required && <span className="text-cyan-400">*</span>}
                                             </label>
                                             {field.field_type === 'group' && field.options?.sub_fields ? (
-                                                <div className="flex gap-2">
-                                                    {field.options.sub_fields.map(sf => (
-                                                        <div key={sf.key} className="flex-1">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {field.options.sub_fields.map(sf => {
+                                                        const sfVal = (godForm.field_values[field.slug] || {})[sf.key]
+                                                        const sfLong = sf.type === 'text' && isLongText(sfVal)
+                                                        return (
+                                                        <div key={sf.key} className={sfLong ? 'w-full' : 'flex-1 min-w-[100px]'}>
                                                             <label className="block text-[10px] text-(--color-text-secondary)/60 mb-0.5">{sf.label}</label>
                                                             {sf.type === 'boolean' ? (
                                                                 <label className="flex items-center gap-2 px-3 py-2 bg-black/20 border border-white/10 rounded-lg cursor-pointer">
@@ -886,18 +918,31 @@ export default function CodexGods() {
                                                                 </label>
                                                             ) : (
                                                                 <div className={sf.type === 'percentage' ? 'relative' : ''}>
-                                                                    <input
-                                                                        type={sf.type === 'number' || sf.type === 'percentage' ? 'number' : 'text'}
-                                                                        value={(godForm.field_values[field.slug] || {})[sf.key] ?? ''}
-                                                                        onChange={e => setGroupSubValue(field.slug, sf.key, e.target.value)}
-                                                                        className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${sf.type === 'percentage' ? ' pr-7' : ''}`}
-                                                                        placeholder={sf.label}
-                                                                    />
+                                                                    {sfLong ? (
+                                                                        <textarea
+                                                                            value={sfVal ?? ''}
+                                                                            onChange={e => { trackFocus(`${field.slug}.${sf.key}`, e.target); setGroupSubValue(field.slug, sf.key, e.target.value); autoResize(e.target) }}
+                                                                            ref={fieldRef(`${field.slug}.${sf.key}`)}
+                                                                            className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent) resize-y min-h-[38px]"
+                                                                            placeholder={sf.label}
+                                                                            rows={1}
+                                                                        />
+                                                                    ) : (
+                                                                        <input
+                                                                            type={sf.type === 'number' || sf.type === 'percentage' ? 'number' : 'text'}
+                                                                            value={sfVal ?? ''}
+                                                                            onChange={e => { if (sf.type === 'text') trackFocus(`${field.slug}.${sf.key}`, e.target); setGroupSubValue(field.slug, sf.key, e.target.value) }}
+                                                                            ref={fieldRef(`${field.slug}.${sf.key}`)}
+                                                                            className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${sf.type === 'percentage' ? ' pr-7' : ''}`}
+                                                                            placeholder={sf.label}
+                                                                        />
+                                                                    )}
                                                                     {sf.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-secondary)/40 text-sm">%</span>}
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : field.field_type === 'boolean' ? (
                                                 <label className="flex items-center gap-2 px-3 py-2 bg-black/20 border border-white/10 rounded-lg cursor-pointer">
@@ -909,13 +954,25 @@ export default function CodexGods() {
                                                 </label>
                                             ) : (
                                                 <div className={field.field_type === 'percentage' ? 'relative' : ''}>
-                                                    <input
-                                                        type={field.field_type === 'number' || field.field_type === 'percentage' ? 'number' : 'text'}
-                                                        value={godForm.field_values[field.slug] ?? ''}
-                                                        onChange={e => setGodFieldValue(field.slug, e.target.value)}
-                                                        className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${field.field_type === 'percentage' ? ' pr-7' : ''}`}
-                                                        placeholder={field.description || field.name}
-                                                    />
+                                                    {field.field_type === 'text' && isLongText(godForm.field_values[field.slug]) ? (
+                                                        <textarea
+                                                            value={godForm.field_values[field.slug] ?? ''}
+                                                            onChange={e => { trackFocus(field.slug, e.target); setGodFieldValue(field.slug, e.target.value); autoResize(e.target) }}
+                                                            ref={fieldRef(field.slug)}
+                                                            className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent) resize-y min-h-[38px]"
+                                                            placeholder={field.description || field.name}
+                                                            rows={1}
+                                                        />
+                                                    ) : (
+                                                        <input
+                                                            type={field.field_type === 'number' || field.field_type === 'percentage' ? 'number' : 'text'}
+                                                            value={godForm.field_values[field.slug] ?? ''}
+                                                            onChange={e => { if (field.field_type === 'text') trackFocus(field.slug, e.target); setGodFieldValue(field.slug, e.target.value) }}
+                                                            ref={fieldRef(field.slug)}
+                                                            className={`w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)${field.field_type === 'percentage' ? ' pr-7' : ''}`}
+                                                            placeholder={field.description || field.name}
+                                                        />
+                                                    )}
                                                     {field.field_type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-(--color-text-secondary)/40 text-sm">%</span>}
                                                 </div>
                                             )}
@@ -994,13 +1051,18 @@ export default function CodexGods() {
                             <div key={god.id} className="bg-(--color-secondary) border border-white/10 rounded-xl p-4 hover:border-white/15 transition-colors group">
                                 <div className="flex items-start gap-3">
                                     {/* Icon */}
-                                    {god.icon_url ? (
-                                        <img src={god.icon_url} alt="" className="w-10 h-10 rounded-lg shrink-0 bg-black/20" />
-                                    ) : (
-                                        <div className="w-10 h-10 rounded-lg shrink-0 bg-white/5 flex items-center justify-center">
-                                            <Swords className="w-5 h-5 text-(--color-text-secondary)/30" />
-                                        </div>
-                                    )}
+                                    <div className="shrink-0 flex flex-col items-center gap-1">
+                                        {god.icon_url ? (
+                                            <img src={god.icon_url} alt="" className="w-10 h-10 rounded-lg bg-black/20" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                                                <Swords className="w-5 h-5 text-(--color-text-secondary)/30" />
+                                            </div>
+                                        )}
+                                        {god.field_values?.aspect && (
+                                            <img src={aspectIcon} alt="Aspect" className="w-7 h-7" title="Aspect" />
+                                        )}
+                                    </div>
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
