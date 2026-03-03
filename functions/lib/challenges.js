@@ -216,23 +216,144 @@ export async function catchupAllUsers(sql, linkedUsers) {
     let updated = 0
     let claimable = 0
 
-    // Performance challenges for users with linked players
-    for (const user of linkedUsers) {
-        const stats = await getPerformanceStats(sql, user.linked_player_id)
-        const newly = await pushChallengeProgress(sql, user.user_id, stats)
-        claimable += newly.length
-        updated++
+    // Performance challenges for users with linked players — parallel batches of 5
+    for (let i = 0; i < linkedUsers.length; i += 5) {
+        const batch = linkedUsers.slice(i, i + 5)
+        const results = await Promise.all(batch.map(async user => {
+            const stats = await getPerformanceStats(sql, user.linked_player_id)
+            return pushChallengeProgress(sql, user.user_id, stats)
+        }))
+        for (const newly of results) {
+            claimable += newly.length
+            updated++
+        }
     }
 
-    // Scrim + referral + forge for ALL authenticated users (no player link needed)
-    const allUsers = await sql`SELECT id FROM users`
-    for (const u of allUsers) {
-        await recalcScrimChallenges(sql, u.id)
-        await recalcReferralChallenges(sql, u.id)
-        await recalcForgeChallenges(sql, u.id)
-    }
+    // Scrim + referral + forge — bulk approach (few queries instead of per-user)
+    await bulkRecalcNonPerfChallenges(sql)
 
     return { updated, claimable }
+}
+
+
+/**
+ * Bulk recalc scrim/referral/forge challenge progress for all users at once.
+ * Uses aggregate queries + single bulk upsert instead of per-user loops.
+ */
+async function bulkRecalcNonPerfChallenges(sql) {
+    const allStatKeys = [...SCRIM_KEYS, ...REFERRAL_KEYS, ...FORGE_KEYS]
+    const challenges = await sql`
+        SELECT id, stat_key FROM challenges
+        WHERE is_active = true AND stat_key = ANY(${allStatKeys})
+    `
+    if (challenges.length === 0) return
+
+    // Find completed/admin-altered entries to skip
+    const challengeIds = challenges.map(c => c.id)
+    const completed = await sql`
+        SELECT user_id, challenge_id FROM user_challenges
+        WHERE challenge_id = ANY(${challengeIds})
+          AND (completed = true OR admin_altered = true)
+    `
+    const skipSet = new Set(completed.map(r => `${r.user_id}:${r.challenge_id}`))
+
+    const hasScrim = challenges.some(c => SCRIM_KEYS.includes(c.stat_key))
+    const hasReferral = challenges.some(c => REFERRAL_KEYS.includes(c.stat_key))
+    const hasForge = challenges.some(c => FORGE_KEYS.includes(c.stat_key))
+
+    // Bulk stats — a few aggregate queries instead of per-user loops
+    const [scrimStats, referralStats, forgeStats] = await Promise.all([
+        hasScrim ? sql`
+            WITH posted AS (
+                SELECT user_id, COUNT(*)::integer as scrims_posted
+                FROM scrim_requests WHERE status != 'cancelled'
+                GROUP BY user_id
+            ), completed AS (
+                SELECT user_id, COUNT(*)::integer as scrims_completed FROM (
+                    SELECT user_id FROM scrim_requests WHERE status = 'completed'
+                    UNION ALL
+                    SELECT accepted_user_id FROM scrim_requests
+                    WHERE status = 'completed' AND accepted_user_id IS NOT NULL
+                ) sub GROUP BY user_id
+            )
+            SELECT COALESCE(p.user_id, c.user_id) as user_id,
+                   COALESCE(p.scrims_posted, 0)::integer as scrims_posted,
+                   COALESCE(c.scrims_completed, 0)::integer as scrims_completed
+            FROM posted p FULL OUTER JOIN completed c ON p.user_id = c.user_id
+        ` : [],
+        hasReferral ? sql`
+            SELECT referrer_id as user_id, COUNT(*)::integer as friends_referred
+            FROM referrals GROUP BY referrer_id
+        ` : [],
+        hasForge ? sql`
+            SELECT user_id,
+                COALESCE(SUM(sparks) FILTER (WHERE type = 'fuel'), 0)::integer as sparks_fueled,
+                COALESCE(SUM(sparks) FILTER (WHERE type = 'cool'), 0)::integer as sparks_cooled,
+                COALESCE(SUM(sparks) FILTER (WHERE type = 'tutorial_fuel'), 0)::integer as starter_sparks_used
+            FROM spark_transactions GROUP BY user_id
+        ` : [],
+    ])
+
+    // Forge profit + perf held need separate queries (different tables)
+    const [forgeProfitStats, forgePerfStats] = hasForge ? await Promise.all([
+        sql`
+            WITH user_txns AS (
+                SELECT user_id,
+                    COALESCE(SUM(CASE WHEN type IN ('cool', 'liquidate') THEN total_cost ELSE 0 END), 0) as proceeds,
+                    COALESCE(SUM(CASE WHEN type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN total_cost ELSE 0 END), 0) as costs
+                FROM spark_transactions GROUP BY user_id
+            ), user_holds AS (
+                SELECT user_id, COALESCE(SUM(total_invested), 0) as remaining
+                FROM spark_holdings WHERE sparks > 0 GROUP BY user_id
+            )
+            SELECT COALESCE(t.user_id, h.user_id) as user_id,
+                (COALESCE(t.proceeds, 0) - COALESCE(t.costs, 0) + COALESCE(h.remaining, 0))::integer as forge_profit
+            FROM user_txns t
+            FULL OUTER JOIN user_holds h ON t.user_id = h.user_id
+        `,
+        sql`
+            SELECT sh.user_id, COUNT(*)::integer as forge_perf_updates_held
+            FROM spark_holdings sh
+            JOIN player_sparks ps ON ps.id = sh.spark_id
+            WHERE sh.sparks > 0 AND ps.perf_multiplier IS NOT NULL AND ps.perf_multiplier != 1
+            GROUP BY sh.user_id
+        `,
+    ]) : [[], []]
+
+    // Build user -> stats map
+    const userStats = new Map()
+    const merge = (uid, stats) => userStats.set(uid, { ...(userStats.get(uid) || {}), ...stats })
+
+    for (const s of scrimStats) merge(s.user_id, { scrims_posted: s.scrims_posted, scrims_completed: s.scrims_completed })
+    for (const s of referralStats) merge(s.user_id, { friends_referred: s.friends_referred })
+    for (const s of forgeStats) merge(s.user_id, { sparks_fueled: s.sparks_fueled, sparks_cooled: s.sparks_cooled, starter_sparks_used: s.starter_sparks_used })
+    for (const s of forgeProfitStats) merge(s.user_id, { forge_profit: s.forge_profit })
+    for (const s of forgePerfStats) merge(s.user_id, { forge_perf_updates_held: s.forge_perf_updates_held })
+
+    // Build bulk upsert arrays
+    const upsertUserIds = []
+    const upsertChallengeIds = []
+    const upsertValues = []
+
+    for (const [userId, stats] of userStats) {
+        for (const ch of challenges) {
+            if (skipSet.has(`${userId}:${ch.id}`)) continue
+            const val = Number(stats[ch.stat_key] || 0)
+            if (val === 0) continue
+            upsertUserIds.push(userId)
+            upsertChallengeIds.push(ch.id)
+            upsertValues.push(val)
+        }
+    }
+
+    if (upsertUserIds.length > 0) {
+        await sql`
+            INSERT INTO user_challenges (user_id, challenge_id, current_value)
+            SELECT unnest(${upsertUserIds}::int[]), unnest(${upsertChallengeIds}::int[]), unnest(${upsertValues}::int[])
+            ON CONFLICT (user_id, challenge_id)
+            DO UPDATE SET current_value = EXCLUDED.current_value
+        `
+    }
 }
 
 
@@ -510,7 +631,7 @@ export async function recalcReferralChallenges(sql, userId) {
  * Returns total sparks fueled, cooled, realized profit, perf updates held, starter sparks used.
  */
 export async function getForgeStats(sql, userId) {
-    const [[fuelCool], [{ realized }], [{ perfHeld }], [{ starterUsed }]] = await Promise.all([
+    const [fuelCoolRows, realizedRows, perfHeldRows, starterRows] = await Promise.all([
         sql`
             SELECT
                 COALESCE(SUM(sparks) FILTER (WHERE type = 'fuel'), 0)::integer as fueled,
@@ -519,24 +640,35 @@ export async function getForgeStats(sql, userId) {
             WHERE user_id = ${userId}
         `,
         sql`
-            SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
-            FROM passion_transactions
-            WHERE user_id = ${userId} AND type IN ('forge_cool', 'forge_liquidate')
-              AND lifetime_amount > 0
+            WITH txns AS (
+                SELECT
+                    COALESCE(SUM(CASE WHEN type IN ('cool', 'liquidate') THEN total_cost ELSE 0 END), 0) as proceeds,
+                    COALESCE(SUM(CASE WHEN type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN total_cost ELSE 0 END), 0) as costs
+                FROM spark_transactions WHERE user_id = ${userId}
+            ), holds AS (
+                SELECT COALESCE(SUM(total_invested), 0) as remaining
+                FROM spark_holdings WHERE user_id = ${userId} AND sparks > 0
+            )
+            SELECT (txns.proceeds - txns.costs + holds.remaining)::integer as realized
+            FROM txns, holds
         `,
         sql`
             SELECT COUNT(*)::integer as "perfHeld"
             FROM spark_holdings sh
-            JOIN forge_players fp ON fp.id = sh.forge_player_id
+            JOIN player_sparks ps ON ps.id = sh.spark_id
             WHERE sh.user_id = ${userId} AND sh.sparks > 0
-              AND fp.perf_modifier IS NOT NULL AND fp.perf_modifier != 0
+              AND ps.perf_multiplier IS NOT NULL AND ps.perf_multiplier != 1
         `,
         sql`
-            SELECT (3 - COALESCE(free_sparks_remaining, 0))::integer as "starterUsed"
-            FROM forge_users
-            WHERE user_id = ${userId}
+            SELECT COALESCE(SUM(sparks), 0)::integer as "starterUsed"
+            FROM spark_transactions
+            WHERE user_id = ${userId} AND type = 'tutorial_fuel'
         `,
     ])
+    const fuelCool = fuelCoolRows[0] || { fueled: 0, cooled: 0 }
+    const realized = realizedRows[0]?.realized ?? 0
+    const perfHeld = perfHeldRows[0]?.perfHeld ?? 0
+    const starterUsed = starterRows[0]?.starterUsed ?? 0
 
     return {
         sparks_fueled: fuelCool.fueled,

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { codexService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Swords, Tag, Settings2, X, Link2, FolderTree, ImagePlus, Copy } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Swords, Tag, Settings2, X, Link2, FolderTree, ImagePlus, Copy, GripVertical } from 'lucide-react'
 import CodexImagePicker from '../../components/codex/CodexImagePicker'
 import { describeFieldValue } from '../../utils/codexFieldDescriptors'
 
@@ -236,6 +236,26 @@ export default function CodexGods() {
             ...prev,
             options: { ...prev.options, sub_fields: (prev.options?.sub_fields || []).filter((_, i) => i !== idx) }
         }))
+    }
+
+    const moveSubField = (fromIdx, toIdx) => {
+        setFieldForm(prev => {
+            const subs = [...(prev.options?.sub_fields || [])]
+            const [moved] = subs.splice(fromIdx, 1)
+            subs.splice(toIdx, 0, moved)
+            return { ...prev, options: { ...prev.options, sub_fields: subs } }
+        })
+    }
+
+    const startGodCopy = (god) => {
+        setGodForm({
+            name: god.name + ' (copy)',
+            description: god.description || '',
+            icon_url: god.icon_url || '',
+            god_id: god.god_id || null,
+            field_values: { ...(god.field_values || {}) },
+            tag_ids: [...(god.tag_ids || [])]
+        })
     }
 
     const toggleGodTag = (tagId) => {
@@ -525,7 +545,13 @@ export default function CodexGods() {
                                             <label className="block text-xs text-(--color-text-secondary) uppercase tracking-wider mb-1">Sub-fields</label>
                                             <div className="space-y-2">
                                                 {(fieldForm.options?.sub_fields || []).map((sf, idx) => (
-                                                    <div key={idx} className="flex items-center gap-2">
+                                                    <div key={idx} className="flex items-center gap-2"
+                                                        draggable onDragStart={e => e.dataTransfer.setData('text/plain', idx)}
+                                                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                                                        onDrop={e => { e.preventDefault(); moveSubField(parseInt(e.dataTransfer.getData('text/plain')), idx) }}>
+                                                        <div className="cursor-grab active:cursor-grabbing text-(--color-text-secondary)/40 hover:text-(--color-text-secondary)">
+                                                            <GripVertical className="w-3.5 h-3.5" />
+                                                        </div>
                                                         <input type="text" placeholder="Label" value={sf.label}
                                                             onChange={e => {
                                                                 const label = e.target.value
@@ -1030,6 +1056,9 @@ export default function CodexGods() {
 
                                     {/* Actions */}
                                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => startGodCopy(god)} className="p-1.5 rounded-lg hover:bg-white/10 text-(--color-text-secondary) hover:text-(--color-accent) transition-colors cursor-pointer" title="Duplicate">
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
                                         <button onClick={() => startGodEdit(god)} className="p-1.5 rounded-lg hover:bg-white/10 text-(--color-text-secondary) hover:text-(--color-accent) transition-colors cursor-pointer" title="Edit">
                                             <Pencil className="w-3.5 h-3.5" />
                                         </button>

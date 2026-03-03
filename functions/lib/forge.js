@@ -1578,12 +1578,18 @@ export async function liquidateMarket(sql, marketId) {
 
         // Push challenge progress
         try {
-            // Realized profit = sum of all profitable cool/liquidate passion transactions
             const [{ realized }] = await sql`
-                SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
-                FROM passion_transactions
-                WHERE user_id = ${h.user_id} AND type IN ('forge_cool', 'forge_liquidate')
-                  AND lifetime_amount > 0
+                WITH txns AS (
+                    SELECT
+                        COALESCE(SUM(CASE WHEN type IN ('cool', 'liquidate') THEN total_cost ELSE 0 END), 0) as proceeds,
+                        COALESCE(SUM(CASE WHEN type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN total_cost ELSE 0 END), 0) as costs
+                    FROM spark_transactions WHERE user_id = ${h.user_id}
+                ), holds AS (
+                    SELECT COALESCE(SUM(total_invested), 0) as remaining
+                    FROM spark_holdings WHERE user_id = ${h.user_id} AND sparks > 0
+                )
+                SELECT (txns.proceeds - txns.costs + holds.remaining)::integer as realized
+                FROM txns, holds
             `
             await pushChallengeProgress(sql, h.user_id, { sparks_cooled: h.sparks, forge_profit: realized })
         } catch (err) {

@@ -888,13 +888,18 @@ async function cool(sql, user, body, event) {
                     WHERE user_id = ${user.id} AND type IN ('cool', 'liquidate')
                 `
                 const stats = { sparks_cooled: coolCount }
-                // Realized profit = sum of profit from all cool/liquidate transactions
-                // (stored as lifetime_amount in passion_transactions by grantPassion)
                 const [{ realized }] = await sql`
-                    SELECT COALESCE(SUM(lifetime_amount), 0)::integer as realized
-                    FROM passion_transactions
-                    WHERE user_id = ${user.id} AND type IN ('forge_cool', 'forge_liquidate')
-                      AND lifetime_amount > 0
+                    WITH txns AS (
+                        SELECT
+                            COALESCE(SUM(CASE WHEN type IN ('cool', 'liquidate') THEN total_cost ELSE 0 END), 0) as proceeds,
+                            COALESCE(SUM(CASE WHEN type IN ('fuel', 'tutorial_fuel', 'referral_fuel') THEN total_cost ELSE 0 END), 0) as costs
+                        FROM spark_transactions WHERE user_id = ${user.id}
+                    ), holds AS (
+                        SELECT COALESCE(SUM(total_invested), 0) as remaining
+                        FROM spark_holdings WHERE user_id = ${user.id} AND sparks > 0
+                    )
+                    SELECT (txns.proceeds - txns.costs + holds.remaining)::integer as realized
+                    FROM txns, holds
                 `
                 stats.forge_profit = realized
                 await pushChallengeProgress(sql, user.id, stats)
