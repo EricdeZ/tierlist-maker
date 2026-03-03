@@ -36,6 +36,7 @@ const handler = async (event) => {
                 const gods = await sql`SELECT * FROM codex_gods ORDER BY name`
                 const godTags = await sql`SELECT god_id, tag_id FROM codex_god_tag_assignments`
                 const linkedGods = await sql`SELECT id, name, slug, image_url FROM gods ORDER BY name`
+                const groupTypes = await sql`SELECT * FROM codex_group_types ORDER BY name`
 
                 const tagMap = {}
                 for (const gt of godTags) {
@@ -53,14 +54,16 @@ const handler = async (event) => {
                     JOIN codex_images ci ON ci.id = gi.codex_image_id
                     ORDER BY gi.sort_order, gi.id
                 `
+                const resolvedFields = resolveGroupTypes(fields, groupTypes)
 
-                return { statusCode: 200, headers, body: JSON.stringify({ fields, tags, gods: godsWithTags, linkedGods, categories, godImages }) }
+                return { statusCode: 200, headers, body: JSON.stringify({ fields: resolvedFields, tags, gods: godsWithTags, linkedGods, categories, godImages, groupTypes }) }
             }
 
             const fields = await sql`SELECT * FROM codex_fields ORDER BY sort_order, id`
             const tags = await sql`SELECT * FROM codex_tags ORDER BY name`
             const items = await sql`SELECT * FROM codex_items ORDER BY name`
             const itemTags = await sql`SELECT item_id, tag_id FROM codex_item_tags`
+            const groupTypes = await sql`SELECT * FROM codex_group_types ORDER BY name`
 
             // Attach tag_ids array to each item
             const tagMap = {}
@@ -69,8 +72,9 @@ const handler = async (event) => {
                 tagMap[it.item_id].push(it.tag_id)
             }
             const itemsWithTags = items.map(i => ({ ...i, tag_ids: tagMap[i.id] || [] }))
+            const resolvedFields = resolveGroupTypes(fields, groupTypes)
 
-            return { statusCode: 200, headers, body: JSON.stringify({ fields, tags, items: itemsWithTags }) }
+            return { statusCode: 200, headers, body: JSON.stringify({ fields: resolvedFields, tags, items: itemsWithTags, groupTypes }) }
         }
 
         // POST: CRUD actions
@@ -125,6 +129,10 @@ const handler = async (event) => {
             case 'create-wordle-category': return await createWordleCategory(sql, body, admin)
             case 'update-wordle-category': return await updateWordleCategory(sql, body, admin)
             case 'delete-wordle-category': return await deleteWordleCategory(sql, body, admin)
+            // Group Types
+            case 'create-group-type': return await createGroupType(sql, body, admin)
+            case 'update-group-type': return await updateGroupType(sql, body, admin)
+            case 'delete-group-type': return await deleteGroupType(sql, body, admin)
             // Images
             case 'update-image-category': return await updateImageCategory(sql, body, admin)
             default:
@@ -138,21 +146,22 @@ const handler = async (event) => {
 
 // ── Fields ──
 
-async function createField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template }, admin) {
+async function createField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template, group_type_id }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const finalSlug = slug?.trim() ? slugify(slug.trim()) : slugify(name.trim())
     const type = ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type) ? field_type : 'text'
-    const finalOptions = type === 'group' ? validateGroupOptions(options) : null
+    const finalOptions = type === 'group' && !group_type_id ? validateGroupOptions(options) : null
+    const finalGroupTypeId = type === 'group' && group_type_id ? group_type_id : null
     const [row] = await sql`
-        INSERT INTO codex_fields (slug, name, icon_url, description, field_type, required, sort_order, options, sentence_template)
-        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null}, ${sentence_template || null})
+        INSERT INTO codex_fields (slug, name, icon_url, description, field_type, required, sort_order, options, sentence_template, group_type_id)
+        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null}, ${sentence_template || null}, ${finalGroupTypeId})
         RETURNING *
     `
     await logAudit(sql, admin, { action: 'create-codex-field', endpoint: 'codex-manage', targetType: 'codex_field', targetId: row.id, details: { name: row.name, slug: row.slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, field: row }) }
 }
 
-async function updateField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template }, admin) {
+async function updateField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options, sentence_template, group_type_id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const updates = {}
     if (name !== undefined) updates.name = name.trim()
@@ -162,7 +171,9 @@ async function updateField(sql, { id, name, slug, icon_url, description, field_t
     if (field_type !== undefined && ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type)) updates.field_type = field_type
     if (required !== undefined) updates.required = !!required
     if (sort_order !== undefined) updates.sort_order = sort_order
-    if (options !== undefined) updates.options = updates.field_type === 'group' || field_type === 'group' ? JSON.stringify(validateGroupOptions(options)) : null
+    const isGroup = updates.field_type === 'group' || field_type === 'group'
+    if (group_type_id !== undefined) updates.group_type_id = isGroup ? (group_type_id || null) : null
+    if (options !== undefined) updates.options = isGroup && !updates.group_type_id ? JSON.stringify(validateGroupOptions(options)) : null
     if (sentence_template !== undefined) updates.sentence_template = sentence_template || null
 
     const [row] = await sql`
@@ -175,7 +186,8 @@ async function updateField(sql, { id, name, slug, icon_url, description, field_t
             required = COALESCE(${updates.required ?? null}, required),
             sort_order = COALESCE(${updates.sort_order ?? null}, sort_order),
             options = COALESCE(${updates.options !== undefined ? updates.options : null}::jsonb, options),
-            sentence_template = ${updates.sentence_template !== undefined ? updates.sentence_template : null}
+            sentence_template = ${updates.sentence_template !== undefined ? updates.sentence_template : null},
+            group_type_id = ${updates.group_type_id !== undefined ? updates.group_type_id : null}
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Field not found' }) }
@@ -306,21 +318,22 @@ async function updateImageCategory(sql, { id, category }, admin) {
 
 // ── God Fields ──
 
-async function createGodField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
+async function createGodField(sql, { name, slug, icon_url, description, field_type, required, sort_order, options, group_type_id }, admin) {
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
     const finalSlug = slug?.trim() ? slugify(slug.trim()) : slugify(name.trim())
     const type = ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type) ? field_type : 'text'
-    const finalOptions = type === 'group' ? validateGroupOptions(options) : null
+    const finalOptions = type === 'group' && !group_type_id ? validateGroupOptions(options) : null
+    const finalGroupTypeId = type === 'group' && group_type_id ? group_type_id : null
     const [row] = await sql`
-        INSERT INTO codex_god_fields (slug, name, icon_url, description, field_type, required, sort_order, options)
-        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null})
+        INSERT INTO codex_god_fields (slug, name, icon_url, description, field_type, required, sort_order, options, group_type_id)
+        VALUES (${finalSlug}, ${name.trim()}, ${icon_url || null}, ${description || null}, ${type}, ${!!required}, ${sort_order ?? 0}, ${finalOptions ? JSON.stringify(finalOptions) : null}, ${finalGroupTypeId})
         RETURNING *
     `
     await logAudit(sql, admin, { action: 'create-codex-god-field', endpoint: 'codex-manage', targetType: 'codex_god_field', targetId: row.id, details: { name: row.name, slug: row.slug } })
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, field: row }) }
 }
 
-async function updateGodField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options }, admin) {
+async function updateGodField(sql, { id, name, slug, icon_url, description, field_type, required, sort_order, options, group_type_id }, admin) {
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     const updates = {}
     if (name !== undefined) updates.name = name.trim()
@@ -330,7 +343,9 @@ async function updateGodField(sql, { id, name, slug, icon_url, description, fiel
     if (field_type !== undefined && ['text', 'number', 'boolean', 'percentage', 'group'].includes(field_type)) updates.field_type = field_type
     if (required !== undefined) updates.required = !!required
     if (sort_order !== undefined) updates.sort_order = sort_order
-    if (options !== undefined) updates.options = updates.field_type === 'group' || field_type === 'group' ? JSON.stringify(validateGroupOptions(options)) : null
+    const isGroup = updates.field_type === 'group' || field_type === 'group'
+    if (group_type_id !== undefined) updates.group_type_id = isGroup ? (group_type_id || null) : null
+    if (options !== undefined) updates.options = isGroup && !updates.group_type_id ? JSON.stringify(validateGroupOptions(options)) : null
 
     const [row] = await sql`
         UPDATE codex_god_fields SET
@@ -341,7 +356,8 @@ async function updateGodField(sql, { id, name, slug, icon_url, description, fiel
             field_type = COALESCE(${updates.field_type ?? null}, field_type),
             required = COALESCE(${updates.required ?? null}, required),
             sort_order = COALESCE(${updates.sort_order ?? null}, sort_order),
-            options = COALESCE(${updates.options !== undefined ? updates.options : null}::jsonb, options)
+            options = COALESCE(${updates.options !== undefined ? updates.options : null}::jsonb, options),
+            group_type_id = ${updates.group_type_id !== undefined ? updates.group_type_id : null}
         WHERE id = ${id} RETURNING *
     `
     if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Field not found' }) }
@@ -583,21 +599,90 @@ async function deleteWordleCategory(sql, { id }, admin) {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
 }
 
+// ── Group Types ──
+
+async function createGroupType(sql, { name, sub_fields, sentence_template }, admin) {
+    if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
+    const validated = validateSubFieldsArray(sub_fields)
+    if (!validated || validated.length === 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'At least one sub-field required' }) }
+    const [row] = await sql`
+        INSERT INTO codex_group_types (name, sub_fields, sentence_template)
+        VALUES (${name.trim()}, ${JSON.stringify(validated)}, ${sentence_template || null})
+        RETURNING *
+    `
+    await logAudit(sql, admin, { action: 'create-codex-group-type', endpoint: 'codex-manage', targetType: 'codex_group_type', targetId: row.id, details: { name: row.name } })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, groupType: row }) }
+}
+
+async function updateGroupType(sql, { id, name, sub_fields, sentence_template }, admin) {
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    const updates = {}
+    if (name !== undefined) updates.name = name.trim()
+    if (sub_fields !== undefined) {
+        const validated = validateSubFieldsArray(sub_fields)
+        if (!validated || validated.length === 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'At least one sub-field required' }) }
+        updates.sub_fields = JSON.stringify(validated)
+    }
+    if (sentence_template !== undefined) updates.sentence_template = sentence_template || null
+    const [row] = await sql`
+        UPDATE codex_group_types SET
+            name = COALESCE(${updates.name ?? null}, name),
+            sub_fields = COALESCE(${updates.sub_fields ?? null}::jsonb, sub_fields),
+            sentence_template = ${updates.sentence_template !== undefined ? updates.sentence_template : null},
+            updated_at = NOW()
+        WHERE id = ${id} RETURNING *
+    `
+    if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Group type not found' }) }
+    await logAudit(sql, admin, { action: 'update-codex-group-type', endpoint: 'codex-manage', targetType: 'codex_group_type', targetId: id, details: updates })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, groupType: row }) }
+}
+
+async function deleteGroupType(sql, { id }, admin) {
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+    const [row] = await sql`DELETE FROM codex_group_types WHERE id = ${id} RETURNING id, name`
+    if (!row) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Group type not found' }) }
+    await logAudit(sql, admin, { action: 'delete-codex-group-type', endpoint: 'codex-manage', targetType: 'codex_group_type', targetId: id, details: { name: row.name } })
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, deleted: row }) }
+}
+
+function resolveGroupTypes(fields, groupTypes) {
+    const typeMap = {}
+    for (const gt of groupTypes) typeMap[gt.id] = gt
+    return fields.map(f => {
+        if (f.field_type !== 'group' || !f.group_type_id) return f
+        const gt = typeMap[f.group_type_id]
+        if (!gt) return f
+        const subFields = Array.isArray(gt.sub_fields) ? gt.sub_fields : []
+        return {
+            ...f,
+            options: { sub_fields: subFields },
+            sentence_template: f.sentence_template || gt.sentence_template || null,
+            _group_type_name: gt.name
+        }
+    })
+}
+
 // ── Helpers ──
 
-function validateGroupOptions(options) {
-    if (!options || !Array.isArray(options.sub_fields) || options.sub_fields.length === 0) return null
-    const subFields = options.sub_fields
+function validateSubFieldsArray(subFields) {
+    if (!Array.isArray(subFields) || subFields.length === 0) return null
+    const cleaned = subFields
         .filter(sf => sf.key?.trim() && sf.label?.trim())
         .map(sf => ({
             key: sf.key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_'),
             label: sf.label.trim(),
             type: ['text', 'number', 'boolean', 'percentage'].includes(sf.type) ? sf.type : 'text'
         }))
-    if (subFields.length === 0) return null
+    if (cleaned.length === 0) return null
     const keys = new Set()
-    const unique = subFields.filter(sf => { if (keys.has(sf.key)) return false; keys.add(sf.key); return true })
-    return { sub_fields: unique }
+    return cleaned.filter(sf => { if (keys.has(sf.key)) return false; keys.add(sf.key); return true })
+}
+
+function validateGroupOptions(options) {
+    if (!options || !Array.isArray(options.sub_fields) || options.sub_fields.length === 0) return null
+    const validated = validateSubFieldsArray(options.sub_fields)
+    if (!validated) return null
+    return { sub_fields: validated }
 }
 
 async function validateRequiredFields(sql, fieldValues) {

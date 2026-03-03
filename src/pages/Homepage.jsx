@@ -1146,19 +1146,16 @@ const Homepage = () => {
                         </span>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap justify-center">
-                        {mainLeagues.filter(l => l.discord_url).map(l => (
-                            <a
-                                key={l.id}
-                                href={l.discord_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs text-(--color-text-secondary)/50 hover:text-[#5865F2] transition-colors"
-                                title={`${l.name} Discord`}
-                            >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                                {l.name}
-                            </a>
-                        ))}
+                        <a
+                            href="https://discord.gg/vAdQMp65nK"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-(--color-text-secondary)/50 hover:text-[#5865F2] transition-colors"
+                            title="smitecomp.com Discord"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            smitecomp.com Discord
+                        </a>
                         <span className="text-(--color-text-secondary)/20 hidden sm:inline">·</span>
                         <Link
                             to="/support"

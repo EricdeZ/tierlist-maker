@@ -437,6 +437,16 @@ export const codexService = {
     async updateImageCategory(id, category) {
         return apiPost('codex-manage', {}, { action: 'update-image-category', id, category })
     },
+    // Group Types
+    async createGroupType(data) {
+        return apiPost('codex-manage', {}, { action: 'create-group-type', ...data })
+    },
+    async updateGroupType(data) {
+        return apiPost('codex-manage', {}, { action: 'update-group-type', ...data })
+    },
+    async deleteGroupType(id) {
+        return apiPost('codex-manage', {}, { action: 'delete-group-type', id })
+    },
     // Gods
     async getAllGods() {
         return apiCall('codex-manage', { type: 'gods' })
