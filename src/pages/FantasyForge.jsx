@@ -1253,7 +1253,9 @@ export default function FantasyForge() {
                             isLeagueWide={isLeagueWide}
                             leagueSlug={urlLeagueSlug}
                             coolingLocked={market?.coolingLocked}
+                            fuelingLocked={market?.fuelingLocked}
                             changeView={changeView}
+                            onFuel={(sparkId, playerName, currentPrice) => openTrade({ sparkId, playerName, currentPrice }, 'fuel')}
                             onCool={(sparkId, playerName, holding) => openTrade({ sparkId, playerName, holding }, 'cool')}
                         />
                     )}

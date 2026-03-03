@@ -132,7 +132,7 @@ function buildMarkers(timeline, chartLayers) {
     return markers
 }
 
-export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, coolingLocked, changeView, onCool }) {
+export default function ForgePortfolioTab({ portfolio, portfolioHistories, portfolioTimeline, loading, seasonSlugs, isLeagueWide, leagueSlug, coolingLocked, fuelingLocked, changeView, onFuel, onCool }) {
     const chartContainerRef = useRef(null)
     const chartInstanceRef = useRef(null)
     const worthSeriesRef = useRef(null)
@@ -595,6 +595,22 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                                 </div>
                             </div>
 
+                            {!fuelingLocked ? (
+                                <button
+                                    onClick={() => onFuel(h.sparkId, h.playerName, h.currentPrice)}
+                                    className="p-1.5 sm:p-2 bg-[var(--forge-flame)]/8 text-[var(--forge-flame)] forge-btn-fuel forge-clip-btn flex items-center gap-1"
+                                    title="Fuel"
+                                >
+                                    <Flame size={14} />
+                                </button>
+                            ) : (
+                                <div
+                                    className="p-1.5 sm:p-2 bg-[var(--forge-edge)]/30 text-[var(--forge-text-dim)] opacity-40 forge-clip-btn"
+                                    title="Fueling is currently locked"
+                                >
+                                    <Flame size={14} />
+                                </div>
+                            )}
                             {!coolingLocked && h.coolableSparks > 0 ? (
                                 <button
                                     onClick={() => onCool(h.sparkId, h.playerName, { sparks: h.sparks, coolableSparks: h.coolableSparks })}

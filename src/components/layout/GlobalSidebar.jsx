@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords
 } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
 
@@ -340,6 +340,12 @@ export default function GlobalSidebar() {
                                         Fantasy Forge
                                     </span>
                                 </SidebarLink>
+                                <SidebarLink to="/scrims" active={isActive('/scrims')}>
+                                    <span className="flex items-center gap-3">
+                                        <Swords className="w-4 h-4 shrink-0 text-emerald-400" />
+                                        Scrim Planner
+                                    </span>
+                                </SidebarLink>
                                 <div className="border-b border-white/5 my-2 mx-3" />
                             </>
                         )}
@@ -352,30 +358,26 @@ export default function GlobalSidebar() {
                             <div className="border-b border-white/5 my-2 mx-3" />
                         )}
 
-                        {/* Profile section — logged in only */}
-                        {user && (
-                            <SidebarSection icon={User} label="Profile" defaultOpen={true}>
-                                {linkedPlayer && (
-                                    <SidebarLink
-                                        to={`/profile/${linkedPlayer.slug}`}
-                                        icon={UserCheck}
-                                        active={isActive(`/profile/${linkedPlayer.slug}`)}
-                                    >
-                                        My Profile
-                                    </SidebarLink>
-                                )}
-                                {!linkedPlayer && (
-                                    <SidebarLink
-                                        icon={User}
-                                        onClick={() => {
-                                            close()
-                                            window.dispatchEvent(new CustomEvent('open-claim-modal'))
-                                        }}
-                                    >
-                                        <span className="text-[#5865F2]">Claim Your Profile</span>
-                                    </SidebarLink>
-                                )}
-                            </SidebarSection>
+                        {/* Profile — logged in only */}
+                        {user && linkedPlayer && (
+                            <SidebarLink
+                                to={`/profile/${linkedPlayer.slug}`}
+                                icon={UserCheck}
+                                active={isActive(`/profile/${linkedPlayer.slug}`)}
+                            >
+                                My Profile
+                            </SidebarLink>
+                        )}
+                        {user && !linkedPlayer && (
+                            <SidebarLink
+                                icon={User}
+                                onClick={() => {
+                                    close()
+                                    window.dispatchEvent(new CustomEvent('open-claim-modal'))
+                                }}
+                            >
+                                <span className="text-[#5865F2]">Claim Your Profile</span>
+                            </SidebarLink>
                         )}
 
                         {/* Leagues section */}
@@ -500,9 +502,6 @@ export default function GlobalSidebar() {
                             </SidebarLink>
                             <SidebarLink to="/draft" active={isActive('/draft')}>
                                 Draft Simulator
-                            </SidebarLink>
-                            <SidebarLink to="/scrims" active={isActive('/scrims')}>
-                                Scrims
                             </SidebarLink>
                             <SidebarLink to="/twitch" icon={Tv} active={isActive('/twitch')}>
                                 Featured Stream
