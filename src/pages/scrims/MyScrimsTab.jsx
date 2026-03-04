@@ -1,6 +1,6 @@
 import ScrimCard from './ScrimCard'
 
-export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores, activeDivisions }) {
+export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onEdit, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores, activeDivisions }) {
     const pendingScrims = scrims.filter(s => s.status === 'pending_confirmation')
     const openScrims = scrims.filter(s => s.status === 'open' && !incomingScrims.some(i => i.id === s.id))
     const upcomingScrims = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) >= new Date())
@@ -15,7 +15,7 @@ export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, curr
             <div className="flex flex-col gap-0.5">
                 {items.map(s => (
                     <ScrimCard key={s.id} scrim={s} showActions captainTeams={captainTeams} currentUserId={currentUserId}
-                        onAccept={onAccept} onCancel={onCancel} onDecline={onDecline}
+                        onAccept={onAccept} onCancel={onCancel} onEdit={onEdit} onDecline={onDecline}
                         onReportOutcome={onReportOutcome} onDisputeOutcome={onDisputeOutcome}
                         onConfirmAccept={onConfirmAccept} onDenyAccept={onDenyAccept}
                         actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}

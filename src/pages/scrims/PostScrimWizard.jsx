@@ -7,20 +7,38 @@ import XpCalendar from '../../components/xp/XpCalendar'
 import XpDialog from '../../components/xp/XpDialog'
 import { PICK_MODES, XP_PICK_BADGE, formatPickMode } from './scrimUtils'
 
-export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess, onCancel }) {
-    const [step, setStep] = useState(0)
+export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess, onCancel, editScrim }) {
+    const isEdit = !!editScrim
+
+    // Parse edit scrim date/time into components
+    const parseEditDateTime = () => {
+        if (!editScrim) return {}
+        const d = new Date(editScrim.scheduledDate)
+        const est = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+        const h = est.getHours()
+        return {
+            date: `${est.getFullYear()}-${String(est.getMonth() + 1).padStart(2, '0')}-${String(est.getDate()).padStart(2, '0')}`,
+            hour: String(h === 0 ? 12 : h > 12 ? h - 12 : h),
+            minute: String(est.getMinutes()).padStart(2, '0'),
+            amPm: h >= 12 ? 'PM' : 'AM',
+        }
+    }
+    const editDT = parseEditDateTime()
+
+    const [step, setStep] = useState(isEdit ? 1 : 0)
 
     // Form state
-    const [teamId, setTeamId] = useState(() => captainTeams[0]?.teamId || '')
-    const [selectedDate, setSelectedDate] = useState(null)
-    const [timeHour, setTimeHour] = useState('7')
-    const [timeMinute, setTimeMinute] = useState('00')
-    const [timeAmPm, setTimeAmPm] = useState('PM')
-    const [pickMode, setPickMode] = useState('regular')
-    const [bannedContentLeague, setBannedContentLeague] = useState('')
-    const [challengedTeamId, setChallengedTeamId] = useState('')
-    const [notes, setNotes] = useState('')
+    const [teamId, setTeamId] = useState(() => isEdit ? editScrim.teamId : (captainTeams[0]?.teamId || ''))
+    const [selectedDate, setSelectedDate] = useState(() => isEdit ? editDT.date : null)
+    const [timeHour, setTimeHour] = useState(() => isEdit ? editDT.hour : '7')
+    const [timeMinute, setTimeMinute] = useState(() => isEdit ? editDT.minute : '00')
+    const [timeAmPm, setTimeAmPm] = useState(() => isEdit ? editDT.amPm : 'PM')
+    const [pickMode, setPickMode] = useState(() => isEdit ? (editScrim.pickMode || 'regular') : 'regular')
+    const [bannedContentLeague, setBannedContentLeague] = useState(() => isEdit ? (editScrim.bannedContentLeague || '') : '')
+    const [challengedTeamId, setChallengedTeamId] = useState(() => isEdit ? (editScrim.challengedTeamId || '') : '')
+    const [notes, setNotes] = useState(() => isEdit ? (editScrim.notes || '') : '')
     const [acceptableTiers, setAcceptableTiers] = useState(() => {
+        if (isEdit) return editScrim.acceptableTiers || [1, 2, 3, 4, 5]
         const tier = captainTeams[0]?.divisionTier
         if (!tier) return [1, 2, 3, 4, 5]
         const tiers = [tier]
@@ -29,14 +47,15 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     })
 
     // New: Division/Region/Confirmation state
-    const [filterMode, setFilterMode] = useState('tier') // 'tier' | 'division'
-    const [acceptableDivisions, setAcceptableDivisions] = useState([])
+    const [filterMode, setFilterMode] = useState(() => isEdit && editScrim.acceptableDivisions?.length ? 'division' : 'tier')
+    const [acceptableDivisions, setAcceptableDivisions] = useState(() => isEdit ? (editScrim.acceptableDivisions || []) : [])
     const [activeDivisions, setActiveDivisions] = useState([])
     const [region, setRegion] = useState(() => {
+        if (isEdit) return editScrim.region || 'NA'
         return captainTeams[0]?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA'
     })
-    const [requiresConfirmation, setRequiresConfirmation] = useState(false)
-    const [allowCommunityTeams, setAllowCommunityTeams] = useState(false)
+    const [requiresConfirmation, setRequiresConfirmation] = useState(() => isEdit ? !!editScrim.requiresConfirmation : false)
+    const [allowCommunityTeams, setAllowCommunityTeams] = useState(() => isEdit ? !!editScrim.allowCommunityTeams : false)
 
     // UI state
     const [teamSearch, setTeamSearch] = useState('')
@@ -48,8 +67,9 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     const [postSuccess, setPostSuccess] = useState(false)
     const [leagues, setLeagues] = useState([])
 
-    // Update acceptable tiers + region when team changes
+    // Update acceptable tiers + region when team changes (skip for edit mode — values pre-filled)
     useEffect(() => {
+        if (isEdit) return
         const team = captainTeams.find(t => t.teamId === Number(teamId))
         const tier = team?.divisionTier
         if (!tier) { setAcceptableTiers([1, 2, 3, 4, 5]); return }
@@ -181,7 +201,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         setPosting(true)
         setPostError(null)
         try {
-            await scrimService.create({
+            const payload = {
                 team_id: Number(teamId),
                 scheduled_date: assembleScheduledDate(),
                 pick_mode: pickMode,
@@ -193,10 +213,15 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                 region,
                 requires_confirmation: requiresConfirmation,
                 allow_community_teams: allowCommunityTeams,
-            })
+            }
+            if (isEdit) {
+                await scrimService.update({ scrim_id: editScrim.id, ...payload })
+            } else {
+                await scrimService.create(payload)
+            }
             setPostSuccess(true)
         } catch (err) {
-            setPostError(err.message || 'Failed to post scrim')
+            setPostError(err.message || (isEdit ? 'Failed to update scrim' : 'Failed to post scrim'))
         } finally {
             setPosting(false)
         }
@@ -223,13 +248,13 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                 <div className="xp-wizard-body" style={{ minHeight: 200 }}>
                     <div className="xp-wizard-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                         <div style={{ fontSize: 36 }}>&#9989;</div>
-                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 14 }}>Scrim Request Posted!</div>
+                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 14 }}>{isEdit ? 'Scrim Updated!' : 'Scrim Request Posted!'}</div>
                         <div className="xp-text xp-text-muted" style={{ fontSize: 11, color: '#555', textAlign: 'center' }}>
-                            {challengedTeamId ? 'Your challenge has been sent.' : 'Your open scrim request is now visible to all teams.'}
+                            {isEdit ? 'Your scrim request has been updated.' : challengedTeamId ? 'Your challenge has been sent.' : 'Your open scrim request is now visible to all teams.'}
                         </div>
                         <div className="flex gap-2 mt-2">
-                            <button type="button" onClick={() => { resetWizard() }} className="xp-btn">Post Another</button>
-                            <button type="button" onClick={onSuccess} className="xp-btn xp-btn-primary">View My Scrims</button>
+                            {!isEdit && <button type="button" onClick={() => { resetWizard() }} className="xp-btn">Post Another</button>}
+                            <button type="button" onClick={onSuccess} className="xp-btn xp-btn-primary">{isEdit ? 'Done' : 'View My Scrims'}</button>
                         </div>
                     </div>
                 </div>
@@ -663,7 +688,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
             {/* Footer navigation */}
             <div className="xp-wizard-footer">
                 <div>
-                    {step > 0 && (
+                    {step > (isEdit ? 1 : 0) && (
                         <button type="button" onClick={() => setStep(s => s - 1)} className="xp-btn">
                             &lt; Back
                         </button>
@@ -676,7 +701,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                         </button>
                     ) : (
                         <button type="button" onClick={handleSubmit} disabled={posting || !canAdvance()} className="xp-btn xp-btn-primary">
-                            {posting ? 'Posting...' : 'Finish'}
+                            {posting ? (isEdit ? 'Saving...' : 'Posting...') : (isEdit ? 'Save Changes' : 'Finish')}
                         </button>
                     )}
                     <button type="button" onClick={() => setShowCancelDialog(true)} className="xp-btn">Cancel</button>

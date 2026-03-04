@@ -1,10 +1,10 @@
-import { Clock, Shield, MessageSquare, Check, Copy, Target, Bell } from 'lucide-react'
+import { Clock, Shield, MessageSquare, Check, Copy, Target, Bell, Pencil } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import { RANK_LABELS, getDivisionImage } from '../../utils/divisionImages'
 import ReliabilityBar from './ReliabilityBar'
 import { XP_PICK_BADGE, formatPickMode, formatDateEST, formatRelativeDate, copyScrimsToClipboard } from './scrimUtils'
 
-export default function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores, activeDivisions }) {
+export default function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onEdit, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores, activeDivisions }) {
     const isLoading = actionLoading === scrim.id
     const acceptableTeams = captainTeams.filter(t =>
         t.teamId !== scrim.teamId &&
@@ -208,7 +208,10 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                             <button onClick={() => onDecline(scrim.id)} disabled={isLoading} className="xp-btn xp-btn-danger">{isLoading ? '...' : 'Decline'}</button>
                         )}
                         {scrim.status === 'open' && canCancel && (
-                            <button onClick={() => onCancel(scrim.id)} disabled={isLoading} className="xp-btn xp-btn-danger">{isLoading ? '...' : 'Cancel'}</button>
+                            <>
+                                {onEdit && <button onClick={() => onEdit(scrim)} disabled={isLoading} className="xp-btn"><Pencil size={10} /> Edit</button>}
+                                <button onClick={() => onCancel(scrim.id)} disabled={isLoading} className="xp-btn xp-btn-danger">{isLoading ? '...' : 'Cancel'}</button>
+                            </>
                         )}
                         {scrim.status === 'pending_confirmation' && isOwnTeam && onConfirmAccept && (
                             <>
@@ -220,6 +223,10 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                                     className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
                                     {isLoading ? '...' : 'Deny'}
                                 </button>
+                                {onEdit && <button onClick={() => onEdit(scrim)} disabled={isLoading}
+                                    className="xp-btn" style={{ fontSize: 10 }}>
+                                    <Pencil size={8} /> Edit
+                                </button>}
                                 <button onClick={() => onCancel(scrim.id)} disabled={isLoading}
                                     className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
                                     {isLoading ? '...' : 'Cancel Scrim'}

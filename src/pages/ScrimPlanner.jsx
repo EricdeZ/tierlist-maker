@@ -51,6 +51,7 @@ export default function ScrimPlanner() {
 
     const [allTeams, setAllTeams] = useState([])
     const [showPostWindow, setShowPostWindow] = useState(false)
+    const [editScrim, setEditScrim] = useState(null)
     const [showHelp, setShowHelp] = useState(false)
     const [minimizedWindows, setMinimizedWindows] = useState({})
     const setWinMinimized = (id, v) => setMinimizedWindows(prev => ({ ...prev, [id]: v }))
@@ -345,6 +346,19 @@ export default function ScrimPlanner() {
         finally { setActionLoading(null) }
     }
 
+    const handleEdit = (scrim) => {
+        setEditScrim(scrim)
+        if (isMobile) {
+            setMobileTab('post')
+        } else {
+            setShowPostWindow(true)
+        }
+        // Ensure allTeams is loaded for the wizard
+        if (allTeams.length === 0) {
+            scrimService.getAllActiveTeams().then(data => setAllTeams(data.teams || [])).catch(() => {})
+        }
+    }
+
     const handleDecline = async (scrimId) => {
         setActionLoading(scrimId)
         try { await scrimService.decline(scrimId); await Promise.all([loadOpenScrims(), loadMyScrims()]) }
@@ -418,7 +432,8 @@ export default function ScrimPlanner() {
                                         divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
                                         uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
                                         activeDivisions={activeDivisions}
-                                        onAccept={handleAccept} actionLoading={actionLoading}
+                                        onAccept={handleAccept} onCancel={handleCancel} onEdit={handleEdit}
+                                        actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
                                     />
@@ -427,6 +442,7 @@ export default function ScrimPlanner() {
                                     <MyScrimsTab
                                         scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}
                                         currentUserId={user?.id} onAccept={handleAccept} onCancel={handleCancel}
+                                        onEdit={handleEdit}
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
                                         setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
                                         onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome}
@@ -436,8 +452,10 @@ export default function ScrimPlanner() {
                                 )}
                                 {mobileTab === 'post' && (
                                     <PostScrimWizard
+                                        key={editScrim?.id || 'new'}
                                         captainTeams={captainTeams} allTeams={allTeams} myScrims={myScrims}
-                                        onSuccess={() => { loadOpenScrims(); loadMyScrims(); setMobileTab('my') }}
+                                        editScrim={editScrim}
+                                        onSuccess={() => { loadOpenScrims(); loadMyScrims(); setEditScrim(null); setMobileTab('my') }}
                                     />
                                 )}
                                 {mobileTab === 'challenges' && user && (
@@ -508,7 +526,7 @@ export default function ScrimPlanner() {
                     activeDivisions={activeDivisions}
                     myScrims={myScrims} incomingScrims={incomingScrims}
                     captainTeams={captainTeams} myTeams={myTeams}
-                    onAccept={handleAccept} onCancel={handleCancel} onDecline={handleDecline}
+                    onAccept={handleAccept} onCancel={handleCancel} onEdit={handleEdit} onDecline={handleDecline}
                     handleReportOutcome={handleReportOutcome} handleDisputeOutcome={handleDisputeOutcome}
                     handleConfirmAccept={handleConfirmAccept} handleDenyAccept={handleDenyAccept}
                     actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
@@ -682,7 +700,7 @@ export default function ScrimPlanner() {
                                 ?
                             </button>
                             {isCaptain && (
-                                <button onClick={() => setShowPostWindow(true)}
+                                <button onClick={() => { setEditScrim(null); setShowPostWindow(true) }}
                                     className="xp-btn xp-btn-primary xp-post-scrim-btn" style={{ fontSize: 10, padding: '2px 10px', marginRight: 4, alignSelf: 'center' }}>
                                     <Plus size={11} /> Post Scrim
                                 </button>
@@ -710,13 +728,15 @@ export default function ScrimPlanner() {
                                         divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
                                         uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
                                         activeDivisions={activeDivisions}
-                                        onAccept={handleAccept} actionLoading={actionLoading}
+                                        onAccept={handleAccept} onCancel={handleCancel} onEdit={handleEdit}
+                                        actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores} />
                                 )}
                                 {activeTab === 'my' && user && (
                                     <MyScrimsTab scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}
                                         currentUserId={user?.id} onAccept={handleAccept} onCancel={handleCancel}
+                                        onEdit={handleEdit}
                                         onDecline={handleDecline} actionLoading={actionLoading} acceptModal={acceptModal}
                                         setAcceptModal={setAcceptModal} reliabilityScores={reliabilityScores}
                                         onReportOutcome={handleReportOutcome} onDisputeOutcome={handleDisputeOutcome}
@@ -731,20 +751,20 @@ export default function ScrimPlanner() {
                 {/* ═══ POST SCRIM WIZARD WINDOW ═══ */}
                 {showPostWindow && isCaptain && (
                     <DraggableXpWindow
-                        title="Post Scrim Wizard"
-                        icon="&#128228;"
+                        title={editScrim ? 'Edit Scrim' : 'Post Scrim Wizard'}
+                        icon={editScrim ? '&#9998;' : '&#128228;'}
                         defaultX={typeof window !== 'undefined' ? Math.max(40, (window.innerWidth - 520) / 2) : 100}
                         defaultY={typeof window !== 'undefined' ? Math.min(120, window.innerHeight * 0.15) : 120}
                         className="xp-post-window"
                         resizable={false}
-                        onClose={() => setShowPostWindow(false)}
+                        onClose={() => { setShowPostWindow(false); setEditScrim(null) }}
                         zIndex={30}
                         minimized={!!minimizedWindows.post}
                         onMinimize={(v) => setWinMinimized('post', v)}
                     >
-                        <PostScrimWizard captainTeams={captainTeams} allTeams={allTeams}
-                            myScrims={myScrims}
-                            onSuccess={() => { loadOpenScrims(); loadMyScrims(); setShowPostWindow(false) }} />
+                        <PostScrimWizard key={editScrim?.id || 'new'} captainTeams={captainTeams} allTeams={allTeams}
+                            myScrims={myScrims} editScrim={editScrim}
+                            onSuccess={() => { loadOpenScrims(); loadMyScrims(); setShowPostWindow(false); setEditScrim(null) }} />
                     </DraggableXpWindow>
                 )}
 

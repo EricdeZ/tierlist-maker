@@ -1178,6 +1178,116 @@ export async function acceptScrim(sql, user, body, waitUntil) {
 }
 
 
+export async function updateScrim(sql, user, body) {
+    const { scrim_id, scheduled_date, pick_mode, banned_content_league, notes,
+            challenged_team_id, acceptable_tiers, acceptable_divisions,
+            region, requires_confirmation, allow_community_teams } = body
+
+    if (!scrim_id) {
+        return { error: 'scrim_id is required', status: 400 }
+    }
+
+    const [scrim] = await sql`
+        SELECT id, team_id, status, pending_team_id, pending_user_id, pending_at
+        FROM scrim_requests WHERE id = ${scrim_id}
+    `
+    if (!scrim) {
+        return { error: 'Scrim request not found', status: 404 }
+    }
+    if (scrim.status !== 'open' && scrim.status !== 'pending_confirmation') {
+        return { error: 'Can only edit open or pending scrim requests', status: 400 }
+    }
+
+    // Verify user is captain of the posting team
+    const captainTeams = await getEligibleTeams(sql, user.id)
+    const isEligible = captainTeams.some(t => t.team_id === scrim.team_id)
+    if (!isEligible) {
+        return { error: 'You are not a captain of the posting team', status: 403 }
+    }
+
+    // Validate fields same as create
+    if (pick_mode && !VALID_PICK_MODES.includes(pick_mode)) {
+        return { error: `Invalid pick_mode. Must be one of: ${VALID_PICK_MODES.join(', ')}`, status: 400 }
+    }
+    if (region && !VALID_REGIONS.includes(region)) {
+        return { error: 'region must be NA or EU', status: 400 }
+    }
+    if (acceptable_tiers && acceptable_divisions) {
+        return { error: 'Cannot set both acceptable_tiers and acceptable_divisions', status: 400 }
+    }
+    if (scheduled_date && new Date(scheduled_date) <= new Date()) {
+        return { error: 'Scheduled date must be in the future', status: 400 }
+    }
+    if (acceptable_tiers) {
+        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 5)) {
+            return { error: 'acceptable_tiers must be an array of integers 1-5', status: 400 }
+        }
+    }
+    if (acceptable_divisions) {
+        if (!Array.isArray(acceptable_divisions) || !acceptable_divisions.every(d => Number.isInteger(d) && d > 0)) {
+            return { error: 'acceptable_divisions must be an array of positive integers', status: 400 }
+        }
+        const validDivs = await sql`
+            SELECT DISTINCT d.id FROM divisions d
+            JOIN seasons s ON s.division_id = d.id
+            WHERE d.id = ANY(${acceptable_divisions}) AND s.is_active = true
+        `
+        if (validDivs.length !== new Set(acceptable_divisions).size) {
+            return { error: 'One or more division IDs are invalid or have no active season', status: 400 }
+        }
+    }
+
+    // If changing challenged_team_id, validate
+    if (challenged_team_id) {
+        if (challenged_team_id === scrim.team_id) {
+            return { error: 'Cannot challenge your own team', status: 400 }
+        }
+        const [target] = await sql`
+            SELECT t.id FROM teams t
+            JOIN seasons s ON s.id = t.season_id
+            WHERE t.id = ${challenged_team_id} AND s.is_active = true
+        `
+        if (!target) {
+            return { error: 'Challenged team not found or not in an active season', status: 400 }
+        }
+        const [isBlocked] = await sql`
+            SELECT 1 FROM scrim_blacklist
+            WHERE (team_id = ${scrim.team_id} AND blocked_team_id = ${challenged_team_id})
+               OR (team_id = ${challenged_team_id} AND blocked_team_id = ${scrim.team_id})
+            LIMIT 1
+        `
+        if (isBlocked) {
+            return { error: 'Cannot challenge this team (blacklisted)', status: 400 }
+        }
+    }
+
+    // If scrim was pending_confirmation, reset to open since details changed
+    const resetPending = scrim.status === 'pending_confirmation'
+
+    await sql`
+        UPDATE scrim_requests SET
+            scheduled_date = ${scheduled_date},
+            pick_mode = ${pick_mode || 'regular'},
+            banned_content_league = ${banned_content_league || null},
+            notes = ${notes || null},
+            challenged_team_id = ${challenged_team_id || null},
+            acceptable_tiers = ${acceptable_tiers ? JSON.stringify(acceptable_tiers) : null},
+            acceptable_divisions = ${acceptable_divisions ? JSON.stringify(acceptable_divisions) : null},
+            region = ${region || 'NA'},
+            requires_confirmation = ${!!requires_confirmation},
+            allow_community_teams = ${!!allow_community_teams},
+            status = ${resetPending ? 'open' : scrim.status},
+            pending_team_id = ${resetPending ? null : scrim.pending_team_id},
+            pending_user_id = ${resetPending ? null : scrim.pending_user_id},
+            pending_at = ${resetPending ? null : scrim.pending_at},
+            updated_at = NOW()
+        WHERE id = ${scrim_id}
+    `
+
+    return { success: true }
+}
+
+
 export async function cancelScrim(sql, user, body) {
     const { scrim_id } = body
 

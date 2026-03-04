@@ -73,7 +73,7 @@ export default function ScrimDashboard({
     // My scrims
     myScrims, incomingScrims, captainTeams, myTeams,
     // Actions
-    onAccept, onCancel, onDecline, handleReportOutcome, handleDisputeOutcome,
+    onAccept, onCancel, onEdit, onDecline, handleReportOutcome, handleDisputeOutcome,
     handleConfirmAccept, handleDenyAccept, actionLoading,
     acceptModal, setAcceptModal, reliabilityScores,
     // Blacklist
@@ -89,7 +89,13 @@ export default function ScrimDashboard({
 }) {
     const [activeTab, setActiveTab] = useState('open')
     const [showPost, setShowPost] = useState(false)
+    const [editingScrim, setEditingScrim] = useState(null)
     const [showHelp, setShowHelp] = useState(false)
+
+    const handleDashboardEdit = (scrim) => {
+        setEditingScrim(scrim)
+        setShowPost(true)
+    }
 
     // Action items that need attention
     const actionItems = useMemo(() => {
@@ -147,7 +153,7 @@ export default function ScrimDashboard({
                 </div>
                 <div className="sd-hero-actions">
                     {isCaptain && (
-                        <button className="sd-action-btn sd-action-btn-primary" onClick={() => setShowPost(true)}>
+                        <button className="sd-action-btn sd-action-btn-primary" onClick={() => { setEditingScrim(null); setShowPost(true) }}>
                             <Plus size={14} /> Post Scrim
                         </button>
                     )}
@@ -236,7 +242,8 @@ export default function ScrimDashboard({
                                         divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter}
                                         uniqueLeagues={uniqueLeagues} uniqueTiers={uniqueTiers}
                                         activeDivisions={activeDivisions}
-                                        onAccept={onAccept} actionLoading={actionLoading}
+                                        onAccept={onAccept} onCancel={onCancel} onEdit={handleDashboardEdit}
+                                        actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
                                     />
@@ -245,6 +252,7 @@ export default function ScrimDashboard({
                                     <MyScrimsTab
                                         scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}
                                         currentUserId={user?.id} onAccept={onAccept} onCancel={onCancel}
+                                        onEdit={handleDashboardEdit}
                                         onDecline={onDecline} actionLoading={actionLoading}
                                         acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
@@ -316,19 +324,21 @@ export default function ScrimDashboard({
 
             {/* Post Scrim Modal */}
             {showPost && isCaptain && (
-                <div className="sd-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPost(false) }}>
+                <div className="sd-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPost(false); setEditingScrim(null) } }}>
                     <div className="sd-modal">
                         <div className="sd-modal-header">
-                            <span>Post a Scrim</span>
-                            <button onClick={() => setShowPost(false)} className="sd-modal-close">
+                            <span>{editingScrim ? 'Edit Scrim' : 'Post a Scrim'}</span>
+                            <button onClick={() => { setShowPost(false); setEditingScrim(null) }} className="sd-modal-close">
                                 <X size={16} />
                             </button>
                         </div>
                         <div className="sd-modal-body">
                             <PostScrimWizard
+                                key={editingScrim?.id || 'new'}
                                 captainTeams={captainTeams} allTeams={allTeams} myScrims={myScrims}
-                                onSuccess={() => { onPostSuccess(); setShowPost(false) }}
-                                onCancel={() => setShowPost(false)}
+                                editScrim={editingScrim}
+                                onSuccess={() => { onPostSuccess(); setShowPost(false); setEditingScrim(null) }}
+                                onCancel={() => { setShowPost(false); setEditingScrim(null) }}
                             />
                         </div>
                     </div>

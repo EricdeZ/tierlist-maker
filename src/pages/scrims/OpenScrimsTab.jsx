@@ -1,6 +1,6 @@
 import ScrimCard from './ScrimCard'
 
-export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, regionFilter, setRegionFilter, divisionFilter, setDivisionFilter, uniqueLeagues, uniqueTiers, activeDivisions, onAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
+export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeams, leagueFilter, setLeagueFilter, tierFilter, setTierFilter, regionFilter, setRegionFilter, divisionFilter, setDivisionFilter, uniqueLeagues, uniqueTiers, activeDivisions, onAccept, onCancel, onEdit, actionLoading, acceptModal, setAcceptModal, reliabilityScores }) {
     return (
         <div>
             {scrims.length > 0 && (
@@ -30,7 +30,7 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
             <div className="flex flex-col gap-0.5">
                 {scrims.map(scrim => (
                     <ScrimCard key={scrim.id} scrim={scrim} showActions={!!user} captainTeams={captainTeams}
-                        currentUserId={currentUserId} onAccept={onAccept} onCancel={() => {}} onDecline={() => {}}
+                        currentUserId={currentUserId} onAccept={onAccept} onCancel={onCancel} onEdit={onEdit} onDecline={() => {}}
                         actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                         isChallenge={false} reliabilityScores={reliabilityScores} activeDivisions={activeDivisions} />
                 ))}

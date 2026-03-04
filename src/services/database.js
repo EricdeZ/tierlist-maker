@@ -674,6 +674,9 @@ export const scrimService = {
     async create(data) {
         return apiPost('scrim', { action: 'create' }, data)
     },
+    async update(data) {
+        return apiPost('scrim', { action: 'update' }, data)
+    },
     async accept(data) {
         return apiPost('scrim', { action: 'accept' }, data)
     },

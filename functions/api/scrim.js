@@ -7,7 +7,7 @@ import {
     fetchAllActiveTeams, fetchTeamReliability, fetchBlacklist,
     searchUsersQuery, fetchActiveDivisions, pollDMConfirmations,
     formatTeamForResponse,
-    createScrim, acceptScrim, cancelScrim, declineScrim,
+    createScrim, updateScrim, acceptScrim, cancelScrim, declineScrim,
     reportOutcome, disputeOutcome,
     addToBlacklist, removeFromBlacklist,
     confirmAccept, denyAccept,
@@ -70,6 +70,8 @@ const handler = async (event) => {
                     }
                     return postResult(result)
                 }
+                case 'update':
+                    return postResult(await updateScrim(sql, user, body))
                 case 'accept':
                     return postResult(await acceptScrim(sql, user, body, event.waitUntil))
                 case 'cancel':
