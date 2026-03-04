@@ -40,6 +40,8 @@ const handler = async (event) => {
                     return await handlePending(sql, event)
                 case 'pending-count':
                     return await handlePendingCount(sql, event)
+                case 'preview-link':
+                    return await handlePreviewLink(sql, params)
                 case 'divisions-by-tier':
                     return await handleDivisionsByTier(sql, params)
                 case 'league-teams':
@@ -514,6 +516,35 @@ async function handleGenerateLink(sql, user, body) {
         VALUES (${teamId}, 'link', ${user.id}, ${code}, 'pending')
     `
     return postOk({ invite_code: code })
+}
+
+async function handlePreviewLink(sql, params) {
+    const code = (params.code || '').trim()
+    if (!code) return err('code required', 400)
+
+    const [invite] = await sql`
+        SELECT cti.id, cti.team_id FROM community_team_invitations cti
+        WHERE cti.invite_code = ${code} AND cti.type = 'link' AND cti.status = 'pending'
+    `
+    if (!invite) return err('Invalid or expired invite link', 404)
+
+    const [team] = await sql`
+        SELECT id, name, slug, logo_url, color, skill_tier
+        FROM community_teams WHERE id = ${invite.team_id}
+    `
+    if (!team) return err('Team not found', 404)
+
+    const members = await sql`
+        SELECT ctm.role, u.discord_username, u.discord_avatar, u.discord_id,
+               p.name AS player_name, p.slug AS player_slug
+        FROM community_team_members ctm
+        JOIN users u ON u.id = ctm.user_id
+        LEFT JOIN players p ON p.id = u.linked_player_id
+        WHERE ctm.team_id = ${team.id} AND ctm.status = 'active'
+        ORDER BY ctm.role = 'captain' DESC, u.discord_username
+    `
+
+    return ok({ team: { ...team, members } })
 }
 
 async function handleJoinLink(sql, user, body) {

@@ -10,6 +10,7 @@ import TeamCard from './myteams/TeamCard'
 import InvitationsPanel from './myteams/InvitationsPanel'
 import CreateTeamWizard from './myteams/CreateTeamWizard'
 import InviteMembersModal from './myteams/InviteMembersModal'
+import JoinTeamModal from './myteams/JoinTeamModal'
 
 export default function MyTeams() {
     const { user, login, linkedPlayer, loading: authLoading } = useAuth()
@@ -29,18 +30,9 @@ export default function MyTeams() {
     const [browseLoading, setBrowseLoading] = useState(false)
     const [joinLoading, setJoinLoading] = useState(null)
 
-    // Handle invite link joins
-    useEffect(() => {
-        const joinCode = searchParams.get('join')
-        if (joinCode && user) {
-            communityTeamService.joinLink(joinCode)
-                .then(() => {
-                    setSearchParams({}, { replace: true })
-                    loadData()
-                })
-                .catch(err => setError(err.message))
-        }
-    }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Show join modal when ?join=CODE is present
+    const joinCode = searchParams.get('join')
+    const [showJoinModal, setShowJoinModal] = useState(!!joinCode)
 
     const loadData = async () => {
         if (!user) return
@@ -342,6 +334,20 @@ export default function MyTeams() {
                     <InviteMembersModal
                         team={inviteTeam}
                         onClose={() => setInviteTeam(null)}
+                    />
+                )}
+                {showJoinModal && joinCode && (
+                    <JoinTeamModal
+                        code={joinCode}
+                        onJoined={() => {
+                            setShowJoinModal(false)
+                            setSearchParams({}, { replace: true })
+                            loadData()
+                        }}
+                        onClose={() => {
+                            setShowJoinModal(false)
+                            setSearchParams({}, { replace: true })
+                        }}
                     />
                 )}
             </div>

@@ -833,6 +833,9 @@ export const communityTeamService = {
     async getPendingCount() {
         return apiCall('community-teams', { action: 'pending-count' })
     },
+    async previewLink(code) {
+        return apiCall('community-teams', { action: 'preview-link', code })
+    },
     async getDivisionsByTier(tier) {
         return apiCall('community-teams', { action: 'divisions-by-tier', tier })
     },
