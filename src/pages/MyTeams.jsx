@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { communityTeamService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import { Plus, Users, Swords, ArrowRight, Info } from 'lucide-react'
+import { Plus, Users, Swords, ArrowRight, Info, ChevronDown, Crown } from 'lucide-react'
 import { RANK_LABELS, getDivisionImage } from '../utils/divisionImages'
 import TeamCard from './myteams/TeamCard'
 import InvitationsPanel from './myteams/InvitationsPanel'
@@ -29,6 +29,7 @@ export default function MyTeams() {
     const [browseTier, setBrowseTier] = useState(null)
     const [browseLoading, setBrowseLoading] = useState(false)
     const [joinLoading, setJoinLoading] = useState(null)
+    const [expandedBrowseTeam, setExpandedBrowseTeam] = useState(null)
 
     // Show join modal when ?join=CODE is present
     const joinCode = searchParams.get('join')
@@ -60,13 +61,13 @@ export default function MyTeams() {
 
     // Browse teams by tier
     useEffect(() => {
-        if (!browseTier) { setBrowseTeams([]); return }
+        if (!user) return
         setBrowseLoading(true)
         communityTeamService.browse(browseTier)
             .then(data => setBrowseTeams(data.teams || []))
             .catch(() => setBrowseTeams([]))
             .finally(() => setBrowseLoading(false))
-    }, [browseTier])
+    }, [browseTier, user])
 
     const handleRespond = async (invitationId, accept) => {
         await communityTeamService.respond(invitationId, accept)
@@ -254,6 +255,16 @@ export default function MyTeams() {
                             <h2 className="text-lg font-bold text-(--color-text) mb-1">Find Teams</h2>
                             <p className="text-xs text-(--color-text-secondary) mb-3">Browse teams by competitive tier and request to join.</p>
                             <div className="flex flex-wrap gap-2 mb-4">
+                                <button
+                                    onClick={() => setBrowseTier(null)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                                        browseTier === null
+                                            ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/30'
+                                            : 'bg-white/[0.04] text-(--color-text-secondary) border border-white/[0.06] hover:bg-white/[0.08]'
+                                    }`}
+                                >
+                                    All
+                                </button>
                                 {[1, 2, 3, 4, 5].map(tier => {
                                     const img = getDivisionImage(null, null, tier)
                                     const selected = browseTier === tier
@@ -278,9 +289,9 @@ export default function MyTeams() {
                                 <div className="flex items-center justify-center py-8">
                                     <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
                                 </div>
-                            ) : browseTier && browsableTeams.length === 0 ? (
+                            ) : browsableTeams.length === 0 ? (
                                 <div className="text-center py-8 text-sm text-(--color-text-secondary)">
-                                    No other teams at {RANK_LABELS[browseTier]} level yet.
+                                    {browseTier ? `No other teams at ${RANK_LABELS[browseTier]} level yet.` : 'No other teams yet.'}
                                     {!hasCaptainTeam && (
                                         <button
                                             onClick={() => setShowWizard(true)}
@@ -292,32 +303,97 @@ export default function MyTeams() {
                                 </div>
                             ) : (
                                 <div className="space-y-1">
-                                    {browsableTeams.map(team => (
-                                        <div key={team.id} className="relative flex items-center gap-3 px-5 py-3 bg-white/[0.02] border-l border-white/[0.06] hover:bg-white/[0.04] transition-colors">
-                                            <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-                                                {team.logo_url ? (
-                                                    <img src={team.logo_url} alt="" className="w-9 h-9 object-contain" />
-                                                ) : (
-                                                    <div className="w-9 h-9 rounded bg-white/[0.06] flex items-center justify-center text-sm font-bold text-(--color-text-secondary)/40">
-                                                        {team.name[0]}
+                                    {browsableTeams.map(team => {
+                                        const isExpanded = expandedBrowseTeam === team.id
+                                        const members = team.members || []
+                                        const color = team.color || '#6366f1'
+                                        const tierImg = getDivisionImage(null, null, team.skill_tier)
+                                        return (
+                                            <div key={team.id} className="relative overflow-hidden">
+                                                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: isExpanded ? color : 'transparent' }} />
+                                                <div
+                                                    className="relative flex items-center gap-3 px-5 py-3 bg-white/[0.02] border-l border-white/[0.06] hover:bg-white/[0.04] transition-colors cursor-pointer"
+                                                    onClick={() => setExpandedBrowseTeam(isExpanded ? null : team.id)}
+                                                >
+                                                    <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+                                                        {team.logo_url ? (
+                                                            <img src={team.logo_url} alt="" className="w-9 h-9 object-contain" />
+                                                        ) : (
+                                                            <div className="w-9 h-9 rounded bg-white/[0.06] flex items-center justify-center text-sm font-bold text-(--color-text-secondary)/40">
+                                                                {team.name[0]}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-medium text-(--color-text) truncate">{team.name}</div>
-                                                <div className="text-[10px] text-(--color-text-secondary)/60">
-                                                    {team.member_count} player{team.member_count !== 1 ? 's' : ''} · {team.owner_name}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-(--color-text) truncate">{team.name}</div>
+                                                        <div className="text-[10px] text-(--color-text-secondary)/60 flex items-center gap-1.5">
+                                                            {tierImg && <img src={tierImg} alt="" className="w-3.5 h-3.5" />}
+                                                            {RANK_LABELS[team.skill_tier] && <span>{RANK_LABELS[team.skill_tier]}</span>}
+                                                            <span>· {team.member_count} player{team.member_count !== 1 ? 's' : ''} · {team.owner_name}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); handleRequestJoin(team.id) }}
+                                                        disabled={joinLoading === team.id}
+                                                        className="text-xs px-3 py-1.5 rounded bg-white/[0.04] text-(--color-text-secondary) hover:text-(--color-text) hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-40 shrink-0"
+                                                    >
+                                                        {joinLoading === team.id ? 'Sending...' : 'Request to Join'}
+                                                    </button>
+                                                    <ChevronDown className={`w-4 h-4 text-(--color-text-secondary)/40 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                </div>
+                                                <div
+                                                    className="overflow-hidden transition-all duration-200 ease-in-out"
+                                                    style={{ maxHeight: isExpanded ? '400px' : '0px', opacity: isExpanded ? 1 : 0 }}
+                                                >
+                                                    <div className="bg-white/[0.02] border-b border-r border-white/[0.06] pl-5 pr-5 py-3">
+                                                        {members.length > 0 ? (
+                                                            <div>
+                                                                <div className="text-[10px] uppercase tracking-widest text-(--color-text-secondary)/40 mb-2 font-semibold">Members</div>
+                                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
+                                                                    {members.map((m, i) => {
+                                                                        const displayName = m.player_name || m.discord_username || '?'
+                                                                        const profileSlug = m.player_slug || m.discord_username
+                                                                        const isCaptain = m.role === 'captain'
+                                                                        return (
+                                                                            <div key={i} className="flex items-center gap-2 py-0.5">
+                                                                                {m.discord_avatar && m.discord_id ? (
+                                                                                    <img
+                                                                                        src={`https://cdn.discordapp.com/avatars/${m.discord_id}/${m.discord_avatar}.png?size=64`}
+                                                                                        alt="" className="w-5 h-5 rounded-full shrink-0"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <div
+                                                                                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+                                                                                        style={{ backgroundColor: `${color}20`, color }}
+                                                                                    >
+                                                                                        {displayName[0].toUpperCase()}
+                                                                                    </div>
+                                                                                )}
+                                                                                {profileSlug ? (
+                                                                                    <Link
+                                                                                        to={`/profile/${profileSlug}`}
+                                                                                        className="text-xs text-(--color-text)/80 truncate hover:text-(--color-text) transition-colors"
+                                                                                        onClick={e => e.stopPropagation()}
+                                                                                    >
+                                                                                        {displayName}
+                                                                                    </Link>
+                                                                                ) : (
+                                                                                    <span className="text-xs text-(--color-text)/80 truncate">{displayName}</span>
+                                                                                )}
+                                                                                {isCaptain && <Crown className="w-3 h-3 shrink-0" style={{ color }} />}
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-xs text-(--color-text-secondary)/40">No members found</div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => handleRequestJoin(team.id)}
-                                                disabled={joinLoading === team.id}
-                                                className="text-xs px-3 py-1.5 rounded bg-white/[0.04] text-(--color-text-secondary) hover:text-(--color-text) hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-40 shrink-0"
-                                            >
-                                                {joinLoading === team.id ? 'Sending...' : 'Request to Join'}
-                                            </button>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>

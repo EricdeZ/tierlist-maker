@@ -34,8 +34,7 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
 
     // Step 1: Skill Tier
     const [skillTier, setSkillTier] = useState(null)
-    const [divisions, setDivisions] = useState([])
-    const [loadingDivisions, setLoadingDivisions] = useState(false)
+    const [allDivisions, setAllDivisions] = useState({}) // { tier: [divisions] }
 
     // Step 2: Invites
     const [searchQuery, setSearchQuery] = useState('')
@@ -50,15 +49,18 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
     const [submitError, setSubmitError] = useState(null)
     const [success, setSuccess] = useState(false)
 
-    // Fetch divisions when tier changes
+    // Fetch divisions for all tiers upfront
     useEffect(() => {
-        if (!skillTier) { setDivisions([]); return }
-        setLoadingDivisions(true)
-        communityTeamService.getDivisionsByTier(skillTier)
-            .then(data => setDivisions(data.divisions || []))
-            .catch(() => setDivisions([]))
-            .finally(() => setLoadingDivisions(false))
-    }, [skillTier])
+        Promise.all([1, 2, 3, 4, 5].map(tier =>
+            communityTeamService.getDivisionsByTier(tier)
+                .then(data => ({ tier, divisions: data.divisions || [] }))
+                .catch(() => ({ tier, divisions: [] }))
+        )).then(results => {
+            const map = {}
+            for (const { tier, divisions } of results) map[tier] = divisions
+            setAllDivisions(map)
+        })
+    }, [])
 
     // Debounced user search
     useEffect(() => {
@@ -314,27 +316,39 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
                                 {[1, 2, 3, 4, 5].map(tier => {
                                     const img = getDivisionImage(null, null, tier)
                                     const selected = skillTier === tier
+                                    const tierDivs = (allDivisions[tier] || []).filter(d => d.is_active)
                                     return (
                                         <button
                                             key={tier}
                                             onClick={() => setSkillTier(tier)}
-                                            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer text-left ${
+                                            className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer text-left ${
                                                 selected
                                                     ? 'border-[var(--color-accent)]/50 bg-[var(--color-accent)]/10'
                                                     : 'border-white/10 bg-white/[0.02] hover:bg-white/5'
                                             }`}
                                         >
-                                            {img && <img src={img} alt="" className="w-8 h-8" />}
-                                            <div className="flex-1">
-                                                <div className={`text-sm font-semibold ${selected ? 'text-[var(--color-accent)]' : 'text-(--color-text)'}`}>
-                                                    {RANK_LABELS[tier]}
+                                            {img && <img src={img} alt="" className="w-8 h-8 mt-0.5" />}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-sm font-semibold ${selected ? 'text-[var(--color-accent)]' : 'text-(--color-text)'}`}>
+                                                        {RANK_LABELS[tier]}
+                                                    </span>
+                                                    <span className="text-[11px] text-(--color-text-secondary)">
+                                                        {TIER_DESCRIPTIONS[tier]}
+                                                    </span>
                                                 </div>
-                                                <div className="text-[11px] text-(--color-text-secondary)">
-                                                    {TIER_DESCRIPTIONS[tier]}
-                                                </div>
+                                                {tierDivs.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                        {tierDivs.map(d => (
+                                                            <span key={d.id} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.06] text-(--color-text-secondary)">
+                                                                {d.name} <span className="opacity-50">({d.league_name})</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             {selected && (
-                                                <div className="w-5 h-5 rounded-full bg-[var(--color-accent)] flex items-center justify-center">
+                                                <div className="w-5 h-5 rounded-full bg-[var(--color-accent)] flex items-center justify-center shrink-0 mt-0.5">
                                                     <Check className="w-3 h-3 text-[var(--color-primary)]" />
                                                 </div>
                                             )}
@@ -342,32 +356,6 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
                                     )
                                 })}
                             </div>
-
-                            {/* Show divisions at selected tier */}
-                            {skillTier && (
-                                <div>
-                                    <div className="text-xs font-bold uppercase tracking-widest text-(--color-text-secondary) mb-2">
-                                        Divisions at {RANK_LABELS[skillTier]} level
-                                    </div>
-                                    {loadingDivisions ? (
-                                        <div className="text-xs text-(--color-text-secondary) animate-pulse">Loading...</div>
-                                    ) : divisions.length === 0 ? (
-                                        <div className="text-xs text-(--color-text-secondary)">No active divisions at this tier yet.</div>
-                                    ) : (
-                                        <div className="space-y-1">
-                                            {divisions.map(d => (
-                                                <div key={d.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] text-sm">
-                                                    <span className="text-(--color-text)">{d.name}</span>
-                                                    <span className="text-[10px] text-(--color-text-secondary)">({d.league_name})</span>
-                                                    {d.is_active && (
-                                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 ml-auto">Active</span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     )}
 

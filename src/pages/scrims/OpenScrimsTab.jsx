@@ -8,6 +8,7 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
                     <select value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Leagues</option>
                         {uniqueLeagues.map(l => <option key={l.slug} value={l.slug}>{l.name}</option>)}
+                        <option value="community">Community Teams</option>
                     </select>
                     <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Tiers</option>

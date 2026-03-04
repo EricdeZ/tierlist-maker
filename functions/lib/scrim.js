@@ -422,7 +422,8 @@ export async function listScrims(sql, params) {
     const { league_id, division_tier, region, division_id } = params
 
     const filters = []
-    if (league_id) filters.push(sql`l.id = ${league_id}`)
+    if (league_id === 'community') filters.push(sql`sr.team_id < 0`)
+    else if (league_id) filters.push(sql`l.slug = ${league_id}`)
     if (division_tier) filters.push(sql`d.tier = ${division_tier}`)
     if (region) filters.push(sql`sr.region = ${region}`)
     if (division_id) filters.push(sql`d.id = ${Number(division_id)}`)

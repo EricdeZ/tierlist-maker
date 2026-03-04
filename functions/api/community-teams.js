@@ -3,6 +3,8 @@ import { getDB, headers, adminHeaders, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { deleteOpenScrimsForCommunityTeam, getCommunityTeamMemberCount } from '../lib/scrim.js'
 
+const MAX_COMMUNITY_TEAM_MEMBERS = 8 // 1 captain + 7 members
+
 function slugify(str) {
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team'
 }
@@ -176,7 +178,30 @@ async function handleBrowse(sql, params) {
         ORDER BY ct.created_at DESC
         LIMIT 100
     `
-    return ok({ teams })
+
+    const teamIds = teams.map(t => t.id)
+    let members = []
+    if (teamIds.length > 0) {
+        members = await sql`
+            SELECT ctm.team_id, ctm.role,
+                   u.discord_username, u.discord_avatar, u.discord_id,
+                   p.name AS player_name, p.slug AS player_slug
+            FROM community_team_members ctm
+            JOIN users u ON u.id = ctm.user_id
+            LEFT JOIN players p ON p.id = u.linked_player_id
+            WHERE ctm.team_id = ANY(${teamIds}) AND ctm.status = 'active'
+            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+        `
+    }
+
+    const membersByTeam = {}
+    for (const m of members) {
+        if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
+        membersByTeam[m.team_id].push(m)
+    }
+
+    const enriched = teams.map(t => ({ ...t, members: membersByTeam[t.id] || [] }))
+    return ok({ teams: enriched })
 }
 
 async function handleSearchUsers(sql, event, params) {
@@ -478,6 +503,9 @@ async function handleInvite(sql, user, body) {
     `
     if (alreadyMember) return postErr('User is already a member of this team')
 
+    const count = await getCommunityTeamMemberCount(sql, teamId)
+    if (count >= MAX_COMMUNITY_TEAM_MEMBERS) return postErr('Your team is full (max 8 players)')
+
     const [targetUser] = await sql`SELECT id FROM users WHERE id = ${targetUserId}`
     if (!targetUser) return postErr('User not found')
 
@@ -563,6 +591,9 @@ async function handleJoinLink(sql, user, body) {
     `
     if (alreadyMember) return postErr('You are already a member of this team')
 
+    const count = await getCommunityTeamMemberCount(sql, invite.team_id)
+    if (count >= MAX_COMMUNITY_TEAM_MEMBERS) return postErr('This team is full (max 8 players)')
+
     // Add user as member (upsert in case they left before)
     await sql`
         INSERT INTO community_team_members (team_id, user_id, role, status)
@@ -623,6 +654,9 @@ async function handleRespond(sql, user, body) {
 
     if (accept) {
         const joiningUserId = invite.type === 'invite' ? invite.to_user_id : invite.from_user_id
+
+        const count = await getCommunityTeamMemberCount(sql, invite.team_id)
+        if (count >= MAX_COMMUNITY_TEAM_MEMBERS) return postErr('This team is full (max 8 players)')
 
         await transaction(async (tx) => {
             await tx`
