@@ -362,7 +362,7 @@ export default function GlobalSidebar() {
                                     <SidebarLink to="/team" active={isActive('/team')}>
                                         <span className="flex items-center gap-3">
                                             <Users className="w-4 h-4 shrink-0 text-blue-400" />
-                                            My Teams
+                                            Build your Team
                                         </span>
                                     </SidebarLink>
                                 )}
