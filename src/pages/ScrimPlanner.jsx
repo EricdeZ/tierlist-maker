@@ -6,7 +6,7 @@ import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
 import passionCoin from '../assets/passion/passion.png'
 import xpBg from '../assets/xp-bg.jpg'
-import { Plus, Search, Shield, Ban, Swords, Trophy } from 'lucide-react'
+import { Plus, Search, Shield, Ban, Swords, Trophy, Flame } from 'lucide-react'
 import DraggableXpWindow from '../components/xp/DraggableXpWindow'
 import XpProgressBar from '../components/xp/XpProgressBar'
 import XpDinoGame from '../components/xp/XpDinoGame'
@@ -205,6 +205,15 @@ export default function ScrimPlanner() {
         return openScrims.filter(s => !blockerTeamIds.has(s.teamId))
     }, [openScrims, blockedMe, myTeams, user])
 
+    // Captain teams with no open scrim posted
+    const passionlessTeams = useMemo(() => {
+        if (!isCaptain) return []
+        const teamsWithOpenScrim = new Set(
+            myScrims.filter(s => s.status === 'open').map(s => s.teamId)
+        )
+        return captainTeams.filter(t => !teamsWithOpenScrim.has(t.teamId))
+    }, [isCaptain, captainTeams, myScrims])
+
     // Outcome reporting handlers
     const handleReportOutcome = async (scrimId, outcome) => {
         setActionLoading(scrimId)
@@ -372,6 +381,23 @@ export default function ScrimPlanner() {
                             <p className="sm-hero-sub">Challenge teams, schedule scrims, and prove your squad.</p>
                         </div>
                     </div>
+                    {passionlessTeams.length > 0 && !loading && (
+                        <div className="sd-passionless-banner" onClick={() => setMobileTab('post')} style={{ cursor: 'pointer', margin: '8px 12px' }}>
+                            <div className="sd-passionless-inner">
+                                <Flame size={16} className="sd-passionless-icon" />
+                                <div className="sd-passionless-text">
+                                    <span className="sd-passionless-title">
+                                        {passionlessTeams.length === 1
+                                            ? <><strong>{passionlessTeams[0].teamName}</strong> has ZERO scrims posted. Absolutely passionless.</>
+                                            : <>{passionlessTeams.map(t => <strong key={t.teamId}>{t.teamName}</strong>).reduce((a, b) => <>{a}, {b}</>)} have ZERO scrims posted. Embarrassing.</>
+                                        }
+                                    </span>
+                                    <span className="sd-passionless-sub">Collecting dust while everyone else grinds.</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="sm-content">
                         {loading && (
                             <div className="sm-loading">

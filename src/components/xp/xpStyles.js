@@ -1761,6 +1761,72 @@ const XP_STYLES = `
     font-family: 'Lato', system-ui, sans-serif;
 }
 
+/* Passionless banner */
+.sd-passionless-banner {
+    margin: 12px 32px;
+    padding: 2px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #ff4d00, #ff8c00, #ff4d00);
+    animation: passionless-glow 3s ease-in-out infinite;
+}
+@keyframes passionless-glow {
+    0%, 100% { opacity: 0.95; }
+    50% { opacity: 1; box-shadow: 0 0 20px rgba(255, 77, 0, 0.3); }
+}
+.sd-passionless-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    background: rgba(10, 14, 20, 0.92);
+}
+.sd-passionless-icon {
+    color: #ff6a00;
+    flex-shrink: 0;
+    animation: passionless-flame 1.5s ease-in-out infinite alternate;
+}
+@keyframes passionless-flame {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.15) rotate(-5deg); }
+}
+.sd-passionless-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+.sd-passionless-title {
+    font-size: 13px;
+    color: #f0d0b0;
+    font-family: 'Lato', system-ui, sans-serif;
+}
+.sd-passionless-title strong {
+    color: #ff8c40;
+}
+.sd-passionless-sub {
+    font-size: 11px;
+    color: #8a7060;
+    font-family: 'Lato', system-ui, sans-serif;
+}
+.sd-passionless-cta {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff6a00;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 12px;
+    border: 1px solid rgba(255, 106, 0, 0.3);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.sd-passionless-banner:hover .sd-passionless-cta {
+    background: rgba(255, 106, 0, 0.15);
+    border-color: #ff6a00;
+}
+
 /* Dashboard grid */
 .sd-grid {
     display: grid;
@@ -2131,6 +2197,33 @@ const XP_STYLES = `
 .sd-filter-select option {
     background: #1a2a3e;
     color: #c8d8e8;
+}
+
+/* XP theme filter overrides */
+.xp-theme .sd-filter-select {
+    color: #222;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23333'/%3E%3C/svg%3E") no-repeat right 8px center;
+    border: 1px solid #7f9db9;
+    border-radius: 3px;
+    padding: 4px 24px 4px 6px;
+    font-family: 'Tahoma', 'Segoe UI', sans-serif;
+    font-size: 11px;
+}
+.xp-theme .sd-filter-select:hover {
+    border-color: #3c7fb1;
+}
+.xp-theme .sd-filter-select:focus {
+    border-color: #3c7fb1;
+    box-shadow: none;
+    outline: 1px dotted #333;
+    outline-offset: -1px;
+}
+.xp-theme .sd-filter-select option {
+    background: #fff;
+    color: #222;
+}
+.xp-theme .sd-filter-row {
+    border-bottom-color: #ccc;
 }
 
 /* Dashboard button overrides */

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Swords, Plus, HelpCircle, Monitor, Clock, ChevronRight, X, Search, Shield, Ban, User } from 'lucide-react'
+import { Swords, Plus, HelpCircle, Monitor, Clock, ChevronRight, X, Search, Shield, Ban, User, Flame } from 'lucide-react'
 import OpenScrimsTab from './OpenScrimsTab'
 import MyScrimsTab from './MyScrimsTab'
 import PostScrimWizard from './PostScrimWizard'
@@ -118,6 +118,15 @@ export default function ScrimDashboard({
             }))
     }, [user, myScrims, myTeams])
 
+    // Captain teams with no open scrim posted
+    const passionlessTeams = useMemo(() => {
+        if (!isCaptain) return []
+        const teamsWithOpenScrim = new Set(
+            myScrims.filter(s => s.status === 'open').map(s => s.teamId)
+        )
+        return captainTeams.filter(t => !teamsWithOpenScrim.has(t.teamId))
+    }, [isCaptain, captainTeams, myScrims])
+
     const TABS = [
         { key: 'open', label: 'Open Scrims', icon: Search },
         ...(user ? [{ key: 'my', label: 'My Scrims', icon: Shield }] : []),
@@ -160,6 +169,27 @@ export default function ScrimDashboard({
                     <button onClick={onClearImpersonation} className="sd-action-btn" style={{ padding: '2px 8px', fontSize: 11 }}>
                         Clear
                     </button>
+                </div>
+            )}
+
+            {/* Passionless banner */}
+            {passionlessTeams.length > 0 && !loading && (
+                <div className="sd-passionless-banner" onClick={() => setShowPost(true)} style={{ cursor: 'pointer' }}>
+                    <div className="sd-passionless-inner">
+                        <Flame size={18} className="sd-passionless-icon" />
+                        <div className="sd-passionless-text">
+                            <span className="sd-passionless-title">
+                                {passionlessTeams.length === 1
+                                    ? <><strong>{passionlessTeams[0].teamName}</strong> has ZERO scrims posted. Absolutely passionless.</>
+                                    : <>{passionlessTeams.map(t => <strong key={t.teamId}>{t.teamName}</strong>).reduce((a, b) => <>{a}, {b}</>)} have ZERO scrims posted. Embarrassing.</>
+                                }
+                            </span>
+                            <span className="sd-passionless-sub">
+                                Your team is collecting dust while everyone else is grinding. Post a scrim or accept your irrelevance.
+                            </span>
+                        </div>
+                        <span className="sd-passionless-cta">Post Scrim</span>
+                    </div>
                 </div>
             )}
 
