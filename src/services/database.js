@@ -163,6 +163,18 @@ export const profileService = {
     }
 }
 
+export const globalPlayerService = {
+    async getStats() {
+        return apiCall('players-global')
+    },
+    async search(q) {
+        return apiCall('players-global', { q })
+    },
+    async getNames() {
+        return apiCall('players-global', { type: 'names' })
+    },
+}
+
 export const godService = {
     async getAll() {
         return apiCall('gods')

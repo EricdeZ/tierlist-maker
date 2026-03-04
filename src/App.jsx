@@ -77,6 +77,7 @@ import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
 import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import Features from "./pages/Features.jsx";
+import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 
 // Codex
@@ -174,6 +175,7 @@ function App() {
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
+                            <Route path="players" element={<Players />} />
 
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />

@@ -503,6 +503,14 @@ export default function GlobalSidebar() {
                             })}
                         </SidebarSection>
 
+                        <SidebarLink
+                            to="/players"
+                            icon={Users}
+                            active={isActive('/players', true)}
+                        >
+                            Players
+                        </SidebarLink>
+
                         {/* Passion section */}
                         <SidebarSection
                             icon={Flame}
