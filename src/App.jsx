@@ -73,6 +73,8 @@ import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
 import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
 import ReferralManager from "./pages/admin/ReferralManager.jsx";
+import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
+import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import Features from "./pages/Features.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
@@ -130,6 +132,8 @@ function App() {
                                 <Route path="roster-sync" element={<ProtectedRoute requiredPermission="roster_manage"><DiscordRosterSync /></ProtectedRoute>} />
                                 <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
                                 <Route path="referrals" element={<ProtectedRoute requiredPermission="league_manage"><ReferralManager /></ProtectedRoute>} />
+                                <Route path="community-teams" element={<ProtectedRoute requiredPermission="league_manage"><CommunityTeamAdmin /></ProtectedRoute>} />
+                                <Route path="scrim-admin" element={<ProtectedRoute requiredPermission="league_manage"><ScrimAdmin /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
                             </Route>
 

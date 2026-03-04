@@ -857,3 +857,33 @@ export const communityTeamService = {
     },
 }
 
+export const adminCommunityService = {
+    async listTeams(params = {}) {
+        return apiCall('admin-community', { action: 'teams', ...params })
+    },
+    async teamDetail(id) {
+        return apiCall('admin-community', { action: 'team-detail', id })
+    },
+    async listScrims(params = {}) {
+        return apiCall('admin-community', { action: 'scrims', ...params })
+    },
+    async scrimStats() {
+        return apiCall('admin-community', { action: 'scrim-stats' })
+    },
+    async teamStats() {
+        return apiCall('admin-community', { action: 'team-stats' })
+    },
+    async editTeam(data) {
+        return apiPost('admin-community', { action: 'edit-team' }, data)
+    },
+    async deleteTeam(id) {
+        return apiPost('admin-community', { action: 'delete-team' }, { id })
+    },
+    async cancelScrim(id) {
+        return apiPost('admin-community', { action: 'cancel-scrim' }, { id })
+    },
+    async resolveDispute(id, outcome) {
+        return apiPost('admin-community', { action: 'resolve-dispute' }, { id, outcome })
+    },
+}
+

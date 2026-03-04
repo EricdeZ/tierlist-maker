@@ -8,7 +8,7 @@ export const FEATURE_FLAGS = {
     ENABLE_EXPORT_IMPORT: true,    // Export/import functionality
     FORGE_RELEASED: true,         // Fantasy Forge publicly visible
     DISCORD_MATCH_INACTIVE_SEASONS: true, // Auto-match Discord screenshots even when season is inactive
-    BYOT_RELEASED: false,                 // Bring Your Own Team self-service team creation
+    BYOT_RELEASED: true,                  // Bring Your Own Team self-service team creation
 }
 
 /**
