@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RANK_LABELS, getDivisionImage } from '../../utils/divisionImages'
 import TeamLogo from '../../components/TeamLogo'
-import { Crown, Users, LogOut, ChevronDown, Swords, ExternalLink, UserPlus, X } from 'lucide-react'
+import { Crown, Users, LogOut, ChevronDown, Swords, ExternalLink, UserPlus, X, Pencil } from 'lucide-react'
 
 const teamImages = import.meta.glob('../../assets/teams/*.webp', { eager: true })
 
-export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick }) {
+export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, onEdit }) {
     const [expanded, setExpanded] = useState(false)
 
     const isLeague = !!team.is_league
@@ -188,6 +188,14 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick })
                             >
                                 <ExternalLink className="w-3.5 h-3.5" /> View Team Page
                             </Link>
+                        )}
+                        {!isLeague && isCaptain && onEdit && (
+                            <button
+                                onClick={e => { e.stopPropagation(); onEdit(team) }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[var(--color-accent)] text-xs font-semibold bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/15 transition-colors cursor-pointer"
+                            >
+                                <Pencil className="w-3.5 h-3.5" /> Edit Team
+                            </button>
                         )}
                         {!isLeague && isCaptain && onInvite && (
                             <button

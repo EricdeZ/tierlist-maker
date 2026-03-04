@@ -10,6 +10,7 @@ import TeamCard from './myteams/TeamCard'
 import InvitationsPanel from './myteams/InvitationsPanel'
 import CreateTeamWizard from './myteams/CreateTeamWizard'
 import InviteMembersModal from './myteams/InviteMembersModal'
+import EditTeamModal from './myteams/EditTeamModal'
 import JoinTeamModal from './myteams/JoinTeamModal'
 
 export default function MyTeams() {
@@ -22,6 +23,7 @@ export default function MyTeams() {
     const [loading, setLoading] = useState(true)
     const [showWizard, setShowWizard] = useState(false)
     const [inviteTeam, setInviteTeam] = useState(null)
+    const [editTeam, setEditTeam] = useState(null)
     const [error, setError] = useState(null)
 
     // Browse state
@@ -224,6 +226,7 @@ export default function MyTeams() {
                                             onLeave={team.is_league ? undefined : handleLeave}
                                             onDisband={team.is_league ? undefined : handleDisband}
                                             onInvite={team.is_league ? undefined : setInviteTeam}
+                                            onEdit={team.is_league ? undefined : setEditTeam}
                                             onKick={team.is_league ? undefined : handleKick}
                                         />
                                     ))}
@@ -404,6 +407,13 @@ export default function MyTeams() {
                     <CreateTeamWizard
                         onSuccess={() => { setShowWizard(false); loadData() }}
                         onClose={() => setShowWizard(false)}
+                    />
+                )}
+                {editTeam && (
+                    <EditTeamModal
+                        team={editTeam}
+                        onSuccess={() => { setEditTeam(null); loadData() }}
+                        onClose={() => setEditTeam(null)}
                     />
                 )}
                 {inviteTeam && (

@@ -870,6 +870,18 @@ export const communityTeamService = {
         if (!res.ok) throw new Error(data.error || 'Upload failed')
         return data
     },
+    async deleteLogo(teamId) {
+        const token = localStorage.getItem('auth_token')
+        const hdrs = {}
+        if (token) hdrs.Authorization = `Bearer ${token}`
+        const res = await fetch(`${API_BASE}/community-team-upload?teamId=${teamId}`, {
+            method: 'DELETE',
+            headers: hdrs,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Delete failed')
+        return data
+    },
 }
 
 export const adminCommunityService = {
