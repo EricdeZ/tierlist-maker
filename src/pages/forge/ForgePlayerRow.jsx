@@ -30,7 +30,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
     const navigate = useNavigate()
     const avatarUrl = usePlayerAvatar(player)
     const forgeProfileUrl = isLeagueWide && player.divisionSlug
-        ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}`
+        ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}?from=all`
         : seasonSlugs
             ? `/forge/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/player/${player.playerSlug}`
             : null

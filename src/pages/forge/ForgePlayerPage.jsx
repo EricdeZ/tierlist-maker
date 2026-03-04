@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { forgeService, leagueService } from '../../services/database'
@@ -22,6 +22,8 @@ const CHANGE_VIEW_KEY = 'smite2_forge_change_view'
 export default function ForgePlayerPage() {
     const { leagueSlug, divisionSlug, playerSlug } = useParams()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const fromAll = searchParams.get('from') === 'all'
     const { user, login, loading: authLoading } = useAuth()
     const { balance, refreshBalance } = usePassion()
 
@@ -295,7 +297,7 @@ export default function ForgePlayerPage() {
         )
     }
 
-    const forgeUrl = `/forge/${leagueSlug}/${divisionSlug}`
+    const forgeUrl = fromAll ? `/forge/${leagueSlug}` : `/forge/${leagueSlug}/${divisionSlug}`
 
     const TRIGGER_LABELS = {
         fuel: 'Fueled', tutorial_fuel: 'Starter Spark', cool: 'Cooled',
