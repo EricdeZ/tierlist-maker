@@ -10,6 +10,11 @@ const STEPS = [
     { title: 'Invite', subtitle: 'Add Members' },
 ]
 
+const COLOR_PRESETS = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+    '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#a855f7',
+]
+
 const TIER_DESCRIPTIONS = {
     1: 'Top-level competitive play',
     2: 'High-level competitive play',
@@ -23,6 +28,7 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
 
     // Step 0: Team Info
     const [name, setName] = useState('')
+    const [color, setColor] = useState('#6366f1')
     const [logoFile, setLogoFile] = useState(null)
     const [logoError, setLogoError] = useState(null)
 
@@ -97,6 +103,7 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
             const { team } = await communityTeamService.create({
                 name: name.trim(),
                 skill_tier: skillTier,
+                color,
             })
 
             // 2. Upload logo if provided
@@ -257,6 +264,39 @@ export default function CreateTeamWizard({ onSuccess, onClose }) {
                                 {logoError && (
                                     <div className="mt-2 text-xs text-red-400">{logoError}</div>
                                 )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-(--color-text) mb-1.5">Team Color</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {COLOR_PRESETS.map(c => (
+                                        <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => setColor(c)}
+                                            className="w-7 h-7 rounded-full cursor-pointer transition-transform hover:scale-110"
+                                            style={{
+                                                backgroundColor: c,
+                                                outline: color === c ? '2px solid white' : '2px solid transparent',
+                                                outlineOffset: '2px',
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <div className="w-6 h-6 rounded" style={{ backgroundColor: color }} />
+                                    <input
+                                        type="text"
+                                        value={color}
+                                        onChange={e => {
+                                            const v = e.target.value
+                                            if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColor(v)
+                                        }}
+                                        maxLength={7}
+                                        className="w-24 px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-(--color-text) font-mono focus:outline-none focus:border-(--color-accent)/50"
+                                    />
+                                    <span className="text-[10px] text-(--color-text-secondary)">Used as your team's accent color</span>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -1625,6 +1625,7 @@ const XP_STYLES = `
    ═══════════════════════════════════════════════════════════════════ */
 
 .sd-dashboard {
+    padding-top: 0 !important;
     padding-bottom: 0 !important;
 }
 
@@ -1633,7 +1634,7 @@ const XP_STYLES = `
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 18px 32px !important;
+    padding: 72px 32px 18px !important;
     gap: 16px !important;
     border-bottom: 1px solid rgba(255,255,255,0.06) !important;
 }
@@ -1859,28 +1860,55 @@ const XP_STYLES = `
 .sd-dashboard .xp-scrim-card {
     background: rgba(255,255,255,0.025) !important;
     border: none !important;
-    border-left: 3px solid rgba(79, 160, 232, 0.3) !important;
+    border-left: 3px solid var(--team-color, rgba(79, 160, 232, 0.3)) !important;
     border-radius: 0 10px 10px 0 !important;
-    padding: 14px 16px !important;
-    margin-bottom: 6px !important;
+    padding: 16px 18px !important;
+    margin-bottom: 8px !important;
     box-shadow: none !important;
     transition: all 0.2s !important;
     position: relative !important;
 }
 .sd-dashboard .xp-scrim-card:hover {
     background: rgba(255,255,255,0.05) !important;
-    border-left-color: #4fa0e8 !important;
+    border-left-width: 4px !important;
     box-shadow: 0 2px 16px rgba(0,0,0,0.15) !important;
 }
 .sd-dashboard .xp-scrim-card .xp-scrim-header {
     border-bottom-color: rgba(255,255,255,0.04) !important;
 }
+.sd-dashboard .xp-scrim-card .xp-team-link {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-meta-inline {
+    font-size: 12px !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-meta-inline .xp-league-link {
+    font-size: 12px !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-meta-inline .xp-text {
+    font-size: 12px !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-body .xp-text {
+    font-size: 13px !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-body .xp-badge {
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+}
 .sd-dashboard .xp-scrim-card .xp-scrim-footer {
     border-top-color: rgba(255,255,255,0.04) !important;
     background: transparent !important;
 }
+.sd-dashboard .xp-scrim-card .xp-scrim-footer .xp-text {
+    font-size: 12px !important;
+}
 .sd-dashboard .xp-scrim-card .xp-scrim-actions {
     border-top-color: rgba(255,255,255,0.04) !important;
+}
+.sd-dashboard .xp-scrim-card .xp-scrim-actions .xp-btn {
+    font-size: 13px !important;
+    padding: 6px 16px !important;
 }
 
 /* ─── Fieldset overrides (My Scrims sections) ────────── */
@@ -2037,7 +2065,7 @@ const XP_STYLES = `
 .sd-modal-body {
     overflow-y: auto;
     flex: 1;
-    padding: 4px;
+    padding: 16px 20px;
 }
 
 /* Override filter row in dashboard */
@@ -2066,15 +2094,43 @@ const XP_STYLES = `
 
 /* Filter row */
 .sd-dashboard .sd-filter-row {
-    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
-    padding-bottom: 10px !important;
-    margin-bottom: 12px !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 0 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.sd-dashboard .sd-filter-row .xp-text {
-    color: #5a7a98 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    font-size: 10px !important;
+.sd-filter-select {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #c8d8e8;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 7px 12px;
+    padding-right: 28px;
+    cursor: pointer;
+    transition: all 0.15s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236a8aa8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+}
+.sd-filter-select:hover {
+    border-color: rgba(255,255,255,0.2);
+    background-color: rgba(255,255,255,0.06);
+}
+.sd-filter-select:focus {
+    border-color: rgba(79, 160, 232, 0.4);
+    box-shadow: 0 0 0 2px rgba(79, 160, 232, 0.1);
+    outline: none;
+}
+.sd-filter-select option {
+    background: #1a2a3e;
+    color: #c8d8e8;
 }
 
 /* Dashboard button overrides */
@@ -2097,6 +2153,334 @@ const XP_STYLES = `
     background: rgba(200, 60, 60, 0.12) !important;
     border-color: rgba(200, 60, 60, 0.2) !important;
     color: #f08080 !important;
+}
+
+/* ─── Export/Copy button overrides for dashboard ─────── */
+.sd-dashboard .xp-export-btn {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 5px !important;
+    color: #8ca8c4 !important;
+    box-shadow: none !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 10px !important;
+    padding: 3px 10px !important;
+    transition: all 0.15s !important;
+}
+.sd-dashboard .xp-export-btn:hover {
+    background: rgba(255,255,255,0.1) !important;
+    color: #c8d8e8 !important;
+    border-color: rgba(255,255,255,0.2) !important;
+}
+.sd-dashboard .xp-export-btn:active {
+    background: rgba(255,255,255,0.04) !important;
+    box-shadow: none !important;
+    border-color: rgba(255,255,255,0.15) !important;
+}
+.sd-dashboard .xp-copy-btn {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 4px !important;
+    color: #8ca8c4 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    transition: all 0.15s !important;
+}
+.sd-dashboard .xp-copy-btn:hover {
+    background: rgba(255,255,255,0.1) !important;
+    color: #c8d8e8 !important;
+    border-color: rgba(255,255,255,0.2) !important;
+}
+
+/* ─── Post Wizard inside dashboard modal ─────────────── */
+.sd-modal .xp-wizard {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+.sd-modal .xp-wizard-body {
+    background: transparent !important;
+    padding: 0 !important;
+}
+.sd-modal .xp-wizard-sidebar {
+    display: none !important;
+}
+.sd-modal .xp-wizard-content {
+    background: transparent !important;
+    padding: 0 !important;
+    max-width: none !important;
+}
+.sd-modal .xp-wizard-mobile-step {
+    color: #5a7a98 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px !important;
+    margin-bottom: 6px !important;
+}
+.sd-modal .xp-wizard-footer {
+    background: transparent !important;
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+    padding: 12px 16px !important;
+}
+.sd-modal .xp-step-divider {
+    background: rgba(255,255,255,0.08) !important;
+}
+.sd-modal .xp-text {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    color: #c8d8e8 !important;
+}
+.sd-modal .xp-text-muted,
+.sd-modal .xp-text[style*="color: #555"],
+.sd-modal .xp-text[style*="color: #666"] {
+    color: #6a8aa8 !important;
+}
+.sd-modal .xp-fieldset {
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,0.02) !important;
+    padding: 14px !important;
+    margin-bottom: 12px !important;
+}
+.sd-modal .xp-fieldset-legend {
+    color: #8cb0d0 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    letter-spacing: 0.3px !important;
+}
+.sd-modal .xp-input,
+.sd-modal .xp-select,
+.sd-modal .xp-textarea {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #c8d8e8 !important;
+    border-radius: 6px !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+}
+.sd-modal .xp-input:focus,
+.sd-modal .xp-select:focus,
+.sd-modal .xp-textarea:focus {
+    border-color: rgba(79, 160, 232, 0.4) !important;
+    box-shadow: 0 0 0 2px rgba(79, 160, 232, 0.1) !important;
+    outline: none !important;
+}
+.sd-modal .xp-input::placeholder {
+    color: #4a6a88 !important;
+}
+.sd-modal .xp-select option {
+    background: #1a2a3e !important;
+    color: #c8d8e8 !important;
+}
+.sd-modal .xp-time-select {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #c8d8e8 !important;
+    border-radius: 6px !important;
+    padding: 8px 10px !important;
+    font-size: 14px !important;
+}
+.sd-modal .xp-time-select option {
+    background: #1a2a3e !important;
+    color: #c8d8e8 !important;
+}
+.sd-modal .xp-time-colon {
+    color: #5a7a98 !important;
+    font-size: 20px !important;
+}
+.sd-modal .xp-radio-label,
+.sd-modal .xp-checkbox-label {
+    color: #c8d8e8 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    padding: 4px 0 !important;
+}
+.sd-modal .xp-radio,
+.sd-modal .xp-checkbox {
+    accent-color: #4fa0e8 !important;
+}
+.sd-modal .xp-btn {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    padding: 6px 14px !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #c8d8e8 !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+}
+.sd-modal .xp-btn:hover {
+    background: rgba(255,255,255,0.1) !important;
+}
+.sd-modal .xp-btn-primary {
+    background: linear-gradient(135deg, #4fa0e8, #3d7cc4) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+}
+.sd-modal .xp-btn-primary:hover {
+    box-shadow: 0 2px 12px rgba(79, 160, 232, 0.3) !important;
+}
+.sd-modal .xp-btn-danger {
+    background: rgba(200, 60, 60, 0.15) !important;
+    border-color: rgba(200, 60, 60, 0.3) !important;
+    color: #f08080 !important;
+}
+.sd-modal .xp-btn-danger:hover {
+    background: rgba(200, 60, 60, 0.25) !important;
+}
+.sd-modal .xp-btn:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+}
+.sd-modal .xp-badge {
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+}
+.sd-modal .xp-team-card {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+}
+.sd-modal .xp-division-preview {
+    background: rgba(79, 160, 232, 0.08) !important;
+    border: 1px solid rgba(79, 160, 232, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+}
+.sd-modal .xp-division-preview-title {
+    color: #4fa0e8 !important;
+}
+.sd-modal .xp-selected-date {
+    color: #4fa0e8 !important;
+}
+.sd-modal .xp-info-box-warn {
+    background: rgba(200, 160, 0, 0.08) !important;
+    border: 1px solid rgba(200, 160, 0, 0.25) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+}
+.sd-modal .xp-info-box-warn .xp-info-box-text,
+.sd-modal .xp-info-box-warn .xp-text {
+    color: #e0b040 !important;
+}
+.sd-modal .xp-info-box-error {
+    background: rgba(220, 60, 60, 0.08) !important;
+    border: 1px solid rgba(220, 60, 60, 0.25) !important;
+    border-radius: 8px !important;
+}
+.sd-modal .xp-info-box-error .xp-info-box-text,
+.sd-modal .xp-info-box-error .xp-text {
+    color: #f08080 !important;
+}
+.sd-modal .xp-challenged-team {
+    background: rgba(128, 48, 192, 0.1) !important;
+    border: 1px solid rgba(128, 48, 192, 0.25) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+}
+.sd-modal .xp-challenged-team-name {
+    color: #d090ff !important;
+}
+.sd-modal .xp-listbox {
+    background: #1a2a3e !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+}
+.sd-modal .xp-listbox-item {
+    background: transparent !important;
+    color: #c8d8e8 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+}
+.sd-modal .xp-listbox-item:hover {
+    background: rgba(79, 160, 232, 0.1) !important;
+}
+.sd-modal .xp-error-icon {
+    background: rgba(220, 60, 60, 0.2) !important;
+    border-color: rgba(220, 60, 60, 0.4) !important;
+    color: #f08080 !important;
+}
+.sd-modal .xp-calendar {
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+}
+.sd-modal .xp-calendar-header {
+    background: rgba(255,255,255,0.04) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    color: #c8d8e8 !important;
+}
+.sd-modal .xp-calendar-day {
+    color: #c8d8e8 !important;
+    background: transparent !important;
+}
+.sd-modal .xp-calendar-day:hover {
+    background: rgba(79, 160, 232, 0.12) !important;
+}
+.sd-modal .xp-calendar-day-today {
+    background: rgba(79, 160, 232, 0.18) !important;
+    color: #4fa0e8 !important;
+}
+.sd-modal .xp-calendar-day-selected {
+    background: rgba(79, 160, 232, 0.3) !important;
+    color: #fff !important;
+}
+.sd-modal .xp-calendar-day-header {
+    color: #5a7a98 !important;
+}
+.sd-modal .xp-calendar-day-past {
+    color: #3a5060 !important;
+    opacity: 0.5 !important;
+}
+.sd-modal .xp-calendar-day-scrim::after {
+    background: #f0a020 !important;
+}
+.sd-modal .xp-calendar > div:last-child {
+    background: rgba(255,255,255,0.02) !important;
+    border-top-color: rgba(255,255,255,0.06) !important;
+}
+/* XpDialog inside dashboard modal */
+.sd-modal .xp-dialog-overlay {
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+.sd-modal .xp-dialog {
+    background: #14202e !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.5) !important;
+}
+.sd-modal .xp-title-bar {
+    background: rgba(255,255,255,0.04) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 10px 14px !important;
+}
+.sd-modal .xp-title-text {
+    color: #c8d8e8 !important;
+    font-family: 'Lato', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+.sd-modal .xp-title-btn {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #8ca8c4 !important;
+    border-radius: 6px !important;
+}
+.sd-modal .xp-title-btn:hover {
+    background: rgba(200, 60, 60, 0.15) !important;
+    color: #f08080 !important;
+}
+.sd-modal .xp-window-body {
+    padding: 16px !important;
 }
 
 /* Scrollbar for sidebar */

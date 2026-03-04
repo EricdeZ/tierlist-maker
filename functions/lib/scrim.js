@@ -8,6 +8,7 @@ export const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian
 export const PICK_MODE_LABELS = { regular: 'Regular', fearless: 'Fearless', fearless_picks: 'Fearless Picks', fearless_bans: 'Fearless Bans' }
 const VALID_PICK_MODES = ['regular', 'fearless', 'fearless_picks', 'fearless_bans']
 const VALID_REGIONS = ['NA', 'EU']
+const MIN_COMMUNITY_TEAM_PLAYERS = 5
 
 
 // ═══════════════════════════════════════════════════
@@ -82,6 +83,7 @@ export function formatScrim(row) {
         outcomeReportedAt: row.outcome_reported_at || null,
         outcomeDisputed: row.outcome_disputed || false,
         outcomeDisputeDeadline: row.outcome_dispute_deadline || null,
+        allowCommunityTeams: row.allow_community_teams || false,
     }
 }
 
@@ -97,7 +99,60 @@ export function formatTeamForResponse(t) {
         divisionSlug: t.division_slug,
         leagueName: t.league_name,
         leagueSlug: t.league_slug,
+        isCommunityTeam: t.team_id < 0,
+        ...(t.team_id < 0 ? { memberCount: t.member_count, eligible: t.eligible } : {}),
     }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Query: Get community teams where user is captain
+// ═══════════════════════════════════════════════════
+export async function getCommunityTeamsCaptain(sql, userId) {
+    const rows = await sql`
+        SELECT ct.id, ct.name, ct.slug, ct.logo_url, ct.skill_tier,
+               (SELECT COUNT(*) FROM community_team_members m
+                WHERE m.team_id = ct.id AND m.status = 'active') AS member_count
+        FROM community_teams ct
+        JOIN community_team_members ctm ON ctm.team_id = ct.id
+        WHERE ctm.user_id = ${userId}
+          AND ctm.role = 'captain' AND ctm.status = 'active'
+    `
+    return rows.map(ct => ({
+        team_id: -ct.id,
+        team_name: ct.name,
+        team_slug: ct.slug,
+        team_logo: ct.logo_url,
+        team_color: null,
+        season_id: null,
+        season_name: null,
+        division_name: 'Community Team',
+        division_tier: ct.skill_tier,
+        division_slug: null,
+        league_id: null,
+        league_name: 'Community',
+        league_slug: null,
+        member_count: Number(ct.member_count),
+        eligible: Number(ct.member_count) >= MIN_COMMUNITY_TEAM_PLAYERS,
+    }))
+}
+
+export async function getCommunityTeamMemberCount(sql, communityTeamId) {
+    const [row] = await sql`
+        SELECT COUNT(*) AS cnt FROM community_team_members
+        WHERE team_id = ${communityTeamId} AND status = 'active'
+    `
+    return Number(row.cnt)
+}
+
+export async function deleteOpenScrimsForCommunityTeam(sql, communityTeamId) {
+    const deleted = await sql`
+        DELETE FROM scrim_requests
+        WHERE team_id = ${-communityTeamId}
+          AND status IN ('open', 'pending_confirmation')
+        RETURNING id
+    `
+    return deleted.length
 }
 
 
@@ -179,21 +234,25 @@ async function getAllActiveTeamsForScrimManage(sql) {
 // Helper: Get eligible teams (captain OR scrim_manage)
 // ═══════════════════════════════════════════════════
 export async function getEligibleTeams(sql, userId) {
-    const captainTeams = await getCaptainTeams(sql, userId)
-    const hasPermission = await hasScrimManagePermission(sql, userId)
+    const [captainTeams, communityTeams] = await Promise.all([
+        getCaptainTeams(sql, userId),
+        getCommunityTeamsCaptain(sql, userId),
+    ])
+    const teams = [...captainTeams, ...communityTeams]
 
-    if (!hasPermission) return captainTeams
+    const hasPermission = await hasScrimManagePermission(sql, userId)
+    if (!hasPermission) return teams
 
     // scrim_manage users get all active teams
     const allTeams = await getAllActiveTeamsForScrimManage(sql)
-    const seen = new Set(captainTeams.map(t => t.team_id))
+    const seen = new Set(teams.map(t => t.team_id))
     for (const t of allTeams) {
         if (!seen.has(t.team_id)) {
-            captainTeams.push(t)
+            teams.push(t)
             seen.add(t.team_id)
         }
     }
-    return captainTeams
+    return teams
 }
 
 
@@ -205,20 +264,29 @@ export async function notifyScrimAccepted(sql, scrimId, accepterTeamId) {
         const [row] = await sql`
             SELECT
                 sr.scheduled_date, sr.pick_mode, sr.banned_content_league, sr.notes,
-                pt.name AS poster_team, pd.name AS poster_div, pd.tier AS poster_tier, pl.name AS poster_league,
+                sr.team_id, sr.accepted_team_id,
+                CASE WHEN sr.team_id < 0 THEN cmt_p.name ELSE pt.name END AS poster_team,
+                CASE WHEN sr.team_id < 0 THEN 'Community Team' ELSE pd.name END AS poster_div,
+                CASE WHEN sr.team_id < 0 THEN cmt_p.skill_tier ELSE pd.tier END AS poster_tier,
+                CASE WHEN sr.team_id < 0 THEN 'Community' ELSE pl.name END AS poster_league,
                 pu.discord_id AS poster_discord_id,
-                at2.name AS accepter_team, ad.name AS accepter_div, ad.tier AS accepter_tier, al.name AS accepter_league,
+                CASE WHEN sr.accepted_team_id < 0 THEN cmt_a.name ELSE at2.name END AS accepter_team,
+                CASE WHEN sr.accepted_team_id < 0 THEN 'Community Team' ELSE ad.name END AS accepter_div,
+                CASE WHEN sr.accepted_team_id < 0 THEN cmt_a.skill_tier ELSE ad.tier END AS accepter_tier,
+                CASE WHEN sr.accepted_team_id < 0 THEN 'Community' ELSE al.name END AS accepter_league,
                 au.discord_id AS accepter_discord_id
             FROM scrim_requests sr
-            JOIN teams pt ON pt.id = sr.team_id
-            JOIN seasons ps ON ps.id = pt.season_id
-            JOIN divisions pd ON pd.id = ps.division_id
-            JOIN leagues pl ON pl.id = ps.league_id
+            LEFT JOIN teams pt ON pt.id = sr.team_id AND sr.team_id > 0
+            LEFT JOIN seasons ps ON ps.id = pt.season_id
+            LEFT JOIN divisions pd ON pd.id = ps.division_id
+            LEFT JOIN leagues pl ON pl.id = ps.league_id
+            LEFT JOIN community_teams cmt_p ON cmt_p.id = -sr.team_id AND sr.team_id < 0
             JOIN users pu ON pu.id = sr.user_id
-            JOIN teams at2 ON at2.id = sr.accepted_team_id
-            JOIN seasons as2 ON as2.id = at2.season_id
-            JOIN divisions ad ON ad.id = as2.division_id
-            JOIN leagues al ON al.id = as2.league_id
+            LEFT JOIN teams at2 ON at2.id = sr.accepted_team_id AND sr.accepted_team_id > 0
+            LEFT JOIN seasons as2 ON as2.id = at2.season_id
+            LEFT JOIN divisions ad ON ad.id = as2.division_id
+            LEFT JOIN leagues al ON al.id = as2.league_id
+            LEFT JOIN community_teams cmt_a ON cmt_a.id = -sr.accepted_team_id AND sr.accepted_team_id < 0
             JOIN users au ON au.id = sr.accepted_user_id
             WHERE sr.id = ${scrimId}
         `
@@ -293,16 +361,21 @@ export async function sendConfirmationDM(sql, scrimId, pendingTeamId) {
         const [row] = await sql`
             SELECT
                 sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
-                pt.name AS poster_team, pu.discord_id AS poster_discord_id,
-                pnt.name AS pending_team, pnd.name AS pending_div, pnd.tier AS pending_tier,
-                pnl.name AS pending_league
+                CASE WHEN sr.team_id < 0 THEN cmt_p.name ELSE pt.name END AS poster_team,
+                pu.discord_id AS poster_discord_id,
+                CASE WHEN sr.pending_team_id < 0 THEN cmt_pn.name ELSE pnt.name END AS pending_team,
+                CASE WHEN sr.pending_team_id < 0 THEN 'Community Team' ELSE pnd.name END AS pending_div,
+                CASE WHEN sr.pending_team_id < 0 THEN cmt_pn.skill_tier ELSE pnd.tier END AS pending_tier,
+                CASE WHEN sr.pending_team_id < 0 THEN 'Community' ELSE pnl.name END AS pending_league
             FROM scrim_requests sr
-            JOIN teams pt ON pt.id = sr.team_id
+            LEFT JOIN teams pt ON pt.id = sr.team_id AND sr.team_id > 0
+            LEFT JOIN community_teams cmt_p ON cmt_p.id = -sr.team_id AND sr.team_id < 0
             JOIN users pu ON pu.id = sr.user_id
-            JOIN teams pnt ON pnt.id = sr.pending_team_id
-            JOIN seasons pns ON pns.id = pnt.season_id
-            JOIN divisions pnd ON pnd.id = pns.division_id
-            JOIN leagues pnl ON pnl.id = pns.league_id
+            LEFT JOIN teams pnt ON pnt.id = sr.pending_team_id AND sr.pending_team_id > 0
+            LEFT JOIN seasons pns ON pns.id = pnt.season_id
+            LEFT JOIN divisions pnd ON pnd.id = pns.division_id
+            LEFT JOIN leagues pnl ON pnl.id = pns.league_id
+            LEFT JOIN community_teams cmt_pn ON cmt_pn.id = -sr.pending_team_id AND sr.pending_team_id < 0
             WHERE sr.id = ${scrimId}
         `
         if (!row || !row.poster_discord_id) return
@@ -363,24 +436,31 @@ export async function listScrims(sql, params) {
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
             sr.notes, sr.status, sr.acceptable_tiers, sr.acceptable_divisions,
-            sr.region, sr.requires_confirmation,
+            sr.region, sr.requires_confirmation, sr.allow_community_teams,
             sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
-            t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
-            l.name as league_name, l.slug as league_slug,
+            CASE WHEN sr.team_id < 0 THEN cmt.name ELSE t.name END as team_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.slug ELSE t.slug END as team_slug,
+            CASE WHEN sr.team_id < 0 THEN cmt.logo_url ELSE t.logo_url END as team_logo,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE t.color END as team_color,
+            CASE WHEN sr.team_id < 0 THEN 'Community Team' ELSE d.name END as division_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.skill_tier ELSE d.tier END as division_tier,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE d.slug END as division_slug,
+            CASE WHEN sr.team_id < 0 THEN 'Community' ELSE l.name END as league_name,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE l.slug END as league_slug,
             u.discord_username as posted_by,
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
             cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name
         FROM scrim_requests sr
-        JOIN teams t ON t.id = sr.team_id
-        JOIN seasons s ON s.id = t.season_id
-        JOIN divisions d ON d.id = s.division_id
-        JOIN leagues l ON l.id = s.league_id
+        LEFT JOIN teams t ON t.id = sr.team_id AND sr.team_id > 0
+        LEFT JOIN seasons s ON s.id = t.season_id
+        LEFT JOIN divisions d ON d.id = s.division_id
+        LEFT JOIN leagues l ON l.id = s.league_id
+        LEFT JOIN community_teams cmt ON cmt.id = -sr.team_id AND sr.team_id < 0
         JOIN users u ON u.id = sr.user_id
-        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id
+        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id AND sr.challenged_team_id > 0
         LEFT JOIN seasons cs ON cs.id = ct.season_id
         LEFT JOIN divisions cd ON cd.id = cs.division_id
         LEFT JOIN leagues cl ON cl.id = cs.league_id
@@ -417,46 +497,73 @@ export async function fetchMyScrims(sql, userId) {
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
             sr.notes, sr.status, sr.acceptable_tiers, sr.acceptable_divisions,
-            sr.region, sr.requires_confirmation,
+            sr.region, sr.requires_confirmation, sr.allow_community_teams,
             sr.pending_team_id, sr.pending_user_id, sr.pending_at,
             sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
             sr.outcome, sr.outcome_reported_by, sr.outcome_reported_at,
             sr.outcome_disputed, sr.outcome_dispute_deadline,
-            t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
-            l.name as league_name, l.slug as league_slug,
+            -- Poster team (league or community)
+            CASE WHEN sr.team_id < 0 THEN cmt.name ELSE t.name END as team_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.slug ELSE t.slug END as team_slug,
+            CASE WHEN sr.team_id < 0 THEN cmt.logo_url ELSE t.logo_url END as team_logo,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE t.color END as team_color,
+            CASE WHEN sr.team_id < 0 THEN 'Community Team' ELSE d.name END as division_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.skill_tier ELSE d.tier END as division_tier,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE d.slug END as division_slug,
+            CASE WHEN sr.team_id < 0 THEN 'Community' ELSE l.name END as league_name,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE l.slug END as league_slug,
             u.discord_username as posted_by,
+            -- Challenged team
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
             cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name,
-            at2.name as accepted_team_name, at2.slug as accepted_team_slug,
-            at2.logo_url as accepted_team_logo, at2.color as accepted_team_color,
-            ad.name as accepted_division_name, ad.tier as accepted_division_tier, ad.slug as accepted_division_slug,
-            al.name as accepted_league_name,
-            pnt.name as pending_team_name, pnt.slug as pending_team_slug,
-            pnt.logo_url as pending_team_logo, pnt.color as pending_team_color,
-            pnd.name as pending_division_name, pnd.tier as pending_division_tier,
-            pnl.name as pending_league_name
+            -- Accepted team (league or community)
+            CASE WHEN sr.accepted_team_id < 0 THEN cma.name ELSE at2.name END as accepted_team_name,
+            CASE WHEN sr.accepted_team_id < 0 THEN cma.slug ELSE at2.slug END as accepted_team_slug,
+            CASE WHEN sr.accepted_team_id < 0 THEN cma.logo_url ELSE at2.logo_url END as accepted_team_logo,
+            CASE WHEN sr.accepted_team_id < 0 THEN NULL ELSE at2.color END as accepted_team_color,
+            CASE WHEN sr.accepted_team_id < 0 THEN 'Community Team' ELSE ad.name END as accepted_division_name,
+            CASE WHEN sr.accepted_team_id < 0 THEN cma.skill_tier ELSE ad.tier END as accepted_division_tier,
+            CASE WHEN sr.accepted_team_id < 0 THEN NULL ELSE ad.slug END as accepted_division_slug,
+            CASE WHEN sr.accepted_team_id < 0 THEN 'Community' ELSE al.name END as accepted_league_name,
+            -- Pending team (league or community)
+            CASE WHEN sr.pending_team_id < 0 THEN cmp.name ELSE pnt.name END as pending_team_name,
+            CASE WHEN sr.pending_team_id < 0 THEN cmp.slug ELSE pnt.slug END as pending_team_slug,
+            CASE WHEN sr.pending_team_id < 0 THEN cmp.logo_url ELSE pnt.logo_url END as pending_team_logo,
+            CASE WHEN sr.pending_team_id < 0 THEN NULL ELSE pnt.color END as pending_team_color,
+            CASE WHEN sr.pending_team_id < 0 THEN 'Community Team' ELSE pnd.name END as pending_division_name,
+            CASE WHEN sr.pending_team_id < 0 THEN cmp.skill_tier ELSE pnd.tier END as pending_division_tier,
+            CASE WHEN sr.pending_team_id < 0 THEN 'Community' ELSE pnl.name END as pending_league_name
         FROM scrim_requests sr
-        JOIN teams t ON t.id = sr.team_id
-        JOIN seasons s ON s.id = t.season_id
-        JOIN divisions d ON d.id = s.division_id
-        JOIN leagues l ON l.id = s.league_id
+        -- Poster: league team
+        LEFT JOIN teams t ON t.id = sr.team_id AND sr.team_id > 0
+        LEFT JOIN seasons s ON s.id = t.season_id
+        LEFT JOIN divisions d ON d.id = s.division_id
+        LEFT JOIN leagues l ON l.id = s.league_id
+        -- Poster: community team
+        LEFT JOIN community_teams cmt ON cmt.id = -sr.team_id AND sr.team_id < 0
         JOIN users u ON u.id = sr.user_id
-        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id
+        -- Challenged team (always league)
+        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id AND sr.challenged_team_id > 0
         LEFT JOIN seasons cs ON cs.id = ct.season_id
         LEFT JOIN divisions cd ON cd.id = cs.division_id
         LEFT JOIN leagues cl ON cl.id = cs.league_id
-        LEFT JOIN teams at2 ON at2.id = sr.accepted_team_id
+        -- Accepted: league team
+        LEFT JOIN teams at2 ON at2.id = sr.accepted_team_id AND sr.accepted_team_id > 0
         LEFT JOIN seasons as2 ON as2.id = at2.season_id
         LEFT JOIN divisions ad ON ad.id = as2.division_id
         LEFT JOIN leagues al ON al.id = as2.league_id
-        LEFT JOIN teams pnt ON pnt.id = sr.pending_team_id
+        -- Accepted: community team
+        LEFT JOIN community_teams cma ON cma.id = -sr.accepted_team_id AND sr.accepted_team_id < 0
+        -- Pending: league team
+        LEFT JOIN teams pnt ON pnt.id = sr.pending_team_id AND sr.pending_team_id > 0
         LEFT JOIN seasons pns ON pns.id = pnt.season_id
         LEFT JOIN divisions pnd ON pnd.id = pns.division_id
         LEFT JOIN leagues pnl ON pnl.id = pns.league_id
+        -- Pending: community team
+        LEFT JOIN community_teams cmp ON cmp.id = -sr.pending_team_id AND sr.pending_team_id < 0
         WHERE sr.team_id = ANY(${teamIds})
            OR sr.challenged_team_id = ANY(${teamIds})
            OR sr.accepted_team_id = ANY(${teamIds})
@@ -472,17 +579,7 @@ export async function fetchMyScrims(sql, userId) {
 
     return {
         scrims: scrims.map(formatScrim),
-        captainTeams: captainTeams.map(t => ({
-            teamId: t.team_id,
-            teamName: t.team_name,
-            teamSlug: t.team_slug,
-            teamLogo: t.team_logo,
-            teamColor: t.team_color,
-            divisionName: t.division_name,
-            divisionTier: t.division_tier,
-            leagueName: t.league_name,
-            leagueSlug: t.league_slug,
-        })),
+        captainTeams: captainTeams.map(formatTeamForResponse),
         myTeams: myTeams.map(t => ({
             teamId: t.team_id,
             teamName: t.team_name,
@@ -507,33 +604,44 @@ export async function fetchIncoming(sql, userId) {
 
     const teamIds = captainTeams.map(t => t.team_id)
 
+    // Only league team IDs for incoming (community teams can't receive direct challenges)
+    const leagueTeamIds = teamIds.filter(id => id > 0)
+    if (leagueTeamIds.length === 0) return []
+
     const scrims = await sql`
         SELECT
             sr.id, sr.team_id, sr.user_id, sr.challenged_team_id,
             sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
             sr.notes, sr.status, sr.acceptable_tiers, sr.acceptable_divisions,
-            sr.region, sr.requires_confirmation,
+            sr.region, sr.requires_confirmation, sr.allow_community_teams,
             sr.accepted_team_id, sr.accepted_user_id,
             sr.accepted_at, sr.created_at, sr.updated_at,
-            t.name as team_name, t.slug as team_slug, t.logo_url as team_logo, t.color as team_color,
-            d.name as division_name, d.tier as division_tier, d.slug as division_slug,
-            l.name as league_name, l.slug as league_slug,
+            CASE WHEN sr.team_id < 0 THEN cmt.name ELSE t.name END as team_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.slug ELSE t.slug END as team_slug,
+            CASE WHEN sr.team_id < 0 THEN cmt.logo_url ELSE t.logo_url END as team_logo,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE t.color END as team_color,
+            CASE WHEN sr.team_id < 0 THEN 'Community Team' ELSE d.name END as division_name,
+            CASE WHEN sr.team_id < 0 THEN cmt.skill_tier ELSE d.tier END as division_tier,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE d.slug END as division_slug,
+            CASE WHEN sr.team_id < 0 THEN 'Community' ELSE l.name END as league_name,
+            CASE WHEN sr.team_id < 0 THEN NULL ELSE l.slug END as league_slug,
             u.discord_username as posted_by,
             ct.name as challenged_team_name, ct.slug as challenged_team_slug,
             ct.logo_url as challenged_team_logo, ct.color as challenged_team_color,
             cd.name as challenged_division_name, cd.slug as challenged_division_slug,
             cl.name as challenged_league_name
         FROM scrim_requests sr
-        JOIN teams t ON t.id = sr.team_id
-        JOIN seasons s ON s.id = t.season_id
-        JOIN divisions d ON d.id = s.division_id
-        JOIN leagues l ON l.id = s.league_id
+        LEFT JOIN teams t ON t.id = sr.team_id AND sr.team_id > 0
+        LEFT JOIN seasons s ON s.id = t.season_id
+        LEFT JOIN divisions d ON d.id = s.division_id
+        LEFT JOIN leagues l ON l.id = s.league_id
+        LEFT JOIN community_teams cmt ON cmt.id = -sr.team_id AND sr.team_id < 0
         JOIN users u ON u.id = sr.user_id
-        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id
+        LEFT JOIN teams ct ON ct.id = sr.challenged_team_id AND sr.challenged_team_id > 0
         LEFT JOIN seasons cs ON cs.id = ct.season_id
         LEFT JOIN divisions cd ON cd.id = cs.division_id
         LEFT JOIN leagues cl ON cl.id = cs.league_id
-        WHERE sr.challenged_team_id = ANY(${teamIds})
+        WHERE sr.challenged_team_id = ANY(${leagueTeamIds})
           AND sr.status = 'open'
           AND sr.scheduled_date > NOW()
         ORDER BY sr.scheduled_date ASC
@@ -544,19 +652,22 @@ export async function fetchIncoming(sql, userId) {
 
 
 export async function fetchAllActiveTeams(sql) {
-    const teams = await sql`
-        SELECT t.id, t.name, t.slug, t.logo_url, t.color,
-               d.id as division_id, d.name as division_name, d.tier as division_tier,
-               l.id as league_id, l.name as league_name, l.slug as league_slug
-        FROM teams t
-        JOIN seasons s ON s.id = t.season_id
-        JOIN divisions d ON d.id = s.division_id
-        JOIN leagues l ON l.id = s.league_id
-        WHERE s.is_active = true
-        ORDER BY l.name, d.tier NULLS LAST, t.name
-    `
+    const [leagueTeams, communityTeams] = await Promise.all([
+        sql`
+            SELECT t.id, t.name, t.slug, t.logo_url, t.color,
+                   d.id as division_id, d.name as division_name, d.tier as division_tier,
+                   l.id as league_id, l.name as league_name, l.slug as league_slug
+            FROM teams t
+            JOIN seasons s ON s.id = t.season_id
+            JOIN divisions d ON d.id = s.division_id
+            JOIN leagues l ON l.id = s.league_id
+            WHERE s.is_active = true
+            ORDER BY l.name, d.tier NULLS LAST, t.name
+        `,
+        sql`SELECT id, name, slug, logo_url, skill_tier FROM community_teams ORDER BY name`,
+    ])
 
-    return teams.map(t => ({
+    const formatted = leagueTeams.map(t => ({
         id: t.id,
         name: t.name,
         slug: t.slug,
@@ -568,7 +679,27 @@ export async function fetchAllActiveTeams(sql) {
         leagueId: t.league_id,
         leagueName: t.league_name,
         leagueSlug: t.league_slug,
+        isCommunityTeam: false,
     }))
+
+    for (const ct of communityTeams) {
+        formatted.push({
+            id: -ct.id,
+            name: ct.name,
+            slug: ct.slug,
+            logoUrl: ct.logo_url,
+            color: null,
+            divisionId: null,
+            divisionName: 'Community Team',
+            divisionTier: ct.skill_tier,
+            leagueId: null,
+            leagueName: 'Community',
+            leagueSlug: null,
+            isCommunityTeam: true,
+        })
+    }
+
+    return formatted
 }
 
 
@@ -809,7 +940,7 @@ export async function pollDMConfirmations(sql, userId) {
 export async function createScrim(sql, user, body) {
     const { team_id, scheduled_date, pick_mode, banned_content_league, notes,
             challenged_team_id, acceptable_tiers, acceptable_divisions,
-            region, requires_confirmation } = body
+            region, requires_confirmation, allow_community_teams } = body
 
     if (!team_id || !scheduled_date) {
         return { error: 'team_id and scheduled_date are required', status: 400 }
@@ -833,6 +964,14 @@ export async function createScrim(sql, user, body) {
     const isEligible = captainTeams.some(t => t.team_id === team_id)
     if (!isEligible) {
         return { error: 'You are not a captain of this team', status: 403 }
+    }
+
+    // Community team minimum player check
+    if (team_id < 0) {
+        const count = await getCommunityTeamMemberCount(sql, Math.abs(team_id))
+        if (count < MIN_COMMUNITY_TEAM_PLAYERS) {
+            return { error: `Your community team needs at least ${MIN_COMMUNITY_TEAM_PLAYERS} active players to post scrims. Invite more players to get started.`, status: 400 }
+        }
     }
 
     // Default region: EU for Tanuki, NA for everything else
@@ -896,13 +1035,13 @@ export async function createScrim(sql, user, body) {
         INSERT INTO scrim_requests (
             team_id, user_id, challenged_team_id, scheduled_date, pick_mode,
             banned_content_league, notes, acceptable_tiers, acceptable_divisions,
-            region, requires_confirmation
+            region, requires_confirmation, allow_community_teams
         ) VALUES (
             ${team_id}, ${user.id}, ${challenged_team_id || null}, ${scheduled_date},
             ${pick_mode || 'regular'}, ${banned_content_league || null}, ${notes || null},
             ${acceptable_tiers ? JSON.stringify(acceptable_tiers) : null},
             ${acceptable_divisions ? JSON.stringify(acceptable_divisions) : null},
-            ${effectiveRegion}, ${!!requires_confirmation}
+            ${effectiveRegion}, ${!!requires_confirmation}, ${!!allow_community_teams}
         )
         RETURNING id, status, created_at
     `
@@ -925,10 +1064,19 @@ export async function acceptScrim(sql, user, body, waitUntil) {
         return { error: 'You are not a captain of this team', status: 403 }
     }
 
+    // Community team minimum player check
+    if (team_id < 0) {
+        const count = await getCommunityTeamMemberCount(sql, Math.abs(team_id))
+        if (count < MIN_COMMUNITY_TEAM_PLAYERS) {
+            return { error: `Your community team needs at least ${MIN_COMMUNITY_TEAM_PLAYERS} active players to accept scrims. Invite more players to get started.`, status: 400 }
+        }
+    }
+
     // Get the scrim
     const [scrim] = await sql`
         SELECT id, team_id, challenged_team_id, status, scheduled_date,
-               acceptable_tiers, acceptable_divisions, requires_confirmation
+               acceptable_tiers, acceptable_divisions, requires_confirmation,
+               allow_community_teams
         FROM scrim_requests WHERE id = ${scrim_id}
     `
     if (!scrim) {
@@ -948,8 +1096,14 @@ export async function acceptScrim(sql, user, body, waitUntil) {
         return { error: 'This challenge was not sent to your team', status: 403 }
     }
 
-    // Validate acceptable_tiers (server-side enforcement)
-    if (scrim.acceptable_tiers) {
+    // Community team accepting — must be allowed by the scrim
+    const isCommunityTeamAccepting = team_id < 0
+    if (isCommunityTeamAccepting && !scrim.allow_community_teams) {
+        return { error: 'This scrim does not allow community teams', status: 403 }
+    }
+
+    // Validate acceptable_tiers (server-side enforcement) — skip for community teams
+    if (scrim.acceptable_tiers && !isCommunityTeamAccepting) {
         const [acceptingTeam] = await sql`
             SELECT d.tier as division_tier FROM teams t
             JOIN seasons s ON s.id = t.season_id
@@ -961,8 +1115,8 @@ export async function acceptScrim(sql, user, body, waitUntil) {
         }
     }
 
-    // Validate acceptable_divisions (server-side enforcement)
-    if (scrim.acceptable_divisions) {
+    // Validate acceptable_divisions (server-side enforcement) — skip for community teams
+    if (scrim.acceptable_divisions && !isCommunityTeamAccepting) {
         const [acceptingTeam] = await sql`
             SELECT d.id as division_id FROM teams t
             JOIN seasons s ON s.id = t.season_id
@@ -1304,6 +1458,14 @@ export async function confirmAccept(sql, user, body, waitUntil) {
     const captainTeams = await getEligibleTeams(sql, user.id)
     if (!captainTeams.some(t => t.team_id === scrim.team_id)) {
         return { error: 'Only the posting team captain can confirm', status: 403 }
+    }
+
+    // Re-validate community team member count before confirming
+    if (scrim.pending_team_id < 0) {
+        const count = await getCommunityTeamMemberCount(sql, Math.abs(scrim.pending_team_id))
+        if (count < MIN_COMMUNITY_TEAM_PLAYERS) {
+            return { error: `The accepting community team no longer has ${MIN_COMMUNITY_TEAM_PLAYERS} active players`, status: 400 }
+        }
     }
 
     const [updated] = await sql`

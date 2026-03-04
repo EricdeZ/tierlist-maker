@@ -7,7 +7,7 @@ import XpCalendar from '../../components/xp/XpCalendar'
 import XpDialog from '../../components/xp/XpDialog'
 import { PICK_MODES, XP_PICK_BADGE, formatPickMode } from './scrimUtils'
 
-export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess }) {
+export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSuccess, onCancel }) {
     const [step, setStep] = useState(0)
 
     // Form state
@@ -36,6 +36,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         return captainTeams[0]?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA'
     })
     const [requiresConfirmation, setRequiresConfirmation] = useState(false)
+    const [allowCommunityTeams, setAllowCommunityTeams] = useState(false)
 
     // UI state
     const [teamSearch, setTeamSearch] = useState('')
@@ -124,7 +125,12 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     ]
 
     const canAdvance = () => {
-        if (step === 0) return !!teamId
+        if (step === 0) {
+            if (!teamId) return false
+            const team = captainTeams.find(t => t.teamId === Number(teamId))
+            if (team?.isCommunityTeam && !team.eligible) return false
+            return true
+        }
         if (step === 1) return !!selectedDate
         if (step === 4) return filterMode === 'tier' ? acceptableTiers.length > 0 : acceptableDivisions.length > 0
         return true
@@ -186,6 +192,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                 acceptable_divisions: filterMode === 'division' ? acceptableDivisions : null,
                 region,
                 requires_confirmation: requiresConfirmation,
+                allow_community_teams: allowCommunityTeams,
             })
             setPostSuccess(true)
         } catch (err) {
@@ -204,7 +211,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
         setAcceptableTiers([1, 2, 3, 4, 5])
         setFilterMode('tier'); setAcceptableDivisions([])
         setRegion(captainTeams[0]?.leagueSlug === 'tanuki-smite-league' ? 'EU' : 'NA')
-        setRequiresConfirmation(false)
+        setRequiresConfirmation(false); setAllowCommunityTeams(false)
         setTeamSearch(''); setShowTeamPicker(false)
         setPostError(null); setPostSuccess(false)
     }
@@ -264,16 +271,28 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                 <div className="xp-team-card flex items-center gap-3 p-2" style={{ background: '#fff', border: '1px solid #c0c0c0' }}>
                                     <TeamLogo slug={captainTeams[0].teamSlug} name={captainTeams[0].teamName} size={28} color={captainTeams[0].teamColor} />
                                     <div>
-                                        <div className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{captainTeams[0].teamName}</div>
+                                        <div className="xp-text flex items-center gap-2" style={{ fontWeight: 700, fontSize: 13 }}>
+                                            {captainTeams[0].teamName}
+                                            {captainTeams[0].isCommunityTeam && <span style={{ fontSize: 9, padding: '1px 5px', background: '#e0c8ff', color: '#5a2d82', borderRadius: 3, fontWeight: 600 }}>Community</span>}
+                                            {captainTeams[0].isCommunityTeam && <span style={{ fontSize: 9, color: '#888' }}>({captainTeams[0].memberCount}/5 players)</span>}
+                                        </div>
                                         <div className="xp-text xp-text-muted" style={{ fontSize: 10, color: '#666' }}>{captainTeams[0].leagueName}</div>
                                     </div>
                                 </div>
                             ) : (
                                 <select value={teamId} onChange={e => setTeamId(e.target.value)} className="xp-select w-full" style={{ fontSize: 12, padding: '4px 6px' }}>
                                     {captainTeams.map(t => (
-                                        <option key={t.teamId} value={t.teamId}>{t.teamName} ({t.leagueName} - {t.divisionName})</option>
+                                        <option key={t.teamId} value={t.teamId} disabled={t.isCommunityTeam && !t.eligible}>
+                                            {t.teamName} ({t.isCommunityTeam ? `Community · ${t.memberCount}/5 players` : `${t.leagueName} - ${t.divisionName}`})
+                                        </option>
                                     ))}
                                 </select>
+                            )}
+                            {selectedTeam?.isCommunityTeam && !selectedTeam.eligible && (
+                                <div className="xp-info-box-warn" style={{ marginTop: 8, padding: '8px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <AlertTriangle size={14} />
+                                    Your community team needs at least 5 active players to post scrims. Invite more players to get started.
+                                </div>
                             )}
                             {selectedTeam && (
                                 <div className="xp-division-preview flex items-center gap-3 mt-3 p-2" style={{ background: '#e8f0ff', border: '1px solid #7f9db9' }}>
@@ -523,6 +542,27 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                     When enabled, teams who accept your scrim must wait for you to confirm via the web or Discord DM before the scrim is official.
                                 </div>
                             </fieldset>
+
+                            <fieldset className="xp-fieldset">
+                                <legend className="xp-fieldset-legend">Community Teams</legend>
+                                <label className="xp-checkbox-label">
+                                    <input type="checkbox" checked={allowCommunityTeams}
+                                        onChange={e => {
+                                            setAllowCommunityTeams(e.target.checked)
+                                            if (e.target.checked && !requiresConfirmation) setRequiresConfirmation(true)
+                                        }} className="xp-checkbox" />
+                                    <span className="xp-text">Allow Community Teams to accept</span>
+                                </label>
+                                <div className="xp-text" style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 20 }}>
+                                    When enabled, non-league community teams can accept this scrim.
+                                    {allowCommunityTeams && !requiresConfirmation && ' Confirmation is recommended.'}
+                                </div>
+                                {allowCommunityTeams && (
+                                    <div className="xp-text" style={{ fontSize: 10, color: '#806000', marginTop: 4, marginLeft: 20, fontStyle: 'italic' }}>
+                                        Confirmation was auto-enabled — you'll review community team acceptors before confirming.
+                                    </div>
+                                )}
+                            </fieldset>
                         </div>
                     )}
 
@@ -573,6 +613,10 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                     <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Confirm:</span>
                                         <span className="xp-text">{requiresConfirmation ? 'Required' : 'Auto-accept'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Community:</span>
+                                        <span className="xp-text">{allowCommunityTeams ? 'Allowed' : 'Not allowed'}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Opponent:</span>
@@ -665,7 +709,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                         Are you sure you want to cancel? All entered information will be lost.
                     </div>
                     <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => { setShowCancelDialog(false); resetWizard() }} className="xp-btn xp-btn-danger">Yes, Cancel</button>
+                        <button type="button" onClick={() => { setShowCancelDialog(false); resetWizard(); onCancel?.() }} className="xp-btn xp-btn-danger">Yes, Cancel</button>
                         <button type="button" onClick={() => setShowCancelDialog(false)} className="xp-btn">No, Continue</button>
                     </div>
                 </XpDialog>

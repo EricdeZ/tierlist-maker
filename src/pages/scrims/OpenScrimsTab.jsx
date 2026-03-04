@@ -4,22 +4,21 @@ export default function OpenScrimsTab({ scrims, user, currentUserId, captainTeam
     return (
         <div>
             {scrims.length > 0 && (
-                <div className="sd-filter-row flex items-center gap-2 mb-2 flex-wrap" style={{ borderBottom: '1px solid #c0c0c0', paddingBottom: 6 }}>
-                    <span className="xp-text" style={{ fontSize: 11, fontWeight: 700 }}>Filter:</span>
-                    <select value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)} className="xp-select">
+                <div className="sd-filter-row">
+                    <select value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Leagues</option>
                         {uniqueLeagues.map(l => <option key={l.slug} value={l.slug}>{l.name}</option>)}
                     </select>
-                    <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="xp-select">
+                    <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Tiers</option>
                         {uniqueTiers.map(t => <option key={t} value={t}>Tier {t}</option>)}
                     </select>
-                    <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className="xp-select">
+                    <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Regions</option>
                         <option value="NA">NA</option>
                         <option value="EU">EU</option>
                     </select>
-                    <select value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="xp-select">
+                    <select value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="sd-filter-select">
                         <option value="">All Divisions</option>
                         {(activeDivisions || []).map(d => (
                             <option key={d.id} value={d.id}>{d.name} ({d.leagueName})</option>

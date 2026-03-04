@@ -5,13 +5,13 @@ import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { formatRank } from '../../config/ranks'
 import RankBadge from '../RankBadge'
-import { leagueService } from '../../services/database'
+import { leagueService, communityTeamService } from '../../services/database'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, Crown
 } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
 
@@ -75,6 +75,10 @@ export default function GlobalSidebar() {
     const [leagues, setLeagues] = useState([])
     const [leaguesLoading, setLeaguesLoading] = useState(false)
     const hasFetchedLeagues = useRef(false)
+    const [teamInviteCount, setTeamInviteCount] = useState(0)
+    const [showInvitesModal, setShowInvitesModal] = useState(false)
+    const [pendingInvites, setPendingInvites] = useState(null)
+    const [inviteResponding, setInviteResponding] = useState(null)
     // Close on route change
     useEffect(() => {
         close()
@@ -190,6 +194,14 @@ export default function GlobalSidebar() {
         }
         load()
     }, [isOpen])
+
+    // Fetch pending team invite count for badge
+    useEffect(() => {
+        if (!user || !(FEATURE_FLAGS.BYOT_RELEASED || isAdmin)) return
+        communityTeamService.getPendingCount()
+            .then(data => setTeamInviteCount(data.count || 0))
+            .catch(() => {})
+    }, [user, isAdmin])
 
     const isActive = (path, exact = false) => {
         if (exact) return location.pathname === path
@@ -351,6 +363,27 @@ export default function GlobalSidebar() {
                                         <span className="flex items-center gap-3">
                                             <Users className="w-4 h-4 shrink-0 text-blue-400" />
                                             My Teams
+                                        </span>
+                                    </SidebarLink>
+                                )}
+                                {user && teamInviteCount > 0 && (
+                                    <SidebarLink
+                                        onClick={async () => {
+                                            setShowInvitesModal(true)
+                                            try {
+                                                const data = await communityTeamService.getPending()
+                                                setPendingInvites(data)
+                                            } catch {}
+                                        }}
+                                        badge={
+                                            <span className="min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center bg-amber-500/20 text-amber-400">
+                                                {teamInviteCount}
+                                            </span>
+                                        }
+                                    >
+                                        <span className="flex items-center gap-3">
+                                            <Mail className="w-4 h-4 shrink-0 text-amber-400" />
+                                            Pending Invites
                                         </span>
                                     </SidebarLink>
                                 )}
@@ -586,6 +619,196 @@ export default function GlobalSidebar() {
                     </div>{/* end scroll wrapper */}
                 </div>
             </div>
-        </>
+
+        {/* Pending Invites Modal */}
+        {showInvitesModal && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowInvitesModal(false)}>
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                <div className="relative w-full max-w-sm bg-(--color-primary) border border-white/10 rounded-xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                        <h2 className="text-base font-bold text-(--color-text)">Pending Invites</h2>
+                        <button onClick={() => setShowInvitesModal(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-(--color-text-secondary) transition-colors cursor-pointer">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto panel-scrollbar">
+                        {!pendingInvites ? (
+                            <div className="flex items-center justify-center py-6">
+                                <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        ) : (
+                            <>
+                                {pendingInvites.invites?.map(inv => (
+                                    <div key={inv.id} className="border border-white/[0.06] rounded-lg overflow-hidden">
+                                        {/* Team header */}
+                                        <div className="flex items-center gap-3 px-3.5 py-2.5 bg-white/[0.02]">
+                                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-white/5 shrink-0 flex items-center justify-center">
+                                                {inv.team_logo ? (
+                                                    <img src={inv.team_logo} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Users className="w-4 h-4 text-(--color-text-secondary)/40" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-(--color-text) truncate">{inv.team_name}</div>
+                                                <div className="text-[10px] text-(--color-text-secondary)">Invited by {inv.from_username}</div>
+                                            </div>
+                                        </div>
+                                        {/* Members */}
+                                        {inv.members?.length > 0 && (
+                                            <div className="px-3.5 py-2 border-t border-white/[0.04]">
+                                                <div className="text-[9px] uppercase tracking-widest text-(--color-text-secondary)/40 mb-1.5 font-semibold">Members</div>
+                                                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                                    {inv.members.map((m, i) => {
+                                                        const name = m.player_name || m.discord_username || '?'
+                                                        const profileSlug = m.player_slug || m.discord_username
+                                                        return (
+                                                            <div key={i} className="flex items-center gap-1.5 py-0.5">
+                                                                {m.discord_avatar && m.discord_id ? (
+                                                                    <img src={`https://cdn.discordapp.com/avatars/${m.discord_id}/${m.discord_avatar}.png?size=64`} alt="" className="w-4 h-4 rounded-full shrink-0" />
+                                                                ) : (
+                                                                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold text-(--color-text-secondary) shrink-0">
+                                                                        {name[0].toUpperCase()}
+                                                                    </div>
+                                                                )}
+                                                                {profileSlug ? (
+                                                                    <Link to={`/profile/${profileSlug}`} onClick={() => setShowInvitesModal(false)} className="text-[11px] text-(--color-text)/70 hover:text-(--color-text) transition-colors">
+                                                                        {name}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span className="text-[11px] text-(--color-text)/70">{name}</span>
+                                                                )}
+                                                                {m.role === 'captain' && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-2 px-3.5 py-2.5 border-t border-white/[0.04]">
+                                            <button
+                                                onClick={async () => {
+                                                    setInviteResponding(inv.id)
+                                                    try {
+                                                        await communityTeamService.respond(inv.id, true)
+                                                        setPendingInvites(prev => ({ ...prev, invites: prev.invites.filter(i => i.id !== inv.id) }))
+                                                        setTeamInviteCount(c => Math.max(0, c - 1))
+                                                    } catch {}
+                                                    setInviteResponding(null)
+                                                }}
+                                                disabled={inviteResponding === inv.id}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors cursor-pointer disabled:opacity-40"
+                                            >
+                                                <Check className="w-3.5 h-3.5" /> Accept
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    setInviteResponding(inv.id)
+                                                    try {
+                                                        await communityTeamService.respond(inv.id, false)
+                                                        setPendingInvites(prev => ({ ...prev, invites: prev.invites.filter(i => i.id !== inv.id) }))
+                                                        setTeamInviteCount(c => Math.max(0, c - 1))
+                                                    } catch {}
+                                                    setInviteResponding(null)
+                                                }}
+                                                disabled={inviteResponding === inv.id}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold bg-red-500/10 text-red-400/70 hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-40"
+                                            >
+                                                <X className="w-3.5 h-3.5" /> Decline
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {pendingInvites.incomingRequests?.map(req => (
+                                    <div key={req.id} className="border border-white/[0.06] rounded-lg overflow-hidden">
+                                        <div className="flex items-center gap-3 px-3.5 py-2.5 bg-white/[0.02]">
+                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 shrink-0 flex items-center justify-center">
+                                                {req.from_avatar && req.from_discord_id ? (
+                                                    <img src={`https://cdn.discordapp.com/avatars/${req.from_discord_id}/${req.from_avatar}.png?size=64`} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-xs font-bold text-(--color-text-secondary)">{req.from_username?.[0]?.toUpperCase()}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-(--color-text) truncate">{req.from_player_name || req.from_username}</div>
+                                                <div className="text-[10px] text-(--color-text-secondary)">Wants to join {req.team_name}</div>
+                                            </div>
+                                        </div>
+                                        {/* Team members */}
+                                        {req.members?.length > 0 && (
+                                            <div className="px-3.5 py-2 border-t border-white/[0.04]">
+                                                <div className="text-[9px] uppercase tracking-widest text-(--color-text-secondary)/40 mb-1.5 font-semibold">Current Members</div>
+                                                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                                    {req.members.map((m, i) => {
+                                                        const name = m.player_name || m.discord_username || '?'
+                                                        const profileSlug = m.player_slug || m.discord_username
+                                                        return (
+                                                            <div key={i} className="flex items-center gap-1.5 py-0.5">
+                                                                {m.discord_avatar && m.discord_id ? (
+                                                                    <img src={`https://cdn.discordapp.com/avatars/${m.discord_id}/${m.discord_avatar}.png?size=64`} alt="" className="w-4 h-4 rounded-full shrink-0" />
+                                                                ) : (
+                                                                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold text-(--color-text-secondary) shrink-0">
+                                                                        {name[0].toUpperCase()}
+                                                                    </div>
+                                                                )}
+                                                                {profileSlug ? (
+                                                                    <Link to={`/profile/${profileSlug}`} onClick={() => setShowInvitesModal(false)} className="text-[11px] text-(--color-text)/70 hover:text-(--color-text) transition-colors">
+                                                                        {name}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span className="text-[11px] text-(--color-text)/70">{name}</span>
+                                                                )}
+                                                                {m.role === 'captain' && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 px-3.5 py-2.5 border-t border-white/[0.04]">
+                                            <button
+                                                onClick={async () => {
+                                                    setInviteResponding(req.id)
+                                                    try {
+                                                        await communityTeamService.respond(req.id, true)
+                                                        setPendingInvites(prev => ({ ...prev, incomingRequests: prev.incomingRequests.filter(r => r.id !== req.id) }))
+                                                        setTeamInviteCount(c => Math.max(0, c - 1))
+                                                    } catch {}
+                                                    setInviteResponding(null)
+                                                }}
+                                                disabled={inviteResponding === req.id}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors cursor-pointer disabled:opacity-40"
+                                            >
+                                                <Check className="w-3.5 h-3.5" /> Accept
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    setInviteResponding(req.id)
+                                                    try {
+                                                        await communityTeamService.respond(req.id, false)
+                                                        setPendingInvites(prev => ({ ...prev, incomingRequests: prev.incomingRequests.filter(r => r.id !== req.id) }))
+                                                        setTeamInviteCount(c => Math.max(0, c - 1))
+                                                    } catch {}
+                                                    setInviteResponding(null)
+                                                }}
+                                                disabled={inviteResponding === req.id}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold bg-red-500/10 text-red-400/70 hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-40"
+                                            >
+                                                <X className="w-3.5 h-3.5" /> Decline
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(!pendingInvites.invites?.length && !pendingInvites.incomingRequests?.length) && (
+                                    <p className="text-sm text-(--color-text-secondary) text-center py-4">No pending invites</p>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+    </>
     )
 }

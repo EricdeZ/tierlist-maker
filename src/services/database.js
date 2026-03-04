@@ -785,6 +785,9 @@ export const communityTeamService = {
     async getMyTeams() {
         return apiCall('community-teams', { action: 'my-teams' })
     },
+    async getLeagueTeams() {
+        return apiCall('community-teams', { action: 'league-teams' })
+    },
     async getTeam(idOrSlug) {
         return apiCall('community-teams', { action: 'team', id: idOrSlug })
     },
@@ -815,6 +818,9 @@ export const communityTeamService = {
     async leave(teamId) {
         return apiPost('community-teams', { action: 'leave' }, { team_id: teamId })
     },
+    async kick(teamId, userId) {
+        return apiPost('community-teams', { action: 'kick' }, { team_id: teamId, user_id: userId })
+    },
     async disband(teamId) {
         return apiPost('community-teams', { action: 'disband' }, { team_id: teamId })
     },
@@ -823,6 +829,9 @@ export const communityTeamService = {
     },
     async getPending() {
         return apiCall('community-teams', { action: 'pending' })
+    },
+    async getPendingCount() {
+        return apiCall('community-teams', { action: 'pending-count' })
     },
     async getDivisionsByTier(tier) {
         return apiCall('community-teams', { action: 'divisions-by-tier', tier })

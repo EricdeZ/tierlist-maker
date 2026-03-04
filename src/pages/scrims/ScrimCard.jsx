@@ -6,7 +6,10 @@ import { XP_PICK_BADGE, formatPickMode, formatDateEST, formatRelativeDate, copyS
 
 export default function ScrimCard({ scrim, showActions, captainTeams, currentUserId, onAccept, onCancel, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, isChallenge, reliabilityScores, activeDivisions }) {
     const isLoading = actionLoading === scrim.id
-    const acceptableTeams = captainTeams.filter(t => t.teamId !== scrim.teamId)
+    const acceptableTeams = captainTeams.filter(t =>
+        t.teamId !== scrim.teamId &&
+        (t.teamId > 0 || scrim.allowCommunityTeams)
+    )
     const handleAcceptClick = () => {
         if (acceptableTeams.length === 1) onAccept(scrim.id, acceptableTeams[0].teamId)
         else setAcceptModal(scrim.id)
@@ -30,7 +33,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
     const leagueUrl = scrim.leagueSlug ? `/${scrim.leagueSlug}` : null
 
     return (
-        <div className="xp-scrim-card">
+        <div className="xp-scrim-card" style={{ '--team-color': scrim.teamColor || null }}>
             <div className="xp-scrim-layout">
                 {/* Header: Team logo + name + challenge badge */}
                 <div className="xp-scrim-header">
@@ -42,6 +45,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                             ) : (
                                 <span className="xp-text" style={{ fontWeight: 700, fontSize: 13 }}>{scrim.teamName}</span>
                             )}
+                            {scrim.leagueName === 'Community' && <span className="xp-badge xp-badge-purple" style={{ fontSize: 9 }}>Community</span>}
                             {isChallenge && <span className="xp-badge xp-badge-purple" style={{ fontSize: 9 }}><Target size={8} /> Challenge</span>}
                         </div>
                         {/* League · Division — shown inline on desktop */}
@@ -85,6 +89,9 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         <span className={`xp-badge ${scrim.region === 'EU' ? 'xp-badge-purple' : 'xp-badge-blue'}`}>{scrim.region || 'NA'}</span>
                         {scrim.requiresConfirmation && scrim.status === 'open' && (
                             <span className="xp-badge xp-badge-amber" style={{ fontSize: 9 }}><Bell size={8} /> Requires Confirmation</span>
+                        )}
+                        {scrim.allowCommunityTeams && scrim.status === 'open' && (
+                            <span className="xp-badge xp-badge-purple" style={{ fontSize: 9 }}>Community Teams OK</span>
                         )}
                     </div>
 
@@ -160,7 +167,8 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                             ) : (
                                 <span className="xp-text" style={{ fontSize: 11, fontWeight: 700, color: '#2d8212' }}>{scrim.acceptedTeamName}</span>
                             )}
-                            {scrim.acceptedDivisionName && <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>· {scrim.acceptedDivisionName}</span>}
+                            {scrim.acceptedLeagueName === 'Community' && <span className="xp-badge xp-badge-purple" style={{ fontSize: 8 }}>Community</span>}
+                            {scrim.acceptedDivisionName && scrim.acceptedLeagueName !== 'Community' && <span className="xp-text" style={{ fontSize: 10, color: '#999' }}>· {scrim.acceptedDivisionName}</span>}
                         </div>
                     )}
                 </div>
@@ -189,7 +197,7 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                                         {acceptableTeams.map(t => (
                                             <button key={t.teamId} onClick={() => { onAccept(scrim.id, t.teamId); setAcceptModal(null) }} className="xp-listbox-item">
                                                 <TeamLogo slug={t.teamSlug} name={t.teamName} size={14} color={t.teamColor} />
-                                                <span>{t.teamName}{t.divisionName ? ` — ${t.divisionName}` : ''}</span>
+                                                <span>{t.teamName}{t.isCommunityTeam ? ' — Community' : t.divisionName ? ` — ${t.divisionName}` : ''}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -225,15 +233,15 @@ export default function ScrimCard({ scrim, showActions, captainTeams, currentUse
                         {scrim.status === 'accepted' && isPast && !scrim.outcome && isInvolvedCaptain && onReportOutcome && (
                             <>
                                 <button onClick={() => onReportOutcome(scrim.id, 'completed')} disabled={isLoading}
-                                    className="xp-btn xp-btn-primary" style={{ fontSize: 10 }}>
+                                    className="xp-btn xp-btn-primary" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
                                     {isLoading ? '...' : 'Completed'}
                                 </button>
                                 <button onClick={() => onReportOutcome(scrim.id, 'no_show_self')} disabled={isLoading}
-                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
                                     {isLoading ? '...' : 'We No-Showed'}
                                 </button>
                                 <button onClick={() => onReportOutcome(scrim.id, 'no_show_opponent')} disabled={isLoading}
-                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10 }}>
+                                    className="xp-btn xp-btn-danger" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
                                     {isLoading ? '...' : 'They No-Showed'}
                                 </button>
                             </>

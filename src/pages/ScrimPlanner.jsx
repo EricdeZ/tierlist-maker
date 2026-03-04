@@ -138,17 +138,16 @@ export default function ScrimPlanner() {
         } catch (err) { console.error('Failed to load my scrims:', err) }
     }, [user])
 
+    // Load open scrims once on mount (filters handled separately)
     useEffect(() => {
-        const load = async () => {
-            setLoading(true)
-            try {
-                await loadOpenScrims()
-                if (user) await loadMyScrims()
-            } catch (err) { setError(err.message) }
-            finally { setLoading(false) }
-        }
-        load()
-    }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+        setLoading(true)
+        loadOpenScrims()
+            .catch(err => setError(err.message))
+            .finally(() => setLoading(false))
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load user-specific data when auth resolves (no open scrim reload)
+    useEffect(() => { if (user) loadMyScrims() }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { if (!loading) loadOpenScrims() }, [leagueFilter, tierFilter, regionFilter, divisionFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 

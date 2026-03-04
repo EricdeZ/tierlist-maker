@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Swords, Plus, HelpCircle, Monitor, Clock, AlertTriangle, ChevronRight, X, Search, Shield, Ban, User } from 'lucide-react'
+import { Swords, Plus, HelpCircle, Monitor, Clock, ChevronRight, X, Search, Shield, Ban, User } from 'lucide-react'
 import OpenScrimsTab from './OpenScrimsTab'
 import MyScrimsTab from './MyScrimsTab'
 import PostScrimWizard from './PostScrimWizard'
@@ -152,24 +152,6 @@ export default function ScrimDashboard({
                 </div>
             </div>
 
-            {/* Action Required Banner */}
-            {actionItems.length > 0 && (
-                <div className="sd-action-bar" onClick={() => setActiveTab('my')}>
-                    <AlertTriangle size={16} style={{ color: '#f0c040', flexShrink: 0 }} />
-                    <div className="sd-action-items">
-                        {actionItems.map((item, i) => (
-                            <span key={item.type}>
-                                {i > 0 && <span className="sd-action-dot">&middot;</span>}
-                                <span style={{ color: item.color, fontWeight: 600 }}>{item.label}</span>
-                            </span>
-                        ))}
-                    </div>
-                    <span className="sd-action-cta">
-                        View My Scrims <ChevronRight size={12} />
-                    </span>
-                </div>
-            )}
-
             {/* Impersonation banner */}
             {impersonatedUser && (
                 <div className="sd-impersonate-bar">
@@ -316,6 +298,7 @@ export default function ScrimDashboard({
                             <PostScrimWizard
                                 captainTeams={captainTeams} allTeams={allTeams} myScrims={myScrims}
                                 onSuccess={() => { onPostSuccess(); setShowPost(false) }}
+                                onCancel={() => setShowPost(false)}
                             />
                         </div>
                     </div>

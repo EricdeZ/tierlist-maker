@@ -1,6 +1,7 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, headers, adminHeaders, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
+import { deleteOpenScrimsForCommunityTeam, getCommunityTeamMemberCount } from '../lib/scrim.js'
 
 function slugify(str) {
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team'
@@ -37,8 +38,12 @@ const handler = async (event) => {
                     return await handleSearchUsers(sql, event, params)
                 case 'pending':
                     return await handlePending(sql, event)
+                case 'pending-count':
+                    return await handlePendingCount(sql, event)
                 case 'divisions-by-tier':
                     return await handleDivisionsByTier(sql, params)
+                case 'league-teams':
+                    return await handleLeagueTeams(sql, event)
                 default:
                     return err(`Unknown action: ${action}`, 400)
             }
@@ -68,6 +73,8 @@ const handler = async (event) => {
                     return await handleRespond(sql, user, body)
                 case 'leave':
                     return await handleLeave(sql, user, body)
+                case 'kick':
+                    return await handleKick(sql, user, body)
                 case 'disband':
                     return await handleDisband(sql, user, body)
                 default:
@@ -92,7 +99,7 @@ async function handleMyTeams(sql, event) {
     if (!user) return err('Unauthorized', 401)
 
     const teams = await sql`
-        SELECT ct.id, ct.name, ct.slug, ct.logo_url, ct.skill_tier, ct.owner_user_id, ct.created_at,
+        SELECT ct.id, ct.name, ct.slug, ct.logo_url, ct.color, ct.skill_tier, ct.owner_user_id, ct.created_at,
                ctm.role, ctm.joined_at,
                (SELECT COUNT(*) FROM community_team_members m WHERE m.team_id = ct.id AND m.status = 'active') AS member_count
         FROM community_team_members ctm
@@ -100,7 +107,35 @@ async function handleMyTeams(sql, event) {
         WHERE ctm.user_id = ${user.id} AND ctm.status = 'active'
         ORDER BY ctm.role = 'captain' DESC, ct.name
     `
-    return ok({ teams })
+
+    // Fetch members for each team
+    const teamIds = teams.map(t => t.id)
+    let members = []
+    if (teamIds.length > 0) {
+        members = await sql`
+            SELECT ctm.team_id, ctm.user_id, ctm.role,
+                   u.discord_username, u.discord_avatar, u.discord_id,
+                   p.name AS player_name, p.slug AS player_slug
+            FROM community_team_members ctm
+            JOIN users u ON u.id = ctm.user_id
+            LEFT JOIN players p ON p.id = u.linked_player_id
+            WHERE ctm.team_id = ANY(${teamIds}) AND ctm.status = 'active'
+            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+        `
+    }
+
+    const membersByTeam = {}
+    for (const m of members) {
+        if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
+        membersByTeam[m.team_id].push(m)
+    }
+
+    const enriched = teams.map(t => ({
+        ...t,
+        members: membersByTeam[t.id] || [],
+    }))
+
+    return ok({ teams: enriched })
 }
 
 async function handleGetTeam(sql, params) {
@@ -130,7 +165,7 @@ async function handleBrowse(sql, params) {
     const tierFilter = tier ? sql`AND ct.skill_tier = ${Number(tier)}` : sql``
 
     const teams = await sql`
-        SELECT ct.id, ct.name, ct.slug, ct.logo_url, ct.skill_tier, ct.created_at,
+        SELECT ct.id, ct.name, ct.slug, ct.logo_url, ct.color, ct.skill_tier, ct.created_at,
                u.discord_username AS owner_name,
                (SELECT COUNT(*) FROM community_team_members m WHERE m.team_id = ct.id AND m.status = 'active') AS member_count
         FROM community_teams ct
@@ -211,7 +246,58 @@ async function handlePending(sql, event) {
         `
     }
 
-    return ok({ invites, outgoingRequests, incomingRequests })
+    // Enrich with team members for all referenced teams
+    const allTeamIds = [...new Set([
+        ...invites.map(i => i.team_id),
+        ...outgoingRequests.map(r => r.team_id),
+        ...incomingRequests.map(r => r.team_id),
+    ])]
+    let membersByTeam = {}
+    if (allTeamIds.length > 0) {
+        const members = await sql`
+            SELECT ctm.team_id, ctm.role,
+                   u.discord_username, u.discord_avatar, u.discord_id,
+                   p.name AS player_name, p.slug AS player_slug
+            FROM community_team_members ctm
+            JOIN users u ON u.id = ctm.user_id
+            LEFT JOIN players p ON p.id = u.linked_player_id
+            WHERE ctm.team_id = ANY(${allTeamIds}) AND ctm.status = 'active'
+            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+        `
+        for (const m of members) {
+            if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
+            membersByTeam[m.team_id].push(m)
+        }
+    }
+    const enrich = (items) => items.map(item => ({ ...item, members: membersByTeam[item.team_id] || [] }))
+
+    return ok({ invites: enrich(invites), outgoingRequests: enrich(outgoingRequests), incomingRequests: enrich(incomingRequests) })
+}
+
+async function handlePendingCount(sql, event) {
+    const user = await requireAuth(event)
+    if (!user) return err('Unauthorized', 401)
+
+    // Count invites to this user + requests to teams they captain
+    const [{ count: inviteCount }] = await sql`
+        SELECT COUNT(*)::int AS count FROM community_team_invitations
+        WHERE to_user_id = ${user.id} AND status = 'pending' AND type = 'invite'
+    `
+    const captainTeamIds = await sql`
+        SELECT team_id FROM community_team_members
+        WHERE user_id = ${user.id} AND role = 'captain' AND status = 'active'
+    `
+    let requestCount = 0
+    if (captainTeamIds.length > 0) {
+        const ids = captainTeamIds.map(r => r.team_id)
+        const [{ count }] = await sql`
+            SELECT COUNT(*)::int AS count FROM community_team_invitations
+            WHERE team_id = ANY(${ids}) AND status = 'pending' AND type = 'request'
+        `
+        requestCount = count
+    }
+
+    return ok({ count: inviteCount + requestCount })
 }
 
 async function handleDivisionsByTier(sql, params) {
@@ -229,6 +315,58 @@ async function handleDivisionsByTier(sql, params) {
         ORDER BY l.name, d.name
     `
     return ok({ divisions })
+}
+
+async function handleLeagueTeams(sql, event) {
+    const user = await requireAuth(event)
+    if (!user) return err('Unauthorized', 401)
+
+    const teams = await sql`
+        SELECT lp.team_id AS id, t.name, t.slug, t.logo_url, t.color,
+               lp.roster_status AS role, lp.is_active,
+               t.season_id, s.name AS season_name,
+               d.name AS division_name, d.tier AS division_tier, d.slug AS division_slug,
+               l.id AS league_id, l.name AS league_name, l.slug AS league_slug
+        FROM league_players lp
+        JOIN teams t ON t.id = lp.team_id
+        JOIN seasons s ON s.id = t.season_id
+        JOIN divisions d ON d.id = s.division_id
+        JOIN leagues l ON l.id = s.league_id
+        WHERE lp.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
+          AND lp.is_active = true AND s.is_active = true
+        ORDER BY lp.roster_status = 'captain' DESC, l.name, d.tier
+    `
+
+    // Fetch member counts + members for each team
+    const teamIds = teams.map(t => t.id)
+    let members = []
+    if (teamIds.length > 0) {
+        members = await sql`
+            SELECT lp.team_id, lp.roster_status, p.name AS player_name, p.slug AS player_slug,
+                   u.discord_username, u.discord_avatar, u.discord_id
+            FROM league_players lp
+            JOIN players p ON p.id = lp.player_id
+            LEFT JOIN users u ON u.linked_player_id = p.id
+            WHERE lp.team_id = ANY(${teamIds}) AND lp.is_active = true
+              AND lp.roster_status IN ('captain', 'member')
+            ORDER BY lp.roster_status = 'captain' DESC, p.name
+        `
+    }
+
+    const membersByTeam = {}
+    for (const m of members) {
+        if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
+        membersByTeam[m.team_id].push(m)
+    }
+
+    const enriched = teams.map(t => ({
+        ...t,
+        member_count: (membersByTeam[t.id] || []).length,
+        members: membersByTeam[t.id] || [],
+        is_league: true,
+    }))
+
+    return ok({ teams: enriched })
 }
 
 
@@ -268,10 +406,12 @@ async function handleCreate(sql, user, body) {
         if (attempt > 20) return postErr('Could not generate a unique slug. Try a different name.')
     }
 
+    const color = (body.color || '#6366f1').match(/^#[0-9a-fA-F]{6}$/) ? body.color : '#6366f1'
+
     const team = await transaction(async (tx) => {
         const [row] = await tx`
-            INSERT INTO community_teams (name, slug, skill_tier, owner_user_id)
-            VALUES (${name}, ${slug}, ${skillTier}, ${user.id})
+            INSERT INTO community_teams (name, slug, skill_tier, owner_user_id, color)
+            VALUES (${name}, ${slug}, ${skillTier}, ${user.id}, ${color})
             RETURNING *
         `
         await tx`
@@ -305,15 +445,15 @@ async function handleUpdate(sql, user, body) {
         if (!tier || tier < 1 || tier > 5) return postErr('Skill tier must be 1-5')
         updates.skill_tier = tier
     }
+    if (body.color !== undefined) {
+        if (!/^#[0-9a-fA-F]{6}$/.test(body.color)) return postErr('Invalid color format')
+        updates.color = body.color
+    }
     if (Object.keys(updates).length === 0) return postErr('Nothing to update')
 
-    if (updates.name !== undefined && updates.skill_tier !== undefined) {
-        await sql`UPDATE community_teams SET name = ${updates.name}, skill_tier = ${updates.skill_tier}, updated_at = NOW() WHERE id = ${teamId}`
-    } else if (updates.name !== undefined) {
-        await sql`UPDATE community_teams SET name = ${updates.name}, updated_at = NOW() WHERE id = ${teamId}`
-    } else {
-        await sql`UPDATE community_teams SET skill_tier = ${updates.skill_tier}, updated_at = NOW() WHERE id = ${teamId}`
-    }
+    if (updates.name !== undefined) await sql`UPDATE community_teams SET name = ${updates.name}, updated_at = NOW() WHERE id = ${teamId}`
+    if (updates.skill_tier !== undefined) await sql`UPDATE community_teams SET skill_tier = ${updates.skill_tier}, updated_at = NOW() WHERE id = ${teamId}`
+    if (updates.color !== undefined) await sql`UPDATE community_teams SET color = ${updates.color}, updated_at = NOW() WHERE id = ${teamId}`
 
     const [team] = await sql`SELECT * FROM community_teams WHERE id = ${teamId}`
     return postOk({ team })
@@ -343,7 +483,7 @@ async function handleInvite(sql, user, body) {
     await sql`
         INSERT INTO community_team_invitations (team_id, type, from_user_id, to_user_id, status)
         VALUES (${teamId}, 'invite', ${user.id}, ${targetUserId}, 'pending')
-        ON CONFLICT (team_id, to_user_id, type) WHERE status = 'pending'
+        ON CONFLICT (team_id, to_user_id, type) WHERE status = 'pending' AND to_user_id IS NOT NULL
         DO NOTHING
     `
 
@@ -420,7 +560,7 @@ async function handleRequest(sql, user, body) {
     await sql`
         INSERT INTO community_team_invitations (team_id, type, from_user_id, to_user_id, status)
         VALUES (${teamId}, 'request', ${user.id}, ${user.id}, 'pending')
-        ON CONFLICT (team_id, to_user_id, type) WHERE status = 'pending'
+        ON CONFLICT (team_id, to_user_id, type) WHERE status = 'pending' AND to_user_id IS NOT NULL
         DO NOTHING
     `
 
@@ -493,7 +633,54 @@ async function handleLeave(sql, user, body) {
         SET status = 'left'
         WHERE team_id = ${teamId} AND user_id = ${user.id}
     `
-    return postOk({ success: true })
+
+    // If team drops below minimum, delete their open scrim requests
+    const count = await getCommunityTeamMemberCount(sql, teamId)
+    let scrimsDeleted = 0
+    if (count < 5) {
+        scrimsDeleted = await deleteOpenScrimsForCommunityTeam(sql, teamId)
+    }
+
+    return postOk({ success: true, scrimsDeleted })
+}
+
+async function handleKick(sql, user, body) {
+    const teamId = Number(body.team_id)
+    const targetUserId = Number(body.user_id)
+    if (!teamId || !targetUserId) return postErr('team_id and user_id required')
+
+    // Verify caller is captain
+    const [captain] = await sql`
+        SELECT 1 FROM community_team_members
+        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+    `
+    if (!captain) return postErr('Only the team captain can kick members')
+
+    // Cannot kick yourself
+    if (targetUserId === user.id) return postErr('Cannot kick yourself')
+
+    // Verify target is an active member
+    const [target] = await sql`
+        SELECT role FROM community_team_members
+        WHERE team_id = ${teamId} AND user_id = ${targetUserId} AND status = 'active'
+    `
+    if (!target) return postErr('User is not an active member of this team')
+    if (target.role === 'captain') return postErr('Cannot kick the captain')
+
+    await sql`
+        UPDATE community_team_members
+        SET status = 'left'
+        WHERE team_id = ${teamId} AND user_id = ${targetUserId}
+    `
+
+    // If team drops below minimum, delete their open scrim requests
+    const count = await getCommunityTeamMemberCount(sql, teamId)
+    let scrimsDeleted = 0
+    if (count < 5) {
+        scrimsDeleted = await deleteOpenScrimsForCommunityTeam(sql, teamId)
+    }
+
+    return postOk({ success: true, scrimsDeleted })
 }
 
 async function handleDisband(sql, user, body) {
@@ -505,6 +692,9 @@ async function handleDisband(sql, user, body) {
     `
     if (!team) return postErr('Team not found')
     if (team.owner_user_id !== user.id) return postErr('Only the team owner can disband')
+
+    // Clean up open scrim requests before deleting team (no FK to cascade)
+    await deleteOpenScrimsForCommunityTeam(sql, teamId)
 
     await sql`DELETE FROM community_teams WHERE id = ${teamId}`
     return postOk({ success: true })
