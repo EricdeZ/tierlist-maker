@@ -221,20 +221,6 @@
   opacity: 0.3;
 }
 
-/* Corner accents */
-.game-card__corner {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-color: var(--border-light);
-  border-style: solid;
-  z-index: 3;
-}
-.game-card__corner--tl { top: 0; left: 8px; border-width: 2px 0 0 2px; }
-.game-card__corner--tr { top: 0; right: 8px; border-width: 2px 2px 0 0; }
-.game-card__corner--bl { bottom: 0; left: 8px; border-width: 0 0 2px 2px; }
-.game-card__corner--br { bottom: 0; right: 8px; border-width: 0 2px 2px 0; }
-
 /* ============================================
    Subtitle (class/category info)
    ============================================ */

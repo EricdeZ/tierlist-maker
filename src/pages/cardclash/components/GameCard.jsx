@@ -58,10 +58,6 @@ function GodCardContent({ data, rarity, rarityInfo }) {
         <div className="game-card__image">
           <img src={imageUrl} alt={data.name} loading="lazy" />
         </div>
-        <div className="game-card__corner game-card__corner--tl" />
-        <div className="game-card__corner game-card__corner--tr" />
-        <div className="game-card__corner game-card__corner--bl" />
-        <div className="game-card__corner game-card__corner--br" />
       </div>
 
       <div className="game-card__subtitle">
@@ -113,10 +109,6 @@ function ItemCardContent({ data, rarity, rarityInfo }) {
             <div className="game-card__image-placeholder">I</div>
           )}
         </div>
-        <div className="game-card__corner game-card__corner--tl" />
-        <div className="game-card__corner game-card__corner--tr" />
-        <div className="game-card__corner game-card__corner--bl" />
-        <div className="game-card__corner game-card__corner--br" />
       </div>
 
       {data.effects && Object.keys(data.effects).length > 0 && (
