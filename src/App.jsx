@@ -183,7 +183,6 @@ function App() {
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
                             <Route path="players" element={<Players />} />
-
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />
 
