@@ -538,6 +538,8 @@
     width: 240px;
     aspect-ratio: 63 / 88;
     overflow: hidden;
+    box-sizing: border-box;
+    padding-top: 8px;
 }
 
 .card-overview-slot .holo-card {
