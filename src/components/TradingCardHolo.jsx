@@ -90,7 +90,7 @@ function useSpring(initial, { stiffness = 0.066, damping = 0.25 } = {}) {
     return [value, set]
 }
 
-export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC' }) {
+export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC', holoType = 'full' }) {
     const cardRef = useRef(null)
     const [interacting, setInteracting] = useState(false)
     const [active, setActive] = useState(false)
@@ -176,6 +176,7 @@ export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC
         <div
             className={`holo-card ${roleClass} ${interacting ? 'interacting' : ''} ${active ? 'active' : ''}`}
             data-rarity={rarity}
+            data-holo-type={holoType}
             style={dynamicStyles}
             ref={cardRef}
         >

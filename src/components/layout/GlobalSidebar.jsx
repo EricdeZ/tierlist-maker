@@ -67,7 +67,7 @@ function SidebarLink({ to, icon: Icon, children, onClick, badge, active }) {
 
 export default function GlobalSidebar() {
     const { isOpen, open, close } = useSidebar()
-    const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, avatarUrl } = useAuth()
+    const { user, linkedPlayer, login, logout, isAdmin, hasPermission, hasAnyPermission, avatarUrl } = useAuth()
     const passion = usePassion()
     const location = useLocation()
     const sidebarRef = useRef(null)
@@ -352,6 +352,14 @@ export default function GlobalSidebar() {
                                         Fantasy Forge
                                     </span>
                                 </SidebarLink>
+                                {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
+                                    <SidebarLink to="/cardclash" active={isActive('/cardclash')}>
+                                        <span className="flex items-center gap-3">
+                                            <Crown className="w-4 h-4 shrink-0 text-amber-400" />
+                                            Card Clash
+                                        </span>
+                                    </SidebarLink>
+                                )}
                                 <SidebarLink to="/scrims" active={isActive('/scrims')}>
                                     <span className="flex items-center gap-3">
                                         <Swords className="w-4 h-4 shrink-0 text-emerald-400" />

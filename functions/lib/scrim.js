@@ -12,6 +12,18 @@ const MIN_COMMUNITY_TEAM_PLAYERS = 5
 
 
 // ═══════════════════════════════════════════════════
+// Expire stale open scrims whose scheduled_date has passed
+// ═══════════════════════════════════════════════════
+export async function expireStale(sql) {
+    await sql`
+        UPDATE scrim_requests
+        SET status = 'expired', updated_at = NOW()
+        WHERE status = 'open'
+          AND scheduled_date <= NOW()
+    `
+}
+
+// ═══════════════════════════════════════════════════
 // Utility: format date as EST string
 // ═══════════════════════════════════════════════════
 export function formatDateEST(date) {
@@ -149,9 +161,13 @@ export async function deleteOpenScrimsForCommunityTeam(sql, communityTeamId) {
     const deleted = await sql`
         DELETE FROM scrim_requests
         WHERE team_id = ${-communityTeamId}
-          AND status IN ('open', 'pending_confirmation')
+          AND status = 'open'
         RETURNING id
     `
+    if (deleted.length > 0) {
+        const deletedIds = deleted.map(r => r.id)
+        await sql`DELETE FROM scrim_confirmation_requests WHERE scrim_id = ANY(${deletedIds})`
+    }
     return deleted.length
 }
 
@@ -363,19 +379,19 @@ export async function sendConfirmationDM(sql, scrimId, pendingTeamId) {
                 sr.scheduled_date, sr.pick_mode, sr.banned_content_league,
                 CASE WHEN sr.team_id < 0 THEN cmt_p.name ELSE pt.name END AS poster_team,
                 pu.discord_id AS poster_discord_id,
-                CASE WHEN sr.pending_team_id < 0 THEN cmt_pn.name ELSE pnt.name END AS pending_team,
-                CASE WHEN sr.pending_team_id < 0 THEN 'Community Team' ELSE pnd.name END AS pending_div,
-                CASE WHEN sr.pending_team_id < 0 THEN cmt_pn.skill_tier ELSE pnd.tier END AS pending_tier,
-                CASE WHEN sr.pending_team_id < 0 THEN 'Community' ELSE pnl.name END AS pending_league
+                CASE WHEN ${pendingTeamId} < 0 THEN cmt_pn.name ELSE pnt.name END AS pending_team,
+                CASE WHEN ${pendingTeamId} < 0 THEN 'Community Team' ELSE pnd.name END AS pending_div,
+                CASE WHEN ${pendingTeamId} < 0 THEN cmt_pn.skill_tier ELSE pnd.tier END AS pending_tier,
+                CASE WHEN ${pendingTeamId} < 0 THEN 'Community' ELSE pnl.name END AS pending_league
             FROM scrim_requests sr
             LEFT JOIN teams pt ON pt.id = sr.team_id AND sr.team_id > 0
             LEFT JOIN community_teams cmt_p ON cmt_p.id = -sr.team_id AND sr.team_id < 0
             JOIN users pu ON pu.id = sr.user_id
-            LEFT JOIN teams pnt ON pnt.id = sr.pending_team_id AND sr.pending_team_id > 0
+            LEFT JOIN teams pnt ON pnt.id = ${pendingTeamId} AND ${pendingTeamId} > 0
             LEFT JOIN seasons pns ON pns.id = pnt.season_id
             LEFT JOIN divisions pnd ON pnd.id = pns.division_id
             LEFT JOIN leagues pnl ON pnl.id = pns.league_id
-            LEFT JOIN community_teams cmt_pn ON cmt_pn.id = -sr.pending_team_id AND sr.pending_team_id < 0
+            LEFT JOIN community_teams cmt_pn ON cmt_pn.id = ${-pendingTeamId} AND ${pendingTeamId} < 0
             WHERE sr.id = ${scrimId}
         `
         if (!row || !row.poster_discord_id) return
@@ -384,7 +400,7 @@ export async function sendConfirmationDM(sql, scrimId, pendingTeamId) {
         const tierLabel = row.pending_tier ? ` (${RANK_LABELS[row.pending_tier] || 'Tier ' + row.pending_tier})` : ''
         const mode = PICK_MODE_LABELS[row.pick_mode] || row.pick_mode
 
-        const result = await sendDMWithReturn(row.poster_discord_id, {
+        await sendDM(row.poster_discord_id, {
             embeds: [{
                 title: '\u{1F514} Scrim Acceptance Request',
                 description: `**${row.pending_team}** from ${row.pending_league} — ${row.pending_div}${tierLabel} wants to accept your scrim.`,
@@ -394,20 +410,10 @@ export async function sendConfirmationDM(sql, scrimId, pendingTeamId) {
                     { name: '\u{1F3AE} Mode', value: mode, inline: true },
                     ...(row.banned_content_league ? [{ name: '\u{1F6AB} Bans', value: row.banned_content_league, inline: true }] : []),
                 ],
-                footer: { text: 'Reply Accept/Yes to confirm, or Decline/No to deny. You can also confirm at smitecomp.com/scrims' },
+                footer: { text: 'Confirm or deny at smitecomp.com/scrims' },
                 url: 'https://smitecomp.com/scrims',
             }],
         })
-
-        // Store DM channel/message IDs for polling
-        if (result?.channelId && result?.messageId) {
-            await sql`
-                UPDATE scrim_requests
-                SET dm_channel_id = ${result.channelId},
-                    confirmation_dm_id = ${result.messageId}
-                WHERE id = ${scrimId}
-            `
-        }
     } catch (err) {
         console.error('sendConfirmationDM error:', err.message || err)
     }
@@ -419,6 +425,7 @@ export async function sendConfirmationDM(sql, scrimId, pendingTeamId) {
 // ═══════════════════════════════════════════════════
 
 export async function listScrims(sql, params) {
+    await expireStale(sql)
     const { league_id, division_tier, region, division_id } = params
 
     const filters = []
@@ -477,6 +484,7 @@ export async function listScrims(sql, params) {
 
 
 export async function fetchMyScrims(sql, userId) {
+    await expireStale(sql)
     const [captainTeams, myTeams] = await Promise.all([
         getEligibleTeams(sql, userId),
         getMyTeams(sql, userId),
@@ -490,7 +498,7 @@ export async function fetchMyScrims(sql, userId) {
     const teamIds = [...allTeamIdSet]
 
     if (teamIds.length === 0) {
-        return { scrims: [], captainTeams: [], myTeams: [], blockedByMe: [], blockedMe: [] }
+        return { scrims: [], captainTeams: [], myTeams: [], blockedByMe: [], blockedMe: [], pendingConfirmations: [] }
     }
 
     const scrims = await sql`
@@ -569,17 +577,63 @@ export async function fetchMyScrims(sql, userId) {
            OR sr.challenged_team_id = ANY(${teamIds})
            OR sr.accepted_team_id = ANY(${teamIds})
            OR sr.pending_team_id = ANY(${teamIds})
+           OR sr.id IN (SELECT scrim_id FROM scrim_confirmation_requests WHERE team_id = ANY(${teamIds}) AND status = 'pending')
         ORDER BY sr.scheduled_date DESC
     `
 
-    // Fetch blacklist data for client-side filtering
-    const [blockedByMe, blockedMe] = await Promise.all([
+    const scrimIds = scrims.map(s => s.id)
+
+    // Fetch confirmation requests for these scrims + blacklist data
+    const [confirmationRows, blockedByMe, blockedMe] = await Promise.all([
+        scrimIds.length > 0 ? sql`
+            SELECT cr.scrim_id, cr.team_id, cr.user_id, cr.status, cr.created_at,
+                   CASE WHEN cr.team_id < 0 THEN ct.name ELSE t.name END AS team_name,
+                   CASE WHEN cr.team_id < 0 THEN ct.slug ELSE t.slug END AS team_slug,
+                   CASE WHEN cr.team_id < 0 THEN ct.logo_url ELSE t.logo_url END AS team_logo,
+                   CASE WHEN cr.team_id < 0 THEN NULL ELSE t.color END AS team_color,
+                   CASE WHEN cr.team_id < 0 THEN 'Community Team' ELSE d.name END AS division_name,
+                   CASE WHEN cr.team_id < 0 THEN ct.skill_tier ELSE d.tier END AS division_tier,
+                   CASE WHEN cr.team_id < 0 THEN 'Community' ELSE l.name END AS league_name,
+                   u.discord_username AS user_name
+            FROM scrim_confirmation_requests cr
+            LEFT JOIN teams t ON t.id = cr.team_id AND cr.team_id > 0
+            LEFT JOIN seasons s ON s.id = t.season_id
+            LEFT JOIN divisions d ON d.id = s.division_id
+            LEFT JOIN leagues l ON l.id = s.league_id
+            LEFT JOIN community_teams ct ON ct.id = -cr.team_id AND cr.team_id < 0
+            JOIN users u ON u.id = cr.user_id
+            WHERE cr.scrim_id = ANY(${scrimIds}) AND cr.status = 'pending'
+            ORDER BY cr.created_at ASC
+        ` : [],
         sql`SELECT team_id, blocked_team_id FROM scrim_blacklist WHERE team_id = ANY(${teamIds})`,
         sql`SELECT team_id, blocked_team_id FROM scrim_blacklist WHERE blocked_team_id = ANY(${teamIds})`,
     ])
 
+    // Group confirmation requests by scrim_id
+    const confirmationsByScrim = {}
+    for (const cr of confirmationRows) {
+        if (!confirmationsByScrim[cr.scrim_id]) confirmationsByScrim[cr.scrim_id] = []
+        confirmationsByScrim[cr.scrim_id].push({
+            teamId: cr.team_id,
+            teamName: cr.team_name,
+            teamSlug: cr.team_slug,
+            teamLogo: cr.team_logo,
+            teamColor: cr.team_color,
+            divisionName: cr.division_name,
+            divisionTier: cr.division_tier,
+            leagueName: cr.league_name,
+            userName: cr.user_name,
+            createdAt: cr.created_at,
+        })
+    }
+
+    // Also build a flat list of the user's own pending confirmations (for open scrims cross-reference)
+    const pendingConfirmations = confirmationRows
+        .filter(cr => teamIds.includes(cr.team_id))
+        .map(cr => ({ scrimId: cr.scrim_id, teamId: cr.team_id }))
+
     return {
-        scrims: scrims.map(formatScrim),
+        scrims: scrims.map(s => ({ ...formatScrim(s), confirmationRequests: confirmationsByScrim[s.id] || [] })),
         captainTeams: captainTeams.map(formatTeamForResponse),
         myTeams: myTeams.map(t => ({
             teamId: t.team_id,
@@ -593,6 +647,7 @@ export async function fetchMyScrims(sql, userId) {
         })),
         blockedByMe: blockedByMe.map(b => ({ teamId: b.team_id, blockedTeamId: b.blocked_team_id })),
         blockedMe: blockedMe.map(b => ({ teamId: b.team_id, blockedTeamId: b.blocked_team_id })),
+        pendingConfirmations,
     }
 }
 
@@ -853,84 +908,10 @@ export async function searchUsersQuery(sql, q) {
 }
 
 
-export async function pollDMConfirmations(sql, userId) {
-    const captainTeams = await getEligibleTeams(sql, userId)
-    if (captainTeams.length === 0) {
-        return 0
-    }
-
-    const teamIds = captainTeams.map(t => t.team_id)
-
-    const pendingScrims = await sql`
-        SELECT id, dm_channel_id, confirmation_dm_id, team_id,
-               pending_team_id, pending_user_id
-        FROM scrim_requests
-        WHERE status = 'pending_confirmation'
-          AND team_id = ANY(${teamIds})
-          AND dm_channel_id IS NOT NULL
-          AND confirmation_dm_id IS NOT NULL
-    `
-
-    let processed = 0
-    const ACCEPT_KEYWORDS = ['accept', 'yes', 'y', 'confirm']
-    const DECLINE_KEYWORDS = ['decline', 'deny', 'no', 'n', 'reject']
-
-    for (const scrim of pendingScrims) {
-        try {
-            const messages = await fetchChannelMessages(scrim.dm_channel_id, scrim.confirmation_dm_id, 10)
-
-            for (const msg of messages) {
-                if (msg.author?.bot) continue
-                const content = (msg.content || '').trim().toLowerCase()
-
-                if (ACCEPT_KEYWORDS.includes(content)) {
-                    await sql`
-                        UPDATE scrim_requests
-                        SET status = 'accepted',
-                            accepted_team_id = pending_team_id,
-                            accepted_user_id = pending_user_id,
-                            accepted_at = NOW(),
-                            pending_team_id = NULL, pending_user_id = NULL, pending_at = NULL,
-                            dm_channel_id = NULL, confirmation_dm_id = NULL,
-                            updated_at = NOW()
-                        WHERE id = ${scrim.id} AND status = 'pending_confirmation'
-                    `
-                    await notifyScrimAccepted(sql, scrim.id, scrim.pending_team_id).catch(() => {})
-                    processed++
-                    break
-                } else if (DECLINE_KEYWORDS.includes(content)) {
-                    // Get pending user's discord_id for notification
-                    const [pendingUser] = await sql`
-                        SELECT discord_id FROM users WHERE id = ${scrim.pending_user_id}
-                    `
-                    await sql`
-                        UPDATE scrim_requests
-                        SET status = 'open',
-                            pending_team_id = NULL, pending_user_id = NULL, pending_at = NULL,
-                            dm_channel_id = NULL, confirmation_dm_id = NULL,
-                            updated_at = NOW()
-                        WHERE id = ${scrim.id} AND status = 'pending_confirmation'
-                    `
-                    if (pendingUser?.discord_id) {
-                        await sendDM(pendingUser.discord_id, {
-                            embeds: [{
-                                title: '\u274C Scrim Request Declined',
-                                description: 'The team captain declined your scrim acceptance via Discord DM.',
-                                color: 0xcc3333,
-                                url: 'https://smitecomp.com/scrims',
-                            }],
-                        }).catch(() => {})
-                    }
-                    processed++
-                    break
-                }
-            }
-        } catch (err) {
-            console.error(`check-dm-confirmations error for scrim ${scrim.id}:`, err.message)
-        }
-    }
-
-    return processed
+// DM-based confirmation polling is deprecated with the confirmation queue model.
+// Confirmations are now handled via the web UI only.
+export async function pollDMConfirmations() {
+    return 0
 }
 
 
@@ -989,12 +970,21 @@ export async function createScrim(sql, user, body) {
         if (challenged_team_id === team_id) {
             return { error: 'Cannot challenge your own team', status: 400 }
         }
-        const [target] = await sql`
-            SELECT t.id FROM teams t
-            JOIN seasons s ON s.id = t.season_id
-            WHERE t.id = ${challenged_team_id} AND s.is_active = true
-        `
-        if (!target) {
+        let targetFound = false
+        if (challenged_team_id < 0) {
+            const [ct] = await sql`
+                SELECT id FROM community_teams WHERE id = ${Math.abs(challenged_team_id)}
+            `
+            targetFound = !!ct
+        } else {
+            const [t] = await sql`
+                SELECT t.id FROM teams t
+                JOIN seasons s ON s.id = t.season_id
+                WHERE t.id = ${challenged_team_id} AND s.is_active = true
+            `
+            targetFound = !!t
+        }
+        if (!targetFound) {
             return { error: 'Challenged team not found or not in an active season', status: 400 }
         }
 
@@ -1139,24 +1129,26 @@ export async function acceptScrim(sql, user, body, waitUntil) {
         return { error: 'This team has blocked you from accepting their scrims', status: 403 }
     }
 
-    // Confirmation flow: if requires_confirmation, set to pending instead of accepted
+    // Confirmation flow: insert into confirmation queue, keep scrim open
     if (scrim.requires_confirmation) {
-        const [pending] = await sql`
-            UPDATE scrim_requests
-            SET status = 'pending_confirmation',
-                pending_team_id = ${team_id}, pending_user_id = ${user.id},
-                pending_at = NOW(), updated_at = NOW()
-            WHERE id = ${scrim_id} AND status = 'open'
-            RETURNING id, status
+        // Check if this team already has a pending request
+        const [existing] = await sql`
+            SELECT id FROM scrim_confirmation_requests
+            WHERE scrim_id = ${scrim_id} AND team_id = ${team_id} AND status = 'pending'
         `
-        if (!pending) {
-            return { error: 'Scrim was already accepted or cancelled', status: 409 }
+        if (existing) {
+            return { error: 'Your team already has a pending confirmation request for this scrim', status: 409 }
         }
+
+        await sql`
+            INSERT INTO scrim_confirmation_requests (scrim_id, team_id, user_id)
+            VALUES (${scrim_id}, ${team_id}, ${user.id})
+        `
 
         // Send confirmation DM to poster's captain
         waitUntil(sendConfirmationDM(sql, scrim_id, team_id).catch(() => {}))
 
-        return { success: true, pendingConfirmation: true, scrim: pending }
+        return { success: true, pendingConfirmation: true }
     }
 
     const [updated] = await sql`
@@ -1194,8 +1186,8 @@ export async function updateScrim(sql, user, body) {
     if (!scrim) {
         return { error: 'Scrim request not found', status: 404 }
     }
-    if (scrim.status !== 'open' && scrim.status !== 'pending_confirmation') {
-        return { error: 'Can only edit open or pending scrim requests', status: 400 }
+    if (scrim.status !== 'open') {
+        return { error: 'Can only edit open scrim requests', status: 400 }
     }
 
     // Verify user is captain of the posting team
@@ -1261,8 +1253,11 @@ export async function updateScrim(sql, user, body) {
         }
     }
 
-    // If scrim was pending_confirmation, reset to open since details changed
-    const resetPending = scrim.status === 'pending_confirmation'
+    // Clear any pending confirmation requests since details changed
+    await sql`
+        DELETE FROM scrim_confirmation_requests
+        WHERE scrim_id = ${scrim_id} AND status = 'pending'
+    `
 
     await sql`
         UPDATE scrim_requests SET
@@ -1276,10 +1271,6 @@ export async function updateScrim(sql, user, body) {
             region = ${region || 'NA'},
             requires_confirmation = ${!!requires_confirmation},
             allow_community_teams = ${!!allow_community_teams},
-            status = ${resetPending ? 'open' : scrim.status},
-            pending_team_id = ${resetPending ? null : scrim.pending_team_id},
-            pending_user_id = ${resetPending ? null : scrim.pending_user_id},
-            pending_at = ${resetPending ? null : scrim.pending_at},
             updated_at = NOW()
         WHERE id = ${scrim_id}
     `
@@ -1301,8 +1292,8 @@ export async function cancelScrim(sql, user, body) {
     if (!scrim) {
         return { error: 'Scrim request not found', status: 404 }
     }
-    if (scrim.status !== 'open' && scrim.status !== 'pending_confirmation') {
-        return { error: 'Can only cancel open or pending scrim requests', status: 400 }
+    if (scrim.status !== 'open') {
+        return { error: 'Can only cancel open scrim requests', status: 400 }
     }
 
     // Verify user is captain or has scrim_manage permission
@@ -1314,11 +1305,15 @@ export async function cancelScrim(sql, user, body) {
 
     await sql`
         UPDATE scrim_requests
-        SET status = 'cancelled',
-            pending_team_id = NULL, pending_user_id = NULL, pending_at = NULL,
-            dm_channel_id = NULL, confirmation_dm_id = NULL,
-            updated_at = NOW()
+        SET status = 'cancelled', updated_at = NOW()
         WHERE id = ${scrim_id}
+    `
+
+    // Withdraw any pending confirmation requests
+    await sql`
+        UPDATE scrim_confirmation_requests
+        SET status = 'withdrawn', resolved_at = NOW()
+        WHERE scrim_id = ${scrim_id} AND status = 'pending'
     `
 
     return { success: true }
@@ -1549,20 +1544,19 @@ export async function removeFromBlacklist(sql, user, body) {
 
 
 export async function confirmAccept(sql, user, body, waitUntil) {
-    const { scrim_id } = body
-    if (!scrim_id) {
-        return { error: 'scrim_id is required', status: 400 }
+    const { scrim_id, team_id } = body
+    if (!scrim_id || !team_id) {
+        return { error: 'scrim_id and team_id are required', status: 400 }
     }
 
     const [scrim] = await sql`
-        SELECT id, team_id, user_id, pending_team_id, pending_user_id, status
-        FROM scrim_requests WHERE id = ${scrim_id}
+        SELECT id, team_id, status FROM scrim_requests WHERE id = ${scrim_id}
     `
     if (!scrim) {
         return { error: 'Scrim not found', status: 404 }
     }
-    if (scrim.status !== 'pending_confirmation') {
-        return { error: 'Scrim is not pending confirmation', status: 400 }
+    if (scrim.status !== 'open') {
+        return { error: 'Scrim is no longer open', status: 400 }
     }
 
     // Only the poster's captain can confirm
@@ -1571,56 +1565,85 @@ export async function confirmAccept(sql, user, body, waitUntil) {
         return { error: 'Only the posting team captain can confirm', status: 403 }
     }
 
-    // Re-validate community team member count before confirming
-    if (scrim.pending_team_id < 0) {
-        const count = await getCommunityTeamMemberCount(sql, Math.abs(scrim.pending_team_id))
+    // Find the pending confirmation request
+    const [request] = await sql`
+        SELECT id, team_id, user_id FROM scrim_confirmation_requests
+        WHERE scrim_id = ${scrim_id} AND team_id = ${team_id} AND status = 'pending'
+    `
+    if (!request) {
+        return { error: 'No pending confirmation request from this team', status: 404 }
+    }
+
+    // Re-validate community team member count
+    if (request.team_id < 0) {
+        const count = await getCommunityTeamMemberCount(sql, Math.abs(request.team_id))
         if (count < MIN_COMMUNITY_TEAM_PLAYERS) {
             return { error: `The accepting community team no longer has ${MIN_COMMUNITY_TEAM_PLAYERS} active players`, status: 400 }
         }
     }
 
+    // Accept the scrim
     const [updated] = await sql`
         UPDATE scrim_requests
         SET status = 'accepted',
-            accepted_team_id = pending_team_id,
-            accepted_user_id = pending_user_id,
-            accepted_at = NOW(),
-            pending_team_id = NULL, pending_user_id = NULL, pending_at = NULL,
-            dm_channel_id = NULL, confirmation_dm_id = NULL,
-            updated_at = NOW()
-        WHERE id = ${scrim_id} AND status = 'pending_confirmation'
+            accepted_team_id = ${request.team_id},
+            accepted_user_id = ${request.user_id},
+            accepted_at = NOW(), updated_at = NOW()
+        WHERE id = ${scrim_id} AND status = 'open'
         RETURNING id, status, accepted_at, accepted_team_id
     `
-
     if (!updated) {
-        return { error: 'Scrim was already confirmed or cancelled', status: 409 }
+        return { error: 'Scrim was already accepted or cancelled', status: 409 }
     }
 
-    // Notify both captains
-    waitUntil(notifyScrimAccepted(sql, scrim_id, updated.accepted_team_id).catch(() => {}))
+    // Mark confirmed request, deny all others
+    await sql`
+        UPDATE scrim_confirmation_requests
+        SET status = 'confirmed', resolved_at = NOW()
+        WHERE scrim_id = ${scrim_id} AND team_id = ${team_id} AND status = 'pending'
+    `
+    await sql`
+        UPDATE scrim_confirmation_requests
+        SET status = 'denied', resolved_at = NOW()
+        WHERE scrim_id = ${scrim_id} AND team_id != ${team_id} AND status = 'pending'
+    `
+
+    // Notify both captains + DM denied teams
+    waitUntil((async () => {
+        await notifyScrimAccepted(sql, scrim_id, updated.accepted_team_id).catch(() => {})
+        const denied = await sql`
+            SELECT cr.user_id, u.discord_id
+            FROM scrim_confirmation_requests cr
+            JOIN users u ON u.id = cr.user_id
+            WHERE cr.scrim_id = ${scrim_id} AND cr.status = 'denied'
+        `
+        for (const d of denied) {
+            await sendDM(d.discord_id, {
+                embeds: [{
+                    title: '\u274C Scrim Request Declined',
+                    description: 'The team captain confirmed a different team for this scrim.',
+                    color: 0xcc3333,
+                    url: 'https://smitecomp.com/scrims',
+                }],
+            }).catch(() => {})
+        }
+    })())
 
     return { success: true, scrim: updated }
 }
 
 
 export async function denyAccept(sql, user, body, waitUntil) {
-    const { scrim_id } = body
-    if (!scrim_id) {
-        return { error: 'scrim_id is required', status: 400 }
+    const { scrim_id, team_id } = body
+    if (!scrim_id || !team_id) {
+        return { error: 'scrim_id and team_id are required', status: 400 }
     }
 
     const [scrim] = await sql`
-        SELECT sr.id, sr.team_id, sr.pending_team_id, sr.pending_user_id, sr.status,
-               pu.discord_id as pending_discord_id
-        FROM scrim_requests sr
-        LEFT JOIN users pu ON pu.id = sr.pending_user_id
-        WHERE sr.id = ${scrim_id}
+        SELECT id, team_id, status FROM scrim_requests WHERE id = ${scrim_id}
     `
     if (!scrim) {
         return { error: 'Scrim not found', status: 404 }
-    }
-    if (scrim.status !== 'pending_confirmation') {
-        return { error: 'Scrim is not pending confirmation', status: 400 }
     }
 
     // Only the poster's captain can deny
@@ -1629,21 +1652,28 @@ export async function denyAccept(sql, user, body, waitUntil) {
         return { error: 'Only the posting team captain can deny', status: 403 }
     }
 
+    const [request] = await sql`
+        SELECT cr.id, cr.user_id, u.discord_id
+        FROM scrim_confirmation_requests cr
+        JOIN users u ON u.id = cr.user_id
+        WHERE cr.scrim_id = ${scrim_id} AND cr.team_id = ${team_id} AND cr.status = 'pending'
+    `
+    if (!request) {
+        return { error: 'No pending confirmation request from this team', status: 404 }
+    }
+
     await sql`
-        UPDATE scrim_requests
-        SET status = 'open',
-            pending_team_id = NULL, pending_user_id = NULL, pending_at = NULL,
-            dm_channel_id = NULL, confirmation_dm_id = NULL,
-            updated_at = NOW()
-        WHERE id = ${scrim_id} AND status = 'pending_confirmation'
+        UPDATE scrim_confirmation_requests
+        SET status = 'denied', resolved_at = NOW()
+        WHERE id = ${request.id}
     `
 
     // DM the denied team's captain
-    if (scrim.pending_discord_id) {
-        waitUntil(sendDM(scrim.pending_discord_id, {
+    if (request.discord_id) {
+        waitUntil(sendDM(request.discord_id, {
             embeds: [{
                 title: '\u274C Scrim Request Declined',
-                description: 'The team captain has declined your scrim acceptance request. The scrim is back to open status.',
+                description: 'The team captain has declined your scrim acceptance request.',
                 color: 0xcc3333,
                 url: 'https://smitecomp.com/scrims',
             }],

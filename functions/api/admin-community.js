@@ -1,7 +1,7 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders, transaction } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
-import { deleteOpenScrimsForCommunityTeam } from '../lib/scrim.js'
+import { deleteOpenScrimsForCommunityTeam, expireStale } from '../lib/scrim.js'
 
 const err = (msg, code = 400) => ({
     statusCode: code, headers: adminHeaders, body: JSON.stringify({ error: msg }),
@@ -117,6 +117,7 @@ async function handleTeamDetail(sql, params) {
 }
 
 async function handleListScrims(sql, params) {
+    await expireStale(sql)
     const { status, limit: rawLimit, offset: rawOffset } = params
     const limit = Math.min(Number(rawLimit) || 50, 200)
     const offset = Number(rawOffset) || 0
@@ -167,6 +168,7 @@ async function handleListScrims(sql, params) {
 }
 
 async function handleScrimStats(sql) {
+    await expireStale(sql)
     const [stats] = await sql`
         SELECT
             COUNT(*) AS total,
@@ -316,4 +318,4 @@ async function handleResolveDispute(sql, body) {
     return ok({ success: true })
 }
 
-export default adapt(handler)
+export const onRequest = adapt(handler)

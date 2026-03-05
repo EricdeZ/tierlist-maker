@@ -75,7 +75,7 @@ export default function ScrimDashboard({
     // Actions
     onAccept, onCancel, onEdit, onDecline, handleReportOutcome, handleDisputeOutcome,
     handleConfirmAccept, handleDenyAccept, actionLoading,
-    acceptModal, setAcceptModal, reliabilityScores,
+    acceptModal, setAcceptModal, reliabilityScores, pendingConfirmations,
     // Blacklist
     blacklist, allTeams, onBlacklistAdd, onBlacklistRemove,
     // Impersonation
@@ -103,12 +103,13 @@ export default function ScrimDashboard({
         const items = []
         const incoming = incomingScrims?.length || 0
         if (incoming > 0) items.push({ type: 'incoming', count: incoming, label: `${incoming} incoming challenge${incoming > 1 ? 's' : ''}`, color: '#d090ff' })
-        const pending = myScrims.filter(s => s.status === 'pending_confirmation').length
+        const myTeamIdSet = new Set((captainTeams || []).map(t => t.teamId))
+        const pending = myScrims.filter(s => s.confirmationRequests?.length > 0 && myTeamIdSet.has(s.teamId)).length
         if (pending > 0) items.push({ type: 'pending', count: pending, label: `${pending} pending confirmation${pending > 1 ? 's' : ''}`, color: '#f0c040' })
         const needsReport = myScrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) < new Date() && !s.outcome).length
         if (needsReport > 0) items.push({ type: 'report', count: needsReport, label: `${needsReport} need${needsReport > 1 ? '' : 's'} report`, color: '#f08080' })
         return items
-    }, [user, myScrims, incomingScrims])
+    }, [user, myScrims, incomingScrims, captainTeams])
 
     // Next upcoming confirmed scrims (max 3)
     const nextUpScrims = useMemo(() => {
@@ -246,6 +247,7 @@ export default function ScrimDashboard({
                                         actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
+                                        pendingConfirmations={pendingConfirmations}
                                     />
                                 )}
                                 {activeTab === 'my' && user && (

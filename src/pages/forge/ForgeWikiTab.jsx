@@ -74,11 +74,7 @@ Think of free Sparks as a free lottery ticket: no downside risk, but you're lock
         title: 'Season End (Liquidation)',
         content: `When the season ends, the market is liquidated. All your holdings are automatically sold at their final prices.
 
-The important difference: liquidation has no cooling tax. This means holding until the end avoids the 10% tax you'd pay by selling early.
-
-For regular Sparks, you get the full value. For free Sparks (Starter & Referral), you get just the profit — the difference between the final price and what the Spark was worth when you got it.
-
-This makes "hold until the end" a valid strategy, but it's a gamble — a player could crash in the final weeks and wipe out your gains.`
+For regular Sparks, you get the full value. For free Sparks (Starter & Referral), you get just the profit — the difference between the final price and what the Spark was worth when you got it.`
     },
     {
         id: 'leaderboard',

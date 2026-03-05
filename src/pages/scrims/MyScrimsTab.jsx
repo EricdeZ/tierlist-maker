@@ -1,8 +1,12 @@
 import ScrimCard from './ScrimCard'
 
 export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, currentUserId, onAccept, onCancel, onEdit, onDecline, onReportOutcome, onDisputeOutcome, onConfirmAccept, onDenyAccept, actionLoading, acceptModal, setAcceptModal, reliabilityScores, activeDivisions }) {
-    const pendingScrims = scrims.filter(s => s.status === 'pending_confirmation')
-    const openScrims = scrims.filter(s => s.status === 'open' && !incomingScrims.some(i => i.id === s.id))
+    const myTeamIds = new Set(captainTeams.map(t => t.teamId))
+    const pendingNeedsAction = scrims.filter(s => s.status === 'open' && s.confirmationRequests?.length > 0 && myTeamIds.has(s.teamId))
+    const pendingNeedsActionIds = new Set(pendingNeedsAction.map(s => s.id))
+    const pendingAwaiting = scrims.filter(s => s.status === 'open' && s.confirmationRequests?.length > 0 && !myTeamIds.has(s.teamId))
+    const pendingAwaitingIds = new Set(pendingAwaiting.map(s => s.id))
+    const openScrims = scrims.filter(s => s.status === 'open' && !incomingScrims.some(i => i.id === s.id) && !pendingNeedsActionIds.has(s.id) && !pendingAwaitingIds.has(s.id))
     const upcomingScrims = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) >= new Date())
     const needsReport = scrims.filter(s => s.status === 'accepted' && new Date(s.scheduledDate) < new Date() && !s.outcome)
     const completedScrims = scrims.filter(s => s.status === 'completed')
@@ -28,7 +32,8 @@ export default function MyScrimsTab({ scrims, incomingScrims, captainTeams, curr
 
     return (
         <div className="flex flex-col gap-3">
-            <Section title="Pending Confirmation" items={pendingScrims} />
+            <Section title="Action Required" items={pendingNeedsAction} />
+            <Section title="Awaiting Response" items={pendingAwaiting} />
             <Section title="Incoming Challenges" items={incomingScrims} challenge />
             {needsReport.length > 0 && <Section title="Needs Report" items={needsReport} />}
             <Section title="Your Open Requests" items={openScrims} />

@@ -31,6 +31,16 @@ export function formatRelativeDate(dateStr) {
     const date = new Date(dateStr)
     const now = new Date()
     const diffMs = date - now
+    if (diffMs < 0) {
+        const agoMs = -diffMs
+        const agoHours = Math.floor(agoMs / (1000 * 60 * 60))
+        const agoDays = Math.floor(agoMs / (1000 * 60 * 60 * 24))
+        if (agoDays > 1) return `${agoDays} days ago`
+        if (agoDays === 1) return 'yesterday'
+        if (agoHours > 1) return `${agoHours} hours ago`
+        if (agoHours === 1) return '1 hour ago'
+        return 'just now'
+    }
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
     if (diffDays > 1) return `in ${diffDays} days`

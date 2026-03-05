@@ -2,7 +2,8 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
-import { mergeForgeHoldings, sellOwnTeamHoldings } from '../lib/forge.js'
+import { logRosterTransaction } from '../lib/roster-tx.js'
+import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -57,6 +58,8 @@ const handler = async (event) => {
                 return await setCaptain(sql, body, admin, event)
             case 'promote-sub':
                 return await promoteSub(sql, body, admin, event)
+            case 'cleanup-illegal-holdings':
+                return await cleanupIllegalHoldings(sql, admin, event)
             default:
                 return {
                     statusCode: 400,
@@ -69,7 +72,7 @@ const handler = async (event) => {
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: 'Internal server error' }),
+            body: JSON.stringify({ error: error.message || 'Internal server error' }),
         }
     }
 }
@@ -136,7 +139,12 @@ async function transferPlayer(sql, { league_player_id, new_team_id }, admin, eve
 
     // Verify the league_player exists
     const [lp] = await sql`
-        SELECT id, team_id, season_id FROM league_players WHERE id = ${league_player_id}
+        SELECT lp.id, lp.team_id, lp.season_id, lp.player_id, lp.roster_status,
+               p.name as player_name, t.name as from_team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
     `
     if (!lp) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
@@ -154,19 +162,32 @@ async function transferPlayer(sql, { league_player_id, new_team_id }, admin, eve
         }
     }
 
-    const [updated] = await sql`
-        UPDATE league_players
-        SET team_id = ${new_team_id}, roster_status = 'member', updated_at = NOW()
-        WHERE id = ${league_player_id}
-        RETURNING id, team_id, roster_status
-    `
+    const result = await transaction(async (tx) => {
+        const [updated] = await tx`
+            UPDATE league_players
+            SET team_id = ${new_team_id}, roster_status = 'member', updated_at = NOW()
+            WHERE id = ${league_player_id}
+            RETURNING id, team_id, roster_status
+        `
 
-    await logAudit(sql, admin, { action: 'transfer-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { new_team_id, team_name: team.name } })
+        // Auto-sell any Forge holdings that are now illegal (own-team rule)
+        const forgeResult = await cleanupForgeAfterTeamChange(tx, lp.player_id, new_team_id)
+
+        return { updated, forgeResult }
+    })
+
+    await logAudit(sql, admin, { action: 'transfer-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { new_team_id, team_name: team.name, forge: result.forgeResult } })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: 'transfer', fromTeamId: lp.team_id, fromTeamName: lp.from_team_name,
+        toTeamId: new_team_id, toTeamName: team.name,
+        fromStatus: lp.roster_status, toStatus: 'member', admin,
+    })
 
     return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, updated, team_name: team.name }),
+        body: JSON.stringify({ success: true, updated: result.updated, team_name: team.name, forge: result.forgeResult }),
     }
 }
 
@@ -182,23 +203,36 @@ async function dropPlayer(sql, { league_player_id }, admin, event) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
-    const [updated] = await sql`
-        UPDATE league_players
-        SET is_active = false, roster_status = 'member', updated_at = NOW()
-        WHERE id = ${league_player_id}
-        RETURNING id, is_active, roster_status
+    // Look up context before dropping
+    const [lp] = await sql`
+        SELECT lp.id, lp.team_id, lp.season_id, lp.player_id, lp.roster_status,
+               p.name as player_name, t.name as team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
     `
-
-    if (!updated) {
+    if (!lp) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await sql`
+        UPDATE league_players
+        SET is_active = false, roster_status = 'member', updated_at = NOW()
+        WHERE id = ${league_player_id}
+    `
+
     await logAudit(sql, admin, { action: 'drop-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: 'drop', fromTeamId: lp.team_id, fromTeamName: lp.team_name,
+        fromStatus: lp.roster_status, admin,
+    })
 
     return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, updated }),
+        body: JSON.stringify({ success: true, updated: { id: lp.id, is_active: false, roster_status: 'member' } }),
     }
 }
 
@@ -214,23 +248,36 @@ async function reactivatePlayer(sql, { league_player_id }, admin, event) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
-    const [updated] = await sql`
-        UPDATE league_players
-        SET is_active = true, updated_at = NOW()
-        WHERE id = ${league_player_id}
-        RETURNING id, is_active
+    // Look up context before reactivating
+    const [lp] = await sql`
+        SELECT lp.id, lp.team_id, lp.season_id, lp.player_id, lp.roster_status,
+               p.name as player_name, t.name as team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
     `
-
-    if (!updated) {
+    if (!lp) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await sql`
+        UPDATE league_players
+        SET is_active = true, updated_at = NOW()
+        WHERE id = ${league_player_id}
+    `
+
     await logAudit(sql, admin, { action: 'reactivate-player', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: 'reactivate', toTeamId: lp.team_id, toTeamName: lp.team_name,
+        toStatus: lp.roster_status, admin,
+    })
 
     return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, updated }),
+        body: JSON.stringify({ success: true, updated: { id: lp.id, is_active: true } }),
     }
 }
 
@@ -251,17 +298,24 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
 
-    // Fall back to player's default role if none specified
-    let effectiveRole = role
-    if (!effectiveRole) {
-        const [player] = await sql`SELECT main_role FROM players WHERE id = ${player_id}`
-        effectiveRole = player?.main_role || 'fill'
+    // Look up player and team names for transaction logging
+    const [player] = await sql`SELECT id, name, main_role FROM players WHERE id = ${player_id}`
+    if (!player) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
     }
+    const [toTeam] = await sql`SELECT id, name FROM teams WHERE id = ${team_id} AND season_id = ${season_id}`
+    if (!toTeam) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found in this season' }) }
+    }
+
+    const effectiveRole = role || player.main_role || 'fill'
 
     // Check if player already has an active league_player entry for this season
     const [existing] = await sql`
-        SELECT id, team_id, is_active FROM league_players
-        WHERE player_id = ${player_id} AND season_id = ${season_id}
+        SELECT lp.id, lp.team_id, lp.is_active, t.name as from_team_name
+        FROM league_players lp
+        LEFT JOIN teams t ON t.id = lp.team_id
+        WHERE lp.player_id = ${player_id} AND lp.season_id = ${season_id}
     `
 
     if (existing) {
@@ -276,34 +330,54 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
             }
         }
         // Reactivate and move to new team
-        const [updated] = await sql`
-            UPDATE league_players
-            SET team_id = ${team_id}, role = ${effectiveRole}, is_active = true, updated_at = NOW()
-            WHERE id = ${existing.id}
-            RETURNING id, team_id, role, is_active
-        `
-        await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: existing.id, details: { player_id, team_id, season_id, reactivated: true } })
+        const result = await transaction(async (tx) => {
+            const [updated] = await tx`
+                UPDATE league_players
+                SET team_id = ${team_id}, role = ${effectiveRole}, is_active = true, updated_at = NOW()
+                WHERE id = ${existing.id}
+                RETURNING id, team_id, role, is_active
+            `
+            const forgeResult = await cleanupForgeAfterTeamChange(tx, player_id, team_id)
+            return { updated, forgeResult }
+        })
+
+        await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: existing.id, details: { player_id, team_id, season_id, reactivated: true, forge: result.forgeResult } })
+        await logRosterTransaction(sql, {
+            seasonId: season_id, playerId: player_id, playerName: player.name,
+            type: 'pickup', fromTeamId: existing.team_id, fromTeamName: existing.from_team_name,
+            toTeamId: team_id, toTeamName: toTeam.name, toStatus: 'member', admin,
+            details: { reactivated: true },
+        })
 
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ success: true, reactivated: true, league_player: updated }),
+            body: JSON.stringify({ success: true, reactivated: true, league_player: result.updated, forge: result.forgeResult }),
         }
     }
 
     // Create new league_players entry
-    const [newLp] = await sql`
-        INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
-        VALUES (${player_id}, ${team_id}, ${season_id}, ${effectiveRole}, true)
-        RETURNING id, team_id, role, is_active
-    `
+    const result = await transaction(async (tx) => {
+        const [newLp] = await tx`
+            INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
+            VALUES (${player_id}, ${team_id}, ${season_id}, ${effectiveRole}, true)
+            RETURNING id, team_id, role, is_active
+        `
+        const forgeResult = await cleanupForgeAfterTeamChange(tx, player_id, team_id)
+        return { newLp, forgeResult }
+    })
 
-    await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: newLp.id, details: { player_id, team_id, season_id } })
+    await logAudit(sql, admin, { action: 'add-player-to-team', endpoint: 'roster-manage', targetType: 'league_player', targetId: result.newLp.id, details: { player_id, team_id, season_id, forge: result.forgeResult } })
+    await logRosterTransaction(sql, {
+        seasonId: season_id, playerId: player_id, playerName: player.name,
+        type: 'pickup', toTeamId: team_id, toTeamName: toTeam.name,
+        toStatus: 'member', admin,
+    })
 
     return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, league_player: newLp }),
+        body: JSON.stringify({ success: true, league_player: result.newLp, forge: result.forgeResult }),
     }
 }
 
@@ -370,7 +444,15 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_ro
         return { player, league_player: lp }
     })
 
+    // Look up team name for transaction log
+    const [toTeam] = await sql`SELECT name FROM teams WHERE id = ${team_id}`
+
     await logAudit(sql, admin, { action: 'create-and-add-player', endpoint: 'roster-manage', targetType: 'player', targetId: result.player.id, details: { name: result.player.name, team_id, season_id } })
+    await logRosterTransaction(sql, {
+        seasonId: season_id, playerId: result.player.id, playerName: result.player.name,
+        type: 'create-and-add', toTeamId: team_id, toTeamName: toTeam?.name,
+        toStatus: 'member', admin,
+    })
 
     return {
         statusCode: 200,
@@ -656,7 +738,12 @@ async function setCaptain(sql, { league_player_id }, admin, event) {
     }
 
     const [lp] = await sql`
-        SELECT id, team_id, season_id, is_active FROM league_players WHERE id = ${league_player_id}
+        SELECT lp.id, lp.team_id, lp.season_id, lp.is_active, lp.player_id, lp.roster_status,
+               p.name as player_name, t.name as team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
     `
     if (!lp) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
@@ -686,6 +773,12 @@ async function setCaptain(sql, { league_player_id }, admin, event) {
         targetId: league_player_id,
         details: { team_id: lp.team_id, season_id: lp.season_id },
     })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: 'set-captain', fromTeamId: lp.team_id, fromTeamName: lp.team_name,
+        toTeamId: lp.team_id, toTeamName: lp.team_name,
+        fromStatus: lp.roster_status, toStatus: 'captain', admin,
+    })
 
     return {
         statusCode: 200,
@@ -707,7 +800,12 @@ async function promoteSub(sql, { league_player_id }, admin, event) {
     }
 
     const [lp] = await sql`
-        SELECT id, roster_status FROM league_players WHERE id = ${league_player_id}
+        SELECT lp.id, lp.roster_status, lp.season_id, lp.team_id, lp.player_id,
+               p.name as player_name, t.name as team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
     `
     if (!lp) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
@@ -724,11 +822,78 @@ async function promoteSub(sql, { league_player_id }, admin, event) {
     `
 
     await logAudit(sql, admin, { action: 'promote-sub', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: 'promote', fromTeamId: lp.team_id, fromTeamName: lp.team_name,
+        toTeamId: lp.team_id, toTeamName: lp.team_name,
+        fromStatus: 'sub', toStatus: 'member', admin,
+    })
 
     return {
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, updated, message: 'Promoted to member' }),
+    }
+}
+
+/**
+ * Scan ALL users with linked players and auto-sell any illegal Forge holdings.
+ * Useful for retroactively cleaning up after trades that happened before enforcement was added.
+ */
+async function cleanupIllegalHoldings(sql, admin, event) {
+    if (!await requirePermission(event, 'roster_manage', null)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global roster permission required' }) }
+    }
+
+    // Pre-scan: find users who actually have illegal holdings (own-team)
+    // This avoids opening a transaction for every user
+    const illegal = await sql`
+        SELECT DISTINCT sh.user_id, u.discord_username
+        FROM spark_holdings sh
+        JOIN player_sparks ps ON sh.spark_id = ps.id
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        JOIN users u ON u.id = sh.user_id
+        WHERE sh.sparks > 0
+          AND fm.status = 'open'
+          AND u.linked_player_id IS NOT NULL
+          AND lp.team_id IN (
+              SELECT lp2.team_id FROM league_players lp2
+              WHERE lp2.player_id = u.linked_player_id AND lp2.is_active = true
+          )
+    `
+
+    let totalSold = 0, totalRefunded = 0
+    const affected = []
+
+    for (const user of illegal) {
+        try {
+            const result = await transaction(async (tx) => {
+                return await sellOwnTeamHoldings(tx, user.user_id)
+            })
+            if (result) {
+                totalSold += result.sold
+                totalRefunded += result.refunded
+                affected.push({ userId: user.user_id, username: user.discord_username, ...result })
+            }
+        } catch (err) {
+            console.error(`Forge cleanup failed for user ${user.user_id} (${user.discord_username}):`, err)
+            affected.push({ userId: user.user_id, username: user.discord_username, error: err.message })
+        }
+    }
+
+    await logAudit(sql, admin, {
+        action: 'cleanup-illegal-holdings',
+        endpoint: 'roster-manage',
+        targetType: 'system',
+        targetId: 0,
+        details: { totalSold, totalRefunded, affectedUsers: affected.length },
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, totalSold, totalRefunded, affected }),
     }
 }
 

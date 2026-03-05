@@ -48,6 +48,7 @@ export default function ScrimPlanner() {
     const [captainTeams, setCaptainTeams] = useState([])
     const [myTeams, setMyTeams] = useState([])
     const [incomingScrims, setIncomingScrims] = useState([])
+    const [pendingConfirmations, setPendingConfirmations] = useState([])
 
     const [allTeams, setAllTeams] = useState([])
     const [showPostWindow, setShowPostWindow] = useState(false)
@@ -135,6 +136,7 @@ export default function ScrimPlanner() {
             setMyTeams(myData.myTeams || [])
             setBlockedByMe(myData.blockedByMe || [])
             setBlockedMe(myData.blockedMe || [])
+            setPendingConfirmations(myData.pendingConfirmations || [])
             setIncomingScrims(incomingData.scrims || [])
         } catch (err) { console.error('Failed to load my scrims:', err) }
     }, [user])
@@ -235,41 +237,23 @@ export default function ScrimPlanner() {
     }
 
     // Confirmation handlers
-    const handleConfirmAccept = async (scrimId) => {
+    const handleConfirmAccept = async (scrimId, teamId) => {
         setActionLoading(scrimId)
         try {
-            await scrimService.confirmAccept(scrimId)
+            await scrimService.confirmAccept(scrimId, teamId)
             await Promise.all([loadOpenScrims(), loadMyScrims()])
         } catch (err) { alert(err.message || 'Failed to confirm') }
         finally { setActionLoading(null) }
     }
 
-    const handleDenyAccept = async (scrimId) => {
+    const handleDenyAccept = async (scrimId, teamId) => {
         setActionLoading(scrimId)
         try {
-            await scrimService.denyAccept(scrimId)
+            await scrimService.denyAccept(scrimId, teamId)
             await Promise.all([loadOpenScrims(), loadMyScrims()])
         } catch (err) { alert(err.message || 'Failed to deny') }
         finally { setActionLoading(null) }
     }
-
-    // DM confirmation polling — check for Discord DM replies when pending scrims exist
-    const hasPendingScrims = useMemo(() => myScrims.some(s => s.status === 'pending_confirmation'), [myScrims])
-
-    useEffect(() => {
-        if (!user || !hasPendingScrims) return
-        // Check immediately
-        scrimService.checkDMConfirmations().then(data => {
-            if (data.processed > 0) { loadMyScrims(); loadOpenScrims() }
-        }).catch(() => {})
-        // Poll every 30s
-        const interval = setInterval(() => {
-            scrimService.checkDMConfirmations().then(data => {
-                if (data.processed > 0) { loadMyScrims(); loadOpenScrims() }
-            }).catch(() => {})
-        }, 30000)
-        return () => clearInterval(interval)
-    }, [user, hasPendingScrims]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Blacklist handlers
     const handleBlacklistAdd = async (teamId, blockedTeamId) => {
@@ -366,8 +350,8 @@ export default function ScrimPlanner() {
         finally { setActionLoading(null) }
     }
 
-    const uniqueLeagues = [...new Map(openScrims.map(s => [s.leagueSlug, { slug: s.leagueSlug, name: s.leagueName }])).values()]
-    const uniqueTiers = [...new Set(openScrims.map(s => s.divisionTier).filter(Boolean))].sort((a, b) => a - b)
+    const uniqueLeagues = useMemo(() => [...new Map(activeDivisions.map(d => [d.leagueSlug, { slug: d.leagueSlug, name: d.leagueName }])).values()], [activeDivisions])
+    const uniqueTiers = useMemo(() => [...new Set(activeDivisions.map(d => d.tier).filter(Boolean))].sort((a, b) => a - b), [activeDivisions])
     const [acceptModal, setAcceptModal] = useState(null)
 
     // Calculate default window position (centered, below banner)
@@ -436,6 +420,7 @@ export default function ScrimPlanner() {
                                         actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                                         reliabilityScores={reliabilityScores}
+                                        pendingConfirmations={pendingConfirmations}
                                     />
                                 )}
                                 {mobileTab === 'my' && user && (
@@ -531,6 +516,7 @@ export default function ScrimPlanner() {
                     handleConfirmAccept={handleConfirmAccept} handleDenyAccept={handleDenyAccept}
                     actionLoading={actionLoading} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
                     reliabilityScores={reliabilityScores}
+                    pendingConfirmations={pendingConfirmations}
                     blacklist={blacklist} allTeams={allTeams}
                     onBlacklistAdd={handleBlacklistAdd} onBlacklistRemove={handleBlacklistRemove}
                     impersonatedUser={impersonatedUser}
@@ -731,7 +717,8 @@ export default function ScrimPlanner() {
                                         onAccept={handleAccept} onCancel={handleCancel} onEdit={handleEdit}
                                         actionLoading={actionLoading}
                                         login={login} acceptModal={acceptModal} setAcceptModal={setAcceptModal}
-                                        reliabilityScores={reliabilityScores} />
+                                        reliabilityScores={reliabilityScores}
+                                        pendingConfirmations={pendingConfirmations} />
                                 )}
                                 {activeTab === 'my' && user && (
                                     <MyScrimsTab scrims={myScrims} incomingScrims={incomingScrims} captainTeams={captainTeams}

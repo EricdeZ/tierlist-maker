@@ -1476,14 +1476,51 @@ export async function sellOwnTeamHoldings(tx, userId) {
         }
 
         if (freeSparks > 0) {
-            const refundValue = Math.round(Number(h.current_price) * freeSparks)
-            if (refundValue > 0) {
-                await grantPassion(tx, userId, 'forge_merge_refund', refundValue,
-                    `Refunded ${freeSparks} free Spark${freeSparks > 1 ? 's' : ''} (team change)`,
-                    String(h.spark_id), 0)
+            const tutorialCount = h.tutorial_sparks || 0
+            const referralCount = h.referral_sparks || 0
+
+            // Return tutorial sparks by deleting their transaction records
+            // (freeSparksRemaining is calculated as 3 - count of tutorial_fuel txns)
+            if (tutorialCount > 0) {
+                await tx`
+                    DELETE FROM spark_transactions
+                    WHERE id IN (
+                        SELECT id FROM spark_transactions
+                        WHERE user_id = ${userId} AND spark_id = ${h.spark_id}
+                          AND type = 'tutorial_fuel'
+                        ORDER BY created_at DESC
+                        LIMIT ${tutorialCount}
+                    )
+                `
             }
 
-            // After executeCool, holding may still exist with just free sparks
+            // Return referral sparks to the user's available pool
+            if (referralCount > 0) {
+                await tx`
+                    UPDATE users SET forge_referral_sparks = forge_referral_sparks + ${referralCount}
+                    WHERE id = ${userId}
+                `
+                await tx`
+                    DELETE FROM spark_transactions
+                    WHERE id IN (
+                        SELECT id FROM spark_transactions
+                        WHERE user_id = ${userId} AND spark_id = ${h.spark_id}
+                          AND type = 'referral_fuel'
+                        ORDER BY created_at DESC
+                        LIMIT ${referralCount}
+                    )
+                `
+            }
+
+            // Reduce total_sparks on the player_sparks row
+            await tx`
+                UPDATE player_sparks SET
+                    total_sparks = total_sparks - ${freeSparks},
+                    updated_at = NOW()
+                WHERE id = ${h.spark_id}
+            `
+
+            // Remove free sparks from holding (or delete it entirely)
             const [remaining] = await tx`
                 SELECT id, sparks FROM spark_holdings
                 WHERE user_id = ${userId} AND spark_id = ${h.spark_id}
@@ -1510,6 +1547,47 @@ export async function sellOwnTeamHoldings(tx, userId) {
     }
 
     return { sold, refunded }
+}
+
+/**
+ * After a player changes teams (transfer or pickup), auto-sell any
+ * Forge holdings that are now illegal under the own-team rule.
+ * Checks both the transferred player's user AND users on the destination team.
+ * Must be called within a transaction, AFTER the team change is applied.
+ *
+ * @param {function} tx - transaction tagged template
+ * @param {number} playerId - players.id of the moved player
+ * @param {number} newTeamId - the destination team ID
+ * @returns {{ sold, refunded } | null}
+ */
+export async function cleanupForgeAfterTeamChange(tx, playerId, newTeamId) {
+    // 1. The transferred player's linked user (now on a new team, may hold stock of new teammates)
+    const [transferredUser] = await tx`
+        SELECT id FROM users WHERE linked_player_id = ${playerId}
+    `
+
+    // 2. All users on the destination team (may hold stock of the transferred player)
+    const teamUsers = await tx`
+        SELECT DISTINCT u.id FROM users u
+        JOIN league_players lp ON lp.player_id = u.linked_player_id
+        WHERE lp.team_id = ${newTeamId} AND lp.is_active = true
+          AND u.linked_player_id IS NOT NULL
+    `
+
+    const userIds = new Set(teamUsers.map(u => u.id))
+    if (transferredUser) userIds.add(transferredUser.id)
+    if (userIds.size === 0) return null
+
+    let totalSold = 0, totalRefunded = 0
+    for (const userId of userIds) {
+        const result = await sellOwnTeamHoldings(tx, userId)
+        if (result) {
+            totalSold += result.sold
+            totalRefunded += result.refunded
+        }
+    }
+
+    return totalSold > 0 || totalRefunded > 0 ? { sold: totalSold, refunded: totalRefunded } : null
 }
 
 // ═══════════════════════════════════════════════════

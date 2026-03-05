@@ -70,6 +70,7 @@ import TeamManager from "./pages/admin/TeamManager.jsx";
 import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
 import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
 import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
+import RoleSync from "./pages/admin/RoleSync.jsx";
 import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
 import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
 import ReferralManager from "./pages/admin/ReferralManager.jsx";
@@ -80,6 +81,7 @@ import CardPreview from "./pages/admin/CardPreview.jsx";
 import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
+import CardClashPage from "./pages/CardClashPage.jsx";
 
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -132,6 +134,7 @@ function App() {
                                 <Route path="teams" element={<ProtectedRoute requiredPermission="team_manage"><TeamManager /></ProtectedRoute>} />
                                 <Route path="leaguestaff" element={<ProtectedRoute requiredPermission="league_staff_manage"><LeagueStaff /></ProtectedRoute>} />
                                 <Route path="roster-sync" element={<ProtectedRoute requiredPermission="roster_manage"><DiscordRosterSync /></ProtectedRoute>} />
+                                <Route path="role-sync" element={<ProtectedRoute requiredPermission="roster_manage"><RoleSync /></ProtectedRoute>} />
                                 <Route path="arcade-npcs" element={<ProtectedRoute requiredPermission="league_manage"><ArcadeNpcManager /></ProtectedRoute>} />
                                 <Route path="referrals" element={<ProtectedRoute requiredPermission="league_manage"><ReferralManager /></ProtectedRoute>} />
                                 <Route path="community-teams" element={<ProtectedRoute requiredPermission="league_manage"><CommunityTeamAdmin /></ProtectedRoute>} />
@@ -169,6 +172,7 @@ function App() {
                             <Route path="forge/:leagueSlug/:divisionSlug/challenges" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
+                            <Route path="cardclash" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><CardClashPage /></ProtectedRoute>} />
                             <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="team" element={<MyTeams />} />
                             <Route path="bring-your-own-team" element={<MyTeams />} />

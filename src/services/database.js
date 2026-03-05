@@ -722,11 +722,11 @@ export const scrimService = {
     async getActiveDivisions() {
         return apiCall('scrim', { action: 'active-divisions' })
     },
-    async confirmAccept(scrimId) {
-        return apiPost('scrim', { action: 'confirm-accept' }, { scrim_id: scrimId })
+    async confirmAccept(scrimId, teamId) {
+        return apiPost('scrim', { action: 'confirm-accept' }, { scrim_id: scrimId, team_id: teamId })
     },
-    async denyAccept(scrimId) {
-        return apiPost('scrim', { action: 'deny-accept' }, { scrim_id: scrimId })
+    async denyAccept(scrimId, teamId) {
+        return apiPost('scrim', { action: 'deny-accept' }, { scrim_id: scrimId, team_id: teamId })
     },
     async checkDMConfirmations() {
         return apiCall('scrim', { action: 'check-dm-confirmations' })
@@ -911,6 +911,36 @@ export const adminCommunityService = {
     },
     async resolveDispute(id, outcome) {
         return apiPost('admin-community', { action: 'resolve-dispute' }, { id, outcome })
+    },
+}
+
+export const cardclashService = {
+    async load() {
+        return apiCall('cardclash', { action: 'load' })
+    },
+    async init() {
+        return apiPost('cardclash', { action: 'init' })
+    },
+    async openPack(packType, testMode) {
+        return apiPost('cardclash', { action: 'open-pack' }, { packType, testMode })
+    },
+    async setLineup(role, cardId) {
+        return apiPost('cardclash', { action: 'set-lineup' }, { role, cardId })
+    },
+    async reportBattle(mode, isWinner, testMode) {
+        return apiPost('cardclash', { action: 'report-battle' }, { mode, isWinner, testMode })
+    },
+    async collectIncome(testMode) {
+        return apiPost('cardclash', { action: 'collect-income' }, { testMode })
+    },
+    async disenchant(cardId) {
+        return apiPost('cardclash', { action: 'disenchant' }, { cardId })
+    },
+    async saveDeck(deck) {
+        return apiPost('cardclash', { action: 'save-deck' }, { deck })
+    },
+    async deleteDeck(deckId) {
+        return apiPost('cardclash', { action: 'delete-deck' }, { deckId })
     },
 }
 

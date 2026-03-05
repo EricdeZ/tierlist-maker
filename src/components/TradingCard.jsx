@@ -27,6 +27,15 @@ const fmt = (num) => {
     return Math.round(num).toLocaleString()
 }
 
+// Player variant: 2 stats per role (KDA always first)
+const ROLE_STATS = {
+    'SOLO':    'mitigated',
+    'SUPPORT': 'mitigated',
+    'JUNGLE':  'damage',
+    'MID':     'damage',
+    'ADC':     'damage',
+}
+
 export default function TradingCard({
     playerName,
     teamName,
@@ -38,47 +47,67 @@ export default function TradingCard({
     power,
     stats,
     bestGod,
+    variant,
+    leagueName,
+    divisionName,
 }) {
     const normalizedRole = normalizeRole(role)
     const roleImg = ROLE_IMAGES[normalizedRole]
     const hp = stats?.gamesPlayed ? stats.gamesPlayed * 10 : 0
+    const isPlayer = variant === 'player'
 
     return (
-        <div className="trading-card" data-role={normalizedRole}>
+        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole}>
             {/* Gold outer border */}
             <div className="card-border">
                 {/* Dark inner body */}
                 <div className="card-body">
 
-                    {/* Top banner with role emblem */}
-                    <div className="card-top-banner">
-                        <div className="card-top-left">
-                            <span className="card-stage-label">{normalizedRole}</span>
+                    {isPlayer ? (
+                        <div className="card-top-banner">
+                            <div className="card-top-left">
+                                <span className="card-name">{playerName}</span>
+                                <span className="card-edition-badge">1st Edition</span>
+                            </div>
+                            <div className="card-top-right">
+                                <span className="card-stage-label">{normalizedRole}</span>
+                                <div className="card-emblem card-emblem--sm">
+                                    <img src={roleImg} alt={normalizedRole} />
+                                </div>
+                            </div>
                         </div>
-                        <div className="card-emblem">
-                            <img src={roleImg} alt={normalizedRole} />
-                        </div>
-                        <div className="card-top-right">
-                            <span className="card-hp-label">HP</span>
-                            <span className="card-hp-value">{hp}</span>
-                        </div>
-                    </div>
+                    ) : (
+                        <>
+                            {/* Top banner with role emblem */}
+                            <div className="card-top-banner">
+                                <div className="card-top-left">
+                                    <span className="card-stage-label">{normalizedRole}</span>
+                                </div>
+                                <div className="card-emblem">
+                                    <img src={roleImg} alt={normalizedRole} />
+                                </div>
+                                <div className="card-top-right">
+                                    <span className="card-hp-label">HP</span>
+                                    <span className="card-hp-value">{hp}</span>
+                                </div>
+                            </div>
 
-                    {/* Player name */}
-                    <div className="card-name-bar">
-                        <span className="card-name">{playerName}</span>
-                    </div>
+                            {/* Player name */}
+                            <div className="card-name-bar">
+                                <span className="card-name">{playerName}</span>
+                            </div>
+                        </>
+                    )}
 
                     {/* Image frame */}
                     <div className="card-image-wrap">
                         <div className="card-image-frame">
                             {avatarUrl ? (
-                                <img src={avatarUrl} alt={playerName} />
-                            ) : (
-                                <div className="card-image-placeholder">
-                                    <img src={roleImg} alt={normalizedRole} />
-                                </div>
-                            )}
+                                <img src={avatarUrl} alt={playerName} onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
+                            ) : null}
+                            <div className="card-image-placeholder" style={avatarUrl ? { display: 'none' } : undefined}>
+                                <img src={roleImg} alt={normalizedRole} />
+                            </div>
                         </div>
                         {/* Corner accents */}
                         <div className="card-corner card-corner-tl" />
@@ -90,7 +119,10 @@ export default function TradingCard({
                     {/* Team / Season info */}
                     <div className="card-info-bar">
                         <span className="card-info-text">
-                            {teamName}{teamName && seasonName ? ' \u00b7 ' : ''}{seasonName}
+                            {isPlayer
+                                ? [teamName, leagueName, divisionName].filter(Boolean).join(' \u00b7 ')
+                                : [teamName, seasonName].filter(Boolean).join(' \u00b7 ')
+                            }
                         </span>
                     </div>
 
@@ -110,36 +142,40 @@ export default function TradingCard({
                                     </div>
                                     <span className="card-stat-value">{stats.kda?.toFixed(1)}</span>
                                 </div>
-                                <div className="card-stat-row">
-                                    <div className="card-stat-energy">
-                                        <div className="card-energy-circle">
-                                            <img src={roleImg} alt="" />
+                                {(!isPlayer || ROLE_STATS[normalizedRole] === 'damage') && (
+                                    <div className="card-stat-row">
+                                        <div className="card-stat-energy">
+                                            <div className="card-energy-circle">
+                                                <img src={roleImg} alt="" />
+                                            </div>
+                                            <div className="card-energy-circle">
+                                                <img src={roleImg} alt="" />
+                                            </div>
                                         </div>
-                                        <div className="card-energy-circle">
-                                            <img src={roleImg} alt="" />
+                                        <div className="card-stat-info">
+                                            <span className="card-stat-name">Damage</span>
+                                            <span className="card-stat-sub">Avg per game</span>
                                         </div>
+                                        <span className="card-stat-value">{fmt(stats.avgDamage || 0)}</span>
                                     </div>
-                                    <div className="card-stat-info">
-                                        <span className="card-stat-name">Damage</span>
-                                        <span className="card-stat-sub">Avg per game</span>
-                                    </div>
-                                    <span className="card-stat-value">{fmt(stats.avgDamage || 0)}</span>
-                                </div>
-                                <div className="card-stat-row">
-                                    <div className="card-stat-energy">
-                                        <div className="card-energy-circle">
-                                            <img src={roleImg} alt="" />
+                                )}
+                                {(!isPlayer || ROLE_STATS[normalizedRole] === 'mitigated') && (
+                                    <div className="card-stat-row">
+                                        <div className="card-stat-energy">
+                                            <div className="card-energy-circle">
+                                                <img src={roleImg} alt="" />
+                                            </div>
+                                            <div className="card-energy-circle">
+                                                <img src={roleImg} alt="" />
+                                            </div>
                                         </div>
-                                        <div className="card-energy-circle">
-                                            <img src={roleImg} alt="" />
+                                        <div className="card-stat-info">
+                                            <span className="card-stat-name">Mitigated</span>
+                                            <span className="card-stat-sub">Avg per game</span>
                                         </div>
+                                        <span className="card-stat-value">{fmt(stats.avgMitigated || 0)}</span>
                                     </div>
-                                    <div className="card-stat-info">
-                                        <span className="card-stat-name">Mitigated</span>
-                                        <span className="card-stat-sub">Avg per game</span>
-                                    </div>
-                                    <span className="card-stat-value">{fmt(stats.avgMitigated || 0)}</span>
-                                </div>
+                                )}
                             </div>
 
                             {/* Record bar */}

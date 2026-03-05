@@ -65,10 +65,41 @@ const handler = async (event) => {
         }
     }
 
+    // Background refresh Discord avatar via bot API (fire-and-forget)
+    event.waitUntil(refreshDiscordAvatar(realUser))
+
     return {
         statusCode: 200,
         headers,
         body: JSON.stringify(response),
+    }
+}
+
+async function refreshDiscordAvatar(user) {
+    try {
+        const botToken = process.env.DISCORD_BOT_TOKEN
+        if (!botToken || !user.discord_id) return
+
+        const res = await fetch(`https://discord.com/api/v10/users/${user.discord_id}`, {
+            headers: { Authorization: `Bot ${botToken}` },
+        })
+        if (!res.ok) return
+
+        const discordUser = await res.json()
+        const newAvatar = discordUser.avatar || null
+        const newUsername = discordUser.username || user.discord_username
+
+        // Only update if something changed
+        if (newAvatar !== user.discord_avatar || newUsername !== user.discord_username) {
+            const sql = getDB()
+            await sql`
+                UPDATE users
+                SET discord_avatar = ${newAvatar}, discord_username = ${newUsername}, updated_at = NOW()
+                WHERE id = ${user.id}
+            `
+        }
+    } catch {
+        // Silently ignore — this is best-effort
     }
 }
 

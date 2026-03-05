@@ -48,6 +48,35 @@ const SAMPLE_PLAYERS = {
     SUPPORT: { name: 'ShieldBro', team: 'Guardian Wall', god: 'Geb' },
 }
 
+const SHOWCASE_CARDS = [
+    {
+        playerName: 'Azulisc',
+        teamName: 'Fallen Angels',
+        teamColor: '#4A0093',
+        seasonName: 'BSL Season 2',
+        role: 'JUNGLE',
+        avatarUrl: 'https://cdn.discordapp.com/avatars/478745217873477633/56256acfe4e67cf501be26394773edd5.png?size=256',
+        stats: {
+            gamesPlayed: 14,
+            wins: 12,
+            winRate: 85.7,
+            kda: 4.3,
+            avgDamage: 21886,
+            avgMitigated: 13313,
+            totalKills: 102,
+            totalDeaths: 40,
+            totalAssists: 141,
+        },
+        bestGod: {
+            name: 'Medusa',
+            imageUrl: 'https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/medusa',
+            games: 3,
+            winRate: 100,
+        },
+        rarity: 'gold',
+    },
+]
+
 function makeSampleCard(role) {
     const p = SAMPLE_PLAYERS[role]
     return {
@@ -78,7 +107,7 @@ function makeSampleCard(role) {
 }
 
 export default function CardPreview() {
-    const [view, setView] = useState('effects')
+    const [view, setView] = useState('showcase')
     const [selectedRole, setSelectedRole] = useState('MID')
 
     return (
@@ -91,6 +120,7 @@ export default function CardPreview() {
             {/* View toggle */}
             <div className="flex flex-wrap gap-2 mb-4">
                 {[
+                    { key: 'showcase', label: 'Showcase' },
                     { key: 'effects', label: 'All Effects' },
                     { key: 'roles', label: 'By Role' },
                 ].map(v => (
@@ -125,6 +155,34 @@ export default function CardPreview() {
                 ))}
             </div>
 
+            {/* Showcase: real player cards */}
+            {view === 'showcase' && (
+                <div className="flex flex-wrap gap-10">
+                    {SHOWCASE_CARDS.map(({ rarity, ...cardProps }) => {
+                        const rarityInfo = RARITIES.find(r => r.key === rarity)
+                        const tierInfo = rarityInfo ? TIER_LABELS[rarityInfo.tier] : null
+                        return (
+                            <div key={cardProps.playerName} className="flex flex-col items-center gap-3">
+                                <TradingCardHolo rarity={rarity} role={cardProps.role}>
+                                    <TradingCard {...cardProps} />
+                                </TradingCardHolo>
+                                <span className="text-sm font-bold text-(--color-text)">{cardProps.playerName}</span>
+                                <div className="flex items-center gap-2">
+                                    {tierInfo && (
+                                        <span className={`text-xs font-semibold uppercase tracking-wider ${tierInfo.color}`}>
+                                            {tierInfo.name}
+                                        </span>
+                                    )}
+                                    <span className="text-xs text-(--color-text-secondary)">
+                                        {rarityInfo?.label}
+                                    </span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
             {/* All Effects: grouped by tier */}
             {view === 'effects' && [1, 2, 3, 4, 5].map(tier => {
                 const tierInfo = TIER_LABELS[tier]
@@ -142,9 +200,32 @@ export default function CardPreview() {
                         <div className="flex flex-wrap gap-8">
                             {tierRarities.map(({ key, label, desc }) => (
                                 <div key={key} className="flex flex-col items-center gap-2">
-                                    <TradingCardHolo rarity={key} role={selectedRole}>
-                                        <TradingCard {...makeSampleCard(selectedRole)} />
-                                    </TradingCardHolo>
+                                    {key === 'common' ? (
+                                        <TradingCardHolo rarity={key} role={selectedRole}>
+                                            <TradingCard {...makeSampleCard(selectedRole)} />
+                                        </TradingCardHolo>
+                                    ) : (
+                                        <div className="flex gap-4">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="holo">
+                                                    <TradingCard {...makeSampleCard(selectedRole)} />
+                                                </TradingCardHolo>
+                                                <span className="text-[10px] text-(--color-text-secondary)">Holo</span>
+                                            </div>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="reverse">
+                                                    <TradingCard {...makeSampleCard(selectedRole)} />
+                                                </TradingCardHolo>
+                                                <span className="text-[10px] text-(--color-text-secondary)">Reverse</span>
+                                            </div>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="full">
+                                                    <TradingCard {...makeSampleCard(selectedRole)} />
+                                                </TradingCardHolo>
+                                                <span className="text-[10px] text-(--color-text-secondary)">Full Art</span>
+                                            </div>
+                                        </div>
+                                    )}
                                     <span className="text-sm font-bold text-(--color-text) uppercase tracking-wider">{label}</span>
                                     <span className="text-xs text-(--color-text-secondary)">{desc}</span>
                                 </div>
@@ -161,9 +242,32 @@ export default function CardPreview() {
                     <div className="flex flex-wrap gap-6">
                         {RARITIES.map(({ key, label }) => (
                             <div key={key} className="flex flex-col items-center gap-2">
-                                <TradingCardHolo rarity={key} role={role}>
-                                    <TradingCard {...makeSampleCard(role)} />
-                                </TradingCardHolo>
+                                {key === 'common' ? (
+                                    <TradingCardHolo rarity={key} role={role}>
+                                        <TradingCard {...makeSampleCard(role)} />
+                                    </TradingCardHolo>
+                                ) : (
+                                    <div className="flex gap-3">
+                                        <div className="flex flex-col items-center gap-1">
+                                            <TradingCardHolo rarity={key} role={role} holoType="holo">
+                                                <TradingCard {...makeSampleCard(role)} />
+                                            </TradingCardHolo>
+                                            <span className="text-[10px] text-(--color-text-secondary)">Holo</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <TradingCardHolo rarity={key} role={role} holoType="reverse">
+                                                <TradingCard {...makeSampleCard(role)} />
+                                            </TradingCardHolo>
+                                            <span className="text-[10px] text-(--color-text-secondary)">Reverse</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <TradingCardHolo rarity={key} role={role} holoType="full">
+                                                <TradingCard {...makeSampleCard(role)} />
+                                            </TradingCardHolo>
+                                            <span className="text-[10px] text-(--color-text-secondary)">Full Art</span>
+                                        </div>
+                                    </div>
+                                )}
                                 <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">{label}</span>
                             </div>
                         ))}

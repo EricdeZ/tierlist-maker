@@ -11,7 +11,14 @@ export async function onRequest(context) {
     }
 
     const obj = await env.TEAM_ICONS.get(key)
-    if (!obj) return new Response('Not found', { status: 404 })
+    if (!obj) {
+        // Fallback: proxy to production (covers local dev where R2 is empty)
+        try {
+            const upstream = await fetch(`https://smitecomp.com/api/r2-image?key=${encodeURIComponent(key)}`)
+            if (upstream.ok) return new Response(upstream.body, { headers: Object.fromEntries(upstream.headers) })
+        } catch {}
+        return new Response('Not found', { status: 404 })
+    }
 
     return new Response(obj.body, {
         headers: {

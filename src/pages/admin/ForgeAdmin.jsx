@@ -28,6 +28,8 @@ export default function ForgeAdmin() {
     const [markets, setMarkets] = useState([])
     const [marketId, setMarketId] = useState('')
     const [loading, setLoading] = useState(true)
+    const [cleanupRunning, setCleanupRunning] = useState(false)
+    const [cleanupResult, setCleanupResult] = useState(null)
 
     // Holdings state
     const [holdings, setHoldings] = useState([])
@@ -127,12 +129,63 @@ export default function ForgeAdmin() {
         <div className="max-w-5xl mx-auto pb-8 px-4">
             <PageTitle title="Forge Admin" noindex />
 
-            <div className="mb-6">
-                <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Forge Admin</h1>
-                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-                    View all holdings and transaction activity across the market.
-                </p>
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="font-heading text-2xl font-bold text-[var(--color-text)]">Forge Admin</h1>
+                    <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                        View all holdings and transaction activity across the market.
+                    </p>
+                </div>
+                <button
+                    onClick={async () => {
+                        if (!confirm('Scan all players and auto-sell any illegal own-team holdings?')) return
+                        setCleanupRunning(true)
+                        setCleanupResult(null)
+                        try {
+                            const data = await adminFetch('roster-manage', {
+                                method: 'POST',
+                                body: { action: 'cleanup-illegal-holdings' },
+                            })
+                            setCleanupResult(data)
+                            if (data.totalSold > 0 || data.totalRefunded > 0) loadData()
+                        } catch (err) {
+                            setCleanupResult({ error: err.message })
+                        } finally {
+                            setCleanupRunning(false)
+                        }
+                    }}
+                    disabled={cleanupRunning}
+                    className="px-4 py-2 rounded-lg bg-red-600/20 border border-red-500/30 text-sm font-medium text-red-400 hover:bg-red-600/30 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                    {cleanupRunning ? 'Scanning...' : 'Cleanup Illegal Holdings'}
+                </button>
             </div>
+
+            {cleanupResult && (
+                <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                    cleanupResult.error
+                        ? 'border-red-500/30 bg-red-600/10 text-red-400'
+                        : cleanupResult.totalSold > 0 || cleanupResult.totalRefunded > 0
+                            ? 'border-amber-500/30 bg-amber-600/10 text-amber-300'
+                            : 'border-green-500/30 bg-green-600/10 text-green-400'
+                }`}>
+                    {cleanupResult.error ? (
+                        <span>Error: {cleanupResult.error}</span>
+                    ) : cleanupResult.totalSold === 0 && cleanupResult.totalRefunded === 0 ? (
+                        <span>No illegal holdings found.</span>
+                    ) : (
+                        <div>
+                            <span className="font-medium">Cleaned up {cleanupResult.affected?.length} user{cleanupResult.affected?.length !== 1 ? 's' : ''}:</span>
+                            {' '}{cleanupResult.totalSold} Spark{cleanupResult.totalSold !== 1 ? 's' : ''} sold (with cooling fee),
+                            {' '}{cleanupResult.totalRefunded} free Spark{cleanupResult.totalRefunded !== 1 ? 's' : ''} refunded.
+                            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                                {cleanupResult.affected?.map(u => `${u.username} (${u.sold} sold, ${u.refunded} refunded)`).join(' | ')}
+                            </div>
+                        </div>
+                    )}
+                    <button onClick={() => setCleanupResult(null)} className="ml-2 text-xs underline opacity-60 hover:opacity-100 cursor-pointer">dismiss</button>
+                </div>
+            )}
 
             {/* Market selector + tabs */}
             <div className="flex flex-wrap items-center gap-3 mb-4">

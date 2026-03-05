@@ -13,8 +13,37 @@ const MATCH_LABELS = {
     fuzzy: 'fuzzy',
 }
 
+const TYPE_STYLES = {
+    promote:  { label: 'PROMOTE',  color: 'text-green-400',  bg: 'bg-green-900/40 text-green-400' },
+    demote:   { label: 'DEMOTE',   color: 'text-orange-400', bg: 'bg-orange-900/40 text-orange-400' },
+    transfer: { label: 'TRANSFER', color: 'text-blue-400',   bg: 'bg-blue-900/40 text-blue-400' },
+    pickup:   { label: 'PICKUP',   color: 'text-cyan-400',   bg: 'bg-cyan-900/40 text-cyan-400' },
+    drop:     { label: 'DROP',     color: 'text-red-400',    bg: 'bg-red-900/40 text-red-400' },
+    'set-captain':    { label: 'CAPTAIN',  color: 'text-yellow-400', bg: 'bg-yellow-900/40 text-yellow-400' },
+    reactivate:       { label: 'REACTIVATE', color: 'text-emerald-400', bg: 'bg-emerald-900/40 text-emerald-400' },
+    'create-and-add': { label: 'CREATED',  color: 'text-purple-400', bg: 'bg-purple-900/40 text-purple-400' },
+}
+
+function TypeBadge({ type, className = '' }) {
+    const style = TYPE_STYLES[type] || { label: type, bg: 'bg-gray-700/50 text-gray-400' }
+    return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${style.bg} ${className}`}>{style.label}</span>
+}
+
+function relativeTime(dateStr) {
+    const now = Date.now()
+    const diff = now - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    if (days < 7) return `${days}d ago`
+    return new Date(dateStr).toLocaleDateString()
+}
+
 export default function DiscordRosterSync() {
-    const { hasPermission } = useAuth()
+    useAuth() // auth context required for admin page
     const [loading, setLoading] = useState(true)
     const [toast, setToast] = useState(null)
 
@@ -36,7 +65,15 @@ export default function DiscordRosterSync() {
     const [syncPreview, setSyncPreview] = useState(null)
     const [syncing, setSyncing] = useState(false)
     const [applying, setApplying] = useState(false)
-    const [excluded, setExcluded] = useState(new Set()) // leaguePlayerIds toggled off
+    const [excluded, setExcluded] = useState(new Set()) // keys toggled off
+
+    // Section collapse state
+    const [mappingOpen, setMappingOpen] = useState(false)
+
+    // Transaction history state
+    const [transactions, setTransactions] = useState([])
+    const [txLoading, setTxLoading] = useState(false)
+    const [txTotal, setTxTotal] = useState(0)
 
     const showToast = useCallback((type, message) => {
         const id = Date.now()
@@ -107,7 +144,7 @@ export default function DiscordRosterSync() {
                         }
                     }
                 }
-            } catch {}
+            } catch { /* ignore individual guild fetch failures */ }
         }
         setGuildRoles(allRoles)
     }, [channels, seasons, selectedSeasonId, extraGuildId])
@@ -201,13 +238,13 @@ export default function DiscordRosterSync() {
             if (!res.ok) throw new Error(data.error)
             setSyncPreview(data)
             // Default-exclude fuzzy matches
-            const fuzzyIds = new Set()
+            const fuzzyKeys = new Set()
             for (const team of (data.teams || [])) {
                 for (const ch of (team.changes || [])) {
-                    if (ch.matchMethod === 'fuzzy') fuzzyIds.add(ch.leaguePlayerId)
+                    if (ch.matchMethod === 'fuzzy') fuzzyKeys.add(changeKey(ch))
                 }
             }
-            setExcluded(fuzzyIds)
+            setExcluded(fuzzyKeys)
         } catch (err) {
             showToast('error', `Preview failed: ${err.message}`)
         } finally {
@@ -215,36 +252,59 @@ export default function DiscordRosterSync() {
         }
     }
 
-    const toggleChange = (leaguePlayerId) => {
+    // Unique key for a change (handles both LP-based and pickup-based)
+    const changeKey = (ch) => {
+        if (ch.type === 'pickup') return `pickup-${ch.discordId}`
+        return `lp-${ch.leaguePlayerId}`
+    }
+
+    const toggleChange = (key) => {
         setExcluded(prev => {
             const next = new Set(prev)
-            if (next.has(leaguePlayerId)) next.delete(leaguePlayerId)
-            else next.add(leaguePlayerId)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
             return next
         })
     }
 
-    // Collect all changes across teams, compute included counts
+    // Collect all changes across teams + pickups
     const allChanges = useMemo(() => {
         if (!syncPreview) return []
-        return syncPreview.teams.flatMap(t => t.changes || [])
+        const teamChanges = syncPreview.teams.flatMap(t => t.changes || [])
+        const pickupChanges = syncPreview.pickups || []
+        return [...teamChanges, ...pickupChanges]
     }, [syncPreview])
 
     const includedChanges = useMemo(() => {
-        return allChanges.filter(ch => !excluded.has(ch.leaguePlayerId))
+        return allChanges.filter(ch => !excluded.has(changeKey(ch)))
     }, [allChanges, excluded])
 
     const includedPromotes = includedChanges.filter(ch => ch.type === 'promote').length
     const includedDemotes = includedChanges.filter(ch => ch.type === 'demote').length
+    const includedTransfers = includedChanges.filter(ch => ch.type === 'transfer').length
+    const includedPickups = includedChanges.filter(ch => ch.type === 'pickup').length
 
     const applySync = async () => {
         if (!selectedSeasonId || !includedChanges.length) return
         setApplying(true)
         try {
-            const updates = includedChanges.map(ch => ({
-                leaguePlayerId: ch.leaguePlayerId,
-                newStatus: ch.to,
-            }))
+            const updates = includedChanges.map(ch => {
+                if (ch.type === 'promote' || ch.type === 'demote') {
+                    return { type: ch.type, leaguePlayerId: ch.leaguePlayerId, newStatus: ch.to }
+                }
+                if (ch.type === 'transfer') {
+                    return { type: 'transfer', leaguePlayerId: ch.leaguePlayerId, newTeamId: ch.toTeamId }
+                }
+                if (ch.type === 'pickup') {
+                    return {
+                        type: 'pickup', playerId: ch.playerId, toTeamId: ch.toTeamId,
+                        existingLpId: ch.existingLpId, isReactivation: ch.isReactivation,
+                        role: ch.role,
+                    }
+                }
+                return null
+            }).filter(Boolean)
+
             const res = await fetch(`${API}/roster-sync`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
@@ -252,15 +312,52 @@ export default function DiscordRosterSync() {
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error)
-            showToast('success', `Applied: ${data.promotes} promoted, ${data.demotes} demoted`)
-            // Re-preview to show updated state
+
+            const parts = []
+            if (data.promotes) parts.push(`${data.promotes} promoted`)
+            if (data.demotes) parts.push(`${data.demotes} demoted`)
+            if (data.transfers) parts.push(`${data.transfers} transferred`)
+            if (data.pickups) parts.push(`${data.pickups} picked up`)
+            showToast('success', `Applied: ${parts.join(', ')}`)
+
+            // Re-preview + refresh transactions
             previewSync()
+            loadTransactions()
         } catch (err) {
             showToast('error', `Apply failed: ${err.message}`)
         } finally {
             setApplying(false)
         }
     }
+
+    // ─── Transaction History ───
+    const loadTransactions = useCallback(async (offset = 0) => {
+        if (!selectedSeasonId) return
+        setTxLoading(true)
+        try {
+            const res = await fetch(
+                `${API}/roster-sync?seasonId=${selectedSeasonId}&limit=50&offset=${offset}`,
+                { headers: getAuthHeaders() }
+            )
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error)
+            if (offset === 0) {
+                setTransactions(data.transactions || [])
+            } else {
+                setTransactions(prev => [...prev, ...(data.transactions || [])])
+            }
+            setTxTotal(data.total || 0)
+        } catch (err) {
+            showToast('error', `Failed to load transactions: ${err.message}`)
+        } finally {
+            setTxLoading(false)
+        }
+    }, [selectedSeasonId, showToast])
+
+    useEffect(() => {
+        if (selectedSeasonId) loadTransactions()
+        else { setTransactions([]); setTxTotal(0) }
+    }, [selectedSeasonId, loadTransactions])
 
     if (loading) {
         return (
@@ -290,7 +387,7 @@ export default function DiscordRosterSync() {
                     </div>
                 )}
 
-                {/* Season selector — shared by both sections */}
+                {/* Season selector */}
                 <select
                     value={selectedSeasonId || ''}
                     onChange={e => {
@@ -309,21 +406,28 @@ export default function DiscordRosterSync() {
                 </select>
 
                 {/* ═══ Team Role Mapping ═══ */}
-                <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
+                <section className="bg-gray-900/60 border border-gray-800 rounded-xl">
+                    <button
+                        onClick={() => setMappingOpen(prev => !prev)}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors rounded-xl"
+                    >
                         <div>
                             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Team Role Mapping</h2>
                             <p className="text-xs text-gray-500 mt-0.5">Link Discord roles to teams for roster syncing and screenshot matching</p>
                         </div>
-                        {totalCount > 0 && (
-                            <div className="text-xs text-gray-400">
-                                <span className={mappedCount === totalCount ? 'text-green-400' : 'text-yellow-400'}>
+                        <div className="flex items-center gap-3 shrink-0">
+                            {totalCount > 0 && (
+                                <span className={`text-xs ${mappedCount === totalCount ? 'text-green-400' : 'text-yellow-400'}`}>
                                     {mappedCount}/{totalCount} mapped
                                 </span>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                            <svg className={`w-4 h-4 text-gray-500 transition-transform ${mappingOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </button>
 
+                    {mappingOpen && <div className="px-4 pb-4 space-y-3">
                     {/* Summary when no season selected */}
                     {!selectedSeasonId && mappingSummary.length > 0 && (
                         <div className="space-y-1.5">
@@ -416,6 +520,7 @@ export default function DiscordRosterSync() {
                     {selectedSeasonId && !loadingMappings && displayMappings.length === 0 && (
                         <p className="text-sm text-gray-500 py-2">No teams found for this season.</p>
                     )}
+                    </div>}
                 </section>
 
                 {/* ═══ Roster Sync ═══ */}
@@ -423,7 +528,7 @@ export default function DiscordRosterSync() {
                     <div className="flex items-center justify-between mb-3">
                         <div>
                             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Roster Sync</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Sync roster_status from Discord role membership. Captains are never touched.</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Sync rosters from Discord role membership. Detects promotions, demotions, transfers, and pickups.</p>
                         </div>
                         <button
                             onClick={previewSync}
@@ -442,15 +547,31 @@ export default function DiscordRosterSync() {
                     {syncPreview && (
                         <div className="space-y-4">
                             {/* Summary bar */}
-                            <div className="flex items-center gap-4 bg-gray-800/60 rounded-lg px-4 py-3">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                                    <span className="text-sm text-green-400 font-medium">{includedPromotes} promote{includedPromotes !== 1 ? 's' : ''}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                                    <span className="text-sm text-orange-400 font-medium">{includedDemotes} demote{includedDemotes !== 1 ? 's' : ''}</span>
-                                </div>
+                            <div className="flex flex-wrap items-center gap-4 bg-gray-800/60 rounded-lg px-4 py-3">
+                                {includedPromotes > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                                        <span className="text-sm text-green-400 font-medium">{includedPromotes} promote{includedPromotes !== 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
+                                {includedDemotes > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                                        <span className="text-sm text-orange-400 font-medium">{includedDemotes} demote{includedDemotes !== 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
+                                {includedTransfers > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                        <span className="text-sm text-blue-400 font-medium">{includedTransfers} transfer{includedTransfers !== 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
+                                {includedPickups > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                                        <span className="text-sm text-cyan-400 font-medium">{includedPickups} pickup{includedPickups !== 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
                                     <span className="text-sm text-gray-400">{syncPreview.summary.unchanged} unchanged</span>
@@ -464,7 +585,7 @@ export default function DiscordRosterSync() {
 
                             {/* Team changes */}
                             {syncPreview.teams.filter(t => t.changes.length > 0).map(team => {
-                                const teamIncluded = team.changes.filter(ch => !excluded.has(ch.leaguePlayerId)).length
+                                const teamIncluded = team.changes.filter(ch => !excluded.has(changeKey(ch))).length
                                 return (
                                     <div key={team.teamId} className="bg-gray-800/40 border border-gray-700/50 rounded-lg overflow-hidden">
                                         <div className="px-3 py-2 border-b border-gray-700/50 flex items-center justify-between">
@@ -475,10 +596,11 @@ export default function DiscordRosterSync() {
                                         </div>
                                         <div className="divide-y divide-gray-700/30">
                                             {team.changes.map((ch) => {
-                                                const isExcluded = excluded.has(ch.leaguePlayerId)
+                                                const key = changeKey(ch)
+                                                const isExcluded = excluded.has(key)
                                                 return (
                                                     <label
-                                                        key={ch.leaguePlayerId}
+                                                        key={key}
                                                         className={`px-3 py-1.5 flex items-center gap-3 text-sm cursor-pointer hover:bg-white/[0.02] transition-colors ${
                                                             isExcluded ? 'opacity-40' : ''
                                                         }`}
@@ -486,16 +608,18 @@ export default function DiscordRosterSync() {
                                                         <input
                                                             type="checkbox"
                                                             checked={!isExcluded}
-                                                            onChange={() => toggleChange(ch.leaguePlayerId)}
+                                                            onChange={() => toggleChange(key)}
                                                             className="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/30 focus:ring-offset-0 shrink-0"
                                                         />
-                                                        <span className={`w-16 text-xs font-medium shrink-0 ${
-                                                            ch.type === 'promote' ? 'text-green-400' : 'text-orange-400'
-                                                        }`}>
-                                                            {ch.type === 'promote' ? 'PROMOTE' : 'DEMOTE'}
-                                                        </span>
+                                                        <TypeBadge type={ch.type} className="w-18 text-center shrink-0" />
                                                         <span className="text-gray-300 min-w-0 truncate">{ch.playerName}</span>
-                                                        <span className="text-gray-600 text-xs shrink-0">{ch.from} → {ch.to}</span>
+                                                        {ch.type === 'transfer' ? (
+                                                            <span className="text-gray-500 text-xs shrink-0">
+                                                                {ch.fromTeamName} &rarr; {ch.toTeamName}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-600 text-xs shrink-0">{ch.from} &rarr; {ch.to}</span>
+                                                        )}
                                                         {ch.matchMethod && (
                                                             <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
                                                                 ch.matchMethod === 'fuzzy'
@@ -512,6 +636,48 @@ export default function DiscordRosterSync() {
                                     </div>
                                 )
                             })}
+
+                            {/* Pickup suggestions */}
+                            {(syncPreview.pickups?.length > 0) && (
+                                <div className="bg-cyan-900/10 border border-cyan-700/30 rounded-lg overflow-hidden">
+                                    <div className="px-3 py-2 border-b border-cyan-700/30 flex items-center justify-between">
+                                        <h3 className="text-sm font-semibold text-cyan-400">
+                                            Suggested Pickups
+                                        </h3>
+                                        <span className="text-xs text-gray-500">
+                                            {syncPreview.pickups.filter(p => !excluded.has(changeKey(p))).length}/{syncPreview.pickups.length} selected
+                                        </span>
+                                    </div>
+                                    <div className="divide-y divide-cyan-800/20">
+                                        {syncPreview.pickups.map(p => {
+                                            const key = changeKey(p)
+                                            const isExcluded = excluded.has(key)
+                                            return (
+                                                <label
+                                                    key={key}
+                                                    className={`px-3 py-1.5 flex items-center gap-3 text-sm cursor-pointer hover:bg-white/[0.02] transition-colors ${
+                                                        isExcluded ? 'opacity-40' : ''
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!isExcluded}
+                                                        onChange={() => toggleChange(key)}
+                                                        className="rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500/30 focus:ring-offset-0 shrink-0"
+                                                    />
+                                                    <TypeBadge type="pickup" className="shrink-0" />
+                                                    <span className="text-gray-300 min-w-0 truncate">{p.playerName}</span>
+                                                    <span className="text-gray-500 text-xs shrink-0">&rarr; {p.toTeamName}</span>
+                                                    <span className="text-gray-600 text-xs shrink-0">({p.discordName})</span>
+                                                    {p.isReactivation && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-400 shrink-0">reactivation</span>
+                                                    )}
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Skipped teams */}
                             {syncPreview.teams.filter(t => t.skipped).length > 0 && (
@@ -533,7 +699,7 @@ export default function DiscordRosterSync() {
                                         {syncPreview.unmatched.map((u, i) => (
                                             <div key={i} className="text-xs text-gray-300 flex items-center gap-2">
                                                 <span>{u.discordName}</span>
-                                                <span className="text-gray-600">→ {u.teamName}</span>
+                                                <span className="text-gray-600">&rarr; {u.teamName}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -555,6 +721,69 @@ export default function DiscordRosterSync() {
                                     className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-sm font-semibold transition"
                                 >
                                     {applying ? 'Applying...' : `Apply ${includedChanges.length} Change${includedChanges.length !== 1 ? 's' : ''}`}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </section>
+
+                {/* ═══ Transaction History ═══ */}
+                <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Transaction History</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">All roster changes from Discord sync and manual admin actions</p>
+                        </div>
+                        {txTotal > 0 && (
+                            <span className="text-xs text-gray-500">{txTotal} total</span>
+                        )}
+                    </div>
+
+                    {!selectedSeasonId && (
+                        <p className="text-sm text-gray-500 py-2">Select a season to view transaction history.</p>
+                    )}
+
+                    {selectedSeasonId && txLoading && transactions.length === 0 && (
+                        <div className="flex justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-blue-500" />
+                        </div>
+                    )}
+
+                    {selectedSeasonId && transactions.length === 0 && !txLoading && (
+                        <p className="text-sm text-gray-500 py-2">No transactions recorded yet.</p>
+                    )}
+
+                    {transactions.length > 0 && (
+                        <div className="space-y-1">
+                            {transactions.map(tx => (
+                                <div key={tx.id} className="flex items-center gap-3 bg-gray-800/30 rounded-lg px-3 py-2 text-sm">
+                                    <span className="text-xs text-gray-500 w-16 shrink-0">{relativeTime(tx.created_at)}</span>
+                                    <TypeBadge type={tx.type} className="shrink-0" />
+                                    <span className="text-gray-200 font-medium min-w-0 truncate">{tx.player_name}</span>
+                                    <span className="text-gray-500 text-xs shrink-0">
+                                        {tx.from_team_name && tx.to_team_name && tx.from_team_name !== tx.to_team_name
+                                            ? <>{tx.from_team_name} &rarr; {tx.to_team_name}</>
+                                            : tx.to_team_name || tx.from_team_name || ''}
+                                    </span>
+                                    {tx.from_status && tx.to_status && tx.from_status !== tx.to_status && (
+                                        <span className="text-gray-600 text-xs shrink-0">{tx.from_status} &rarr; {tx.to_status}</span>
+                                    )}
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                                        tx.source === 'discord_sync' ? 'bg-indigo-900/40 text-indigo-400' : 'bg-gray-700/50 text-gray-500'
+                                    }`}>
+                                        {tx.source === 'discord_sync' ? 'sync' : 'manual'}
+                                    </span>
+                                    <span className="text-xs text-gray-600 shrink-0 ml-auto">{tx.admin_username}</span>
+                                </div>
+                            ))}
+
+                            {txTotal > transactions.length && (
+                                <button
+                                    onClick={() => loadTransactions(transactions.length)}
+                                    disabled={txLoading}
+                                    className="w-full py-2 text-xs text-gray-400 hover:text-gray-300 transition"
+                                >
+                                    {txLoading ? 'Loading...' : `Load more (${txTotal - transactions.length} remaining)`}
                                 </button>
                             )}
                         </div>

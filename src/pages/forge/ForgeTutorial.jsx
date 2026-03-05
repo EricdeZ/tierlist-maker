@@ -58,8 +58,8 @@ const STEPS = [
     {
         id: 'cooling',
         title: 'Cooling (Selling)',
-        body: 'When you want to take profits, you Cool your Sparks. There is a 10% Cooling Tax on all sales — so timing matters. However, if you hold until the season ends, liquidation pays out at full value with no tax. Your free Starter Sparks can\'t be cooled, but Sparks you buy with Passion can.',
-        mobileBody: 'Cool your Sparks to take profits (10% tax). Hold until season end for full payout with no tax. Starter Sparks can\'t be cooled.',
+        body: 'When you want to take profits, you Cool your Sparks. There is a 10% Cooling Tax on all sales — so timing matters. Your free Starter Sparks can\'t be cooled, but Sparks you buy with Passion can.',
+        mobileBody: 'Cool your Sparks to take profits (10% tax). Starter Sparks can\'t be cooled.',
         placement: 'center',
         btnText: 'Next',
     },

@@ -88,6 +88,7 @@ const handler = async (event) => {
                     l.name AS league_name,
                     l.slug AS league_slug,
                     l.color AS league_color,
+                    lp.team_id,
                     t.name AS team_name,
                     t.color AS team_color,
                     t.slug AS team_slug,
@@ -115,7 +116,7 @@ const handler = async (event) => {
                 GROUP BY s.id, s.name, s.slug, s.is_active, s.start_date,
                          d.name, d.slug, d.tier,
                          l.id, l.name, l.slug, l.color,
-                         t.name, t.color, t.slug,
+                         lp.team_id, t.name, t.color, t.slug,
                          lp.role, lp.secondary_role
                 ORDER BY s.is_active DESC, s.start_date DESC
             `,

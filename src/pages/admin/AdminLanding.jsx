@@ -127,6 +127,21 @@ const tools = [
         btnClass: 'bg-emerald-600 hover:bg-emerald-700',
     },
     {
+        title: 'Role Sync',
+        description: 'Detect role mismatches by comparing each player\'s assigned role to their most recently played game. Preview changes and apply corrections in bulk.',
+        path: '/admin/role-sync',
+        permission: 'roster_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+            </svg>
+        ),
+        accent: 'from-amber-500/20 to-amber-600/5',
+        border: 'border-amber-500/20 hover:border-amber-500/40',
+        iconColor: 'text-amber-400',
+        btnClass: 'bg-amber-600 hover:bg-amber-700',
+    },
+    {
         title: 'Banned Content',
         description: 'Configure Discord channels for league ban lists. Sync gods, items, relics, and other banned content from Discord messages. Auto-syncs hourly.',
         path: '/admin/banned-content',
