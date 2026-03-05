@@ -643,13 +643,15 @@ async function handleRespond(sql, user, body) {
     if (invite.type === 'invite') {
         if (invite.to_user_id !== user.id) return postErr('You cannot respond to this invitation')
     }
-    // For request type: only the team captain can respond
+    // For request type: captain can accept/decline, requester can cancel (decline only)
     if (invite.type === 'request') {
-        const [captain] = await sql`
+        const isCaptain = (await sql`
             SELECT 1 FROM community_team_members
             WHERE team_id = ${invite.team_id} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
-        `
-        if (!captain) return postErr('Only the team captain can respond to join requests')
+        `).length > 0
+        const isRequester = invite.from_user_id === user.id
+        if (!isCaptain && !isRequester) return postErr('Only the team captain can respond to join requests')
+        if (isRequester && accept) return postErr('You cannot accept your own join request')
     }
 
     if (accept) {
