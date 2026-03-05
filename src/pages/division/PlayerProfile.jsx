@@ -1027,6 +1027,7 @@ const PlayerProfile = () => {
                     </>
                 )
             )}
+
         </div>
     )
 }

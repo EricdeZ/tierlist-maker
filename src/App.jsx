@@ -76,6 +76,7 @@ import ReferralManager from "./pages/admin/ReferralManager.jsx";
 import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
 import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
+import CardPreview from "./pages/admin/CardPreview.jsx";
 import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
@@ -135,6 +136,7 @@ function App() {
                                 <Route path="referrals" element={<ProtectedRoute requiredPermission="league_manage"><ReferralManager /></ProtectedRoute>} />
                                 <Route path="community-teams" element={<ProtectedRoute requiredPermission="league_manage"><CommunityTeamAdmin /></ProtectedRoute>} />
                                 <Route path="scrim-admin" element={<ProtectedRoute requiredPermission="league_manage"><ScrimAdmin /></ProtectedRoute>} />
+                                <Route path="card-preview" element={<ProtectedRoute requiredPermission="permission_manage"><CardPreview /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
                             </Route>
 
