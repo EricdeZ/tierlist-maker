@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { GODS, CLASS_ROLE, CLASS_DAMAGE, getGodImageUrl } from '../../../data/cardclash/gods'
+import { GODS, CLASS_ROLE, CLASS_DAMAGE, ABILITY_TYPES } from '../../../data/cardclash/gods'
 import { RARITIES } from '../../../data/cardclash/economy'
 import { cardclashAdminService } from '../../../services/database'
 import GameCard from '../../cardclash/components/GameCard'
 
 const CLASSES = ['All', 'Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter']
-const ABILITY_TYPES = ['All', 'damage', 'aoe_damage', 'heal', 'buff', 'debuff', 'cc', 'execute', 'shield', 'summon', 'global', 'stealth', 'mobility', 'rotate', 'gank', 'split', 'vision', 'zone', 'objective', 'wave', 'invade']
+const ABILITY_TYPE_LIST = ['All', ...Object.values(ABILITY_TYPES)]
 
 export default function CCAdminGods() {
   const [classFilter, setClassFilter] = useState('All')
@@ -29,7 +29,13 @@ export default function CCAdminGods() {
   const getGodWithOverride = useCallback((god) => {
     const override = overrides[god.slug]
     if (!override) return god
-    return { ...god, metadata: override }
+    return {
+      ...god,
+      ...override.name && { name: override.name },
+      ...override.class && { class: override.class },
+      metadata: override,
+      ability: override.ability ? { ...god.ability, ...override.ability } : god.ability,
+    }
   }, [overrides])
 
   const filtered = useMemo(() => {
@@ -97,7 +103,7 @@ export default function CCAdminGods() {
           onChange={e => setAbilityFilter(e.target.value)}
           className="bg-[var(--color-bg)] border border-white/10 rounded-lg px-3 py-2 text-sm"
         >
-          {ABILITY_TYPES.map(t => (
+          {ABILITY_TYPE_LIST.map(t => (
             <option key={t} value={t}>{t === 'All' ? 'All Ability Types' : t}</option>
           ))}
         </select>
@@ -148,7 +154,7 @@ export default function CCAdminGods() {
                   <th className="p-3">Mana</th>
                   <th className="p-3">CD</th>
                   <th className="p-3">Value</th>
-                  <th className="p-3">Img Override</th>
+                  <th className="p-3">Override</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,7 +188,7 @@ export default function CCAdminGods() {
         </div>
       )}
 
-      {/* God detail modal with image editor */}
+      {/* God detail modal */}
       {selectedGod && (
         <GodDetailModal
           god={selectedGod}
@@ -211,41 +217,73 @@ export default function CCAdminGods() {
   )
 }
 
+const INPUT = 'w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm'
+const LABEL = 'block text-xs text-[var(--color-text-secondary)] mb-1'
+
 function GodDetailModal({ god, override, onSave, onClose }) {
+  // Image positioning
   const [offsetX, setOffsetX] = useState(override.image_offset_x || 0)
   const [offsetY, setOffsetY] = useState(override.image_offset_y || 0)
   const [zoom, setZoom] = useState(override.image_zoom || 1)
   const [customImageUrl, setCustomImageUrl] = useState(override.custom_image_url || '')
+
+  // Editable card properties
+  const [name, setName] = useState(override.name || god.name)
+  const [godClass, setGodClass] = useState(override.class || god.class)
+  const [abilityName, setAbilityName] = useState(override.ability?.name || god.ability?.name || '')
+  const [abilityType, setAbilityType] = useState(override.ability?.type || god.ability?.type || '')
+  const [abilityDesc, setAbilityDesc] = useState(override.ability?.description || god.ability?.description || '')
+  const [abilityMana, setAbilityMana] = useState(override.ability?.manaCost ?? god.ability?.manaCost ?? 0)
+  const [abilityCooldown, setAbilityCooldown] = useState(override.ability?.cooldown ?? god.ability?.cooldown ?? 0)
+  const [abilityValue, setAbilityValue] = useState(override.ability?.value ?? god.ability?.value ?? 0)
+
   const [saving, setSaving] = useState(false)
   const [previewRarity, setPreviewRarity] = useState('rare')
 
-  const hasChanges = offsetX !== (override.image_offset_x || 0)
-    || offsetY !== (override.image_offset_y || 0)
-    || zoom !== (override.image_zoom || 1)
-    || customImageUrl !== (override.custom_image_url || '')
+  const buildMetadata = () => {
+    const metadata = {}
+    // Image positioning
+    if (offsetX !== 0) metadata.image_offset_x = offsetX
+    if (offsetY !== 0) metadata.image_offset_y = offsetY
+    if (zoom !== 1) metadata.image_zoom = zoom
+    if (customImageUrl) metadata.custom_image_url = customImageUrl
+    // Card properties (only store if different from default)
+    if (name !== god.name) metadata.name = name
+    if (godClass !== god.class) metadata.class = godClass
+    const ability = {}
+    if (abilityName !== (god.ability?.name || '')) ability.name = abilityName
+    if (abilityType !== (god.ability?.type || '')) ability.type = abilityType
+    if (abilityDesc !== (god.ability?.description || '')) ability.description = abilityDesc
+    if (abilityMana !== (god.ability?.manaCost ?? 0)) ability.manaCost = Number(abilityMana)
+    if (abilityCooldown !== (god.ability?.cooldown ?? 0)) ability.cooldown = Number(abilityCooldown)
+    if (abilityValue !== (god.ability?.value ?? 0)) ability.value = Number(abilityValue)
+    if (Object.keys(ability).length > 0) metadata.ability = ability
+    return metadata
+  }
+
+  const hasChanges = JSON.stringify(buildMetadata()) !== JSON.stringify(
+    Object.keys(override).length ? override : {}
+  )
 
   const handleSave = async () => {
     setSaving(true)
-    const metadata = {
-      image_offset_x: offsetX,
-      image_offset_y: offsetY,
-      image_zoom: zoom,
-    }
-    if (customImageUrl) metadata.custom_image_url = customImageUrl
-    await onSave(god, metadata)
+    await onSave(god, buildMetadata())
     setSaving(false)
+  }
+
+  const handleReset = () => {
+    setOffsetX(0); setOffsetY(0); setZoom(1); setCustomImageUrl('')
+    setName(god.name); setGodClass(god.class)
+    setAbilityName(god.ability?.name || ''); setAbilityType(god.ability?.type || '')
+    setAbilityDesc(god.ability?.description || '')
+    setAbilityMana(god.ability?.manaCost ?? 0); setAbilityCooldown(god.ability?.cooldown ?? 0)
+    setAbilityValue(god.ability?.value ?? 0)
   }
 
   const handleMouseDown = (e) => {
     e.preventDefault()
-    const startX = e.clientX
-    const startY = e.clientY
-    const startOX = offsetX
-    const startOY = offsetY
-    const onMove = (e) => {
-      setOffsetX(Math.round(startOX + (e.clientX - startX)))
-      setOffsetY(Math.round(startOY + (e.clientY - startY)))
-    }
+    const startX = e.clientX, startY = e.clientY, startOX = offsetX, startOY = offsetY
+    const onMove = (e) => { setOffsetX(Math.round(startOX + (e.clientX - startX))); setOffsetY(Math.round(startOY + (e.clientY - startY))) }
     const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -253,15 +291,26 @@ function GodDetailModal({ god, override, onSave, onClose }) {
 
   const previewData = {
     ...god,
+    name,
+    class: godClass,
     imageUrl: customImageUrl || undefined,
     metadata: { image_offset_x: offsetX, image_offset_y: offsetY, image_zoom: zoom },
+    ability: {
+      ...god.ability,
+      name: abilityName,
+      type: abilityType,
+      description: abilityDesc,
+      manaCost: Number(abilityMana),
+      cooldown: Number(abilityCooldown),
+      value: Number(abilityValue),
+    },
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[var(--color-bg)] rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="text-lg font-bold">{god.name}</h2>
+          <h2 className="text-lg font-bold">{god.name} <span className="text-sm text-[var(--color-text-secondary)] font-normal">({god.slug})</span></h2>
           <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -270,92 +319,112 @@ function GodDetailModal({ god, override, onSave, onClose }) {
         </div>
         <div className="p-5 grid md:grid-cols-[1fr_280px] gap-6">
           <div className="space-y-4">
-            {/* Info */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Class</div>
-                <div className="font-bold">{god.class}</div>
+            {/* Card Properties */}
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Card Properties</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>Name</label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Class</label>
+                  <select value={godClass} onChange={e => setGodClass(e.target.value)} className={INPUT}>
+                    {['Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter'].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Role</div>
-                <div className="font-bold uppercase">{CLASS_ROLE[god.class]}</div>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Damage Type</div>
-                <div className="font-bold">{CLASS_DAMAGE[god.class]}</div>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Image Key</div>
-                <div className="font-mono text-sm">{god.imageKey}</div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-black/20 rounded-lg p-3">
+                  <div className="text-xs text-[var(--color-text-secondary)]">Role (from class)</div>
+                  <div className="font-bold uppercase">{CLASS_ROLE[godClass]}</div>
+                </div>
+                <div className="bg-black/20 rounded-lg p-3">
+                  <div className="text-xs text-[var(--color-text-secondary)]">Damage Type (from class)</div>
+                  <div className="font-bold">{CLASS_DAMAGE[godClass]}</div>
+                </div>
               </div>
             </div>
 
-            {god.ability && (
-              <div className="bg-black/20 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-bold text-amber-400">{god.ability.name}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-xs">{god.ability.type}</span>
+            {/* Ability */}
+            <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Ability</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>Ability Name</label>
+                  <input type="text" value={abilityName} onChange={e => setAbilityName(e.target.value)} className={INPUT} />
                 </div>
-                <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{god.ability.description}</p>
-                <div className="flex gap-4 mt-3 text-xs text-[var(--color-text-secondary)]">
-                  <span>Mana: <strong className="text-white">{god.ability.manaCost}</strong></span>
-                  <span>Cooldown: <strong className="text-white">{god.ability.cooldown}t</strong></span>
-                  <span>Value: <strong className="text-white">{god.ability.value}</strong></span>
+                <div>
+                  <label className={LABEL}>Ability Type</label>
+                  <select value={abilityType} onChange={e => setAbilityType(e.target.value)} className={INPUT}>
+                    {Object.values(ABILITY_TYPES).map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            )}
-
-            {/* Image positioning */}
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Image Positioning</h4>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                These settings apply to all cards of this god. Drag the card preview or use sliders.
-              </p>
 
               <div>
-                <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Custom Image URL (optional)</label>
-                <input
-                  type="text"
-                  value={customImageUrl}
-                  onChange={e => setCustomImageUrl(e.target.value)}
-                  placeholder="Leave empty for default CDN image"
-                  className="w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm font-mono"
-                />
+                <label className={LABEL}>Description</label>
+                <textarea value={abilityDesc} onChange={e => setAbilityDesc(e.target.value)} rows={3}
+                  className={INPUT + ' resize-y'} />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Offset X: {offsetX}px</label>
-                  <input type="range" min={-100} max={100} value={offsetX} onChange={e => setOffsetX(parseInt(e.target.value))} className="w-full accent-amber-500" />
+                  <label className={LABEL}>Mana Cost</label>
+                  <input type="number" min={0} max={10} value={abilityMana} onChange={e => setAbilityMana(e.target.value)} className={INPUT} />
                 </div>
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Offset Y: {offsetY}px</label>
-                  <input type="range" min={-100} max={100} value={offsetY} onChange={e => setOffsetY(parseInt(e.target.value))} className="w-full accent-amber-500" />
+                  <label className={LABEL}>Cooldown</label>
+                  <input type="number" min={0} max={10} value={abilityCooldown} onChange={e => setAbilityCooldown(e.target.value)} className={INPUT} />
                 </div>
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Zoom: {zoom.toFixed(2)}x</label>
-                  <input type="range" min={50} max={200} value={Math.round(zoom * 100)} onChange={e => setZoom(parseInt(e.target.value) / 100)} className="w-full accent-amber-500" />
+                  <label className={LABEL}>Value</label>
+                  <input type="number" min={0} max={99} value={abilityValue} onChange={e => setAbilityValue(e.target.value)} className={INPUT} />
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => { setOffsetX(0); setOffsetY(0); setZoom(1); setCustomImageUrl('') }}
-                  className="text-xs text-[var(--color-text-secondary)] hover:text-white"
-                >
-                  Reset to defaults
-                </button>
               </div>
             </div>
 
-            {/* Save */}
+            {/* Image positioning */}
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Image Positioning</h4>
+
+              <div>
+                <label className={LABEL}>Custom Image URL (optional)</label>
+                <input type="text" value={customImageUrl} onChange={e => setCustomImageUrl(e.target.value)}
+                  placeholder="Leave empty for default CDN image" className={INPUT + ' font-mono'} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={LABEL}>Offset X: {offsetX}px</label>
+                  <input type="range" min={-100} max={100} value={offsetX} onChange={e => setOffsetX(parseInt(e.target.value))} className="w-full accent-amber-500" />
+                </div>
+                <div>
+                  <label className={LABEL}>Offset Y: {offsetY}px</label>
+                  <input type="range" min={-100} max={100} value={offsetY} onChange={e => setOffsetY(parseInt(e.target.value))} className="w-full accent-amber-500" />
+                </div>
+                <div>
+                  <label className={LABEL}>Zoom: {zoom.toFixed(2)}x</label>
+                  <input type="range" min={50} max={200} value={Math.round(zoom * 100)} onChange={e => setZoom(parseInt(e.target.value) / 100)} className="w-full accent-amber-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving || !hasChanges}
-                className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save Image Settings'}
+              <button onClick={handleSave} disabled={saving || !hasChanges}
+                className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors disabled:opacity-50">
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={handleReset} className="text-xs text-[var(--color-text-secondary)] hover:text-white">
+                Reset all to defaults
               </button>
               {!hasChanges && <span className="text-xs text-[var(--color-text-secondary)]">No changes</span>}
             </div>
@@ -367,12 +436,9 @@ function GodDetailModal({ god, override, onSave, onClose }) {
 
             <div className="flex gap-1 mb-2">
               {['common', 'rare', 'epic', 'legendary'].map(r => (
-                <button
-                  key={r}
-                  onClick={() => setPreviewRarity(r)}
+                <button key={r} onClick={() => setPreviewRarity(r)}
                   className={`px-2 py-0.5 text-[10px] rounded font-bold capitalize ${previewRarity === r ? 'text-black' : 'bg-[var(--color-secondary)] text-[var(--color-text-secondary)]'}`}
-                  style={previewRarity === r ? { backgroundColor: RARITIES[r]?.color } : undefined}
-                >{r}</button>
+                  style={previewRarity === r ? { backgroundColor: RARITIES[r]?.color } : undefined}>{r}</button>
               ))}
             </div>
 

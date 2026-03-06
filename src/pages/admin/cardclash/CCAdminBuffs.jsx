@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MINIONS, MINION_TYPES } from '../../../data/cardclash/minions'
+import { BUFFS } from '../../../data/cardclash/buffs'
 import { RARITIES } from '../../../data/cardclash/economy'
 import { cardclashAdminService } from '../../../services/database'
 import GameCard from '../../cardclash/components/GameCard'
@@ -7,13 +7,13 @@ import GameCard from '../../cardclash/components/GameCard'
 const INPUT = 'w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm'
 const LABEL = 'block text-xs text-[var(--color-text-secondary)] mb-1'
 
-export default function CCAdminMinions() {
-  const [selectedMinion, setSelectedMinion] = useState(null)
+export default function CCAdminBuffs() {
+  const [selectedBuff, setSelectedBuff] = useState(null)
   const [previewRarity, setPreviewRarity] = useState('rare')
   const [overrides, setOverrides] = useState({})
 
   useEffect(() => {
-    cardclashAdminService.getDefinitionOverrides('minion').then(data => {
+    cardclashAdminService.getDefinitionOverrides('buff').then(data => {
       const map = {}
       for (const o of (data.overrides || [])) {
         map[o.definitionId] = o.metadata
@@ -22,26 +22,28 @@ export default function CCAdminMinions() {
     }).catch(() => {})
   }, [])
 
-  const getMinionWithOverride = useCallback((minion) => {
-    const override = overrides[minion.type]
-    if (!override) return minion
+  const getBuffWithOverride = useCallback((buff) => {
+    const override = overrides[buff.id]
+    if (!override) return buff
     return {
-      ...minion,
+      ...buff,
       ...override.name && { name: override.name },
-      ...override.hp !== undefined && { hp: override.hp },
-      ...override.attack !== undefined && { attack: override.attack },
-      ...override.defense !== undefined && { defense: override.defense },
-      ...override.manaCost !== undefined && { manaCost: override.manaCost },
       ...override.description && { description: override.description },
+      ...override.color && { color: override.color },
+      ...override.manaCost !== undefined && { manaCost: override.manaCost },
+      ...override.duration !== undefined && { duration: override.duration },
       metadata: override,
-      imageUrl: override.custom_image_url || minion.imageUrl,
+      imageUrl: override.custom_image_url || buff.imageUrl,
     }
   }, [overrides])
 
-  const handleSaveOverride = async (minion, metadata) => {
-    await cardclashAdminService.saveDefinitionOverride('minion', minion.type, metadata)
-    setOverrides(prev => ({ ...prev, [minion.type]: metadata }))
+  const handleSaveOverride = async (buff, metadata) => {
+    await cardclashAdminService.saveDefinitionOverride('buff', buff.id, metadata)
+    setOverrides(prev => ({ ...prev, [buff.id]: metadata }))
   }
+
+  const jungleBuffs = BUFFS.filter(b => b.category === 'jungle')
+  const objectiveBuffs = BUFFS.filter(b => b.category === 'objective')
 
   return (
     <div className="space-y-6">
@@ -54,43 +56,98 @@ export default function CCAdminMinions() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        {MINIONS.map(m => (
-          <div key={m.type} onClick={() => setSelectedMinion(m)} className="cursor-pointer hover:scale-105 transition-transform">
-            <GameCard type="minion" rarity={previewRarity} data={getMinionWithOverride(m)} />
-            <div className="text-center mt-1 text-xs text-[var(--color-text-secondary)]">
-              {overrides[m.type] ? <span className="text-amber-400">Custom</span> : 'Default'}
+      {/* Jungle Buffs */}
+      <div>
+        <h3 className="text-sm font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Jungle Buffs</h3>
+        <div className="flex flex-wrap gap-4">
+          {jungleBuffs.map(b => (
+            <div key={b.id} onClick={() => setSelectedBuff(b)} className="cursor-pointer hover:scale-105 transition-transform">
+              <GameCard type="buff" rarity={previewRarity} data={getBuffWithOverride(b)} />
+              <div className="text-center mt-1 text-xs text-[var(--color-text-secondary)]">
+                {overrides[b.id] ? <span className="text-amber-400">Custom</span> : 'Default'}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {selectedMinion && (
-        <MinionDetailModal
-          minion={selectedMinion}
-          override={overrides[selectedMinion.type] || {}}
+      {/* Objective Buffs */}
+      <div>
+        <h3 className="text-sm font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Objective Buffs</h3>
+        <div className="flex flex-wrap gap-4">
+          {objectiveBuffs.map(b => (
+            <div key={b.id} onClick={() => setSelectedBuff(b)} className="cursor-pointer hover:scale-105 transition-transform">
+              <GameCard type="buff" rarity={previewRarity} data={getBuffWithOverride(b)} />
+              <div className="text-center mt-1 text-xs text-[var(--color-text-secondary)]">
+                {overrides[b.id] ? <span className="text-amber-400">Custom</span> : 'Default'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Table view */}
+      <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-left text-xs text-[var(--color-text-secondary)] uppercase tracking-wider">
+                <th className="p-3">ID</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Category</th>
+                <th className="p-3">Duration</th>
+                <th className="p-3">Mana</th>
+                <th className="p-3">Description</th>
+                <th className="p-3">Override</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BUFFS.map(b => (
+                <tr key={b.id} className="border-b border-white/5 hover:bg-white/5 cursor-pointer" onClick={() => setSelectedBuff(b)}>
+                  <td className="p-3 text-xs text-[var(--color-text-secondary)]">{b.id}</td>
+                  <td className="p-3 font-medium">
+                    <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: b.color }} />
+                    {b.name}
+                  </td>
+                  <td className="p-3 text-xs capitalize">{b.category}</td>
+                  <td className="p-3 font-mono text-xs">{b.duration}t</td>
+                  <td className="p-3 font-mono text-xs">{b.manaCost}</td>
+                  <td className="p-3 text-xs max-w-sm truncate text-[var(--color-text-secondary)]">{b.description}</td>
+                  <td className="p-3 text-xs">
+                    {overrides[b.id] ? <span className="text-amber-400">Custom</span> : <span className="text-[var(--color-text-secondary)]">Default</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="p-3 border-t border-white/10 text-xs text-[var(--color-text-secondary)]">{BUFFS.length} buffs total</div>
+      </div>
+
+      {selectedBuff && (
+        <BuffDetailModal
+          buff={selectedBuff}
+          override={overrides[selectedBuff.id] || {}}
           onSave={handleSaveOverride}
-          onClose={() => setSelectedMinion(null)}
+          onClose={() => setSelectedBuff(null)}
         />
       )}
     </div>
   )
 }
 
-function MinionDetailModal({ minion, override, onSave, onClose }) {
-  // Image positioning
+function BuffDetailModal({ buff, override, onSave, onClose }) {
   const [offsetX, setOffsetX] = useState(override.image_offset_x || 0)
   const [offsetY, setOffsetY] = useState(override.image_offset_y || 0)
   const [zoom, setZoom] = useState(override.image_zoom || 1)
   const [customImageUrl, setCustomImageUrl] = useState(override.custom_image_url || '')
 
-  // Editable properties
-  const [name, setName] = useState(override.name || minion.name)
-  const [description, setDescription] = useState(override.description || minion.description)
-  const [hp, setHp] = useState(override.hp ?? minion.hp)
-  const [attack, setAttack] = useState(override.attack ?? minion.attack)
-  const [defense, setDefense] = useState(override.defense ?? minion.defense)
-  const [manaCost, setManaCost] = useState(override.manaCost ?? minion.manaCost)
+  const [name, setName] = useState(override.name || buff.name)
+  const [description, setDescription] = useState(override.description || buff.description)
+  const [color, setColor] = useState(override.color || buff.color)
+  const [category, setCategory] = useState(override.category || buff.category)
+  const [manaCost, setManaCost] = useState(override.manaCost ?? buff.manaCost)
+  const [duration, setDuration] = useState(override.duration ?? buff.duration)
 
   const [saving, setSaving] = useState(false)
   const [previewRarity, setPreviewRarity] = useState('rare')
@@ -101,12 +158,12 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
     if (offsetY !== 0) metadata.image_offset_y = offsetY
     if (zoom !== 1) metadata.image_zoom = zoom
     if (customImageUrl) metadata.custom_image_url = customImageUrl
-    if (name !== minion.name) metadata.name = name
-    if (description !== minion.description) metadata.description = description
-    if (Number(hp) !== minion.hp) metadata.hp = Number(hp)
-    if (Number(attack) !== minion.attack) metadata.attack = Number(attack)
-    if (Number(defense) !== minion.defense) metadata.defense = Number(defense)
-    if (Number(manaCost) !== minion.manaCost) metadata.manaCost = Number(manaCost)
+    if (name !== buff.name) metadata.name = name
+    if (description !== buff.description) metadata.description = description
+    if (color !== buff.color) metadata.color = color
+    if (category !== buff.category) metadata.category = category
+    if (Number(manaCost) !== buff.manaCost) metadata.manaCost = Number(manaCost)
+    if (Number(duration) !== buff.duration) metadata.duration = Number(duration)
     return metadata
   }
 
@@ -116,14 +173,14 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
 
   const handleSave = async () => {
     setSaving(true)
-    await onSave(minion, buildMetadata())
+    await onSave(buff, buildMetadata())
     setSaving(false)
   }
 
   const handleReset = () => {
     setOffsetX(0); setOffsetY(0); setZoom(1); setCustomImageUrl('')
-    setName(minion.name); setDescription(minion.description)
-    setHp(minion.hp); setAttack(minion.attack); setDefense(minion.defense); setManaCost(minion.manaCost)
+    setName(buff.name); setDescription(buff.description); setColor(buff.color)
+    setCategory(buff.category); setManaCost(buff.manaCost); setDuration(buff.duration)
   }
 
   const handleMouseDown = (e) => {
@@ -136,14 +193,14 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
   }
 
   const previewData = {
-    ...minion,
+    ...buff,
     name,
     description,
-    hp: Number(hp),
-    attack: Number(attack),
-    defense: Number(defense),
+    color,
+    category,
     manaCost: Number(manaCost),
-    imageUrl: customImageUrl || minion.imageUrl,
+    duration: Number(duration),
+    imageUrl: customImageUrl || buff.imageUrl,
     metadata: { image_offset_x: offsetX, image_offset_y: offsetY, image_zoom: zoom },
   }
 
@@ -151,7 +208,10 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[var(--color-bg)] rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="text-lg font-bold">{minion.name} <span className="text-sm text-[var(--color-text-secondary)] font-normal">({minion.type})</span></h2>
+          <h2 className="text-lg font-bold">
+            <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: buff.color }} />
+            {buff.name} <span className="text-sm text-[var(--color-text-secondary)] font-normal">({buff.id})</span>
+          </h2>
           <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -160,13 +220,21 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
         </div>
         <div className="p-5 grid md:grid-cols-[1fr_280px] gap-6">
           <div className="space-y-4">
-            {/* Card Properties */}
             <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
               <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Card Properties</h4>
 
-              <div>
-                <label className={LABEL}>Name</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className={INPUT} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>Name</label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Category</label>
+                  <select value={category} onChange={e => setCategory(e.target.value)} className={INPUT}>
+                    <option value="jungle">Jungle</option>
+                    <option value="objective">Objective</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -175,33 +243,21 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
                   className={INPUT + ' resize-y'} />
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                <div>
-                  <label className={LABEL}>HP</label>
-                  <input type="number" min={1} max={99} value={hp} onChange={e => setHp(e.target.value)} className={INPUT} />
-                </div>
-                <div>
-                  <label className={LABEL}>Attack</label>
-                  <input type="number" min={0} max={99} value={attack} onChange={e => setAttack(e.target.value)} className={INPUT} />
-                </div>
-                <div>
-                  <label className={LABEL}>Defense</label>
-                  <input type="number" min={0} max={99} value={defense} onChange={e => setDefense(e.target.value)} className={INPUT} />
-                </div>
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className={LABEL}>Mana Cost</label>
                   <input type="number" min={0} max={10} value={manaCost} onChange={e => setManaCost(e.target.value)} className={INPUT} />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-black/20 rounded-lg p-3">
-                  <div className="text-xs text-[var(--color-text-secondary)]">Auto Spawn</div>
-                  <div className="font-bold">{minion.isAutoSpawn ? 'Yes' : 'No'}</div>
+                <div>
+                  <label className={LABEL}>Duration (turns)</label>
+                  <input type="number" min={1} max={10} value={duration} onChange={e => setDuration(e.target.value)} className={INPUT} />
                 </div>
-                <div className="bg-black/20 rounded-lg p-3">
-                  <div className="text-xs text-[var(--color-text-secondary)]">Spawn Count</div>
-                  <div className="font-bold">{minion.spawnCount || '-'}</div>
+                <div>
+                  <label className={LABEL}>Color</label>
+                  <div className="flex gap-2 items-center">
+                    <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 rounded border border-white/10 cursor-pointer" />
+                    <input type="text" value={color} onChange={e => setColor(e.target.value)} className={INPUT + ' font-mono'} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -232,7 +288,6 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-3">
               <button onClick={handleSave} disabled={saving || !hasChanges}
                 className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors disabled:opacity-50">
@@ -255,7 +310,7 @@ function MinionDetailModal({ minion, override, onSave, onClose }) {
               ))}
             </div>
             <div className="cursor-grab active:cursor-grabbing" onMouseDown={handleMouseDown}>
-              <GameCard type="minion" rarity={previewRarity} data={previewData} />
+              <GameCard type="buff" rarity={previewRarity} data={previewData} />
             </div>
             <div className="text-center text-[10px] text-[var(--color-text-secondary)]">
               Offset: ({offsetX}, {offsetY}) &middot; Zoom: {zoom.toFixed(2)}x

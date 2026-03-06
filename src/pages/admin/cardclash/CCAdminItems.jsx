@@ -5,6 +5,7 @@ import { cardclashAdminService } from '../../../services/database'
 import GameCard from '../../cardclash/components/GameCard'
 
 const CATEGORIES = ['All', ...new Set(ITEMS.map(i => i.category))]
+const STAT_KEYS = ['attack', 'defense', 'hp', 'mana']
 
 export default function CCAdminItems() {
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -27,7 +28,15 @@ export default function CCAdminItems() {
   const getItemWithOverride = useCallback((item) => {
     const override = overrides[String(item.id)]
     if (!override) return item
-    return { ...item, metadata: override }
+    return {
+      ...item,
+      ...override.name && { name: override.name },
+      ...override.category && { category: override.category },
+      ...override.manaCost !== undefined && { manaCost: override.manaCost },
+      metadata: override,
+      effects: override.effects ? { ...item.effects, ...override.effects } : item.effects,
+      passive: override.passive ? { ...item.passive, ...override.passive } : item.passive,
+    }
   }, [overrides])
 
   const filtered = useMemo(() => {
@@ -108,7 +117,7 @@ export default function CCAdminItems() {
                   <th className="p-3">Cost</th>
                   <th className="p-3">Effects</th>
                   <th className="p-3">Passive</th>
-                  <th className="p-3">Img Override</th>
+                  <th className="p-3">Override</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,25 +158,72 @@ export default function CCAdminItems() {
   )
 }
 
+const INPUT = 'w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm'
+const LABEL = 'block text-xs text-[var(--color-text-secondary)] mb-1'
+
 function ItemDetailModal({ item, override, onSave, onClose }) {
+  // Image positioning
   const [offsetX, setOffsetX] = useState(override.image_offset_x || 0)
   const [offsetY, setOffsetY] = useState(override.image_offset_y || 0)
   const [zoom, setZoom] = useState(override.image_zoom || 1)
   const [customImageUrl, setCustomImageUrl] = useState(override.custom_image_url || '')
+
+  // Editable card properties
+  const [name, setName] = useState(override.name || item.name)
+  const [category, setCategory] = useState(override.category || item.category)
+  const [manaCost, setManaCost] = useState(override.manaCost ?? item.manaCost)
+  const [passiveName, setPassiveName] = useState(override.passive?.name || item.passive?.name || '')
+  const [passiveDesc, setPassiveDesc] = useState(override.passive?.description || item.passive?.description || '')
+
+  // Effects as individual fields
+  const [effectAttack, setEffectAttack] = useState(override.effects?.attack ?? item.effects?.attack ?? '')
+  const [effectDefense, setEffectDefense] = useState(override.effects?.defense ?? item.effects?.defense ?? '')
+  const [effectHp, setEffectHp] = useState(override.effects?.hp ?? item.effects?.hp ?? '')
+  const [effectMana, setEffectMana] = useState(override.effects?.mana ?? item.effects?.mana ?? '')
+
   const [saving, setSaving] = useState(false)
   const [previewRarity, setPreviewRarity] = useState('rare')
 
-  const hasChanges = offsetX !== (override.image_offset_x || 0)
-    || offsetY !== (override.image_offset_y || 0)
-    || zoom !== (override.image_zoom || 1)
-    || customImageUrl !== (override.custom_image_url || '')
+  const buildMetadata = () => {
+    const metadata = {}
+    if (offsetX !== 0) metadata.image_offset_x = offsetX
+    if (offsetY !== 0) metadata.image_offset_y = offsetY
+    if (zoom !== 1) metadata.image_zoom = zoom
+    if (customImageUrl) metadata.custom_image_url = customImageUrl
+    if (name !== item.name) metadata.name = name
+    if (category !== item.category) metadata.category = category
+    if (Number(manaCost) !== item.manaCost) metadata.manaCost = Number(manaCost)
+    // Effects
+    const effects = {}
+    if (effectAttack !== '' && Number(effectAttack) !== (item.effects?.attack ?? '')) effects.attack = Number(effectAttack)
+    if (effectDefense !== '' && Number(effectDefense) !== (item.effects?.defense ?? '')) effects.defense = Number(effectDefense)
+    if (effectHp !== '' && Number(effectHp) !== (item.effects?.hp ?? '')) effects.hp = Number(effectHp)
+    if (effectMana !== '' && Number(effectMana) !== (item.effects?.mana ?? '')) effects.mana = Number(effectMana)
+    if (Object.keys(effects).length > 0) metadata.effects = effects
+    // Passive
+    const passive = {}
+    if (passiveName !== (item.passive?.name || '')) passive.name = passiveName
+    if (passiveDesc !== (item.passive?.description || '')) passive.description = passiveDesc
+    if (Object.keys(passive).length > 0) metadata.passive = passive
+    return metadata
+  }
+
+  const hasChanges = JSON.stringify(buildMetadata()) !== JSON.stringify(
+    Object.keys(override).length ? override : {}
+  )
 
   const handleSave = async () => {
     setSaving(true)
-    const metadata = { image_offset_x: offsetX, image_offset_y: offsetY, image_zoom: zoom }
-    if (customImageUrl) metadata.custom_image_url = customImageUrl
-    await onSave(item, metadata)
+    await onSave(item, buildMetadata())
     setSaving(false)
+  }
+
+  const handleReset = () => {
+    setOffsetX(0); setOffsetY(0); setZoom(1); setCustomImageUrl('')
+    setName(item.name); setCategory(item.category); setManaCost(item.manaCost)
+    setPassiveName(item.passive?.name || ''); setPassiveDesc(item.passive?.description || '')
+    setEffectAttack(item.effects?.attack ?? ''); setEffectDefense(item.effects?.defense ?? '')
+    setEffectHp(item.effects?.hp ?? ''); setEffectMana(item.effects?.mana ?? '')
   }
 
   const handleMouseDown = (e) => {
@@ -179,17 +235,28 @@ function ItemDetailModal({ item, override, onSave, onClose }) {
     document.addEventListener('mouseup', onUp)
   }
 
+  const currentEffects = {}
+  if (effectAttack !== '') currentEffects.attack = Number(effectAttack)
+  if (effectDefense !== '') currentEffects.defense = Number(effectDefense)
+  if (effectHp !== '') currentEffects.hp = Number(effectHp)
+  if (effectMana !== '') currentEffects.mana = Number(effectMana)
+
   const previewData = {
     ...item,
+    name,
+    category,
+    manaCost: Number(manaCost),
     imageUrl: customImageUrl || undefined,
     metadata: { image_offset_x: offsetX, image_offset_y: offsetY, image_zoom: zoom },
+    effects: Object.keys(currentEffects).length ? currentEffects : item.effects,
+    passive: { ...item.passive, name: passiveName, description: passiveDesc },
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[var(--color-bg)] rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="text-lg font-bold">{item.name}</h2>
+          <h2 className="text-lg font-bold">{item.name} <span className="text-sm text-[var(--color-text-secondary)] font-normal">({item.slug})</span></h2>
           <button onClick={onClose} className="text-[var(--color-text-secondary)] hover:text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -198,74 +265,102 @@ function ItemDetailModal({ item, override, onSave, onClose }) {
         </div>
         <div className="p-5 grid md:grid-cols-[1fr_280px] gap-6">
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Category</div>
-                <div className="font-bold">{item.category}</div>
+            {/* Card Properties */}
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Card Properties</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>Name</label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Category</label>
+                  <select value={category} onChange={e => setCategory(e.target.value)} className={INPUT}>
+                    {[...new Set(ITEMS.map(i => i.category))].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <div className="text-xs text-[var(--color-text-secondary)]">Mana Cost</div>
-                <div className="font-bold">{item.manaCost}</div>
+
+              <div>
+                <label className={LABEL}>Mana Cost</label>
+                <input type="number" min={0} max={10} value={manaCost} onChange={e => setManaCost(e.target.value)} className={INPUT + ' w-24'} />
               </div>
             </div>
 
-            {item.effects && (
-              <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-xs text-[var(--color-text-secondary)] mb-2">Stats</div>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(item.effects).map(([k, v]) => (
-                    <div key={k} className="px-3 py-1.5 rounded bg-amber-500/10 text-sm">
-                      <span className="text-amber-400 font-bold">+{v}</span> {k}
-                    </div>
-                  ))}
+            {/* Effects */}
+            <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-green-400 uppercase tracking-wider">Stat Effects</h4>
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <label className={LABEL}>Attack</label>
+                  <input type="number" min={0} max={20} value={effectAttack} onChange={e => setEffectAttack(e.target.value)} placeholder="-" className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Defense</label>
+                  <input type="number" min={0} max={20} value={effectDefense} onChange={e => setEffectDefense(e.target.value)} placeholder="-" className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>HP</label>
+                  <input type="number" min={0} max={50} value={effectHp} onChange={e => setEffectHp(e.target.value)} placeholder="-" className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Mana</label>
+                  <input type="number" min={0} max={20} value={effectMana} onChange={e => setEffectMana(e.target.value)} placeholder="-" className={INPUT} />
                 </div>
               </div>
-            )}
+            </div>
 
-            {item.passive && (
-              <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-sm font-bold text-amber-400 mb-1">{item.passive.name}</div>
-                <p className="text-sm text-[var(--color-text-secondary)]">{item.passive.description}</p>
+            {/* Passive */}
+            <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Passive</h4>
+              <div>
+                <label className={LABEL}>Passive Name</label>
+                <input type="text" value={passiveName} onChange={e => setPassiveName(e.target.value)} className={INPUT} />
               </div>
-            )}
+              <div>
+                <label className={LABEL}>Passive Description</label>
+                <textarea value={passiveDesc} onChange={e => setPassiveDesc(e.target.value)} rows={2}
+                  className={INPUT + ' resize-y'} />
+              </div>
+            </div>
 
             {/* Image positioning */}
             <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-3">
               <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Image Positioning</h4>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                These settings apply to all cards of this item. Drag the card preview or use sliders.
-              </p>
 
               <div>
-                <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Custom Image URL (optional)</label>
+                <label className={LABEL}>Custom Image URL (optional)</label>
                 <input type="text" value={customImageUrl} onChange={e => setCustomImageUrl(e.target.value)}
-                  placeholder="Leave empty for default CDN image"
-                  className="w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm font-mono" />
+                  placeholder="Leave empty for default CDN image" className={INPUT + ' font-mono'} />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Offset X: {offsetX}px</label>
+                  <label className={LABEL}>Offset X: {offsetX}px</label>
                   <input type="range" min={-100} max={100} value={offsetX} onChange={e => setOffsetX(parseInt(e.target.value))} className="w-full accent-amber-500" />
                 </div>
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Offset Y: {offsetY}px</label>
+                  <label className={LABEL}>Offset Y: {offsetY}px</label>
                   <input type="range" min={-100} max={100} value={offsetY} onChange={e => setOffsetY(parseInt(e.target.value))} className="w-full accent-amber-500" />
                 </div>
                 <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Zoom: {zoom.toFixed(2)}x</label>
+                  <label className={LABEL}>Zoom: {zoom.toFixed(2)}x</label>
                   <input type="range" min={50} max={200} value={Math.round(zoom * 100)} onChange={e => setZoom(parseInt(e.target.value) / 100)} className="w-full accent-amber-500" />
                 </div>
               </div>
-
-              <button onClick={() => { setOffsetX(0); setOffsetY(0); setZoom(1); setCustomImageUrl('') }}
-                className="text-xs text-[var(--color-text-secondary)] hover:text-white">Reset to defaults</button>
             </div>
 
+            {/* Actions */}
             <div className="flex items-center gap-3">
               <button onClick={handleSave} disabled={saving || !hasChanges}
                 className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors disabled:opacity-50">
-                {saving ? 'Saving...' : 'Save Image Settings'}
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={handleReset} className="text-xs text-[var(--color-text-secondary)] hover:text-white">
+                Reset all to defaults
               </button>
               {!hasChanges && <span className="text-xs text-[var(--color-text-secondary)]">No changes</span>}
             </div>
