@@ -562,6 +562,27 @@
 }
 
 /* ============================================
+   Share page — viewport-responsive card scaling
+   Uses --share-scale set via JS (ResizeObserver)
+   ============================================ */
+.card-share-wrapper {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.card-share-wrapper > .holo-card {
+    transform: scale(var(--share-scale, 1)) translate3d(0px, 0px, 0.01px);
+    transform-origin: top center;
+}
+
+.card-share-wrapper > .trading-card {
+    transform: scale(var(--share-scale, 1));
+    transform-origin: top center;
+}
+
+/* ============================================
    Responsive
    ============================================ */
 @media (max-width: 400px) {
