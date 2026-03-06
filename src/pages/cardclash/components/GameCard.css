@@ -204,9 +204,15 @@
 
 .game-card__image img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
+}
+
+.game-card[data-type="item"] .game-card__image,
+.game-card[data-type="buff"] .game-card__image,
+.game-card[data-type="consumable"] .game-card__image,
+.game-card[data-type="minion"] .game-card__image {
+  aspect-ratio: 1 / 1;
 }
 
 .game-card__image-placeholder {
@@ -224,14 +230,14 @@
    Subtitle (class/category info)
    ============================================ */
 .game-card__subtitle {
-  padding: 0.86cqi 3.45cqi 0;
+  padding: 0.22cqi 3.45cqi 0;
   text-align: center;
   position: relative;
   z-index: 2;
 }
 
 .game-card__subtitle span {
-  font-size: 3.02cqi;
+  font-size: 2.8cqi;
   font-weight: 600;
   color: var(--text-dim);
   letter-spacing: 0.22cqi;
@@ -242,8 +248,8 @@
    Ability Section
    ============================================ */
 .game-card__ability {
-  margin: 1.29cqi 3.45cqi 0;
-  padding: 1.72cqi 2.59cqi;
+  margin: 0.65cqi 3.45cqi 0;
+  padding: 1.29cqi 2.16cqi;
   border: 1px solid var(--body-border);
   border-radius: 1.72cqi;
   background: var(--body-surface);
@@ -255,25 +261,29 @@
 }
 
 .game-card__ability-name {
-  font-size: 3.88cqi;
+  font-size: 3.66cqi;
   font-weight: 700;
   color: var(--accent-light);
   line-height: 1.2;
-  margin-bottom: 0.86cqi;
+  margin-bottom: 0.43cqi;
 }
 
 .game-card__ability-desc {
-  font-size: 3.66cqi;
+  font-size: 3.45cqi;
   color: var(--text-dim);
-  line-height: 1.35;
+  line-height: 1.3;
   flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .game-card__ability-cost {
   display: flex;
   gap: 2.59cqi;
-  margin-top: 1.29cqi;
-  padding-top: 1.29cqi;
+  margin-top: 0.65cqi;
+  padding-top: 0.65cqi;
   border-top: 1px solid var(--body-border);
 }
 
@@ -320,6 +330,93 @@
 /* ============================================
    Responsive — only width changes, cqi does the rest
    ============================================ */
+/* When inside holo wrapper, fill the container */
+.holo-card:has(.game-card) { --card-radius: 12px; }
+.holo-card .game-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* Disable hover transform when inside holo (rotator handles it) */
+.holo-card .game-card:hover {
+  transform: none;
+  box-shadow:
+    0 0 12px var(--border-glow),
+    0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* Reverse holo clip — god card (13/9 image) */
+.holo-card[data-holo-type="reverse"]:has(.game-card) .holo-card__shine,
+.holo-card[data-holo-type="reverse"]:has(.game-card) .holo-card__shine::before,
+.holo-card[data-holo-type="reverse"]:has(.game-card) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card) .holo-card__glare,
+.holo-card[data-holo-type="reverse"]:has(.game-card) .holo-card__glare::after {
+  clip-path: polygon(evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%,
+    5.8% 11.3%, 94.2% 11.3%, 94.2% 55.1%, 5.8% 55.1%
+  );
+}
+
+/* Reverse holo clip — square image cards (item/minion/buff/consumable) */
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="item"]) .holo-card__shine,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="item"]) .holo-card__shine::before,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="item"]) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="item"]) .holo-card__glare,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="item"]) .holo-card__glare::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="minion"]) .holo-card__shine,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="minion"]) .holo-card__shine::before,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="minion"]) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="minion"]) .holo-card__glare,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="minion"]) .holo-card__glare::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="buff"]) .holo-card__shine,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="buff"]) .holo-card__shine::before,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="buff"]) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="buff"]) .holo-card__glare,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="buff"]) .holo-card__glare::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="consumable"]) .holo-card__shine,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="consumable"]) .holo-card__shine::before,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="consumable"]) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="consumable"]) .holo-card__glare,
+.holo-card[data-holo-type="reverse"]:has(.game-card[data-type="consumable"]) .holo-card__glare::after {
+  clip-path: polygon(evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%,
+    5.8% 11.3%, 94.2% 11.3%, 94.2% 74.6%, 5.8% 74.6%
+  );
+}
+
+/* Holo clip — god card (image area only) */
+.holo-card[data-holo-type="holo"]:has(.game-card) .holo-card__shine,
+.holo-card[data-holo-type="holo"]:has(.game-card) .holo-card__shine::before,
+.holo-card[data-holo-type="holo"]:has(.game-card) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.game-card) .holo-card__glare,
+.holo-card[data-holo-type="holo"]:has(.game-card) .holo-card__glare::after {
+  clip-path: inset(11.3% 5.8% 44.9% 5.8%);
+}
+
+/* Holo clip — square image cards */
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="item"]) .holo-card__shine,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="item"]) .holo-card__shine::before,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="item"]) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="item"]) .holo-card__glare,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="item"]) .holo-card__glare::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="minion"]) .holo-card__shine,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="minion"]) .holo-card__shine::before,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="minion"]) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="minion"]) .holo-card__glare,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="minion"]) .holo-card__glare::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="buff"]) .holo-card__shine,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="buff"]) .holo-card__shine::before,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="buff"]) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="buff"]) .holo-card__glare,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="buff"]) .holo-card__glare::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="consumable"]) .holo-card__shine,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="consumable"]) .holo-card__shine::before,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="consumable"]) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="consumable"]) .holo-card__glare,
+.holo-card[data-holo-type="holo"]:has(.game-card[data-type="consumable"]) .holo-card__glare::after {
+  clip-path: inset(11.3% 5.8% 25.4% 5.8%);
+}
+
 @media (max-width: 400px) {
   .game-card { width: 200px; }
   .game-card.compact { width: 150px; }

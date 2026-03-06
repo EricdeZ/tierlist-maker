@@ -83,6 +83,7 @@ import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import CardClashPage from "./pages/CardClashPage.jsx";
+import CardSharePage from "./pages/cardclash/CardSharePage.jsx";
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
 import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
@@ -101,6 +102,9 @@ function App() {
                     <Routes>
                         {/* Stream overlay — standalone, no app chrome */}
                         <Route path="snooz/:week" element={<SnoozOverlay />} />
+
+                        {/* Card Clash share — standalone, no app chrome */}
+                        <Route path="cardclash/share/:token" element={<CardSharePage />} />
 
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector */}

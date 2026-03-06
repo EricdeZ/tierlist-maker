@@ -50,6 +50,7 @@ export default function TradingCard({
     variant,
     leagueName,
     divisionName,
+    rarity,
 }) {
     const normalizedRole = normalizeRole(role)
     const roleImg = ROLE_IMAGES[normalizedRole]
@@ -57,7 +58,7 @@ export default function TradingCard({
     const isPlayer = variant === 'player'
 
     return (
-        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole}>
+        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined}>
             {/* Gold outer border */}
             <div className="card-border">
                 {/* Dark inner body */}

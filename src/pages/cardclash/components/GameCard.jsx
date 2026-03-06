@@ -10,14 +10,26 @@ const ABILITY_ICONS = {
   zone: 'Zone', objective: 'Obj', wave: 'Wave', invade: 'Inv',
 }
 
+// Convert px offsets (authored at 240px card = 232px content = 100cqi) to cqi so they scale
+function imgTransformStyle(meta) {
+  if (!meta) return undefined
+  if (!meta.image_offset_x && !meta.image_offset_y && !meta.image_zoom) return undefined
+  const ox = (meta.image_offset_x || 0) * (100 / 232)
+  const oy = (meta.image_offset_y || 0) * (100 / 232)
+  return { transform: `translate(${ox}cqi, ${oy}cqi) scale(${meta.image_zoom || 1})` }
+}
+
 function itemCatSlug(category) {
   if (!category) return 'utility'
   return category.toLowerCase().replace(/\s+/g, '-')
 }
 
-export default function GameCard({ type = 'god', rarity = 'common', data, compact, onClick }) {
+export default function GameCard({ type = 'god', rarity = 'common', data, compact, size, onClick }) {
   const rarityInfo = RARITIES[rarity] || RARITIES.common
   const role = type === 'god' ? (CLASS_ROLE[data.class] || 'mid') : null
+  const style = {}
+  if (size) style.width = size
+  if (onClick) style.cursor = 'pointer'
 
   return (
     <div
@@ -27,7 +39,7 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
       data-type={type !== 'god' ? type : undefined}
       data-item-cat={type === 'item' ? itemCatSlug(data.category) : undefined}
       onClick={onClick}
-      style={onClick ? { cursor: 'pointer' } : undefined}
+      style={Object.keys(style).length ? style : undefined}
     >
       <div className="game-card__border">
         <div className="game-card__body">
@@ -46,6 +58,7 @@ function GodCardContent({ data, rarity, rarityInfo }) {
   const role = CLASS_ROLE[data.class] || 'mid'
   const dmgType = CLASS_DAMAGE[data.class] || 'Physical'
   const imageUrl = data.imageUrl || getGodImageUrl(data)
+  const imgStyle = imgTransformStyle(data.metadata)
 
   return (
     <>
@@ -56,7 +69,7 @@ function GodCardContent({ data, rarity, rarityInfo }) {
 
       <div className="game-card__image-wrap">
         <div className="game-card__image">
-          <img src={imageUrl} alt={data.name} loading="lazy" />
+          <img src={imageUrl} alt={data.name} loading="lazy" style={imgStyle} />
         </div>
       </div>
 
@@ -90,6 +103,7 @@ function GodCardContent({ data, rarity, rarityInfo }) {
 
 function ItemCardContent({ data, rarity, rarityInfo }) {
   const imageUrl = data.imageUrl || getItemImageUrl(data)
+  const imgStyle = imgTransformStyle(data.metadata)
 
   return (
     <>
@@ -104,7 +118,7 @@ function ItemCardContent({ data, rarity, rarityInfo }) {
       <div className="game-card__image-wrap">
         <div className="game-card__image">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} loading="lazy" />
+            <img src={imageUrl} alt={data.name} loading="lazy" style={imgStyle} />
           ) : (
             <div className="game-card__image-placeholder">I</div>
           )}
@@ -121,8 +135,7 @@ function ItemCardContent({ data, rarity, rarityInfo }) {
 
       {data.passive && (
         <div className="game-card__ability">
-          <div className="game-card__ability-name">{data.passive.name}</div>
-          <div className="game-card__ability-desc">{data.passive.description}</div>
+          <div className="game-card__ability-desc"><span className="game-card__ability-name">{data.passive.name}</span> {data.passive.description}</div>
         </div>
       )}
 
@@ -136,6 +149,7 @@ function ItemCardContent({ data, rarity, rarityInfo }) {
 
 function MinionCardContent({ data, rarity, rarityInfo }) {
   const imageUrl = data.imageUrl
+  const imgStyle = imgTransformStyle(data.metadata)
   return (
     <>
       <div className="game-card__top">
@@ -149,7 +163,7 @@ function MinionCardContent({ data, rarity, rarityInfo }) {
       <div className="game-card__image-wrap">
         <div className="game-card__image">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} loading="lazy" />
+            <img src={imageUrl} alt={data.name} loading="lazy" style={imgStyle} />
           ) : (
             <div className="game-card__image-placeholder">M</div>
           )}
@@ -174,6 +188,7 @@ function MinionCardContent({ data, rarity, rarityInfo }) {
 
 function BuffCardContent({ data, rarity, rarityInfo }) {
   const imageUrl = data.imageUrl
+  const imgStyle = imgTransformStyle(data.metadata)
   return (
     <>
       <div className="game-card__top">
@@ -187,7 +202,7 @@ function BuffCardContent({ data, rarity, rarityInfo }) {
       <div className="game-card__image-wrap">
         <div className="game-card__image">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} loading="lazy" />
+            <img src={imageUrl} alt={data.name} loading="lazy" style={imgStyle} />
           ) : (
             <div className="game-card__image-placeholder" style={{ color: data.color }}>B</div>
           )}
@@ -208,6 +223,7 @@ function BuffCardContent({ data, rarity, rarityInfo }) {
 
 function ConsumableCardContent({ data, rarity, rarityInfo }) {
   const imageUrl = data.imageUrl
+  const imgStyle = imgTransformStyle(data.metadata)
   return (
     <>
       <div className="game-card__top">
@@ -221,7 +237,7 @@ function ConsumableCardContent({ data, rarity, rarityInfo }) {
       <div className="game-card__image-wrap">
         <div className="game-card__image">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} loading="lazy" />
+            <img src={imageUrl} alt={data.name} loading="lazy" style={imgStyle} />
           ) : (
             <div className="game-card__image-placeholder" style={{ color: data.color }}>C</div>
           )}
@@ -243,7 +259,7 @@ function ConsumableCardContent({ data, rarity, rarityInfo }) {
 // Helpers
 function getGodImageUrl(god) {
   if (!god.imageKey) return ''
-  return `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${god.imageKey}/Default/t_GodPortrait_${god.imageKey}.png`
+  return `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${god.imageKey}/Default/t_GodCard_${god.imageKey}.png`
 }
 
 function getItemImageUrl(item) {

@@ -379,6 +379,22 @@ const tools = [
         btnClass: 'bg-orange-600 hover:bg-orange-700',
     },
     {
+        title: 'Card Clash Admin',
+        description: 'Manage the Card Clash card game. Browse and edit all player cards, view god and item definitions, tune economy parameters, and adjust image positioning and holo effects.',
+        path: '/admin/cardclash',
+        permission: 'cardclash_manage',
+        globalOnly: true,
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+            </svg>
+        ),
+        accent: 'from-amber-500/20 to-amber-600/5',
+        border: 'border-amber-500/20 hover:border-amber-500/40',
+        iconColor: 'text-amber-400',
+        btnClass: 'bg-amber-600 hover:bg-amber-700',
+    },
+    {
         title: 'Audit Log',
         description: 'View a chronological log of all admin actions. Filter by user, endpoint, action, and date range to track changes and investigate issues.',
         path: '/admin/auditlog',

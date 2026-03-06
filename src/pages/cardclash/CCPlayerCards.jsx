@@ -187,9 +187,11 @@ export default function CCPlayerCards() {
               const holoEffect = RARITY_HOLO_MAP[rarity]
               return (
                 <div key={rarity} className="flex flex-col items-center gap-2">
-                  <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse">
-                    <TradingCard {...cardProps} variant="player" />
-                  </TradingCardHolo>
+                  <div className="card-overview-slot">
+                    <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse">
+                      <TradingCard {...cardProps} variant="player" rarity={rarity} />
+                    </TradingCardHolo>
+                  </div>
                   <span
                     className="text-xs font-bold uppercase tracking-wider"
                     style={{ color: info?.color }}

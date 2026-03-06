@@ -1,5 +1,5 @@
 // God data scraped from smitesource.com/gods + class assignments
-// imageUrl pattern: https://cdn.smitesource.com/cdn-cgi/image/width=3840,format=auto,quality=75/Gods/{Key}/Default/t_GodPortrait_{Key}.png
+// imageUrl pattern: https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/{Key}/Default/t_GodCard_{Key}.png
 
 const CDN = 'https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75';
 
