@@ -103,9 +103,9 @@ const PACKS = {
 }
 
 const GAME_MODES = {
-  quick:  { winReward: 5,  losePenalty: 0,  entryFee: 0 },
-  ranked: { winReward: 18, losePenalty: 0,  entryFee: 10 },
-  wager:  { winReward: 0,  losePenalty: 0,  entryFee: 0 },
+  quick:  { entryFee: 0 },
+  ranked: { entryFee: 10 },
+  wager:  { entryFee: 0 },
 }
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary']
@@ -256,14 +256,6 @@ export async function reportBattle(sql, userId, mode, isWinner, testMode) {
     eloChange = Math.round(k * (actual - expected))
   }
 
-  // Passion reward
-  let passionChange = 0
-  if (isWinner) {
-    passionChange = modeConfig.winReward
-  } else {
-    passionChange = -modeConfig.losePenalty
-  }
-
   // Update stats
   const newStreak = isWinner ? stats.streak + 1 : 0
   const newBestStreak = Math.max(stats.best_streak, newStreak)
@@ -277,12 +269,6 @@ export async function reportBattle(sql, userId, mode, isWinner, testMode) {
     WHERE user_id = ${userId}
   `
 
-  // Grant/deduct Passion (unless test mode)
-  if (!testMode && passionChange !== 0) {
-    await grantPassion(sql, userId, 'cc_battle', passionChange,
-      `Card Clash ${mode}: ${isWinner ? 'Victory' : 'Defeat'}`)
-  }
-
   // Give XP to lineup cards
   await sql`
     UPDATE cc_cards SET xp = xp + ${isWinner ? 25 : 10}
@@ -290,7 +276,7 @@ export async function reportBattle(sql, userId, mode, isWinner, testMode) {
   `
 
   const [updated] = await sql`SELECT * FROM cc_stats WHERE user_id = ${userId}`
-  return { stats: updated, eloChange, passionChange }
+  return { stats: updated, eloChange }
 }
 
 // ════════════════════════════════════════════

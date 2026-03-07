@@ -136,7 +136,6 @@ async function handleReportBattle(sql, user, body) {
   return { statusCode: 200, headers, body: JSON.stringify({
     stats: formatStats(result.stats),
     eloChange: result.eloChange,
-    passionChange: result.passionChange,
   }) }
 }
 
