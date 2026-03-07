@@ -63,9 +63,9 @@ const Teams = () => {
     const getTeamPlayers = (teamId) =>
         (players?.filter(p => p.team_id === teamId) || [])
             .sort((a, b) => {
-                if (a.roster_status === 'captain' && b.roster_status !== 'captain') return -1
-                if (a.roster_status !== 'captain' && b.roster_status === 'captain') return 1
-                return a.name.localeCompare(b.name)
+                const order = { captain: 0, co_captain: 1, member: 2, sub: 3 }
+                const diff = (order[a.roster_status] ?? 2) - (order[b.roster_status] ?? 2)
+                return diff !== 0 ? diff : a.name.localeCompare(b.name)
             })
 
     return (
@@ -165,6 +165,9 @@ const Teams = () => {
                                             <span className="flex items-center gap-1.5">
                                                 {player.roster_status === 'captain' && (
                                                     <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
+                                                )}
+                                                {player.roster_status === 'co_captain' && (
+                                                    <Crown className="w-3.5 h-3.5 text-yellow-400/60 shrink-0" title="Co-Captain" />
                                                 )}
                                                 {player.name}
                                             </span>

@@ -128,7 +128,7 @@ export async function getCommunityTeamsCaptain(sql, userId) {
         FROM community_teams ct
         JOIN community_team_members ctm ON ctm.team_id = ct.id
         WHERE ctm.user_id = ${userId}
-          AND ctm.role = 'captain' AND ctm.status = 'active'
+          AND ctm.role IN ('captain', 'co_captain') AND ctm.status = 'active'
     `
     return rows.map(ct => ({
         team_id: -ct.id,
@@ -187,7 +187,7 @@ export async function getCaptainTeams(sql, userId) {
         JOIN divisions d ON d.id = s.division_id
         JOIN leagues l ON l.id = s.league_id
         WHERE lp.player_id = (SELECT linked_player_id FROM users WHERE id = ${userId})
-          AND lp.roster_status = 'captain' AND lp.is_active = true AND s.is_active = true
+          AND lp.roster_status IN ('captain', 'co_captain') AND lp.is_active = true AND s.is_active = true
     `
 }
 

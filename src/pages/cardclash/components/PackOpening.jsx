@@ -27,17 +27,25 @@ function toGameCardData(card) {
   }
 }
 
-export default function PackOpening({ result, packType, onClose, skipTear, skipToStack, onReplay }) {
+export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
   const [phase, setPhase] = useState(skipToStack ? 'stack' : skipTear ? 'ripping' : 'enter')
   const [tearProgress, setTearProgress] = useState(0)
   const [tearSide, setTearSide] = useState(null)
   const [sparks, setSparks] = useState([])
   const [revealedSet, setRevealedSet] = useState(new Set())
   const [cardFlipped, setCardFlipped] = useState(false)
+  const [flipPhase, setFlipPhase] = useState(null) // null | 'anticipation' | 'flipping' | 'revealed'
+  const [revealParticles, setRevealParticles] = useState([])
+  const [anticipationSparks, setAnticipationSparks] = useState([])
+  const [rarityBanner, setRarityBanner] = useState(null)
+  const bannerKeyRef = useRef(0)
 
   const packRef = useRef(null)
   const tearRef = useRef({ active: false, side: null, maxProgress: 0 })
   const sparkIdRef = useRef(0)
+  const flipLockRef = useRef(false)
+  const particleIdRef = useRef(0)
+  const antSparkTimerRef = useRef(null)
 
   const cards = useMemo(() =>
     [...result.cards].sort((a, b) => (RARITY_TIER[b.rarity] ?? 5) - (RARITY_TIER[a.rarity] ?? 5)),
@@ -52,8 +60,6 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
   }, [cards, revealedSet])
 
   const allRevealed = topIndex === -1
-  const currentCard = topIndex >= 0 ? cards[topIndex] : null
-  const currentTier = currentCard ? (RARITY_TIER[currentCard.rarity] ?? 5) : 5
   const rarestIndex = Math.max(cards.length - 2, 0)
   const rarestColor = RARITIES[cards[rarestIndex]?.rarity]?.color || '#fff'
   const rarestTier = RARITY_TIER[cards[rarestIndex]?.rarity] ?? 5
@@ -65,14 +71,14 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
       case 'enter': t = setTimeout(() => setPhase('ready'), 900); break
       case 'ripping': t = setTimeout(() => setPhase('emerging'), 5500); break
       case 'emerging': t = setTimeout(() => setPhase('stack'), 3500); break
-      case 'collecting': t = setTimeout(() => setPhase('done'), 600 + cards.length * 120); break
+      /* collecting phase removed — go straight to summary */
     }
     return () => clearTimeout(t)
   }, [phase, cards.length])
 
   useEffect(() => {
     if (phase === 'stack' && allRevealed) {
-      const t = setTimeout(() => setPhase('collecting'), 500)
+      const t = setTimeout(() => setPhase('summary'), 500)
       return () => clearTimeout(t)
     }
   }, [phase, allRevealed])
@@ -89,6 +95,57 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
       dur: 0.2 + Math.random() * 0.4,
     }))
     setSparks(prev => [...prev.slice(-60), ...batch])
+  }, [])
+
+  // ─── Reveal particle burst ───
+  const spawnRevealParticles = useCallback((tier, color) => {
+    const count = tier <= 0 ? 40 : tier <= 1 ? 25 : tier <= 2 ? 15 : 8
+    const spread = tier <= 0 ? 280 : tier <= 1 ? 220 : tier <= 2 ? 170 : 130
+    const batch = Array.from({ length: count }, () => {
+      const angle = Math.random() * Math.PI * 2
+      const dist = (0.4 + Math.random() * 0.6) * spread
+      return {
+        id: particleIdRef.current++,
+        tx: Math.cos(angle) * dist,
+        ty: Math.sin(angle) * dist - spread * 0.15,
+        size: 2 + Math.random() * (tier <= 1 ? 6 : 4),
+        dur: 0.5 + Math.random() * 0.6,
+        color: Math.random() > 0.3 ? color : '#fff',
+      }
+    })
+    setRevealParticles(batch)
+    setTimeout(() => setRevealParticles([]), 1500)
+  }, [])
+
+  // ─── Anticipation rising sparks — spawn intermittently during wait ───
+  const startAnticipationSparks = useCallback((color, tier) => {
+    const interval = tier <= 0 ? 80 : tier <= 1 ? 120 : tier <= 2 ? 180 : 250
+    const id = setInterval(() => {
+      const count = tier <= 0 ? 3 : tier <= 1 ? 2 : 1
+      const batch = Array.from({ length: count }, () => ({
+        id: particleIdRef.current++,
+        x: (Math.random() - 0.5) * 200,
+        y: -(120 + Math.random() * 180),
+        size: 2 + Math.random() * 3,
+        dur: 0.6 + Math.random() * 0.6,
+        delay: Math.random() * 0.15,
+      }))
+      setAnticipationSparks(prev => [...prev.slice(-30), ...batch])
+    }, interval)
+    antSparkTimerRef.current = id
+  }, [])
+
+  const stopAnticipationSparks = useCallback(() => {
+    if (antSparkTimerRef.current) {
+      clearInterval(antSparkTimerRef.current)
+      antSparkTimerRef.current = null
+    }
+    setTimeout(() => setAnticipationSparks([]), 1200)
+  }, [])
+
+  // Cleanup anticipation spark timer on unmount
+  useEffect(() => () => {
+    if (antSparkTimerRef.current) clearInterval(antSparkTimerRef.current)
   }, [])
 
   // ─── Auto sparks during ripping — scaled by rarest card ───
@@ -162,21 +219,93 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
 
   const onTearUp = useCallback(() => { tearRef.current.active = false }, [])
 
-  // ─── Card click handler ───
+  const isLastCard = topIndex >= 0 && topIndex === cards.length - 1
+
+  // ─── Card click handler — flip-locked so animation always completes ───
   const onCardClick = useCallback(() => {
-    if (phase !== 'stack' || topIndex < 0) return
+    if (phase !== 'stack' || topIndex < 0 || flipLockRef.current) return
+
     if (!cardFlipped) {
-      setCardFlipped(true)
+      flipLockRef.current = true
+      const tier = RARITY_TIER[cards[topIndex]?.rarity] ?? 5
+      const last = topIndex === cards.length - 1
+
+      // Anticipation phase duration scales with rarity
+      // Common: 0ms, Uncommon: 0ms, Rare: 300ms, Epic: 600ms, Legendary: 1000ms, Mythic: 1400ms
+      // Last card adds extra: +400ms for rare+, +800ms for legendary+
+      const baseAnticipation = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0
+      const lastBonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0
+      const anticipationMs = baseAnticipation + lastBonus
+
+      // Flip duration: Common 400ms → Mythic 800ms, last card +200ms
+      const flipMs = tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 500 : 400
+      const totalFlipMs = flipMs + (last ? 200 : 0)
+
+      // Hold time after reveal: let effects breathe
+      const holdMs = tier <= 0 ? 1200 : tier <= 1 ? 800 : tier <= 2 ? 500 : 200
+
+      const cardColor = RARITIES[cards[topIndex]?.rarity]?.color || '#fff'
+
+      const doReveal = () => {
+        setFlipPhase('revealed')
+        stopAnticipationSparks()
+        if (tier <= 3) spawnRevealParticles(tier, cardColor)
+        // Show rarity banner for rare+
+        if (tier <= 2) {
+          const rarityName = cards[topIndex]?.rarity?.toUpperCase() || ''
+          bannerKeyRef.current++
+          setRarityBanner({ name: rarityName, color: cardColor, tier, key: bannerKeyRef.current })
+          setTimeout(() => setRarityBanner(null), tier <= 0 ? 2000 : tier <= 1 ? 1500 : 1000)
+        }
+        setTimeout(() => { flipLockRef.current = false }, holdMs)
+      }
+
+      if (anticipationMs > 0) {
+        setFlipPhase('anticipation')
+        if (tier <= 3) startAnticipationSparks(cardColor, tier)
+        setTimeout(() => {
+          stopAnticipationSparks()
+          setCardFlipped(true)
+          setFlipPhase('flipping')
+          setTimeout(doReveal, totalFlipMs)
+        }, anticipationMs)
+      } else {
+        setCardFlipped(true)
+        setFlipPhase('flipping')
+        setTimeout(doReveal, totalFlipMs)
+      }
     } else {
+      // Dismiss the revealed card
+      flipLockRef.current = true
       setRevealedSet(prev => new Set([...prev, topIndex]))
       setCardFlipped(false)
+      setFlipPhase(null)
+      setRarityBanner(null)
+      stopAnticipationSparks()
+      setTimeout(() => { flipLockRef.current = false }, 350)
     }
-  }, [phase, cardFlipped, topIndex])
+  }, [phase, cardFlipped, topIndex, cards])
 
   // ─── Computed ───
   const tearLineLeft = tearSide === 'right' ? (1 - tearProgress) * 100 : 0
   const tearLineWidth = tearProgress * 100
   const showPack = ['enter', 'ready', 'tearing', 'ripping', 'emerging'].includes(phase)
+
+  // Flip reveal effect state
+  const topCard = topIndex >= 0 ? cards[topIndex] : null
+  const topTier = topCard ? (RARITY_TIER[topCard.rarity] ?? 5) : 5
+  const topColor = topCard ? (RARITIES[topCard.rarity]?.color || '#fff') : '#fff'
+
+  const shakeClass = flipPhase === 'anticipation'
+    ? topTier <= 0 ? 'shake-mythic' : topTier <= 1 ? 'shake-legendary' : topTier <= 2 ? 'shake-epic' : ''
+    : ''
+
+  let veilClass = '', veilDim = ''
+  if (flipPhase === 'anticipation' || flipPhase === 'flipping') {
+    veilDim = topTier <= 0 ? 'mythic' : topTier <= 1 ? 'legendary' : topTier <= 2 ? 'epic' : topTier <= 3 ? 'rare' : ''
+  } else if (flipPhase === 'revealed') {
+    veilClass = topTier <= 0 ? 'flash-mythic' : topTier <= 1 ? 'flash-legendary' : topTier <= 2 ? 'flash-epic' : topTier <= 3 ? 'flash' : ''
+  }
 
   const fanOffsets = useMemo(() => {
     const n = cards.length
@@ -188,7 +317,20 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
     }))
   }, [cards])
 
-  const flipTime = currentTier <= 1 ? '1s' : currentTier <= 2 ? '0.8s' : currentTier <= 3 ? '0.6s' : '0.4s'
+  const getFlipTime = (card, idx) => {
+    const tier = RARITY_TIER[card?.rarity] ?? 5
+    const last = idx === cards.length - 1
+    const ms = (tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 500 : 400) + (last ? 200 : 0)
+    return `${ms}ms`
+  }
+
+  const getAnticipationTime = (card, idx) => {
+    const tier = RARITY_TIER[card?.rarity] ?? 5
+    const last = idx === cards.length - 1
+    const base = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0
+    const bonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0
+    return `${base + bonus}ms`
+  }
 
   return (
     <div className="pack-opening" data-phase={phase}>
@@ -242,36 +384,93 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
         </>
       )}
 
+      {/* ═══ Screen veil — dim during anticipation, flash on reveal ═══ */}
+      {phase === 'stack' && (flipPhase || veilClass) && (
+        <div
+          className={`pack-opening__flip-veil ${veilClass}`}
+          data-dim={veilDim || undefined}
+        />
+      )}
+
+      {/* ═══ Rarity name banner ═══ */}
+      {rarityBanner && (
+        <div
+          key={rarityBanner.key}
+          className={`pack-opening__rarity-banner${rarityBanner.tier <= 0 ? ' tier-0' : ''}`}
+          style={{ '--banner-color': rarityBanner.color }}
+        >
+          {rarityBanner.name}
+        </div>
+      )}
+
       {/* ═══ Cards — emerge, fan, then flip-to-reveal in place ═══ */}
       {(phase === 'emerging' || phase === 'stack') && !allRevealed && (
-        <div className="pack-opening__emerging-cards">
+        <div className={`pack-opening__emerging-cards ${shakeClass}`}>
           {cards.map((card, i) => {
             const isTop = i === topIndex
             const isFlipped = isTop && cardFlipped
             const isDismissed = revealedSet.has(i)
+            const isLast = i === cards.length - 1
+            const cardColor = RARITIES[card.rarity]?.color || '#fff'
+            const tier = RARITY_TIER[card.rarity] ?? 5
+            const topFlipPhase = isTop ? flipPhase : null
             return (
               <div key={i}
-                className={`pack-opening__emerging-card${i === rarestIndex ? ' rarest' : ''}${isFlipped ? ' flipped' : ''}${isDismissed ? ' dismissed' : ''}`}
+                className={`pack-opening__emerging-card${i === rarestIndex ? ' rarest' : ''}${isFlipped ? ' flipped' : ''}${isDismissed ? ' dismissed' : ''}${isLast ? ' last-card' : ''}${topFlipPhase === 'anticipation' ? ' anticipation' : ''}${topFlipPhase === 'revealed' ? ' revealed' : ''}`}
+                data-rarity={card.rarity}
+                data-tier={tier}
                 style={{
                   '--ei': i, '--et': cards.length,
                   '--fx': `${fanOffsets[i].x}px`,
                   '--fr': `${fanOffsets[i].rot}deg`,
-                  '--flip-time': flipTime,
+                  '--flip-time': getFlipTime(card, i),
+                  '--anticipation-time': getAnticipationTime(card, i),
+                  '--card-color': cardColor,
                   zIndex: isDismissed ? 0 : (cards.length - i),
                   ...(i === rarestIndex ? { '--rc': rarestColor } : {}),
                 }}
                 onClick={phase === 'stack' && isTop && !isDismissed ? onCardClick : undefined}
               >
+                {/* Spinning rays behind card (legendary+) */}
+                {isTop && topFlipPhase === 'revealed' && tier <= 1 && (
+                  <div className={`pack-opening__reveal-rays active${tier === 0 ? ' mythic-rays' : ''}`} />
+                )}
                 <div className="pack-opening__ec-flip">
                   <div className="pack-opening__ec-back"><CardBack /></div>
                   <div className="pack-opening__ec-front">
                     <GameCard type="god" rarity={card.rarity} data={toGameCardData(card)} />
                   </div>
                 </div>
-
+                {/* Expanding ring burst (epic+) */}
+                {isTop && topFlipPhase === 'revealed' && tier <= 2 && (
+                  <>
+                    <div className={`pack-opening__reveal-ring${tier <= 1 ? ' ring-big' : ''} active`} />
+                    {tier <= 0 && (
+                      <div className="pack-opening__reveal-ring ring-big active" style={{ animationDelay: '0.15s' }} />
+                    )}
+                  </>
+                )}
               </div>
             )
           })}
+
+          {/* Anticipation rising sparks */}
+          {anticipationSparks.map(s => (
+            <div key={s.id} className="pack-opening__anticipation-spark" style={{
+              '--as-x': `${s.x}px`, '--as-y': `${s.y}px`,
+              '--as-size': `${s.size}px`, '--as-dur': `${s.dur}s`,
+              '--as-delay': `${s.delay}s`,
+            }} />
+          ))}
+
+          {/* Reveal particles */}
+          {revealParticles.map(p => (
+            <div key={p.id} className="pack-opening__reveal-particle" style={{
+              '--p-tx': `${p.tx}px`, '--p-ty': `${p.ty}px`,
+              '--p-size': `${p.size}px`, '--p-dur': `${p.dur}s`,
+              '--p-color': p.color,
+            }} />
+          ))}
 
           {phase === 'stack' && (
             <>
@@ -279,40 +478,37 @@ export default function PackOpening({ result, packType, onClose, skipTear, skipT
                 {revealedSet.size} / {cards.length}
               </div>
               <p className="pack-opening__stack-hint" style={{ position: 'absolute', bottom: '-75px' }}>
-                {cardFlipped ? 'Tap for next' : 'Tap to reveal'}
+                {flipPhase === 'anticipation' ? '...' : cardFlipped ? 'Tap for next' : isLastCard ? 'Wild card — tap to reveal!' : 'Tap to reveal'}
               </p>
             </>
           )}
         </div>
       )}
 
-      {/* ═══ Collecting — cards fly to binder ═══ */}
-      {phase === 'collecting' && (
-        <div className="pack-opening__collect-area">
-          <div className="pack-opening__binder-target">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="56" height="56">
-              <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 010-5H20" />
-            </svg>
-          </div>
-          {cards.map((_, i) => (
-            <div key={i} className="pack-opening__fly-card" style={{ '--fi': i, '--ft': cards.length }}>
-              <CardBack />
-            </div>
-          ))}
-        </div>
-      )}
-
       {phase === 'ready' && <p className="pack-opening__hint">Swipe across to tear open</p>}
 
-      {phase === 'done' && (
-        <div className="pack-opening__done-area">
-          <div className="pack-opening__done-binder">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="48" height="48">
-              <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 010-5H20" />
-            </svg>
+      {/* ═══ Summary — show all cards after reveal ═══ */}
+      {phase === 'summary' && (
+        <div className="pack-opening__summary">
+          <h2 className="pack-opening__summary-title">{result.packName}</h2>
+          <div className="pack-opening__summary-grid">
+            {cards.map((card, i) => (
+              <div key={i} className="pack-opening__summary-card" style={{ '--si': i }}>
+                <GameCard type="god" rarity={card.rarity} data={toGameCardData(card)} />
+                {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
+              </div>
+            ))}
           </div>
-          <p className="pack-opening__done-summary">{cards.length} cards collected</p>
-          <button onClick={onClose} className="pack-opening__close-btn">DONE</button>
+          <div className="pack-opening__summary-actions">
+            {onOpenMore && (
+              <button onClick={onOpenMore} className="pack-opening__summary-btn pack-opening__summary-btn--primary">
+                Open More
+              </button>
+            )}
+            <button onClick={onClose} className="pack-opening__summary-btn pack-opening__summary-btn--secondary">
+              Close
+            </button>
+          </div>
         </div>
       )}
 

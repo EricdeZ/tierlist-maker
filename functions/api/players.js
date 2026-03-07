@@ -32,7 +32,7 @@ const handler = async (event, context) => {
                     WHERE lp.season_id = ${seasonId}
                       AND lp.is_active = true
                       AND lp.roster_status != 'sub'
-                    ORDER BY t.name, CASE WHEN lp.roster_status = 'captain' THEN 0 ELSE 1 END, p.name
+                    ORDER BY t.name, CASE WHEN lp.roster_status = 'captain' THEN 0 WHEN lp.roster_status = 'co_captain' THEN 1 ELSE 2 END, p.name
                 `
 
                 return {

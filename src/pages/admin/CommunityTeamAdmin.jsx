@@ -315,6 +315,9 @@ export default function CommunityTeamAdmin() {
                                                                     {m.role === 'captain' && (
                                                                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">CPT</span>
                                                                     )}
+                                                                    {m.role === 'co_captain' && (
+                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400/70">CO-CPT</span>
+                                                                    )}
                                                                     <span className="text-xs text-(--color-text-secondary) ml-auto">
                                                                         {new Date(m.joined_at).toLocaleDateString()}
                                                                     </span>

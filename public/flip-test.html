@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Card Flip Test — Full Effects</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a14; color: white; font-family: system-ui; display: flex; flex-direction: column; align-items: center; min-height: 100vh; gap: 16px; padding: 20px; overflow-x: hidden; }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.controls button { padding: 8px 16px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.controls button:hover { background: rgba(255,255,255,0.1); }
+.status { font-size: 12px; color: rgba(255,255,255,0.5); min-height: 18px; }
+.log { font-size: 11px; color: rgba(255,255,255,0.35); max-height: 100px; overflow-y: auto; width: 100%; max-width: 600px; padding: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.log div { padding: 1px 0; }
+
+/* ============================================
+   PACK OPENING STYLES — mirrors real component
+   ============================================ */
+
+.pack-opening {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+}
+
+.pack-opening__emerging-cards {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 420px;
+}
+
+/* BASE card */
+.pack-opening__emerging-card {
+  position: absolute;
+  width: 240px;
+  aspect-ratio: 63 / 88;
+  border-radius: 12px;
+  opacity: 0;
+  transform-origin: bottom center;
+  perspective: 1000px;
+  animation: po-card-emerge 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 2px rgba(255,255,255,0.1);
+}
+
+.pack-opening__emerging-card.rarest {
+  animation:
+    po-card-emerge 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards,
+    po-rarest-fan-glow 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes po-rarest-fan-glow {
+  0%, 38% { box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 2px rgba(255,255,255,0.1); }
+  46% { box-shadow: 0 0 30px 12px var(--rc, #fff), 0 0 60px 20px color-mix(in srgb, var(--rc, #fff) 40%, transparent); }
+  64% { box-shadow: 0 0 30px 12px var(--rc, #fff), 0 0 60px 20px color-mix(in srgb, var(--rc, #fff) 40%, transparent); }
+  76%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 2px rgba(255,255,255,0.1); }
+}
+
+/* STACK PHASE — kill emerge, enable transitions */
+.pack-opening[data-phase="stack"] .pack-opening__emerging-card {
+  cursor: pointer;
+  animation: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow var(--anticipation-time, 0.3s) ease-in;
+}
+
+.pack-opening[data-phase="stack"] .pack-opening__emerging-card.flipped {
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease;
+}
+
+/* Flip container */
+.pack-opening__ec-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--flip-time, 0.5s) ease-in-out;
+}
+
+.pack-opening__emerging-card.flipped .pack-opening__ec-flip {
+  transform: rotateY(180deg);
+}
+
+.pack-opening__ec-back,
+.pack-opening__ec-front {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.pack-opening__ec-back {
+  background: linear-gradient(135deg, #1a1a3a, #2a1a4a);
+  border: 2px solid rgba(255,255,255,0.15);
+}
+
+.pack-opening__ec-front {
+  transform: rotateY(180deg);
+  border: 2px solid var(--card-color, #fff);
+  position: relative;
+}
+
+.pack-opening__ec-front .inner {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+}
+
+/* Dismissed */
+.pack-opening__emerging-card.dismissed {
+  animation: po-card-dismiss 0.3s ease-in forwards !important;
+  pointer-events: none !important;
+}
+
+@keyframes po-card-dismiss {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3) translateY(50px); }
+}
+
+/* ============================================
+   ANTICIPATION — glow + pulse
+   ============================================ */
+
+.pack-opening__emerging-card[data-tier="3"].anticipation {
+  box-shadow: 0 0 15px 3px color-mix(in srgb, var(--card-color) 35%, transparent);
+  filter: brightness(1.05);
+}
+
+.pack-opening__emerging-card[data-tier="2"].anticipation {
+  box-shadow: 0 0 25px 6px color-mix(in srgb, var(--card-color) 45%, transparent);
+  animation: po-anticipate-pulse 150ms ease-in-out infinite;
+}
+
+.pack-opening__emerging-card[data-tier="1"].anticipation {
+  box-shadow: 0 0 40px 10px color-mix(in srgb, var(--card-color) 55%, transparent);
+  animation: po-anticipate-pulse 100ms ease-in-out infinite;
+}
+
+.pack-opening__emerging-card[data-tier="0"].anticipation {
+  box-shadow: 0 0 60px 15px color-mix(in srgb, var(--card-color) 65%, transparent),
+              0 0 120px 40px color-mix(in srgb, var(--card-color) 25%, transparent);
+  animation: po-anticipate-pulse 60ms ease-in-out infinite;
+}
+
+@keyframes po-anticipate-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+}
+
+/* Last card amplified */
+.pack-opening__emerging-card.last-card[data-tier="3"].anticipation {
+  box-shadow: 0 0 25px 5px color-mix(in srgb, var(--card-color) 40%, transparent);
+}
+.pack-opening__emerging-card.last-card[data-tier="2"].anticipation {
+  box-shadow: 0 0 40px 10px color-mix(in srgb, var(--card-color) 55%, transparent);
+}
+.pack-opening__emerging-card.last-card[data-tier="1"].anticipation {
+  box-shadow: 0 0 55px 14px color-mix(in srgb, var(--card-color) 60%, transparent),
+              0 0 100px 30px color-mix(in srgb, var(--card-color) 20%, transparent);
+}
+.pack-opening__emerging-card.last-card[data-tier="0"].anticipation {
+  box-shadow: 0 0 80px 20px color-mix(in srgb, var(--card-color) 70%, transparent),
+              0 0 150px 50px color-mix(in srgb, var(--card-color) 30%, transparent);
+}
+
+/* ============================================
+   REVEALED — scale-up + glow
+   ============================================ */
+
+.pack-opening__emerging-card[data-tier="3"].revealed {
+  box-shadow: 0 0 20px 5px color-mix(in srgb, var(--card-color) 30%, transparent);
+  transform: scale(1.03);
+}
+.pack-opening__emerging-card[data-tier="2"].revealed {
+  box-shadow: 0 0 35px 8px color-mix(in srgb, var(--card-color) 40%, transparent);
+  transform: scale(1.06);
+}
+.pack-opening__emerging-card[data-tier="1"].revealed {
+  box-shadow: 0 0 50px 12px color-mix(in srgb, var(--card-color) 50%, transparent),
+              0 0 100px 30px color-mix(in srgb, var(--card-color) 15%, transparent);
+  transform: scale(1.1);
+}
+.pack-opening__emerging-card[data-tier="0"].revealed {
+  box-shadow: 0 0 70px 18px color-mix(in srgb, var(--card-color) 60%, transparent),
+              0 0 140px 50px color-mix(in srgb, var(--card-color) 25%, transparent);
+  transform: scale(1.15);
+}
+
+/* Last card idle glow */
+.pack-opening__emerging-card.last-card:not(.flipped):not(.dismissed):not(.anticipation) {
+  box-shadow: 0 0 12px 2px rgba(255,255,255,0.12);
+}
+
+/* ============================================
+   SCREEN VEIL — dim + flash
+   ============================================ */
+
+.pack-opening__flip-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+  background: black;
+  opacity: 0;
+  transition: opacity 0.4s ease-out;
+}
+
+.pack-opening__flip-veil[data-dim="rare"] { opacity: 0.15; }
+.pack-opening__flip-veil[data-dim="epic"] { opacity: 0.35; }
+.pack-opening__flip-veil[data-dim="legendary"] { opacity: 0.5; }
+.pack-opening__flip-veil[data-dim="mythic"] { opacity: 0.65; }
+
+.pack-opening__flip-veil.flash {
+  z-index: 60;
+  background: white;
+  transition: none;
+  animation: po-flip-flash 0.4s ease-out forwards;
+}
+
+.pack-opening__flip-veil.flash-big {
+  z-index: 60;
+  background: white;
+  transition: none;
+  animation: po-flip-flash-big 0.6s ease-out forwards;
+}
+
+@keyframes po-flip-flash {
+  0% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+@keyframes po-flip-flash-big {
+  0% { opacity: 0.95; }
+  12% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* ============================================
+   SHAKE — cards container during anticipation
+   ============================================ */
+
+.pack-opening__emerging-cards.shake-epic {
+  animation: po-shake-epic 80ms ease-in-out infinite;
+}
+.pack-opening__emerging-cards.shake-legendary {
+  animation: po-shake-legendary 60ms ease-in-out infinite;
+}
+.pack-opening__emerging-cards.shake-mythic {
+  animation: po-shake-mythic 40ms linear infinite;
+}
+
+@keyframes po-shake-epic {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1.5px, 0.5px); }
+  75% { transform: translate(1.5px, -0.5px); }
+}
+
+@keyframes po-shake-legendary {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2.5px, 1px); }
+  50% { transform: translate(1px, -1.5px); }
+  75% { transform: translate(2.5px, 0.5px); }
+}
+
+@keyframes po-shake-mythic {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-3px, 1px); }
+  30% { transform: translate(2px, -2.5px); }
+  50% { transform: translate(-1px, 2.5px); }
+  70% { transform: translate(3px, -1px); }
+  90% { transform: translate(-2px, -1.5px); }
+}
+
+/* ============================================
+   RADIAL GLOW behind card (legendary+)
+   ============================================ */
+
+.pack-opening__reveal-rays {
+  position: absolute;
+  inset: -120px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--card-color) 18%, transparent) 0%,
+    color-mix(in srgb, var(--card-color) 12%, transparent) 15%,
+    color-mix(in srgb, var(--card-color) 7%, transparent) 35%,
+    color-mix(in srgb, var(--card-color) 3%, transparent) 55%,
+    color-mix(in srgb, var(--card-color) 1%, transparent) 70%,
+    transparent 100%
+  );
+}
+
+.pack-opening__reveal-rays.active {
+  animation: po-radial-glow-in 0.8s ease-out forwards;
+}
+
+.pack-opening__reveal-rays.mythic-rays {
+  inset: -240px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--card-color) 25%, transparent) 0%,
+    color-mix(in srgb, var(--card-color) 16%, transparent) 12%,
+    color-mix(in srgb, var(--card-color) 9%, transparent) 28%,
+    color-mix(in srgb, var(--card-color) 4%, transparent) 45%,
+    color-mix(in srgb, var(--card-color) 1.5%, transparent) 65%,
+    color-mix(in srgb, var(--card-color) 0.5%, transparent) 82%,
+    transparent 100%
+  );
+}
+
+@keyframes po-radial-glow-in {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ============================================
+   EXPANDING RING burst on reveal (epic+)
+   ============================================ */
+
+.pack-opening__reveal-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 240px;
+  height: 240px;
+  margin-left: -120px;
+  margin-top: -120px;
+  border: 2px solid var(--card-color, white);
+  border-radius: 50%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.pack-opening__reveal-ring.active {
+  animation: po-ring-expand 0.7s ease-out forwards;
+}
+
+.pack-opening__reveal-ring.ring-big {
+  border-width: 3px;
+  animation: po-ring-expand-big 0.9s ease-out forwards;
+}
+
+@keyframes po-ring-expand {
+  0% { opacity: 0.7; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(3); }
+}
+
+@keyframes po-ring-expand-big {
+  0% { opacity: 0.9; transform: scale(0.2); }
+  40% { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(4); }
+}
+
+/* ============================================
+   REVEAL PARTICLES
+   ============================================ */
+
+.pack-opening__reveal-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--p-size, 4px);
+  height: var(--p-size, 4px);
+  border-radius: 50%;
+  background: var(--p-color, white);
+  z-index: 35;
+  pointer-events: none;
+  box-shadow: 0 0 6px 2px var(--p-color, white);
+  animation: po-reveal-particle var(--p-dur, 0.8s) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes po-reveal-particle {
+  0% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  70% { opacity: 0.6; }
+  100% { transform: translate(calc(-50% + var(--p-tx, 0px)), calc(-50% + var(--p-ty, 0px))) scale(0); opacity: 0; }
+}
+
+/* ============================================
+   LIGHT SWEEP across revealed card face
+   ============================================ */
+
+.pack-opening__emerging-card.revealed .pack-opening__ec-front::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255,255,255,0.15) 42%,
+    rgba(255,255,255,0.35) 50%,
+    rgba(255,255,255,0.15) 58%,
+    transparent 65%
+  );
+  animation: po-card-sweep 0.5s ease-out 0.1s both;
+  z-index: 10;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.pack-opening__emerging-card[data-tier="1"].revealed .pack-opening__ec-front::after,
+.pack-opening__emerging-card[data-tier="0"].revealed .pack-opening__ec-front::after {
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255,255,255,0.2) 38%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0.2) 62%,
+    transparent 70%
+  );
+  animation-duration: 0.7s;
+}
+
+@keyframes po-card-sweep {
+  0% { transform: translateX(-120%); opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
+/* ============================================
+   RARITY NAME BANNER
+   ============================================ */
+
+.pack-opening__rarity-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 18%;
+  z-index: 61;
+  pointer-events: none;
+  text-align: center;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 48px;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  color: white;
+  text-shadow:
+    0 0 20px var(--banner-color, white),
+    0 0 60px var(--banner-color, white),
+    0 0 100px color-mix(in srgb, var(--banner-color, white) 50%, transparent),
+    0 2px 4px rgba(0,0,0,0.9);
+  opacity: 0;
+  transform: scale(1.8) translateY(10px);
+  animation: po-banner-slam 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.pack-opening__rarity-banner.tier-0 {
+  font-size: 56px;
+  letter-spacing: 16px;
+  animation: po-banner-slam-mythic 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes po-banner-slam {
+  0% { opacity: 0; transform: scale(1.8) translateY(10px); filter: blur(8px); }
+  40% { opacity: 1; transform: scale(0.95) translateY(0); filter: blur(0); }
+  60% { transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+@keyframes po-banner-slam-mythic {
+  0% { opacity: 0; transform: scale(2.2) translateY(15px); filter: blur(12px); }
+  30% { opacity: 1; transform: scale(0.9) translateY(0); filter: blur(0); }
+  50% { transform: scale(1.08); }
+  70% { transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+/* ============================================
+   COLOR-TINTED FLASH
+   ============================================ */
+
+.pack-opening__flip-veil.flash-epic {
+  z-index: 60;
+  background: #a855f7;
+  transition: none;
+  animation: po-flip-flash-tinted 0.5s ease-out forwards;
+}
+
+.pack-opening__flip-veil.flash-legendary {
+  z-index: 60;
+  background: #ff8c00;
+  transition: none;
+  animation: po-flip-flash-tinted 0.6s ease-out forwards;
+}
+
+.pack-opening__flip-veil.flash-mythic {
+  z-index: 60;
+  background: #ef4444;
+  transition: none;
+  animation: po-flip-flash-tinted 0.7s ease-out forwards;
+}
+
+@keyframes po-flip-flash-tinted {
+  0% { opacity: 0.55; }
+  15% { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
+/* ============================================
+   REVEALED GLOW PULSE
+   ============================================ */
+
+.pack-opening__emerging-card[data-tier="2"].revealed {
+  animation: po-revealed-pulse-epic 2s ease-in-out infinite;
+}
+.pack-opening__emerging-card[data-tier="1"].revealed {
+  animation: po-revealed-pulse-legendary 1.8s ease-in-out infinite;
+}
+.pack-opening__emerging-card[data-tier="0"].revealed {
+  animation: po-revealed-pulse-mythic 1.5s ease-in-out infinite;
+}
+
+@keyframes po-revealed-pulse-epic {
+  0%, 100% {
+    box-shadow: 0 0 35px 8px color-mix(in srgb, var(--card-color) 40%, transparent);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 50px 14px color-mix(in srgb, var(--card-color) 55%, transparent);
+    filter: brightness(1.05);
+  }
+}
+
+@keyframes po-revealed-pulse-legendary {
+  0%, 100% {
+    box-shadow: 0 0 50px 12px color-mix(in srgb, var(--card-color) 50%, transparent),
+                0 0 100px 30px color-mix(in srgb, var(--card-color) 15%, transparent);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 65px 18px color-mix(in srgb, var(--card-color) 65%, transparent),
+                0 0 120px 40px color-mix(in srgb, var(--card-color) 25%, transparent);
+    filter: brightness(1.06);
+  }
+}
+
+@keyframes po-revealed-pulse-mythic {
+  0%, 100% {
+    box-shadow: 0 0 70px 18px color-mix(in srgb, var(--card-color) 60%, transparent),
+                0 0 140px 50px color-mix(in srgb, var(--card-color) 25%, transparent);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 90px 25px color-mix(in srgb, var(--card-color) 75%, transparent),
+                0 0 180px 60px color-mix(in srgb, var(--card-color) 35%, transparent);
+    filter: brightness(1.08);
+  }
+}
+
+/* ============================================
+   ANTICIPATION RISING SPARKS
+   ============================================ */
+
+.pack-opening__anticipation-spark {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--as-size, 3px);
+  height: var(--as-size, 3px);
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 6px 2px var(--card-color, white), 0 0 12px 4px color-mix(in srgb, var(--card-color, white) 40%, transparent);
+  z-index: 36;
+  pointer-events: none;
+  opacity: 0;
+  animation: po-anticipation-rise var(--as-dur, 1s) ease-out forwards;
+  animation-delay: var(--as-delay, 0s);
+}
+
+@keyframes po-anticipation-rise {
+  0% { opacity: 0; transform: translate(calc(-50% + var(--as-x, 0px)), 0) scale(1.2); }
+  10% { opacity: 1; }
+  60% { opacity: 0.5; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--as-x, 0px)), var(--as-y, -200px)) scale(0.2); }
+}
+
+/* ============================================
+   EMERGE ANIMATION
+   ============================================ */
+
+@keyframes po-card-emerge {
+  0% { transform: translateY(15px); opacity: 0; }
+  5% { opacity: 1; transform: translateY(15px); }
+  25% { opacity: 1; transform: translateY(-80px); }
+  38% { opacity: 1; transform: translateY(-80px); }
+  52% { opacity: 1; transform: translateY(-80px) translateX(var(--fx, 0px)) rotate(var(--fr, 0deg)); }
+  66% { opacity: 1; transform: translateY(-80px) translateX(var(--fx, 0px)) rotate(var(--fr, 0deg)); }
+  78% { opacity: 1; transform: translateY(-80px); }
+  92%, 100% { opacity: 1; transform: translateY(0); }
+}
+
+.rarity-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--card-color); }
+
+/* ============================================
+   Summary — all cards after reveal
+   ============================================ */
+.pack-opening__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  animation: po-summary-in 0.5s ease-out both;
+}
+
+@keyframes po-summary-in {
+  0% { opacity: 0; transform: translateY(30px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pack-opening__summary-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.pack-opening__summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pack-opening__summary-card {
+  position: relative;
+  width: 120px;
+  aspect-ratio: 63 / 88;
+  border-radius: 8px;
+  overflow: hidden;
+  animation: po-summary-card-in 0.4s ease-out both;
+  animation-delay: calc(var(--si, 0) * 0.08s);
+}
+
+@keyframes po-summary-card-in {
+  0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pack-opening__summary-card-face {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 2px solid var(--card-color, #666);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-color, #666) 15%, #111);
+  color: var(--card-color, #aaa);
+}
+
+.pack-opening__summary-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pack-opening__summary-btn {
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pack-opening__summary-btn--primary {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.3);
+}
+
+.pack-opening__summary-btn--primary:hover {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+
+.pack-opening__summary-btn--secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.pack-opening__summary-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+</style>
+</head>
+<body>
+
+<h2>Card Flip Effects Test</h2>
+<div class="status" id="status">Choose a test below</div>
+
+<div class="controls">
+  <button onclick="testSingleCard('common','#9ca3af',5)">Common</button>
+  <button onclick="testSingleCard('uncommon','#22c55e',4)">Uncommon</button>
+  <button onclick="testSingleCard('rare','#3b82f6',3)">Rare</button>
+  <button onclick="testSingleCard('epic','#a855f7',2)">Epic</button>
+  <button onclick="testSingleCard('legendary','#ff8c00',1)">Legendary</button>
+  <button onclick="testSingleCard('mythic','#ef4444',0)">Mythic</button>
+  <button onclick="testAllRarities()" style="border-color: rgba(255,50,50,0.5); color: #ff6b6b; font-weight: bold;">Test All 6</button>
+  <button onclick="reset()">Reset</button>
+</div>
+
+<div class="pack-opening" id="packOpening" data-phase="emerging">
+  <div class="pack-opening__flip-veil" id="veil"></div>
+  <div class="pack-opening__emerging-cards" id="cardContainer"></div>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+const packOpening = document.getElementById('packOpening');
+const container = document.getElementById('cardContainer');
+const veil = document.getElementById('veil');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+let locked = false;
+let cards = [];
+let revealedSet = new Set();
+let topIndex = 0;
+let cardFlipped = false;
+let flipPhase = null;
+let particleId = 0;
+let antSparkTimer = null;
+
+const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 };
+
+function log(msg) {
+  const d = document.createElement('div');
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.prepend(d);
+  if (logEl.children.length > 50) logEl.lastChild.remove();
+}
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+  log(msg);
+}
+
+function reset() {
+  locked = false;
+  cards = [];
+  revealedSet.clear();
+  topIndex = 0;
+  cardFlipped = false;
+  flipPhase = null;
+  if (antSparkTimer) { clearInterval(antSparkTimer); antSparkTimer = null; }
+  container.innerHTML = '';
+  container.className = 'pack-opening__emerging-cards';
+  packOpening.dataset.phase = 'emerging';
+  veil.className = 'pack-opening__flip-veil';
+  veil.removeAttribute('data-dim');
+  // Remove stale particles, sparks, banners
+  document.querySelectorAll('.pack-opening__reveal-particle, .pack-opening__anticipation-spark, .pack-opening__rarity-banner').forEach(p => p.remove());
+  setStatus('Reset. Choose a test.');
+}
+
+function getFlipTime(tier, last) {
+  return (tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 500 : 400) + (last ? 200 : 0);
+}
+
+function createCardEl(rarity, color, tier, index, total, isRarest, isLast) {
+  const el = document.createElement('div');
+  el.className = `pack-opening__emerging-card${isRarest ? ' rarest' : ''}${isLast ? ' last-card' : ''}`;
+  el.dataset.rarity = rarity;
+  el.dataset.tier = tier;
+  el.dataset.index = index;
+  const flipMs = getFlipTime(tier, isLast);
+  el.style.setProperty('--card-color', color);
+  el.style.setProperty('--flip-time', flipMs + 'ms');
+  el.style.setProperty('--ei', index);
+  el.style.setProperty('--et', total);
+  el.style.setProperty('--fx', '0px');
+  el.style.setProperty('--fr', '0deg');
+  // Anticipation time for glow-build transition
+  const baseAnticipation = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0;
+  const lastBonus = isLast ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0;
+  el.style.setProperty('--anticipation-time', (baseAnticipation + lastBonus) + 'ms');
+  if (isRarest) el.style.setProperty('--rc', color);
+  el.style.zIndex = total - index;
+
+  el.innerHTML = `
+    <div class="pack-opening__ec-flip">
+      <div class="pack-opening__ec-back">BACK</div>
+      <div class="pack-opening__ec-front">
+        <div class="inner">
+          <div class="rarity-label">${rarity.charAt(0).toUpperCase() + rarity.slice(1)}</div>
+          <div style="font-size:32px">${tier <= 0 ? '🔥' : tier <= 1 ? '⭐' : tier <= 2 ? '💎' : tier <= 3 ? '💠' : tier <= 4 ? '🟢' : '⚪'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  el.addEventListener('click', () => onCardClick(index));
+  return el;
+}
+
+function updateTopIndex() {
+  topIndex = -1;
+  for (let i = 0; i < cards.length; i++) {
+    if (!revealedSet.has(i)) { topIndex = i; break; }
+  }
+}
+
+function setVeil(phase, tier) {
+  veil.className = 'pack-opening__flip-veil';
+  veil.removeAttribute('data-dim');
+
+  if (phase === 'anticipation' || phase === 'flipping') {
+    const dim = tier <= 0 ? 'mythic' : tier <= 1 ? 'legendary' : tier <= 2 ? 'epic' : tier <= 3 ? 'rare' : '';
+    if (dim) veil.dataset.dim = dim;
+  } else if (phase === 'revealed') {
+    const flash = tier <= 0 ? 'flash-mythic' : tier <= 1 ? 'flash-legendary' : tier <= 2 ? 'flash-epic' : tier <= 3 ? 'flash' : '';
+    if (flash) veil.classList.add(flash);
+  }
+}
+
+function setShake(phase, tier) {
+  container.classList.remove('shake-epic', 'shake-legendary', 'shake-mythic');
+  if (phase === 'anticipation') {
+    const cls = tier <= 0 ? 'shake-mythic' : tier <= 1 ? 'shake-legendary' : tier <= 2 ? 'shake-epic' : '';
+    if (cls) container.classList.add(cls);
+  }
+}
+
+function spawnParticles(tier, color) {
+  const count = tier <= 0 ? 40 : tier <= 1 ? 25 : tier <= 2 ? 15 : 8;
+  const spread = tier <= 0 ? 280 : tier <= 1 ? 220 : tier <= 2 ? 170 : 130;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = (0.4 + Math.random() * 0.6) * spread;
+    const p = document.createElement('div');
+    p.className = 'pack-opening__reveal-particle';
+    p.style.setProperty('--p-tx', `${Math.cos(angle) * dist}px`);
+    p.style.setProperty('--p-ty', `${Math.sin(angle) * dist - spread * 0.15}px`);
+    p.style.setProperty('--p-size', `${2 + Math.random() * (tier <= 1 ? 6 : 4)}px`);
+    p.style.setProperty('--p-dur', `${0.5 + Math.random() * 0.6}s`);
+    p.style.setProperty('--p-color', Math.random() > 0.3 ? color : '#fff');
+    container.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
+
+function addRays(el, tier) {
+  if (tier > 1) return;
+  const rays = document.createElement('div');
+  rays.className = `pack-opening__reveal-rays active${tier === 0 ? ' mythic-rays' : ''}`;
+  el.insertBefore(rays, el.firstChild);
+}
+
+function addRing(el, tier) {
+  if (tier > 2) return;
+  const ring = document.createElement('div');
+  ring.className = `pack-opening__reveal-ring${tier <= 1 ? ' ring-big' : ''} active`;
+  el.appendChild(ring);
+  // Second staggered ring for mythic
+  if (tier <= 0) {
+    const ring2 = document.createElement('div');
+    ring2.className = 'pack-opening__reveal-ring ring-big active';
+    ring2.style.animationDelay = '0.15s';
+    el.appendChild(ring2);
+  }
+}
+
+function startAnticipationSparks(color, tier) {
+  if (antSparkTimer) { clearInterval(antSparkTimer); antSparkTimer = null; }
+  const interval = tier <= 0 ? 80 : tier <= 1 ? 120 : tier <= 2 ? 180 : 250;
+  antSparkTimer = setInterval(() => {
+    const count = tier <= 0 ? 3 : tier <= 1 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = 'pack-opening__anticipation-spark';
+      s.style.setProperty('--as-x', `${(Math.random() - 0.5) * 200}px`);
+      s.style.setProperty('--as-y', `${-(120 + Math.random() * 180)}px`);
+      s.style.setProperty('--as-size', `${2 + Math.random() * 3}px`);
+      s.style.setProperty('--as-dur', `${0.6 + Math.random() * 0.6}s`);
+      s.style.setProperty('--as-delay', `${Math.random() * 0.15}s`);
+      container.appendChild(s);
+      setTimeout(() => s.remove(), 1500);
+    }
+  }, interval);
+}
+
+function stopAnticipationSparks() {
+  if (antSparkTimer) { clearInterval(antSparkTimer); antSparkTimer = null; }
+}
+
+function showRarityBanner(rarity, color, tier) {
+  if (tier > 2) return;
+  // Remove any existing banner
+  document.querySelectorAll('.pack-opening__rarity-banner').forEach(b => b.remove());
+  const banner = document.createElement('div');
+  banner.className = `pack-opening__rarity-banner${tier <= 0 ? ' tier-0' : ''}`;
+  banner.style.setProperty('--banner-color', color);
+  banner.textContent = rarity.toUpperCase();
+  document.body.appendChild(banner);
+  const dur = tier <= 0 ? 2000 : tier <= 1 ? 1500 : 1000;
+  setTimeout(() => banner.remove(), dur);
+}
+
+function onCardClick(clickedIndex) {
+  if (packOpening.dataset.phase !== 'stack') return;
+  if (clickedIndex !== topIndex) return;
+  if (locked) return;
+
+  const card = cards[clickedIndex];
+  const el = card.el;
+  const tier = card.tier;
+  const color = card.color;
+  const isLast = clickedIndex === cards.length - 1;
+
+  if (!cardFlipped) {
+    locked = true;
+
+    const baseAnticipation = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0;
+    const lastBonus = isLast ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0;
+    const anticipationMs = baseAnticipation + lastBonus;
+    const flipMs = getFlipTime(tier, isLast);
+    const holdMs = tier <= 0 ? 1200 : tier <= 1 ? 800 : tier <= 2 ? 500 : 200;
+
+    const doReveal = () => {
+      flipPhase = 'revealed';
+      stopAnticipationSparks();
+      el.classList.remove('anticipation');
+      el.classList.add('revealed');
+      setVeil('revealed', tier);
+      setShake(null, tier);
+      addRays(el, tier);
+      addRing(el, tier);
+      if (tier <= 3) spawnParticles(tier, color);
+      showRarityBanner(card.rarity, color, tier);
+
+      const cs = getComputedStyle(el);
+      log(`[REVEALED] ${card.rarity} — opacity: ${cs.opacity}, transform: ${cs.transform}`);
+      setStatus(`Revealed ${card.rarity}! Tap to dismiss.`);
+
+      setTimeout(() => { locked = false; }, holdMs);
+    };
+
+    const doFlip = () => {
+      stopAnticipationSparks();
+      el.classList.add('flipped');
+      el.classList.remove('anticipation');
+      cardFlipped = true;
+      flipPhase = 'flipping';
+      setVeil('flipping', tier);
+      setShake(null, tier);
+      setStatus(`Flipping ${card.rarity}... (${flipMs}ms)`);
+      setTimeout(doReveal, flipMs);
+    };
+
+    if (anticipationMs > 0) {
+      flipPhase = 'anticipation';
+      el.classList.add('anticipation');
+      setVeil('anticipation', tier);
+      setShake('anticipation', tier);
+      if (tier <= 3) startAnticipationSparks(color, tier);
+      setStatus(`Anticipation for ${card.rarity}... (${anticipationMs}ms)`);
+      setTimeout(doFlip, anticipationMs);
+    } else {
+      doFlip();
+    }
+  } else {
+    // Dismiss
+    locked = true;
+    el.classList.add('dismissed');
+    el.classList.remove('flipped', 'revealed', 'anticipation');
+    // Clean up rays/ring/banner
+    el.querySelectorAll('.pack-opening__reveal-rays, .pack-opening__reveal-ring').forEach(e => e.remove());
+    document.querySelectorAll('.pack-opening__rarity-banner').forEach(b => b.remove());
+    revealedSet.add(clickedIndex);
+    cardFlipped = false;
+    flipPhase = null;
+    setVeil(null, 5);
+    updateTopIndex();
+
+    if (topIndex === -1) {
+      setStatus('All cards revealed! Showing summary...');
+      locked = false;
+      setTimeout(() => showSummary(), 500);
+    } else {
+      setStatus(`Dismissed. Next: ${cards[topIndex].rarity} (${topIndex + 1}/${cards.length})`);
+      setTimeout(() => { locked = false; }, 350);
+    }
+  }
+}
+
+function showSummary() {
+  // Hide the card stack
+  container.style.display = 'none';
+  packOpening.dataset.phase = 'summary';
+
+  const summary = document.createElement('div');
+  summary.className = 'pack-opening__summary';
+
+  const title = document.createElement('h2');
+  title.className = 'pack-opening__summary-title';
+  title.textContent = `${cards.length} Cards Opened`;
+  summary.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.className = 'pack-opening__summary-grid';
+  cards.forEach((card, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'pack-opening__summary-card';
+    wrap.style.setProperty('--si', i);
+    wrap.style.setProperty('--card-color', card.color);
+    const face = document.createElement('div');
+    face.className = 'pack-opening__summary-card-face';
+    face.textContent = card.rarity;
+    wrap.appendChild(face);
+    grid.appendChild(wrap);
+  });
+  summary.appendChild(grid);
+
+  const actions = document.createElement('div');
+  actions.className = 'pack-opening__summary-actions';
+  const openMore = document.createElement('button');
+  openMore.className = 'pack-opening__summary-btn pack-opening__summary-btn--primary';
+  openMore.textContent = 'Open More';
+  openMore.onclick = () => { summary.remove(); container.style.display = ''; reset(); setStatus('Ready to test again!'); };
+  const close = document.createElement('button');
+  close.className = 'pack-opening__summary-btn pack-opening__summary-btn--secondary';
+  close.textContent = 'Close';
+  close.onclick = () => { summary.remove(); container.style.display = ''; reset(); setStatus('Closed.'); };
+  actions.appendChild(openMore);
+  actions.appendChild(close);
+  summary.appendChild(actions);
+
+  packOpening.appendChild(summary);
+  setStatus('Summary — all cards revealed!');
+}
+
+function startStackPhase() {
+  setStatus('Emerging...');
+  packOpening.dataset.phase = 'emerging';
+  setTimeout(() => {
+    packOpening.dataset.phase = 'stack';
+    setStatus(`Stack phase! ${cards.length} cards. Tap the top card.`);
+  }, 3200);
+}
+
+function testSingleCard(rarity, color, tier) {
+  reset();
+  const el = createCardEl(rarity, color, tier, 0, 1, false, true);
+  container.appendChild(el);
+  cards = [{ el, rarity, color, tier }];
+  startStackPhase();
+}
+
+function testAllRarities() {
+  reset();
+  const rarities = [
+    { rarity: 'common', color: '#9ca3af', tier: 5 },
+    { rarity: 'uncommon', color: '#22c55e', tier: 4 },
+    { rarity: 'rare', color: '#3b82f6', tier: 3 },
+    { rarity: 'epic', color: '#a855f7', tier: 2 },
+    { rarity: 'legendary', color: '#ff8c00', tier: 1 },
+    { rarity: 'mythic', color: '#ef4444', tier: 0 },
+  ];
+
+  rarities.forEach((r, i) => {
+    const isLast = i === rarities.length - 1;
+    const isRarest = i === rarities.length - 2;
+    const el = createCardEl(r.rarity, r.color, r.tier, i, rarities.length, isRarest, isLast);
+    container.appendChild(el);
+    cards.push({ el, ...r });
+  });
+
+  startStackPhase();
+}
+</script>
+</body>
+</html>

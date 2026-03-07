@@ -56,6 +56,8 @@ const handler = async (event) => {
                 return await renamePlayer(sql, body, admin, event)
             case 'set-captain':
                 return await setCaptain(sql, body, admin, event)
+            case 'set-co-captain':
+                return await setCoCaptain(sql, body, admin, event)
             case 'promote-sub':
                 return await promoteSub(sql, body, admin, event)
             case 'cleanup-illegal-holdings':
@@ -784,6 +786,79 @@ async function setCaptain(sql, { league_player_id }, admin, event) {
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, updated }),
+    }
+}
+
+/**
+ * Set or remove a player as co-captain.
+ * Only one co-captain per team+season.
+ */
+async function setCoCaptain(sql, { league_player_id, remove }, admin, event) {
+    if (!league_player_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'league_player_id required' }) }
+    }
+    const leagueId = await getLeagueIdFromLeaguePlayer(league_player_id)
+    if (!await requirePermission(event, 'roster_manage', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
+    const [lp] = await sql`
+        SELECT lp.id, lp.team_id, lp.season_id, lp.is_active, lp.player_id, lp.roster_status,
+               p.name as player_name, t.name as team_name
+        FROM league_players lp
+        JOIN players p ON p.id = lp.player_id
+        JOIN teams t ON t.id = lp.team_id
+        WHERE lp.id = ${league_player_id}
+    `
+    if (!lp) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
+    }
+    if (!lp.is_active) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot modify an inactive player' }) }
+    }
+
+    if (remove) {
+        if (lp.roster_status !== 'co_captain') {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Player is not a co-captain' }) }
+        }
+        await sql`
+            UPDATE league_players SET roster_status = 'member', updated_at = NOW()
+            WHERE id = ${league_player_id}
+        `
+    } else {
+        if (lp.roster_status === 'captain') {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot demote the captain to co-captain' }) }
+        }
+        // Remove any existing co-captain on this team+season
+        await sql`
+            UPDATE league_players SET roster_status = 'member', updated_at = NOW()
+            WHERE team_id = ${lp.team_id} AND season_id = ${lp.season_id} AND roster_status = 'co_captain'
+        `
+        await sql`
+            UPDATE league_players SET roster_status = 'co_captain', updated_at = NOW()
+            WHERE id = ${league_player_id}
+        `
+    }
+
+    await logAudit(sql, admin, {
+        action: remove ? 'remove-co-captain' : 'set-co-captain',
+        endpoint: 'roster-manage',
+        targetType: 'league_player',
+        targetId: league_player_id,
+        details: { team_id: lp.team_id, season_id: lp.season_id },
+    })
+    await logRosterTransaction(sql, {
+        seasonId: lp.season_id, playerId: lp.player_id, playerName: lp.player_name,
+        type: remove ? 'remove-co-captain' : 'set-co-captain',
+        fromTeamId: lp.team_id, fromTeamName: lp.team_name,
+        toTeamId: lp.team_id, toTeamName: lp.team_name,
+        fromStatus: lp.roster_status, toStatus: remove ? 'member' : 'co_captain', admin,
+    })
+
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, updated: { id: lp.id, roster_status: remove ? 'member' : 'co_captain' } }),
     }
 }
 

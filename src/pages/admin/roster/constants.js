@@ -23,9 +23,11 @@ export const POOL_ROLE_COLORS = {
     fill: 'bg-gray-500/20 text-gray-400',
 }
 
+const ROSTER_ORDER = { captain: 0, co_captain: 1, member: 2, sub: 3 }
 export const playerSort = (a, b) => {
-    if (a.roster_status === 'captain' && b.roster_status !== 'captain') return -1
-    if (a.roster_status !== 'captain' && b.roster_status === 'captain') return 1
+    const orderA = ROSTER_ORDER[a.roster_status] ?? 2
+    const orderB = ROSTER_ORDER[b.roster_status] ?? 2
+    if (orderA !== orderB) return orderA - orderB
     return a.name.localeCompare(b.name)
 }
 

@@ -73,9 +73,8 @@ const TeamDetail = () => {
                         return { ...s, gamesPlayed, wins, totalKills, totalDeaths, totalAssists, kda, winRate, roster_status: pInfo?.roster_status || 'member' }
                     })
                     .sort((a, b) => {
-                        if (a.roster_status === 'captain' && b.roster_status !== 'captain') return -1
-                        if (a.roster_status !== 'captain' && b.roster_status === 'captain') return 1
-                        return 0
+                        const order = { captain: 0, co_captain: 1, member: 2, sub: 3 }
+                        return (order[a.roster_status] ?? 2) - (order[b.roster_status] ?? 2)
                     })
 
                 setRosterStats(filtered)
@@ -237,6 +236,9 @@ const TeamDetail = () => {
                                                 >
                                                     {player.roster_status === 'captain' && (
                                                         <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" title="Team Captain" />
+                                                    )}
+                                                    {player.roster_status === 'co_captain' && (
+                                                        <Crown className="w-3.5 h-3.5 text-yellow-400/60 shrink-0" title="Co-Captain" />
                                                     )}
                                                     {player.name}
                                                 </Link>

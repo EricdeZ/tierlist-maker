@@ -424,6 +424,35 @@ export default function RosterManager() {
         })
     }
 
+    // ─── Set/remove co-captain (pending) ───
+    const handleSetCoCaptain = (leaguePlayerId, playerName, teamId, remove) => {
+        setPendingChanges(prev => [
+            ...prev.filter(c => !(c.type === 'set-co-captain' && String(c.team_id) === String(teamId))),
+            {
+                id: crypto.randomUUID(),
+                type: 'set-co-captain',
+                league_player_id: leaguePlayerId,
+                team_id: teamId,
+                remove,
+                description: remove ? `Remove ${playerName} as co-captain` : `Set ${playerName} as co-captain`,
+            },
+        ])
+
+        setLocalRosters(prev => {
+            const next = structuredClone(prev)
+            const team = next.find(t => String(t.team_id) === String(teamId))
+            if (team) {
+                if (!remove) {
+                    team.players.forEach(p => { if (p.roster_status === 'co_captain') p.roster_status = 'member' })
+                }
+                const player = team.players.find(p => p.league_player_id === leaguePlayerId)
+                if (player) player.roster_status = remove ? 'member' : 'co_captain'
+                team.players.sort(playerSort)
+            }
+            return next
+        })
+    }
+
     // ─── Remove pending add ───
     const handleRemovePendingAdd = (playerId, playerName) => {
         setPendingChanges(prev => prev.filter(c => !(c.type === 'add' && c.player_id === playerId)))
@@ -495,6 +524,8 @@ export default function RosterManager() {
                     payload = { action: 'add-player-to-team', player_id: change.player_id, team_id: change.team_id, season_id: parseInt(selectedSeasonId), role: change.role }
                 } else if (change.type === 'set-captain') {
                     payload = { action: 'set-captain', league_player_id: change.league_player_id }
+                } else if (change.type === 'set-co-captain') {
+                    payload = { action: 'set-co-captain', league_player_id: change.league_player_id, remove: change.remove }
                 } else {
                     payload = { action: 'change-role', league_player_id: change.league_player_id, role: change.role }
                 }
@@ -786,6 +817,7 @@ export default function RosterManager() {
                             onSetDragOverPlayer={setDragOverPlayer}
                             onRoleChange={handleRoleChange}
                             onSetCaptain={handleSetCaptain}
+                            onSetCoCaptain={handleSetCoCaptain}
                             onDropPlayer={handleDropPlayer}
                             onPromoteSub={handlePromoteSub}
                             onRemovePendingAdd={handleRemovePendingAdd}

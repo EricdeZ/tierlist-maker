@@ -836,6 +836,9 @@ export const communityTeamService = {
     async kick(teamId, userId) {
         return apiPost('community-teams', { action: 'kick' }, { team_id: teamId, user_id: userId })
     },
+    async setCoCaptain(teamId, userId, remove = false) {
+        return apiPost('community-teams', { action: 'set-co-captain' }, { team_id: teamId, user_id: userId, remove })
+    },
     async disband(teamId) {
         return apiPost('community-teams', { action: 'disband' }, { team_id: teamId })
     },

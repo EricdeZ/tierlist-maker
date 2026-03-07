@@ -84,6 +84,7 @@ import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import CardClashPage from "./pages/CardClashPage.jsx";
 import CardSharePage from "./pages/cardclash/CardSharePage.jsx";
+import BgRemover from "./pages/BgRemover.jsx";
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
 import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
@@ -187,6 +188,7 @@ function App() {
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
                             <Route path="players" element={<Players />} />
+                            <Route path="bg-remove" element={<BgRemover />} />
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />
 

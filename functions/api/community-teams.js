@@ -79,6 +79,8 @@ const handler = async (event) => {
                     return await handleLeave(sql, user, body)
                 case 'kick':
                     return await handleKick(sql, user, body)
+                case 'set-co-captain':
+                    return await handleSetCoCaptain(sql, user, body)
                 case 'disband':
                     return await handleDisband(sql, user, body)
                 default:
@@ -109,7 +111,7 @@ async function handleMyTeams(sql, event) {
         FROM community_team_members ctm
         JOIN community_teams ct ON ct.id = ctm.team_id
         WHERE ctm.user_id = ${user.id} AND ctm.status = 'active'
-        ORDER BY ctm.role = 'captain' DESC, ct.name
+        ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, ct.name
     `
 
     // Fetch members for each team
@@ -124,7 +126,7 @@ async function handleMyTeams(sql, event) {
             JOIN users u ON u.id = ctm.user_id
             LEFT JOIN players p ON p.id = u.linked_player_id
             WHERE ctm.team_id = ANY(${teamIds}) AND ctm.status = 'active'
-            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+            ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, u.discord_username
         `
     }
 
@@ -159,7 +161,7 @@ async function handleGetTeam(sql, params) {
         JOIN users u ON u.id = ctm.user_id
         LEFT JOIN players p ON p.id = u.linked_player_id
         WHERE ctm.team_id = ${team.id} AND ctm.status = 'active'
-        ORDER BY ctm.role = 'captain' DESC, ctm.joined_at
+        ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, ctm.joined_at
     `
     return ok({ team, members })
 }
@@ -190,7 +192,7 @@ async function handleBrowse(sql, params) {
             JOIN users u ON u.id = ctm.user_id
             LEFT JOIN players p ON p.id = u.linked_player_id
             WHERE ctm.team_id = ANY(${teamIds}) AND ctm.status = 'active'
-            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+            ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, u.discord_username
         `
     }
 
@@ -251,10 +253,10 @@ async function handlePending(sql, event) {
         ORDER BY cti.created_at DESC
     `
 
-    // Requests TO teams this user captains
+    // Requests TO teams this user captains or co-captains
     const captainTeamIds = await sql`
         SELECT team_id FROM community_team_members
-        WHERE user_id = ${user.id} AND role = 'captain' AND status = 'active'
+        WHERE user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
     `
     let incomingRequests = []
     if (captainTeamIds.length > 0) {
@@ -289,7 +291,7 @@ async function handlePending(sql, event) {
             JOIN users u ON u.id = ctm.user_id
             LEFT JOIN players p ON p.id = u.linked_player_id
             WHERE ctm.team_id = ANY(${allTeamIds}) AND ctm.status = 'active'
-            ORDER BY ctm.role = 'captain' DESC, u.discord_username
+            ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, u.discord_username
         `
         for (const m of members) {
             if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
@@ -305,14 +307,14 @@ async function handlePendingCount(sql, event) {
     const user = await requireAuth(event)
     if (!user) return err('Unauthorized', 401)
 
-    // Count invites to this user + requests to teams they captain
+    // Count invites to this user + requests to teams they captain/co-captain
     const [{ count: inviteCount }] = await sql`
         SELECT COUNT(*)::int AS count FROM community_team_invitations
         WHERE to_user_id = ${user.id} AND status = 'pending' AND type = 'invite'
     `
     const captainTeamIds = await sql`
         SELECT team_id FROM community_team_members
-        WHERE user_id = ${user.id} AND role = 'captain' AND status = 'active'
+        WHERE user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
     `
     let requestCount = 0
     if (captainTeamIds.length > 0) {
@@ -361,7 +363,7 @@ async function handleLeagueTeams(sql, event) {
         JOIN leagues l ON l.id = s.league_id
         WHERE lp.player_id = (SELECT linked_player_id FROM users WHERE id = ${user.id})
           AND lp.is_active = true AND s.is_active = true
-        ORDER BY lp.roster_status = 'captain' DESC, l.name, d.tier
+        ORDER BY lp.roster_status = 'captain' DESC, lp.roster_status = 'co_captain' DESC, l.name, d.tier
     `
 
     // Fetch member counts + members for each team
@@ -375,8 +377,8 @@ async function handleLeagueTeams(sql, event) {
             JOIN players p ON p.id = lp.player_id
             LEFT JOIN users u ON u.linked_player_id = p.id
             WHERE lp.team_id = ANY(${teamIds}) AND lp.is_active = true
-              AND lp.roster_status IN ('captain', 'member')
-            ORDER BY lp.roster_status = 'captain' DESC, p.name
+              AND lp.roster_status IN ('captain', 'co_captain', 'member')
+            ORDER BY lp.roster_status = 'captain' DESC, lp.roster_status = 'co_captain' DESC, p.name
         `
     }
 
@@ -493,7 +495,7 @@ async function handleInvite(sql, user, body) {
 
     const [captain] = await sql`
         SELECT 1 FROM community_team_members
-        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
     `
     if (!captain) return postErr('You are not the captain of this team')
 
@@ -526,7 +528,7 @@ async function handleGenerateLink(sql, user, body) {
 
     const [captain] = await sql`
         SELECT 1 FROM community_team_members
-        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
     `
     if (!captain) return postErr('You are not the captain of this team')
 
@@ -569,7 +571,7 @@ async function handlePreviewLink(sql, params) {
         JOIN users u ON u.id = ctm.user_id
         LEFT JOIN players p ON p.id = u.linked_player_id
         WHERE ctm.team_id = ${team.id} AND ctm.status = 'active'
-        ORDER BY ctm.role = 'captain' DESC, u.discord_username
+        ORDER BY ctm.role = 'captain' DESC, ctm.role = 'co_captain' DESC, u.discord_username
     `
 
     return ok({ team: { ...team, members } })
@@ -647,7 +649,7 @@ async function handleRespond(sql, user, body) {
     if (invite.type === 'request') {
         const isCaptain = (await sql`
             SELECT 1 FROM community_team_members
-            WHERE team_id = ${invite.team_id} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+            WHERE team_id = ${invite.team_id} AND user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
         `).length > 0
         const isRequester = invite.from_user_id === user.id
         if (!isCaptain && !isRequester) return postErr('Only the team captain can respond to join requests')
@@ -716,12 +718,12 @@ async function handleKick(sql, user, body) {
     const targetUserId = Number(body.user_id)
     if (!teamId || !targetUserId) return postErr('team_id and user_id required')
 
-    // Verify caller is captain
-    const [captain] = await sql`
-        SELECT 1 FROM community_team_members
-        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+    // Verify caller is captain or co-captain
+    const [callerMembership] = await sql`
+        SELECT role FROM community_team_members
+        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role IN ('captain', 'co_captain') AND status = 'active'
     `
-    if (!captain) return postErr('Only the team captain can kick members')
+    if (!callerMembership) return postErr('Only the team captain can kick members')
 
     // Cannot kick yourself
     if (targetUserId === user.id) return postErr('Cannot kick yourself')
@@ -733,6 +735,7 @@ async function handleKick(sql, user, body) {
     `
     if (!target) return postErr('User is not an active member of this team')
     if (target.role === 'captain') return postErr('Cannot kick the captain')
+    if (target.role === 'co_captain' && callerMembership.role !== 'captain') return postErr('Only the captain can kick the co-captain')
 
     await sql`
         UPDATE community_team_members
@@ -748,6 +751,49 @@ async function handleKick(sql, user, body) {
     }
 
     return postOk({ success: true, scrimsDeleted })
+}
+
+async function handleSetCoCaptain(sql, user, body) {
+    const teamId = Number(body.team_id)
+    const targetUserId = Number(body.user_id)
+    const remove = body.remove === true
+    if (!teamId || !targetUserId) return postErr('team_id and user_id required')
+
+    // Only the captain can set/remove co-captains
+    const [captain] = await sql`
+        SELECT 1 FROM community_team_members
+        WHERE team_id = ${teamId} AND user_id = ${user.id} AND role = 'captain' AND status = 'active'
+    `
+    if (!captain) return postErr('Only the team captain can set a co-captain')
+
+    if (targetUserId === user.id) return postErr('Cannot set yourself as co-captain')
+
+    const [target] = await sql`
+        SELECT role FROM community_team_members
+        WHERE team_id = ${teamId} AND user_id = ${targetUserId} AND status = 'active'
+    `
+    if (!target) return postErr('User is not an active member of this team')
+
+    if (remove) {
+        if (target.role !== 'co_captain') return postErr('User is not a co-captain')
+        await sql`
+            UPDATE community_team_members SET role = 'member'
+            WHERE team_id = ${teamId} AND user_id = ${targetUserId}
+        `
+    } else {
+        if (target.role === 'captain') return postErr('Cannot demote the captain')
+        // Remove any existing co-captain first
+        await sql`
+            UPDATE community_team_members SET role = 'member'
+            WHERE team_id = ${teamId} AND role = 'co_captain' AND status = 'active'
+        `
+        await sql`
+            UPDATE community_team_members SET role = 'co_captain'
+            WHERE team_id = ${teamId} AND user_id = ${targetUserId}
+        `
+    }
+
+    return postOk({ success: true })
 }
 
 async function handleDisband(sql, user, body) {

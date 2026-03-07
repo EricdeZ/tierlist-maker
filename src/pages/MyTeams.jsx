@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { communityTeamService } from '../services/database'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import { Plus, Users, Swords, ArrowRight, Info, ChevronDown, Crown } from 'lucide-react'
+import { Plus, Users, Swords, ArrowRight, Info, ChevronDown, Crown, X } from 'lucide-react'
 import { RANK_LABELS, getDivisionImage } from '../utils/divisionImages'
 import TeamCard from './myteams/TeamCard'
 import InvitationsPanel from './myteams/InvitationsPanel'
@@ -25,6 +25,7 @@ export default function MyTeams() {
     const [inviteTeam, setInviteTeam] = useState(null)
     const [editTeam, setEditTeam] = useState(null)
     const [error, setError] = useState(null)
+    const [confirmModal, setConfirmModal] = useState(null) // { title, message, confirmLabel, confirmColor, onConfirm }
 
     // Browse state
     const [browseTeams, setBrowseTeams] = useState([])
@@ -81,34 +82,62 @@ export default function MyTeams() {
         loadData()
     }
 
-    const handleLeave = async (team) => {
-        if (!confirm(`Leave ${team.name}?`)) return
-        try {
-            await communityTeamService.leave(team.id)
-            loadData()
-        } catch (err) {
-            setError(err.message)
-        }
+    const showConfirm = (title, message, confirmLabel, confirmColor, onConfirm) => {
+        setConfirmModal({ title, message, confirmLabel, confirmColor, onConfirm })
     }
 
-    const handleDisband = async (team) => {
-        if (!confirm(`Disband ${team.name}? This cannot be undone.`)) return
-        try {
-            await communityTeamService.disband(team.id)
-            loadData()
-        } catch (err) {
-            setError(err.message)
-        }
+    const handleLeave = (team) => {
+        showConfirm('Leave Team', `Leave ${team.name}?`, 'Leave', 'red', async () => {
+            setConfirmModal(null)
+            try {
+                await communityTeamService.leave(team.id)
+                loadData()
+            } catch (err) {
+                setError(err.message)
+            }
+        })
     }
 
-    const handleKick = async (team, userId, displayName) => {
-        if (!confirm(`Remove ${displayName} from ${team.name}?`)) return
-        try {
-            await communityTeamService.kick(team.id, userId)
-            loadData()
-        } catch (err) {
-            setError(err.message)
-        }
+    const handleDisband = (team) => {
+        showConfirm('Disband Team', `Disband ${team.name}? This cannot be undone.`, 'Disband', 'red', async () => {
+            setConfirmModal(null)
+            try {
+                await communityTeamService.disband(team.id)
+                loadData()
+            } catch (err) {
+                setError(err.message)
+            }
+        })
+    }
+
+    const handleKick = (team, userId, displayName) => {
+        showConfirm('Remove Member', `Remove ${displayName} from ${team.name}?`, 'Remove', 'red', async () => {
+            setConfirmModal(null)
+            try {
+                await communityTeamService.kick(team.id, userId)
+                loadData()
+            } catch (err) {
+                setError(err.message)
+            }
+        })
+    }
+
+    const handleSetCoCaptain = (team, userId, displayName, remove) => {
+        const title = remove ? 'Remove Co-Captain' : 'Set Co-Captain'
+        const message = remove
+            ? `Remove ${displayName} as co-captain of ${team.name}?`
+            : `Promote ${displayName} to co-captain of ${team.name}? This will replace any existing co-captain.`
+        const label = remove ? 'Remove' : 'Promote'
+        const color = remove ? 'red' : 'amber'
+        showConfirm(title, message, label, color, async () => {
+            setConfirmModal(null)
+            try {
+                await communityTeamService.setCoCaptain(team.id, userId, remove)
+                loadData()
+            } catch (err) {
+                setError(err.message)
+            }
+        })
     }
 
     const handleRequestJoin = async (teamId) => {
@@ -125,7 +154,7 @@ export default function MyTeams() {
 
     const hasCaptainTeam = communityTeams.some(t => t.role === 'captain')
     const allMyTeams = [...leagueTeams, ...communityTeams]
-    const isCaptainAnywhere = leagueTeams.some(t => t.role === 'captain') || hasCaptainTeam
+    const isCaptainAnywhere = leagueTeams.some(t => t.role === 'captain') || hasCaptainTeam || communityTeams.some(t => t.role === 'co_captain')
     const myTeamIds = new Set(communityTeams.map(t => t.id))
     const browsableTeams = browseTeams.filter(t => !myTeamIds.has(t.id))
     const pendingTotal = (pending.invites?.length || 0) + (pending.outgoingRequests?.length || 0) + (pending.incomingRequests?.length || 0)
@@ -228,6 +257,7 @@ export default function MyTeams() {
                                             onInvite={team.is_league ? undefined : setInviteTeam}
                                             onEdit={team.is_league ? undefined : setEditTeam}
                                             onKick={team.is_league ? undefined : handleKick}
+                                            onSetCoCaptain={team.is_league ? undefined : handleSetCoCaptain}
                                         />
                                     ))}
                                 </div>
@@ -357,6 +387,7 @@ export default function MyTeams() {
                                                                         const displayName = m.player_name || m.discord_username || '?'
                                                                         const profileSlug = m.player_slug || m.discord_username
                                                                         const isCaptain = m.role === 'captain'
+                                                                        const isCoCaptain = m.role === 'co_captain'
                                                                         return (
                                                                             <div key={i} className="flex items-center gap-2 py-0.5">
                                                                                 {m.discord_avatar && m.discord_id ? (
@@ -384,6 +415,7 @@ export default function MyTeams() {
                                                                                     <span className="text-xs text-(--color-text)/80 truncate">{displayName}</span>
                                                                                 )}
                                                                                 {isCaptain && <Crown className="w-3 h-3 shrink-0" style={{ color }} />}
+                                                                                {isCoCaptain && <Crown className="w-3 h-3 shrink-0" style={{ color: `${color}99` }} />}
                                                                             </div>
                                                                         )
                                                                     })}
@@ -435,6 +467,41 @@ export default function MyTeams() {
                             setSearchParams({}, { replace: true })
                         }}
                     />
+                )}
+                {confirmModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onClick={() => setConfirmModal(null)}>
+                        <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full bg-(--color-secondary)" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                                <h2 className="text-base font-bold text-(--color-text)">{confirmModal.title}</h2>
+                                <button onClick={() => setConfirmModal(null)} className="p-1.5 rounded-lg text-(--color-text-secondary) hover:text-(--color-text) hover:bg-white/10 transition-colors cursor-pointer">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="px-5 py-4">
+                                <p className="text-sm text-(--color-text-secondary)">{confirmModal.message}</p>
+                            </div>
+                            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10">
+                                <button
+                                    onClick={() => setConfirmModal(null)}
+                                    className="px-4 py-2 rounded-lg text-sm text-(--color-text-secondary) hover:text-(--color-text) bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmModal.onConfirm}
+                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+                                        confirmModal.confirmColor === 'red'
+                                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                            : confirmModal.confirmColor === 'amber'
+                                                ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                                                : 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/30'
+                                    }`}
+                                >
+                                    {confirmModal.confirmLabel}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </>

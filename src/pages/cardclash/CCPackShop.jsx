@@ -32,13 +32,16 @@ export default function PackShop() {
   const [lastTest, setLastTest] = useState(null);
   const closeResult = () => setOpenResult(null);
 
+  const godNames = ['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'];
+  const godUrl = (name) => `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${name}/Default/t_GodCard_${name}.png`;
+
   const testOpening = useCallback((packType = 'premium') => {
     const pack = PACKS[packType];
     const rarityKeys = Object.keys(RARITIES);
     const fakeCards = Array.from({ length: pack.cards }, (_, i) => ({
-      godName: ['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8],
+      godName: godNames[i % 8],
       godClass: 'Mage',
-      imageUrl: `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8]}/Default/t_GodCard_${['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8]}.png`,
+      imageUrl: godUrl(godNames[i % 8]),
       ability: { name: 'Test Ability', description: 'A test ability.' },
       godId: i + 1,
       serialNumber: 1000 + i,
@@ -46,6 +49,23 @@ export default function PackShop() {
       isNew: i < 3,
     }));
     const result = { cards: fakeCards, packName: pack.name, packType, _skipTear: true };
+    setLastTest(result);
+    setOpenResult(result);
+  }, []);
+
+  const testAllRarities = useCallback(() => {
+    const allRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+    const fakeCards = allRarities.map((rarity, i) => ({
+      godName: godNames[i],
+      godClass: ['Mage', 'Warrior', 'Hunter', 'Guardian', 'Assassin', 'Mage'][i],
+      imageUrl: godUrl(godNames[i]),
+      ability: { name: `${RARITIES[rarity].name} Ability`, description: `A ${rarity} test ability.` },
+      godId: i + 1,
+      serialNumber: 2000 + i,
+      rarity,
+      isNew: true,
+    }));
+    const result = { cards: fakeCards, packName: 'All Rarities Test', packType: 'legendary', _skipToStack: true };
     setLastTest(result);
     setOpenResult(result);
   }, []);
@@ -120,6 +140,12 @@ export default function PackShop() {
               Test {key}
             </button>
           ))}
+          <button
+            onClick={testAllRarities}
+            className="px-3 py-1 text-xs bg-red-600/30 border border-red-500/40 rounded text-red-300 hover:bg-red-600/50 font-bold"
+          >
+            Test All Rarities
+          </button>
           {lastTest && !openResult && (
             <>
               <button
@@ -155,6 +181,7 @@ export default function PackShop() {
           result={openResult}
           packType={openResult.packType}
           onClose={closeResult}
+          onOpenMore={closeResult}
           skipTear={openResult._skipTear}
           skipToStack={openResult._skipToStack}
           onReplay={(openResult._skipTear || openResult._skipToStack) ? () => {

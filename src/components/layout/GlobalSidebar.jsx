@@ -695,6 +695,7 @@ export default function GlobalSidebar() {
                                                                     <span className="text-[11px] text-(--color-text)/70">{name}</span>
                                                                 )}
                                                                 {m.role === 'captain' && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                                                                {m.role === 'co_captain' && <Crown className="w-2.5 h-2.5 text-amber-400/60 shrink-0" />}
                                                             </div>
                                                         )
                                                     })}
@@ -776,6 +777,7 @@ export default function GlobalSidebar() {
                                                                     <span className="text-[11px] text-(--color-text)/70">{name}</span>
                                                                 )}
                                                                 {m.role === 'captain' && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                                                                {m.role === 'co_captain' && <Crown className="w-2.5 h-2.5 text-amber-400/60 shrink-0" />}
                                                             </div>
                                                         )
                                                     })}

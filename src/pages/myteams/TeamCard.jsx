@@ -6,11 +6,13 @@ import { Crown, Users, LogOut, ChevronDown, Swords, ExternalLink, UserPlus, X, P
 
 const teamImages = import.meta.glob('../../assets/teams/*.webp', { eager: true })
 
-export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, onEdit }) {
+export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, onEdit, onSetCoCaptain }) {
     const [expanded, setExpanded] = useState(false)
 
     const isLeague = !!team.is_league
     const isCaptain = team.role === 'captain'
+    const isCoCaptain = team.role === 'co_captain'
+    const canManage = isCaptain || isCoCaptain
     const color = team.color || '#6366f1'
     const tierImg = isLeague
         ? getDivisionImage(team.league_slug, team.division_slug, team.division_tier)
@@ -19,7 +21,7 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
         ? team.division_name
         : (RANK_LABELS[team.skill_tier] || `Tier ${team.skill_tier}`)
     const members = (team.members || []).filter(m =>
-        m.role === 'captain' || m.role === 'member' || m.roster_status === 'captain' || m.roster_status === 'member'
+        m.role === 'captain' || m.role === 'co_captain' || m.role === 'member' || m.roster_status === 'captain' || m.roster_status === 'co_captain' || m.roster_status === 'member'
     )
     const logoUrl = team.logo_url || (team.slug ? teamImages[`../../assets/teams/${team.slug}.webp`]?.default : null)
 
@@ -88,6 +90,10 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
                                     <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1" style={{ backgroundColor: `${color}15`, color }}>
                                         <Crown className="w-3 h-3" /> Captain
                                     </span>
+                                ) : isCoCaptain ? (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1" style={{ backgroundColor: `${color}10`, color: `${color}cc` }}>
+                                        <Crown className="w-3 h-3" /> Co-Captain
+                                    </span>
                                 ) : (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.06] text-(--color-text-secondary) font-semibold">
                                         Member
@@ -133,7 +139,10 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
                                         <span className="text-xs text-(--color-text)/80 truncate">{displayName}</span>
                                     )
                                     const isMemberCaptain = m.role === 'captain' || m.roster_status === 'captain'
-                                    const canKick = !isLeague && isCaptain && !isMemberCaptain && onKick
+                                    const isMemberCoCaptain = m.role === 'co_captain' || m.roster_status === 'co_captain'
+                                    const canKick = !isLeague && canManage && !isMemberCaptain && !(isMemberCoCaptain && !isCaptain) && onKick
+                                    const canPromote = !isLeague && isCaptain && !isMemberCaptain && !isMemberCoCaptain && onSetCoCaptain
+                                    const canDemote = !isLeague && isCaptain && isMemberCoCaptain && onSetCoCaptain
                                     return (
                                         <div key={i} className="flex items-center gap-2 py-0.5 group/member">
                                             {m.discord_avatar && m.discord_id ? (
@@ -153,10 +162,31 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
                                             {isMemberCaptain && (
                                                 <Crown className="w-3 h-3 shrink-0" style={{ color }} />
                                             )}
+                                            {isMemberCoCaptain && (
+                                                <Crown className="w-3 h-3 shrink-0" style={{ color: `${color}99` }} />
+                                            )}
+                                            {canPromote && (
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); onSetCoCaptain(team, m.user_id, displayName, false) }}
+                                                    className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/member:opacity-100 text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/15 transition-all cursor-pointer shrink-0 ml-auto"
+                                                    title={`Promote ${displayName} to Co-Captain`}
+                                                >
+                                                    <Crown className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                            {canDemote && (
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); onSetCoCaptain(team, m.user_id, displayName, true) }}
+                                                    className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/member:opacity-100 text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/15 transition-all cursor-pointer shrink-0"
+                                                    title={`Remove ${displayName} as Co-Captain`}
+                                                >
+                                                    <Crown className="w-3 h-3 line-through" />
+                                                </button>
+                                            )}
                                             {canKick && (
                                                 <button
                                                     onClick={e => { e.stopPropagation(); onKick(team, m.user_id, displayName) }}
-                                                    className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/member:opacity-100 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 transition-all cursor-pointer shrink-0 ml-auto"
+                                                    className={`w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/member:opacity-100 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 transition-all cursor-pointer shrink-0 ${canPromote || canDemote ? '' : 'ml-auto'}`}
                                                     title={`Remove ${displayName}`}
                                                 >
                                                     <X className="w-3 h-3" />
@@ -171,7 +201,7 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
 
                     {/* Actions */}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {isCaptain && (
+                        {canManage && (
                             <Link
                                 to="/scrims"
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded text-emerald-400 text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors"
@@ -197,7 +227,7 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
                                 <Pencil className="w-3.5 h-3.5" /> Edit Team
                             </button>
                         )}
-                        {!isLeague && isCaptain && onInvite && (
+                        {!isLeague && canManage && onInvite && (
                             <button
                                 onClick={e => { e.stopPropagation(); onInvite(team) }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded text-blue-400 text-xs font-semibold bg-blue-500/10 hover:bg-blue-500/15 transition-colors cursor-pointer"
@@ -213,7 +243,7 @@ export default function TeamCard({ team, onLeave, onDisband, onInvite, onKick, o
                                 Disband
                             </button>
                         )}
-                        {!isLeague && !isCaptain && onLeave && (
+                        {!isLeague && !canManage && onLeave && (
                             <button
                                 onClick={e => { e.stopPropagation(); onLeave(team) }}
                                 className="flex items-center gap-1 px-3 py-1.5 rounded text-(--color-text-secondary)/60 text-xs hover:text-red-400 bg-white/[0.04] hover:bg-red-900/15 transition-colors cursor-pointer ml-auto"

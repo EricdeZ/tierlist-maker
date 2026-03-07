@@ -109,6 +109,7 @@ export default function JoinTeamModal({ code, onJoined, onClose }) {
                                                         <span className="text-xs text-(--color-text)/80">{name}</span>
                                                     )}
                                                     {m.role === 'captain' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                                                    {m.role === 'co_captain' && <Crown className="w-3 h-3 text-amber-400/60 shrink-0" />}
                                                 </div>
                                             )
                                         })}

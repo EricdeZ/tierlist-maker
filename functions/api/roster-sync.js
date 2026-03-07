@@ -272,7 +272,7 @@ async function syncRosters(sql, seasonId) {
 
             if (matchedDiscordId) globalMatchedDiscordIds.add(matchedDiscordId)
 
-            if (lp.roster_status === 'captain') {
+            if (lp.roster_status === 'captain' || lp.roster_status === 'co_captain') {
                 unchanged++
                 continue
             }
@@ -479,7 +479,7 @@ async function applyChanges(sql, body, admin, event) {
         await sql`
             UPDATE league_players
             SET roster_status = ${newStatus}, updated_at = NOW()
-            WHERE id = ${leaguePlayerId} AND roster_status != 'captain'
+            WHERE id = ${leaguePlayerId} AND roster_status NOT IN ('captain', 'co_captain')
         `
         if (newStatus === 'member') promotes++
         else demotes++
@@ -506,7 +506,7 @@ async function applyChanges(sql, body, admin, event) {
         await sql`
             UPDATE league_players
             SET team_id = ${newTeamId}, roster_status = 'member', updated_at = NOW()
-            WHERE id = ${leaguePlayerId} AND roster_status != 'captain'
+            WHERE id = ${leaguePlayerId} AND roster_status NOT IN ('captain', 'co_captain')
         `
         transfers++
         forgeCleanups.push({ playerId: lp.player_id, newTeamId })

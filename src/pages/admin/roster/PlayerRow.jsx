@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Crown } from 'lucide-react'
 import { RoleBadge } from './RoleBadge'
 
-export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onSetCaptain, onDropPlayer, onPromoteSub, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
+export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarget, hasDraggedPlayer, isLoading, onDragStart, onDragEnd, onDropOnPlayer, onSetDragOverPlayer, onRoleChange, onSetCaptain, onSetCoCaptain, onDropPlayer, onPromoteSub, onRemovePendingAdd, onManageAliases, onRenamePlayer }) {
     const [showActions, setShowActions] = useState(false)
     const actionsRef = useRef(null)
     const isPending = player.is_pending
@@ -51,7 +51,7 @@ export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarge
                 <span className="w-1 h-1 rounded-full bg-[var(--color-text)]" />
             </div>
 
-            {/* Captain crown */}
+            {/* Captain/Co-Captain crown */}
             {!isPending && (
                 <button
                     onClick={(e) => {
@@ -63,9 +63,11 @@ export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarge
                     className={`shrink-0 transition-all ${
                         player.roster_status === 'captain'
                             ? 'text-yellow-400 opacity-100'
-                            : 'text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-30 hover:!opacity-70 hover:!text-yellow-400'
+                            : player.roster_status === 'co_captain'
+                                ? 'text-yellow-400/60 opacity-100'
+                                : 'text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-30 hover:!opacity-70 hover:!text-yellow-400'
                     }`}
-                    title={player.roster_status === 'captain' ? 'Team Captain' : 'Set as Captain'}
+                    title={player.roster_status === 'captain' ? 'Team Captain' : player.roster_status === 'co_captain' ? 'Co-Captain (click to promote to Captain)' : 'Set as Captain'}
                 >
                     <Crown className="w-4 h-4" />
                 </button>
@@ -140,6 +142,28 @@ export function PlayerRow({ player, teamId, teamName, teamColor, isDragOverTarge
                                         className="w-full text-left px-3 py-2 text-xs text-green-400 hover:bg-green-500/10 transition-colors flex items-center gap-2"
                                     >
                                         <span>↑</span> Promote to Member
+                                    </button>
+                                )}
+                                {player.roster_status !== 'captain' && player.roster_status !== 'co_captain' && (
+                                    <button
+                                        onClick={() => {
+                                            setShowActions(false)
+                                            onSetCoCaptain(player.league_player_id, player.name, teamId, false)
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-yellow-400/80 hover:bg-yellow-500/10 transition-colors flex items-center gap-2"
+                                    >
+                                        <Crown className="w-3 h-3" /> Set as Co-Captain
+                                    </button>
+                                )}
+                                {player.roster_status === 'co_captain' && (
+                                    <button
+                                        onClick={() => {
+                                            setShowActions(false)
+                                            onSetCoCaptain(player.league_player_id, player.name, teamId, true)
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-yellow-400/80 hover:bg-yellow-500/10 transition-colors flex items-center gap-2"
+                                    >
+                                        <Crown className="w-3 h-3" /> Remove Co-Captain
                                     </button>
                                 )}
                                 <button
