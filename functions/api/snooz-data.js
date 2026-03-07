@@ -149,6 +149,80 @@ const handler = async (event) => {
             .sort((a, b) => b.kda - a.kda)
             .slice(0, 30)
 
+        // ── Snooz AP: saved panelists, picks, scores ──
+        const weekNum = parseInt(week)
+        const savedPanelists = week ? await sql`
+            SELECT sp.id, sp.name, wp.sort_order
+            FROM snooz_week_panelists wp
+            JOIN snooz_panelists sp ON sp.id = wp.panelist_id
+            WHERE wp.league_id = ${league.id} AND wp.week = ${weekNum}
+            ORDER BY wp.sort_order ASC
+        ` : []
+
+        const seasonIds = divisions.map(d => d.season_id)
+
+        // All panelists who have picks in any week/division (for scores overlay)
+        const allSnoozPanelists = await sql`
+            SELECT DISTINCT sp.id, sp.name, sp.sort_order
+            FROM snooz_panelists sp
+            JOIN snooz_picks pk ON pk.panelist_id = sp.id AND pk.season_id = ANY(${seasonIds})
+            ORDER BY sp.sort_order ASC
+        `
+
+        const allPicks = await sql`
+            SELECT panelist_id, season_id, week, team_a_id, team_b_id, picked_team_id
+            FROM snooz_picks WHERE season_id = ANY(${seasonIds})
+        `
+
+        const allResults = await sql`
+            SELECT season_id, week, team1_id, team2_id, winner_team_id
+            FROM matches
+            WHERE season_id = ANY(${seasonIds}) AND is_completed = true AND winner_team_id IS NOT NULL
+        `
+
+        const [maxWeekRow] = await sql`
+            SELECT MAX(week) as max_week FROM scheduled_matches WHERE season_id = ANY(${seasonIds})
+        `
+
+        // Current week's saved picks for current division (for display)
+        const savedPicks = allPicks.filter(p => p.week === weekNum && p.season_id === seasonId)
+
+        // Helper to compute scores from a set of picks/results
+        const computeScores = (picks, results) => {
+            const scores = {}
+            const cmMap = {}
+            for (const pick of picks) {
+                const result = results.find(r =>
+                    r.season_id === pick.season_id &&
+                    r.week === pick.week &&
+                    Math.min(r.team1_id, r.team2_id) === pick.team_a_id &&
+                    Math.max(r.team1_id, r.team2_id) === pick.team_b_id
+                )
+                if (!result) continue
+                const pid = String(pick.panelist_id)
+                if (!scores[pid]) scores[pid] = {}
+                if (!scores[pid][pick.week]) scores[pid][pick.week] = { correct: 0, total: 0 }
+                scores[pid][pick.week].total++
+                if (pick.picked_team_id === result.winner_team_id) scores[pid][pick.week].correct++
+
+                const cmKey = `${pick.season_id}_${pick.week}_${pick.team_a_id}_${pick.team_b_id}`
+                if (!cmMap[cmKey]) cmMap[cmKey] = { week: pick.week, teamAId: pick.team_a_id, teamBId: pick.team_b_id, total: 0, correct: 0 }
+                cmMap[cmKey].total++
+                if (pick.picked_team_id === result.winner_team_id) cmMap[cmKey].correct++
+            }
+            return { scores, completeMisses: Object.values(cmMap).filter(cm => cm.total > 0 && cm.correct === 0) }
+        }
+
+        // Per-division scores
+        const divPicks = allPicks.filter(p => p.season_id === seasonId)
+        const divResults = allResults.filter(r => r.season_id === seasonId)
+        const { scores, completeMisses } = computeScores(divPicks, divResults)
+        const savedWeeks = [...new Set(divPicks.map(p => p.week))].sort((a, b) => a - b)
+
+        // All-divisions scores
+        const { scores: allDivScores, completeMisses: allDivCompleteMisses } = computeScores(allPicks, allResults)
+        const allDivSavedWeeks = [...new Set(allPicks.map(p => p.week))].sort((a, b) => a - b)
+
         return {
             statusCode: 200,
             headers: getHeaders(event),
@@ -160,6 +234,16 @@ const handler = async (event) => {
                 standings,
                 allPlayers,
                 tickerPlayers,
+                savedPanelists,
+                allSnoozPanelists,
+                savedPicks,
+                scores,
+                completeMisses,
+                savedWeeks,
+                allDivScores,
+                allDivCompleteMisses,
+                allDivSavedWeeks,
+                maxWeek: maxWeekRow?.max_week || null,
             }),
         }
     } catch (error) {

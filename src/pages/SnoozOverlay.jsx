@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams } from 'react-router-dom'
-import { ChevronDown, Plus, Pencil, X, Check, Trash2, Shield, Swords, Target, Heart, Flame, Crown, TrendingUp, Settings, Upload } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, X, Check, Trash2, Shield, Swords, Target, Heart, Flame, Crown, TrendingUp, Settings, Upload, Save, Trophy, RefreshCw, GripVertical } from 'lucide-react'
 import TeamLogo from '../components/TeamLogo'
 import { getLeagueLogo } from '../utils/leagueImages'
 import { getDivisionImage } from '../utils/divisionImages'
@@ -47,10 +47,12 @@ const StreamTicker = ({ tickerPlayers, leagueColor }) => {
 }
 
 /* ─── Settings Modal ─── */
-const SettingsModal = ({ open, onClose, people, onAdd, onRename, onRemove, customBg, onSetCustomBg }) => {
+const SettingsModal = ({ open, onClose, people, onAdd, onRename, onRemove, onReorder, customBg, onSetCustomBg }) => {
     const [editingId, setEditingId] = useState(null)
     const [editName, setEditName] = useState('')
     const [dragOver, setDragOver] = useState(false)
+    const [dragIdx, setDragIdx] = useState(null)
+    const [dragOverIdx, setDragOverIdx] = useState(null)
     const fileInputRef = useRef(null)
 
     if (!open) return null
@@ -73,6 +75,15 @@ const SettingsModal = ({ open, onClose, people, onAdd, onRename, onRemove, custo
         handleFile(e.dataTransfer.files[0])
     }
 
+    const handlePanelistDragEnd = (e) => {
+        e.preventDefault()
+        if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+            onReorder(dragIdx, dragOverIdx)
+        }
+        setDragIdx(null)
+        setDragOverIdx(null)
+    }
+
     return (
         <div className="absolute inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -84,8 +95,18 @@ const SettingsModal = ({ open, onClose, people, onAdd, onRename, onRemove, custo
                 </div>
                 <div className="p-5 space-y-2.5 max-h-[300px] overflow-y-auto">
                     {people.length === 0 && <div className="text-white/20 text-sm text-center py-8">No panelists added yet</div>}
-                    {people.map(p => (
-                        <div key={p.id} className="flex items-center gap-3 bg-white/[0.03] rounded-lg px-4 py-3 border border-white/[0.05] group/item">
+                    {people.map((p, idx) => (
+                        <div key={p.id}
+                            draggable={editingId !== p.id}
+                            onDragStart={() => setDragIdx(idx)}
+                            onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx) }}
+                            onDragEnd={handlePanelistDragEnd}
+                            className={`flex items-center gap-2 bg-white/[0.03] rounded-lg px-3 py-3 border group/item transition-all ${
+                                dragOverIdx === idx && dragIdx !== null && dragIdx !== idx ? 'border-white/20 bg-white/[0.06]' : 'border-white/[0.05]'
+                            } ${dragIdx === idx ? 'opacity-40' : ''}`}>
+                            <div className="cursor-grab active:cursor-grabbing text-white/15 hover:text-white/30 transition-colors shrink-0">
+                                <GripVertical size={16} />
+                            </div>
                             {editingId === p.id ? (
                                 <>
                                     <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
@@ -186,6 +207,7 @@ const TeamStatsPanel = ({ team, standings, players, leagueColor, onSelectPlayer,
                                 <div className="flex items-center gap-1.5">
                                     <span className={`text-sm font-bold truncate ${isSelected ? 'text-white' : 'text-white/70'}`}>{p.name}</span>
                                     {p.roster_status === 'captain' && <Crown size={11} className="text-yellow-500/60 shrink-0" />}
+                                    {p.roster_status === 'co_captain' && <Crown size={11} className="text-yellow-500/40 shrink-0" />}
                                 </div>
                                 <div className="text-xs text-white/25 font-mono">{p.role || '—'}{gp > 0 ? ` · ${gp}g` : ''}</div>
                             </div>
@@ -259,8 +281,150 @@ const PlayerDetailPanel = ({ player, leagueColor }) => {
 /* ═══════════════════════════════════════════════════════════════════
    Main Overlay — 1920×1080
    ═══════════════════════════════════════════════════════════════════ */
+/* ─── Scores Overlay ─── */
+const ScoresOverlay = ({ open, onClose, scores, people, allPanelists, savedWeeks, leagueColor, completeMisses, maxWeek, allDivScores, allDivCompleteMisses, allDivSavedWeeks, activeDivisionName }) => {
+    const [showAll, setShowAll] = useState(false)
+    if (!open) return null
+
+    const activeScores = showAll ? allDivScores : scores
+    const activeMisses = showAll ? allDivCompleteMisses : completeMisses
+    const activeWeeks = showAll ? allDivSavedWeeks : savedWeeks
+
+    const weeks = activeWeeks?.length > 0 ? activeWeeks : []
+    const totalMisses = activeMisses?.length || 0
+
+    // Sort all panelists (across all weeks) by cumulative score descending
+    const scorePeople = allPanelists.length > 0 ? allPanelists : people
+    const ranked = scorePeople.map(p => {
+        const pid = String(p.serverId || p.id)
+        const pScores = activeScores?.[pid] || {}
+        const cumCorrect = Object.values(pScores).reduce((s, w) => s + w.correct, 0)
+        const cumTotal = Object.values(pScores).reduce((s, w) => s + w.total, 0)
+        return { ...p, pid, pScores, cumCorrect, cumTotal }
+    }).sort((a, b) => b.cumCorrect - a.cumCorrect || a.cumTotal - b.cumTotal)
+
+    const missCountByWeek = {}
+    for (const cm of (activeMisses || [])) {
+        missCountByWeek[cm.week] = (missCountByWeek[cm.week] || 0) + 1
+    }
+
+    return (
+        <div className="absolute inset-0 z-[80] flex items-center justify-center" onClick={onClose}>
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+            <div className="relative w-[1200px] max-h-[900px] overflow-auto rounded-2xl border border-white/[0.1]"
+                onClick={e => e.stopPropagation()}
+                style={{ background: 'linear-gradient(135deg, #0e1620 0%, #131d28 50%, #0e1620 100%)' }}>
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-10 py-8 border-b border-white/[0.06]">
+                    <div>
+                        <h2 className="text-3xl font-black tracking-[0.15em] uppercase"
+                            style={{ background: `linear-gradient(135deg, ${leagueColor}, #fff, ${leagueColor})`, backgroundSize: '200% 200%', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            Season Scoreboard
+                        </h2>
+                        <div className="text-white/30 text-sm font-mono mt-1 tracking-wider uppercase">
+                            {weeks.length} week{weeks.length !== 1 ? 's' : ''} scored
+                            {totalMisses > 0 && <span className="text-red-400/50 ml-3">{totalMisses} complete miss{totalMisses !== 1 ? 'es' : ''}</span>}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex rounded-lg overflow-hidden border border-white/[0.1]">
+                            <button onClick={() => setShowAll(false)}
+                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${!showAll ? 'bg-white/[0.1] text-white' : 'text-white/30 hover:text-white/50'}`}>
+                                {activeDivisionName || 'Division'}
+                            </button>
+                            <button onClick={() => setShowAll(true)}
+                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${showAll ? 'bg-white/[0.1] text-white' : 'text-white/30 hover:text-white/50'}`}>
+                                All Divisions
+                            </button>
+                        </div>
+                        <button onClick={onClose} className="text-white/30 hover:text-white/60 cursor-pointer transition-colors p-2"><X size={24} /></button>
+                    </div>
+                </div>
+
+                {/* Leaderboard */}
+                <div className="px-10 py-6">
+                    {ranked.length === 0 || !activeScores || Object.keys(activeScores).length === 0 ? (
+                        <div className="text-center text-white/20 py-16 text-lg">No scores yet. Save predictions and play some matches!</div>
+                    ) : (
+                        <div className="space-y-1">
+                            {/* Column headers */}
+                            <div className="flex items-center gap-3 px-4 py-2 text-xs font-black tracking-[0.15em] uppercase text-white/20">
+                                <div className="w-8 text-center">#</div>
+                                <div className="flex-1">Panelist</div>
+                                {weeks.map(w => (
+                                    <div key={w} className="w-16 text-center">W{w}</div>
+                                ))}
+                                <div className="w-20 text-center">Total</div>
+                                <div className="w-16 text-center">%</div>
+                            </div>
+
+                            {ranked.map((p, i) => {
+                                const pct = p.cumTotal > 0 ? Math.round((p.cumCorrect / p.cumTotal) * 100) : 0
+                                const isFirst = i === 0 && p.cumCorrect > 0
+                                return (
+                                    <div key={p.id}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                                            isFirst ? 'bg-white/[0.06] border-white/[0.1]' : 'bg-white/[0.02] border-transparent'
+                                        }`}
+                                        style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}>
+                                        <div className="w-8 text-center text-lg font-black" style={{ color: isFirst ? leagueColor : 'rgba(255,255,255,0.2)' }}>
+                                            {isFirst ? '\u2B50' : i + 1}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className={`text-lg font-black truncate ${isFirst ? 'text-white' : 'text-white/60'}`}>{p.name}</div>
+                                        </div>
+                                        {weeks.map(w => {
+                                            const ws = p.pScores[w]
+                                            return (
+                                                <div key={w} className="w-16 text-center text-sm font-mono tabular-nums">
+                                                    {ws ? (
+                                                        <span style={{ color: ws.correct === ws.total ? '#22c55e' : ws.correct === 0 ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.5)' }}>
+                                                            {ws.correct}/{ws.total}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-white/10">-</span>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                        <div className="w-20 text-center text-xl font-black tabular-nums" style={{ color: leagueColor }}>
+                                            {p.cumCorrect}/{p.cumTotal}
+                                        </div>
+                                        <div className="w-16 text-center text-sm font-bold tabular-nums text-white/30">{pct}%</div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {/* Complete Misses by week */}
+                    {totalMisses > 0 && (
+                        <div className="mt-8 pt-6 border-t border-white/[0.06]">
+                            <div className="text-xs font-black tracking-[0.2em] uppercase text-red-400/40 mb-3">Complete Misses</div>
+                            <div className="flex gap-3 flex-wrap">
+                                {weeks.map(w => {
+                                    const count = missCountByWeek[w] || 0
+                                    if (count === 0) return null
+                                    return (
+                                        <div key={w} className="bg-red-500/[0.08] border border-red-500/15 rounded-lg px-4 py-2">
+                                            <div className="text-xs text-white/30 font-bold uppercase">Week {w}</div>
+                                            <div className="text-lg font-black text-red-400/60">{count} miss{count !== 1 ? 'es' : ''}</div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const SnoozOverlay = () => {
     const { week } = useParams()
+    const navigate = useNavigate()
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [selectedDivision, setSelectedDivision] = useState(null)
@@ -268,6 +432,18 @@ const SnoozOverlay = () => {
     const [selectedTeam, setSelectedTeam] = useState(null)
     const [selectedPlayer, setSelectedPlayer] = useState(null)
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [scores, setScores] = useState(null)
+    const [completeMisses, setCompleteMisses] = useState([])
+    const [savedWeeks, setSavedWeeks] = useState([])
+    const [allDivScores, setAllDivScores] = useState(null)
+    const [allDivCompleteMisses, setAllDivCompleteMisses] = useState([])
+    const [allDivSavedWeeks, setAllDivSavedWeeks] = useState([])
+    const [maxWeek, setMaxWeek] = useState(null)
+    const [saving, setSaving] = useState(false)
+    const [saveStatus, setSaveStatus] = useState(null)
+    const [scoresOpen, setScoresOpen] = useState(false)
+    const [allSnoozPanelists, setAllSnoozPanelists] = useState([])
+    const hasAuth = !!localStorage.getItem('auth_token')
     const [customBg, setCustomBg] = useState(() => {
         try { return localStorage.getItem('snooz_custom_bg') || null } catch { return null }
     })
@@ -278,19 +454,37 @@ const SnoozOverlay = () => {
         else localStorage.removeItem('snooz_custom_bg')
     }, [])
 
-    const [people, setPeople] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('snooz_people') || '[]') } catch { return [] }
-    })
-    const [picks, setPicks] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('snooz_picks') || '{}') } catch { return {} }
-    })
+    const [people, setPeople] = useState([])
+    const [picks, setPicks] = useState({})
 
-    const savePeople = useCallback((p) => { setPeople(p); localStorage.setItem('snooz_people', JSON.stringify(p)) }, [])
-    const savePicks = useCallback((p) => { setPicks(p); localStorage.setItem('snooz_picks', JSON.stringify(p)) }, [])
+    const draftKey = `snooz_draft_${week}_${selectedDivision || 'default'}`
+    const saveDraft = useCallback((p, pk) => {
+        localStorage.setItem(draftKey, JSON.stringify({ people: p, picks: pk }))
+    }, [draftKey])
+    const clearDraft = useCallback(() => {
+        localStorage.removeItem(draftKey)
+    }, [draftKey])
+
+    const savePeople = useCallback((p) => {
+        setPeople(p)
+        setPicks(prev => { saveDraft(p, prev); return prev })
+    }, [saveDraft])
+    const savePicks = useCallback((pk) => {
+        setPicks(pk)
+        setPeople(prev => { saveDraft(prev, pk); return prev })
+    }, [saveDraft])
+
+    const [syncing, setSyncing] = useState(false)
+    const handleSync = useCallback(() => {
+        clearDraft()
+        setSyncing(true)
+    }, [clearDraft])
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true)
+            setPeople([])
+            setPicks({})
             try {
                 const params = new URLSearchParams({ week })
                 if (selectedDivision) params.append('divisionSlug', selectedDivision)
@@ -298,14 +492,54 @@ const SnoozOverlay = () => {
                 const json = await res.json()
                 setData(json)
                 if (!selectedDivision && json.activeDivision) setSelectedDivision(json.activeDivision.slug)
+
+                // Check for a local draft first (unsaved edits survive refresh)
+                const divSlug = selectedDivision || json.activeDivision?.slug || 'default'
+                const draft = JSON.parse(localStorage.getItem(`snooz_draft_${week}_${divSlug}`) || 'null')
+                if (draft && draft.people?.length > 0) {
+                    setPeople(draft.people)
+                    setPicks(draft.picks || {})
+                } else if (json.savedPanelists?.length > 0) {
+                    // No draft — load from server
+                    const serverPeople = json.savedPanelists.map(p => ({ id: String(p.id), name: p.name, serverId: p.id }))
+                    setPeople(serverPeople)
+
+                    if (json.savedPicks?.length > 0) {
+                        const allMatches = json.matches || []
+                        const serverPicks = {}
+                        for (const sp of json.savedPicks) {
+                            const match = allMatches.find(m =>
+                                Math.min(m.team1_id, m.team2_id) === sp.team_a_id &&
+                                Math.max(m.team1_id, m.team2_id) === sp.team_b_id
+                            )
+                            if (match) {
+                                serverPicks[`${match.id}_${String(sp.panelist_id)}`] = sp.picked_team_id
+                            }
+                        }
+                        setPicks(serverPicks)
+                    } else {
+                        setPicks({})
+                    }
+                }
+
+                setScores(json.scores || null)
+                setCompleteMisses(json.completeMisses || [])
+                setSavedWeeks(json.savedWeeks || [])
+                setAllDivScores(json.allDivScores || null)
+                setAllDivCompleteMisses(json.allDivCompleteMisses || [])
+                setAllDivSavedWeeks(json.allDivSavedWeeks || [])
+                setMaxWeek(json.maxWeek || null)
+                setAllSnoozPanelists((json.allSnoozPanelists || []).map(p => ({ id: String(p.id), name: p.name, serverId: p.id })))
+                setSaveStatus(null)
             } catch (err) {
                 console.error('Failed to load snooz data:', err)
             } finally {
                 setLoading(false)
+                setSyncing(false)
             }
         }
         fetchData()
-    }, [week, selectedDivision])
+    }, [week, selectedDivision, syncing])
 
     const leagueColor = data?.league?.color || '#f59e0b'
     const leagueLogo = getLeagueLogo('osl')
@@ -318,7 +552,37 @@ const SnoozOverlay = () => {
         const id = Date.now().toString(36)
         savePeople([...people, { id, name: `Person ${people.length + 1}` }])
     }
-    const renamePerson = (id, name) => savePeople(people.map(p => p.id === id ? { ...p, name } : p))
+    const renamePerson = (id, newName) => {
+        const allMatches = data?.matches || []
+        const newPicks = { ...picks }
+
+        // Clear old person's picks for current week
+        for (const m of allMatches) {
+            delete newPicks[`${m.id}_${id}`]
+        }
+
+        // Check if new name has existing server picks for this week
+        const serverPanelist = (data?.allSnoozPanelists || []).find(p => p.name.toLowerCase() === newName.toLowerCase())
+        if (serverPanelist) {
+            for (const sp of (data?.savedPicks || [])) {
+                if (sp.panelist_id !== serverPanelist.id) continue
+                const match = allMatches.find(m =>
+                    Math.min(m.team1_id, m.team2_id) === sp.team_a_id &&
+                    Math.max(m.team1_id, m.team2_id) === sp.team_b_id
+                )
+                if (match) newPicks[`${match.id}_${id}`] = sp.picked_team_id
+            }
+        }
+
+        savePicks(newPicks)
+        savePeople(people.map(p => p.id === id ? { ...p, name: newName, serverId: serverPanelist?.id || null } : p))
+    }
+    const reorderPerson = (fromIdx, toIdx) => {
+        const updated = [...people]
+        const [moved] = updated.splice(fromIdx, 1)
+        updated.splice(toIdx, 0, moved)
+        savePeople(updated)
+    }
     const removePerson = (id) => {
         savePeople(people.filter(p => p.id !== id))
         const newPicks = { ...picks }
@@ -332,6 +596,64 @@ const SnoozOverlay = () => {
         if (newPicks[key] === teamId) delete newPicks[key]
         else newPicks[key] = teamId
         savePicks(newPicks)
+    }
+
+    const handleSave = async () => {
+        const token = localStorage.getItem('auth_token')
+        if (!token || saving) return
+        setSaving(true)
+        setSaveStatus(null)
+        try {
+            const seasonId = data?.activeDivision?.season_id
+            if (!seasonId) throw new Error('No season')
+
+            const panelists = people.map(p => ({ id: p.serverId || null, name: p.name }))
+
+            const serverPicks = []
+            for (const [key, teamId] of Object.entries(picks)) {
+                const [matchId, panelistId] = key.split('_')
+                const match = matches.find(m => String(m.id) === matchId)
+                if (!match) continue
+                const panelistIndex = people.findIndex(p => p.id === panelistId)
+                if (panelistIndex === -1) continue
+                serverPicks.push({ panelistIndex, team1Id: match.team1_id, team2Id: match.team2_id, pickedTeamId: teamId })
+            }
+
+            const res = await fetch(`${API_BASE}/snooz-save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ seasonId, week: parseInt(week), panelists, picks: serverPicks })
+            })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error(err.error || `Save failed (${res.status})`)
+            }
+
+            const result = await res.json()
+            const oldToNew = {}
+            people.forEach((p, i) => {
+                if (result.panelists[i]) oldToNew[p.id] = String(result.panelists[i].id)
+            })
+
+            const newPeople = result.panelists.map(p => ({ id: String(p.id), name: p.name, serverId: p.id }))
+            const newPicks = {}
+            for (const [key, value] of Object.entries(picks)) {
+                const [matchId, oldPanelistId] = key.split('_')
+                newPicks[`${matchId}_${oldToNew[oldPanelistId] || oldPanelistId}`] = value
+            }
+
+            setPeople(newPeople)
+            setPicks(newPicks)
+            clearDraft()
+            setSaveStatus('saved')
+            setTimeout(() => setSaveStatus(null), 3000)
+        } catch (err) {
+            console.error('Save failed:', err)
+            setSaveStatus('error')
+            setTimeout(() => setSaveStatus(null), 3000)
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleTeamClick = (teamData) => {
@@ -403,7 +725,33 @@ const SnoozOverlay = () => {
                             style={{ background: `linear-gradient(135deg, ${leagueColor}, #fff, ${leagueColor})`, backgroundSize: '200% 200%', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'gradientShift 4s ease infinite' }}>
                             ASSOCIATED PRESS
                         </h1>
-                        <div className="text-white/40 text-sm font-mono tracking-[0.25em] uppercase">Week {week} Predictions</div>
+                        <div className="flex items-center gap-2 text-white/40 text-sm font-mono tracking-[0.25em] uppercase">
+                            <button onClick={() => navigate(`/snooz/${Math.max(1, parseInt(week) - 1)}`)}
+                                disabled={parseInt(week) <= 1}
+                                className="text-white/25 hover:text-white/60 disabled:opacity-20 cursor-pointer disabled:cursor-default transition-colors p-0.5">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span>Week {week} Predictions</span>
+                            <button onClick={() => navigate(`/snooz/${parseInt(week) + 1}`)}
+                                disabled={maxWeek && parseInt(week) >= maxWeek}
+                                className="text-white/25 hover:text-white/60 disabled:opacity-20 cursor-pointer disabled:cursor-default transition-colors p-0.5">
+                                <ChevronRight size={16} />
+                            </button>
+                            {savedWeeks.length > 0 && (
+                                <div className="flex items-center gap-1 ml-2">
+                                    {Array.from({ length: maxWeek || parseInt(week) }, (_, i) => i + 1).map(w => (
+                                        <button key={w} onClick={() => navigate(`/snooz/${w}`)}
+                                            className={`w-5 h-5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                                                w === parseInt(week) ? 'bg-white/20 text-white' :
+                                                savedWeeks.includes(w) ? 'bg-white/[0.06] text-white/40 hover:bg-white/10' :
+                                                'bg-white/[0.02] text-white/15'
+                                            }`}>
+                                            {w}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -441,6 +789,31 @@ const SnoozOverlay = () => {
                         </div>
                     )}
 
+                    <button onClick={() => setScoresOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer border backdrop-blur-sm bg-black/30 hover:bg-black/50 border-white/[0.08] text-white/50 hover:text-white/70">
+                        <Trophy size={14} />
+                        Scores
+                    </button>
+
+                    {hasAuth && (
+                        <>
+                            <button onClick={handleSync} disabled={syncing}
+                                className="p-2.5 rounded-lg bg-black/30 hover:bg-black/50 text-white/30 hover:text-white/60 transition-all cursor-pointer border border-white/[0.08] backdrop-blur-sm"
+                                title="Sync from server (discard local changes)">
+                                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                            </button>
+                            <button onClick={handleSave} disabled={saving}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer border backdrop-blur-sm ${
+                                    saveStatus === 'saved' ? 'bg-green-500/20 border-green-500/30 text-green-400' :
+                                    saveStatus === 'error' ? 'bg-red-500/20 border-red-500/30 text-red-400' :
+                                    'bg-black/30 hover:bg-black/50 border-white/[0.08] text-white/50 hover:text-white/70'
+                                }`}>
+                                <Save size={14} />
+                                {saving ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Error' : 'Save'}
+                            </button>
+                        </>
+                    )}
+
                     <button onClick={() => setSettingsOpen(true)}
                         className="p-2.5 rounded-lg bg-black/30 hover:bg-black/50 text-white/30 hover:text-white/60 transition-all cursor-pointer border border-white/[0.08] backdrop-blur-sm">
                         <Settings size={16} />
@@ -461,17 +834,40 @@ const SnoozOverlay = () => {
                             <div className="flex items-center border-b border-white/[0.1] bg-[#0e1620]">
                                 <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30 text-center">Order</div>
                                 <div className="w-[280px] shrink-0 px-4 py-3 text-sm font-black tracking-[0.2em] uppercase text-white/30 text-center">Chaos</div>
-                                {people.map(p => (
-                                    <div key={p.id} className="flex-1 px-2 py-3 text-center text-sm font-black tracking-[0.1em] uppercase text-white/35 truncate">{p.name}</div>
-                                ))}
+                                {people.map(p => {
+                                    const pid = String(p.serverId || p.id)
+                                    const weekScore = scores?.[pid]?.[parseInt(week)]
+                                    return (
+                                        <div key={p.id} className="flex-1 px-2 py-3 text-center truncate">
+                                            <div className="text-sm font-black tracking-[0.1em] uppercase text-white/35">{p.name}</div>
+                                            {weekScore && (
+                                                <div className="text-xs font-mono tabular-nums" style={{ color: leagueColor }}>
+                                                    {weekScore.correct}/{weekScore.total}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </div>
 
                             {/* Match rows */}
                             <div className="flex-1 flex flex-col">
-                                {matches.map((match, idx) => (
+                                {matches.map((match, idx) => {
+                                    const isCompleteMiss = match.is_completed && match.winner_team_id && completeMisses.some(cm =>
+                                        cm.week === parseInt(week) &&
+                                        cm.teamAId === Math.min(match.team1_id, match.team2_id) &&
+                                        cm.teamBId === Math.max(match.team1_id, match.team2_id)
+                                    )
+                                    return (
                                     <div key={match.id}
-                                        className="flex items-center border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.03] transition-colors"
+                                        className={`relative flex items-center border-b border-white/[0.06] last:border-b-0 transition-colors ${isCompleteMiss ? 'bg-red-500/[0.06]' : 'hover:bg-white/[0.03]'}`}
                                         style={{ flex: '1 1 0', animation: `fadeIn 0.3s ease-out ${idx * 0.04}s both` }}>
+
+                                        {isCompleteMiss && (
+                                            <div className="absolute left-1 top-1 z-10 bg-red-500/20 border border-red-500/25 rounded px-2 py-0.5 text-[10px] font-black text-red-400/80 tracking-[0.15em] uppercase pointer-events-none">
+                                                Complete Miss!
+                                            </div>
+                                        )}
 
                                         <button
                                             onClick={() => handleTeamClick({ id: match.team1_id, name: match.team1_name, color: match.team1_color, slug: match.team1_slug, logo: match.team1_logo })}
@@ -513,18 +909,22 @@ const SnoozOverlay = () => {
                                             const picked2 = pick === match.team2_id
                                             const hasPick = picked1 || picked2
 
-                                            if (match.is_completed && match.winner_team_id) {
+                                            if (match.is_completed && match.winner_team_id && hasPick) {
                                                 const isWinner1 = match.winner_team_id === match.team1_id
                                                 const winnerName = isWinner1 ? match.team1_name : match.team2_name
                                                 const winnerColor = isWinner1 ? match.team1_color : match.team2_color
-                                                const wasCorrect = hasPick && pick === match.winner_team_id
-                                                const wasWrong = hasPick && pick !== match.winner_team_id
+                                                const wasCorrect = pick === match.winner_team_id
+                                                const wasWrong = pick !== match.winner_team_id
                                                 const displayName = wasWrong ? (picked1 ? match.team1_name : match.team2_name) : winnerName
                                                 const displayColor = wasWrong ? (picked1 ? match.team1_color : match.team2_color) : winnerColor
+                                                const otherTeamId = picked1 ? match.team2_id : match.team1_id
 
+                                                const Tag = hasAuth ? 'button' : 'div'
                                                 return (
                                                     <div key={person.id} className="flex-1 px-1.5 flex items-center justify-center">
-                                                        <div className="w-full py-2 rounded text-sm font-bold text-center truncate px-1.5"
+                                                        <Tag
+                                                            {...(hasAuth ? { onClick: () => handlePick(match.id, person.id, otherTeamId) } : {})}
+                                                            className={`w-full py-2 rounded text-sm font-bold text-center truncate px-1.5 ${hasAuth ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                                                             style={{
                                                                 background: wasCorrect ? displayColor : wasWrong ? 'rgba(239,68,68,0.15)' : `${displayColor}30`,
                                                                 color: wasCorrect ? '#fff' : wasWrong ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.25)',
@@ -532,7 +932,7 @@ const SnoozOverlay = () => {
                                                                 textShadow: wasCorrect ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
                                                             }}>
                                                             {wasCorrect && '\u2713 '}{wasWrong && '\u2717 '}{displayName}
-                                                        </div>
+                                                        </Tag>
                                                     </div>
                                                 )
                                             }
@@ -588,7 +988,8 @@ const SnoozOverlay = () => {
                                             )
                                         })}
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -645,6 +1046,13 @@ const SnoozOverlay = () => {
                 </div>
             </div>
 
+            {/* ═══ Loading Overlay ═══ */}
+            {loading && data && (
+                <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="text-white/50 text-2xl font-mono animate-pulse">Loading...</div>
+                </div>
+            )}
+
             {/* ═══ Settings Modal ═══ */}
             <SettingsModal
                 open={settingsOpen}
@@ -652,9 +1060,27 @@ const SnoozOverlay = () => {
                 people={people}
                 onAdd={addPerson}
                 onRename={renamePerson}
+                onReorder={reorderPerson}
                 onRemove={removePerson}
                 customBg={customBg}
                 onSetCustomBg={handleSetCustomBg}
+            />
+
+            {/* ═══ Scores Overlay ═══ */}
+            <ScoresOverlay
+                open={scoresOpen}
+                onClose={() => setScoresOpen(false)}
+                scores={scores}
+                people={people}
+                allPanelists={allSnoozPanelists}
+                savedWeeks={savedWeeks}
+                leagueColor={leagueColor}
+                completeMisses={completeMisses}
+                maxWeek={maxWeek}
+                allDivScores={allDivScores}
+                allDivCompleteMisses={allDivCompleteMisses}
+                allDivSavedWeeks={allDivSavedWeeks}
+                activeDivisionName={data?.activeDivision?.name}
             />
         </div>
     )
