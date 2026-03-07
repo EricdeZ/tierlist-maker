@@ -1,0 +1,526 @@
+/* ============================================
+   Pack Art — Pokemon-style metallic booster pack
+   Full-bleed art, crimped edges, V-notch tear
+   ============================================ */
+
+/* --- 3D perspective wrapper --- */
+.pack-art-wrap {
+  perspective: 600px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.pack-art {
+  --pack-accent: #4a6a9a;
+  --pack-accent-light: #6a8aba;
+  --pack-accent-dark: #2a4a6a;
+  --mx: 50%;
+  --my: 50%;
+  --rx: 0deg;
+  --ry: 0deg;
+
+  width: 190px;
+  aspect-ratio: 63 / 100;
+  position: relative;
+  user-select: none;
+  flex-shrink: 0;
+  isolation: isolate;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  overflow: hidden;
+  will-change: transform;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.pack-art:hover {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 24px color-mix(in srgb, var(--pack-accent) 30%, transparent);
+}
+
+/* --- Tier color schemes --- */
+.pack-art[data-tier="standard"] { --pack-accent: #6a7a8a; --pack-accent-light: #a0b0c0; --pack-accent-dark: #3a4a5a; }
+.pack-art[data-tier="premium"]  { --pack-accent: #2563eb; --pack-accent-light: #7db4ff; --pack-accent-dark: #1a3a8a; }
+.pack-art[data-tier="elite"]    { --pack-accent: #7c3aed; --pack-accent-light: #b888ff; --pack-accent-dark: #4a1a8a; }
+.pack-art[data-tier="legendary"]{ --pack-accent: #d97706; --pack-accent-light: #fcd34d; --pack-accent-dark: #78350f; }
+
+/* ============================================
+   Crimped / serrated edges (top + bottom seal)
+   The zigzag heat-seal pattern on real packs
+   ============================================ */
+.pack-art__crimp-top,
+.pack-art__crimp-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.pack-art__crimp-top { top: -1px; }
+.pack-art__crimp-bottom { bottom: -1px; }
+
+.pack-art__crimp-top::after,
+.pack-art__crimp-bottom::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--pack-accent-dark) 0px,
+      var(--pack-accent-light) 3px,
+      var(--pack-accent) 5px,
+      var(--pack-accent-dark) 8px,
+      var(--pack-accent-light) 10px
+    );
+}
+
+.pack-art__crimp-top::after {
+  top: 0;
+  mask-image: linear-gradient(180deg, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, black 40%, transparent 100%);
+}
+
+.pack-art__crimp-bottom::after {
+  bottom: 0;
+  mask-image: linear-gradient(0deg, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(0deg, black 40%, transparent 100%);
+}
+
+/* Serrated edge shape */
+.pack-art__crimp-top::before,
+.pack-art__crimp-bottom::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.3) 3px,
+    rgba(0, 0, 0, 0.3) 4px
+  );
+}
+
+.pack-art__crimp-top::before { bottom: 0; }
+.pack-art__crimp-bottom::before { top: 0; }
+
+/* ============================================
+   V-notch tear point (right side)
+   ============================================ */
+.pack-art__notch {
+  position: absolute;
+  right: -1px;
+  top: 9%;
+  width: 10px;
+  height: 16px;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.pack-art__notch::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid #060d1a;
+}
+
+/* Mirror notch on left */
+.pack-art__notch-left {
+  position: absolute;
+  left: -1px;
+  top: 9%;
+  width: 10px;
+  height: 16px;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.pack-art__notch-left::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid #060d1a;
+}
+
+/* ============================================
+   Full metallic foil base
+   ============================================ */
+.pack-art__foil {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    160deg,
+    var(--pack-accent-dark) 0%,
+    var(--pack-accent) 12%,
+    var(--pack-accent-light) 25%,
+    var(--pack-accent) 40%,
+    var(--pack-accent-dark) 55%,
+    var(--pack-accent) 70%,
+    var(--pack-accent-light) 85%,
+    var(--pack-accent-dark) 100%
+  );
+}
+
+/* ============================================
+   God art — FULL BLEED, covers entire pack
+   ============================================ */
+.pack-art__god-art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.pack-art__god-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  filter: saturate(1.2) contrast(1.1);
+}
+
+/* Bottom fade into metallic */
+.pack-art__god-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      transparent 50%,
+      color-mix(in srgb, var(--pack-accent-dark) 70%, transparent) 70%,
+      var(--pack-accent-dark) 88%,
+      var(--pack-accent) 100%
+    ),
+    linear-gradient(0deg,
+      transparent 85%,
+      color-mix(in srgb, var(--pack-accent-dark) 30%, transparent) 95%,
+      color-mix(in srgb, var(--pack-accent-dark) 50%, transparent) 100%
+    );
+}
+
+/* ============================================
+   Metallic overlay effects on top of art
+   ============================================ */
+
+/* Foil sheen — color-tinted overlay */
+.pack-art__foil-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--pack-accent) 40%, transparent) 0%,
+      color-mix(in srgb, var(--pack-accent) 10%, transparent) 20%,
+      transparent 40%,
+      transparent 60%,
+      color-mix(in srgb, var(--pack-accent) 10%, transparent) 80%,
+      color-mix(in srgb, var(--pack-accent) 35%, transparent) 100%
+    );
+  mix-blend-mode: color;
+}
+
+/* Metallic specular bands — diagonal highlights across art */
+.pack-art__foil-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      160deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 15%,
+      transparent 25%,
+      transparent 35%,
+      rgba(255, 255, 255, 0.05) 45%,
+      transparent 55%,
+      transparent 65%,
+      rgba(255, 255, 255, 0.1) 80%,
+      transparent 90%
+    );
+  mix-blend-mode: screen;
+}
+
+/* Side metallic edge highlights */
+.pack-art__foil-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--pack-accent-light) 20%, transparent) 0%,
+      transparent 8%,
+      transparent 92%,
+      color-mix(in srgb, var(--pack-accent-light) 20%, transparent) 100%
+    );
+}
+
+/* Brushed metal grain */
+.pack-art__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.15;
+  mix-blend-mode: overlay;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 1px,
+      rgba(255, 255, 255, 0.08) 1px,
+      rgba(255, 255, 255, 0.08) 2px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 4px,
+      rgba(255, 255, 255, 0.04) 4px,
+      rgba(255, 255, 255, 0.04) 5px
+    );
+  background-size: 3px 100%, 7px 100%;
+}
+
+/* ============================================
+   Mouse-tracking glare (specular highlight)
+   ============================================ */
+.pack-art__glare {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: radial-gradient(
+    ellipse 50% 50% at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0.15) 25%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 70%
+  );
+}
+
+.pack-art:hover .pack-art__glare { opacity: 1; }
+
+/* Traveling shimmer */
+.pack-art__shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.04) 38%,
+    rgba(255, 255, 255, 0.12) 42%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.12) 48%,
+    rgba(255, 255, 255, 0.04) 52%,
+    transparent 65%
+  );
+}
+
+.pack-art:hover .pack-art__shimmer {
+  opacity: 1;
+  animation: pack-shimmer 2s ease-in-out;
+}
+
+@keyframes pack-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+/* ============================================
+   SC Logo — top center, overlaid on art
+   ============================================ */
+.pack-art__logo {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 9%;
+  z-index: 6;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+/* ============================================
+   League + Division badges
+   ============================================ */
+.pack-art__badges {
+  position: absolute;
+  bottom: 30%;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6%;
+}
+
+.pack-art__badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pack-art__badge img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.pack-art__badge span {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 7px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+}
+
+/* ============================================
+   Pack title — bottom area on metallic
+   ============================================ */
+.pack-art__title {
+  position: absolute;
+  bottom: 18%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 6;
+  padding: 0 6%;
+}
+
+.pack-art__title-text {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow:
+    0 0 20px var(--pack-accent),
+    0 0 8px var(--pack-accent-dark),
+    0 2px 4px rgba(0, 0, 0, 0.9);
+  line-height: 1.2;
+}
+
+.pack-art__subtitle-text {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--pack-accent-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  margin-top: 3px;
+}
+
+/* ============================================
+   Card count — bottom
+   ============================================ */
+.pack-art__card-count {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 7px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   Bottom metallic band
+   ============================================ */
+.pack-art__bottom-band {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4%;
+  z-index: 5;
+  background: linear-gradient(
+    90deg,
+    var(--pack-accent-dark),
+    var(--pack-accent-light) 25%,
+    var(--pack-accent) 50%,
+    var(--pack-accent-light) 75%,
+    var(--pack-accent-dark)
+  );
+}
+
+/* ============================================
+   Edge bevel
+   ============================================ */
+.pack-art__edge {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1),
+    inset -1px 0 0 rgba(255, 255, 255, 0.1),
+    inset 2px 0 0 rgba(255, 255, 255, 0.03),
+    inset -2px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+/* ============================================
+   Compact variant
+   ============================================ */
+.pack-art.compact { width: 140px; }
+.pack-art.compact .pack-art__title-text { font-size: 9px; letter-spacing: 2px; }
+.pack-art.compact .pack-art__subtitle-text { font-size: 6px; }
+.pack-art.compact .pack-art__card-count { font-size: 6px; }
+.pack-art.compact .pack-art__badge img { width: 12px; height: 12px; }
+.pack-art.compact .pack-art__badge span { font-size: 5px; }
+.pack-art.compact .pack-art__notch,
+.pack-art.compact .pack-art__notch-left { display: none; }
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 640px) {
+  .pack-art { width: 140px; }
+  .pack-art .pack-art__title-text { font-size: 9px; letter-spacing: 2px; }
+  .pack-art .pack-art__subtitle-text { font-size: 6px; }
+}

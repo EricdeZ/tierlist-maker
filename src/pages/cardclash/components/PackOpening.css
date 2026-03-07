@@ -1,0 +1,952 @@
+/* ============================================
+   Pack Opening Ceremony — TCGP x Valorant
+   ============================================ */
+
+.pack-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Dark background with subtle grid */
+.pack-opening__bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(8, 8, 18, 0.97), rgba(4, 4, 12, 0.99));
+  z-index: -1;
+}
+
+.pack-opening__bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(255,255,255,0.012) 60px, rgba(255,255,255,0.012) 61px),
+    repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.012) 60px, rgba(255,255,255,0.012) 61px);
+}
+
+/* ============================================
+   Pack area
+   ============================================ */
+.pack-opening__pack-area {
+  position: relative;
+  z-index: 10;
+}
+
+.pack-opening__pack-inner {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pack-opening__pack-inner * {
+  pointer-events: none !important;
+  -webkit-user-drag: none !important;
+  user-select: none !important;
+}
+
+.pack-opening__pack-inner .pack-art {
+  width: 260px;
+  box-shadow:
+    0 0 15px rgba(255, 255, 255, 0.06),
+    0 0 2px rgba(255, 255, 255, 0.15),
+    0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Entrance */
+.pack-opening[data-phase="enter"] .pack-opening__pack-area {
+  animation: po-enter 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes po-enter {
+  0% { opacity: 0; transform: scale(0.3) translateY(80px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Idle float */
+.pack-opening[data-phase="ready"] .pack-opening__pack-area {
+  animation: po-float 3s ease-in-out infinite;
+}
+
+@keyframes po-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Pack bottom — clip off torn top only during emerging (top tears away) */
+.pack-opening[data-phase="emerging"] .pack-opening__pack-inner {
+  clip-path: inset(9% 0 0 0);
+}
+
+/* Bottom half slides down and away during emerging — simultaneous with cards rising */
+.pack-opening[data-phase="emerging"] .pack-opening__pack-inner {
+  animation: po-pack-slide-down 1.4s ease-in 0.15s forwards;
+}
+
+@keyframes po-pack-slide-down {
+  0% { transform: translateY(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(400px); opacity: 0; }
+}
+
+/* ============================================
+   Edge indicator dots (ready state)
+   ============================================ */
+.pack-opening__edge-dot {
+  position: absolute;
+  top: 9%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 220, 150, 0.7);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 6;
+  box-shadow: 0 0 6px rgba(255, 200, 100, 0.5);
+  animation: po-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.pack-opening__edge-dot--left { left: -4px; }
+.pack-opening__edge-dot--right { right: -4px; }
+
+@keyframes po-dot-pulse {
+  0%, 100% { opacity: 0.3; transform: translateY(-50%) scale(0.8); }
+  50% { opacity: 0.9; transform: translateY(-50%) scale(1.3); }
+}
+
+/* ============================================
+   Tear line
+   ============================================ */
+.pack-opening__tear-line {
+  position: absolute;
+  top: 9%;
+  height: 3px;
+  z-index: 5;
+  pointer-events: none;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 220, 150, 0.5), rgba(255, 255, 255, 0.95));
+  box-shadow:
+    0 0 calc(4px + var(--progress, 0) * 10px) rgba(255, 255, 255, 0.8),
+    0 0 calc(10px + var(--progress, 0) * 20px) rgba(255, 220, 150, 0.6),
+    0 0 calc(20px + var(--progress, 0) * 35px) rgba(255, 180, 80, 0.3);
+}
+
+.pack-opening__tear-line[data-side="right"] {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(255, 220, 150, 0.5));
+}
+
+/* ============================================
+   Sparkles
+   ============================================ */
+.pack-opening__spark {
+  position: absolute;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  background: #fff;
+  border-radius: 50%;
+  z-index: 20;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 3px #fff,
+    0 0 6px #ffd700,
+    0 0 10px rgba(255, 200, 50, 0.5);
+  animation: po-spark var(--dur, 0.4s) ease-out forwards;
+}
+
+@keyframes po-spark {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; }
+}
+
+/* ============================================
+   Tear interaction zone
+   ============================================ */
+.pack-opening__tear-zone {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pack-opening[data-phase="tearing"] .pack-opening__tear-zone {
+  cursor: grabbing;
+}
+
+/* ============================================
+   Torn top — real pack art, clipped to top 9%
+   ============================================ */
+.pack-opening__torn-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  pointer-events: none;
+  user-select: none;
+  clip-path: inset(0 0 91% 0);
+}
+
+.pack-opening__torn-top .pack-art {
+  width: 260px;
+  box-shadow: none;
+}
+
+.pack-opening__torn-top * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* During ripping — top piece flies away after shine sweep */
+.pack-opening[data-phase="ripping"] .pack-opening__torn-top {
+  animation: po-top-tear 1s ease-in-out 2s forwards;
+}
+
+/* During emerging — already gone */
+.pack-opening[data-phase="emerging"] .pack-opening__torn-top {
+  transform: translateY(-80px);
+  opacity: 0;
+}
+
+@keyframes po-top-tear {
+  0% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-50px); opacity: 0.7; }
+  100% { transform: translateY(-100px); opacity: 0; }
+}
+
+/* Clip main pack immediately during ripping — torn-top overlay covers the top */
+.pack-opening[data-phase="ripping"] .pack-opening__pack-inner {
+  clip-path: inset(9% 0 0 0);
+}
+
+/* Torn edge effect — glowing exposed foil along the cut (ripping only) */
+.pack-opening[data-phase="ripping"] .pack-opening__pack-inner::after {
+  content: '';
+  position: absolute;
+  top: 9%;
+  left: -2px;
+  right: -2px;
+  height: 8px;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 220, 150, 0.6) 30%,
+    rgba(255, 180, 80, 0.2) 70%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 8px 2px rgba(255, 220, 150, 0.5),
+    0 0 20px 4px rgba(255, 180, 80, 0.2);
+  z-index: 5;
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    white 3%,
+    white 15%,
+    rgba(255,255,255,0.6) 20%,
+    white 25%,
+    white 40%,
+    rgba(255,255,255,0.5) 45%,
+    white 50%,
+    rgba(255,255,255,0.7) 55%,
+    white 60%,
+    white 75%,
+    rgba(255,255,255,0.5) 80%,
+    white 85%,
+    white 97%,
+    transparent 100%
+  );
+  animation: po-torn-edge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes po-torn-edge-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* ============================================
+   Shine sweep — left to right across tear opening
+   ============================================ */
+.pack-opening__shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 22;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.pack-opening__shine::before {
+  content: '';
+  position: absolute;
+  top: 9%;
+  left: -80%;
+  width: 60%;
+  height: 6px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--rc, #fff) 20%, transparent) 15%,
+    color-mix(in srgb, var(--rc, #fff) 70%, white) 45%,
+    white 50%,
+    color-mix(in srgb, var(--rc, #fff) 70%, white) 55%,
+    color-mix(in srgb, var(--rc, #fff) 20%, transparent) 85%,
+    transparent
+  );
+  transform: translateY(-50%);
+  border-radius: 3px;
+  box-shadow:
+    0 0 15px 6px color-mix(in srgb, var(--rc, #fff) 70%, transparent),
+    0 0 40px 15px color-mix(in srgb, var(--rc, #fff) 40%, transparent),
+    0 0 80px 30px color-mix(in srgb, var(--rc, #fff) 15%, transparent);
+  animation: po-shine-sweep 2.5s cubic-bezier(0.12, 0, 0.39, 0) forwards;
+}
+
+/* Vertical glow spill from the shine — radiates upward like a chest */
+.pack-opening__shine::after {
+  content: '';
+  position: absolute;
+  top: 9%;
+  left: -80%;
+  width: 40%;
+  height: 500px;
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--rc, #fff) 60%, transparent) 0%,
+    color-mix(in srgb, var(--rc, #fff) 35%, transparent) 15%,
+    color-mix(in srgb, var(--rc, #fff) 12%, transparent) 40%,
+    transparent 100%
+  );
+  transform: translateY(-100%);
+  filter: blur(15px);
+  animation: po-shine-sweep 2.5s cubic-bezier(0.12, 0, 0.39, 0) forwards;
+  opacity: 0.7;
+}
+
+@keyframes po-shine-sweep {
+  0% { left: -80%; opacity: 0; }
+  5% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { left: 110%; opacity: 0; }
+}
+
+.pack-opening[data-phase="emerging"] .pack-opening__shine::before,
+.pack-opening[data-phase="emerging"] .pack-opening__shine::after {
+  animation: none;
+  opacity: 0;
+}
+
+/* ============================================
+   Rarity glow — cone of light from inside the pack
+   Light escapes ONLY through the torn top opening,
+   fanning upward like a chest cracking open.
+   ============================================ */
+.pack-opening__rarity-glow {
+  position: absolute;
+  bottom: 91%;
+  left: 0;
+  width: 100%;
+  height: 500px;
+  transform-origin: bottom center;
+  pointer-events: none;
+  z-index: 14;
+  background: linear-gradient(
+    0deg,
+    var(--rc, #fff) 0%,
+    color-mix(in srgb, var(--rc, #fff) 70%, transparent) 5%,
+    color-mix(in srgb, var(--rc, #fff) 40%, transparent) 18%,
+    color-mix(in srgb, var(--rc, #fff) 15%, transparent) 40%,
+    transparent 100%
+  );
+  clip-path: polygon(0% 100%, 100% 100%, 120% 0%, -20% 0%);
+  opacity: 0;
+  filter: blur(14px);
+}
+
+/* Ripping: light rises from the slit via scaleY (GPU-accelerated) */
+.pack-opening[data-phase="ripping"] .pack-opening__rarity-glow {
+  animation: po-glow-build 2.5s ease-out 2.5s forwards;
+}
+
+@keyframes po-glow-build {
+  0% { opacity: 0; transform: scaleY(0.03); }
+  30% { opacity: 0.3; transform: scaleY(0.2); }
+  60% { opacity: 0.6; transform: scaleY(0.55); }
+  100% { opacity: 0.9; transform: scaleY(1); }
+}
+
+/* Emerging: fade out as pack starts moving */
+.pack-opening[data-phase="emerging"] .pack-opening__rarity-glow {
+  animation: po-glow-fade 0.5s ease-out forwards;
+}
+
+@keyframes po-glow-fade {
+  0% { opacity: 0.9; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0.15); }
+}
+
+/* ============================================
+   Cards emerging — full-screen scatter & converge
+   ============================================ */
+.pack-opening__emerging-cards {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  pointer-events: none;
+}
+
+/* Cards start BEHIND the pack (z-index below pack-area's 10).
+   Pack-inner is clipped at 9% top, so cards rising above the tear line
+   are visible in the open area while still hidden behind the pack body.
+   After pack slides away, z-index jumps to bring cards to front. */
+.pack-opening[data-phase="emerging"] .pack-opening__emerging-cards {
+  animation: po-emerge-reveal 1.7s step-start forwards;
+}
+
+@keyframes po-emerge-reveal {
+  0%, 94% { z-index: 5; }
+  95%, 100% { z-index: 30; }
+}
+
+.pack-opening__emerging-card {
+  position: absolute;
+  width: 240px;
+  aspect-ratio: 63 / 88;
+  border-radius: 12px;
+  opacity: 0;
+  transform-origin: bottom center;
+  perspective: 1000px;
+  animation: po-card-emerge 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.7),
+    0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+/* Interactive during stack phase */
+.pack-opening[data-phase="stack"] .pack-opening__emerging-cards {
+  pointer-events: auto;
+}
+
+.pack-opening[data-phase="stack"] .pack-opening__emerging-card {
+  cursor: pointer;
+}
+
+/* Flip container */
+.pack-opening__ec-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--flip-time, 0.5s) ease-in-out;
+}
+
+.pack-opening__emerging-card.flipped .pack-opening__ec-flip {
+  transform: rotateY(180deg);
+}
+
+.pack-opening__ec-back,
+.pack-opening__ec-front {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pack-opening__ec-front {
+  transform: rotateY(180deg);
+}
+
+.pack-opening__ec-front .game-card {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Dismissed card — shrinks away */
+.pack-opening__emerging-card.dismissed {
+  animation: po-card-dismiss 0.3s ease-in forwards !important;
+  pointer-events: none !important;
+}
+
+@keyframes po-card-dismiss {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3) translateY(50px); }
+}
+
+/* Glow behind the converging cards */
+.pack-opening__cards-glow {
+  position: absolute;
+  width: 380px;
+  height: 540px;
+  border-radius: 40%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--rc, #fff) 60%, white),
+    color-mix(in srgb, var(--rc, #fff) 35%, transparent) 40%,
+    color-mix(in srgb, var(--rc, #fff) 12%, transparent) 70%,
+    transparent 100%
+  );
+  opacity: 0;
+  filter: blur(25px);
+  animation: po-cards-glow-in 3.5s ease-out forwards;
+}
+
+@keyframes po-cards-glow-in {
+  0%, 25% { opacity: 0; transform: scale(0.4); }
+  55% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0.5; transform: scale(1.05); }
+}
+
+/* Rarest card — same emerge animation + glow on box-shadow during fan */
+.pack-opening__emerging-card.rarest {
+  animation:
+    po-card-emerge 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards,
+    po-rarest-fan-glow 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes po-rarest-fan-glow {
+  0%, 38% {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 2px rgba(255,255,255,0.1);
+  }
+  46% {
+    box-shadow: 0 0 30px 12px var(--rc, #fff), 0 0 60px 20px color-mix(in srgb, var(--rc, #fff) 40%, transparent);
+  }
+  64% {
+    box-shadow: 0 0 30px 12px var(--rc, #fff), 0 0 60px 20px color-mix(in srgb, var(--rc, #fff) 40%, transparent);
+  }
+  76%, 100% {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 2px rgba(255,255,255,0.1);
+  }
+}
+
+/* Stack phase — cards stay visible, interactive */
+.pack-opening[data-phase="stack"] .pack-opening__emerging-cards {
+  z-index: 30;
+}
+
+@keyframes po-card-emerge {
+  0% {
+    transform: translateY(15px);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+    transform: translateY(15px);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-80px);
+  }
+  /* Hold above pack — wait for pack to clear */
+  38% {
+    opacity: 1;
+    transform: translateY(-80px);
+  }
+  /* Fan out in place */
+  52% {
+    opacity: 1;
+    transform: translateY(-80px) translateX(var(--fx)) rotate(var(--fr));
+  }
+  /* Hold fan */
+  66% {
+    opacity: 1;
+    transform: translateY(-80px) translateX(var(--fx)) rotate(var(--fr));
+  }
+  /* Fan back together */
+  78% {
+    opacity: 1;
+    transform: translateY(-80px);
+  }
+  /* Move down to center */
+  92%, 100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Card Stack — drag-to-reveal pile
+   ============================================ */
+.pack-opening__card-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 30;
+}
+
+/* ============================================
+   Pile cards (face-down depth)
+   ============================================ */
+.pack-opening__pile-card {
+  position: absolute;
+  width: 240px;
+  aspect-ratio: 63 / 88;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.pack-opening__pile-card img {
+  width: 104%;
+  height: 104%;
+  object-fit: cover;
+  margin: -2%;
+  display: block;
+}
+
+/* ============================================
+   Top card — draggable, flippable
+   ============================================ */
+.pack-opening__top-card {
+  position: relative;
+  width: 240px;
+  aspect-ratio: 63 / 88;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  perspective: 1000px;
+}
+
+.pack-opening__top-card:not(.flipped) {
+  animation: po-card-appear 0.3s ease-out;
+}
+
+@keyframes po-card-appear {
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.pack-opening__top-card:active:not(.flipped) {
+  cursor: grabbing;
+}
+
+.pack-opening__top-card.flipped {
+  cursor: pointer;
+}
+
+/* ============================================
+   Card flip inner
+   ============================================ */
+.pack-opening__flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--flip-time, 0.5s) ease-in-out;
+}
+
+.pack-opening__top-card.flipped .pack-opening__flip-inner {
+  transform: rotateY(180deg);
+}
+
+.pack-opening__flip-back,
+.pack-opening__flip-front {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pack-opening__flip-front {
+  transform: rotateY(180deg);
+}
+
+/* Card back image — crop white edges */
+.pack-opening__flip-back img {
+  width: 104%;
+  height: 104%;
+  object-fit: cover;
+  margin: -2%;
+  display: block;
+}
+
+/* GameCard fills the front */
+.pack-opening__flip-front .game-card {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ============================================
+   Rarity effects — burst glow behind card
+   ============================================ */
+.pack-opening__rarity-burst {
+  position: absolute;
+  inset: -30px;
+  border-radius: 24px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.pack-opening__rarity-burst.special {
+  box-shadow: 0 0 40px 10px var(--rc, #3b82f6);
+  animation: po-rarity-subtle 0.6s ease-out forwards;
+}
+
+.pack-opening__rarity-burst.epic {
+  box-shadow: 0 0 60px 20px var(--rc, #a855f7);
+  animation: po-rarity-medium 0.8s ease-out forwards;
+}
+
+.pack-opening__rarity-burst.ultra {
+  box-shadow: 0 0 80px 30px var(--rc, #ff8c00);
+  animation: po-rarity-dramatic 1.2s ease-out forwards;
+}
+
+@keyframes po-rarity-subtle {
+  0% { opacity: 0; transform: scale(0.8); }
+  40% { opacity: 0.7; }
+  100% { opacity: 0.3; transform: scale(1); }
+}
+
+@keyframes po-rarity-medium {
+  0% { opacity: 0; transform: scale(0.7); }
+  30% { opacity: 0.9; transform: scale(1.1); }
+  100% { opacity: 0.4; transform: scale(1); }
+}
+
+@keyframes po-rarity-dramatic {
+  0% { opacity: 0; transform: scale(0.5); }
+  20% { opacity: 1; transform: scale(1.2); }
+  40% { opacity: 0.85; transform: scale(0.95); }
+  60% { opacity: 0.95; transform: scale(1.08); }
+  100% { opacity: 0.5; transform: scale(1); }
+}
+
+/* Ultra rarity rays — spinning conic gradient */
+.pack-opening__rarity-rays {
+  position: absolute;
+  inset: -100px;
+  z-index: -2;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--rc) 15%, transparent) 3deg,
+    transparent 6deg
+  );
+  border-radius: 50%;
+  animation: po-rays-spin 8s linear infinite, po-rays-enter 0.8s ease-out;
+}
+
+@keyframes po-rays-spin { to { transform: rotate(360deg); } }
+
+@keyframes po-rays-enter {
+  0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1) rotate(20deg); }
+}
+
+/* ============================================
+   NEW! badge
+   ============================================ */
+.pack-opening__new-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: linear-gradient(135deg, #ff2d55, #ff0844);
+  color: white;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 13px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  transform: rotate(12deg);
+  z-index: 30;
+  animation: po-new-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 0.3s;
+  box-shadow:
+    0 2px 10px rgba(255, 0, 68, 0.5),
+    0 0 20px rgba(255, 0, 68, 0.3);
+  letter-spacing: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes po-new-pop {
+  0% { transform: rotate(12deg) scale(0); opacity: 0; }
+  100% { transform: rotate(12deg) scale(1); opacity: 1; }
+}
+
+/* ============================================
+   Collecting — cards fly to binder
+   ============================================ */
+.pack-opening__collect-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+}
+
+.pack-opening__binder-target {
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 24px;
+  animation: po-binder-pulse 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.15));
+}
+
+@keyframes po-binder-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.8; }
+}
+
+.pack-opening__fly-card {
+  position: absolute;
+  width: 60px;
+  aspect-ratio: 63 / 88;
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 0;
+  animation: po-fly-to-binder 0.5s ease-in forwards;
+  animation-delay: calc(var(--fi) * 0.1s);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.pack-opening__fly-card img {
+  width: 104%;
+  height: 104%;
+  object-fit: cover;
+  margin: -2%;
+  display: block;
+}
+
+@keyframes po-fly-to-binder {
+  0% {
+    transform: translateY(120px) scale(1) rotate(calc((var(--fi) - var(--ft) / 2) * 12deg));
+    opacity: 1;
+  }
+  70% { opacity: 1; }
+  100% {
+    transform: translateY(-10px) scale(0.15) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/* ============================================
+   Counter & hints
+   ============================================ */
+.pack-opening__counter {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 2px;
+  margin-top: 8px;
+}
+
+.pack-opening__stack-hint {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0;
+  animation: po-guide-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes po-guide-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.6; }
+}
+
+.pack-opening__hint {
+  position: absolute;
+  bottom: 16%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0;
+  z-index: 10;
+}
+
+/* ============================================
+   Done area
+   ============================================ */
+.pack-opening__done-area {
+  position: absolute;
+  bottom: 28px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: po-done-enter 0.5s ease-out;
+}
+
+@keyframes po-done-enter {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.pack-opening__done-binder {
+  color: rgba(255, 255, 255, 0.25);
+  margin-bottom: 4px;
+}
+
+.pack-opening__done-summary {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.pack-opening__close-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+  padding: 10px 48px;
+  border-radius: 4px;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 3px;
+  transition: all 0.2s;
+}
+
+.pack-opening__close-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 640px) {
+  .pack-opening__pack-inner .pack-art { width: 200px; }
+  .pack-opening__torn-top .pack-art { width: 200px; }
+  .pack-opening__top-card { width: 200px; }
+  .pack-opening__pile-card { width: 200px; }
+  .pack-opening__rarity-rays { inset: -60px; }
+  .pack-opening__emerging-card { width: 180px; }
+  .pack-opening__cards-glow { width: 280px; height: 400px; }
+}

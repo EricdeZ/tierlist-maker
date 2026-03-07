@@ -1,49 +1,54 @@
 import { useState, useCallback } from 'react';
 import { useCardClash } from './CardClashContext';
 import { PACKS, RARITIES } from '../../data/cardclash/economy';
-import GodCard from './components/GodCard';
+import PackArt from './components/PackArt';
+import PackOpening from './components/PackOpening';
 
-const PACK_STYLES = {
-  standard: { gradient: 'from-gray-600 to-gray-800', glow: 'shadow-gray-500/20', icon: '📦' },
-  premium: { gradient: 'from-blue-600 to-blue-900', glow: 'shadow-blue-500/20', icon: '💎' },
-  elite: { gradient: 'from-purple-600 to-purple-900', glow: 'shadow-purple-500/20', icon: '👑' },
-  legendary: { gradient: 'from-amber-500 to-orange-700', glow: 'shadow-amber-500/30', icon: '🔥' },
+const PACK_META = {
+  standard: { subtitle: 'Basic Collection', seed: 0 },
+  premium: { subtitle: 'Enhanced Drops', seed: 1 },
+  elite: { subtitle: 'Rare Guaranteed', seed: 2 },
+  legendary: { subtitle: 'The Ultimate Pull', seed: 3 },
 };
 
 export default function PackShop() {
   const { passion, buyPack, testMode } = useCardClash();
   const [openResult, setOpenResult] = useState(null);
-  const [revealIndex, setRevealIndex] = useState(-1);
-  const [isOpening, setIsOpening] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleBuyPack = useCallback(async (packType) => {
     try {
+      setLoading(true);
       const result = await buyPack(packType);
-      if (!result) return;
-
-      setIsOpening(true);
-      setOpenResult(result);
-      setRevealIndex(-1);
-
-      // Auto-reveal cards one by one
-      let i = 0;
-      const interval = setInterval(() => {
-        setRevealIndex(i);
-        i++;
-        if (i >= result.cards.length) {
-          clearInterval(interval);
-          setIsOpening(false);
-        }
-      }, 600);
+      if (!result) { setLoading(false); return; }
+      setOpenResult({ ...result, packType });
+      setLoading(false);
     } catch (err) {
+      setLoading(false);
       alert(err.message || 'Failed to open pack');
     }
   }, [buyPack]);
 
-  const closeResult = () => {
-    setOpenResult(null);
-    setRevealIndex(-1);
-  };
+  const [lastTest, setLastTest] = useState(null);
+  const closeResult = () => setOpenResult(null);
+
+  const testOpening = useCallback((packType = 'premium') => {
+    const pack = PACKS[packType];
+    const rarityKeys = Object.keys(RARITIES);
+    const fakeCards = Array.from({ length: pack.cards }, (_, i) => ({
+      godName: ['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8],
+      godClass: 'Mage',
+      imageUrl: `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8]}/Default/t_GodCard_${['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'][i % 8]}.png`,
+      ability: { name: 'Test Ability', description: 'A test ability.' },
+      godId: i + 1,
+      serialNumber: 1000 + i,
+      rarity: i === 0 ? 'legendary' : i === 1 ? 'epic' : i < 4 ? 'rare' : rarityKeys[Math.floor(Math.random() * 3)],
+      isNew: i < 3,
+    }));
+    const result = { cards: fakeCards, packName: pack.name, packType, _skipTear: true };
+    setLastTest(result);
+    setOpenResult(result);
+  }, []);
 
   return (
     <div className="p-6">
@@ -51,42 +56,43 @@ export default function PackShop() {
       <p className="text-sm text-gray-400 mb-8">Spend Passion to open card packs. Better packs guarantee rarer cards.</p>
 
       {/* Pack options */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8 justify-items-center">
         {Object.entries(PACKS).map(([key, pack]) => {
-          const style = PACK_STYLES[key];
+          const meta = PACK_META[key];
           const canAfford = testMode || passion >= pack.cost;
 
           return (
             <div
               key={key}
-              className={`bg-gradient-to-b ${style.gradient} rounded-xl overflow-hidden border border-white/10 shadow-xl ${style.glow} ${
-                canAfford ? 'hover:scale-[1.02] transition-transform cursor-pointer' : 'opacity-50'
+              className={`flex flex-col items-center gap-4 ${
+                canAfford ? 'cursor-pointer group' : 'opacity-50'
               }`}
-              onClick={() => canAfford && !isOpening && handleBuyPack(key)}
+              onClick={() => canAfford && !openResult && handleBuyPack(key)}
             >
-              <div className="p-6 text-center">
-                <div className="text-4xl mb-3">{style.icon}</div>
-                <h2 className="text-lg font-bold text-white">{pack.name}</h2>
-                <p className="text-sm text-white/60 mt-1">{pack.cards} cards</p>
+              <PackArt
+                tier={key}
+                name={pack.name}
+                subtitle={meta.subtitle}
+                cardCount={pack.cards}
+                seed={meta.seed}
+              />
 
-                <div className="mt-3 space-y-1">
+              <div className="text-center">
+                <div className="space-y-0.5 mb-2">
                   {pack.guarantees.map((g, i) => (
-                    <div key={i} className="text-xs text-white/80">
+                    <div key={i} className="text-xs text-white/60">
                       {g.count}x <span style={{ color: RARITIES[g.minRarity]?.color }}>{RARITIES[g.minRarity]?.name}+</span> guaranteed
                     </div>
                   ))}
                 </div>
-              </div>
 
-              <div className="bg-black/30 px-4 py-3 flex justify-between items-center border-t border-white/10">
-                <span className="text-amber-400 font-bold">{pack.cost} Passion</span>
                 <button
-                  disabled={!canAfford || isOpening}
-                  className={`px-4 py-1.5 rounded font-bold text-sm ${
+                  disabled={!canAfford || !!openResult}
+                  className={`px-5 py-1.5 rounded font-bold text-sm ${
                     canAfford ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {canAfford ? 'Buy' : 'Need more'}
+                  {canAfford ? `${pack.cost} Passion` : 'Need more'}
                 </button>
               </div>
             </div>
@@ -97,51 +103,66 @@ export default function PackShop() {
       {/* Current balance */}
       <div className="text-center text-sm text-gray-400">
         {testMode
-          ? <span className="text-amber-400 font-bold">Test Mode — All packs free!</span>
+          ? <span className="text-amber-400 font-bold">Test Mode -- All packs free!</span>
           : <>Your balance: <span className="text-amber-400 font-bold">{passion.toLocaleString()} Passion</span></>
         }
       </div>
 
-      {/* Pack opening overlay */}
-      {openResult && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center" onClick={revealIndex >= openResult.cards.length - 1 ? closeResult : undefined}>
-          <div className="text-center" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold text-white mb-2">{openResult.packName}</h2>
-            <p className="text-sm text-gray-400 mb-6">{isOpening ? 'Revealing...' : 'Click anywhere to close'}</p>
-
-            <div className="flex gap-4 justify-center flex-wrap max-w-4xl">
-              {openResult.cards.map((card, i) => (
-                <div
-                  key={card.id}
-                  className={`transition-all duration-500 ${
-                    i <= revealIndex
-                      ? 'opacity-100 scale-100 translate-y-0'
-                      : 'opacity-0 scale-75 translate-y-8'
-                  }`}
-                >
-                  {i <= revealIndex ? (
-                    <div className="animate-[bounce_0.5s_ease-in-out]">
-                      <GodCard card={card} />
-                    </div>
-                  ) : (
-                    <div className="w-52 h-72 bg-gray-800 rounded-lg border-2 border-gray-700 flex items-center justify-center">
-                      <span className="text-4xl">?</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {!isOpening && (
+      {/* Dev: test opening animation */}
+      {testMode && (
+        <div className="mt-6 flex justify-center gap-3">
+          {Object.keys(PACKS).map(key => (
+            <button
+              key={key}
+              onClick={() => testOpening(key)}
+              className="px-3 py-1 text-xs bg-purple-600/30 border border-purple-500/40 rounded text-purple-300 hover:bg-purple-600/50"
+            >
+              Test {key}
+            </button>
+          ))}
+          {lastTest && !openResult && (
+            <>
               <button
-                onClick={closeResult}
-                className="mt-8 px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700"
+                onClick={() => setOpenResult({ ...lastTest })}
+                className="px-3 py-1 text-xs bg-amber-600/30 border border-amber-500/40 rounded text-amber-300 hover:bg-amber-600/50"
               >
-                Done
+                Replay last
               </button>
-            )}
+              <button
+                onClick={() => setOpenResult({ ...lastTest, _skipToStack: true })}
+                className="px-3 py-1 text-xs bg-green-600/30 border border-green-500/40 rounded text-green-300 hover:bg-green-600/50"
+              >
+                Skip to stack
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Loading overlay while buying pack */}
+      {loading && !openResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-3 border-white/20 border-t-amber-400 rounded-full animate-spin" />
+            <p className="text-sm text-white/60 font-semibold tracking-widest uppercase">Opening pack...</p>
           </div>
         </div>
+      )}
+
+      {/* Pack opening ceremony */}
+      {openResult && (
+        <PackOpening
+          result={openResult}
+          packType={openResult.packType}
+          onClose={closeResult}
+          skipTear={openResult._skipTear}
+          skipToStack={openResult._skipToStack}
+          onReplay={(openResult._skipTear || openResult._skipToStack) ? () => {
+            const flags = openResult._skipToStack ? { _skipToStack: true } : { _skipTear: true };
+            setOpenResult(null);
+            setTimeout(() => setOpenResult({ ...lastTest, ...flags }), 50);
+          } : undefined}
+        />
       )}
     </div>
   );
