@@ -101,7 +101,7 @@ const handler = async (event) => {
                     LEFT JOIN teams t2 ON sm.team2_id = t2.id
                     LEFT JOIN users u ON sm.locked_by = u.id
                     WHERE sm.id = ${scheduled_match_id}
-                    FOR UPDATE
+                    FOR UPDATE OF sm
                 `
                 if (!sm) throw Object.assign(new Error('Match not found'), { status: 404 })
                 if (sm.status !== 'scheduled') throw Object.assign(new Error('Match is not scheduled'), { status: 400 })
