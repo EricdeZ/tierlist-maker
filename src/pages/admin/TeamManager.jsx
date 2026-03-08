@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Pencil, Trash2, Check, X, Copy, Users } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import TeamLogo from '../../components/TeamLogo'
+import BaseModal from '../../components/BaseModal'
 import ImageUpload from '../../components/ImageUpload'
 
 const API = import.meta.env.VITE_API_URL || '/api'
@@ -188,105 +189,101 @@ export default function TeamManager() {
 
             {/* Confirm Modal */}
             {confirmModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
-                        <p className="text-sm text-[var(--color-text)] mb-4">{confirmModal.message}</p>
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => setConfirmModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
-                            <button onClick={confirmModal.onConfirm} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-500">Delete</button>
-                        </div>
+                <BaseModal onClose={() => setConfirmModal(null)} maxWidth="max-w-sm" className="p-6">
+                    <p className="text-sm text-[var(--color-text)] mb-4">{confirmModal.message}</p>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={() => setConfirmModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                        <button onClick={confirmModal.onConfirm} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-500">Delete</button>
                     </div>
-                </div>
+                </BaseModal>
             )}
 
             {/* Copy Teams Modal */}
             {copyModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
-                        <h3 className="text-sm font-bold text-[var(--color-text)] mb-3 flex items-center gap-2">
-                            <Copy className="w-4 h-4 text-[var(--color-accent)]" />
-                            Copy Teams
-                        </h3>
+                <BaseModal onClose={() => setCopyModal(null)} maxWidth="max-w-md" className="p-6">
+                    <h3 className="text-sm font-bold text-[var(--color-text)] mb-3 flex items-center gap-2">
+                        <Copy className="w-4 h-4 text-[var(--color-accent)]" />
+                        Copy Teams
+                    </h3>
 
-                        {!copyModal.sourceSeasonId ? (
-                            <>
-                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">Select a season to copy teams from:</p>
-                                <div className="max-h-60 overflow-y-auto space-y-0.5 mb-3">
-                                    {allSeasons
-                                        .filter(s => s.id !== selectedSeasonId && (teamsBySeason[s.id]?.length || 0) > 0)
-                                        .map(s => (
-                                            <button
-                                                key={s.id}
-                                                onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: s.id, selectedTeamIds: new Set(teamsBySeason[s.id]?.map(t => t.id) || []) }))}
-                                                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs hover:bg-white/5 transition-colors"
-                                            >
-                                                <span className="text-[var(--color-text)] truncate">{s.label}</span>
-                                                <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{teamsBySeason[s.id]?.length || 0} teams</span>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
-                                <div className="flex justify-end">
-                                    <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: null, selectedTeamIds: new Set() }))}
-                                    className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] mb-2 flex items-center gap-1"
-                                >
-                                    &larr; Change season
-                                </button>
-                                <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                                    Select teams to copy ({copyModal.selectedTeamIds.size} selected):
-                                </p>
-                                <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
-                                    {(teamsBySeason[copyModal.sourceSeasonId] || []).map(team => (
-                                        <label key={team.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs">
-                                            <input
-                                                type="checkbox"
-                                                checked={copyModal.selectedTeamIds.has(team.id)}
-                                                onChange={() => setCopyModal(prev => {
-                                                    const next = new Set(prev.selectedTeamIds)
-                                                    if (next.has(team.id)) next.delete(team.id); else next.add(team.id)
-                                                    return { ...prev, selectedTeamIds: next }
-                                                })}
-                                                className="accent-[var(--color-accent)]"
-                                            />
-                                            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
-                                            <span className="text-[var(--color-text)]">{team.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <button
-                                        onClick={() => {
-                                            const all = teamsBySeason[copyModal.sourceSeasonId]?.map(t => t.id) || []
-                                            setCopyModal(prev => ({
-                                                ...prev,
-                                                selectedTeamIds: prev.selectedTeamIds.size === all.length ? new Set() : new Set(all)
-                                            }))
-                                        }}
-                                        className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                                    >
-                                        {copyModal.selectedTeamIds.size === (teamsBySeason[copyModal.sourceSeasonId]?.length || 0) ? 'Deselect all' : 'Select all'}
-                                    </button>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                    {!copyModal.sourceSeasonId ? (
+                        <>
+                            <p className="text-xs text-[var(--color-text-secondary)] mb-2">Select a season to copy teams from:</p>
+                            <div className="max-h-60 overflow-y-auto space-y-0.5 mb-3">
+                                {allSeasons
+                                    .filter(s => s.id !== selectedSeasonId && (teamsBySeason[s.id]?.length || 0) > 0)
+                                    .map(s => (
                                         <button
-                                            onClick={handleCopyTeams}
-                                            disabled={copyModal.selectedTeamIds.size === 0}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                            key={s.id}
+                                            onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: s.id, selectedTeamIds: new Set(teamsBySeason[s.id]?.map(t => t.id) || []) }))}
+                                            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs hover:bg-white/5 transition-colors"
                                         >
-                                            Copy {copyModal.selectedTeamIds.size} team{copyModal.selectedTeamIds.size !== 1 ? 's' : ''}
+                                            <span className="text-[var(--color-text)] truncate">{s.label}</span>
+                                            <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{teamsBySeason[s.id]?.length || 0} teams</span>
                                         </button>
-                                    </div>
+                                    ))
+                                }
+                            </div>
+                            <div className="flex justify-end">
+                                <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setCopyModal(prev => ({ ...prev, sourceSeasonId: null, selectedTeamIds: new Set() }))}
+                                className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] mb-2 flex items-center gap-1"
+                            >
+                                &larr; Change season
+                            </button>
+                            <p className="text-xs text-[var(--color-text-secondary)] mb-2">
+                                Select teams to copy ({copyModal.selectedTeamIds.size} selected):
+                            </p>
+                            <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
+                                {(teamsBySeason[copyModal.sourceSeasonId] || []).map(team => (
+                                    <label key={team.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-xs">
+                                        <input
+                                            type="checkbox"
+                                            checked={copyModal.selectedTeamIds.has(team.id)}
+                                            onChange={() => setCopyModal(prev => {
+                                                const next = new Set(prev.selectedTeamIds)
+                                                if (next.has(team.id)) next.delete(team.id); else next.add(team.id)
+                                                return { ...prev, selectedTeamIds: next }
+                                            })}
+                                            className="accent-[var(--color-accent)]"
+                                        />
+                                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: team.color }} />
+                                        <span className="text-[var(--color-text)]">{team.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <button
+                                    onClick={() => {
+                                        const all = teamsBySeason[copyModal.sourceSeasonId]?.map(t => t.id) || []
+                                        setCopyModal(prev => ({
+                                            ...prev,
+                                            selectedTeamIds: prev.selectedTeamIds.size === all.length ? new Set() : new Set(all)
+                                        }))
+                                    }}
+                                    className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                                >
+                                    {copyModal.selectedTeamIds.size === (teamsBySeason[copyModal.sourceSeasonId]?.length || 0) ? 'Deselect all' : 'Select all'}
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setCopyModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
+                                    <button
+                                        onClick={handleCopyTeams}
+                                        disabled={copyModal.selectedTeamIds.size === 0}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Copy {copyModal.selectedTeamIds.size} team{copyModal.selectedTeamIds.size !== 1 ? 's' : ''}
+                                    </button>
                                 </div>
-                            </>
-                        )}
-                    </div>
-                </div>
+                            </div>
+                        </>
+                    )}
+                </BaseModal>
             )}
 
             {/* Header */}

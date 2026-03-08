@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, MessageCircle, Flag } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
+import BaseModal from '../../components/BaseModal'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
 
@@ -227,16 +228,14 @@ export default function LeagueManager() {
 
             {/* Confirm Modal */}
             {confirmModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                <BaseModal onClose={() => setConfirmModal(null)} maxWidth="max-w-sm" className="p-6">
                         <h3 className="text-sm font-bold text-[var(--color-text)] mb-2">{confirmModal.title}</h3>
                         <p className="text-xs text-[var(--color-text-secondary)] mb-4">{confirmModal.message}</p>
                         <div className="flex justify-end gap-2">
                             <button onClick={() => setConfirmModal(null)} className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/5">Cancel</button>
                             <button onClick={confirmModal.onConfirm} className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white ${confirmModal.danger ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}>Confirm</button>
                         </div>
-                    </div>
-                </div>
+                </BaseModal>
             )}
 
             {/* Header */}
@@ -422,8 +421,6 @@ export default function LeagueManager() {
                                                                             </>
                                                                         )}
                                                                     </div>
-
-                                                                    )}
                                                                 </div>
                                                             )
                                                         })}

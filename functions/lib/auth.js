@@ -140,16 +140,16 @@ export async function requireAnyPermission(event, permissionKeys, leagueId = und
             ? sql`AND ur.league_id IS NULL`
             : sql`AND (ur.league_id IS NULL OR ur.league_id = ${leagueId})`
 
+    const rows = await sql`
+        SELECT rp.permission_key FROM user_roles ur
+        JOIN role_permissions rp ON rp.role_id = ur.role_id
+        WHERE ur.user_id = ${user.id}
+          AND rp.permission_key = ANY(${permissionKeys})
+          ${leagueFilt}
+    `
+    const found = new Set(rows.map(r => r.permission_key))
     for (const permissionKey of permissionKeys) {
-        const [has] = await sql`
-            SELECT 1 FROM user_roles ur
-            JOIN role_permissions rp ON rp.role_id = ur.role_id
-            WHERE ur.user_id = ${user.id}
-              AND rp.permission_key = ${permissionKey}
-              ${leagueFilt}
-            LIMIT 1
-        `
-        if (has) return { user, permissionKey }
+        if (found.has(permissionKey)) return { user, permissionKey }
     }
 
     return null

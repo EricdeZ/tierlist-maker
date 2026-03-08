@@ -147,13 +147,15 @@ async function claimReferral(sql, event, body) {
         if (!result) {
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already have a website referrer or cannot self-refer' }) }
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, referrerUsername: (await sql`SELECT discord_username FROM users WHERE id = ${referrer.id}`)[0].discord_username }) }
+        const [ref] = await sql`SELECT discord_username FROM users WHERE id = ${referrer.id}`
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, referrerUsername: ref?.discord_username }) }
     } else {
         const result = await processForgeReferral(sql, referrer.id, user.id)
         if (!result) {
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already have a Forge referrer or cannot self-refer' }) }
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, referrerUsername: (await sql`SELECT discord_username FROM users WHERE id = ${referrer.id}`)[0].discord_username }) }
+        const [ref] = await sql`SELECT discord_username FROM users WHERE id = ${referrer.id}`
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, referrerUsername: ref?.discord_username }) }
     }
 }
 

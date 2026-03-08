@@ -66,16 +66,3 @@ export const clearRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
         console.error('Failed to clear rankings from localStorage:', error)
     }
 }
-
-/**
- * Check if there are saved rankings in localStorage
- * @param {string} [storageKey] - Optional custom storage key
- * @returns {boolean}
- */
-export const hasSavedRankings = (storageKey = DEFAULT_KEY) => {
-    try {
-        return localStorage.getItem(storageKey) !== null
-    } catch {
-        return false
-    }
-}

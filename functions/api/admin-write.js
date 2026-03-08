@@ -212,12 +212,18 @@ async function submitMatch(sql, body, admin, event) {
 
                 // Skip player stats entirely for forfeit games
                 if (!isForfeit) {
+                    const seenInGame = new Set()
+
                     // Insert team 1 players (team_side = 1)
                     for (const player of (game.team1_players || [])) {
                         const lpId = await resolveLeaguePlayerId(tx, player, team1_id, season_id, playerCache)
                         if (!lpId) {
                             throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 1`)
                         }
+                        if (seenInGame.has(lpId)) {
+                            throw new Error(`Game ${i + 1}: "${player.player_name}" resolved to a player already in this game (duplicate name or alias conflict)`)
+                        }
+                        seenInGame.add(lpId)
                         await tx`
                             INSERT INTO player_game_stats (
                                 game_id, league_player_id, team_side,
@@ -241,6 +247,10 @@ async function submitMatch(sql, body, admin, event) {
                         if (!lpId) {
                             throw new Error(`Game ${i + 1}: Could not resolve player "${player.player_name}" for team 2`)
                         }
+                        if (seenInGame.has(lpId)) {
+                            throw new Error(`Game ${i + 1}: "${player.player_name}" resolved to a player already in this game (duplicate name or alias conflict)`)
+                        }
+                        seenInGame.add(lpId)
                         await tx`
                             INSERT INTO player_game_stats (
                                 game_id, league_player_id, team_side,

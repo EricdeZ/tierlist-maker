@@ -7,6 +7,9 @@ export function setImpersonation(userId) { _impersonateUserId = userId }
 export function clearImpersonation() { _impersonateUserId = null }
 export function getImpersonation() { return _impersonateUserId }
 
+// In-flight GET request deduplication — simultaneous calls to the same URL share one fetch
+const _inflight = new Map()
+
 const apiCall = async (endpoint, params = {}) => {
     const url = new URL(`${API_BASE}/${endpoint}`, window.location.origin)
     Object.keys(params).forEach(key => {
@@ -15,25 +18,32 @@ const apiCall = async (endpoint, params = {}) => {
         }
     })
 
+    const cacheKey = url.toString()
+    if (_inflight.has(cacheKey)) return _inflight.get(cacheKey)
+
     const token = localStorage.getItem('auth_token')
     const hdrs = {}
     if (token) hdrs.Authorization = `Bearer ${token}`
     if (_impersonateUserId) hdrs['X-Impersonate'] = String(_impersonateUserId)
 
-    const response = await fetch(url, {
+    const promise = fetch(url, {
         headers: Object.keys(hdrs).length > 0 ? hdrs : undefined,
+    }).then(async response => {
+        if (!response.ok) {
+            let message = `API call failed: ${response.statusText}`
+            try {
+                const data = await response.json()
+                if (data.error) message = data.error
+            } catch {}
+            throw new Error(message)
+        }
+        return response.json()
+    }).finally(() => {
+        _inflight.delete(cacheKey)
     })
 
-    if (!response.ok) {
-        let message = `API call failed: ${response.statusText}`
-        try {
-            const data = await response.json()
-            if (data.error) message = data.error
-        } catch {}
-        throw new Error(message)
-    }
-
-    return response.json()
+    _inflight.set(cacheKey, promise)
+    return promise
 }
 
 const apiPost = async (endpoint, params = {}, body = {}) => {

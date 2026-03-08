@@ -1,5 +1,5 @@
 import { adapt } from '../lib/adapter.js'
-import { getDB, headers, adminHeaders } from '../lib/db.js'
+import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import {
     grantPassion,
@@ -10,6 +10,7 @@ import {
     EARNING_RULES,
 } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
+import { ensureEmberBalance, getConversionCost, EMBER_RULES } from '../lib/ember.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -67,32 +68,23 @@ const handler = async (event) => {
 // GET: User balance + rank info
 // ═══════════════════════════════════════════════════
 async function getBalance(sql, user) {
-    // Ensure balance row exists
-    await sql`
-        INSERT INTO passion_balances (user_id)
-        VALUES (${user.id})
-        ON CONFLICT (user_id) DO NOTHING
-    `
+    // Ensure balance rows exist
+    await Promise.all([
+        sql`INSERT INTO passion_balances (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING`,
+        ensureEmberBalance(sql, user.id),
+    ])
 
-    const [pb] = await sql`
-        SELECT balance, total_earned, total_spent,
-               last_daily_claim, current_streak, longest_streak
-        FROM passion_balances WHERE user_id = ${user.id}
-    `
-
-    const rank = getRank(pb.total_earned)
-    const nextRank = getNextRank(pb.total_earned)
-
-    // Check if daily claim is available
-    const now = new Date()
-    const todayUTC = now.toISOString().slice(0, 10)
-    const lastClaimDate = pb.last_daily_claim
-        ? new Date(pb.last_daily_claim).toISOString().slice(0, 10)
-        : null
-    const canClaimDaily = lastClaimDate !== todayUTC
-
-    // Count claimable challenges + check Discord membership
-    const [[{ count: claimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
+    const [[pb], [eb], [{ count: claimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
+        sql`
+            SELECT balance, total_earned, total_spent,
+                   last_daily_claim, current_streak, longest_streak
+            FROM passion_balances WHERE user_id = ${user.id}
+        `,
+        sql`
+            SELECT balance, last_daily_claim, current_streak, longest_streak,
+                   conversions_today, last_conversion_date
+            FROM ember_balances WHERE user_id = ${user.id}
+        `,
         sql`
             SELECT COUNT(*) as count FROM user_challenges uc
             JOIN challenges c ON c.id = uc.challenge_id
@@ -109,6 +101,25 @@ async function getBalance(sql, user) {
             ) as in_discord
         `,
     ])
+
+    const rank = getRank(pb.total_earned)
+    const nextRank = getNextRank(pb.total_earned)
+
+    const now = new Date()
+    const todayUTC = now.toISOString().slice(0, 10)
+    const lastClaimDate = pb.last_daily_claim
+        ? new Date(pb.last_daily_claim).toISOString().slice(0, 10)
+        : null
+    const canClaimDaily = lastClaimDate !== todayUTC
+
+    // Ember daily claim check
+    const emberLastClaim = eb.last_daily_claim
+        ? new Date(eb.last_daily_claim).toISOString().slice(0, 10)
+        : null
+    let emberConversionsToday = eb.conversions_today || 0
+    if (eb.last_conversion_date && eb.last_conversion_date !== todayUTC) {
+        emberConversionsToday = 0
+    }
 
     return {
         statusCode: 200,
@@ -127,6 +138,16 @@ async function getBalance(sql, user) {
             nextRank: nextRank
                 ? { name: nextRank.name, division: nextRank.division, display: formatRank(nextRank), passionNeeded: nextRank.passionNeeded }
                 : null,
+            ember: {
+                balance: eb.balance,
+                currentStreak: eb.current_streak,
+                longestStreak: eb.longest_streak,
+                canClaimDaily: emberLastClaim !== todayUTC,
+                lastDailyClaim: eb.last_daily_claim,
+                conversionsToday: emberConversionsToday,
+                nextConversionCost: getConversionCost(emberConversionsToday),
+                conversionEmberAmount: EMBER_RULES.conversion_ember_amount,
+            },
         }),
     }
 }

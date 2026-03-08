@@ -1,11 +1,7 @@
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /admin/
 Disallow: /predictions
 Disallow: /matchup/
 Disallow: /coinflip
-Disallow: /codex
-Disallow: /codex/
 
 Sitemap: https://smitecomp.com/api/sitemap.xml

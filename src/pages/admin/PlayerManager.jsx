@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ExternalLink, Download, Search, X, ChevronDown, ChevronRight, Check, Users, Tag, Plus, Trash2, Merge, AlertTriangle } from 'lucide-react'
 import { PlayerManagerHelp } from '../../components/admin/AdminHelp'
+import BaseModal from '../../components/BaseModal'
 import { getAuthHeaders } from '../../services/adminApi.js'
 
 const API = import.meta.env.VITE_API_URL || '/api'
@@ -643,8 +644,7 @@ export default function PlayerManager() {
 
             {/* Enrollment Modal */}
             {showEnroll && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                <BaseModal onClose={() => setShowEnroll(false)} className="p-6">
                         <h3 className="text-sm font-bold text-[var(--color-text)] mb-1">Enroll {selected.size} Player{selected.size !== 1 ? 's' : ''} in Season</h3>
                         <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                             Creates roster entries for the selected players. Players already in that season will be skipped.
@@ -713,8 +713,7 @@ export default function PlayerManager() {
                                 {enrolling ? 'Enrolling...' : `Enroll ${selected.size} Player${selected.size !== 1 ? 's' : ''}`}
                             </button>
                         </div>
-                    </div>
-                </div>
+                </BaseModal>
             )}
 
             {/* Edit Info Modal */}
@@ -972,8 +971,7 @@ function EditInfoModal({ player, onChange, onSave, onClose, saving }) {
     useEffect(() => { inputRef.current?.focus() }, [])
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-            <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+        <BaseModal onClose={onClose} className="p-6">
                 <h3 className="text-sm font-bold text-[var(--color-text)] mb-4">
                     Edit — {player.name}
                 </h3>
@@ -1046,8 +1044,7 @@ function EditInfoModal({ player, onChange, onSave, onClose, saving }) {
                         {saving ? 'Saving...' : 'Save'}
                     </button>
                 </div>
-            </div>
-        </div>
+        </BaseModal>
     )
 }
 
@@ -1102,8 +1099,7 @@ function AliasModal({ player, onAdd, onRemove, onClose, saving }) {
     }
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-            <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+        <BaseModal onClose={onClose} className="p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold text-[var(--color-text)]">
                         Aliases — {player.name}
@@ -1193,8 +1189,7 @@ function AliasModal({ player, onAdd, onRemove, onClose, saving }) {
                         Done
                     </button>
                 </div>
-            </div>
-        </div>
+        </BaseModal>
     )
 }
 
@@ -1307,8 +1302,7 @@ function MergeModal({ players, onClose, onMerge, merging }) {
     }
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-            <div className="rounded-xl border border-white/10 shadow-2xl max-w-md w-full" style={{ backgroundColor: 'var(--color-secondary)' }}>
+        <BaseModal onClose={onClose}>
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
                     <div>
@@ -1396,7 +1390,6 @@ function MergeModal({ players, onClose, onMerge, merging }) {
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+        </BaseModal>
     )
 }

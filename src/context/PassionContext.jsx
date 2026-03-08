@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { passionService, emberService } from '../services/database'
@@ -29,10 +29,7 @@ export const PassionProvider = ({ children }) => {
     const refreshBalance = useCallback(async () => {
         if (!user) return
         try {
-            const [data, emberData] = await Promise.all([
-                passionService.getBalance(),
-                emberService.getBalance().catch(() => null),
-            ])
+            const data = await passionService.getBalance()
             setBalance(data.balance)
             setTotalEarned(data.totalEarned)
             setCurrentStreak(data.currentStreak)
@@ -41,7 +38,7 @@ export const PassionProvider = ({ children }) => {
             setLastDailyClaim(data.lastDailyClaim || null)
             setClaimableCount(data.claimableCount || 0)
             setInDiscord(!!data.inDiscord)
-            if (emberData) setEmber(emberData)
+            if (data.ember) setEmber(data.ember)
         } catch (err) {
             console.error('Failed to fetch passion balance:', err)
         }
@@ -160,32 +157,40 @@ export const PassionProvider = ({ children }) => {
     const dismissRankUp = useCallback(() => setRankUpInfo(null), [])
     const triggerRankUp = useCallback((overrideRank = null) => setRankUpInfo({ overrideRank }), [])
 
+    const value = useMemo(() => ({
+        balance,
+        totalEarned,
+        currentStreak,
+        longestStreak,
+        canClaimDaily,
+        lastDailyClaim,
+        claimableCount,
+        inDiscord,
+        ember,
+        rank,
+        nextRank,
+        loading,
+        rankUpInfo,
+        challengeNotifications,
+        claimDaily,
+        claimEmberDaily,
+        trackAction,
+        refreshBalance,
+        updateFromClaim,
+        dismissRankUp,
+        triggerRankUp,
+        addChallengeNotification,
+        dismissChallengeNotification,
+    }), [
+        balance, totalEarned, currentStreak, longestStreak, canClaimDaily,
+        lastDailyClaim, claimableCount, inDiscord, ember, rank, nextRank,
+        loading, rankUpInfo, challengeNotifications, claimDaily, claimEmberDaily,
+        trackAction, refreshBalance, updateFromClaim, dismissRankUp, triggerRankUp,
+        addChallengeNotification, dismissChallengeNotification,
+    ])
+
     return (
-        <PassionContext.Provider value={{
-            balance,
-            totalEarned,
-            currentStreak,
-            longestStreak,
-            canClaimDaily,
-            lastDailyClaim,
-            claimableCount,
-            inDiscord,
-            ember,
-            rank,
-            nextRank,
-            loading,
-            rankUpInfo,
-            challengeNotifications,
-            claimDaily,
-            claimEmberDaily,
-            trackAction,
-            refreshBalance,
-            updateFromClaim,
-            dismissRankUp,
-            triggerRankUp,
-            addChallengeNotification,
-            dismissChallengeNotification,
-        }}>
+        <PassionContext.Provider value={value}>
             {children}
         </PassionContext.Provider>
     )

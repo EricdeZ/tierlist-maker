@@ -5,6 +5,7 @@ import { Home } from 'lucide-react'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
+import BaseModal from '../../components/BaseModal'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 const SEASON_KEY = 'smite2_admin_season'
@@ -259,8 +260,7 @@ export default function ScheduleManager() {
 
             {/* Confirm Modal */}
             {confirmModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                <BaseModal onClose={() => setConfirmModal(null)} maxWidth="max-w-sm" className="p-6">
                         <h3 className="text-sm font-bold text-[var(--color-text)] mb-2">{confirmModal.title}</h3>
                         <p className="text-xs text-[var(--color-text-secondary)] mb-4">{confirmModal.message}</p>
                         <div className="flex justify-end gap-2">
@@ -275,8 +275,7 @@ export default function ScheduleManager() {
                                 Confirm
                             </button>
                         </div>
-                    </div>
-                </div>
+                </BaseModal>
             )}
 
             <div className="mb-6">

@@ -15,27 +15,14 @@ export function CardClashProvider({ children }) {
   const [loading, setLoading] = useState(false)
   const [testMode, setTestMode] = useState(true)
 
-  // Conversion-specific state (not in PassionContext)
-  const [conversionInfo, setConversionInfo] = useState({
-    conversionsToday: 0, nextConversionCost: 50, conversionEmberAmount: 10,
-  })
-
   useEffect(() => {
     if (!user) return
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      cardclashService.load(),
-      emberService.getBalance(),
-    ]).then(([ccData, emberData]) => {
+    cardclashService.load().then(ccData => {
       if (cancelled) return
       setCollection(ccData.collection || [])
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
-      setConversionInfo({
-        conversionsToday: emberData.conversionsToday || 0,
-        nextConversionCost: emberData.nextConversionCost || 50,
-        conversionEmberAmount: emberData.conversionEmberAmount || 10,
-      })
       setLoaded(true)
       setLoading(false)
     }).catch(err => {
@@ -52,12 +39,7 @@ export function CardClashProvider({ children }) {
   const convertPassionToEmber = useCallback(async () => {
     try {
       const result = await emberService.convert()
-      setConversionInfo({
-        conversionsToday: result.conversionsToday,
-        nextConversionCost: result.nextConversionCost,
-        conversionEmberAmount: 10,
-      })
-      passionCtx?.refreshBalance?.()
+      await passionCtx?.refreshBalance?.()
       return result
     } catch (err) {
       console.error('Failed to convert passion to ember:', err)
@@ -80,7 +62,7 @@ export function CardClashProvider({ children }) {
 
   return (
     <CardClashContext.Provider value={{
-      collection, passion, ember: { ...ember, ...conversionInfo }, stats,
+      collection, passion, ember, stats,
       loaded, loading, testMode, setTestMode,
       buyPack, convertPassionToEmber,
     }}>

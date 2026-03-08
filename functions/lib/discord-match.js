@@ -9,7 +9,6 @@
  */
 
 import { sendWebhook, sendDM, sendChannelMessage } from './discord.js'
-import { FEATURE_FLAGS } from '../../src/config/featureFlags.js'
 
 /**
  * Auto-match newly inserted discord_queue items to scheduled matches.
@@ -38,7 +37,7 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
         WHERE s.division_id = ${channel.division_id} AND s.is_active = true
         ORDER BY s.id DESC LIMIT 1
     `
-    if (!seasons.length && FEATURE_FLAGS.DISCORD_MATCH_INACTIVE_SEASONS) {
+    if (!seasons.length) {
         seasons = await sql`
             SELECT s.id as season_id
             FROM seasons s

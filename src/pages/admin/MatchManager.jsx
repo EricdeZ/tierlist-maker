@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Home } from 'lucide-react'
 import { MatchManagerHelp } from '../../components/admin/AdminHelp'
+import BaseModal from '../../components/BaseModal'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import soloImage from '../../assets/roles/solo.webp'
 import jungleImage from '../../assets/roles/jungle.webp'
@@ -358,8 +359,7 @@ export default function MatchManager() {
 
             {/* Confirm Modal */}
             {confirmModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                    <div className="rounded-xl border border-white/10 shadow-2xl max-w-sm w-full p-6" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                <BaseModal onClose={() => setConfirmModal(null)} maxWidth="max-w-sm" className="p-6">
                         <h3 className="text-sm font-bold text-[var(--color-text)] mb-2">{confirmModal.title}</h3>
                         <p className="text-xs text-[var(--color-text-secondary)] mb-4">{confirmModal.message}</p>
                         <div className="flex justify-end gap-2">
@@ -374,8 +374,7 @@ export default function MatchManager() {
                                 Confirm
                             </button>
                         </div>
-                    </div>
-                </div>
+                </BaseModal>
             )}
 
             <div className="mb-6">

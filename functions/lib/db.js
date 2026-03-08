@@ -66,25 +66,26 @@ const baseHeaders = {
     'Content-Type': 'application/json',
 }
 
-// Read endpoints: cache in production for anonymous users
+// Read endpoints: cache in production for anonymous users, no-cache for auth'd
 export const getHeaders = (event) => {
     const isProd = process.env.CONTEXT === 'production'
     const hasAuth = event?.headers?.authorization
     if (isProd && !hasAuth) {
         return { ...baseHeaders, 'Cache-Control': 'public, max-age=300' }
     }
-    return baseHeaders
+    return { ...baseHeaders, 'Cache-Control': 'private, no-cache' }
 }
 
-// Static export for CORS preflight, auth endpoints, and other non-cached uses
-export const headers = baseHeaders
+// Mutation/auth endpoints: never cache
+export const headers = { ...baseHeaders, 'Cache-Control': 'no-store' }
 
-// Admin endpoints: restrict origin if ALLOWED_ORIGIN is set
+// Admin endpoints: never cache, restrict origin if ALLOWED_ORIGIN is set
 // Uses getter so process.env is read at response time, not module load time
 export const adminHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
 }
 Object.defineProperty(adminHeaders, 'Access-Control-Allow-Origin', {
     get() { return process.env.ALLOWED_ORIGIN || '*' },
