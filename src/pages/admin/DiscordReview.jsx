@@ -32,6 +32,7 @@ export default function DiscordReview() {
     // Poll/Match state
     const [polling, setPolling] = useState(false)
     const [matching, setMatching] = useState(false)
+    const [matchDivisionIds, setMatchDivisionIds] = useState([])
 
     const showToast = useCallback((type, message) => {
         const id = Date.now()
@@ -99,14 +100,16 @@ export default function DiscordReview() {
         }
     }, [showToast, fetchReview, fetchActivity])
 
-    // Re-run auto-matching on unmatched items
+    // Re-run auto-matching on unmatched items (optionally filtered by division)
     const handleMatchNow = useCallback(async () => {
         setMatching(true)
         try {
+            const payload = { action: 'match-now' }
+            if (matchDivisionIds.length > 0) payload.divisionIds = matchDivisionIds
             const res = await fetch(`${API}/discord-queue`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ action: 'match-now' }),
+                body: JSON.stringify(payload),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error)
@@ -117,7 +120,7 @@ export default function DiscordReview() {
         } finally {
             setMatching(false)
         }
-    }, [showToast, fetchReview, fetchActivity])
+    }, [showToast, fetchReview, fetchActivity, matchDivisionIds])
 
     useEffect(() => {
         setLoading(true)
@@ -135,9 +138,13 @@ export default function DiscordReview() {
         })
     }
 
-    // Select all unmatched
+    const filteredUnmatched = matchDivisionIds.length > 0
+        ? unmatched.filter(item => matchDivisionIds.includes(item.division_id))
+        : unmatched
+
+    // Select all unmatched (respects division filter)
     const selectAllUnmatched = () => {
-        setSelectedItems(new Set(unmatched.map(i => i.id)))
+        setSelectedItems(new Set(filteredUnmatched.map(i => i.id)))
     }
 
     // Assign selected items to a match
@@ -235,8 +242,13 @@ export default function DiscordReview() {
         return acc
     }, {})
 
+    // Unique divisions from unmatched items (for Match Now filter)
+    const unmatchedDivisions = [...new Map(
+        unmatched.map(item => [item.division_id, { id: item.division_id, name: item.division_name }])
+    ).values()].sort((a, b) => a.name.localeCompare(b.name))
+
     const tabs = [
-        { key: 'review', label: 'Auto-Match Review', count: unmatched.length },
+        { key: 'review', label: 'Auto-Match Review', count: filteredUnmatched.length },
         { key: 'members', label: 'Member Sync', count: syncSummary?.players_unlinked || 0 },
         { key: 'activity', label: 'Activity Log', count: null },
     ]
@@ -255,7 +267,7 @@ export default function DiscordReview() {
                         Review auto-matched screenshots, member sync status, and recent activity
                     </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={handlePollNow}
                         disabled={polling || matching}
@@ -264,13 +276,35 @@ export default function DiscordReview() {
                         <RefreshCw className={`w-3.5 h-3.5 ${polling ? 'animate-spin' : ''}`} />
                         Poll Now
                     </button>
+                    {unmatchedDivisions.length > 1 && (
+                        <div className="flex flex-wrap gap-1">
+                            {unmatchedDivisions.map(div => {
+                                const active = matchDivisionIds.includes(div.id)
+                                return (
+                                    <button
+                                        key={div.id}
+                                        onClick={() => setMatchDivisionIds(prev =>
+                                            active ? prev.filter(id => id !== div.id) : [...prev, div.id]
+                                        )}
+                                        className={`px-2 py-1 rounded text-[11px] border transition ${
+                                            active
+                                                ? 'bg-[var(--color-accent)]/20 border-[var(--color-accent)]/50 text-[var(--color-accent)]'
+                                                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]'
+                                        }`}
+                                    >
+                                        {div.name}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
                     <button
                         onClick={handleMatchNow}
                         disabled={polling || matching || unmatched.length === 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition disabled:opacity-50"
                     >
                         <Zap className={`w-3.5 h-3.5 ${matching ? 'animate-pulse' : ''}`} />
-                        Match Now
+                        {matchDivisionIds.length > 0 ? `Match (${matchDivisionIds.length})` : 'Match All'}
                     </button>
                 </div>
             </div>
@@ -323,7 +357,7 @@ export default function DiscordReview() {
                 <>
                     {tab === 'review' && (
                         <ReviewTab
-                            unmatched={unmatched}
+                            unmatched={filteredUnmatched}
                             matched={matched}
                             scheduledMatches={scheduledMatches}
                             selectedItems={selectedItems}

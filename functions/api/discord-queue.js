@@ -64,7 +64,7 @@ const handler = async (event) => {
                 case 'map-team-role':          return await mapTeamRole(sql, body, admin, event)
                 case 'update-suggested-match': return await updateSuggestedMatch(sql, body, admin, allowed)
                 case 'skip-channel-pending':   return await skipChannelPending(sql, body, admin)
-                case 'match-now':              return await matchNow(sql, admin, allowed)
+                case 'match-now':              return await matchNow(sql, admin, allowed, body.divisionIds || null)
                 case 'send-test-dm':
                     if (!isGlobal) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Global permission required for DMs' }) }
                     return await sendTestDM(sql, body, admin)
@@ -619,8 +619,8 @@ async function pollNow(sql, admin, waitUntil) {
 // ═══════════════════════════════════════════════════
 // POST: Re-run auto-matching on all unmatched pending items
 // ═══════════════════════════════════════════════════
-async function matchNow(sql, admin, allowedLeagues) {
-    // Get all pending unmatched items grouped by channel (filtered by allowed leagues)
+async function matchNow(sql, admin, allowedLeagues, divisionIds) {
+    // Get all pending unmatched items grouped by channel (filtered by allowed leagues + optional divisions)
     const items = await sql`
         SELECT dq.id, dq.channel_id
         FROM discord_queue dq
@@ -628,6 +628,7 @@ async function matchNow(sql, admin, allowedLeagues) {
         JOIN divisions d ON dc.division_id = d.id
         WHERE dq.status = 'pending' AND dq.suggested_match_id IS NULL
         ${allowedLeagues !== null ? sql`AND d.league_id = ANY(${allowedLeagues})` : sql``}
+        ${divisionIds ? sql`AND dc.division_id = ANY(${divisionIds})` : sql``}
     `
 
     if (!items.length) {
