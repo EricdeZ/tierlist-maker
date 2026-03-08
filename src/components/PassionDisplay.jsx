@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { usePassion } from '../context/PassionContext'
 import { useAuth } from '../context/AuthContext'
 import { formatRank } from '../config/ranks'
+import { FEATURE_FLAGS } from '../config/featureFlags'
 import RankBadge from './RankBadge'
 import passionCoin from '../assets/passion/passion.png'
 import flip1 from '../assets/passion/flipping1.png'
@@ -15,7 +16,7 @@ import emberIcon from '../assets/ember.png'
 const FLIP_FRAMES = [flip1, flip2, flip3, passionCoin]
 
 export default function PassionDisplay() {
-    const { user } = useAuth()
+    const { user, isAdmin, hasPermission } = useAuth()
     const navigate = useNavigate()
     const location = useLocation()
     const {
@@ -534,14 +535,16 @@ export default function PassionDisplay() {
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Coin Flip
                                         </Link>
-                                        <Link to="/cardclash" onClick={() => setOpen(false)}
-                                            className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                            <span className="flex items-center gap-2">
-                                                <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
-                                                Card Clash
-                                            </span>
-                                            <span className="text-xs font-bold text-orange-400 tabular-nums">{ember.balance}</span>
-                                        </Link>
+                                        {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
+                                            <Link to="/cardclash" onClick={() => setOpen(false)}
+                                                className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                                <span className="flex items-center gap-2">
+                                                    <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+                                                    Card Clash
+                                                </span>
+                                                <span className="text-xs font-bold text-orange-400 tabular-nums">{ember.balance}</span>
+                                            </Link>
+                                        )}
                                     </div>
                                 </>
                             )}
