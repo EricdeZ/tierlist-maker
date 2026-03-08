@@ -492,10 +492,10 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
                     const histData = portfolioHistories?.[h.sparkId]
                     const profileUrl = h.playerSlug
                         ? (isLeagueWide && h.divisionSlug
-                            ? `/${leagueSlug}/${h.divisionSlug}/players/${h.playerSlug}`
+                            ? `/forge/${leagueSlug}/${h.divisionSlug}/player/${h.playerSlug}`
                             : seasonSlugs
-                                ? `/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/players/${h.playerSlug}`
-                                : `/profile/${h.playerSlug}`)
+                                ? `/forge/${seasonSlugs.leagueSlug}/${seasonSlugs.divisionSlug}/player/${h.playerSlug}`
+                                : null)
                         : null
 
                     return (

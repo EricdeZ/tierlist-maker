@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
-import { cardclashService } from '../../services/database'
+import { cardclashService, emberService } from '../../services/database'
 
 const CardClashContext = createContext(null)
 
@@ -10,26 +10,32 @@ export function CardClashProvider({ children }) {
   const passionCtx = usePassion()
 
   const [collection, setCollection] = useState([])
-  const [lineup, setLineup] = useState({ solo: null, jungle: null, mid: null, support: null, adc: null })
-  const [stats, setStats] = useState({ elo: 1000, wins: 0, losses: 0, streak: 0, bestStreak: 0, packsOpened: 0, embers: 0 })
-  const [decks, setDecks] = useState([])
-  const [lastCollected, setLastCollected] = useState(null)
+  const [stats, setStats] = useState({ packsOpened: 0, embers: 0 })
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [testMode, setTestMode] = useState(true)
 
-  // Load state from API when user is available
+  // Conversion-specific state (not in PassionContext)
+  const [conversionInfo, setConversionInfo] = useState({
+    conversionsToday: 0, nextConversionCost: 50, conversionEmberAmount: 10,
+  })
+
   useEffect(() => {
     if (!user) return
     let cancelled = false
     setLoading(true)
-    cardclashService.load().then(data => {
+    Promise.all([
+      cardclashService.load(),
+      emberService.getBalance(),
+    ]).then(([ccData, emberData]) => {
       if (cancelled) return
-      setCollection(data.collection || [])
-      setLineup(data.lineup || { solo: null, jungle: null, mid: null, support: null, adc: null })
-      setStats(data.stats || { elo: 1000, wins: 0, losses: 0, streak: 0, bestStreak: 0, packsOpened: 0, embers: 0 })
-      setDecks(data.decks || [])
-      setLastCollected(data.stats?.lastCollected || null)
+      setCollection(ccData.collection || [])
+      setStats(ccData.stats || { packsOpened: 0, embers: 0 })
+      setConversionInfo({
+        conversionsToday: emberData.conversionsToday || 0,
+        nextConversionCost: emberData.nextConversionCost || 50,
+        conversionEmberAmount: emberData.conversionEmberAmount || 10,
+      })
       setLoaded(true)
       setLoading(false)
     }).catch(err => {
@@ -40,23 +46,24 @@ export function CardClashProvider({ children }) {
     return () => { cancelled = true }
   }, [user?.id])
 
-  // Derived values
   const passion = passionCtx?.balance ?? 0
-  const embers = stats.embers || 0
-  const elo = stats.elo || 1000
+  const ember = passionCtx?.ember ?? { balance: 0 }
 
-  // ═══ Actions ═══
-
-  const generateStarterCollection = useCallback(async () => {
-    if (collection.length > 0) return
+  const convertPassionToEmber = useCallback(async () => {
     try {
-      const data = await cardclashService.init()
-      if (data.cards) setCollection(data.cards)
-      return data.cards
+      const result = await emberService.convert()
+      setConversionInfo({
+        conversionsToday: result.conversionsToday,
+        nextConversionCost: result.nextConversionCost,
+        conversionEmberAmount: 10,
+      })
+      passionCtx?.refreshBalance?.()
+      return result
     } catch (err) {
-      console.error('Failed to generate starter:', err)
+      console.error('Failed to convert passion to ember:', err)
+      throw err
     }
-  }, [collection.length])
+  }, [passionCtx])
 
   const buyPack = useCallback(async (packType) => {
     try {
@@ -71,90 +78,11 @@ export function CardClashProvider({ children }) {
     }
   }, [testMode, passionCtx])
 
-  const setLineupCard = useCallback(async (role, cardId) => {
-    // Optimistic update
-    const card = cardId ? collection.find(c => c.id === cardId) : null
-    setLineup(prev => ({ ...prev, [role]: card }))
-    try {
-      await cardclashService.setLineup(role, cardId)
-    } catch (err) {
-      console.error('Failed to set lineup:', err)
-    }
-  }, [collection])
-
-  const reportBattle = useCallback(async (mode, isWinner) => {
-    try {
-      const result = await cardclashService.reportBattle(mode, isWinner, testMode)
-      setStats(result.stats)
-      if (!testMode) passionCtx?.refreshBalance?.()
-      return result
-    } catch (err) {
-      console.error('Failed to report battle:', err)
-      throw err
-    }
-  }, [testMode, passionCtx])
-
-  const collectIncome = useCallback(async () => {
-    try {
-      const result = await cardclashService.collectIncome(testMode)
-      if (result.amount > 0) {
-        setLastCollected(Date.now())
-        if (!testMode) passionCtx?.refreshBalance?.()
-      }
-      return result.amount || 0
-    } catch (err) {
-      console.error('Failed to collect income:', err)
-      return 0
-    }
-  }, [testMode, passionCtx])
-
-  const disenchantCard = useCallback(async (cardId) => {
-    try {
-      const result = await cardclashService.disenchant(cardId)
-      setCollection(prev => prev.filter(c => c.id !== cardId))
-      setStats(prev => ({ ...prev, embers: prev.embers + result.embersGained }))
-      // Clear from lineup if present
-      setLineup(prev => {
-        const updated = { ...prev }
-        for (const role of Object.keys(updated)) {
-          if (updated[role]?.id === cardId) updated[role] = null
-        }
-        return updated
-      })
-      return result.embersGained
-    } catch (err) {
-      console.error('Failed to disenchant:', err)
-      return 0
-    }
-  }, [])
-
-  const saveDeck = useCallback(async (deck) => {
-    try {
-      const result = await cardclashService.saveDeck(deck)
-      setDecks(result.decks)
-    } catch (err) {
-      console.error('Failed to save deck:', err)
-    }
-  }, [])
-
-  const deleteDeck = useCallback(async (deckId) => {
-    try {
-      const result = await cardclashService.deleteDeck(deckId)
-      setDecks(result.decks)
-    } catch (err) {
-      console.error('Failed to delete deck:', err)
-    }
-  }, [])
-
   return (
     <CardClashContext.Provider value={{
-      collection, lineup, embers, passion, elo, decks, stats, lastCollected,
+      collection, passion, ember: { ...ember, ...conversionInfo }, stats,
       loaded, loading, testMode, setTestMode,
-      buyPack, setLineupCard, collectIncome, disenchantCard,
-      generateStarterCollection, saveDeck, deleteDeck,
-      reportBattle,
-      // Legacy: expose updateElo/updatePassion/updateStats as no-ops for any pages that still reference them
-      updateElo: () => {}, updatePassion: () => {}, updateStats: () => {},
+      buyPack, convertPassionToEmber,
     }}>
       {children}
     </CardClashContext.Provider>

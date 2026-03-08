@@ -1,9 +1,9 @@
 // src/pages/division/Teams.jsx
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Crown } from 'lucide-react'
 import { useDivision } from '../../context/DivisionContext'
-import { matchService } from '../../services/database'
+import { standingsService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
 
@@ -31,34 +31,22 @@ const roleImages = {
 const Teams = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const { season, teams, players, division } = useDivision()
-    const [matches, setMatches] = useState([])
+    const [teamRecords, setTeamRecords] = useState({})
 
     const basePath = `/${leagueSlug}/${divisionSlug}`
 
     useEffect(() => {
         if (!season?.id) return
-        matchService.getAllBySeason(season.id)
-            .then(data => setMatches(data))
+        standingsService.getBySeason(season.id)
+            .then(data => {
+                const records = {}
+                for (const s of data) {
+                    records[s.id] = { wins: Number(s.match_wins) || 0, losses: Number(s.match_losses) || 0 }
+                }
+                setTeamRecords(records)
+            })
             .catch(() => {})
     }, [season?.id])
-
-    // Build W-L records per team from completed matches
-    const teamRecords = useMemo(() => {
-        const records = {}
-        const completed = matches.filter(m => m.is_completed)
-        for (const m of completed) {
-            if (!records[m.team1_id]) records[m.team1_id] = { wins: 0, losses: 0 }
-            if (!records[m.team2_id]) records[m.team2_id] = { wins: 0, losses: 0 }
-            if (m.winner_team_id === m.team1_id) {
-                records[m.team1_id].wins++
-                records[m.team2_id].losses++
-            } else if (m.winner_team_id === m.team2_id) {
-                records[m.team2_id].wins++
-                records[m.team1_id].losses++
-            }
-        }
-        return records
-    }, [matches])
 
     const getTeamPlayers = (teamId) =>
         (players?.filter(p => p.team_id === teamId) || [])

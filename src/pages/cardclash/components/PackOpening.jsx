@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PackArt from './PackArt'
 import GameCard from './GameCard'
-import { RARITIES } from '../../../data/cardclash/economy'
+import TradingCard from '../../../components/TradingCard'
+import TradingCardHolo from '../../../components/TradingCardHolo'
+import { RARITIES, getHoloEffect } from '../../../data/cardclash/economy'
 import cardBackImg from '../../../assets/card_backsite.png'
 import './PackOpening.css'
 
@@ -22,6 +24,7 @@ function getCardType(card) {
 
 function toGameCardData(card) {
   const type = getCardType(card)
+  const cd = card.cardData || card.card_data || {}
   const base = {
     name: card.godName || card.god_name || card.name,
     class: card.godClass || card.god_class || card.class,
@@ -30,21 +33,72 @@ function toGameCardData(card) {
     serialNumber: card.serialNumber || card.serial_number,
   }
   if (type === 'god') {
-    return { ...base, ability: card.ability }
+    return { ...base, ability: card.ability || cd.ability, imageKey: cd.imageKey }
   }
   if (type === 'item') {
-    const cd = card.cardData || card.card_data || {}
     return { ...base, category: cd.category || card.class, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd.imageKey }
   }
   if (type === 'consumable') {
-    const cd = card.cardData || card.card_data || {}
     return { ...base, color: cd.color || '#10b981', description: cd.description || 'Consumable card', manaCost: cd.manaCost || 1 }
   }
   if (type === 'player') {
-    const cd = card.cardData || card.card_data || {}
     return { ...base, role: cd.role || card.role, teamName: cd.teamName, teamColor: cd.teamColor, cardData: cd }
   }
   return base
+}
+
+function toPlayerCardProps(card) {
+  const cd = card.cardData || card.card_data || {}
+  return {
+    playerName: card.godName || card.god_name || card.name,
+    teamName: cd.teamName || '',
+    teamColor: cd.teamColor || '#6366f1',
+    seasonName: cd.seasonName || '',
+    leagueName: cd.leagueName || '',
+    divisionName: cd.divisionName || '',
+    role: cd.role || card.role || 'ADC',
+    avatarUrl: card.imageUrl || card.image_url || '',
+    stats: cd.stats || null,
+    bestGod: cd.bestGod || null,
+  }
+}
+
+/**
+ * Reusable card renderer — same pattern as the catalog.
+ * - Player cards: card-overview-slot + TradingCard (transform: scale)
+ * - Other cards:  TradingCardHolo(size) + GameCard (container queries)
+ * Pass holo=false to skip the TradingCardHolo wrapper (e.g. inside flip animation).
+ */
+function PackCard({ card, size, holo = true }) {
+  const type = getCardType(card)
+  const isPlayer = type === 'player'
+  const holoEffect = getHoloEffect(card.rarity)
+  const role = isPlayer
+    ? ((card.cardData || card.card_data || {}).role || 'ADC')
+    : ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
+
+  if (isPlayer) {
+    const inner = holo
+      ? <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse">
+          <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
+        </TradingCardHolo>
+      : <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
+    return (
+      <div className="card-overview-slot" style={{ width: size, height: size * (88 / 63), '--slot-scale': size / 340 }}>
+        {inner}
+      </div>
+    )
+  }
+
+  const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} />
+  if (holo) {
+    return (
+      <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size={size}>
+        {gameCard}
+      </TradingCardHolo>
+    )
+  }
+  return gameCard
 }
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
@@ -466,7 +520,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                 <div className="pack-opening__ec-flip">
                   <div className="pack-opening__ec-back"><CardBack /></div>
                   <div className="pack-opening__ec-front">
-                    <GameCard type={getCardType(card)} rarity={card.rarity} data={toGameCardData(card)} />
+                    <PackCard card={card} size={240} holo={false} />
                     {isTop && topFlipPhase === 'revealed' && (
                       <div className={`pack-opening__holo-shimmer${tier <= 1 ? ' holo-intense' : tier <= 2 ? ' holo-medium' : ''}`}
                         style={{ '--holo-color': cardColor }} />
@@ -526,7 +580,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
           <div className="pack-opening__summary-grid">
             {cards.map((card, i) => (
               <div key={i} className="pack-opening__summary-card" style={{ '--si': i }}>
-                <GameCard type={getCardType(card)} rarity={card.rarity} data={toGameCardData(card)} />
+                <PackCard card={card} size={140} holo />
                 {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
               </div>
             ))}

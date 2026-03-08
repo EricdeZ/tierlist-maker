@@ -28,6 +28,10 @@ export default function MatchManager() {
 
     const [matches, setMatches] = useState([])
     const [matchesLoading, setMatchesLoading] = useState(false)
+    const [stageData, setStageData] = useState({ stages: [], groups: [], rounds: [] })
+    const [selectedMatchIds, setSelectedMatchIds] = useState(new Set())
+    const [bulkStage, setBulkStage] = useState({ stage_id: '', group_id: '', round_id: '' })
+    const [bulkSaving, setBulkSaving] = useState(false)
     const [expandedMatchId, setExpandedMatchId] = useState(null)
     const [matchDetail, setMatchDetail] = useState(null)
     const [detailLoading, setDetailLoading] = useState(false)
@@ -77,9 +81,25 @@ export default function MatchManager() {
         }
     }, [])
 
+    // ─── Fetch stage data for season ───
+    const fetchStageData = useCallback(async (seasonId) => {
+        if (!seasonId) { setStageData({ stages: [], groups: [], rounds: [] }); return }
+        try {
+            const res = await fetch(`${API}/stage-manage?seasonId=${seasonId}`, { headers: getAuthHeaders() })
+            if (!res.ok) return
+            const data = await res.json()
+            setStageData({ stages: data.stages || [], groups: data.groups || [], rounds: data.rounds || [] })
+        } catch {
+            setStageData({ stages: [], groups: [], rounds: [] })
+        }
+    }, [])
+
     useEffect(() => {
-        if (selectedSeasonId) fetchMatches(selectedSeasonId)
-    }, [selectedSeasonId, fetchMatches])
+        if (selectedSeasonId) {
+            fetchMatches(selectedSeasonId)
+            fetchStageData(selectedSeasonId)
+        }
+    }, [selectedSeasonId, fetchMatches, fetchStageData])
 
     // ─── Deep-link: auto-expand match from URL param ───
     const deepLinkHandled = useRef(false)
@@ -208,6 +228,29 @@ export default function MatchManager() {
             setSaving(prev => ({ ...prev, match: false }))
         }
     }, [doAction, showToast, fetchDetail, fetchMatches, selectedSeasonId])
+
+    // ─── Bulk assign stage ───
+    const handleBulkAssignStage = useCallback(async () => {
+        if (selectedMatchIds.size === 0) return
+        setBulkSaving(true)
+        try {
+            await doAction({
+                action: 'bulk-assign-stage',
+                match_ids: [...selectedMatchIds],
+                stage_id: bulkStage.stage_id || null,
+                group_id: bulkStage.group_id || null,
+                round_id: bulkStage.round_id || null,
+            })
+            showToast('success', `${selectedMatchIds.size} match(es) assigned`)
+            setSelectedMatchIds(new Set())
+            setBulkStage({ stage_id: '', group_id: '', round_id: '' })
+            fetchMatches(selectedSeasonId)
+        } catch (err) {
+            showToast('error', err.message)
+        } finally {
+            setBulkSaving(false)
+        }
+    }, [doAction, showToast, fetchMatches, selectedSeasonId, selectedMatchIds, bulkStage])
 
     // ─── Save game (bulk) ───
     const handleSaveGame = useCallback(async (gameId, matchId, game) => {
@@ -362,6 +405,53 @@ export default function MatchManager() {
                 </select>
             </div>
 
+            {/* Bulk stage assignment bar */}
+            {selectedMatchIds.size > 0 && stageData.stages.length > 0 && (
+                <div className="sticky top-0 z-20 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-bold text-violet-300 shrink-0">{selectedMatchIds.size} selected</span>
+                    <div>
+                        <select value={bulkStage.stage_id || ''} onChange={e => setBulkStage({ stage_id: e.target.value ? parseInt(e.target.value) : '', group_id: '', round_id: '' })}
+                                className="rounded px-2 py-1.5 text-xs border"
+                                style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                            <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— Stage —</option>
+                            {stageData.stages.map(s => <option key={s.id} value={s.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{s.name}</option>)}
+                        </select>
+                    </div>
+                    {bulkStage.stage_id && stageData.groups.filter(g => String(g.stage_id) === String(bulkStage.stage_id)).length > 0 && (
+                        <div>
+                            <select value={bulkStage.group_id || ''} onChange={e => setBulkStage(p => ({ ...p, group_id: e.target.value ? parseInt(e.target.value) : '' }))}
+                                    className="rounded px-2 py-1.5 text-xs border"
+                                    style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                                <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— Group —</option>
+                                {stageData.groups.filter(g => String(g.stage_id) === String(bulkStage.stage_id)).map(g => <option key={g.id} value={g.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{g.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    {bulkStage.stage_id && stageData.rounds.filter(r => String(r.stage_id) === String(bulkStage.stage_id)).length > 0 && (
+                        <div>
+                            <select value={bulkStage.round_id || ''} onChange={e => setBulkStage(p => ({ ...p, round_id: e.target.value ? parseInt(e.target.value) : '' }))}
+                                    className="rounded px-2 py-1.5 text-xs border"
+                                    style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                                <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— Round —</option>
+                                {stageData.rounds.filter(r => String(r.stage_id) === String(bulkStage.stage_id)).map(r => <option key={r.id} value={r.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{r.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    <button onClick={handleBulkAssignStage} disabled={bulkSaving}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-50">
+                        {bulkSaving ? 'Assigning...' : 'Assign Stage'}
+                    </button>
+                    <button onClick={() => { setSelectedMatchIds(new Set()); setBulkStage({ stage_id: '', group_id: '', round_id: '' }) }}
+                            className="px-2 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
+                        Clear
+                    </button>
+                    <button onClick={() => setSelectedMatchIds(new Set(matches.map(m => m.id)))}
+                            className="px-2 py-1.5 rounded-lg text-xs text-violet-400 hover:text-violet-300 ml-auto">
+                        Select All
+                    </button>
+                </div>
+            )}
+
             {/* Match List */}
             {matchesLoading ? (
                 <p className="text-sm text-[var(--color-text-secondary)]">Loading matches...</p>
@@ -370,8 +460,23 @@ export default function MatchManager() {
             ) : (
                 <div className="space-y-2">
                     {matches.map(m => (
-                        <div key={m.id} ref={expandedMatchId === m.id ? (el) => { if (el && urlMatchId) el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } : undefined} className="border border-[var(--color-border)] rounded-lg">
+                        <div key={m.id} ref={expandedMatchId === m.id ? (el) => { if (el && urlMatchId) el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } : undefined} className={`border rounded-lg ${selectedMatchIds.has(m.id) ? 'border-violet-500/40 bg-violet-500/5' : 'border-[var(--color-border)]'}`}>
                             {/* Match row */}
+                            <div className="flex items-center">
+                                {stageData.stages.length > 0 && (
+                                    <label className="pl-3 pr-1 py-3 flex items-center cursor-pointer shrink-0" onClick={e => e.stopPropagation()}>
+                                        <input type="checkbox" checked={selectedMatchIds.has(m.id)}
+                                            onChange={e => {
+                                                setSelectedMatchIds(prev => {
+                                                    const next = new Set(prev)
+                                                    if (e.target.checked) next.add(m.id)
+                                                    else next.delete(m.id)
+                                                    return next
+                                                })
+                                            }}
+                                            className="w-3.5 h-3.5 rounded accent-violet-500 cursor-pointer" />
+                                    </label>
+                                )}
                             <button
                                 onClick={() => toggleMatch(m.id)}
                                 className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors"
@@ -396,6 +501,7 @@ export default function MatchManager() {
                                 <span className="text-xs text-[var(--color-text-secondary)] shrink-0">{m.game_count} game{m.game_count !== 1 ? 's' : ''}</span>
                                 <span className="text-[var(--color-text-secondary)] text-sm">{expandedMatchId === m.id ? '\u25B2' : '\u25BC'}</span>
                             </button>
+                            </div>
 
                             {/* Expanded detail */}
                             {expandedMatchId === m.id && (
@@ -411,6 +517,7 @@ export default function MatchManager() {
                                             saving={saving}
                                             seasons={seasons}
                                             selectedSeasonId={selectedSeasonId}
+                                            stageData={stageData}
                                             onUpdateMatch={(updates) => handleUpdateMatch(m.id, updates)}
                                             onSaveGame={(gameId, game) => handleSaveGame(gameId, m.id, game)}
                                             onDeleteGame={(gameId) => handleDeleteGame(gameId, m.id)}
@@ -434,7 +541,7 @@ export default function MatchManager() {
 // ═══════════════════════════════════════════════════
 // MATCH EDITOR (expanded detail)
 // ═══════════════════════════════════════════════════
-function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, seasons, selectedSeasonId, onUpdateMatch, onSaveGame, onDeleteGame, onDeleteMatch, onTransferMatch, onEditGame, onEditPlayer }) {
+function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, seasons, selectedSeasonId, stageData, onUpdateMatch, onSaveGame, onDeleteGame, onDeleteMatch, onTransferMatch, onEditGame, onEditPlayer }) {
     const [activeGame, setActiveGame] = useState(0)
     const [transferOpen, setTransferOpen] = useState(false)
     const [transferTarget, setTransferTarget] = useState('')
@@ -443,12 +550,21 @@ function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, season
         week: editData.week || '',
         team1_id: editData.team1_id,
         team2_id: editData.team2_id,
+        stage_id: editData.stage_id || '',
+        group_id: editData.group_id || '',
+        round_id: editData.round_id || '',
     })
+
+    const filteredGroups = stageData.groups.filter(g => String(g.stage_id) === String(matchFields.stage_id))
+    const filteredRounds = stageData.rounds.filter(r => String(r.stage_id) === String(matchFields.stage_id))
 
     const matchDirty = matchFields.date !== (editData.date || '') ||
         String(matchFields.week || '') !== String(editData.week || '') ||
         String(matchFields.team1_id) !== String(editData.team1_id) ||
-        String(matchFields.team2_id) !== String(editData.team2_id)
+        String(matchFields.team2_id) !== String(editData.team2_id) ||
+        String(matchFields.stage_id || '') !== String(editData.stage_id || '') ||
+        String(matchFields.group_id || '') !== String(editData.group_id || '') ||
+        String(matchFields.round_id || '') !== String(editData.round_id || '')
 
     return (
         <div className="bg-[var(--color-card)]/30">
@@ -470,18 +586,54 @@ function MatchEditor({ editData, teamsForSeason, gods, adminData, saving, season
                     <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Team 1</label>
                     <select value={matchFields.team1_id || ''} onChange={e => setMatchFields(p => ({ ...p, team1_id: parseInt(e.target.value) }))}
                             className="rounded px-2 py-1.5 text-xs border"
-                            style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}>
-                        {teamsForSeason.map(t => <option key={t.team_id} value={t.team_id}>{t.team_name}</option>)}
+                            style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                        {teamsForSeason.map(t => <option key={t.team_id} value={t.team_id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{t.team_name}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Team 2</label>
                     <select value={matchFields.team2_id || ''} onChange={e => setMatchFields(p => ({ ...p, team2_id: parseInt(e.target.value) }))}
                             className="rounded px-2 py-1.5 text-xs border"
-                            style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}>
-                        {teamsForSeason.filter(t => t.team_id !== matchFields.team1_id).map(t => <option key={t.team_id} value={t.team_id}>{t.team_name}</option>)}
+                            style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                        {teamsForSeason.filter(t => t.team_id !== matchFields.team1_id).map(t => <option key={t.team_id} value={t.team_id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{t.team_name}</option>)}
                     </select>
                 </div>
+                {stageData.stages.length > 0 && (
+                    <>
+                        <div className="w-px h-6 bg-[var(--color-border)] self-center" />
+                        <div>
+                            <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Stage</label>
+                            <select value={matchFields.stage_id || ''} onChange={e => setMatchFields(p => ({ ...p, stage_id: e.target.value ? parseInt(e.target.value) : '', group_id: '', round_id: '' }))}
+                                    className="rounded px-2 py-1.5 text-xs border"
+                                    style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                                <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— None —</option>
+                                {stageData.stages.map(s => <option key={s.id} value={s.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        {matchFields.stage_id && filteredGroups.length > 0 && (
+                            <div>
+                                <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Group</label>
+                                <select value={matchFields.group_id || ''} onChange={e => setMatchFields(p => ({ ...p, group_id: e.target.value ? parseInt(e.target.value) : '' }))}
+                                        className="rounded px-2 py-1.5 text-xs border"
+                                        style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                                    <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— None —</option>
+                                    {filteredGroups.map(g => <option key={g.id} value={g.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{g.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        {matchFields.stage_id && filteredRounds.length > 0 && (
+                            <div>
+                                <label className="block text-[10px] text-[var(--color-text-secondary)] mb-0.5">Round</label>
+                                <select value={matchFields.round_id || ''} onChange={e => setMatchFields(p => ({ ...p, round_id: e.target.value ? parseInt(e.target.value) : '' }))}
+                                        className="rounded px-2 py-1.5 text-xs border"
+                                        style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text)', borderColor: 'var(--color-border)', colorScheme: 'dark' }}>
+                                    <option value="" style={{ backgroundColor: '#1e1e2e', color: '#999' }}>— None —</option>
+                                    {filteredRounds.map(r => <option key={r.id} value={r.id} style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}>{r.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+                    </>
+                )}
                 {matchDirty && (
                     <button onClick={() => onUpdateMatch(matchFields)} disabled={saving.match}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50">

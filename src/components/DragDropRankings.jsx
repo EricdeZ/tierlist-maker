@@ -55,6 +55,10 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
     const [spotlightPos, setSpotlightPos] = useState({ x: window.innerWidth - 260, y: 80 })
     const [isDraggingSpotlight, setIsDraggingSpotlight] = useState(false)
     const spotlightDragOffset = useRef({ x: 0, y: 0 })
+    const [showSpotlight, setShowSpotlight] = useState(() => {
+        const saved = localStorage.getItem('tierlist-show-spotlight')
+        return saved === null ? true : saved === 'true'
+    })
 
     // Format teams to match the shape the component expects
     const teams = useMemo(() => {
@@ -111,9 +115,13 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
     const [teamsPanelOpen, setTeamsPanelOpen] = useState(true)
     const [teamsPanelPosition, setTeamsPanelPosition] = useState('bottom') // 'bottom' | 'right'
     const [teamsPanelHeight, setTeamsPanelHeight] = useState(0)
+    const [panelUserHeight, setPanelUserHeight] = useState(null) // null = auto
+    const [isResizingPanel, setIsResizingPanel] = useState(false)
 
     const rankingsRef = useRef(null)
     const teamsPanelRef = useRef(null)
+    const resizeStartY = useRef(0)
+    const resizeStartHeight = useRef(0)
 
     // Check for mobile/small screen
     useEffect(() => {
@@ -217,6 +225,30 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
 
         return () => observer.disconnect()
     }, [teamsPanelOpen, teamsPanelPosition])
+
+    // Panel resize drag handling
+    useEffect(() => {
+        if (!isResizingPanel) return
+        const onMouseMove = (e) => {
+            const delta = resizeStartY.current - e.clientY
+            const newHeight = Math.max(100, Math.min(window.innerHeight * 0.7, resizeStartHeight.current + delta))
+            setPanelUserHeight(newHeight)
+        }
+        const onMouseUp = () => setIsResizingPanel(false)
+        window.addEventListener('mousemove', onMouseMove)
+        window.addEventListener('mouseup', onMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove)
+            window.removeEventListener('mouseup', onMouseUp)
+        }
+    }, [isResizingPanel])
+
+    const handlePanelResizeStart = (e) => {
+        e.preventDefault()
+        resizeStartY.current = e.clientY
+        resizeStartHeight.current = teamsPanelRef.current?.offsetHeight || 200
+        setIsResizingPanel(true)
+    }
 
     // Utility functions
     const getPlayerByName = (playerName) => {
@@ -430,7 +462,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
 
     // --- Drag & Drop handlers ---
     const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
-        setSpotlightPlayer(player)
+        if (showSpotlight) setSpotlightPlayer(player)
         setDraggedItem({
             player,
             sourceTeam,
@@ -826,6 +858,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                     scrollbar-width: thin;
                     scrollbar-color: rgba(255, 255, 255, 0.15) rgba(255, 255, 255, 0.05);
                 }
+                ${isResizingPanel ? 'body { cursor: ns-resize !important; user-select: none !important; }' : ''}
             `}</style>
 
             {/* Rankings Container */}
@@ -893,7 +926,7 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                                                 }`}
                                                 style={{ backgroundColor: teamColor, borderColor: teamColor, color: textColor }}
                                                 draggable
-                                                onMouseDown={() => setSpotlightPlayer(player)}
+                                                onMouseDown={() => showSpotlight && setSpotlightPlayer(player)}
                                                 onDragStart={(e) => handleDragStart(e, player, null, role, index)}
                                                 onDragEnd={handleDragEnd}
                                                 onDragOver={handleDragOver}
@@ -976,12 +1009,19 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
             {teamsPanelOpen && teamsPanelPosition === 'bottom' && (
                 <div
                     ref={teamsPanelRef}
-                    className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10"
+                    className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 flex flex-col"
                     style={{
                         backgroundColor: 'var(--color-secondary)',
                         boxShadow: '0 -4px 30px rgba(0,0,0,0.5)',
+                        ...(panelUserHeight ? { height: `${panelUserHeight}px` } : {}),
                     }}
                 >
+                    {/* Resize handle */}
+                    <div
+                        className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-50 hover:bg-white/20 transition-colors"
+                        onMouseDown={handlePanelResizeStart}
+                        onDoubleClick={() => setPanelUserHeight(null)}
+                    />
                     {/* Panel header */}
                     <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5 gap-2">
                         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1072,6 +1112,20 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                                 </button>
                             )}
                             <button
+                                onClick={() => {
+                                    const next = !showSpotlight
+                                    setShowSpotlight(next)
+                                    localStorage.setItem('tierlist-show-spotlight', String(next))
+                                    if (!next) setSpotlightPlayer(null)
+                                }}
+                                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                    showSpotlight ? 'bg-white/15 text-(--color-text)' : 'bg-white/10 text-(--color-text-secondary)'
+                                } hover:bg-white/20`}
+                                title={showSpotlight ? 'Disable floating stats on drag' : 'Enable floating stats on drag'}
+                            >
+                                Stats {showSpotlight ? 'ON' : 'OFF'}
+                            </button>
+                            <button
                                 onClick={() => setTeamsPanelPosition('right')}
                                 className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"
                             >
@@ -1086,8 +1140,10 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                         </div>
                     </div>
                     {/* Horizontally scrollable team cards */}
-                    <div className="teams-panel-scroll overflow-x-auto overflow-y-hidden px-4 py-3">
-                        <div className="flex gap-4" style={{ minWidth: 'fit-content' }}>
+                    <div className={`teams-panel-scroll px-4 py-3 min-h-0 flex-1 ${panelUserHeight && panelUserHeight >= 380 ? 'overflow-auto' : 'overflow-x-auto overflow-y-hidden'}`}
+                         onWheel={(e) => { if ((!panelUserHeight || panelUserHeight < 380) && e.deltaY !== 0) { e.currentTarget.scrollLeft += e.deltaY; e.preventDefault() } }}
+                    >
+                        <div className={panelUserHeight && panelUserHeight >= 380 ? 'flex flex-wrap gap-4' : 'flex gap-4'} style={panelUserHeight && panelUserHeight >= 380 ? {} : { minWidth: 'fit-content' }}>
                             {teams.map(team => {
                                 const teamTextColor = getContrastColor(team.color)
                                 const available = team.players.filter(p => !rankedPlayers.has(p))
@@ -1245,6 +1301,20 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-bold text-(--color-text) font-heading">Teams</h3>
                             <div className="flex gap-1">
+                                <button
+                                    onClick={() => {
+                                        const next = !showSpotlight
+                                        setShowSpotlight(next)
+                                        localStorage.setItem('tierlist-show-spotlight', String(next))
+                                        if (!next) setSpotlightPlayer(null)
+                                    }}
+                                    className={`px-1.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                                        showSpotlight ? 'bg-white/15 text-(--color-text)' : 'bg-white/10 text-(--color-text-secondary)'
+                                    } hover:bg-white/20`}
+                                    title={showSpotlight ? 'Disable floating stats on drag' : 'Enable floating stats on drag'}
+                                >
+                                    Stats
+                                </button>
                                 <button
                                     onClick={() => setTeamsPanelPosition('bottom')}
                                     className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-(--color-text-secondary) hover:bg-white/20 transition-colors"

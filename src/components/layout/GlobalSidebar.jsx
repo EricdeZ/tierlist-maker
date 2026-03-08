@@ -10,8 +10,8 @@ import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
-    X, User, Trophy, Flame, Wrench, Shield, Home,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, Crown
+    X, User, Trophy, Flame, Wrench, Shield,
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, Crown, ArrowLeftRight
 } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
 
@@ -336,14 +336,27 @@ export default function GlobalSidebar() {
 
                     {/* Sections */}
                     <div className="px-2 py-3">
-                        {/* Home */}
-                        <SidebarLink
-                            to="/"
-                            icon={Home}
-                            active={isActive('/', true)}
-                        >
-                            Home
-                        </SidebarLink>
+                        {/* Profile */}
+                        {user && linkedPlayer && (
+                            <SidebarLink
+                                to={`/profile/${linkedPlayer.slug}`}
+                                icon={UserCheck}
+                                active={isActive(`/profile/${linkedPlayer.slug}`)}
+                            >
+                                My Profile
+                            </SidebarLink>
+                        )}
+                        {user && !linkedPlayer && (
+                            <SidebarLink
+                                icon={User}
+                                onClick={() => {
+                                    close()
+                                    window.dispatchEvent(new CustomEvent('open-claim-modal'))
+                                }}
+                            >
+                                <span className="text-[#5865F2]">Claim Your Profile</span>
+                            </SidebarLink>
+                        )}
                         {FEATURE_FLAGS.FORGE_RELEASED && (
                             <>
                                 <SidebarLink to={isActive('/forge') ? location.pathname : '/forge'} active={isActive('/forge')}>
@@ -374,6 +387,12 @@ export default function GlobalSidebar() {
                                         </span>
                                     </SidebarLink>
                                 )}
+                                <SidebarLink to="/leagues" active={isActive('/leagues', true)}>
+                                    <span className="flex items-center gap-3">
+                                        <Trophy className="w-4 h-4 shrink-0 text-yellow-400" />
+                                        Browse All Leagues
+                                    </span>
+                                </SidebarLink>
                                 {user && teamInviteCount > 0 && (
                                     <SidebarLink
                                         onClick={async () => {
@@ -411,47 +430,12 @@ export default function GlobalSidebar() {
                                 <div className="border-b border-white/5 my-2 mx-3" />
                             </>
                         )}
-                        {user && (
-                            <SidebarLink to="/referral" icon={UserPlus} active={isActive('/referral')}>
-                                Refer a Friend
-                            </SidebarLink>
-                        )}
                         {!FEATURE_FLAGS.FORGE_RELEASED && (
                             <div className="border-b border-white/5 my-2 mx-3" />
                         )}
 
-                        {/* Profile — logged in only */}
-                        {user && linkedPlayer && (
-                            <SidebarLink
-                                to={`/profile/${linkedPlayer.slug}`}
-                                icon={UserCheck}
-                                active={isActive(`/profile/${linkedPlayer.slug}`)}
-                            >
-                                My Profile
-                            </SidebarLink>
-                        )}
-                        {user && !linkedPlayer && (
-                            <SidebarLink
-                                icon={User}
-                                onClick={() => {
-                                    close()
-                                    window.dispatchEvent(new CustomEvent('open-claim-modal'))
-                                }}
-                            >
-                                <span className="text-[#5865F2]">Claim Your Profile</span>
-                            </SidebarLink>
-                        )}
-
                         {/* Leagues section */}
                         <SidebarSection icon={Trophy} label="Leagues" defaultOpen={false}>
-                            <SidebarLink
-                                to="/leagues"
-                                icon={Trophy}
-                                active={isActive('/leagues', true)}
-                            >
-                                Browse All Leagues
-                            </SidebarLink>
-
                             {leaguesLoading && (
                                 <div className="flex items-center gap-2 px-3 py-2 text-xs text-(--color-text-secondary)">
                                     <div className="animate-spin rounded-full h-3 w-3 border-b border-(--color-accent)" />
@@ -519,6 +503,14 @@ export default function GlobalSidebar() {
                             Players
                         </SidebarLink>
 
+                        <SidebarLink
+                            to="/transactions"
+                            icon={ArrowLeftRight}
+                            active={isActive('/transactions', true)}
+                        >
+                            Transactions
+                        </SidebarLink>
+
                         {/* Passion section */}
                         <SidebarSection
                             icon={Flame}
@@ -580,6 +572,11 @@ export default function GlobalSidebar() {
 
                         {/* Support & Feedback */}
                         <div className="border-b border-white/5 my-2 mx-3" />
+                        {user && (
+                            <SidebarLink to="/referral" icon={UserPlus} active={isActive('/referral')}>
+                                Refer a Friend
+                            </SidebarLink>
+                        )}
                         <SidebarLink
                             icon={Sparkles}
                             onClick={() => {

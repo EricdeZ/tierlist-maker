@@ -165,6 +165,18 @@ export const standingsService = {
     }
 }
 
+export const transactionService = {
+    async getRecent() {
+        return apiCall('transactions')
+    },
+    async getByLeague(leagueId) {
+        return apiCall('transactions', { leagueId })
+    },
+    async getByDivision(divisionId) {
+        return apiCall('transactions', { divisionId })
+    },
+}
+
 export const profileService = {
     async getPlayerProfile(slug) {
         return apiCall('player-profile', { slug })
@@ -937,33 +949,24 @@ export const adminCommunityService = {
     },
 }
 
+export const emberService = {
+    async getBalance() {
+        return apiCall('ember', { action: 'balance' })
+    },
+    async claimDaily() {
+        return apiPost('ember', { action: 'claim-daily' })
+    },
+    async convert() {
+        return apiPost('ember', { action: 'convert' })
+    },
+}
+
 export const cardclashService = {
     async load() {
         return apiCall('cardclash', { action: 'load' })
     },
-    async init() {
-        return apiPost('cardclash', { action: 'init' })
-    },
     async openPack(packType, testMode) {
         return apiPost('cardclash', { action: 'open-pack' }, { packType, testMode })
-    },
-    async setLineup(role, cardId) {
-        return apiPost('cardclash', { action: 'set-lineup' }, { role, cardId })
-    },
-    async reportBattle(mode, isWinner, testMode) {
-        return apiPost('cardclash', { action: 'report-battle' }, { mode, isWinner, testMode })
-    },
-    async collectIncome(testMode) {
-        return apiPost('cardclash', { action: 'collect-income' }, { testMode })
-    },
-    async disenchant(cardId) {
-        return apiPost('cardclash', { action: 'disenchant' }, { cardId })
-    },
-    async saveDeck(deck) {
-        return apiPost('cardclash', { action: 'save-deck' }, { deck })
-    },
-    async deleteDeck(deckId) {
-        return apiPost('cardclash', { action: 'delete-deck' }, { deckId })
     },
     async getDefinitionOverrides() {
         return apiCall('cardclash', { action: 'definition-overrides' })

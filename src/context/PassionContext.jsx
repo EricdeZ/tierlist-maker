@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import { passionService } from '../services/database'
+import { passionService, emberService } from '../services/database'
 import { getRank, getNextRank } from '../config/ranks'
 
 const PassionContext = createContext(null)
@@ -14,11 +14,13 @@ export const PassionProvider = ({ children }) => {
     const [currentStreak, setCurrentStreak] = useState(0)
     const [longestStreak, setLongestStreak] = useState(0)
     const [canClaimDaily, setCanClaimDaily] = useState(false)
+    const [lastDailyClaim, setLastDailyClaim] = useState(null)
     const [claimableCount, setClaimableCount] = useState(0)
     const [inDiscord, setInDiscord] = useState(false)
     const [loading, setLoading] = useState(true)
     const [rankUpInfo, setRankUpInfo] = useState(null)
     const [challengeNotifications, setChallengeNotifications] = useState([])
+    const [ember, setEmber] = useState({ balance: 0, currentStreak: 0, canClaimDaily: false, lastDailyClaim: null })
     const initialLoadDone = useRef(false)
 
     const rank = getRank(totalEarned)
@@ -27,14 +29,19 @@ export const PassionProvider = ({ children }) => {
     const refreshBalance = useCallback(async () => {
         if (!user) return
         try {
-            const data = await passionService.getBalance()
+            const [data, emberData] = await Promise.all([
+                passionService.getBalance(),
+                emberService.getBalance().catch(() => null),
+            ])
             setBalance(data.balance)
             setTotalEarned(data.totalEarned)
             setCurrentStreak(data.currentStreak)
             setLongestStreak(data.longestStreak)
             setCanClaimDaily(data.canClaimDaily)
+            setLastDailyClaim(data.lastDailyClaim || null)
             setClaimableCount(data.claimableCount || 0)
             setInDiscord(!!data.inDiscord)
+            if (emberData) setEmber(emberData)
         } catch (err) {
             console.error('Failed to fetch passion balance:', err)
         }
@@ -49,8 +56,10 @@ export const PassionProvider = ({ children }) => {
             setCurrentStreak(0)
             setLongestStreak(0)
             setCanClaimDaily(false)
+            setLastDailyClaim(null)
             setClaimableCount(0)
             setInDiscord(false)
+            setEmber({ balance: 0, currentStreak: 0, canClaimDaily: false, lastDailyClaim: null })
             setLoading(false)
             initialLoadDone.current = false
             return
@@ -106,6 +115,24 @@ export const PassionProvider = ({ children }) => {
         }
     }, [user, addChallengeNotification])
 
+    const claimEmberDaily = useCallback(async () => {
+        if (!user) return null
+        try {
+            const result = await emberService.claimDaily()
+            if (result.alreadyClaimed) return result
+            setEmber(prev => ({
+                ...prev,
+                balance: result.balance,
+                currentStreak: result.streak,
+                canClaimDaily: false,
+            }))
+            return result
+        } catch (err) {
+            console.error('Failed to claim ember daily:', err)
+            return null
+        }
+    }, [user])
+
     const trackAction = useCallback(async (type, referenceId = null) => {
         if (!user) return null
         try {
@@ -140,14 +167,17 @@ export const PassionProvider = ({ children }) => {
             currentStreak,
             longestStreak,
             canClaimDaily,
+            lastDailyClaim,
             claimableCount,
             inDiscord,
+            ember,
             rank,
             nextRank,
             loading,
             rankUpInfo,
             challengeNotifications,
             claimDaily,
+            claimEmberDaily,
             trackAction,
             refreshBalance,
             updateFromClaim,

@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { grantPassion, getRank, getNextRank, formatRank } from '../lib/passion.js'
+import { grantEmber } from '../lib/ember.js'
 import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, DISCORD_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, recalcDiscordChallenges, pushChallengeProgress } from '../lib/challenges.js'
 
 const handler = async (event) => {
@@ -49,7 +50,7 @@ async function listChallenges(sql, user) {
     // Unauthenticated: return challenges without user progress
     if (!user) {
         const challenges = await sql`
-            SELECT id, title, description, category, type, reward,
+            SELECT id, title, description, category, type, reward, ember_reward,
                    target_value, stat_key, repeat_cooldown,
                    tier, gives_badge, badge_label
             FROM challenges
@@ -66,6 +67,7 @@ async function listChallenges(sql, user) {
             grouped[ch.tier].push({
                 id: ch.id, title: ch.title, description: ch.description,
                 category: ch.category, type: ch.type, reward: ch.reward,
+                emberReward: ch.ember_reward || 0,
                 targetValue: ch.target_value, statKey: ch.stat_key,
                 tier: ch.tier, givesBadge: ch.gives_badge, badgeLabel: ch.badge_label,
                 currentValue: 0, completed: false, completedAt: null,
@@ -98,19 +100,9 @@ async function listChallenges(sql, user) {
         console.error('Challenge recalc failed:', err)
     }
 
-    // Lazy recalc for scrim challenges (all authenticated users, no linked player needed)
+    // Always recalc scrim challenges (cheap query, catches missed pushes)
     try {
-        const scrimStale = await sql`
-            SELECT c.id FROM challenges c
-            LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${user.id}
-            WHERE c.is_active = true
-              AND c.stat_key = ANY(${SCRIM_KEYS})
-              AND (uc.current_value IS NULL OR uc.current_value < 0)
-            LIMIT 1
-        `
-        if (scrimStale.length > 0) {
-            await recalcScrimChallenges(sql, user.id)
-        }
+        await recalcScrimChallenges(sql, user.id)
     } catch (err) {
         console.error('Scrim challenge recalc failed:', err)
     }
@@ -167,7 +159,7 @@ async function listChallenges(sql, user) {
     }
 
     const challenges = await sql`
-        SELECT c.id, c.title, c.description, c.category, c.type, c.reward,
+        SELECT c.id, c.title, c.description, c.category, c.type, c.reward, c.ember_reward,
                c.target_value, c.stat_key, c.repeat_cooldown,
                c.tier, c.gives_badge, c.badge_label,
                COALESCE(uc.current_value, 0) as current_value,
@@ -210,6 +202,7 @@ async function listChallenges(sql, user) {
             category: ch.category,
             type: ch.type,
             reward: ch.reward,
+            emberReward: ch.ember_reward || 0,
             targetValue: ch.target_value,
             statKey: ch.stat_key,
             tier: ch.tier,
@@ -270,7 +263,7 @@ async function claimChallenge(sql, user, event) {
 
     // Get challenge
     const [challenge] = await sql`
-        SELECT id, title, reward, target_value, type, tier, gives_badge, badge_label
+        SELECT id, title, reward, ember_reward, target_value, type, tier, gives_badge, badge_label
         FROM challenges
         WHERE id = ${challengeId} AND is_active = true
     `
@@ -330,6 +323,14 @@ async function claimChallenge(sql, user, event) {
     const result = await grantPassion(sql, user.id, 'challenge_complete', challenge.reward,
         `Challenge: ${challenge.title}`, String(challenge.id))
 
+    // Grant ember if challenge has ember_reward
+    let emberEarned = 0
+    if (challenge.ember_reward && challenge.ember_reward > 0) {
+        await grantEmber(sql, user.id, 'challenge_complete', challenge.ember_reward,
+            `Challenge: ${challenge.title}`, String(challenge.id))
+        emberEarned = challenge.ember_reward
+    }
+
     const newRank = getRank(result.totalEarned)
     const rankedUp = formatRank(oldRank) !== formatRank(newRank)
 
@@ -353,6 +354,7 @@ async function claimChallenge(sql, user, event) {
         body: JSON.stringify({
             success: true,
             earned: challenge.reward,
+            emberEarned,
             balance: result.balance,
             totalEarned: result.totalEarned,
             rank: { name: newRank.name, division: newRank.division, display: formatRank(newRank) },

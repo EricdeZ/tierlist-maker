@@ -2,19 +2,10 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { globalPlayerService, profileService } from '../../services/database'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
-import { RARITIES } from '../../data/cardclash/economy'
+import { RARITIES, getHoloEffect } from '../../data/cardclash/economy'
 import { Search, Loader2, User } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary']
-
-// Map CC rarities to TradingCardHolo effect names
-const RARITY_HOLO_MAP = {
-  common: 'common',
-  uncommon: 'holo',
-  rare: 'galaxy',
-  epic: 'cosmos',
-  legendary: 'gold',
-}
 
 export default function CCPlayerCards() {
   const [query, setQuery] = useState('')
@@ -184,7 +175,7 @@ export default function CCPlayerCards() {
           <div className="flex flex-wrap gap-8">
             {rarities.map((rarity) => {
               const info = RARITIES[rarity]
-              const holoEffect = RARITY_HOLO_MAP[rarity]
+              const holoEffect = getHoloEffect(rarity)
               return (
                 <div key={rarity} className="flex flex-col items-center gap-2">
                   <div className="card-overview-slot">

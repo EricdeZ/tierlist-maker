@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { usePassion } from '../context/PassionContext'
 import { useAuth } from '../context/AuthContext'
 import { formatRank } from '../config/ranks'
@@ -10,17 +10,21 @@ import flip1 from '../assets/passion/flipping1.png'
 import flip2 from '../assets/passion/flipping2.png'
 import flip3 from '../assets/passion/flipping3.png'
 import passionsplosion from '../assets/passion/passionsplosion.png'
+import emberIcon from '../assets/ember.png'
 
 const FLIP_FRAMES = [flip1, flip2, flip3, passionCoin]
 
 export default function PassionDisplay() {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
     const {
-        balance, totalEarned, currentStreak, canClaimDaily, claimableCount,
-        rank, nextRank, claimDaily, loading, rankUpInfo, dismissRankUp,
-        challengeNotifications, dismissChallengeNotification,
+        balance, totalEarned, currentStreak, canClaimDaily, lastDailyClaim, claimableCount,
+        rank, nextRank, claimDaily, claimEmberDaily, refreshBalance, loading, rankUpInfo, dismissRankUp,
+        challengeNotifications, dismissChallengeNotification, ember,
     } = usePassion()
+
+    const isCardClash = location.pathname.startsWith('/cardclash')
 
     // Auto-dismiss challenge notifications after 5 seconds
     useEffect(() => {
@@ -82,6 +86,55 @@ export default function PassionDisplay() {
         return () => clearTimeout(timer)
     }, [animatingBalance, balance])
 
+    // Countdown timer until next daily claim (midnight UTC)
+    const [countdown, setCountdown] = useState('')
+    useEffect(() => {
+        if (canClaimDaily || !lastDailyClaim) {
+            setCountdown('')
+            return
+        }
+        const tick = () => {
+            const now = new Date()
+            const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+            const diff = tomorrow - now
+            if (diff <= 0) {
+                setCountdown('')
+                refreshBalance()
+                return
+            }
+            const h = Math.floor(diff / 3600000)
+            const m = Math.floor((diff % 3600000) / 60000)
+            const s = Math.floor((diff % 60000) / 1000)
+            setCountdown(`${h}h ${m}m ${s}s`)
+        }
+        tick()
+        const id = setInterval(tick, 1000)
+        return () => clearInterval(id)
+    }, [canClaimDaily, lastDailyClaim, refreshBalance])
+
+    // Ember daily claim
+    const [emberClaiming, setEmberClaiming] = useState(false)
+    const [emberClaimResult, setEmberClaimResult] = useState(null)
+
+    // Ember countdown
+    const [emberCountdown, setEmberCountdown] = useState('')
+    useEffect(() => {
+        if (ember.canClaimDaily || !ember.lastDailyClaim) { setEmberCountdown(''); return }
+        const tick = () => {
+            const now = new Date()
+            const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+            const diff = tomorrow - now
+            if (diff <= 0) { setEmberCountdown(''); refreshBalance(); return }
+            const h = Math.floor(diff / 3600000)
+            const m = Math.floor((diff % 3600000) / 60000)
+            const s = Math.floor((diff % 60000) / 1000)
+            setEmberCountdown(`${h}h ${m}m ${s}s`)
+        }
+        tick()
+        const id = setInterval(tick, 1000)
+        return () => clearInterval(id)
+    }, [ember.canClaimDaily, ember.lastDailyClaim, refreshBalance])
+
     if (!user || loading) return null
 
     const handleClaim = async () => {
@@ -96,6 +149,16 @@ export default function PassionDisplay() {
             setShowExplosion(true)
             setAnimatingBalance(startBalance)
             setTimeout(() => setShowExplosion(false), 1200)
+        }
+    }
+
+    const handleEmberClaim = async () => {
+        setEmberClaiming(true)
+        setEmberClaimResult(null)
+        const result = await claimEmberDaily()
+        setEmberClaiming(false)
+        if (result && !result.alreadyClaimed) {
+            setEmberClaimResult(result)
         }
     }
 
@@ -265,132 +328,223 @@ export default function PassionDisplay() {
                     )}
                 </Link>
 
-                {/* Passion counter */}
+                {/* Currency counter — swaps between Passion and Ember on Card Clash pages */}
                 <div ref={menuRef} className="relative">
                     <button
                         onClick={() => { setOpen(!open); setClaimResult(null) }}
                         className="relative flex items-center gap-1.5 rounded-lg hover:bg-white/10 transition-colors px-2 py-1"
                     >
-                        <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>
-                        <img id="passion-balance-coin" src={claiming ? FLIP_FRAMES[flipFrame] : passionCoin} alt="Passion"
-                            className={`w-5 h-5 ${claiming ? 'animate-pulse' : ''}`} />
-                        <span className="text-sm font-semibold text-(--color-accent) tabular-nums min-w-[2ch]">
-                            {displayBalance}
-                        </span>
+                        {!isCardClash && <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>}
+                        {isCardClash ? (
+                            <>
+                                <img src={emberIcon} alt="Ember" className="h-5 w-auto object-contain" />
+                                <span className="text-sm font-semibold text-orange-400 tabular-nums min-w-[2ch]">
+                                    {ember.balance}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <img id="passion-balance-coin" src={claiming ? FLIP_FRAMES[flipFrame] : passionCoin} alt="Passion"
+                                    className={`w-5 h-5 ${claiming ? 'animate-pulse' : ''}`} />
+                                <span className="text-sm font-semibold text-(--color-accent) tabular-nums min-w-[2ch]">
+                                    {displayBalance}
+                                </span>
+                            </>
+                        )}
                         {(canClaimDaily && !claimResult || claimableCount > 0) && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#f8c56a' }} />
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: '#f8c56a' }} />
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isCardClash ? '#f97316' : '#f8c56a' }} />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isCardClash ? '#f97316' : '#f8c56a' }} />
                             </span>
                         )}
                     </button>
 
                     {open && (
                         <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-14 sm:top-full mt-0 sm:mt-2 w-auto sm:w-72 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
-                            {/* Rank & Balance header */}
-                            <div className="px-4 py-3 border-b border-white/10">
-                                <div className="flex items-center gap-3">
-                                    <RankBadge rank={rank} size="lg" />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-bold text-(--color-text)">{formatRank(rank)}</div>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                            <img src={passionCoin} alt="" className="w-4 h-4" />
-                                            <span className="text-lg font-bold text-(--color-accent) tabular-nums">{displayBalance}</span>
+                            {isCardClash ? (
+                                <>
+                                    {/* ═══ Card Clash Dropdown ═══ */}
+                                    {/* Ember Balance header */}
+                                    <div className="px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center gap-3">
+                                            <img src={emberIcon} alt="Ember" className="h-8 w-auto object-contain" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-bold text-white/50 uppercase tracking-wider">Ember</div>
+                                                <span className="text-xl font-bold text-orange-400 tabular-nums">{ember.balance}</span>
+                                            </div>
+                                        </div>
+                                        {/* Secondary: Passion balance */}
+                                        <div className="flex items-center gap-1.5 mt-2 text-xs text-white/40">
+                                            <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
+                                            <span className="tabular-nums">{displayBalance} Passion</span>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Progress to next rank */}
-                                {nextRank && (
-                                    <div className="mt-3">
-                                        <div className="flex justify-between text-[10px] text-(--color-text-secondary) mb-1">
-                                            <span>{formatRank(rank)}</span>
-                                            <span>{formatRank(nextRank)}</span>
+                                    {/* Daily Ember claim */}
+                                    <div className="px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="text-xs text-white/50">
+                                                Ember Streak: <span className="text-orange-400 font-bold">{ember.currentStreak || 0}</span>
+                                            </div>
                                         </div>
-                                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full transition-all duration-500"
-                                                style={{
-                                                    width: `${progressPct}%`,
-                                                    background: 'linear-gradient(90deg, #d4a04a, #f8c56a)',
-                                                }} />
-                                        </div>
-                                        <div className="text-[10px] text-(--color-text-secondary) mt-1 text-center">
-                                            {nextRank.passionNeeded} more to {formatRank(nextRank)}
-                                        </div>
-                                    </div>
-                                )}
-                                {!nextRank && (
-                                    <div className="mt-2 text-xs text-center text-(--color-accent) font-medium">Max Rank!</div>
-                                )}
-                            </div>
 
-                            {/* Streak & Daily claim */}
-                            <div className="px-4 py-3 border-b border-white/10">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-(--color-text-secondary)">
-                                        Daily Streak: <span className="text-(--color-accent) font-bold">{currentStreak}</span>
-                                    </div>
-                                </div>
-
-                                {canClaimDaily && !claimResult ? (
-                                    <button
-                                        onClick={handleClaim}
-                                        disabled={claiming}
-                                        className="w-full py-2 rounded-lg hover:opacity-90 font-bold text-sm transition-all disabled:opacity-50 relative overflow-hidden"
-                                        style={{ background: 'linear-gradient(135deg, #c4922e, #f8c56a)', color: '#0a0f1a' }}
-                                    >
-                                        {claiming ? 'Claiming...' : 'Claim Daily Passion'}
-                                        {showExplosion && (
-                                            <img src={passionsplosion} alt=""
-                                                className="absolute inset-0 w-full h-full object-contain animate-explosion pointer-events-none" />
-                                        )}
-                                    </button>
-                                ) : claimResult ? (
-                                    <div className="text-center py-2 text-sm">
-                                        <span className="text-(--color-accent) font-bold">+{claimResult.earned}</span>
-                                        <span className="text-(--color-text-secondary) ml-1">Passion earned!</span>
-                                        {claimResult.streakBonus > 0 && (
-                                            <div className="text-xs text-(--color-accent) mt-0.5">
-                                                (includes +{claimResult.streakBonus} streak bonus)
+                                        {ember.canClaimDaily && !emberClaimResult ? (
+                                            <button
+                                                onClick={handleEmberClaim}
+                                                disabled={emberClaiming}
+                                                className="w-full py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                                                style={{ background: 'linear-gradient(135deg, #c2410c, #f97316)', color: '#fff' }}
+                                            >
+                                                {emberClaiming ? 'Claiming...' : `Claim ${10 + Math.min((ember.currentStreak || 0), 10)} Ember`}
+                                            </button>
+                                        ) : emberClaimResult ? (
+                                            <div className="text-center py-2 text-sm">
+                                                <span className="text-orange-400 font-bold">+{emberClaimResult.earned}</span>
+                                                <span className="text-white/50 ml-1">Ember claimed!</span>
+                                                {emberClaimResult.streakBonus > 0 && (
+                                                    <div className="text-xs text-orange-400/70 mt-0.5">
+                                                        includes +{emberClaimResult.streakBonus} streak bonus
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-2 text-xs text-white/50">
+                                                {emberCountdown
+                                                    ? <>Next claim in <span className="text-orange-400 font-mono font-medium tabular-nums">{emberCountdown}</span></>
+                                                    : 'Come back tomorrow!'
+                                                }
                                             </div>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="text-center py-2 text-xs text-(--color-text-secondary)">
-                                        Daily claim used — come back tomorrow!
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* Links */}
-                            <div className="py-1">
-                                <Link to="/leaderboard" onClick={() => setOpen(false)}
-                                    className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                    Leaderboard
-                                </Link>
-                                <Link to="/challenges" onClick={() => setOpen(false)}
-                                    className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                    Challenges
-                                    {claimableCount > 0 && (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                                            style={{ background: 'rgba(248,197,106,0.15)', color: '#f8c56a' }}>
-                                            {claimableCount} ready
-                                        </span>
-                                    )}
-                                </Link>
-                                <Link to="/coinflip" onClick={() => setOpen(false)}
-                                    className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                    Coin Flip
-                                </Link>
-                                <Link to="/shop" onClick={() => setOpen(false)}
-                                    className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
-                                    Passion Shop
-                                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                                        style={{ background: 'rgba(248,197,106,0.15)', color: '#f8c56a' }}>
-                                        Soon
-                                    </span>
-                                </Link>
-                            </div>
+                                    {/* Card Clash Links */}
+                                    <div className="py-1">
+                                        <Link to="/cardclash?tab=packs" onClick={() => setOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Packs
+                                        </Link>
+                                        <Link to="/cardclash?tab=catalog" onClick={() => setOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Collection
+                                        </Link>
+                                        <Link to="/cardclash?tab=starting5" onClick={() => setOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Starting 5
+                                        </Link>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* ═══ Passion Dropdown (default) ═══ */}
+                                    {/* Rank & Balance header */}
+                                    <div className="px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center gap-3">
+                                            <RankBadge rank={rank} size="lg" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-(--color-text)">{formatRank(rank)}</div>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <img src={passionCoin} alt="" className="w-4 h-4" />
+                                                    <span className="text-lg font-bold text-(--color-accent) tabular-nums">{displayBalance}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Progress to next rank */}
+                                        {nextRank && (
+                                            <div className="mt-3">
+                                                <div className="flex justify-between text-[10px] text-(--color-text-secondary) mb-1">
+                                                    <span>{formatRank(rank)}</span>
+                                                    <span>{formatRank(nextRank)}</span>
+                                                </div>
+                                                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all duration-500"
+                                                        style={{
+                                                            width: `${progressPct}%`,
+                                                            background: 'linear-gradient(90deg, #d4a04a, #f8c56a)',
+                                                        }} />
+                                                </div>
+                                                <div className="text-[10px] text-(--color-text-secondary) mt-1 text-center">
+                                                    {nextRank.passionNeeded} more to {formatRank(nextRank)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {!nextRank && (
+                                            <div className="mt-2 text-xs text-center text-(--color-accent) font-medium">Max Rank!</div>
+                                        )}
+                                    </div>
+
+                                    {/* Streak & Daily claim */}
+                                    <div className="px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="text-xs text-(--color-text-secondary)">
+                                                Daily Streak: <span className="text-(--color-accent) font-bold">{currentStreak}</span>
+                                            </div>
+                                        </div>
+
+                                        {canClaimDaily && !claimResult ? (
+                                            <button
+                                                onClick={handleClaim}
+                                                disabled={claiming}
+                                                className="w-full py-2 rounded-lg hover:opacity-90 font-bold text-sm transition-all disabled:opacity-50 relative overflow-hidden"
+                                                style={{ background: 'linear-gradient(135deg, #c4922e, #f8c56a)', color: '#0a0f1a' }}
+                                            >
+                                                {claiming ? 'Claiming...' : 'Claim Daily Passion'}
+                                                {showExplosion && (
+                                                    <img src={passionsplosion} alt=""
+                                                        className="absolute inset-0 w-full h-full object-contain animate-explosion pointer-events-none" />
+                                                )}
+                                            </button>
+                                        ) : claimResult ? (
+                                            <div className="text-center py-2 text-sm">
+                                                <span className="text-(--color-accent) font-bold">+{claimResult.earned}</span>
+                                                <span className="text-(--color-text-secondary) ml-1">Passion earned!</span>
+                                                {claimResult.streakBonus > 0 && (
+                                                    <div className="text-xs text-(--color-accent) mt-0.5">
+                                                        (includes +{claimResult.streakBonus} streak bonus)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-2 text-xs text-(--color-text-secondary)">
+                                                {countdown
+                                                    ? <>Next claim in <span className="text-(--color-accent) font-mono font-medium tabular-nums">{countdown}</span></>
+                                                    : 'Daily claim used — come back tomorrow!'
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Links */}
+                                    <div className="py-1">
+                                        <Link to="/leaderboard" onClick={() => setOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Leaderboard
+                                        </Link>
+                                        <Link to="/challenges" onClick={() => setOpen(false)}
+                                            className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Challenges
+                                            {claimableCount > 0 && (
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                                    style={{ background: 'rgba(248,197,106,0.15)', color: '#f8c56a' }}>
+                                                    {claimableCount} ready
+                                                </span>
+                                            )}
+                                        </Link>
+                                        <Link to="/coinflip" onClick={() => setOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            Coin Flip
+                                        </Link>
+                                        <Link to="/cardclash" onClick={() => setOpen(false)}
+                                            className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
+                                            <span className="flex items-center gap-2">
+                                                <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+                                                Card Clash
+                                            </span>
+                                            <span className="text-xs font-bold text-orange-400 tabular-nums">{ember.balance}</span>
+                                        </Link>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

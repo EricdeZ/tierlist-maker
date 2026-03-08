@@ -1,27 +1,235 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useCardClash } from './CardClashContext';
+import { usePassion } from '../../context/PassionContext';
 import { PACKS, RARITIES } from '../../data/cardclash/economy';
 import { ITEMS } from '../../data/cardclash/items';
 import { CONSUMABLES } from '../../data/cardclash/buffs';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
+import emberIcon from '../../assets/ember.png';
 
-const RARITY_PACKS = ['standard', 'premium', 'elite', 'legendary']
-
-const MIXED_PACKS = ['osl-mixed', 'bsl-mixed']
+const LEAGUE_PACKS = ['osl-mixed', 'bsl-mixed']
 
 const PACK_META = {
-  standard: { subtitle: 'Basic Collection', seed: 0 },
-  premium: { subtitle: 'Enhanced Drops', seed: 1 },
-  elite: { subtitle: 'Rare Guaranteed', seed: 2 },
-  legendary: { subtitle: 'The Ultimate Pull', seed: 3 },
-  mixed: { subtitle: 'Gods, Items & Players', seed: 4 },
   'osl-mixed': { subtitle: 'Olympus League', seed: 5 },
   'bsl-mixed': { subtitle: 'Babylon League', seed: 6 },
 };
 
+// ═══════════════════════════════════════════════
+// Gas Valve Gauge — shows conversion rate pressure
+// ═══════════════════════════════════════════════
+function GasValve({ conversionsToday, nextCost, baseCost }) {
+  const ratio = nextCost / baseCost
+  // 0 conversions = 0%, clamp at 100%
+  const pressure = Math.min((ratio - 1) / 4 * 100, 100)
+  // Needle angle: -90 (left/green) to 90 (right/red)
+  const needleAngle = -90 + (pressure / 100) * 180
+
+  const getColor = (pct) => {
+    if (pct < 25) return '#22c55e'
+    if (pct < 50) return '#eab308'
+    if (pct < 75) return '#f97316'
+    return '#ef4444'
+  }
+  const color = getColor(pressure)
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Rate Pressure</div>
+      <div className="relative w-24 h-14 overflow-hidden">
+        {/* Gauge arc background */}
+        <svg viewBox="0 0 100 55" className="w-full h-full">
+          {/* Background arc */}
+          <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="white" strokeOpacity="0.1" strokeWidth="6" strokeLinecap="round" />
+          {/* Colored arc segments */}
+          <path d="M 10 50 A 40 40 0 0 1 30 17" fill="none" stroke="#22c55e" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
+          <path d="M 30 17 A 40 40 0 0 1 50 10" fill="none" stroke="#eab308" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
+          <path d="M 50 10 A 40 40 0 0 1 70 17" fill="none" stroke="#f97316" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
+          <path d="M 70 17 A 40 40 0 0 1 90 50" fill="none" stroke="#ef4444" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
+          {/* Needle */}
+          <g transform={`rotate(${needleAngle}, 50, 50)`} style={{ transition: 'transform 0.5s ease-out' }}>
+            <line x1="50" y1="50" x2="50" y2="15" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="3" fill={color} />
+          </g>
+          {/* Center dot */}
+          <circle cx="50" cy="50" r="2" fill="white" fillOpacity="0.8" />
+        </svg>
+      </div>
+      <div className="text-xs font-bold tabular-nums" style={{ color }}>
+        {conversionsToday === 0 ? 'Base rate' : `${ratio.toFixed(1)}x cost`}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// Ember Conversion Panel
+// ═══════════════════════════════════════════════
+function EmberConversion({ ember, passion, onConvert }) {
+  const [converting, setConverting] = useState(false)
+  const [result, setResult] = useState(null)
+  const canAfford = passion >= ember.nextConversionCost
+
+  const handleConvert = async () => {
+    setConverting(true)
+    setResult(null)
+    try {
+      const res = await onConvert()
+      setResult(res)
+      setTimeout(() => setResult(null), 3000)
+    } catch (err) {
+      // error handled by context
+    }
+    setConverting(false)
+  }
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <img src={emberIcon} alt="Ember" className="h-5 w-auto object-contain" />
+          <span className="text-sm font-bold text-orange-400">Passion → Ember</span>
+        </div>
+        <GasValve
+          conversionsToday={ember.conversionsToday}
+          nextCost={ember.nextConversionCost}
+          baseCost={50}
+        />
+      </div>
+
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex-1 text-center">
+          <div className="text-2xl font-bold text-amber-400 tabular-nums">{ember.nextConversionCost}</div>
+          <div className="text-[10px] text-white/40 uppercase">Passion cost</div>
+        </div>
+        <svg className="w-5 h-5 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+        <div className="flex-1 text-center">
+          <div className="flex items-center justify-center gap-1">
+            <div className="text-2xl font-bold text-orange-400 tabular-nums">{ember.conversionEmberAmount}</div>
+            <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+          </div>
+          <div className="text-[10px] text-white/40 uppercase">Ember gained</div>
+        </div>
+      </div>
+
+      {result ? (
+        <div className="text-center py-1.5 text-sm">
+          <span className="text-orange-400 font-bold">+{result.emberGained}</span>
+          <span className="text-white/60 ml-1">Ember received</span>
+        </div>
+      ) : (
+        <button
+          onClick={handleConvert}
+          disabled={!canAfford || converting}
+          className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
+            canAfford
+              ? 'bg-gradient-to-r from-orange-600 to-orange-500 text-white hover:from-orange-500 hover:to-orange-400'
+              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {converting ? 'Converting...' : canAfford ? 'Convert' : `Need ${ember.nextConversionCost} Passion`}
+        </button>
+      )}
+
+      {ember.conversionsToday > 0 && (
+        <div className="text-[10px] text-white/30 text-center mt-2">
+          {ember.conversionsToday} conversion{ember.conversionsToday !== 1 ? 's' : ''} today — rates reset at midnight UTC
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// Ember Daily Claim
+// ═══════════════════════════════════════════════
+function EmberDailyClaim({ ember, onClaim }) {
+  const [claiming, setClaiming] = useState(false)
+  const [claimResult, setClaimResult] = useState(null)
+  const [countdown, setCountdown] = useState('')
+
+  useEffect(() => {
+    if (ember.canClaimDaily || !ember.lastDailyClaim) {
+      setCountdown('')
+      return
+    }
+    const tick = () => {
+      const now = new Date()
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+      const diff = tomorrow - now
+      if (diff <= 0) { setCountdown(''); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown(`${h}h ${m}m ${s}s`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [ember.canClaimDaily, ember.lastDailyClaim])
+
+  const handleClaim = async () => {
+    setClaiming(true)
+    const result = await onClaim()
+    setClaiming(false)
+    if (result && !result.alreadyClaimed) {
+      setClaimResult(result)
+      setTimeout(() => setClaimResult(null), 4000)
+    }
+  }
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <img src={emberIcon} alt="Ember" className="h-5 w-auto object-contain" />
+        <span className="text-sm font-bold text-orange-400">Daily Ember</span>
+        {ember.currentStreak > 0 && (
+          <span className="ml-auto text-xs text-white/50">
+            Streak: <span className="text-orange-400 font-bold">{ember.currentStreak}</span>
+          </span>
+        )}
+      </div>
+
+      {ember.canClaimDaily && !claimResult ? (
+        <button
+          onClick={handleClaim}
+          disabled={claiming}
+          className="w-full py-2.5 rounded-lg font-bold text-sm transition-all bg-gradient-to-r from-orange-600 to-amber-500 text-white hover:from-orange-500 hover:to-amber-400 disabled:opacity-50"
+        >
+          {claiming ? 'Claiming...' : `Claim ${10 + Math.min((ember.currentStreak) * 1, 10)} Ember`}
+        </button>
+      ) : claimResult ? (
+        <div className="text-center py-1.5">
+          <div className="text-sm">
+            <span className="text-orange-400 font-bold">+{claimResult.earned}</span>
+            <span className="text-white/60 ml-1">Ember claimed!</span>
+          </div>
+          {claimResult.streakBonus > 0 && (
+            <div className="text-xs text-orange-400/70 mt-0.5">
+              includes +{claimResult.streakBonus} streak bonus
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-1.5 text-xs text-white/50">
+          {countdown
+            ? <>Next claim in <span className="text-orange-400 font-mono font-medium tabular-nums">{countdown}</span></>
+            : 'Come back tomorrow!'
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// Main Pack Shop
+// ═══════════════════════════════════════════════
 export default function PackShop() {
-  const { passion, buyPack, testMode } = useCardClash();
+  const { passion, ember, buyPack, testMode, convertPassionToEmber } = useCardClash();
+  const { claimEmberDaily } = usePassion();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,24 +252,6 @@ export default function PackShop() {
   const godNames = ['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'];
   const godUrl = (name) => `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${name}/Default/t_GodCard_${name}.png`;
 
-  const testOpening = useCallback((packType = 'premium') => {
-    const pack = PACKS[packType];
-    const rarityKeys = Object.keys(RARITIES);
-    const fakeCards = Array.from({ length: pack.cards }, (_, i) => ({
-      godName: godNames[i % 8],
-      godClass: 'Mage',
-      imageUrl: godUrl(godNames[i % 8]),
-      ability: { name: 'Test Ability', description: 'A test ability.' },
-      godId: i + 1,
-      serialNumber: 1000 + i,
-      rarity: i === 0 ? 'legendary' : i === 1 ? 'epic' : i < 4 ? 'rare' : rarityKeys[Math.floor(Math.random() * 3)],
-      isNew: i < 3,
-    }));
-    const result = { cards: fakeCards, packName: pack.name, packType, _skipTear: true };
-    setLastTest(result);
-    setOpenResult(result);
-  }, []);
-
   const testAllRarities = useCallback(() => {
     const allRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
     const fakeCards = allRarities.map((rarity, i) => ({
@@ -74,7 +264,7 @@ export default function PackShop() {
       rarity,
       isNew: true,
     }));
-    const result = { cards: fakeCards, packName: 'All Rarities Test', packType: 'legendary', _skipToStack: true };
+    const result = { cards: fakeCards, packName: 'All Rarities Test', packType: 'osl-mixed', _skipToStack: true };
     setLastTest(result);
     setOpenResult(result);
   }, []);
@@ -103,7 +293,6 @@ export default function PackShop() {
           imageUrl: pick.imageUrl || '', cardData: { color: pick.color, description: pick.description, manaCost: pick.manaCost },
           godId: `con-${pick.id}`, serialNumber: 3000 + order, rarity, isNew: true, _revealOrder: order };
       }
-      // god
       const g = godNames[Math.floor(Math.random() * godNames.length)];
       return { cardType: 'god', godName: g, godClass: 'Mage', imageUrl: godUrl(g),
         ability: { name: 'Test Ability', description: 'A test ability.' },
@@ -111,7 +300,6 @@ export default function PackShop() {
         rarity, isNew: true, _revealOrder: order };
     };
 
-    // Guaranteed player in slots 0-4, wildcard slot 5 can also roll player
     const playerSlot = Math.floor(Math.random() * 5);
     const rareRarities = ['uncommon', 'rare', 'epic', 'legendary', 'mythic'];
     const base = [];
@@ -131,18 +319,30 @@ export default function PackShop() {
     setOpenResult(result);
   }, []);
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-1">Pack Shop</h1>
-      <p className="text-sm text-gray-400 mb-8">Spend Passion to open card packs. Better packs guarantee rarer cards.</p>
+  const emberBalance = ember?.balance ?? 0;
 
-      {/* Rarity Packs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10 justify-items-center">
-        {RARITY_PACKS.map((key) => {
+  return (
+    <div>
+      {/* ═══ Ember Balance Bar ═══ */}
+      <div className="flex items-center justify-center gap-6 mb-6">
+        <div className="flex items-center gap-2 bg-white/5 border border-orange-500/20 rounded-xl px-4 py-2">
+          <img src={emberIcon} alt="Ember" className="h-6 w-auto object-contain" />
+          <span className="text-lg font-bold text-orange-400 tabular-nums">{emberBalance}</span>
+          <span className="text-xs text-white/40">Ember</span>
+        </div>
+        {!testMode && (
+          <div className="text-xs text-white/30">
+            Passion: <span className="text-amber-400 font-bold">{passion.toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ League Packs ═══ */}
+      <div className="flex justify-center gap-10 mb-8">
+        {LEAGUE_PACKS.map((key) => {
           const pack = PACKS[key];
           const meta = PACK_META[key];
-          const canAfford = testMode || passion >= pack.cost;
-
+          const canAfford = testMode || emberBalance >= pack.cost;
           return (
             <div
               key={key}
@@ -161,20 +361,22 @@ export default function PackShop() {
 
               <div className="text-center">
                 <div className="space-y-0.5 mb-2">
-                  {pack.guarantees.map((g, i) => (
-                    <div key={i} className="text-xs text-white/60">
-                      {g.count}x <span style={{ color: RARITIES[g.minRarity]?.color }}>{RARITIES[g.minRarity]?.name}+</span> guaranteed
-                    </div>
-                  ))}
+                  <div className="text-xs text-white/60">
+                    6 cards &middot; 1 <span style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player &middot; random mix
+                  </div>
+                  <div className="text-xs text-white/60">
+                    <span className="text-green-400">Uncommon+</span> rare slot &middot; <span className="text-amber-400">Wildcard</span> finale
+                  </div>
                 </div>
 
                 <button
                   disabled={!canAfford || !!openResult}
-                  className={`px-5 py-1.5 rounded font-bold text-sm ${
-                    canAfford ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  className={`px-5 py-1.5 rounded font-bold text-sm flex items-center gap-1.5 mx-auto ${
+                    canAfford ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {canAfford ? `${pack.cost} Passion` : 'Need more'}
+                  <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+                  {canAfford ? `${pack.cost} Ember` : 'Need more'}
                 </button>
               </div>
             </div>
@@ -182,76 +384,28 @@ export default function PackShop() {
         })}
       </div>
 
-      {/* League Mixed Packs */}
-      <div className="border-t border-white/10 pt-8 mb-8">
-        <h2 className="text-lg font-bold mb-1 text-center">League Packs</h2>
-        <p className="text-xs text-gray-500 mb-6 text-center">Gods, items, consumables & a guaranteed player card from each league</p>
-        <div className="flex justify-center gap-10">
-          {MIXED_PACKS.map((key) => {
-            const pack = PACKS[key];
-            const meta = PACK_META[key];
-            const canAfford = testMode || passion >= pack.cost;
-            return (
-              <div
-                key={key}
-                className={`flex flex-col items-center gap-4 ${
-                  canAfford ? 'cursor-pointer group' : 'opacity-50'
-                }`}
-                onClick={() => canAfford && !openResult && handleBuyPack(key)}
-              >
-                <PackArt
-                  tier={key}
-                  name={pack.name}
-                  subtitle={meta.subtitle}
-                  cardCount={pack.cards}
-                  seed={meta.seed}
-                />
-
-                <div className="text-center">
-                  <div className="space-y-0.5 mb-2">
-                    <div className="text-xs text-white/60">
-                      6 cards &middot; 1 <span style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player &middot; random mix
-                    </div>
-                    <div className="text-xs text-white/60">
-                      <span className="text-green-400">Uncommon+</span> rare slot &middot; <span className="text-amber-400">Wildcard</span> finale
-                    </div>
-                  </div>
-
-                  <button
-                    disabled={!canAfford || !!openResult}
-                    className={`px-5 py-1.5 rounded font-bold text-sm ${
-                      canAfford ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {canAfford ? `${pack.cost} Passion` : 'Need more'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Current balance */}
-      <div className="text-center text-sm text-gray-400">
+      {/* ═══ Current balance ═══ */}
+      <div className="text-center text-sm text-gray-400 mb-6">
         {testMode
           ? <span className="text-amber-400 font-bold">Test Mode -- All packs free!</span>
-          : <>Your balance: <span className="text-amber-400 font-bold">{passion.toLocaleString()} Passion</span></>
+          : <span className="flex items-center justify-center gap-1.5">
+              <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+              <span className="text-orange-400 font-bold">{emberBalance} Ember</span>
+            </span>
         }
       </div>
+
+      {/* ═══ Ember Economy Panel ═══ */}
+      {!testMode && (
+        <div className="max-w-sm mx-auto space-y-3 mb-8">
+          <EmberDailyClaim ember={ember} onClaim={claimEmberDaily} />
+          <EmberConversion ember={ember} passion={passion} onConvert={convertPassionToEmber} />
+        </div>
+      )}
 
       {/* Dev: test opening animation */}
       {testMode && (
         <div className="mt-6 flex justify-center gap-3 flex-wrap">
-          {RARITY_PACKS.map(key => (
-            <button
-              key={key}
-              onClick={() => testOpening(key)}
-              className="px-3 py-1 text-xs bg-purple-600/30 border border-purple-500/40 rounded text-purple-300 hover:bg-purple-600/50"
-            >
-              Test {key}
-            </button>
-          ))}
           <button
             onClick={() => testMixedPack('osl-mixed', 'OSL Pack')}
             className="px-3 py-1 text-xs bg-yellow-600/30 border border-yellow-500/40 rounded text-yellow-300 hover:bg-yellow-600/50 font-bold"
@@ -293,7 +447,7 @@ export default function PackShop() {
       {loading && !openResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 border-3 border-white/20 border-t-amber-400 rounded-full animate-spin" />
+            <div className="w-10 h-10 border-3 border-white/20 border-t-orange-400 rounded-full animate-spin" />
             <p className="text-sm text-white/60 font-semibold tracking-widest uppercase">Opening pack...</p>
           </div>
         </div>

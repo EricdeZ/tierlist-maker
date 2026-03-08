@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useDivision } from '../../context/DivisionContext'
-import { statsService, matchService } from '../../services/database'
+import { statsService, matchService, standingsService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 import TeamLogo from '../../components/TeamLogo'
 import { Building2, Crown } from 'lucide-react'
@@ -30,6 +30,7 @@ const TeamDetail = () => {
 
     const [rosterStats, setRosterStats] = useState([])
     const [matches, setMatches] = useState([])
+    const [teamRecord, setTeamRecord] = useState({ wins: 0, losses: 0 })
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [showPerGame, setShowPerGame] = useState(false)
@@ -47,9 +48,10 @@ const TeamDetail = () => {
             setLoading(true)
             setError(null)
             try {
-                const [allStats, allMatches] = await Promise.all([
+                const [allStats, allMatches, standings] = await Promise.all([
                     statsService.getPlayerStats(season.id),
                     matchService.getAllBySeason(season.id),
+                    standingsService.getBySeason(season.id),
                 ])
                 if (cancelled) return
 
@@ -84,6 +86,12 @@ const TeamDetail = () => {
                     m => m.team1_id === team.id || m.team2_id === team.id
                 )
                 setMatches(teamMatches)
+
+                // Team record from standings (respects stage filters)
+                const teamStanding = standings.find(s => s.id === team.id)
+                if (teamStanding) {
+                    setTeamRecord({ wins: Number(teamStanding.match_wins) || 0, losses: Number(teamStanding.match_losses) || 0 })
+                }
             } catch (err) {
                 if (!cancelled) setError(err.message)
             } finally {
@@ -116,10 +124,8 @@ const TeamDetail = () => {
         })
     }
 
-    // Team record from matches
-    const completedMatches = matches.filter(m => m.is_completed)
-    const teamWins = completedMatches.filter(m => m.winner_team_id === team.id).length
-    const teamLosses = completedMatches.length - teamWins
+    const teamWins = teamRecord.wins
+    const teamLosses = teamRecord.losses
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
@@ -155,7 +161,7 @@ const TeamDetail = () => {
                             {teamPlayers.length} players · {season?.name}
                         </p>
                     </div>
-                    {!loading && completedMatches.length > 0 && (
+                    {!loading && (teamWins + teamLosses) > 0 && (
                         <div className="sm:text-right flex-shrink-0">
                             <div className="font-heading text-2xl font-bold text-(--color-text)">
                                 <span className="text-green-400">{teamWins}</span>

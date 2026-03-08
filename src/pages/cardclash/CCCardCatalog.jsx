@@ -6,7 +6,7 @@ import { GODS } from '../../data/cardclash/gods'
 import { ITEMS } from '../../data/cardclash/items'
 import { MINIONS } from '../../data/cardclash/minions'
 import { BUFFS, CONSUMABLES } from '../../data/cardclash/buffs'
-import { RARITIES } from '../../data/cardclash/economy'
+import { RARITIES, getHoloEffect } from '../../data/cardclash/economy'
 import { cardclashService } from '../../services/database'
 
 const SAMPLE_PLAYER = {
@@ -30,10 +30,6 @@ const SAMPLE_PLAYER = {
   },
 }
 
-const OVERVIEW_HOLO_MAP = {
-  common: 'common', uncommon: 'holo', rare: 'galaxy',
-  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow',
-}
 
 const CARD_TYPES = [
   { key: 'overview', label: 'Overview' },
@@ -174,7 +170,7 @@ export default function CCCardCatalog() {
             <RaritySection key={rarity} rarity={rarity}>
               <div className="flex flex-col items-center gap-2">
                 <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="JUNGLE" holoType="holo">
+                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="holo">
                     <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
                   </TradingCardHolo>
                 </div>
@@ -182,7 +178,7 @@ export default function CCCardCatalog() {
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="JUNGLE" holoType="reverse">
+                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="reverse">
                     <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
                   </TradingCardHolo>
                 </div>
@@ -190,38 +186,38 @@ export default function CCCardCatalog() {
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="JUNGLE" holoType="full">
+                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="full">
                     <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
                   </TradingCardHolo>
                 </div>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player (Full)</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="ADC" holoType="reverse" size={cardSize}>
+                <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="god" rarity={rarity} data={applyOverride('god', GODS[0].slug, GODS[0])} />
                 </TradingCardHolo>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">God</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="ADC" holoType="reverse" size={cardSize}>
+                <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="item" rarity={rarity} data={applyOverride('item', ITEMS[0].id, ITEMS[0])} />
                 </TradingCardHolo>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Item</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="ADC" holoType="reverse" size={cardSize}>
+                <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="minion" rarity={rarity} data={applyOverride('minion', MINIONS[0].type, MINIONS[0])} />
                 </TradingCardHolo>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Minion</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="ADC" holoType="reverse" size={cardSize}>
+                <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="buff" rarity={rarity} data={applyOverride('buff', BUFFS[0].id, BUFFS[0])} />
                 </TradingCardHolo>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Buff</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <TradingCardHolo rarity={OVERVIEW_HOLO_MAP[rarity] || 'common'} role="ADC" holoType="reverse" size={cardSize}>
+                <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="consumable" rarity={rarity} data={applyOverride('consumable', CONSUMABLES[0].id, CONSUMABLES[0])} />
                 </TradingCardHolo>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Consumable</span>

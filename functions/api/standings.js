@@ -27,6 +27,9 @@ const handler = async (event) => {
                     ON m.season_id = ${seasonId}
                     AND m.is_completed = true
                     AND (m.team1_id = t.id OR m.team2_id = t.id)
+                    AND (m.stage_id IS NULL OR NOT EXISTS (
+                        SELECT 1 FROM season_stages ss WHERE ss.id = m.stage_id AND ss.counts_for_team_record = false
+                    ))
                 LEFT JOIN games g
                     ON g.match_id = m.id
                     AND g.is_completed = true

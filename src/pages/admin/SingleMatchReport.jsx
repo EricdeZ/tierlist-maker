@@ -4,6 +4,7 @@ import { getAuthHeaders } from '../../services/adminApi.js'
 import { API, uid, buildEditData, compressImage } from './dashboard/constants'
 import { ErrorBanner } from './dashboard/FormControls'
 import { MatchReportCard } from './dashboard/MatchReportCard'
+import WizardMatchReport from './dashboard/WizardMatchReport'
 
 const LOCK_TTL_MS = 10 * 60 * 1000
 const LOCK_WARN_MS = 9 * 60 * 1000
@@ -11,6 +12,9 @@ const LOCK_WARN_MS = 9 * 60 * 1000
 export default function SingleMatchReport() {
     const { scheduledMatchId } = useParams()
     const navigate = useNavigate()
+
+    // Mode toggle
+    const [wizardMode, setWizardMode] = useState(true)
 
     // Core state
     const [adminData, setAdminData] = useState(null)
@@ -436,6 +440,23 @@ export default function SingleMatchReport() {
         }
     }, [matchReport, adminData, updateReport, clearLockTimers])
 
+    // ─── Wizard helpers ───
+    const extractFromScreenshots = useCallback(async (selectedItemIds) => {
+        const result = await addDiscordImages(mrIdRef.current, selectedItemIds)
+        if (!result.success) {
+            updateReport({ status: 'error', error: result.error })
+            return
+        }
+        await processOne()
+    }, [addDiscordImages, processOne, updateReport])
+
+    const handleUpdateEditData = useCallback((updater) => {
+        updateReport(prev => ({
+            ...prev,
+            editData: typeof updater === 'function' ? updater(prev.editData) : { ...prev.editData, ...updater },
+        }))
+    }, [updateReport])
+
     const selectedSeason = adminData?.seasons?.find(s => String(s.season_id) === String(matchInfo?.season_id)) || null
 
     // ─── Render ───
@@ -498,12 +519,20 @@ export default function SingleMatchReport() {
                         {matchInfo.scheduled_date && <> &middot; {new Date(matchInfo.scheduled_date).toLocaleDateString()}</>}
                     </p>
                 </div>
-                <button
-                    onClick={async () => { await releaseLock(); navigate('/admin/matchreport') }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-red-500/50 hover:text-red-400 transition"
-                >
-                    Cancel Report
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setWizardMode(m => !m)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition"
+                    >
+                        {wizardMode ? 'Legacy Mode' : 'Wizard Mode'}
+                    </button>
+                    <button
+                        onClick={async () => { await releaseLock(); navigate('/admin/matchreport') }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-red-500/50 hover:text-red-400 transition"
+                    >
+                        Cancel Report
+                    </button>
+                </div>
             </div>
 
             {/* Lock refresh warning popup */}
@@ -532,39 +561,52 @@ export default function SingleMatchReport() {
                 </div>
             )}
 
-            {/* The match report card */}
-            <MatchReportCard
-                report={matchReport}
-                liveImages={liveImagesRef.current}
-                adminData={adminData}
-                isSelected={false}
-                onToggleSelect={() => {}}
-                onUpdateText={(text) => updateReport({ text })}
-                onUpdateEditData={(updater) => updateReport(prev => ({
-                    ...prev,
-                    editData: typeof updater === 'function' ? updater(prev.editData) : { ...prev.editData, ...updater },
-                }))}
-                onAddImages={(files) => addImages(mrIdRef.current, files)}
-                onRemoveImage={(imgId) => removeImage(mrIdRef.current, imgId)}
-                onRemove={() => {}}
-                confirmDelete={false}
-                onConfirmRemove={() => {}}
-                onCancelRemove={() => {}}
-                onProcess={processOne}
-                onRetry={() => updateReport({ status: 'pending', error: null })}
-                onSubmit={submitOne}
-                isSubmitting={submitting}
-                submitResult={submitResult}
-                scheduledMatches={[]}
-                linkedScheduledIds={new Set()}
-                discordItems={discordItems}
-                discordPolling={false}
-                selectedSeason={selectedSeason}
-                onPollDiscord={() => {}}
-                onAddDiscordImages={(selectedItemIds) => addDiscordImages(mrIdRef.current, selectedItemIds)}
-                onSkipDiscordItems={() => {}}
-                onSetActiveCard={() => {}}
-            />
+            {/* Match report content */}
+            {wizardMode ? (
+                <WizardMatchReport
+                    matchInfo={matchInfo}
+                    editData={matchReport.editData}
+                    onUpdateEditData={handleUpdateEditData}
+                    adminData={adminData}
+                    queueItems={discordItems}
+                    onExtract={extractFromScreenshots}
+                    status={matchReport.status}
+                    error={matchReport.error}
+                    onSubmit={submitOne}
+                    isSubmitting={submitting}
+                    submitResult={submitResult}
+                />
+            ) : (
+                <MatchReportCard
+                    report={matchReport}
+                    liveImages={liveImagesRef.current}
+                    adminData={adminData}
+                    isSelected={false}
+                    onToggleSelect={() => {}}
+                    onUpdateText={(text) => updateReport({ text })}
+                    onUpdateEditData={handleUpdateEditData}
+                    onAddImages={(files) => addImages(mrIdRef.current, files)}
+                    onRemoveImage={(imgId) => removeImage(mrIdRef.current, imgId)}
+                    onRemove={() => {}}
+                    confirmDelete={false}
+                    onConfirmRemove={() => {}}
+                    onCancelRemove={() => {}}
+                    onProcess={processOne}
+                    onRetry={() => updateReport({ status: 'pending', error: null })}
+                    onSubmit={submitOne}
+                    isSubmitting={submitting}
+                    submitResult={submitResult}
+                    scheduledMatches={[]}
+                    linkedScheduledIds={new Set()}
+                    discordItems={discordItems}
+                    discordPolling={false}
+                    selectedSeason={selectedSeason}
+                    onPollDiscord={() => {}}
+                    onAddDiscordImages={(selectedItemIds) => addDiscordImages(mrIdRef.current, selectedItemIds)}
+                    onSkipDiscordItems={() => {}}
+                    onSetActiveCard={() => {}}
+                />
+            )}
         </div>
     )
 }

@@ -40,6 +40,9 @@ const handler = async (event) => {
                 JOIN divisions d ON s.division_id = d.id
                 JOIN leagues l ON s.league_id = l.id
                 LEFT JOIN matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
+                    AND (m.stage_id IS NULL OR NOT EXISTS (
+                        SELECT 1 FROM season_stages ss WHERE ss.id = m.stage_id AND ss.counts_for_team_record = false
+                    ))
                 WHERE t.organization_id = ${org.id}
                 GROUP BY t.id, t.name, t.slug, t.color, t.season_id,
                          s.name, s.start_date, d.name, d.slug, l.name, l.slug, l.color

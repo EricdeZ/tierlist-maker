@@ -81,9 +81,12 @@ const handler = async (event) => {
                 case 'report-outcome': {
                     const result = await reportOutcome(sql, user, body)
                     if (!result.error && body.outcome === 'completed') {
-                        const push = getScrimStats(sql, user.id).then(stats =>
-                            pushChallengeProgress(sql, user.id, stats)
-                        ).catch(err => console.error('Scrim challenge push failed:', err))
+                        const userIds = [result.user_id, result.accepted_user_id].filter(Boolean)
+                        const push = Promise.all(userIds.map(uid =>
+                            getScrimStats(sql, uid).then(stats =>
+                                pushChallengeProgress(sql, uid, stats)
+                            )
+                        )).catch(err => console.error('Scrim challenge push failed:', err))
                         if (event.waitUntil) event.waitUntil(push)
                     }
                     return postResult(result)

@@ -52,6 +52,8 @@ const handler = async (event) => {
                     return await saveGame(sql, body, admin, isOwnOnly, event)
                 case 'transfer-match':
                     return await transferMatch(sql, body, admin, isOwnOnly, event)
+                case 'bulk-assign-stage':
+                    return await bulkAssignStage(sql, body, admin, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -308,7 +310,7 @@ async function deleteGame(sql, body, admin, isOwnOnly, event) {
 // POST: Update match-level fields
 // ═══════════════════════════════════════════════════
 async function updateMatch(sql, body, admin, isOwnOnly, event) {
-    const { match_id, date, week, team1_id, team2_id } = body
+    const { match_id, date, week, team1_id, team2_id, stage_id, group_id, round_id } = body
     if (!match_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_id required' }) }
     }
@@ -328,11 +330,14 @@ async function updateMatch(sql, body, admin, isOwnOnly, event) {
             date = COALESCE(${date || null}, date),
             week = ${week !== undefined ? (week || null) : sql`week`},
             team1_id = COALESCE(${team1_id || null}, team1_id),
-            team2_id = COALESCE(${team2_id || null}, team2_id)
+            team2_id = COALESCE(${team2_id || null}, team2_id),
+            stage_id = ${stage_id !== undefined ? (stage_id || null) : sql`stage_id`},
+            group_id = ${group_id !== undefined ? (group_id || null) : sql`group_id`},
+            round_id = ${round_id !== undefined ? (round_id || null) : sql`round_id`}
         WHERE id = ${match_id}
     `
 
-    await logAudit(sql, admin, { action: 'update-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id, details: { date, week, team1_id, team2_id } })
+    await logAudit(sql, admin, { action: 'update-match', endpoint: 'admin-match-manage', targetType: 'match', targetId: match_id, details: { date, week, team1_id, team2_id, stage_id, group_id, round_id } })
 
     // Recalculate forge performance scores (date changes affect recency weights)
     const [matchForForge] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
@@ -505,6 +510,31 @@ async function recalcMatchWinner(tx, matchId, event) {
                 .catch(err => console.error('Bracket advancement from game save failed:', err))
         )
     }
+}
+
+async function bulkAssignStage(sql, body, admin, event) {
+    const { match_ids, stage_id, group_id, round_id } = body
+    if (!Array.isArray(match_ids) || match_ids.length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'match_ids array required' }) }
+    }
+
+    // Verify permission from the first match's league
+    const leagueId = await getLeagueIdFromMatch(match_ids[0])
+    if (!leagueId || !await requireAnyPermission(event, ['match_manage', 'match_schedule'], leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
+    await sql`
+        UPDATE matches SET
+            stage_id = ${stage_id || null},
+            group_id = ${group_id || null},
+            round_id = ${round_id || null}
+        WHERE id = ANY(${match_ids})
+    `
+
+    await logAudit(sql, admin, { action: 'bulk-assign-stage', endpoint: 'admin-match-manage', details: { match_ids, stage_id, group_id, round_id } })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: `${match_ids.length} match(es) updated` }) }
 }
 
 export const onRequest = adapt(handler)

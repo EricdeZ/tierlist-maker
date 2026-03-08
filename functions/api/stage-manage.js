@@ -117,7 +117,7 @@ async function handleGet(sql, event) {
 // ═══════════════════════════════════════════════════
 
 async function createStage(sql, body, admin, event) {
-    const { season_id, name, stage_type, sort_order, settings } = body
+    const { season_id, name, stage_type, sort_order, settings, counts_for_team_record } = body
     if (!season_id || !name) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id and name required' }) }
     }
@@ -128,23 +128,24 @@ async function createStage(sql, body, admin, event) {
     }
 
     const slug = slugify(name)
+    const countsForRecord = counts_for_team_record !== false
     const [created] = await sql`
-        INSERT INTO season_stages (season_id, name, slug, stage_type, sort_order, settings)
-        VALUES (${season_id}, ${name}, ${slug}, ${stage_type || null}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})})
+        INSERT INTO season_stages (season_id, name, slug, stage_type, sort_order, settings, counts_for_team_record)
+        VALUES (${season_id}, ${name}, ${slug}, ${stage_type || null}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})}, ${countsForRecord})
         RETURNING *
     `
 
     await logAudit(sql, admin, {
         action: 'create-stage', endpoint: 'stage-manage',
         targetType: 'season_stage', targetId: created.id,
-        details: { season_id, name, stage_type }
+        details: { season_id, name, stage_type, counts_for_team_record: countsForRecord }
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, stage: created }) }
 }
 
 async function createStageLeagueWide(sql, body, admin, event) {
-    const { season_id, name, stage_type, sort_order, settings } = body
+    const { season_id, name, stage_type, sort_order, settings, counts_for_team_record } = body
     if (!season_id || !name) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id and name required' }) }
     }
@@ -162,6 +163,7 @@ async function createStageLeagueWide(sql, body, admin, event) {
     `
 
     const slug = slugify(name)
+    const countsForRecord = counts_for_team_record !== false
     const created = []
     for (const s of siblingSeasons) {
         // Skip if this season already has a stage with this slug
@@ -171,8 +173,8 @@ async function createStageLeagueWide(sql, body, admin, event) {
         if (existing) continue
 
         const [row] = await sql`
-            INSERT INTO season_stages (season_id, name, slug, stage_type, sort_order, settings)
-            VALUES (${s.season_id}, ${name}, ${slug}, ${stage_type || null}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})})
+            INSERT INTO season_stages (season_id, name, slug, stage_type, sort_order, settings, counts_for_team_record)
+            VALUES (${s.season_id}, ${name}, ${slug}, ${stage_type || null}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})}, ${countsForRecord})
             RETURNING *
         `
         created.push(row)
@@ -188,7 +190,7 @@ async function createStageLeagueWide(sql, body, admin, event) {
 }
 
 async function updateStage(sql, body, admin, event) {
-    const { id, name, stage_type, sort_order, status, settings } = body
+    const { id, name, stage_type, sort_order, status, settings, counts_for_team_record } = body
     if (!id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
     }
@@ -210,7 +212,8 @@ async function updateStage(sql, body, admin, event) {
             stage_type = ${stage_type !== undefined ? (stage_type || null) : sql`stage_type`},
             sort_order = COALESCE(${sort_order ?? null}, sort_order),
             status = COALESCE(${status || null}, status),
-            settings = COALESCE(${settings ? JSON.stringify(settings) : null}::jsonb, settings)
+            settings = COALESCE(${settings ? JSON.stringify(settings) : null}::jsonb, settings),
+            counts_for_team_record = ${counts_for_team_record !== undefined ? counts_for_team_record : sql`counts_for_team_record`}
         WHERE id = ${id}
     `
 

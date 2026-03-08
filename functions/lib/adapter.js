@@ -45,7 +45,16 @@ export function adapt(handler) {
             env,
         }
 
-        const result = await handler(event)
+        let result
+        try {
+            result = await handler(event)
+        } catch (err) {
+            console.error('Unhandled function error:', err)
+            return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            })
+        }
 
         return new Response(result.body || '', {
             status: result.statusCode || 200,

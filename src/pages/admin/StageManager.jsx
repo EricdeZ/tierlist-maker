@@ -203,7 +203,7 @@ export default function StageManager() {
 
     const openNewStageForm = () => {
         setEditingStage('new')
-        setStageForm({ name: '', stage_type: '', sort_order: stages.length, status: 'pending', league_wide: false })
+        setStageForm({ name: '', stage_type: '', sort_order: stages.length, status: 'pending', counts_for_team_record: true, league_wide: false })
     }
 
     const openEditStageForm = (stage) => {
@@ -213,6 +213,7 @@ export default function StageManager() {
             stage_type: stage.stage_type || '',
             sort_order: stage.sort_order,
             status: stage.status,
+            counts_for_team_record: stage.counts_for_team_record !== false,
         })
     }
 
@@ -229,6 +230,7 @@ export default function StageManager() {
                     name: stageForm.name.trim(),
                     stage_type: stageForm.stage_type || null,
                     sort_order: parseInt(stageForm.sort_order) || 0,
+                    counts_for_team_record: stageForm.counts_for_team_record,
                 })
                 showToast('success', isLeagueWide
                     ? `Stage created in ${result.created_count} division${result.created_count !== 1 ? 's' : ''}`
@@ -242,6 +244,7 @@ export default function StageManager() {
                     stage_type: stageForm.stage_type || null,
                     sort_order: parseInt(stageForm.sort_order) || 0,
                     status: stageForm.status,
+                    counts_for_team_record: stageForm.counts_for_team_record,
                 })
                 showToast('success', 'Stage updated')
             }
@@ -717,6 +720,11 @@ function StageCard({
                 <span className="text-sm font-semibold text-[var(--color-text)] flex-1">{stage.name}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-md border ${typeColor}`}>{typeLabel}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-md border ${statusColor}`}>{stage.status}</span>
+                {stage.counts_for_team_record === false && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400/70">
+                        No record
+                    </span>
+                )}
                 <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                     <button onClick={onEdit} className="px-2 py-1 rounded text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-white/5 transition-colors">
                         Edit
@@ -1160,19 +1168,32 @@ function StageForm({ isNew, form, setForm, onSubmit, onCancel, saving, hasMultip
                         </div>
                     )}
                 </div>
-                {isNew && hasMultipleDivisions && (
-                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                <div className="flex flex-wrap gap-x-6 gap-y-2 mt-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={!!form.league_wide}
-                            onChange={e => setForm(p => ({ ...p, league_wide: e.target.checked }))}
+                            checked={form.counts_for_team_record !== false}
+                            onChange={e => setForm(p => ({ ...p, counts_for_team_record: e.target.checked }))}
                             className="rounded border-white/20 bg-[var(--color-primary)] text-cyan-500 focus:ring-cyan-500/30"
                         />
                         <span className="text-xs text-[var(--color-text-secondary)]">
-                            Create in all {leagueName} divisions
+                            Counts for team record
                         </span>
                     </label>
-                )}
+                    {isNew && hasMultipleDivisions && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!!form.league_wide}
+                                onChange={e => setForm(p => ({ ...p, league_wide: e.target.checked }))}
+                                className="rounded border-white/20 bg-[var(--color-primary)] text-cyan-500 focus:ring-cyan-500/30"
+                            />
+                            <span className="text-xs text-[var(--color-text-secondary)]">
+                                Create in all {leagueName} divisions
+                            </span>
+                        </label>
+                    )}
+                </div>
                 <div className="flex gap-2 mt-4">
                     <button type="submit" disabled={saving}
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors">

@@ -1367,7 +1367,7 @@ export async function reportOutcome(sql, user, body) {
     }
 
     const [scrim] = await sql`
-        SELECT id, team_id, accepted_team_id, status, scheduled_date, outcome
+        SELECT id, user_id, accepted_user_id, team_id, accepted_team_id, status, scheduled_date, outcome
         FROM scrim_requests WHERE id = ${scrim_id}
     `
     if (!scrim) {
@@ -1438,7 +1438,7 @@ export async function reportOutcome(sql, user, body) {
         WHERE id = ${scrim_id}
     `
 
-    return { success: true }
+    return { success: true, user_id: scrim.user_id, accepted_user_id: scrim.accepted_user_id }
 }
 
 

@@ -20,6 +20,7 @@ import PlayerProfile from './pages/division/PlayerProfile'
 import Stats from "./pages/Stats.jsx";
 import Rankings from "./pages/Rankings.jsx";
 import TierListFeed from "./pages/division/TierListFeed.jsx";
+import Transactions from "./pages/division/Transactions.jsx"
 import LeagueOverview from "./pages/LeagueOverview.jsx";
 import LeaguesBrowse from "./pages/LeaguesBrowse.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
@@ -192,6 +193,7 @@ function App() {
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
                             <Route path="players" element={<Players />} />
+                            <Route path="transactions" element={<Transactions />} />
                             <Route path="bg-remove" element={<BgRemover />} />
                             {/* Featured stream */}
                             <Route path="twitch" element={<FeaturedStream />} />

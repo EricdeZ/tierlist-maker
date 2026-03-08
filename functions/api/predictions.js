@@ -177,6 +177,9 @@ async function getUpcoming(sql, event, params) {
                 COUNT(DISTINCT g.id) FILTER (WHERE g.is_completed AND g.winner_team_id IS NOT NULL AND g.winner_team_id != t.id)::integer as game_losses
             FROM teams t
             LEFT JOIN matches m ON (m.team1_id = t.id OR m.team2_id = t.id) AND m.season_id = t.season_id
+                AND (m.stage_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM season_stages ss WHERE ss.id = m.stage_id AND ss.counts_for_team_record = false
+                ))
             LEFT JOIN games g ON g.match_id = m.id
             WHERE t.season_id = ANY(${seasonIds})
             GROUP BY t.id, t.season_id
@@ -613,6 +616,9 @@ async function getMatchupDetail(sql, event, params) {
                 COUNT(DISTINCT g.id) FILTER (WHERE g.is_completed AND g.winner_team_id IS NOT NULL AND g.winner_team_id != t.id)::integer as game_losses
             FROM teams t
             LEFT JOIN matches m ON (m.team1_id = t.id OR m.team2_id = t.id) AND m.season_id = t.season_id
+                AND (m.stage_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM season_stages ss WHERE ss.id = m.stage_id AND ss.counts_for_team_record = false
+                ))
             LEFT JOIN games g ON g.match_id = m.id
             WHERE t.id IN (${t1Id}, ${t2Id})
             GROUP BY t.id

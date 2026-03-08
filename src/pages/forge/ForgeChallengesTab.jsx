@@ -352,7 +352,7 @@ function ForgeChallengeCard({ challenge: ch, index, claimingId, justClaimed, onC
                             <div
                                 className="h-full transition-all duration-700"
                                 style={{
-                                    width: `${Math.min(pct, 100)}%`,
+                                    width: `${Math.max(0, Math.min(pct, 100))}%`,
                                     background: ch.completed
                                         ? 'linear-gradient(90deg, rgba(74,222,128,0.4), rgba(74,222,128,0.7))'
                                         : `linear-gradient(90deg, ${tierColor}80, ${tierColor})`,
