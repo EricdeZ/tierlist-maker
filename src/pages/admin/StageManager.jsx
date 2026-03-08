@@ -73,7 +73,7 @@ export default function StageManager() {
 
     // ─── Group form ───
     const [editingGroup, setEditingGroup] = useState(null)
-    const [groupForm, setGroupForm] = useState({ name: '', sort_order: 0 })
+    const [groupForm, setGroupForm] = useState({ name: '', sort_order: 0, league_wide: false })
     const [groupFormStageId, setGroupFormStageId] = useState(null)
 
     // ─── Group teams editor ───
@@ -82,7 +82,7 @@ export default function StageManager() {
 
     // ─── Round form ───
     const [editingRound, setEditingRound] = useState(null)
-    const [roundForm, setRoundForm] = useState({ name: '', round_number: 1, sort_order: 0, best_of_override: '', scheduled_date: '' })
+    const [roundForm, setRoundForm] = useState({ name: '', round_number: 1, sort_order: 0, best_of_override: '', scheduled_date: '', league_wide: false })
     const [roundFormStageId, setRoundFormStageId] = useState(null)
 
     const [saving, setSaving] = useState(false)
@@ -185,6 +185,13 @@ export default function StageManager() {
     // ─── Season teams ───
     const seasonTeams = teams.filter(t => String(t.season_id) === String(selectedSeasonId))
 
+    // ─── League siblings (for league-wide stage creation) ───
+    const selectedSeason = seasons.find(s => String(s.season_id) === String(selectedSeasonId))
+    const leagueSiblings = selectedSeason
+        ? seasons.filter(s => s.league_id === selectedSeason.league_id && s.is_active)
+        : []
+    const hasMultipleDivisions = leagueSiblings.length > 1
+
     // ─── Toggle stage expand/collapse ───
     const toggleStage = (stageId) => {
         setExpandedStages(prev => ({ ...prev, [stageId]: !prev[stageId] }))
@@ -196,7 +203,7 @@ export default function StageManager() {
 
     const openNewStageForm = () => {
         setEditingStage('new')
-        setStageForm({ name: '', stage_type: '', sort_order: stages.length, status: 'pending' })
+        setStageForm({ name: '', stage_type: '', sort_order: stages.length, status: 'pending', league_wide: false })
     }
 
     const openEditStageForm = (stage) => {
@@ -215,14 +222,18 @@ export default function StageManager() {
         setSaving(true)
         try {
             if (editingStage === 'new') {
-                await doAction({
-                    action: 'create-stage',
+                const isLeagueWide = stageForm.league_wide && hasMultipleDivisions
+                const result = await doAction({
+                    action: isLeagueWide ? 'create-stage-league-wide' : 'create-stage',
                     season_id: selectedSeasonId,
                     name: stageForm.name.trim(),
                     stage_type: stageForm.stage_type || null,
                     sort_order: parseInt(stageForm.sort_order) || 0,
                 })
-                showToast('success', 'Stage created')
+                showToast('success', isLeagueWide
+                    ? `Stage created in ${result.created_count} division${result.created_count !== 1 ? 's' : ''}`
+                    : 'Stage created'
+                )
             } else {
                 await doAction({
                     action: 'update-stage',
@@ -269,7 +280,7 @@ export default function StageManager() {
         const stageGroups = groups.filter(g => g.stage_id === stageId)
         setEditingGroup('new')
         setGroupFormStageId(stageId)
-        setGroupForm({ name: '', sort_order: stageGroups.length })
+        setGroupForm({ name: '', sort_order: stageGroups.length, league_wide: false })
     }
 
     const openEditGroupForm = (group) => {
@@ -284,13 +295,17 @@ export default function StageManager() {
         setSaving(true)
         try {
             if (editingGroup === 'new') {
-                await doAction({
-                    action: 'create-group',
+                const isLeagueWide = groupForm.league_wide && hasMultipleDivisions
+                const result = await doAction({
+                    action: isLeagueWide ? 'create-group-league-wide' : 'create-group',
                     stage_id: groupFormStageId,
                     name: groupForm.name.trim(),
                     sort_order: parseInt(groupForm.sort_order) || 0,
                 })
-                showToast('success', 'Group created')
+                showToast('success', isLeagueWide
+                    ? `Group created in ${result.created_count} division${result.created_count !== 1 ? 's' : ''}`
+                    : 'Group created'
+                )
             } else {
                 await doAction({
                     action: 'update-group',
@@ -378,7 +393,7 @@ export default function StageManager() {
         const nextNum = stageRounds.length > 0 ? Math.max(...stageRounds.map(r => r.round_number)) + 1 : 1
         setEditingRound('new')
         setRoundFormStageId(stageId)
-        setRoundForm({ name: `Round ${nextNum}`, round_number: nextNum, sort_order: nextNum, best_of_override: '', scheduled_date: '' })
+        setRoundForm({ name: `Round ${nextNum}`, round_number: nextNum, sort_order: nextNum, best_of_override: '', scheduled_date: '', league_wide: false })
     }
 
     const openEditRoundForm = (round) => {
@@ -400,8 +415,9 @@ export default function StageManager() {
         setSaving(true)
         try {
             if (editingRound === 'new') {
-                await doAction({
-                    action: 'create-round',
+                const isLeagueWide = roundForm.league_wide && hasMultipleDivisions
+                const result = await doAction({
+                    action: isLeagueWide ? 'create-round-league-wide' : 'create-round',
                     stage_id: roundFormStageId,
                     name: roundForm.name.trim(),
                     round_number: parseInt(roundForm.round_number),
@@ -409,7 +425,10 @@ export default function StageManager() {
                     best_of_override: roundForm.best_of_override ? parseInt(roundForm.best_of_override) : null,
                     scheduled_date: roundForm.scheduled_date || null,
                 })
-                showToast('success', 'Round created')
+                showToast('success', isLeagueWide
+                    ? `Round created in ${result.created_count} division${result.created_count !== 1 ? 's' : ''}`
+                    : 'Round created'
+                )
             } else {
                 await doAction({
                     action: 'update-round',
@@ -614,6 +633,8 @@ export default function StageManager() {
                             onSubmit={submitStage}
                             onCancel={() => setEditingStage(null)}
                             saving={saving}
+                            hasMultipleDivisions={hasMultipleDivisions}
+                            leagueName={selectedSeason?.league_name}
                         />
                     )}
 
@@ -626,6 +647,8 @@ export default function StageManager() {
                             onSubmit={submitGroup}
                             onCancel={() => { setEditingGroup(null); setGroupFormStageId(null) }}
                             saving={saving}
+                            hasMultipleDivisions={hasMultipleDivisions}
+                            leagueName={selectedSeason?.league_name}
                         />
                     )}
 
@@ -638,6 +661,8 @@ export default function StageManager() {
                             onSubmit={submitRound}
                             onCancel={() => { setEditingRound(null); setRoundFormStageId(null) }}
                             saving={saving}
+                            hasMultipleDivisions={hasMultipleDivisions}
+                            leagueName={selectedSeason?.league_name}
                         />
                     )}
 
@@ -1075,7 +1100,7 @@ function BracketMatchBox({ match, getSourceDescription }) {
 // FORMS
 // ═══════════════════════════════════════════════════
 
-function StageForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
+function StageForm({ isNew, form, setForm, onSubmit, onCancel, saving, hasMultipleDivisions, leagueName }) {
     return (
         <div className="bg-[var(--color-secondary)] border border-cyan-500/20 rounded-xl p-5">
             <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">{isNew ? 'New Stage' : 'Edit Stage'}</h2>
@@ -1135,6 +1160,19 @@ function StageForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
                         </div>
                     )}
                 </div>
+                {isNew && hasMultipleDivisions && (
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={!!form.league_wide}
+                            onChange={e => setForm(p => ({ ...p, league_wide: e.target.checked }))}
+                            className="rounded border-white/20 bg-[var(--color-primary)] text-cyan-500 focus:ring-cyan-500/30"
+                        />
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                            Create in all {leagueName} divisions
+                        </span>
+                    </label>
+                )}
                 <div className="flex gap-2 mt-4">
                     <button type="submit" disabled={saving}
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors">
@@ -1150,7 +1188,7 @@ function StageForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
     )
 }
 
-function GroupForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
+function GroupForm({ isNew, form, setForm, onSubmit, onCancel, saving, hasMultipleDivisions, leagueName }) {
     return (
         <div className="bg-[var(--color-secondary)] border border-cyan-500/20 rounded-xl p-5">
             <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">{isNew ? 'New Group' : 'Edit Group'}</h2>
@@ -1179,6 +1217,19 @@ function GroupForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
                         />
                     </div>
                 </div>
+                {isNew && hasMultipleDivisions && (
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={!!form.league_wide}
+                            onChange={e => setForm(p => ({ ...p, league_wide: e.target.checked }))}
+                            className="rounded border-white/20 bg-[var(--color-primary)] text-cyan-500 focus:ring-cyan-500/30"
+                        />
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                            Create in all {leagueName} divisions
+                        </span>
+                    </label>
+                )}
                 <div className="flex gap-2 mt-4">
                     <button type="submit" disabled={saving}
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors">
@@ -1194,7 +1245,7 @@ function GroupForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
     )
 }
 
-function RoundForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
+function RoundForm({ isNew, form, setForm, onSubmit, onCancel, saving, hasMultipleDivisions, leagueName }) {
     return (
         <div className="bg-[var(--color-secondary)] border border-cyan-500/20 rounded-xl p-5">
             <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">{isNew ? 'New Round' : 'Edit Round'}</h2>
@@ -1252,6 +1303,19 @@ function RoundForm({ isNew, form, setForm, onSubmit, onCancel, saving }) {
                         />
                     </div>
                 </div>
+                {isNew && hasMultipleDivisions && (
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={!!form.league_wide}
+                            onChange={e => setForm(p => ({ ...p, league_wide: e.target.checked }))}
+                            className="rounded border-white/20 bg-[var(--color-primary)] text-cyan-500 focus:ring-cyan-500/30"
+                        />
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                            Create in all {leagueName} divisions
+                        </span>
+                    </label>
+                )}
                 <div className="flex gap-2 mt-4">
                     <button type="submit" disabled={saving}
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 transition-colors">

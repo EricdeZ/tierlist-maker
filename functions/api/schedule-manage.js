@@ -27,7 +27,8 @@ const handler = async (event) => {
             const [seasons, teams] = await Promise.all([
                 sql`
                     SELECT s.id as season_id, s.name as season_name, s.is_active,
-                           d.name as division_name, l.name as league_name
+                           d.id as division_id, d.name as division_name,
+                           l.id as league_id, l.name as league_name
                     FROM seasons s
                     JOIN divisions d ON s.division_id = d.id
                     JOIN leagues l ON d.league_id = l.id

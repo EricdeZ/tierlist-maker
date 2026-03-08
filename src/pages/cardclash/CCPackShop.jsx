@@ -8,12 +8,16 @@ import PackOpening from './components/PackOpening';
 
 const RARITY_PACKS = ['standard', 'premium', 'elite', 'legendary']
 
+const MIXED_PACKS = ['osl-mixed', 'bsl-mixed']
+
 const PACK_META = {
   standard: { subtitle: 'Basic Collection', seed: 0 },
   premium: { subtitle: 'Enhanced Drops', seed: 1 },
   elite: { subtitle: 'Rare Guaranteed', seed: 2 },
   legendary: { subtitle: 'The Ultimate Pull', seed: 3 },
   mixed: { subtitle: 'Gods, Items & Players', seed: 4 },
+  'osl-mixed': { subtitle: 'Olympus League', seed: 5 },
+  'bsl-mixed': { subtitle: 'Babylon League', seed: 6 },
 };
 
 export default function PackShop() {
@@ -75,7 +79,7 @@ export default function PackShop() {
     setOpenResult(result);
   }, []);
 
-  const testMixedPack = useCallback(() => {
+  const testMixedPack = useCallback((packType, packName) => {
     const rarityKeys = Object.keys(RARITIES);
     const nonPlayerTypes = ['god', 'item', 'consumable'];
     const allTypes = ['god', 'item', 'consumable', 'player'];
@@ -107,27 +111,22 @@ export default function PackShop() {
         rarity, isNew: true, _revealOrder: order };
     };
 
-    // Slots 1-4: 1 player + 3 random type, shuffled
-    const base = [
-      makeCard('player', rarityKeys[Math.floor(Math.random() * 3)], 0),
-      makeCard(nonPlayerTypes[Math.floor(Math.random() * 3)], rarityKeys[Math.floor(Math.random() * 3)], 1),
-      makeCard(nonPlayerTypes[Math.floor(Math.random() * 3)], rarityKeys[Math.floor(Math.random() * 3)], 2),
-      makeCard(nonPlayerTypes[Math.floor(Math.random() * 3)], rarityKeys[Math.floor(Math.random() * 3)], 3),
-    ];
-    // Shuffle and reassign order
-    for (let i = base.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [base[i], base[j]] = [base[j], base[i]]; }
-    base.forEach((c, i) => { c._revealOrder = i; });
-
-    // Slot 5: uncommon+ guaranteed, random type
-    const rareType = allTypes[Math.floor(Math.random() * 4)];
+    // Guaranteed player in slots 0-4, wildcard slot 5 can also roll player
+    const playerSlot = Math.floor(Math.random() * 5);
     const rareRarities = ['uncommon', 'rare', 'epic', 'legendary', 'mythic'];
-    base.push(makeCard(rareType, rareRarities[Math.floor(Math.random() * rareRarities.length)], 4));
+    const base = [];
+    for (let i = 0; i < 6; i++) {
+      const rarity = i === 4
+        ? rareRarities[Math.floor(Math.random() * rareRarities.length)]
+        : rarityKeys[Math.floor(Math.random() * (i === 5 ? 6 : 3))];
+      let type;
+      if (i === playerSlot) type = 'player';
+      else if (i === 5) type = allTypes[Math.floor(Math.random() * 4)];
+      else type = nonPlayerTypes[Math.floor(Math.random() * 3)];
+      base.push(makeCard(type, rarity, i));
+    }
 
-    // Slot 6: wildcard — any type, any rarity
-    const wcType = allTypes[Math.floor(Math.random() * 4)];
-    base.push(makeCard(wcType, rarityKeys[Math.floor(Math.random() * 6)], 5));
-
-    const result = { cards: base, packName: 'Mixed Pack', packType: 'mixed', _skipTear: true };
+    const result = { cards: base, packName: packName || 'Mixed Pack', packType: packType || 'mixed', _skipTear: true };
     setLastTest(result);
     setOpenResult(result);
   }, []);
@@ -183,24 +182,25 @@ export default function PackShop() {
         })}
       </div>
 
-      {/* Mixed Packs */}
+      {/* League Mixed Packs */}
       <div className="border-t border-white/10 pt-8 mb-8">
-        <h2 className="text-lg font-bold mb-1 text-center">Mixed Packs</h2>
-        <p className="text-xs text-gray-500 mb-6 text-center">Cards of every type — gods, items, consumables, and real player cards</p>
-        <div className="flex justify-center">
-          {(() => {
-            const pack = PACKS.mixed;
-            const meta = PACK_META.mixed;
+        <h2 className="text-lg font-bold mb-1 text-center">League Packs</h2>
+        <p className="text-xs text-gray-500 mb-6 text-center">Gods, items, consumables & a guaranteed player card from each league</p>
+        <div className="flex justify-center gap-10">
+          {MIXED_PACKS.map((key) => {
+            const pack = PACKS[key];
+            const meta = PACK_META[key];
             const canAfford = testMode || passion >= pack.cost;
             return (
               <div
+                key={key}
                 className={`flex flex-col items-center gap-4 ${
                   canAfford ? 'cursor-pointer group' : 'opacity-50'
                 }`}
-                onClick={() => canAfford && !openResult && handleBuyPack('mixed')}
+                onClick={() => canAfford && !openResult && handleBuyPack(key)}
               >
                 <PackArt
-                  tier="mixed"
+                  tier={key}
                   name={pack.name}
                   subtitle={meta.subtitle}
                   cardCount={pack.cards}
@@ -210,7 +210,7 @@ export default function PackShop() {
                 <div className="text-center">
                   <div className="space-y-0.5 mb-2">
                     <div className="text-xs text-white/60">
-                      6 cards &middot; 1 guaranteed <span className="text-violet-400">Player</span> &middot; random mix of types
+                      6 cards &middot; 1 <span style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player &middot; random mix
                     </div>
                     <div className="text-xs text-white/60">
                       <span className="text-green-400">Uncommon+</span> rare slot &middot; <span className="text-amber-400">Wildcard</span> finale
@@ -228,7 +228,7 @@ export default function PackShop() {
                 </div>
               </div>
             );
-          })()}
+          })}
         </div>
       </div>
 
@@ -253,10 +253,16 @@ export default function PackShop() {
             </button>
           ))}
           <button
-            onClick={testMixedPack}
-            className="px-3 py-1 text-xs bg-indigo-600/30 border border-indigo-500/40 rounded text-indigo-300 hover:bg-indigo-600/50 font-bold"
+            onClick={() => testMixedPack('osl-mixed', 'OSL Pack')}
+            className="px-3 py-1 text-xs bg-yellow-600/30 border border-yellow-500/40 rounded text-yellow-300 hover:bg-yellow-600/50 font-bold"
           >
-            Test Mixed
+            Test OSL
+          </button>
+          <button
+            onClick={() => testMixedPack('bsl-mixed', 'BSL Pack')}
+            className="px-3 py-1 text-xs bg-sky-600/30 border border-sky-500/40 rounded text-sky-300 hover:bg-sky-600/50 font-bold"
+          >
+            Test BSL
           </button>
           <button
             onClick={testAllRarities}

@@ -18,6 +18,12 @@ export const PACKS = {
   legendary:{ name: 'Legendary Pack', cost: 1500, cards: 7, guarantees: [{ minRarity: 'legendary', count: 1 }], category: 'rarity' },
   mixed:    { name: 'Mixed Pack',    cost: 150, cards: 6, guarantees: [], category: 'mixed',
     description: '1 guaranteed Player Card, random mix of types, rare slot + wildcard' },
+  'osl-mixed': { name: 'OSL Pack', cost: 150, cards: 6, guarantees: [], category: 'mixed',
+    leagueId: 2, leagueSlug: 'osl', leagueName: 'Olympus Smite League', color: '#d2b138',
+    description: 'OSL players only — gods, items, consumables & an Olympus player card' },
+  'bsl-mixed': { name: 'BSL Pack', cost: 150, cards: 6, guarantees: [], category: 'mixed',
+    leagueId: 3, leagueSlug: 'bsl', leagueName: 'Babylon Smite League', color: '#2795cf',
+    description: 'BSL players only — gods, items, consumables & a Babylon player card' },
 };
 
 // Card Clash game modes

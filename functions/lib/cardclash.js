@@ -101,7 +101,9 @@ const PACKS = {
   premium:  { name: 'Premium Pack',  cost: 200, cards: 5, guarantees: [{ minRarity: 'rare', count: 1 }] },
   elite:    { name: 'Elite Pack',    cost: 500, cards: 5, guarantees: [{ minRarity: 'epic', count: 1 }, { minRarity: 'rare', count: 2 }] },
   legendary:{ name: 'Legendary Pack', cost: 1500, cards: 7, guarantees: [{ minRarity: 'legendary', count: 1 }] },
-  mixed:    { name: 'Mixed Pack',    cost: 150, cards: 6, guarantees: [] },
+  mixed:        { name: 'Mixed Pack',    cost: 150, cards: 6, guarantees: [] },
+  'osl-mixed':  { name: 'OSL Pack',     cost: 150, cards: 6, guarantees: [], leagueId: 2 },
+  'bsl-mixed':  { name: 'BSL Pack',     cost: 150, cards: 6, guarantees: [], leagueId: 3 },
 }
 
 const GAME_MODES = {
@@ -225,16 +227,29 @@ function generateConsumableCard(rarity) {
   }
 }
 
-async function generatePlayerCard(sql, rarity) {
-  // Pick a random player from the database
-  const players = await sql`
-    SELECT lp.id, lp.name, lp.main_role, t.name as team_name, t.color as team_color,
-           u.discord_id, u.discord_avatar
-    FROM league_players lp
-    LEFT JOIN teams t ON t.id = lp.team_id
-    LEFT JOIN users u ON u.id = lp.user_id
-    ORDER BY RANDOM() LIMIT 1
-  `
+async function generatePlayerCard(sql, rarity, leagueId) {
+  // Pick a random player from the database, optionally scoped to a league
+  // league_players → players (via player_id) → users (via linked_player_id)
+  const players = leagueId
+    ? await sql`
+      SELECT p.id, p.name, p.main_role, t.name as team_name, t.color as team_color,
+             u.discord_id, u.discord_avatar
+      FROM league_players lp
+      JOIN players p ON p.id = lp.player_id
+      JOIN seasons s ON lp.season_id = s.id AND s.league_id = ${leagueId}
+      LEFT JOIN teams t ON t.id = lp.team_id
+      LEFT JOIN users u ON u.linked_player_id = p.id
+      ORDER BY RANDOM() LIMIT 1
+    `
+    : await sql`
+      SELECT p.id, p.name, p.main_role, t.name as team_name, t.color as team_color,
+             u.discord_id, u.discord_avatar
+      FROM league_players lp
+      JOIN players p ON p.id = lp.player_id
+      LEFT JOIN teams t ON t.id = lp.team_id
+      LEFT JOIN users u ON u.linked_player_id = p.id
+      ORDER BY RANDOM() LIMIT 1
+    `
   const player = players[0]
   if (!player) return generateCard(rarity) // fallback to god card
 
@@ -307,8 +322,8 @@ export async function openPack(sql, userId, packType, testMode) {
   }
 
   let cards
-  if (packType === 'mixed') {
-    cards = await generateMixedPack(sql)
+  if (packType === 'mixed' || pack.leagueId) {
+    cards = await generateMixedPack(sql, pack.leagueId)
   } else {
     cards = generateRarityPack(pack)
   }
@@ -347,45 +362,41 @@ function generateRarityPack(pack) {
   return cards
 }
 
-async function generateMixedPack(sql) {
-  // 6 cards total:
-  //   Slots 1-4: exactly 1 player card, rest are fully random type (god/item/consumable)
-  //   Slot 5: guaranteed uncommon+ rarity, random type (not wildcard)
-  //   Slot 6: complete wildcard — any type, any rarity
+async function generateMixedPack(sql, leagueId) {
+  // 6 cards: at least 1 guaranteed player card
+  // Slot 5 (index 4): uncommon+ minimum rarity
+  // Slot 6 (index 5): complete wildcard — any type, any rarity
+  // Slots 1-4: random type (god/item/consumable), one guaranteed player
+  // Slot 6 wildcard can also be a player (so you could get 2 player cards)
   const allTypes = ['god', 'item', 'consumable', 'player']
   const nonPlayerTypes = ['god', 'item', 'consumable']
-  const baseCards = []
 
-  // 1 guaranteed player card
-  baseCards.push(await generatePlayerCard(sql, rollRarity('common')))
+  // Pick which slot (0-4) gets the guaranteed player card
+  const playerSlot = Math.floor(Math.random() * 5)
 
-  // 3 random-type cards (god/item/consumable — could all be gods)
-  for (let i = 0; i < 3; i++) {
-    const type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]
-    baseCards.push(generateCardByType(type, rollRarity('common')))
+  const cards = []
+  for (let i = 0; i < 6; i++) {
+    const minRarity = i === 4 ? 'uncommon' : 'common'
+    const rarity = rollRarity(minRarity)
+
+    let type
+    if (i === playerSlot) {
+      type = 'player'
+    } else if (i === 5) {
+      // Wildcard: any type including player
+      type = allTypes[Math.floor(Math.random() * allTypes.length)]
+    } else {
+      type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]
+    }
+
+    const card = type === 'player'
+      ? await generatePlayerCard(sql, rarity, leagueId)
+      : generateCardByType(type, rarity)
+    card._revealOrder = i
+    cards.push(card)
   }
 
-  // Shuffle so the player card lands in a random position
-  shuffle(baseCards)
-  baseCards.forEach((c, i) => { c._revealOrder = i })
-
-  // Card 5: guaranteed uncommon+ rarity, random type
-  const rareType = allTypes[Math.floor(Math.random() * allTypes.length)]
-  const rareRarity = rollRarity('uncommon')
-  const card5 = rareType === 'player'
-    ? await generatePlayerCard(sql, rareRarity)
-    : generateCardByType(rareType, rareRarity)
-  card5._revealOrder = 4
-
-  // Card 6: complete wildcard — any type, any rarity
-  const wcType = allTypes[Math.floor(Math.random() * allTypes.length)]
-  const wcRarity = rollRarity('common')
-  const card6 = wcType === 'player'
-    ? await generatePlayerCard(sql, wcRarity)
-    : generateCardByType(wcType, wcRarity)
-  card6._revealOrder = 5
-
-  return [...baseCards, card5, card6]
+  return cards
 }
 
 // ════════════════════════════════════════════

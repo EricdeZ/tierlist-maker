@@ -10,6 +10,8 @@ const PACK_FEATURED_GODS = {
   elite: ['Ares', 'Kali', 'Hades', 'Camazotz', 'Medusa'],
   legendary: ['Zeus', 'Odin', 'Ra', 'Poseidon', 'Agni'],
   mixed: ['Discordia', 'Freya', 'NuWa', 'Pele', 'Sol'],
+  'osl-mixed': ['Zeus', 'Athena', 'Ares', 'Poseidon', 'Hercules'],
+  'bsl-mixed': ['Anubis', 'Ra', 'Hades', 'Agni', 'Bakasura'],
 }
 
 function getFeaturedGodUrl(tier, seed) {

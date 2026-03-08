@@ -1,11 +1,24 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
-import { requirePermission, getAllowedLeagueIds, leagueFilter, getLeagueIdFromSeason } from '../lib/auth.js'
+import { requirePermission, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { advanceFromGroupStandings } from '../lib/advancement.js'
 
 function slugify(name) {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+// Find sibling stages with the same slug across all active seasons in the same league
+async function getSiblingStages(sql, stageId) {
+    return sql`
+        SELECT ss2.id as stage_id, ss2.season_id
+        FROM season_stages ss
+        JOIN seasons s ON ss.season_id = s.id
+        JOIN divisions d ON s.division_id = d.id
+        JOIN seasons s2 ON s2.division_id IN (SELECT d2.id FROM divisions d2 WHERE d2.league_id = d.league_id)
+        JOIN season_stages ss2 ON ss2.season_id = s2.id AND ss2.slug = ss.slug
+        WHERE ss.id = ${stageId} AND s2.is_active = true
+    `
 }
 
 const handler = async (event) => {
@@ -33,13 +46,16 @@ const handler = async (event) => {
 
             switch (body.action) {
                 case 'create-stage': return await createStage(sql, body, admin, event)
+                case 'create-stage-league-wide': return await createStageLeagueWide(sql, body, admin, event)
                 case 'update-stage': return await updateStage(sql, body, admin, event)
                 case 'delete-stage': return await deleteStage(sql, body, admin, event)
                 case 'create-group': return await createGroup(sql, body, admin, event)
+                case 'create-group-league-wide': return await createGroupLeagueWide(sql, body, admin, event)
                 case 'update-group': return await updateGroup(sql, body, admin, event)
                 case 'delete-group': return await deleteGroup(sql, body, admin, event)
                 case 'set-group-teams': return await setGroupTeams(sql, body, admin, event)
                 case 'create-round': return await createRound(sql, body, admin, event)
+                case 'create-round-league-wide': return await createRoundLeagueWide(sql, body, admin, event)
                 case 'update-round': return await updateRound(sql, body, admin, event)
                 case 'delete-round': return await deleteRound(sql, body, admin, event)
                 default:
@@ -56,7 +72,7 @@ const handler = async (event) => {
 
 
 // ─── GET: stages, groups, rounds, group teams for a season ───
-async function handleGet(sql, event, admin) {
+async function handleGet(sql, event) {
     const { seasonId } = event.queryStringParameters || {}
     if (!seasonId) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId required' }) }
@@ -125,6 +141,50 @@ async function createStage(sql, body, admin, event) {
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, stage: created }) }
+}
+
+async function createStageLeagueWide(sql, body, admin, event) {
+    const { season_id, name, stage_type, sort_order, settings } = body
+    if (!season_id || !name) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id and name required' }) }
+    }
+
+    const leagueId = await getLeagueIdFromSeason(season_id)
+    if (!await requirePermission(event, 'match_schedule', leagueId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
+    }
+
+    // Find all active seasons in the same league
+    const siblingSeasons = await sql`
+        SELECT s.id as season_id FROM seasons s
+        JOIN divisions d ON s.division_id = d.id
+        WHERE d.league_id = ${leagueId} AND s.is_active = true
+    `
+
+    const slug = slugify(name)
+    const created = []
+    for (const s of siblingSeasons) {
+        // Skip if this season already has a stage with this slug
+        const [existing] = await sql`
+            SELECT id FROM season_stages WHERE season_id = ${s.season_id} AND slug = ${slug}
+        `
+        if (existing) continue
+
+        const [row] = await sql`
+            INSERT INTO season_stages (season_id, name, slug, stage_type, sort_order, settings)
+            VALUES (${s.season_id}, ${name}, ${slug}, ${stage_type || null}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})})
+            RETURNING *
+        `
+        created.push(row)
+    }
+
+    await logAudit(sql, admin, {
+        action: 'create-stage-league-wide', endpoint: 'stage-manage',
+        targetType: 'season_stage', targetId: null,
+        details: { league_id: leagueId, name, stage_type, seasons_count: created.length }
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, created_count: created.length }) }
 }
 
 async function updateStage(sql, body, admin, event) {
@@ -229,6 +289,43 @@ async function createGroup(sql, body, admin, event) {
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, group: created }) }
+}
+
+async function createGroupLeagueWide(sql, body, admin, event) {
+    const { stage_id, name, group_type, sort_order, settings } = body
+    if (!stage_id || !name) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'stage_id and name required' }) }
+    }
+
+    const [stage] = await sql`
+        SELECT ss.id, s.league_id FROM season_stages ss JOIN seasons s ON ss.season_id = s.id WHERE ss.id = ${stage_id}
+    `
+    if (!stage || !await requirePermission(event, 'match_schedule', stage.league_id)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission' }) }
+    }
+
+    const siblings = await getSiblingStages(sql, stage_id)
+    const slug = slugify(name)
+    let count = 0
+    for (const sib of siblings) {
+        const [existing] = await sql`
+            SELECT id FROM stage_groups WHERE stage_id = ${sib.stage_id} AND slug = ${slug}
+        `
+        if (existing) continue
+        await sql`
+            INSERT INTO stage_groups (stage_id, name, slug, group_type, sort_order, settings)
+            VALUES (${sib.stage_id}, ${name}, ${slug}, ${group_type || 'default'}, ${sort_order ?? 0}, ${JSON.stringify(settings || {})})
+        `
+        count++
+    }
+
+    await logAudit(sql, admin, {
+        action: 'create-group-league-wide', endpoint: 'stage-manage',
+        targetType: 'stage_group', targetId: null,
+        details: { stage_id, name, created_count: count }
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, created_count: count }) }
 }
 
 async function updateGroup(sql, body, admin, event) {
@@ -368,6 +465,42 @@ async function createRound(sql, body, admin, event) {
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, round: created }) }
+}
+
+async function createRoundLeagueWide(sql, body, admin, event) {
+    const { stage_id, name, round_number, sort_order, best_of_override, scheduled_date } = body
+    if (!stage_id || !name || round_number == null) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'stage_id, name, and round_number required' }) }
+    }
+
+    const [stage] = await sql`
+        SELECT ss.id, s.league_id FROM season_stages ss JOIN seasons s ON ss.season_id = s.id WHERE ss.id = ${stage_id}
+    `
+    if (!stage || !await requirePermission(event, 'match_schedule', stage.league_id)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission' }) }
+    }
+
+    const siblings = await getSiblingStages(sql, stage_id)
+    let count = 0
+    for (const sib of siblings) {
+        const [existing] = await sql`
+            SELECT id FROM stage_rounds WHERE stage_id = ${sib.stage_id} AND round_number = ${round_number}
+        `
+        if (existing) continue
+        await sql`
+            INSERT INTO stage_rounds (stage_id, name, round_number, sort_order, best_of_override, scheduled_date)
+            VALUES (${sib.stage_id}, ${name}, ${round_number}, ${sort_order ?? round_number}, ${best_of_override ?? null}, ${scheduled_date || null})
+        `
+        count++
+    }
+
+    await logAudit(sql, admin, {
+        action: 'create-round-league-wide', endpoint: 'stage-manage',
+        targetType: 'stage_round', targetId: null,
+        details: { stage_id, name, round_number, created_count: count }
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, created_count: count }) }
 }
 
 async function updateRound(sql, body, admin, event) {
