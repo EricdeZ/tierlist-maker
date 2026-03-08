@@ -3,6 +3,7 @@ import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission, getAllowedLeagueIds, leagueFilter, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { refundPredictions } from '../lib/predictions.js'
+import { advanceFromMatch } from '../lib/advancement.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -49,14 +50,21 @@ const handler = async (event) => {
                 scheduledMatches = await sql`
                     SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                            sm.best_of, sm.scheduled_date, sm.week, sm.status,
+                           sm.stage_id, sm.group_id, sm.round_id,
+                           sm.bracket_position, sm.team1_source, sm.team2_source,
                            sm.created_at, sm.updated_at,
                            t1.name as team1_name, t1.color as team1_color, t1.slug as team1_slug,
-                           t2.name as team2_name, t2.color as team2_color, t2.slug as team2_slug
+                           t2.name as team2_name, t2.color as team2_color, t2.slug as team2_slug,
+                           ss.name as stage_name, sg.name as group_name, sr.name as round_name
                     FROM scheduled_matches sm
-                    JOIN teams t1 ON sm.team1_id = t1.id
-                    JOIN teams t2 ON sm.team2_id = t2.id
+                    LEFT JOIN teams t1 ON sm.team1_id = t1.id
+                    LEFT JOIN teams t2 ON sm.team2_id = t2.id
+                    LEFT JOIN season_stages ss ON sm.stage_id = ss.id
+                    LEFT JOIN stage_groups sg ON sm.group_id = sg.id
+                    LEFT JOIN stage_rounds sr ON sm.round_id = sr.id
                     WHERE sm.season_id = ${seasonId}
-                    ORDER BY sm.scheduled_date ASC, sm.week ASC NULLS LAST, sm.id ASC
+                    ORDER BY ss.sort_order ASC NULLS LAST, sr.sort_order ASC NULLS LAST,
+                             sm.scheduled_date ASC, sm.week ASC NULLS LAST, sm.id ASC
                 `
             }
 
@@ -96,38 +104,57 @@ const handler = async (event) => {
 // POST: Create a scheduled match
 // ═══════════════════════════════════════════════════
 async function createMatch(sql, body, admin, event) {
-    const { season_id, team1_id, team2_id, best_of, scheduled_date, week } = body
+    const { season_id, team1_id, team2_id, best_of, scheduled_date, week,
+            stage_id, group_id, round_id, bracket_position, team1_source, team2_source } = body
 
-    if (!season_id || !team1_id || !team2_id || !scheduled_date) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id, team1_id, team2_id, and scheduled_date are required' }) }
+    if (!season_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'season_id is required' }) }
+    }
+
+    // Bracket matches can have null teams (resolved later via sources)
+    const hasTeams = team1_id && team2_id
+    if (!hasTeams && !team1_source && !team2_source && !scheduled_date) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Either teams or slot sources are required' }) }
     }
 
     const leagueId = await getLeagueIdFromSeason(season_id)
     if (!await requirePermission(event, 'match_schedule', leagueId)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for this league' }) }
     }
-    if (String(team1_id) === String(team2_id)) {
+    if (team1_id && team2_id && String(team1_id) === String(team2_id)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Teams must be different' }) }
     }
 
-    // Validate teams belong to the season
-    const validTeams = await sql`
-        SELECT id FROM teams WHERE id IN (${team1_id}, ${team2_id}) AND season_id = ${season_id}
-    `
-    if (validTeams.length < 2) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'One or both teams do not belong to the selected season' }) }
+    // Validate teams belong to the season (if provided)
+    if (hasTeams) {
+        const validTeams = await sql`
+            SELECT id FROM teams WHERE id IN (${team1_id}, ${team2_id}) AND season_id = ${season_id}
+        `
+        if (validTeams.length < 2) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'One or both teams do not belong to the selected season' }) }
+        }
     }
 
     const [created] = await sql`
-        INSERT INTO scheduled_matches (season_id, team1_id, team2_id, best_of, scheduled_date, week, created_by)
-        VALUES (${season_id}, ${team1_id}, ${team2_id}, ${best_of || 1}, ${scheduled_date}, ${week || null}, ${admin.id})
+        INSERT INTO scheduled_matches (
+            season_id, team1_id, team2_id, best_of, scheduled_date, week, created_by,
+            stage_id, group_id, round_id, bracket_position, team1_source, team2_source
+        )
+        VALUES (
+            ${season_id}, ${team1_id || null}, ${team2_id || null},
+            ${best_of || 1}, ${scheduled_date || null}, ${week || null}, ${admin.id},
+            ${stage_id || null}, ${group_id || null}, ${round_id || null},
+            ${bracket_position ?? null},
+            ${team1_source ? JSON.stringify(team1_source) : null},
+            ${team2_source ? JSON.stringify(team2_source) : null}
+        )
         RETURNING id
     `
 
     await logAudit(sql, admin, {
         action: 'create-scheduled-match', endpoint: 'schedule-manage',
         targetType: 'scheduled_match', targetId: created.id,
-        details: { season_id, team1_id, team2_id, best_of, scheduled_date, week }
+        details: { season_id, team1_id, team2_id, best_of, scheduled_date, week, stage_id, group_id, round_id }
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match scheduled', id: created.id }) }
@@ -138,7 +165,8 @@ async function createMatch(sql, body, admin, event) {
 // POST: Update a scheduled match
 // ═══════════════════════════════════════════════════
 async function updateMatch(sql, body, admin, event) {
-    const { id, team1_id, team2_id, best_of, scheduled_date, week } = body
+    const { id, team1_id, team2_id, best_of, scheduled_date, week,
+            stage_id, group_id, round_id, bracket_position, team1_source, team2_source } = body
 
     if (!id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
@@ -154,11 +182,17 @@ async function updateMatch(sql, body, admin, event) {
 
     await sql`
         UPDATE scheduled_matches SET
-            team1_id = COALESCE(${team1_id || null}, team1_id),
-            team2_id = COALESCE(${team2_id || null}, team2_id),
+            team1_id = ${team1_id !== undefined ? (team1_id || null) : sql`team1_id`},
+            team2_id = ${team2_id !== undefined ? (team2_id || null) : sql`team2_id`},
             best_of = COALESCE(${best_of || null}, best_of),
-            scheduled_date = COALESCE(${scheduled_date || null}, scheduled_date),
+            scheduled_date = ${scheduled_date !== undefined ? (scheduled_date || null) : sql`scheduled_date`},
             week = ${week !== undefined ? (week || null) : sql`week`},
+            stage_id = ${stage_id !== undefined ? (stage_id || null) : sql`stage_id`},
+            group_id = ${group_id !== undefined ? (group_id || null) : sql`group_id`},
+            round_id = ${round_id !== undefined ? (round_id || null) : sql`round_id`},
+            bracket_position = ${bracket_position !== undefined ? (bracket_position ?? null) : sql`bracket_position`},
+            team1_source = ${team1_source !== undefined ? (team1_source ? JSON.stringify(team1_source) : null) : sql`team1_source`},
+            team2_source = ${team2_source !== undefined ? (team2_source ? JSON.stringify(team2_source) : null) : sql`team2_source`},
             updated_at = NOW()
         WHERE id = ${id}
     `
@@ -166,7 +200,7 @@ async function updateMatch(sql, body, admin, event) {
     await logAudit(sql, admin, {
         action: 'update-scheduled-match', endpoint: 'schedule-manage',
         targetType: 'scheduled_match', targetId: id,
-        details: { team1_id, team2_id, best_of, scheduled_date, week }
+        details: { team1_id, team2_id, best_of, scheduled_date, week, stage_id, group_id, round_id }
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Match updated' }) }
@@ -202,6 +236,14 @@ async function updateStatus(sql, body, admin, event) {
     if (status === 'cancelled') {
         refundPredictions(sql, id)
             .catch(err => console.error('Prediction refund failed:', err))
+    }
+
+    // Trigger bracket advancement when a match is completed
+    if (status === 'completed') {
+        event.waitUntil(
+            advanceFromMatch(sql, id)
+                .catch(err => console.error('Bracket advancement failed:', err))
+        )
     }
 
     await logAudit(sql, admin, {

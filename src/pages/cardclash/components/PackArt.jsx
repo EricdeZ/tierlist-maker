@@ -9,6 +9,7 @@ const PACK_FEATURED_GODS = {
   premium: ['Thor', 'Thanatos', 'Hecate', 'Susano', 'Izanami'],
   elite: ['Ares', 'Kali', 'Hades', 'Camazotz', 'Medusa'],
   legendary: ['Zeus', 'Odin', 'Ra', 'Poseidon', 'Agni'],
+  mixed: ['Discordia', 'Freya', 'NuWa', 'Pele', 'Sol'],
 }
 
 function getFeaturedGodUrl(tier, seed) {

@@ -12,10 +12,12 @@ export const RARITIES = {
 
 // Pack types
 export const PACKS = {
-  standard: { name: 'Standard Pack', cost: 75, cards: 3, guarantees: [{ minRarity: 'uncommon', count: 1 }] },
-  premium:  { name: 'Premium Pack',  cost: 200, cards: 5, guarantees: [{ minRarity: 'rare', count: 1 }] },
-  elite:    { name: 'Elite Pack',    cost: 500, cards: 5, guarantees: [{ minRarity: 'epic', count: 1 }, { minRarity: 'rare', count: 2 }] },
-  legendary:{ name: 'Legendary Pack', cost: 1500, cards: 7, guarantees: [{ minRarity: 'legendary', count: 1 }] },
+  standard: { name: 'Standard Pack', cost: 75, cards: 3, guarantees: [{ minRarity: 'uncommon', count: 1 }], category: 'rarity' },
+  premium:  { name: 'Premium Pack',  cost: 200, cards: 5, guarantees: [{ minRarity: 'rare', count: 1 }], category: 'rarity' },
+  elite:    { name: 'Elite Pack',    cost: 500, cards: 5, guarantees: [{ minRarity: 'epic', count: 1 }, { minRarity: 'rare', count: 2 }], category: 'rarity' },
+  legendary:{ name: 'Legendary Pack', cost: 1500, cards: 7, guarantees: [{ minRarity: 'legendary', count: 1 }], category: 'rarity' },
+  mixed:    { name: 'Mixed Pack',    cost: 150, cards: 6, guarantees: [], category: 'mixed',
+    description: '1 guaranteed Player Card, random mix of types, rare slot + wildcard' },
 };
 
 // Card Clash game modes

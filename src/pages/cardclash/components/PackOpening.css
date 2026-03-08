@@ -1258,6 +1258,95 @@
   100% { transform: translateX(120%); opacity: 0; }
 }
 
+/* --- Holographic shimmer overlay on revealed cards --- */
+.pack-opening__holo-shimmer {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 11;
+  opacity: 0;
+  mix-blend-mode: overlay;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    hsla(180, 80%, 70%, 0.12) 18%,
+    hsla(240, 80%, 70%, 0.18) 28%,
+    hsla(300, 80%, 70%, 0.22) 38%,
+    hsla(360, 80%, 70%, 0.18) 48%,
+    hsla(60, 80%, 70%, 0.22) 58%,
+    hsla(120, 80%, 70%, 0.18) 68%,
+    hsla(180, 80%, 70%, 0.12) 82%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  animation: po-holo-sweep 2s ease-in-out 0.15s both;
+}
+
+.pack-opening__holo-shimmer.holo-medium {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    hsla(180, 90%, 70%, 0.18) 15%,
+    hsla(240, 90%, 75%, 0.28) 25%,
+    hsla(300, 90%, 75%, 0.32) 37%,
+    hsla(360, 90%, 70%, 0.28) 48%,
+    hsla(60, 90%, 75%, 0.32) 58%,
+    hsla(120, 90%, 70%, 0.28) 70%,
+    hsla(180, 90%, 70%, 0.18) 85%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  animation: po-holo-sweep 2.5s ease-in-out 0.15s both;
+}
+
+.pack-opening__holo-shimmer.holo-intense {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    hsla(180, 100%, 75%, 0.25) 12%,
+    hsla(240, 100%, 80%, 0.4) 24%,
+    hsla(300, 100%, 80%, 0.45) 36%,
+    hsla(360, 100%, 75%, 0.4) 48%,
+    hsla(60, 100%, 80%, 0.45) 58%,
+    hsla(120, 100%, 75%, 0.4) 70%,
+    hsla(180, 100%, 75%, 0.25) 85%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  animation: po-holo-sweep 3s ease-in-out 0.1s both, po-holo-pulse 1.5s ease-in-out 2s infinite alternate;
+}
+
+@keyframes po-holo-sweep {
+  0% { background-position: 200% 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 0.8; }
+  100% { background-position: -100% 0; opacity: 0.5; }
+}
+
+@keyframes po-holo-pulse {
+  0% { background-position: -100% 0; opacity: 0.3; }
+  100% { background-position: 200% 0; opacity: 0.6; }
+}
+
+/* --- 3D depth effect — revealed card lifts toward viewer --- */
+.pack-opening__emerging-card.revealed .pack-opening__ec-flip {
+  transform: rotateY(180deg) translateZ(8px);
+  transition: transform 0.4s ease-out;
+}
+
+.pack-opening__emerging-card[data-tier="2"].revealed .pack-opening__ec-flip {
+  transform: rotateY(180deg) translateZ(12px);
+}
+
+.pack-opening__emerging-card[data-tier="1"].revealed .pack-opening__ec-flip {
+  transform: rotateY(180deg) translateZ(18px);
+}
+
+.pack-opening__emerging-card[data-tier="0"].revealed .pack-opening__ec-flip {
+  transform: rotateY(180deg) translateZ(24px);
+}
+
 /* --- Rarity name banner --- */
 .pack-opening__rarity-banner {
   position: fixed;

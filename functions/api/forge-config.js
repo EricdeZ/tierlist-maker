@@ -107,19 +107,22 @@ const handler = async (event) => {
                 // Snapshot current per-game config values — locks them in for all games up to now
                 const [currentCfg] = await sql`
                     SELECT expectation_weight, supply_weight, opponent_weight,
-                           teammate_weight, god_weight, win_bonus
+                           teammate_weight, god_weight, win_bonus,
+                           inactivity_decay, game_decay
                     FROM forge_config LIMIT 1
                 `
                 if (currentCfg) {
                     await sql`
                         INSERT INTO forge_config_history (
                             effective_from, expectation_weight, supply_weight,
-                            opponent_weight, teammate_weight, god_weight, win_bonus
+                            opponent_weight, teammate_weight, god_weight, win_bonus,
+                            inactivity_decay, game_decay
                         ) VALUES (
                             NOW(),
                             ${currentCfg.expectation_weight}, ${currentCfg.supply_weight},
                             ${currentCfg.opponent_weight}, ${currentCfg.teammate_weight},
-                            ${currentCfg.god_weight}, ${currentCfg.win_bonus}
+                            ${currentCfg.god_weight}, ${currentCfg.win_bonus},
+                            ${currentCfg.inactivity_decay}, ${currentCfg.game_decay}
                         )
                     `
                 }

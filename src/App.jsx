@@ -76,7 +76,9 @@ import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
 import ReferralManager from "./pages/admin/ReferralManager.jsx";
 import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
 import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
+import StageManager from "./pages/admin/StageManager.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
+import SingleMatchReport from "./pages/admin/SingleMatchReport.jsx";
 import CardPreview from "./pages/admin/CardPreview.jsx";
 import CardClashAdmin from "./pages/admin/CardClashAdmin.jsx";
 import Features from "./pages/Features.jsx";
@@ -116,6 +118,7 @@ function App() {
                                 <Route index element={<AdminLanding />} />
                                 <Route path="matchreport" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
                                 <Route path="matchreport/:scheduledMatchId" element={<ProtectedRoute requiredPermission="match_report"><AdminDashboard /></ProtectedRoute>} />
+                                <Route path="report/:scheduledMatchId" element={<ProtectedRoute requiredPermission="match_report"><SingleMatchReport /></ProtectedRoute>} />
                                 <Route path="rosters" element={<ProtectedRoute requiredPermission="roster_manage"><RosterManager /></ProtectedRoute>} />
                                 <Route path="matches" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
                                 <Route path="matches/:matchId" element={<ProtectedRoute requiredPermission={["match_manage", "match_manage_own"]}><MatchManager /></ProtectedRoute>} />
@@ -126,6 +129,7 @@ function App() {
                                 <Route path="permissions" element={<ProtectedRoute requiredPermission="permission_manage"><PermissionManager /></ProtectedRoute>} />
                                 <Route path="auditlog" element={<ProtectedRoute requiredPermission="audit_log_view"><AuditLog /></ProtectedRoute>} />
                                 <Route path="schedule" element={<ProtectedRoute requiredPermission="match_schedule"><ScheduleManager /></ProtectedRoute>} />
+                                <Route path="stages" element={<ProtectedRoute requiredPermission="match_schedule"><StageManager /></ProtectedRoute>} />
                                 <Route path="discord" element={<ProtectedRoute requiredPermission="match_report"><DiscordQueue /></ProtectedRoute>} />
                                 <Route path="discord-review" element={<ProtectedRoute requiredPermission="match_report"><DiscordReview /></ProtectedRoute>} />
                                 <Route path="banned-content" element={<ProtectedRoute requiredPermission="league_manage"><BannedContentManager /></ProtectedRoute>} />

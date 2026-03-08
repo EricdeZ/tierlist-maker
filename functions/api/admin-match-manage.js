@@ -4,6 +4,7 @@ import { requireAnyPermission, getLeagueIdFromSeason, getLeagueIdFromMatch } fro
 import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
 import { recalcForgePerformance } from '../lib/forge.js'
+import { advanceFromMatch } from '../lib/advancement.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -77,14 +78,19 @@ async function listMatches(sql, seasonId, admin, isOwnOnly, event) {
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
             m.team1_id, m.team2_id, m.winner_team_id, m.reported_by,
+            m.stage_id, m.group_id, m.round_id,
             u.discord_username as reported_by_username,
             t1.name as team1_name, t1.color as team1_color,
             t2.name as team2_name, t2.color as team2_color,
+            ss.name as stage_name, sg.name as group_name, sr.name as round_name,
             (SELECT count(*) FROM games g WHERE g.match_id = m.id) as game_count
         FROM matches m
         JOIN teams t1 ON m.team1_id = t1.id
         JOIN teams t2 ON m.team2_id = t2.id
         LEFT JOIN users u ON m.reported_by = u.id
+        LEFT JOIN season_stages ss ON m.stage_id = ss.id
+        LEFT JOIN stage_groups sg ON m.group_id = sg.id
+        LEFT JOIN stage_rounds sr ON m.round_id = sr.id
         WHERE m.season_id = ${seasonId}
             ${isOwnOnly ? sql`AND m.reported_by = ${admin.id}` : sql``}
         ORDER BY m.date DESC, m.id DESC
@@ -107,11 +113,16 @@ async function getMatchDetail(sql, matchId, admin, isOwnOnly, event) {
         SELECT
             m.id, m.season_id, m.date, m.week, m.best_of, m.is_completed,
             m.team1_id, m.team2_id, m.winner_team_id, m.reported_by,
+            m.stage_id, m.group_id, m.round_id,
             t1.name as team1_name, t1.color as team1_color,
-            t2.name as team2_name, t2.color as team2_color
+            t2.name as team2_name, t2.color as team2_color,
+            ss.name as stage_name, sg.name as group_name, sr.name as round_name
         FROM matches m
         JOIN teams t1 ON m.team1_id = t1.id
         JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN season_stages ss ON m.stage_id = ss.id
+        LEFT JOIN stage_groups sg ON m.group_id = sg.id
+        LEFT JOIN stage_rounds sr ON m.round_id = sr.id
         WHERE m.id = ${matchId}
     `
 
@@ -269,7 +280,7 @@ async function deleteGame(sql, body, admin, isOwnOnly, event) {
         }
 
         // Recalculate match winner
-        await recalcMatchWinner(tx, match_id)
+        await recalcMatchWinner(tx, match_id, event)
     })
 
     await logAudit(sql, admin, { action: 'delete-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id } })
@@ -384,7 +395,7 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
         }
 
         // Recalculate match winner
-        await recalcMatchWinner(tx, match_id)
+        await recalcMatchWinner(tx, match_id, event)
     })
 
     await logAudit(sql, admin, { action: 'save-game', endpoint: 'admin-match-manage', targetType: 'game', targetId: game_id, details: { match_id, winner_team_id } })
@@ -467,7 +478,7 @@ async function transferMatch(sql, body, admin, isOwnOnly, event) {
 // ═══════════════════════════════════════════════════
 // Helper: recalculate match winner from game results
 // ═══════════════════════════════════════════════════
-async function recalcMatchWinner(tx, matchId) {
+async function recalcMatchWinner(tx, matchId, event) {
     const [match] = await tx`SELECT team1_id, team2_id FROM matches WHERE id = ${matchId}`
     if (!match) return
 
@@ -481,6 +492,19 @@ async function recalcMatchWinner(tx, matchId) {
     else if (team2Wins > team1Wins) winnerTeamId = match.team2_id
 
     await tx`UPDATE matches SET winner_team_id = ${winnerTeamId}, best_of = ${games.length} WHERE id = ${matchId}`
+
+    // Trigger bracket advancement if there's a linked scheduled_match with a winner
+    if (winnerTeamId && event) {
+        // Find the scheduled_match linked to this completed match
+        const sql = getDB()
+        event.waitUntil(
+            sql`SELECT id FROM scheduled_matches WHERE match_id = ${matchId}`
+                .then(rows => {
+                    if (rows.length > 0) return advanceFromMatch(sql, rows[0].id)
+                })
+                .catch(err => console.error('Bracket advancement from game save failed:', err))
+        )
+    }
 }
 
 export const onRequest = adapt(handler)

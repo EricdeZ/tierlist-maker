@@ -73,7 +73,8 @@ export async function loadForgeConfigHistory(sql) {
     try {
         const rows = await sql`
             SELECT effective_from, expectation_weight, supply_weight,
-                   opponent_weight, teammate_weight, god_weight, win_bonus
+                   opponent_weight, teammate_weight, god_weight, win_bonus,
+                   inactivity_decay, game_decay
             FROM forge_config_history
             ORDER BY effective_from ASC
         `
@@ -81,7 +82,8 @@ export async function loadForgeConfigHistory(sql) {
             return [{ effectiveFrom: 0, EXPECTATION_WEIGHT: PERF_DEFAULTS.EXPECTATION_WEIGHT,
                 SUPPLY_WEIGHT: PERF_DEFAULTS.SUPPLY_WEIGHT, OPPONENT_WEIGHT: PERF_DEFAULTS.OPPONENT_WEIGHT,
                 TEAMMATE_WEIGHT: PERF_DEFAULTS.TEAMMATE_WEIGHT, GOD_WEIGHT: PERF_DEFAULTS.GOD_WEIGHT,
-                WIN_BONUS: PERF_DEFAULTS.WIN_BONUS }]
+                WIN_BONUS: PERF_DEFAULTS.WIN_BONUS,
+                INACTIVITY_DECAY: PERF_DEFAULTS.INACTIVITY_DECAY, GAME_DECAY: PERF_DEFAULTS.GAME_DECAY }]
         }
         return rows.map(r => ({
             effectiveFrom: new Date(r.effective_from).getTime(),
@@ -91,12 +93,15 @@ export async function loadForgeConfigHistory(sql) {
             TEAMMATE_WEIGHT: Number(r.teammate_weight),
             GOD_WEIGHT: Number(r.god_weight),
             WIN_BONUS: Number(r.win_bonus),
+            INACTIVITY_DECAY: Number(r.inactivity_decay),
+            GAME_DECAY: Number(r.game_decay),
         }))
     } catch {
         return [{ effectiveFrom: 0, EXPECTATION_WEIGHT: PERF_DEFAULTS.EXPECTATION_WEIGHT,
             SUPPLY_WEIGHT: PERF_DEFAULTS.SUPPLY_WEIGHT, OPPONENT_WEIGHT: PERF_DEFAULTS.OPPONENT_WEIGHT,
             TEAMMATE_WEIGHT: PERF_DEFAULTS.TEAMMATE_WEIGHT, GOD_WEIGHT: PERF_DEFAULTS.GOD_WEIGHT,
-            WIN_BONUS: PERF_DEFAULTS.WIN_BONUS }]
+            WIN_BONUS: PERF_DEFAULTS.WIN_BONUS,
+            INACTIVITY_DECAY: PERF_DEFAULTS.INACTIVITY_DECAY, GAME_DECAY: PERF_DEFAULTS.GAME_DECAY }]
     }
 }
 
@@ -517,7 +522,7 @@ export async function updateForgeAfterMatch(sql, matchId) {
  *
  * Returns { multiplier, trace, finalInactivityDecay, hasGames }
  */
-function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames }) {
+function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates }) {
     const halfLife = cfg.DECAY_HALF_LIFE
     let multiplier = 1.0
     let lastGameTime = null
@@ -527,11 +532,13 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
     // Group post-forge games into sets (matches)
     const sets = []
     let currentSet = null
+    const playerMatchIds = new Set()
     for (const game of games) {
         const gameTime = new Date(game.match_date).getTime()
         if (gameTime < marketStartTime) continue
         const avgs = roleAvgMap[game.role]
         if (!avgs) continue
+        playerMatchIds.add(game.match_id)
         if (!currentSet || currentSet.matchId !== game.match_id) {
             currentSet = { matchId: game.match_id, gameData: [], gameTime }
             sets.push(currentSet)
@@ -539,25 +546,30 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         currentSet.gameData.push({ game, avgs })
     }
 
+    // Team matches this player missed (for inactivity decay), only after they joined the team
+    const allTeamMatches = teamMatchDates ? (teamMatchDates.get(spark.team_id) || []) : []
+    const joinedAt = spark.team_joined_at ? new Date(spark.team_joined_at).getTime() : 0
+    const teamMatches = joinedAt > 0 ? allTeamMatches.filter(m => m.date >= joinedAt) : allTeamMatches
+
     for (const set of sets) {
         hasGames = true
         const gameTime = set.gameTime
         const multBeforeSet = multiplier
 
-        // 1. Inactivity decay between sets
+        // 1. Inactivity decay between sets (only for team matches the player missed)
+        const setSnap = getCfgAtTime(configHistory, gameTime, cfg)
         let inactivityApplied = null
         if (lastGameTime !== null) {
-            const dayGap = (gameTime - lastGameTime) / MS_PER_DAY
-            const weeksGap = Math.floor(dayGap / 7)
-            if (weeksGap > 0) {
-                const factor = Math.pow(cfg.INACTIVITY_DECAY, weeksGap)
+            const missedMatches = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId)).length
+            if (missedMatches > 0) {
+                const factor = Math.pow(setSnap.INACTIVITY_DECAY, missedMatches)
                 multiplier = compressMultiplier(multiplier * factor, cfg)
-                inactivityApplied = { weeks: weeksGap, factor, multAfter: multiplier }
+                inactivityApplied = { weeks: missedMatches, factor, multAfter: multiplier }
             }
         }
 
         // 2. Per-set regression toward 1.0
-        const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
+        const decayed = 1 + (multiplier - 1) * setSnap.GAME_DECAY
 
         // 3. Calculate per-game factors and average them across the set
         const setEntries = []
@@ -651,15 +663,14 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         lastGameTime = gameTime
     }
 
-    // Final inactivity decay (last game → today)
+    // Final inactivity decay (only for team matches missed since player's last game)
     let finalInactivityDecay = null
     if (lastGameTime !== null) {
-        const daysSinceLast = (now - lastGameTime) / MS_PER_DAY
-        const weeksInactive = Math.floor(daysSinceLast / 7)
-        if (weeksInactive > 0) {
+        const missedSinceLast = teamMatches.filter(m => m.date > lastGameTime && !playerMatchIds.has(m.matchId)).length
+        if (missedSinceLast > 0) {
             const before = multiplier
-            multiplier = compressMultiplier(multiplier * Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
-            finalInactivityDecay = { weeks: weeksInactive, before, after: multiplier }
+            multiplier = compressMultiplier(multiplier * Math.pow(cfg.INACTIVITY_DECAY, missedSinceLast), cfg)
+            finalInactivityDecay = { weeks: missedSinceLast, before, after: multiplier }
         }
     }
 
@@ -871,9 +882,59 @@ export async function recalcForgePerformance(sql, seasonId) {
     // ── Get spark rows for batch updates ──
 
     const sparks = await sql`
-        SELECT id, league_player_id, total_sparks, sell_pressure, sell_pressure_updated_at
-        FROM player_sparks WHERE market_id = ${market.id}
+        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.sell_pressure, ps.sell_pressure_updated_at,
+               lp.team_id, lp.is_active, lp.player_id,
+               COALESCE(lp.joined_date, rt.transfer_date) as team_joined_at
+        FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        LEFT JOIN LATERAL (
+            SELECT created_at as transfer_date
+            FROM roster_transactions
+            WHERE player_id = lp.player_id AND to_team_id = lp.team_id
+            ORDER BY created_at DESC LIMIT 1
+        ) rt ON true
+        WHERE ps.market_id = ${market.id}
     `
+
+    // All completed non-forfeit matches this season, grouped by team → sorted match dates
+    const teamMatchRows = await sql`
+        SELECT m.id, m.team1_id, m.team2_id, m.date
+        FROM matches m
+        WHERE m.season_id = ${seasonId} AND m.is_completed = true
+          AND NOT EXISTS (
+              SELECT 1 FROM games g
+              WHERE g.match_id = m.id AND g.is_forfeit = true
+          )
+        ORDER BY m.date ASC
+    `
+    const teamMatchDates = new Map()
+    for (const m of teamMatchRows) {
+        const entry = { matchId: m.id, date: new Date(m.date).getTime() }
+        for (const tid of [m.team1_id, m.team2_id]) {
+            if (!teamMatchDates.has(tid)) teamMatchDates.set(tid, [])
+            teamMatchDates.get(tid).push(entry)
+        }
+    }
+    const teamsWithGames = new Set(teamMatchDates.keys())
+
+    // Player transfer history for counting missed matches on previous teams
+    const transferRows = await sql`
+        SELECT rt.player_id, rt.from_team_id, rt.to_team_id, rt.created_at
+        FROM roster_transactions rt
+        WHERE rt.season_id = ${seasonId} AND rt.type = 'transfer'
+        ORDER BY rt.created_at ASC
+    `
+    // Build per-player transfer timeline: player_id → [{fromTeam, toTeam, date}]
+    const playerTransfers = new Map()
+    for (const rt of transferRows) {
+        if (!playerTransfers.has(rt.player_id)) playerTransfers.set(rt.player_id, [])
+        playerTransfers.get(rt.player_id).push({
+            fromTeam: rt.from_team_id,
+            toTeam: rt.to_team_id,
+            date: new Date(rt.created_at).getTime(),
+        })
+    }
+
     const sparkMap = new Map(sparks.map(s => [s.league_player_id, s]))
 
     // ── Replay each player's games with compounding heat ──
@@ -889,24 +950,60 @@ export async function recalcForgePerformance(sql, seasonId) {
         if (!spark) continue
 
         const result = replayPlayerGames({
-            games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+            games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, teamMatchDates,
         })
 
+        // Only mark as processed if they have post-forge games.
+        // Players with only pre-forge games fall through to the no-games loop for benched detection.
+        if (!result.hasGames) continue
+
         processedSparkIds.add(spark.id)
-        const multiplier = result.hasGames ? result.multiplier : 1.0
+        const multiplier = result.multiplier
         const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
         const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
         updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
     }
 
     // Process players with sparks but no games in the season
+    // Only decay free agents (is_active=false) or benched players (team played but player wasn't in any game)
     for (const spark of sparks) {
         if (processedSparkIds.has(spark.id)) continue
-        const daysSinceMarket = (now - marketStartTime) / MS_PER_DAY
-        const weeksInactive = Math.floor(daysSinceMarket / 7)
-        const multiplier = weeksInactive > 0
-            ? compressMultiplier(Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
-            : 1.0
+        const isFreeAgent = !spark.is_active
+        let multiplier = 1.0
+        if (isFreeAgent) {
+            const daysSinceMarket = (now - marketStartTime) / MS_PER_DAY
+            const weeksInactive = Math.floor(daysSinceMarket / 7)
+            if (weeksInactive > 0) {
+                multiplier = compressMultiplier(Math.pow(cfg.INACTIVITY_DECAY, weeksInactive), cfg)
+            }
+        } else if (spark.is_active) {
+            // Count missed matches across all teams the player has been on
+            let matchesMissed = 0
+            const transfers = playerTransfers.get(spark.player_id) || []
+            if (transfers.length > 0) {
+                // Build team stints from transfer history
+                // First stint: on fromTeam of first transfer, from market start to first transfer
+                const firstTransfer = transfers[0]
+                const prevTeamMatches = teamMatchDates.get(firstTransfer.fromTeam) || []
+                matchesMissed += prevTeamMatches.filter(m => m.date >= marketStartTime && m.date < firstTransfer.date).length
+                // Middle stints: between consecutive transfers
+                for (let i = 0; i < transfers.length - 1; i++) {
+                    const midMatches = teamMatchDates.get(transfers[i].toTeam) || []
+                    matchesMissed += midMatches.filter(m => m.date >= transfers[i].date && m.date < transfers[i + 1].date).length
+                }
+                // Current team: from last transfer to now
+                const lastTransfer = transfers[transfers.length - 1]
+                const curMatches = teamMatchDates.get(spark.team_id) || []
+                matchesMissed += curMatches.filter(m => m.date >= lastTransfer.date).length
+            } else {
+                // No transfers — simple case: count all team matches since market opened
+                const teamMatches = teamMatchDates.get(spark.team_id) || []
+                matchesMissed = teamMatches.filter(m => m.date >= marketStartTime).length
+            }
+            if (matchesMissed > 0) {
+                multiplier = compressMultiplier(Math.pow(cfg.INACTIVITY_DECAY, matchesMissed), cfg)
+            }
+        }
         const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
         const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
         updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
@@ -1028,10 +1125,18 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
                ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier,
                ps.current_price, fm.base_price, fm.created_at as market_created_at,
                fm.season_id, COALESCE(p.name, 'Unknown') as player_name,
-               LOWER(COALESCE(lp.role, 'fill')) as player_role
+               LOWER(COALESCE(lp.role, 'fill')) as player_role,
+               lp.team_id,
+               COALESCE(lp.joined_date, rt.transfer_date) as team_joined_at
         FROM player_sparks ps
         JOIN forge_markets fm ON ps.market_id = fm.id
         JOIN league_players lp ON ps.league_player_id = lp.id
+        LEFT JOIN LATERAL (
+            SELECT created_at as transfer_date
+            FROM roster_transactions
+            WHERE player_id = lp.player_id AND to_team_id = lp.team_id
+            ORDER BY created_at DESC LIMIT 1
+        ) rt ON true
         JOIN players p ON lp.player_id = p.id
         WHERE ps.id = ${sparkId}
     `
@@ -1214,13 +1319,33 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
         gamePlayerNames.set(game.league_player_id, game.player_name)
     }
 
+    // Team match dates for inactivity decay (only decay for missed non-forfeit team matches)
+    const teamMatchRows = await sql`
+        SELECT m.id, m.team1_id, m.team2_id, m.date
+        FROM matches m
+        WHERE m.season_id = ${seasonId} AND m.is_completed = true
+          AND NOT EXISTS (
+              SELECT 1 FROM games g
+              WHERE g.match_id = m.id AND g.is_forfeit = true
+          )
+        ORDER BY m.date ASC
+    `
+    const teamMatchDates = new Map()
+    for (const m of teamMatchRows) {
+        const entry = { matchId: m.id, date: new Date(m.date).getTime() }
+        for (const tid of [m.team1_id, m.team2_id]) {
+            if (!teamMatchDates.has(tid)) teamMatchDates.set(tid, [])
+            teamMatchDates.get(tid).push(entry)
+        }
+    }
+
     // Replay this player's games with full trace
     const playerGames = playerGamesMap.get(lpId) || []
     const marketStartTime = new Date(spark.market_created_at).getTime()
 
     const result = replayPlayerGames({
         games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
-        gameTeamPlayers, playerStrengthMap, gamePlayerNames,
+        gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates,
     })
 
     return {

@@ -1,3 +1,4 @@
+/* global process */
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission, getLeagueIdFromSeason } from '../lib/auth.js'
@@ -5,6 +6,8 @@ import { logAudit } from '../lib/audit.js'
 import { updateMatchChallenges } from '../lib/challenges.js'
 import { resolvePredictions } from '../lib/predictions.js'
 import { updateForgeAfterMatch } from '../lib/forge.js'
+import { sendChannelMessage } from '../lib/discord.js'
+import { advanceFromMatch } from '../lib/advancement.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -172,10 +175,21 @@ async function submitMatch(sql, body, admin, event) {
             // Cache for resolved league_player_ids within this transaction
             const playerCache = {}
 
+            // Look up stage info from linked scheduled match
+            let stageId = null, groupId = null, roundId = null
+            if (scheduled_match_id) {
+                const [smInfo] = await tx`SELECT stage_id, group_id, round_id FROM scheduled_matches WHERE id = ${scheduled_match_id}`
+                if (smInfo) {
+                    stageId = smInfo.stage_id
+                    groupId = smInfo.group_id
+                    roundId = smInfo.round_id
+                }
+            }
+
             // 1. Create the match
             const [match] = await tx`
-                INSERT INTO matches (season_id, team1_id, team2_id, date, week, best_of, match_type, winner_team_id, is_completed, reported_by)
-                VALUES (${season_id}, ${team1_id}, ${team2_id}, ${date || new Date().toISOString().split('T')[0]}, ${week || null}, ${best_of || games.length}, 'regular', ${winnerTeamId}, true, ${admin.id})
+                INSERT INTO matches (season_id, team1_id, team2_id, date, week, best_of, match_type, winner_team_id, is_completed, reported_by, stage_id, group_id, round_id)
+                VALUES (${season_id}, ${team1_id}, ${team2_id}, ${date || new Date().toISOString().split('T')[0]}, ${week || null}, ${best_of || games.length}, 'regular', ${winnerTeamId}, true, ${admin.id}, ${stageId}, ${groupId}, ${roundId})
                 RETURNING id
             `
 
@@ -283,6 +297,11 @@ async function submitMatch(sql, body, admin, event) {
                 resolvePredictions(sql, scheduled_match_id, winnerTeamId)
                     .catch(err => console.error('Prediction resolution failed:', err))
             )
+            // Trigger bracket advancement
+            event.waitUntil(
+                advanceFromMatch(sql, scheduled_match_id)
+                    .catch(err => console.error('Bracket advancement failed:', err))
+            )
         }
 
         // Recalculate Fantasy Forge performance scores for the season (fire-and-forget)
@@ -296,6 +315,36 @@ async function submitMatch(sql, body, admin, event) {
             updatePlayerRoles(sql, result.match_id)
                 .catch(err => console.error('Player role update failed:', err))
         )
+
+        // Release report lock and notify Discord (fire-and-forget)
+        if (scheduled_match_id) {
+            event.waitUntil((async () => {
+                try {
+                    const [sm] = await sql`
+                        SELECT t1.name as team1_name, t2.name as team2_name, sm.week
+                        FROM scheduled_matches sm
+                        JOIN teams t1 ON sm.team1_id = t1.id
+                        JOIN teams t2 ON sm.team2_id = t2.id
+                        WHERE sm.id = ${scheduled_match_id}
+                    `
+                    await sql`
+                        UPDATE scheduled_matches
+                        SET locked_by = NULL, locked_at = NULL
+                        WHERE id = ${scheduled_match_id}
+                    `
+                    const channelId = process.env.DISCORD_REPORT_CHANNEL_ID
+                    if (channelId && sm) {
+                        const week = sm.week ? ` (Week ${sm.week})` : ''
+                        await sendChannelMessage(channelId, {
+                            content: `**${admin.discord_username}** reported **${sm.team1_name}** vs **${sm.team2_name}**${week}`,
+                            flags: 4096,
+                        })
+                    }
+                } catch (err) {
+                    console.error('Lock release/notify failed:', err)
+                }
+            })())
+        }
 
         return {
             statusCode: 200,

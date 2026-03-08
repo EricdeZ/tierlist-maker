@@ -41,6 +41,7 @@ export default function ScheduledMatchPanel({ scheduledMatches = [], linkedSched
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)] mt-0.5 ml-5.5">
+                                    {sm.stage_name && <span className="text-violet-400">{sm.stage_name}{sm.round_name ? ` / ${sm.round_name}` : ''}</span>}
                                     {sm.scheduled_date && <span>{sm.scheduled_date.slice(0, 10)}</span>}
                                     {sm.week && <span>W{sm.week}</span>}
                                     <span>Bo{sm.best_of}</span>

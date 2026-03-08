@@ -16,15 +16,35 @@ function CardBack() {
 
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
 
+function getCardType(card) {
+  return card.cardType || card.card_type || 'god'
+}
+
 function toGameCardData(card) {
-  return {
-    name: card.godName || card.name,
-    class: card.godClass || card.class,
-    imageUrl: card.imageUrl,
-    ability: card.ability,
-    id: card.godId || card.id,
-    serialNumber: card.serialNumber,
+  const type = getCardType(card)
+  const base = {
+    name: card.godName || card.god_name || card.name,
+    class: card.godClass || card.god_class || card.class,
+    imageUrl: card.imageUrl || card.image_url,
+    id: card.godId || card.god_id || card.id,
+    serialNumber: card.serialNumber || card.serial_number,
   }
+  if (type === 'god') {
+    return { ...base, ability: card.ability }
+  }
+  if (type === 'item') {
+    const cd = card.cardData || card.card_data || {}
+    return { ...base, category: cd.category || card.class, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd.imageKey }
+  }
+  if (type === 'consumable') {
+    const cd = card.cardData || card.card_data || {}
+    return { ...base, color: cd.color || '#10b981', description: cd.description || 'Consumable card', manaCost: cd.manaCost || 1 }
+  }
+  if (type === 'player') {
+    const cd = card.cardData || card.card_data || {}
+    return { ...base, role: cd.role || card.role, teamName: cd.teamName, teamColor: cd.teamColor, cardData: cd }
+  }
+  return base
 }
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
@@ -47,10 +67,18 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
   const particleIdRef = useRef(0)
   const antSparkTimerRef = useRef(null)
 
-  const cards = useMemo(() =>
-    [...result.cards].sort((a, b) => (RARITY_TIER[b.rarity] ?? 5) - (RARITY_TIER[a.rarity] ?? 5)),
-    [result.cards]
-  )
+  const isMixed = result.packType === 'mixed' || result.cards.some(c => c._revealOrder != null || c.card_type)
+  const cards = useMemo(() => {
+    const sorted = [...result.cards]
+    if (isMixed && sorted.some(c => c._revealOrder != null)) {
+      // Mixed packs: use assigned reveal order
+      sorted.sort((a, b) => (a._revealOrder ?? 99) - (b._revealOrder ?? 99))
+    } else {
+      // Rarity packs: common first, rarest last
+      sorted.sort((a, b) => (RARITY_TIER[b.rarity] ?? 5) - (RARITY_TIER[a.rarity] ?? 5))
+    }
+    return sorted
+  }, [result.cards, isMixed])
 
   const topIndex = useMemo(() => {
     for (let i = 0; i < cards.length; i++) {
@@ -438,7 +466,11 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                 <div className="pack-opening__ec-flip">
                   <div className="pack-opening__ec-back"><CardBack /></div>
                   <div className="pack-opening__ec-front">
-                    <GameCard type="god" rarity={card.rarity} data={toGameCardData(card)} />
+                    <GameCard type={getCardType(card)} rarity={card.rarity} data={toGameCardData(card)} />
+                    {isTop && topFlipPhase === 'revealed' && (
+                      <div className={`pack-opening__holo-shimmer${tier <= 1 ? ' holo-intense' : tier <= 2 ? ' holo-medium' : ''}`}
+                        style={{ '--holo-color': cardColor }} />
+                    )}
                   </div>
                 </div>
                 {/* Expanding ring burst (epic+) */}
@@ -478,7 +510,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                 {revealedSet.size} / {cards.length}
               </div>
               <p className="pack-opening__stack-hint" style={{ position: 'absolute', bottom: '-75px' }}>
-                {flipPhase === 'anticipation' ? '...' : cardFlipped ? 'Tap for next' : isLastCard ? 'Wild card — tap to reveal!' : 'Tap to reveal'}
+                {flipPhase === 'anticipation' ? '...' : cardFlipped ? 'Tap for next' : isLastCard && isMixed ? 'Wildcard — tap to reveal!' : isLastCard ? 'Last card — tap to reveal!' : 'Tap to reveal'}
               </p>
             </>
           )}
@@ -494,7 +526,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
           <div className="pack-opening__summary-grid">
             {cards.map((card, i) => (
               <div key={i} className="pack-opening__summary-card" style={{ '--si': i }}>
-                <GameCard type="god" rarity={card.rarity} data={toGameCardData(card)} />
+                <GameCard type={getCardType(card)} rarity={card.rarity} data={toGameCardData(card)} />
                 {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
               </div>
             ))}

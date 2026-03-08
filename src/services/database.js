@@ -124,7 +124,15 @@ export const playerService = {
 
 export const matchService = {
     async getAllBySeason(seasonId, limit = null) {
-        return apiCall('matches', { seasonId, ...(limit && { limit }) })
+        const data = await apiCall('matches', { seasonId, ...(limit && { limit }) })
+        // API returns { matches, stages } when stages exist, or plain array
+        return Array.isArray(data) ? data : data.matches
+    },
+
+    async getAllBySeasonWithStages(seasonId) {
+        const data = await apiCall('matches', { seasonId })
+        if (Array.isArray(data)) return { matches: data, stages: [] }
+        return { matches: data.matches, stages: data.stages || [] }
     },
 
     async getRecentMatches(seasonId, limit = 5) {
@@ -312,6 +320,18 @@ export const challengeService = {
 
     async revokeUserChallenge(userId, challengeId) {
         return apiPost('challenge-manage', {}, { action: 'revoke-user-challenge', userId, challengeId })
+    },
+
+    async getUserTitles(userId) {
+        return apiPost('challenge-manage', {}, { action: 'get-user-titles', userId })
+    },
+
+    async grantTitle(userId, label, tier) {
+        return apiPost('challenge-manage', {}, { action: 'grant-title', userId, label, tier })
+    },
+
+    async revokeTitle(titleId) {
+        return apiPost('challenge-manage', {}, { action: 'revoke-title', titleId })
     },
 }
 

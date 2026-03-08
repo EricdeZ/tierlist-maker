@@ -130,6 +130,9 @@ roster_status values: 'member', 'captain', 'sub'
 | is_completed | boolean | YES | false |
 | notes | text | YES | |
 | reported_by | integer | YES | FK → users.id (SET NULL) |
+| stage_id | integer | YES | FK → season_stages.id (SET NULL) |
+| group_id | integer | YES | FK → stage_groups.id (SET NULL) |
+| round_id | integer | YES | FK → stage_rounds.id (SET NULL) |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 
@@ -255,25 +258,84 @@ Valid permission keys: `match_report`, `roster_manage`, `match_manage`, `player_
 | details | jsonb | YES | |
 | created_at | timestamptz | YES | now() |
 
+### season_stages
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| season_id | integer | NO | FK → seasons.id (CASCADE) |
+| name | text | NO | |
+| slug | text | NO | |
+| stage_type | text | YES | NULL (round_robin, single_elimination, double_elimination, swiss, custom, or NULL for freeform) |
+| sort_order | integer | NO | 0 |
+| status | text | NO | 'pending' |
+| settings | jsonb | NO | '{}' |
+| created_at | timestamptz | NO | NOW() |
+
+UNIQUE(season_id, slug)
+CHECK (status IN ('pending', 'active', 'completed'))
+
+### stage_groups
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| stage_id | integer | NO | FK → season_stages.id (CASCADE) |
+| name | text | NO | |
+| slug | text | NO | |
+| group_type | text | NO | 'default' (conference, pool, bracket, winners, losers, custom) |
+| sort_order | integer | NO | 0 |
+| settings | jsonb | NO | '{}' |
+
+UNIQUE(stage_id, slug)
+
+### stage_group_teams
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| group_id | integer | NO | FK → stage_groups.id (CASCADE) |
+| team_id | integer | NO | FK → teams.id (CASCADE) |
+| seed | integer | YES | |
+
+UNIQUE(group_id, team_id)
+
+### stage_rounds
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| stage_id | integer | NO | FK → season_stages.id (CASCADE) |
+| name | text | NO | |
+| round_number | integer | NO | |
+| sort_order | integer | NO | 0 |
+| best_of_override | integer | YES | |
+| scheduled_date | date | YES | |
+
+UNIQUE(stage_id, round_number)
+
 ### scheduled_matches
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | id | integer | NO | auto-increment |
 | season_id | integer | NO | FK → seasons.id (CASCADE) |
-| team1_id | integer | NO | FK → teams.id (CASCADE) |
-| team2_id | integer | NO | FK → teams.id (CASCADE) |
+| team1_id | integer | YES | FK → teams.id (CASCADE) |
+| team2_id | integer | YES | FK → teams.id (CASCADE) |
 | best_of | integer | NO | 1 |
-| scheduled_date | date | NO | |
+| scheduled_date | date | YES | |
 | week | integer | YES | |
 | status | varchar(20) | NO | 'scheduled' |
 | created_by | integer | YES | FK → users.id (SET NULL) |
 | created_at | timestamptz | YES | now() |
 | updated_at | timestamptz | YES | now() |
 | match_id | integer | YES | FK → matches.id (SET NULL) |
-
 | predictions_locked | boolean | NO | false |
+| stage_id | integer | YES | FK → season_stages.id (SET NULL) |
+| group_id | integer | YES | FK → stage_groups.id (SET NULL) |
+| round_id | integer | YES | FK → stage_rounds.id (SET NULL) |
+| bracket_position | integer | YES | |
+| team1_source | jsonb | YES | |
+| team2_source | jsonb | YES | |
+| locked_by | integer | YES | FK → users.id (SET NULL) |
+| locked_at | timestamptz | YES | |
 
-CHECK (team1_id <> team2_id)
+CHECK (team1_id IS NULL OR team2_id IS NULL OR team1_id <> team2_id)
 CHECK (status IN ('scheduled', 'completed', 'cancelled'))
 
 ### predictions

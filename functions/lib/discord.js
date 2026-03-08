@@ -217,6 +217,28 @@ export async function sendDMWithReturn(discordUserId, { content, embeds }) {
  * @param {string} webhookUrl - Full Discord webhook URL
  * @param {object} options - { content, embeds }
  */
+/**
+ * Send a message to a Discord channel as the bot.
+ * @param {string} channelId - Discord channel snowflake ID
+ * @param {object} options - { content, embeds, flags }
+ */
+export async function sendChannelMessage(channelId, { content, embeds, flags }) {
+    if (!channelId) return
+    try {
+        const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+            method: 'POST',
+            headers: { ...getDiscordHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, embeds, flags }),
+        })
+        if (!res.ok) {
+            const text = await res.text().catch(() => '')
+            console.error(`Discord channel message failed ${res.status}: ${text.slice(0, 200)}`)
+        }
+    } catch (err) {
+        console.error('sendChannelMessage error:', err.message || err)
+    }
+}
+
 export async function sendWebhook(webhookUrl, { content, embeds }) {
     const res = await fetch(webhookUrl, {
         method: 'POST',

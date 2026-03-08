@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext'
 import PageTitle from '../../components/PageTitle'
 import passionCoin from '../../assets/passion/passion.png'
 
+const TITLE_TIERS = CHALLENGE_TIERS.map(t => t.key)
+
 // ═══════════════════════════════════════════════════
 // Player Challenge Manager — search, view, award/revoke
 // ═══════════════════════════════════════════════════
@@ -18,6 +20,10 @@ function PlayerChallengePanel() {
     const [actionId, setActionId] = useState(null)
     const [tierFilter, setTierFilter] = useState('all')
     const searchTimeout = useRef(null)
+    const [userTitles, setUserTitles] = useState([])
+    const [newTitleLabel, setNewTitleLabel] = useState('')
+    const [newTitleTier, setNewTitleTier] = useState('gold')
+    const [grantingTitle, setGrantingTitle] = useState(false)
 
     const doSearch = useCallback(async (q) => {
         if (q.length < 2) { setSearchResults([]); return }
@@ -44,8 +50,12 @@ function PlayerChallengePanel() {
         setQuery('')
         setLoadingChallenges(true)
         try {
-            const data = await challengeService.getUserChallenges(user.id)
-            setUserChallenges(data.challenges || [])
+            const [chalData, titleData] = await Promise.all([
+                challengeService.getUserChallenges(user.id),
+                challengeService.getUserTitles(user.id),
+            ])
+            setUserChallenges(chalData.challenges || [])
+            setUserTitles(titleData.titles || [])
         } catch (err) {
             console.error('Failed to load user challenges:', err)
         } finally {
@@ -76,6 +86,31 @@ function PlayerChallengePanel() {
             alert(err.message)
         } finally {
             setActionId(null)
+        }
+    }
+
+    const handleGrantTitle = async () => {
+        if (!newTitleLabel.trim()) return
+        setGrantingTitle(true)
+        try {
+            await challengeService.grantTitle(selectedUser.id, newTitleLabel.trim(), newTitleTier)
+            setNewTitleLabel('')
+            const data = await challengeService.getUserTitles(selectedUser.id)
+            setUserTitles(data.titles || [])
+        } catch (err) {
+            alert(err.message)
+        } finally {
+            setGrantingTitle(false)
+        }
+    }
+
+    const handleRevokeTitle = async (titleId, label) => {
+        if (!confirm(`Remove "${label}" title?`)) return
+        try {
+            await challengeService.revokeTitle(titleId)
+            setUserTitles(prev => prev.filter(t => t.id !== titleId))
+        } catch (err) {
+            alert(err.message)
         }
     }
 
@@ -150,11 +185,51 @@ function PlayerChallengePanel() {
                             </div>
                         </div>
                         <button
-                            onClick={() => { setSelectedUser(null); setUserChallenges([]) }}
+                            onClick={() => { setSelectedUser(null); setUserChallenges([]); setUserTitles([]) }}
                             className="text-xs text-(--color-text-secondary) hover:text-white transition-colors"
                         >
                             Clear
                         </button>
+                    </div>
+
+                    {/* Direct Titles */}
+                    <div className="mb-4 pb-4 border-b border-white/10">
+                        <h3 className="text-xs font-bold text-(--color-text-secondary) uppercase tracking-wider mb-3">Profile Titles</h3>
+                        {userTitles.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {userTitles.map(t => {
+                                    const color = getTierColor(t.tier)
+                                    return (
+                                        <div key={t.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold"
+                                            style={{ borderColor: `${color}60`, color, backgroundColor: `${color}15` }}>
+                                            <span>&#9733;</span>
+                                            {t.label}
+                                            <button onClick={() => handleRevokeTitle(t.id, t.label)}
+                                                className="ml-1 text-red-400 hover:text-red-300 cursor-pointer">&times;</button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                        <div className="flex gap-2 items-center">
+                            <input
+                                value={newTitleLabel}
+                                onChange={e => setNewTitleLabel(e.target.value)}
+                                placeholder="Title label..."
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50"
+                                onKeyDown={e => e.key === 'Enter' && handleGrantTitle()}
+                            />
+                            <select value={newTitleTier} onChange={e => setNewTitleTier(e.target.value)}
+                                className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-(--color-accent)/50">
+                                {TITLE_TIERS.map(t => (
+                                    <option key={t} value={t} className="bg-gray-900">{getTierLabel(t)}</option>
+                                ))}
+                            </select>
+                            <button onClick={handleGrantTitle} disabled={grantingTitle || !newTitleLabel.trim()}
+                                className="px-3 py-1.5 rounded-lg bg-green-500/15 text-green-400 hover:bg-green-500/25 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer">
+                                {grantingTitle ? '...' : 'Grant'}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Tier filter */}

@@ -82,6 +82,21 @@ const tools = [
         btnClass: 'bg-cyan-600 hover:bg-cyan-700',
     },
     {
+        title: 'Stage Manager',
+        description: 'Set up tournament structure: stages (regular season, playoffs, finals), conferences/groups, rounds, and bracket visualization with auto-advancement.',
+        path: '/admin/stages',
+        permission: 'match_schedule',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+            </svg>
+        ),
+        accent: 'from-violet-500/20 to-violet-600/5',
+        border: 'border-violet-500/20 hover:border-violet-500/40',
+        iconColor: 'text-violet-400',
+        btnClass: 'bg-violet-600 hover:bg-violet-700',
+    },
+    {
         title: 'Discord Configuration',
         description: 'Configure Discord channel connections, map team roles, and set up webhook notifications for automatic screenshot collection and matching.',
         path: '/admin/discord',

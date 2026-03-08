@@ -1,3 +1,4 @@
+/* global process */
 /**
  * Auto-match Discord queue items to scheduled matches.
  *
@@ -7,7 +8,7 @@
  * 3. Scheduled match lookup → match team(s) + division + date proximity
  */
 
-import { sendWebhook, sendDM } from './discord.js'
+import { sendWebhook, sendDM, sendChannelMessage } from './discord.js'
 import { FEATURE_FLAGS } from '../../src/config/featureFlags.js'
 
 /**
@@ -290,7 +291,30 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
         }
     }
 
-    // 6. Send DM notifications to staff with match_report permission for this division
+    // 6. Send bot channel notifications for ready-to-report matches
+    const reportChannelId = process.env.DISCORD_REPORT_CHANNEL_ID
+    if (matchedScheduleIds.size > 0 && reportChannelId) {
+        for (const smId of matchedScheduleIds) {
+            const sm = scheduledMatches.find(m => m.id === smId)
+            if (!sm) continue
+
+            const [countRow] = await sql`
+                SELECT COUNT(*) as count FROM discord_queue
+                WHERE suggested_match_id = ${smId} AND status = 'pending'
+            `
+
+            const week = sm.week ? ` (Week ${sm.week})` : ''
+            const screenshots = countRow?.count || '?'
+            const reportUrl = `https://smitecomp.com/admin/report/${smId}`
+
+            sendChannelMessage(reportChannelId, {
+                content: `**${sm.team1_name}** vs **${sm.team2_name}**${week} is ready to report (${screenshots} screenshots)\n<${reportUrl}>`,
+                flags: 4096,
+            }).catch(err => console.error('discord-match: bot channel notify failed:', err.message))
+        }
+    }
+
+    // 7. Send DM notifications to staff with match_report permission for this division
     if (matchedScheduleIds.size > 0) {
         try {
             const [divRow] = await sql`
@@ -326,7 +350,7 @@ export async function autoMatchQueueItems(sql, newItemIds, channel, guildMembers
                         WHERE suggested_match_id = ${smId} AND status = 'pending'
                     `
 
-                    const reportUrl = `https://smitecomp.com/admin/matchreport/${smId}`
+                    const reportUrl = `https://smitecomp.com/admin/report/${smId}`
                     const weekStr = sm.week ? ` — Week ${sm.week}` : ''
                     const screenshots = countRow?.count || '?'
                     const screenshotLabel = `${screenshots} screenshot${screenshots !== 1 ? 's' : ''}`

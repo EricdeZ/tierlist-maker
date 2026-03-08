@@ -224,7 +224,8 @@ export function EditableMatchData({ editData, adminData, result, onChange }) {
                     {linkedMatch ? (
                         <div className="flex items-center gap-2 text-xs">
                             <span className="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-medium">
-                                Linked: {linkedMatch.team1_name} vs {linkedMatch.team2_name}
+                                Linked: {linkedMatch.team1_name || 'TBD'} vs {linkedMatch.team2_name || 'TBD'}
+                                {linkedMatch.stage_name && ` \u2014 ${linkedMatch.stage_name}${linkedMatch.round_name ? ` / ${linkedMatch.round_name}` : ''}`}
                                 {linkedMatch.scheduled_date && ` \u2014 ${linkedMatch.scheduled_date.slice(0, 10)}`}
                                 {linkedMatch.week && ` (W${linkedMatch.week})`}
                             </span>
@@ -248,7 +249,8 @@ export function EditableMatchData({ editData, adminData, result, onChange }) {
                                 <option value="">{'\u2014'} Select to auto-fill {'\u2014'}</option>
                                 {scheduledForSeason.map(sm => (
                                     <option key={sm.id} value={sm.id}>
-                                        {sm.team1_name} vs {sm.team2_name}
+                                        {sm.team1_name || 'TBD'} vs {sm.team2_name || 'TBD'}
+                                        {sm.stage_name ? ` \u2014 ${sm.stage_name}${sm.round_name ? ` / ${sm.round_name}` : ''}` : ''}
                                         {sm.scheduled_date ? ` \u2014 ${sm.scheduled_date.slice(0, 10)}` : ''}
                                         {sm.week ? ` (W${sm.week})` : ''}
                                         {` Bo${sm.best_of}`}

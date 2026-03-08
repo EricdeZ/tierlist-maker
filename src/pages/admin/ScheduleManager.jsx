@@ -26,9 +26,10 @@ export default function ScheduleManager() {
 
     const [scheduledMatches, setScheduledMatches] = useState([])
     const [matchesLoading, setMatchesLoading] = useState(false)
+    const [stageData, setStageData] = useState({ stages: [], groups: [], rounds: [] })
 
     const [editingMatch, setEditingMatch] = useState(null)
-    const [formData, setFormData] = useState({ team1_id: '', team2_id: '', best_of: 3, scheduled_date: '', week: '' })
+    const [formData, setFormData] = useState({ team1_id: '', team2_id: '', best_of: 3, scheduled_date: '', week: '', stage_id: '', group_id: '', round_id: '' })
     const [saving, setSaving] = useState(false)
 
     const [toast, setToast] = useState(null)
@@ -68,13 +69,20 @@ export default function ScheduleManager() {
 
     // ─── Fetch scheduled matches when season changes ───
     const fetchMatches = useCallback(async (seasonId) => {
-        if (!seasonId) { setScheduledMatches([]); return }
+        if (!seasonId) { setScheduledMatches([]); setStageData({ stages: [], groups: [], rounds: [] }); return }
         setMatchesLoading(true)
         try {
-            const res = await fetch(`${API}/schedule-manage?seasonId=${seasonId}`, { headers: getAuthHeaders() })
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            const data = await res.json()
-            setScheduledMatches(data.scheduledMatches || [])
+            const [matchRes, stageRes] = await Promise.all([
+                fetch(`${API}/schedule-manage?seasonId=${seasonId}`, { headers: getAuthHeaders() }),
+                fetch(`${API}/stage-manage?seasonId=${seasonId}`, { headers: getAuthHeaders() }).catch(() => null),
+            ])
+            if (!matchRes.ok) throw new Error(`HTTP ${matchRes.status}`)
+            const matchData = await matchRes.json()
+            setScheduledMatches(matchData.scheduledMatches || [])
+            if (stageRes?.ok) {
+                const sd = await stageRes.json()
+                setStageData({ stages: sd.stages || [], groups: sd.groups || [], rounds: sd.rounds || [] })
+            }
         } catch {
             setScheduledMatches([])
         } finally {
@@ -105,11 +113,14 @@ export default function ScheduleManager() {
     const handleEdit = (match) => {
         setEditingMatch(match)
         setFormData({
-            team1_id: match.team1_id,
-            team2_id: match.team2_id,
+            team1_id: match.team1_id || '',
+            team2_id: match.team2_id || '',
             best_of: match.best_of,
             scheduled_date: match.scheduled_date ? match.scheduled_date.slice(0, 10) : '',
             week: match.week || '',
+            stage_id: match.stage_id || '',
+            group_id: match.group_id || '',
+            round_id: match.round_id || '',
         })
     }
 
@@ -127,15 +138,21 @@ export default function ScheduleManager() {
 
         setSaving(true)
         try {
+            const stageFields = {
+                stage_id: formData.stage_id ? parseInt(formData.stage_id) : null,
+                group_id: formData.group_id ? parseInt(formData.group_id) : null,
+                round_id: formData.round_id ? parseInt(formData.round_id) : null,
+            }
             if (editingMatch) {
                 await doAction({
                     action: 'update',
                     id: editingMatch.id,
-                    team1_id: parseInt(formData.team1_id),
-                    team2_id: parseInt(formData.team2_id),
+                    team1_id: formData.team1_id ? parseInt(formData.team1_id) : null,
+                    team2_id: formData.team2_id ? parseInt(formData.team2_id) : null,
                     best_of: parseInt(formData.best_of) || 1,
-                    scheduled_date: formData.scheduled_date,
+                    scheduled_date: formData.scheduled_date || null,
                     week: formData.week ? parseInt(formData.week) : null,
+                    ...stageFields,
                 })
                 showToast('success', 'Match updated')
                 setEditingMatch(null)
@@ -143,14 +160,15 @@ export default function ScheduleManager() {
                 await doAction({
                     action: 'create',
                     season_id: selectedSeasonId,
-                    team1_id: parseInt(formData.team1_id),
-                    team2_id: parseInt(formData.team2_id),
+                    team1_id: formData.team1_id ? parseInt(formData.team1_id) : null,
+                    team2_id: formData.team2_id ? parseInt(formData.team2_id) : null,
                     best_of: parseInt(formData.best_of) || 1,
-                    scheduled_date: formData.scheduled_date,
+                    scheduled_date: formData.scheduled_date || null,
                     week: formData.week ? parseInt(formData.week) : null,
+                    ...stageFields,
                 })
                 showToast('success', 'Match scheduled')
-                // Only reset team selections — keep best_of, date, and week for bulk entry
+                // Only reset team selections — keep best_of, date, week, and stage fields for bulk entry
                 setFormData(prev => ({ ...prev, team1_id: '', team2_id: '' }))
             }
             fetchMatches(selectedSeasonId)
@@ -191,11 +209,20 @@ export default function ScheduleManager() {
         })
     }, [doAction, showToast, fetchMatches, selectedSeasonId])
 
-    // ─── Group matches by week ───
+    // ─── Computed helpers for stage dropdowns ───
+    const stageGroups = stageData.groups.filter(g => !formData.stage_id || String(g.stage_id) === String(formData.stage_id))
+    const stageRounds = stageData.rounds.filter(r => !formData.stage_id || String(r.stage_id) === String(formData.stage_id))
+
+    // ─── Group matches by stage/round or week ───
     const groupedMatches = (() => {
         const groups = {}
         for (const m of scheduledMatches) {
-            const key = m.week ? `Week ${m.week}` : 'Unscheduled'
+            let key
+            if (m.stage_name) {
+                key = m.round_name ? `${m.stage_name} — ${m.round_name}` : m.stage_name
+            } else {
+                key = m.week ? `Week ${m.week}` : 'Unscheduled'
+            }
             if (!groups[key]) groups[key] = []
             groups[key].push(m)
         }
@@ -284,6 +311,55 @@ export default function ScheduleManager() {
                 <div className="bg-[var(--color-secondary)] border border-cyan-500/20 rounded-xl p-5 mb-6">
                     <h2 className="text-sm font-bold text-[var(--color-text)] mb-4">Schedule New Match</h2>
                     <form onSubmit={handleSubmit}>
+                        {/* Stage/Group/Round selectors (shown when stages exist) */}
+                        {stageData.stages.length > 0 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Stage <span className="opacity-50">(optional)</span></label>
+                                    <select
+                                        value={formData.stage_id}
+                                        onChange={e => setFormData(p => ({ ...p, stage_id: e.target.value, group_id: '', round_id: '' }))}
+                                        className="w-full rounded-lg px-3 py-2 text-sm border"
+                                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                    >
+                                        <option value="">No stage</option>
+                                        {stageData.stages.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Group <span className="opacity-50">(optional)</span></label>
+                                    <select
+                                        value={formData.group_id}
+                                        onChange={e => setFormData(p => ({ ...p, group_id: e.target.value }))}
+                                        className="w-full rounded-lg px-3 py-2 text-sm border"
+                                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                        disabled={!formData.stage_id}
+                                    >
+                                        <option value="">No group</option>
+                                        {stageGroups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">Round <span className="opacity-50">(optional)</span></label>
+                                    <select
+                                        value={formData.round_id}
+                                        onChange={e => setFormData(p => ({ ...p, round_id: e.target.value }))}
+                                        className="w-full rounded-lg px-3 py-2 text-sm border"
+                                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-text)', borderColor: 'rgba(255,255,255,0.1)' }}
+                                        disabled={!formData.stage_id}
+                                    >
+                                        <option value="">No round</option>
+                                        {stageRounds.map(r => (
+                                            <option key={r.id} value={r.id}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                         {/* Persistent fields: Best Of, Date, Week */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                             <div>
@@ -407,13 +483,25 @@ export default function ScheduleManager() {
 
                                             {/* Teams */}
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <TeamLogo slug={m.team1_slug} name={m.team1_name} size={18} color={m.team1_color} />
-                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />
-                                                <span className="text-sm text-[var(--color-text)]">{m.team1_name}</span>
+                                                {m.team1_id ? (
+                                                    <>
+                                                        <TeamLogo slug={m.team1_slug} name={m.team1_name} size={18} color={m.team1_color} />
+                                                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />
+                                                        <span className="text-sm text-[var(--color-text)]">{m.team1_name}</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-sm text-[var(--color-text-secondary)] italic">TBD</span>
+                                                )}
                                                 <span className="text-xs text-[var(--color-text-secondary)]">vs</span>
-                                                <TeamLogo slug={m.team2_slug} name={m.team2_name} size={18} color={m.team2_color} />
-                                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team2_color || '#ef4444' }} />
-                                                <span className="text-sm text-[var(--color-text)]">{m.team2_name}</span>
+                                                {m.team2_id ? (
+                                                    <>
+                                                        <TeamLogo slug={m.team2_slug} name={m.team2_name} size={18} color={m.team2_color} />
+                                                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team2_color || '#ef4444' }} />
+                                                        <span className="text-sm text-[var(--color-text)]">{m.team2_name}</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-sm text-[var(--color-text-secondary)] italic">TBD</span>
+                                                )}
                                             </div>
 
                                             {/* Best of */}

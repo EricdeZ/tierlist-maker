@@ -51,6 +51,8 @@
   --body-bg: #1e1a10; --body-surface: #2a2418; --body-border: #4a3a20; --text-dim: #9a8a60; }
 .game-card[data-type="consumable"] { --accent: #10b981; --accent-light: #34d399; --accent-dark: #059669; --accent-glow: #10b98140;
   --body-bg: #101e18; --body-surface: #182a22; --body-border: #284a3a; --text-dim: #709a80; }
+.game-card[data-type="player"] { --accent: #6366f1; --accent-light: #818cf8; --accent-dark: #4f46e5; --accent-glow: #6366f140;
+  --body-bg: #12121e; --body-surface: #1a1a2a; --body-border: #2a2a48; --text-dim: #7a7a9a; }
 
 /* ============================================
    Card Shell — container query for perfect scaling

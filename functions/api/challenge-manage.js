@@ -60,6 +60,12 @@ const handler = async (event) => {
                     return await awardChallenge(sql, body, admin)
                 case 'revoke-user-challenge':
                     return await revokeUserChallenge(sql, body, admin)
+                case 'get-user-titles':
+                    return await getUserTitles(sql, body)
+                case 'grant-title':
+                    return await grantTitle(sql, body, admin)
+                case 'revoke-title':
+                    return await revokeTitle(sql, body, admin)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${body.action}` }) }
             }
@@ -421,6 +427,87 @@ async function revokeUserChallenge(sql, body, admin) {
         action: 'revoke-challenge', endpoint: 'challenge-manage',
         targetType: 'user', targetId: userId,
         details: { challengeId, title: challenge.title, reward: challenge.reward },
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Get direct titles for a user
+// ═══════════════════════════════════════════════════
+async function getUserTitles(sql, body) {
+    const { userId } = body
+    if (!userId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'userId required' }) }
+    }
+
+    const titles = await sql`
+        SELECT id, label, tier, granted_at
+        FROM user_titles
+        WHERE user_id = ${userId}
+        ORDER BY granted_at DESC
+    `
+
+    return { statusCode: 200, headers, body: JSON.stringify({ titles }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Grant a direct title to a user (no challenge needed)
+// ═══════════════════════════════════════════════════
+async function grantTitle(sql, body, admin) {
+    const { userId, label, tier } = body
+    if (!userId || !label?.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'userId and label required' }) }
+    }
+
+    const validTiers = ['daily', 'unique', 'clay', 'amber', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'obsidian', 'master', 'demigod', 'deity']
+    const safeTier = validTiers.includes(tier) ? tier : 'gold'
+
+    const [title] = await sql`
+        INSERT INTO user_titles (user_id, label, tier, granted_by)
+        VALUES (${userId}, ${label.trim()}, ${safeTier}, ${admin.id})
+        ON CONFLICT (user_id, label) DO NOTHING
+        RETURNING id
+    `
+
+    if (!title) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'User already has this title' }) }
+    }
+
+    await logAudit(sql, admin, {
+        action: 'grant-title', endpoint: 'challenge-manage',
+        targetType: 'user', targetId: userId,
+        details: { label: label.trim(), tier: safeTier },
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: title.id }) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// Revoke a direct title from a user
+// ═══════════════════════════════════════════════════
+async function revokeTitle(sql, body, admin) {
+    const { titleId } = body
+    if (!titleId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'titleId required' }) }
+    }
+
+    const [deleted] = await sql`
+        DELETE FROM user_titles WHERE id = ${titleId}
+        RETURNING user_id, label
+    `
+
+    if (!deleted) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Title not found' }) }
+    }
+
+    await logAudit(sql, admin, {
+        action: 'revoke-title', endpoint: 'challenge-manage',
+        targetType: 'user', targetId: deleted.user_id,
+        details: { label: deleted.label },
     })
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }

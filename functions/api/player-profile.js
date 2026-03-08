@@ -43,7 +43,7 @@ const handler = async (event) => {
         ` : [null]
 
         // 2, 3, 4, 5 in parallel
-        const [leagueBreakdowns, seasonHistory, gameHistory, badges] = await Promise.all([
+        const [leagueBreakdowns, seasonHistory, gameHistory, badges, directTitles] = await Promise.all([
             // Per-league aggregate stats
             sql`
                 SELECT
@@ -180,7 +180,18 @@ const handler = async (event) => {
                   AND c.is_active = true
                 ORDER BY uc.completed_at DESC
             ` : [],
+            // Direct titles (not tied to challenges)
+            player.is_claimed ? sql`
+                SELECT ut.label AS badge_label, ut.tier, ut.label AS title, ut.granted_at AS completed_at
+                FROM user_titles ut
+                JOIN users u ON u.id = ut.user_id
+                WHERE u.linked_player_id = ${player.id}
+                ORDER BY ut.granted_at DESC
+            ` : [],
         ])
+
+        // Merge direct titles into badges
+        badges.push(...directTitles)
 
         // Check for Featured Streamer badge
         if (player.is_claimed) {

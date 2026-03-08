@@ -134,6 +134,7 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
     const team1Won = match.winner_team_id === match.team1_id
     const team2Won = match.winner_team_id === match.team2_id
     const matchLink = isCompleted ? `${basePath}/matches/${match.id}` : null
+    const tbd = 'TBD'
 
     const CardWrapper = matchLink
         ? ({ children, className }) => (
@@ -165,20 +166,26 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
             <div className="hidden md:flex items-center min-h-[60px]">
                 {/* Team 1 side */}
                 <div className={`flex-1 flex items-center gap-3 px-5 py-3 ${isCompleted && !team1Won ? 'opacity-40' : ''}`}>
-                    <TeamLogo slug={match.team1_slug} name={match.team1_name} size={28} color={match.team1_color} />
-                    <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
-                        style={{
-                            backgroundColor: match.team1_color,
-                            ringColor: `${match.team1_color}40`,
-                            ringOffsetColor: 'transparent',
-                        }}
-                    />
-                    <span className={`text-sm font-bold truncate transition-colors ${
-                        team1Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
-                    }`}>
-                        {match.team1_name}
-                    </span>
+                    {match.team1_id ? (
+                        <>
+                            <TeamLogo slug={match.team1_slug} name={match.team1_name} size={28} color={match.team1_color} />
+                            <div
+                                className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
+                                style={{
+                                    backgroundColor: match.team1_color,
+                                    ringColor: `${match.team1_color}40`,
+                                    ringOffsetColor: 'transparent',
+                                }}
+                            />
+                            <span className={`text-sm font-bold truncate transition-colors ${
+                                team1Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
+                            }`}>
+                                {match.team1_name}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="text-sm font-bold text-(--color-text-secondary)/40 italic">{tbd}</span>
+                    )}
                     {team1Won && (
                         <span className="ml-auto text-[10px] font-black uppercase tracking-wider text-green-400 shrink-0">
                             WIN
@@ -226,20 +233,26 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                             WIN
                         </span>
                     )}
-                    <span className={`text-sm font-bold truncate text-right transition-colors ${
-                        team2Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
-                    }`}>
-                        {match.team2_name}
-                    </span>
-                    <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
-                        style={{
-                            backgroundColor: match.team2_color,
-                            ringColor: `${match.team2_color}40`,
-                            ringOffsetColor: 'transparent',
-                        }}
-                    />
-                    <TeamLogo slug={match.team2_slug} name={match.team2_name} size={28} color={match.team2_color} />
+                    {match.team2_id ? (
+                        <>
+                            <span className={`text-sm font-bold truncate text-right transition-colors ${
+                                team2Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
+                            }`}>
+                                {match.team2_name}
+                            </span>
+                            <div
+                                className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
+                                style={{
+                                    backgroundColor: match.team2_color,
+                                    ringColor: `${match.team2_color}40`,
+                                    ringOffsetColor: 'transparent',
+                                }}
+                            />
+                            <TeamLogo slug={match.team2_slug} name={match.team2_name} size={28} color={match.team2_color} />
+                        </>
+                    ) : (
+                        <span className="text-sm font-bold text-(--color-text-secondary)/40 italic">{tbd}</span>
+                    )}
                 </div>
 
                 {/* View arrow for completed */}
@@ -297,14 +310,15 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                                     : ''
                         }`}
                     >
-                        <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} color={match.team1_color} />
-                        <div
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: match.team1_color }}
-                        />
-                        <span className="text-sm font-bold text-(--color-text) flex-1 truncate">
-                            {match.team1_name}
-                        </span>
+                        {match.team1_id ? (
+                            <>
+                                <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} color={match.team1_color} />
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: match.team1_color }} />
+                                <span className="text-sm font-bold text-(--color-text) flex-1 truncate">{match.team1_name}</span>
+                            </>
+                        ) : (
+                            <span className="text-sm font-bold text-(--color-text-secondary)/40 italic flex-1">{tbd}</span>
+                        )}
                         {team1Won && (
                             <span className="text-[10px] font-black text-green-400 uppercase tracking-wider shrink-0">WIN</span>
                         )}
@@ -327,14 +341,15 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                                     : ''
                         }`}
                     >
-                        <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} color={match.team2_color} />
-                        <div
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: match.team2_color }}
-                        />
-                        <span className="text-sm font-bold text-(--color-text) flex-1 truncate">
-                            {match.team2_name}
-                        </span>
+                        {match.team2_id ? (
+                            <>
+                                <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} color={match.team2_color} />
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: match.team2_color }} />
+                                <span className="text-sm font-bold text-(--color-text) flex-1 truncate">{match.team2_name}</span>
+                            </>
+                        ) : (
+                            <span className="text-sm font-bold text-(--color-text-secondary)/40 italic flex-1">{tbd}</span>
+                        )}
                         {team2Won && (
                             <span className="text-[10px] font-black text-green-400 uppercase tracking-wider shrink-0">WIN</span>
                         )}
@@ -430,6 +445,7 @@ const Matches = () => {
     const { leagueSlug, divisionSlug } = useParams()
     const { season, division, league } = useDivision()
     const [matches, setMatches] = useState([])
+    const [stages, setStages] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [activeSection, setActiveSection] = useState(null) // set after data loads
@@ -444,8 +460,11 @@ const Matches = () => {
             setLoading(true)
             setError(null)
             try {
-                const data = await matchService.getAllBySeason(season.id)
-                if (!cancelled) setMatches(data)
+                const data = await matchService.getAllBySeasonWithStages(season.id)
+                if (!cancelled) {
+                    setMatches(data.matches)
+                    setStages(data.stages)
+                }
             } catch (err) {
                 if (!cancelled) setError(err.message)
             } finally {
@@ -464,13 +483,31 @@ const Matches = () => {
         })
     }, [])
 
-    // Split matches into upcoming and completed, grouped by week
+    // Split matches into upcoming and completed, grouped by stage/round or week
     const { upcomingWeeks, resultsWeeks, upcomingCount, resultsCount } = useMemo(() => {
+        const hasStages = stages.length > 0
         const upcoming = {}
         const results = {}
 
+        // Build a sort key for stage-aware grouping
+        const getGroupKey = (match) => {
+            if (hasStages && match.stage_name) {
+                const roundPart = match.round_name || ''
+                return roundPart ? `${match.stage_name} — ${roundPart}` : match.stage_name
+            }
+            return match.week != null ? `Week ${match.week}` : 'Unscheduled'
+        }
+
+        // Track ordering from stage/round sort_order for stable sorting
+        const groupOrder = {}
+
         for (const match of matches) {
-            const key = match.week != null ? `Week ${match.week}` : 'Unscheduled'
+            const key = getGroupKey(match)
+            if (!(key in groupOrder)) {
+                // Use stage sort_order * 1000 + round sort_order for composite ordering
+                const stageIdx = match.stage_id ? stages.findIndex(s => s.id === match.stage_id) : 999
+                groupOrder[key] = stageIdx * 1000 + (match.week ?? 999)
+            }
             if (match.is_completed) {
                 if (!results[key]) results[key] = []
                 results[key].push(match)
@@ -480,9 +517,12 @@ const Matches = () => {
             }
         }
 
-        // Sort weeks: ascending for upcoming (soonest first), descending for results (latest first)
-        const sortWeeks = (obj, ascending) => {
+        const sortGroups = (obj, ascending) => {
             return Object.keys(obj).sort((a, b) => {
+                const oA = groupOrder[a] ?? 999999
+                const oB = groupOrder[b] ?? 999999
+                if (oA !== oB) return ascending ? oA - oB : oB - oA
+                // Fallback: parse week number
                 const numA = parseInt(a.replace('Week ', ''))
                 const numB = parseInt(b.replace('Week ', ''))
                 if (isNaN(numA)) return 1
@@ -491,7 +531,7 @@ const Matches = () => {
             })
         }
 
-        // Sort matches within each week by date
+        // Sort matches within each group by date
         for (const key of Object.keys(upcoming)) {
             upcoming[key].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
         }
@@ -499,14 +539,14 @@ const Matches = () => {
             results[key].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
         }
 
-        const uw = sortWeeks(upcoming, true).map(k => ({ key: k, matches: upcoming[k] }))
-        const rw = sortWeeks(results, false).map(k => ({ key: k, matches: results[k] }))
+        const uw = sortGroups(upcoming, true).map(k => ({ key: k, matches: upcoming[k] }))
+        const rw = sortGroups(results, false).map(k => ({ key: k, matches: results[k] }))
 
         const uCount = Object.values(upcoming).reduce((s, arr) => s + arr.length, 0)
         const rCount = Object.values(results).reduce((s, arr) => s + arr.length, 0)
 
         return { upcomingWeeks: uw, resultsWeeks: rw, upcomingCount: uCount, resultsCount: rCount }
-    }, [matches])
+    }, [matches, stages])
 
     // Default to results
     useEffect(() => {

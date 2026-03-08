@@ -102,9 +102,16 @@ async function handleInit(sql, user) {
 async function handleOpenPack(sql, user, body) {
   const { packType, testMode } = body
   const result = await openPack(sql, user.id, packType, !!testMode)
+  const cards = result.cards.map((c, i) => {
+    const formatted = formatCard(c)
+    // Preserve reveal order for mixed packs
+    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+    return formatted
+  })
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
-    cards: result.cards.map(formatCard),
+    packType,
+    cards,
   }) }
 }
 
@@ -342,6 +349,8 @@ function formatCard(row) {
     metadata: row.metadata || {},
     acquiredVia: row.acquired_via,
     acquiredAt: row.created_at,
+    cardType: row.card_type || 'god',
+    cardData: row.card_data || null,
   }
 }
 

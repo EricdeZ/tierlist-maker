@@ -380,6 +380,7 @@ export default function MatchManager() {
                                 <span className="text-xs text-[var(--color-text-secondary)] tabular-nums w-20 shrink-0">
                                     {m.date ? m.date.slice(0, 10) : 'No date'}
                                 </span>
+                                {m.stage_name && <span className="text-[10px] text-violet-400 font-medium shrink-0">{m.stage_name}{m.round_name ? ` / ${m.round_name}` : ''}</span>}
                                 {m.week && <span className="text-xs text-[var(--color-text-secondary)] shrink-0">W{m.week}</span>}
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                     <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: m.team1_color || '#3b82f6' }} />

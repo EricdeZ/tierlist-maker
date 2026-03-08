@@ -1,6 +1,7 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { MatchReportHelp } from '../../components/admin/AdminHelp'
 import DraggablePanel from '../../components/admin/DraggablePanel'
 import ScheduledMatchPanel from '../../components/admin/ScheduledMatchPanel'
@@ -10,9 +11,12 @@ import { API, loadStorage, saveStorage, uid, buildEditData, compressImage } from
 import { ErrorBanner } from './dashboard/FormControls'
 import { MatchReportCard } from './dashboard/MatchReportCard'
 
+const LOCK_TTL_MS = 10 * 60 * 1000
+
 export default function AdminDashboard() {
     const { scheduledMatchId } = useParams()
     const navigate = useNavigate()
+    const { user } = useAuth()
     const autoStartedRef = useRef(false)
     const [matchReports, setMatchReports] = useState(() => loadStorage())
     const [submitting, setSubmitting] = useState({}) // { [mrId]: true }
@@ -172,16 +176,12 @@ export default function AdminDashboard() {
         }
     }, [fetchReadyMatches])
 
-    // Auto-open match report from URL param (e.g. /admin/matchreport/123)
+    // Redirect old matchreport/:id URLs to the new single-match page
     useEffect(() => {
-        if (!scheduledMatchId || autoStartedRef.current || !readyMatches.length) return
-        const match = readyMatches.find(rm => rm.id === Number(scheduledMatchId))
-        if (match) {
-            autoStartedRef.current = true
-            startReadyReport(match)
-            navigate('/admin/matchreport', { replace: true })
-        }
-    }, [scheduledMatchId, readyMatches, startReadyReport, navigate])
+        if (!scheduledMatchId || autoStartedRef.current) return
+        autoStartedRef.current = true
+        navigate(`/admin/report/${scheduledMatchId}`, { replace: true })
+    }, [scheduledMatchId, navigate])
 
     // ─── Start a forfeit report (skip screenshots) ───
     const startForfeitReport = useCallback((readyMatch) => {
@@ -677,8 +677,10 @@ export default function AdminDashboard() {
                                         const confColor = isLow ? 'text-red-400' : isMedium ? 'text-amber-400' : 'text-green-400'
                                         const confBorder = isLow ? 'border-red-500/50' : isMedium ? 'border-amber-500/30' : 'border-[var(--color-border)]'
                                         const confLabel = isLow ? 'Low match' : isMedium ? 'Likely match' : 'Strong match'
+                                        const isLocked = rm.locked_by && rm.locked_at && (Date.now() - new Date(rm.locked_at).getTime()) < LOCK_TTL_MS
+                                        const isMyLock = isLocked && rm.locked_by === user?.id
                                         return (
-                                        <div key={rm.id} className={`bg-[var(--color-card)] border rounded-lg p-3 hover:border-[var(--color-accent)]/40 transition-colors ${confBorder}`}>
+                                        <div key={rm.id} className={`bg-[var(--color-card)] border rounded-lg p-3 transition-colors ${isLocked && !isMyLock ? 'opacity-60 border-amber-500/40' : `hover:border-[var(--color-accent)]/40 ${confBorder}`}`}>
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`w-2.5 h-2.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
@@ -694,9 +696,17 @@ export default function AdminDashboard() {
                                                     }>
                                                         {confLabel}
                                                     </span>
+                                                    {rm.stage_name && <span className="text-[10px] text-violet-400 font-medium">{rm.stage_name}{rm.round_name ? ` / ${rm.round_name}` : ''}</span>}
                                                     {rm.week && <span className="text-xs text-[var(--color-text-secondary)]">Wk {rm.week}</span>}
                                                 </div>
                                             </div>
+                                            {isLocked && !isMyLock && (
+                                                <div className="mb-2 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">
+                                                    <p className="text-[10px] text-amber-400">
+                                                        &#128274; {rm.locked_by_name} is currently reporting this match
+                                                    </p>
+                                                </div>
+                                            )}
                                             {isLow && (
                                                 <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
                                                     <p className="text-[10px] text-red-400">
@@ -726,19 +736,22 @@ export default function AdminDashboard() {
                                                     </button>
                                                     <button
                                                         onClick={() => startForfeitReport(rm)}
-                                                        disabled={readyMatchLoading}
+                                                        disabled={readyMatchLoading || (isLocked && !isMyLock)}
                                                         className="px-2 py-1 rounded-lg text-xs font-semibold border border-orange-500/40 text-orange-400 hover:bg-orange-500/15 disabled:opacity-50 transition"
                                                         title="Report as forfeit — skip screenshots"
                                                     >
                                                         FF
                                                     </button>
-                                                    <button
-                                                        onClick={() => startReadyReport(rm)}
-                                                        disabled={readyMatchLoading}
-                                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition"
+                                                    <Link
+                                                        to={`/admin/report/${rm.id}`}
+                                                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition inline-block ${
+                                                            isLocked && !isMyLock
+                                                                ? 'bg-gray-600 text-gray-400 pointer-events-none'
+                                                                : 'bg-green-600 text-white hover:bg-green-500'
+                                                        }`}
                                                     >
                                                         Report Match
-                                                    </button>
+                                                    </Link>
                                                 </div>
                                             </div>
                                         </div>

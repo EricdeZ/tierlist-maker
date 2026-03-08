@@ -513,9 +513,13 @@ async function getReadyMatches(sql, lf) {
     const matches = await sql`
         SELECT sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                sm.scheduled_date, sm.week, sm.best_of,
+               sm.stage_id, sm.group_id, sm.round_id,
+               sm.locked_by, sm.locked_at,
+               lock_user.discord_username as locked_by_name,
                t1.name as team1_name, t1.color as team1_color,
                t2.name as team2_name, t2.color as team2_color,
                d.name as division_name, l.name as league_name,
+               ss.name as stage_name, sg.name as group_name, sr.name as round_name,
                COUNT(dq.id)::int as screenshot_count,
                MIN(dq.message_timestamp) as first_screenshot_at,
                MAX(dq.message_timestamp) as last_screenshot_at,
@@ -528,17 +532,24 @@ async function getReadyMatches(sql, lf) {
                    WHEN 1 THEN 'low' WHEN 2 THEN 'medium' WHEN 3 THEN 'high'
                    ELSE 'unknown' END as match_confidence
         FROM scheduled_matches sm
-        JOIN teams t1 ON sm.team1_id = t1.id
-        JOIN teams t2 ON sm.team2_id = t2.id
+        LEFT JOIN teams t1 ON sm.team1_id = t1.id
+        LEFT JOIN teams t2 ON sm.team2_id = t2.id
         JOIN seasons s ON sm.season_id = s.id
         JOIN divisions d ON s.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
+        LEFT JOIN users lock_user ON sm.locked_by = lock_user.id
+        LEFT JOIN season_stages ss ON sm.stage_id = ss.id
+        LEFT JOIN stage_groups sg ON sm.group_id = sg.id
+        LEFT JOIN stage_rounds sr ON sm.round_id = sr.id
         JOIN discord_queue dq ON dq.suggested_match_id = sm.id AND dq.status = 'pending'
         WHERE sm.status = 'scheduled' ${lf}
         GROUP BY sm.id, sm.season_id, sm.team1_id, sm.team2_id,
                  sm.scheduled_date, sm.week, sm.best_of,
+                 sm.stage_id, sm.group_id, sm.round_id,
+                 sm.locked_by, sm.locked_at, lock_user.discord_username,
                  t1.name, t1.color, t2.name, t2.color,
-                 d.name, l.name
+                 d.name, l.name,
+                 ss.name, sg.name, sr.name
         ORDER BY MIN(CASE dq.match_confidence
                      WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3
                      ELSE 0 END) ASC,
