@@ -324,91 +324,139 @@ export async function cleanupSubSparks(sql, dryRun = false) {
         return { preview: preview.map(r => ({ ...r, totalSparks: Number(r.total_sparks) })) }
     }
 
-    // Find all sparks on sub league_players
-    const subSparks = await sql`
+    // Single query to get all sub sparks with their main LP and holding counts
+    const rows = await sql`
         SELECT ps.id as spark_id, ps.league_player_id as sub_lp_id, ps.market_id,
-               ps.total_sparks, ps.perf_multiplier, ps.current_price,
-               ps.sell_pressure, ps.sell_pressure_updated_at,
-               lp.player_id, lp.season_id,
-               fm.base_price
+               ps.total_sparks, ps.sell_pressure,
+               lp.player_id, lp.season_id, fm.base_price,
+               main_lp.id as main_lp_id,
+               main_spark.id as main_spark_id,
+               COALESCE(holdings.cnt, 0)::integer as holdings,
+               CASE
+                   WHEN main_lp.id IS NULL THEN 'orphaned'
+                   WHEN COALESCE(holdings.cnt, 0) = 0 THEN 'delete'
+                   ELSE 'move'
+               END as action
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
         JOIN forge_markets fm ON ps.market_id = fm.id
+        LEFT JOIN LATERAL (
+            SELECT lp2.id FROM league_players lp2
+            WHERE lp2.player_id = lp.player_id AND lp2.season_id = lp.season_id
+              AND lp2.roster_status != 'sub' AND lp2.is_active = true
+            ORDER BY CASE lp2.roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
+            LIMIT 1
+        ) main_lp ON true
+        LEFT JOIN player_sparks main_spark ON main_spark.league_player_id = main_lp.id AND main_spark.market_id = ps.market_id
+        LEFT JOIN LATERAL (
+            SELECT COUNT(*)::integer as cnt FROM spark_holdings sh WHERE sh.spark_id = ps.id AND sh.sparks > 0
+        ) holdings ON true
         WHERE lp.roster_status = 'sub'
     `
-    if (subSparks.length === 0) return { moved: 0, deleted: 0, orphaned: 0 }
+    if (rows.length === 0) return { moved: 0, deleted: 0, orphaned: 0 }
 
-    let moved = 0, deleted = 0, orphaned = 0
+    const toDelete = rows.filter(r => r.action === 'delete')
+    const toMove = rows.filter(r => r.action === 'move')
+    const orphaned = rows.filter(r => r.action === 'orphaned').length
 
-    for (const sub of subSparks) {
-        const [mainLp] = await sql`
-            SELECT id FROM league_players
-            WHERE player_id = ${sub.player_id}
-              AND season_id = ${sub.season_id}
-              AND roster_status != 'sub'
-              AND is_active = true
-            ORDER BY CASE roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
-            LIMIT 1
-        `
-
-        if (!mainLp) { orphaned++; continue }
-
-        const [holdingCount] = await sql`
-            SELECT COUNT(*) as cnt FROM spark_holdings WHERE spark_id = ${sub.spark_id} AND sparks > 0
-        `
-
-        if (Number(holdingCount.cnt) === 0) {
-            await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
-            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
-            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
-            deleted++
-            continue
-        }
-
-        // Has holdings — move to main LP
-        {
-            let [mainSpark] = await sql`
-                SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
-                FROM player_sparks
-                WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
-            `
-            if (!mainSpark) {
-                [mainSpark] = await sql`
-                    INSERT INTO player_sparks (market_id, league_player_id, current_price)
-                    VALUES (${sub.market_id}, ${mainLp.id}, ${sub.base_price})
-                    ON CONFLICT (market_id, league_player_id) DO NOTHING
-                    RETURNING id, total_sparks, sell_pressure, sell_pressure_updated_at
-                `
-                if (!mainSpark) {
-                    [mainSpark] = await sql`
-                        SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
-                        FROM player_sparks
-                        WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
-                    `
-                }
-                await sql`
-                    INSERT INTO spark_price_history (spark_id, price, trigger)
-                    VALUES (${mainSpark.id}, ${sub.base_price}, 'init')
-                `
-            }
-
-            await sql`UPDATE spark_holdings SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
-            await sql`UPDATE spark_transactions SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
-            await sql`UPDATE spark_price_history SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
-            await sql`
-                UPDATE player_sparks
-                SET total_sparks = total_sparks + ${sub.total_sparks},
-                    sell_pressure = sell_pressure + ${Number(sub.sell_pressure) || 0},
-                    updated_at = NOW()
-                WHERE id = ${mainSpark.id}
-            `
-            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
-            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
-        }
-        moved++
+    // Batch delete empty sub sparks (no holdings)
+    if (toDelete.length > 0) {
+        const deleteIds = toDelete.map(r => r.spark_id)
+        await sql`DELETE FROM spark_price_history WHERE spark_id = ANY(${deleteIds})`
+        await sql`DELETE FROM forge_pending_updates WHERE spark_id = ANY(${deleteIds})`
+        await sql`DELETE FROM player_sparks WHERE id = ANY(${deleteIds})`
     }
 
-    return { moved, deleted, orphaned }
+    // Batch move sub sparks with holdings to main LP
+    if (toMove.length > 0) {
+        // Ensure main sparks exist for those that don't have one yet
+        const needCreate = toMove.filter(r => !r.main_spark_id)
+        if (needCreate.length > 0) {
+            await sql`
+                INSERT INTO player_sparks (market_id, league_player_id, current_price)
+                SELECT UNNEST(${needCreate.map(r => r.market_id)}::int[]),
+                       UNNEST(${needCreate.map(r => r.main_lp_id)}::int[]),
+                       UNNEST(${needCreate.map(r => Number(r.base_price))}::numeric[])
+                ON CONFLICT (market_id, league_player_id) DO NOTHING
+            `
+            await sql`
+                INSERT INTO spark_price_history (spark_id, price, trigger)
+                SELECT ps.id, fm.base_price, 'init'
+                FROM player_sparks ps
+                JOIN forge_markets fm ON ps.market_id = fm.id
+                WHERE ps.league_player_id = ANY(${needCreate.map(r => r.main_lp_id)})
+                  AND ps.market_id = ANY(${needCreate.map(r => r.market_id)})
+                  AND NOT EXISTS (
+                      SELECT 1 FROM spark_price_history sph WHERE sph.spark_id = ps.id AND sph.trigger = 'init'
+                  )
+            `
+        }
+
+        // Resolve all main spark IDs (including newly created ones)
+        const mainSparks = await sql`
+            SELECT ps.id, ps.league_player_id, ps.market_id
+            FROM player_sparks ps
+            WHERE (ps.league_player_id, ps.market_id) IN (
+                SELECT UNNEST(${toMove.map(r => r.main_lp_id)}::int[]),
+                       UNNEST(${toMove.map(r => r.market_id)}::int[])
+            )
+        `
+        const mainSparkMap = new Map()
+        for (const ms of mainSparks) {
+            mainSparkMap.set(`${ms.league_player_id}-${ms.market_id}`, ms.id)
+        }
+
+        // Build mapping arrays: sub_spark_id → main_spark_id
+        const subIds = []
+        const targetIds = []
+        const sparksToAdd = []
+        const pressureToAdd = []
+        for (const r of toMove) {
+            const mainId = mainSparkMap.get(`${r.main_lp_id}-${r.market_id}`)
+            if (!mainId) continue // shouldn't happen
+            subIds.push(r.spark_id)
+            targetIds.push(mainId)
+            sparksToAdd.push(Number(r.total_sparks))
+            pressureToAdd.push(Number(r.sell_pressure) || 0)
+        }
+
+        // Batch relink holdings, transactions, price history
+        await sql`
+            UPDATE spark_holdings SET spark_id = v.target_id
+            FROM (SELECT UNNEST(${subIds}::int[]) as sub_id, UNNEST(${targetIds}::int[]) as target_id) v
+            WHERE spark_id = v.sub_id
+        `
+        await sql`
+            UPDATE spark_transactions SET spark_id = v.target_id
+            FROM (SELECT UNNEST(${subIds}::int[]) as sub_id, UNNEST(${targetIds}::int[]) as target_id) v
+            WHERE spark_id = v.sub_id
+        `
+        await sql`
+            UPDATE spark_price_history SET spark_id = v.target_id
+            FROM (SELECT UNNEST(${subIds}::int[]) as sub_id, UNNEST(${targetIds}::int[]) as target_id) v
+            WHERE spark_id = v.sub_id
+        `
+
+        // Batch update main spark totals
+        await sql`
+            UPDATE player_sparks AS ps SET
+                total_sparks = ps.total_sparks + v.add_sparks,
+                sell_pressure = ps.sell_pressure + v.add_pressure,
+                updated_at = NOW()
+            FROM (
+                SELECT UNNEST(${targetIds}::int[]) AS id,
+                       UNNEST(${sparksToAdd}::numeric[]) AS add_sparks,
+                       UNNEST(${pressureToAdd}::numeric[]) AS add_pressure
+            ) AS v
+            WHERE ps.id = v.id
+        `
+
+        // Batch delete moved sub sparks
+        await sql`DELETE FROM forge_pending_updates WHERE spark_id = ANY(${subIds})`
+        await sql`DELETE FROM player_sparks WHERE id = ANY(${subIds})`
+    }
+
+    return { moved: toMove.length, deleted: toDelete.length, orphaned }
 }
 
 // ═══════════════════════════════════════════════════
