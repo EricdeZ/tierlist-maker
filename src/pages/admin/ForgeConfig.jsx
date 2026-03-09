@@ -562,7 +562,7 @@ function factorColor(v) {
 }
 
 function PlayerBreakdown({ data }) {
-    const { player, games, skippedGames, totalRawGames, marketOpenDate, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg } = data
+    const { player, games, skippedGames, totalRawGames, diagnostic, marketOpenDate, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg } = data
     const playerRoleAvgs = roleAvgs[player.role] || roleAvgs[Object.keys(roleAvgs)[0]]
 
     return (
@@ -613,11 +613,22 @@ function PlayerBreakdown({ data }) {
                 </div>
             )}
 
+            {/* Diagnostic detail when SQL returns 0 games */}
+            {diagnostic && (
+                <div className="text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 font-mono space-y-0.5">
+                    <div className="text-red-400 font-medium font-sans mb-1">SQL diagnostic (0 games found):</div>
+                    <div>league_player_id: {diagnostic.leaguePlayerId} | roster_status: <span className={diagnostic.rosterStatus === 'sub' ? 'text-red-400 font-bold' : ''}>{diagnostic.rosterStatus}</span> | lp.role: {diagnostic.lpRole || 'NULL'}</div>
+                    <div>lp.season_id: {diagnostic.lpSeasonId} | market season_id: {diagnostic.marketSeasonId}{diagnostic.lpSeasonId !== diagnostic.marketSeasonId && <span className="text-red-400 font-bold"> MISMATCH</span>}</div>
+                    <div>player_game_stats rows: {diagnostic.totalPgsRows} | completed: {diagnostic.completedGameRows} | incomplete: <span className={diagnostic.incompleteGameRows > 0 ? 'text-yellow-400 font-bold' : ''}>{diagnostic.incompleteGameRows}</span></div>
+                    <div>roles in games: {diagnostic.rolesInGames || 'none'} | games in correct season: {diagnostic.gamesInCorrectSeason}</div>
+                </div>
+            )}
+
             {/* Per-game table */}
             {games.length === 0 ? (
                 <div className="text-xs text-[var(--color-text-secondary)] py-2">
                     No post-market games found (multiplier affected only by inactivity decay).
-                    {totalRawGames === 0 && ' No games found in SQL query — check player role, roster_status, and game is_completed flags.'}
+                    {totalRawGames === 0 && !diagnostic && ' No games found in SQL query — check player role, roster_status, and game is_completed flags.'}
                 </div>
             ) : (
                 <div className="overflow-x-auto">

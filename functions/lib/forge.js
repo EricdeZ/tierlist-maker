@@ -1358,6 +1358,51 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
     // Count total raw games in SQL results for this player (before JS-level filters)
     const totalRawGames = playerGames.length
 
+    // Diagnostic: if no SQL games, check why
+    let diagnostic = null
+    if (totalRawGames === 0) {
+        const [diag] = await sql`
+            SELECT
+                lp.id as lp_id,
+                lp.roster_status,
+                lp.role as lp_role,
+                lp.season_id as lp_season_id,
+                ${seasonId}::int as market_season_id,
+                (SELECT COUNT(*) FROM player_game_stats pgs WHERE pgs.league_player_id = lp.id) as total_pgs_rows,
+                (SELECT COUNT(*) FROM player_game_stats pgs
+                    JOIN games g ON pgs.game_id = g.id
+                    WHERE pgs.league_player_id = lp.id AND g.is_completed = true) as completed_game_rows,
+                (SELECT COUNT(*) FROM player_game_stats pgs
+                    JOIN games g ON pgs.game_id = g.id
+                    WHERE pgs.league_player_id = lp.id AND g.is_completed = false) as incomplete_game_rows,
+                (SELECT string_agg(DISTINCT LOWER(COALESCE(pgs.role_played, lp2.role)), ', ')
+                    FROM player_game_stats pgs
+                    JOIN league_players lp2 ON pgs.league_player_id = lp2.id
+                    WHERE pgs.league_player_id = lp.id) as roles_in_games,
+                (SELECT COUNT(*) FROM player_game_stats pgs
+                    JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+                    JOIN matches m ON g.match_id = m.id
+                    WHERE pgs.league_player_id = lp.id
+                      AND m.season_id = ${seasonId}) as games_in_correct_season
+            FROM league_players lp
+            WHERE lp.id = ${lpId}
+        `
+        if (diag) {
+            diagnostic = {
+                leaguePlayerId: diag.lp_id,
+                rosterStatus: diag.roster_status,
+                lpRole: diag.lp_role,
+                lpSeasonId: diag.lp_season_id,
+                marketSeasonId: diag.market_season_id,
+                totalPgsRows: Number(diag.total_pgs_rows),
+                completedGameRows: Number(diag.completed_game_rows),
+                incompleteGameRows: Number(diag.incomplete_game_rows),
+                rolesInGames: diag.roles_in_games,
+                gamesInCorrectSeason: Number(diag.games_in_correct_season),
+            }
+        }
+    }
+
     const result = replayPlayerGames({
         games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
         gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates,
@@ -1377,6 +1422,7 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
         games: result.trace,
         skippedGames: result.skippedGames,
         totalRawGames,
+        diagnostic,
         marketOpenDate: new Date(marketStartTime).toISOString().split('T')[0],
         finalInactivityDecay: result.finalInactivityDecay,
         finalMultiplier: result.multiplier,
