@@ -3,7 +3,7 @@ import { getDB, adminHeaders } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { grantPassion } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
-import { recalcForgePerformance, getPlayerBreakdown } from '../lib/forge.js'
+import { recalcForgePerformance, getPlayerBreakdown, cleanupSubSparks } from '../lib/forge.js'
 
 const NUMERIC_KEYS = [
     'game_decay', 'supply_weight', 'expectation_weight', 'inactivity_decay',
@@ -25,7 +25,7 @@ const handler = async (event) => {
     try {
         // Pending/approve/reject actions: league_manage (global admin)
         // Config read/write: permission_manage (owner)
-        if (action === 'pending' || action === 'approve' || action === 'reject' || action === 'recalc' || action === 'player-detail') {
+        if (action === 'pending' || action === 'approve' || action === 'reject' || action === 'recalc' || action === 'player-detail' || action === 'cleanup-subs') {
             const admin = await requirePermission(event, 'league_manage')
             if (!admin) {
                 return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
@@ -158,6 +158,11 @@ const handler = async (event) => {
             if (action === 'reject') {
                 await sql`DELETE FROM forge_pending_updates`
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ rejected: true }) }
+            }
+
+            if (action === 'cleanup-subs') {
+                const result = await cleanupSubSparks(sql)
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ status: 'done', ...result }) }
             }
 
             if (action === 'recalc') {

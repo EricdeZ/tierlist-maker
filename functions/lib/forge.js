@@ -278,6 +278,117 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
     `
 }
 
+/**
+ * Find and relink sparks attached to sub league_players to the same player's
+ * non-sub LP in the same season. Merges holdings if the non-sub LP already
+ * has a spark. Deletes empty sub sparks with no holdings.
+ */
+export async function cleanupSubSparks(sql) {
+    // Find all sparks on sub league_players
+    const subSparks = await sql`
+        SELECT ps.id as spark_id, ps.league_player_id as sub_lp_id, ps.market_id,
+               ps.total_sparks, ps.perf_multiplier, ps.current_price,
+               ps.sell_pressure, ps.sell_pressure_updated_at,
+               lp.player_id, lp.season_id,
+               fm.base_price
+        FROM player_sparks ps
+        JOIN league_players lp ON ps.league_player_id = lp.id
+        JOIN forge_markets fm ON ps.market_id = fm.id
+        WHERE lp.roster_status = 'sub'
+    `
+    if (subSparks.length === 0) return { moved: 0, deleted: 0, orphaned: 0 }
+
+    let moved = 0, deleted = 0, orphaned = 0
+
+    for (const sub of subSparks) {
+        // Find non-sub LP for same player in same season
+        const [mainLp] = await sql`
+            SELECT id FROM league_players
+            WHERE player_id = ${sub.player_id}
+              AND season_id = ${sub.season_id}
+              AND roster_status != 'sub'
+              AND is_active = true
+            ORDER BY CASE roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
+            LIMIT 1
+        `
+
+        if (!mainLp) {
+            orphaned++
+            continue
+        }
+
+        // Check if sub spark has any holdings
+        const [holdingCount] = await sql`
+            SELECT COUNT(*) as cnt FROM spark_holdings WHERE spark_id = ${sub.spark_id} AND sparks > 0
+        `
+
+        if (Number(holdingCount.cnt) === 0) {
+            // No holdings — just delete the sub spark and its history
+            await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
+            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
+            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+            deleted++
+            continue
+        }
+
+        // Has holdings — find or create spark on the main LP and move everything
+        let [mainSpark] = await sql`
+            SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
+            FROM player_sparks
+            WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
+        `
+        if (!mainSpark) {
+            [mainSpark] = await sql`
+                INSERT INTO player_sparks (market_id, league_player_id, current_price)
+                VALUES (${sub.market_id}, ${mainLp.id}, ${sub.base_price})
+                ON CONFLICT (market_id, league_player_id) DO NOTHING
+                RETURNING id, total_sparks, sell_pressure, sell_pressure_updated_at
+            `
+            if (!mainSpark) {
+                [mainSpark] = await sql`
+                    SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
+                    FROM player_sparks
+                    WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
+                `
+            }
+            await sql`
+                INSERT INTO spark_price_history (spark_id, price, trigger)
+                VALUES (${mainSpark.id}, ${sub.base_price}, 'init')
+            `
+        }
+
+        // Move holdings
+        await sql`
+            UPDATE spark_holdings SET spark_id = ${mainSpark.id}
+            WHERE spark_id = ${sub.spark_id}
+        `
+        // Move transactions
+        await sql`
+            UPDATE spark_transactions SET spark_id = ${mainSpark.id}
+            WHERE spark_id = ${sub.spark_id}
+        `
+        // Move price history
+        await sql`
+            UPDATE spark_price_history SET spark_id = ${mainSpark.id}
+            WHERE spark_id = ${sub.spark_id}
+        `
+        // Update main spark totals
+        await sql`
+            UPDATE player_sparks
+            SET total_sparks = total_sparks + ${sub.total_sparks},
+                sell_pressure = sell_pressure + ${Number(sub.sell_pressure) || 0},
+                updated_at = NOW()
+            WHERE id = ${mainSpark.id}
+        `
+        // Delete the sub spark
+        await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
+        await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+        moved++
+    }
+
+    return { moved, deleted, orphaned }
+}
+
 // ═══════════════════════════════════════════════════
 // Trade execution
 // ═══════════════════════════════════════════════════
@@ -1457,7 +1568,10 @@ export async function mergeForgeHoldings(tx, sourceLpId, targetLpId) {
     `
     if (!sourceSpark || sourceSpark.status !== 'open') return null
 
-    // Find or create target spark in the same market
+    // Find or create target spark in the same market (skip if target is a sub)
+    const [targetLpCheck] = await tx`SELECT roster_status FROM league_players WHERE id = ${targetLpId}`
+    if (targetLpCheck?.roster_status === 'sub') return null
+
     let [targetSpark] = await tx`
         SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at, perf_multiplier
         FROM player_sparks

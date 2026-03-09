@@ -3,7 +3,7 @@ import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
-import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange } from '../lib/forge.js'
+import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange, ensurePlayerSparks } from '../lib/forge.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -903,6 +903,15 @@ async function promoteSub(sql, { league_player_id }, admin, event) {
         toTeamId: lp.team_id, toTeamName: lp.team_name,
         fromStatus: 'sub', toStatus: 'member', admin,
     })
+
+    // Create forge spark for newly promoted member (fire-and-forget)
+    const [market] = await sql`SELECT id, season_id FROM forge_markets WHERE season_id = ${lp.season_id} AND status = 'open'`
+    if (market) {
+        event.waitUntil(
+            ensurePlayerSparks(sql, market.id, market.season_id)
+                .catch(err => console.error('Spark creation after promote-sub failed:', err))
+        )
+    }
 
     return {
         statusCode: 200,
