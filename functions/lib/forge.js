@@ -240,6 +240,7 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
         FROM league_players lp
         WHERE lp.season_id = ${seasonId}
           AND lp.is_active = true
+          AND lp.roster_status != 'sub'
           AND NOT EXISTS (
               SELECT 1 FROM player_sparks ps
               WHERE ps.market_id = ${marketId} AND ps.league_player_id = lp.id
