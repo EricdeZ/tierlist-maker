@@ -777,7 +777,18 @@ function PlayerBreakdown({ data }) {
                         </thead>
                         <tbody>
                             {games.map((g, i) => (
-                                <GameRow key={i} game={g} index={i} cfg={cfg} />
+                                <React.Fragment key={i}>
+                                    {g.inactivityDecay && (
+                                        <tr className="bg-red-500/5 border-y border-red-500/20">
+                                            <td colSpan={14} className="px-2 py-1.5 text-xs text-red-400">
+                                                <span className="font-medium">{g.inactivityDecay.weeks} missed match{g.inactivityDecay.weeks > 1 ? 'es' : ''}</span>
+                                                <span className="font-mono ml-2">virtual game: {cfg.INACTIVITY_DECAY}<sup>{g.inactivityDecay.weeks}</sup> = {g.inactivityDecay.compoundFactor.toFixed(4)}</span>
+                                                <span className="text-red-400/60 ml-2">(averaged with {g.inactivityDecay.gameCount - 1} real game{g.inactivityDecay.gameCount - 1 !== 1 ? 's' : ''})</span>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    <GameRow game={g} index={i} cfg={cfg} />
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -786,12 +797,19 @@ function PlayerBreakdown({ data }) {
 
             {/* Final inactivity decay */}
             {finalInactivityDecay && (
-                <div className="text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                    <span className="text-red-400 font-medium">Inactivity decay applied:</span>
-                    <span className="text-[var(--color-text-secondary)] ml-1">
-                        {finalInactivityDecay.weeks} week{finalInactivityDecay.weeks > 1 ? 's' : ''} since last game
-                        — {finalInactivityDecay.before.toFixed(4)} &rarr; {finalInactivityDecay.after.toFixed(4)}
-                    </span>
+                <div className="text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 space-y-1">
+                    <div className="text-red-400 font-medium">
+                        Inactivity: {finalInactivityDecay.weeks} missed match{finalInactivityDecay.weeks > 1 ? 'es' : ''} since last game
+                    </div>
+                    <div className="text-red-400/80 font-mono">
+                        game_decay: 1 + ({finalInactivityDecay.before.toFixed(4)} - 1) &times; {cfg.GAME_DECAY} = {(1 + (finalInactivityDecay.before - 1) * cfg.GAME_DECAY).toFixed(4)}
+                    </div>
+                    <div className="text-red-400/80 font-mono">
+                        virtual factor: {cfg.INACTIVITY_DECAY}<sup>{finalInactivityDecay.weeks}</sup> = {Math.pow(cfg.INACTIVITY_DECAY, finalInactivityDecay.weeks).toFixed(4)}
+                    </div>
+                    <div className="text-red-400/80 font-mono">
+                        {(1 + (finalInactivityDecay.before - 1) * cfg.GAME_DECAY).toFixed(4)} &times; {Math.pow(cfg.INACTIVITY_DECAY, finalInactivityDecay.weeks).toFixed(4)} &rarr; compress = <span className="font-medium text-red-400">{finalInactivityDecay.after.toFixed(4)}</span>
+                    </div>
                 </div>
             )}
         </div>
