@@ -709,7 +709,7 @@ export async function updateForgeAfterMatch(sql, matchId) {
  *
  * Returns { multiplier, trace, finalInactivityDecay, hasGames }
  */
-function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates }) {
+function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates, transfers }) {
     const halfLife = cfg.DECAY_HALF_LIFE
     let multiplier = 1.0
     let lastGameTime = null
@@ -740,10 +740,34 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         currentSet.gameData.push({ game, avgs })
     }
 
-    // Team matches this player missed (for inactivity decay), only after they joined the team
-    const allTeamMatches = teamMatchDates ? (teamMatchDates.get(spark.team_id) || []) : []
-    const joinedAt = spark.team_joined_at ? new Date(spark.team_joined_at).getTime() : 0
-    const teamMatches = joinedAt > 0 ? allTeamMatches.filter(m => m.date >= joinedAt) : allTeamMatches
+    // Team matches this player missed (for inactivity decay)
+    // For transferred players, build a comprehensive list spanning all team stints
+    let teamMatches = []
+    const playerTransfers = transfers || []
+    if (teamMatchDates) {
+        if (playerTransfers.length > 0) {
+            // First stint: on fromTeam of first transfer, from market start to first transfer
+            const firstTransfer = playerTransfers[0]
+            const prevTeamMatches = teamMatchDates.get(firstTransfer.fromTeam) || []
+            teamMatches.push(...prevTeamMatches.filter(m => m.date >= marketStartTime && m.date < firstTransfer.date))
+            // Middle stints: between consecutive transfers
+            for (let i = 0; i < playerTransfers.length - 1; i++) {
+                const midMatches = teamMatchDates.get(playerTransfers[i].toTeam) || []
+                teamMatches.push(...midMatches.filter(m => m.date >= playerTransfers[i].date && m.date < playerTransfers[i + 1].date))
+            }
+            // Current team: from last transfer onward
+            const lastTransfer = playerTransfers[playerTransfers.length - 1]
+            const curMatches = teamMatchDates.get(spark.team_id) || []
+            teamMatches.push(...curMatches.filter(m => m.date >= lastTransfer.date))
+            // Sort by date since we merged from multiple teams
+            teamMatches.sort((a, b) => a.date - b.date)
+        } else {
+            // No transfers — simple case: current team matches since join date
+            const allTeamMatches = teamMatchDates.get(spark.team_id) || []
+            const joinedAt = spark.team_joined_at ? new Date(spark.team_joined_at).getTime() : 0
+            teamMatches = joinedAt > 0 ? allTeamMatches.filter(m => m.date >= joinedAt) : allTeamMatches
+        }
+    }
 
     for (const set of sets) {
         hasGames = true
@@ -875,7 +899,7 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
     }
 
     return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames,
-        _debug: { teamId: spark.team_id, teamMatchCount: teamMatches.length, playerMatchCount: playerMatchIds.size, setsCount: sets.length } }
+        _debug: { teamId: spark.team_id, teamMatchCount: teamMatches.length, playerMatchCount: playerMatchIds.size, setsCount: sets.length, transfers: playerTransfers.length } }
 }
 
 /**
@@ -1153,6 +1177,7 @@ export async function recalcForgePerformance(sql, seasonId) {
 
         const result = replayPlayerGames({
             games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, teamMatchDates,
+            transfers: playerTransfers.get(spark.player_id) || [],
         })
 
         // Only mark as processed if they have post-forge games.
@@ -1328,7 +1353,7 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
                ps.current_price, fm.base_price, fm.created_at as market_created_at,
                fm.season_id, COALESCE(p.name, 'Unknown') as player_name,
                LOWER(COALESCE(lp.role, 'fill')) as player_role,
-               lp.team_id,
+               lp.team_id, lp.player_id,
                COALESCE(lp.joined_date, rt.transfer_date) as team_joined_at
         FROM player_sparks ps
         JOIN forge_markets fm ON ps.market_id = fm.id
@@ -1593,9 +1618,23 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
         }
     }
 
+    // Player transfer history for inactivity across team stints
+    const transferRows = await sql`
+        SELECT from_team_id, to_team_id, created_at
+        FROM roster_transactions
+        WHERE season_id = ${seasonId} AND player_id = ${spark.player_id} AND type = 'transfer'
+        ORDER BY created_at ASC
+    `
+    const playerTransferList = transferRows.map(rt => ({
+        fromTeam: rt.from_team_id,
+        toTeam: rt.to_team_id,
+        date: new Date(rt.created_at).getTime(),
+    }))
+
     const result = replayPlayerGames({
         games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
         gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates,
+        transfers: playerTransferList,
     })
 
     return {
