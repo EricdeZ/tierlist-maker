@@ -65,9 +65,9 @@ export default function CCPlayerCards() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Player Cards</h1>
-        <p className="text-sm text-gray-400 mt-1">
+      <div className="mb-6 cd-section-accent pb-3">
+        <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Player Cards</h1>
+        <p className="text-sm text-[var(--cd-text-mid)] mt-1">
           Search for any player to see their trading card in all 6 rarities
         </p>
       </div>
@@ -75,7 +75,7 @@ export default function CCPlayerCards() {
       {/* Search */}
       <div className="relative max-w-md mb-6" ref={dropdownRef}>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--cd-text-dim)]" />
           <input
             type="text"
             placeholder="Search player name..."
@@ -84,26 +84,26 @@ export default function CCPlayerCards() {
               setQuery(e.target.value)
               search(e.target.value)
             }}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+            className="w-full cd-input rounded-lg pl-10 pr-3 py-2.5 text-sm"
           />
-          {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />}
+          {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--cd-cyan)] animate-spin" />}
         </div>
 
         {results.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-20 max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg shadow-xl z-20 max-h-64 overflow-y-auto cd-stagger">
             {results.map((p) => (
               <button
                 key={p.id}
                 onClick={() => selectPlayer(p)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-rgba(0,229,255,0.04) cd-row-hover transition-colors text-left cursor-pointer"
               >
                 <div
                   className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: p.team_color || '#6b7280' }}
+                  style={{ backgroundColor: p.team_color || '#6b7280', boxShadow: `0 0 6px ${p.team_color || '#6b7280'}66` }}
                 />
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-white truncate">{p.name}</div>
-                  <div className="text-xs text-gray-500 truncate">
+                  <div className="text-xs text-[var(--cd-text-mid)] truncate">
                     {p.team_name || 'Free Agent'}{p.league_name ? ` · ${p.league_name}` : ''}
                     {p.main_role ? ` · ${p.main_role}` : ''}
                   </div>
@@ -117,7 +117,7 @@ export default function CCPlayerCards() {
       {/* Loading */}
       {loadingProfile && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+          <div className="cd-spinner w-8 h-8" />
         </div>
       )}
 
@@ -125,25 +125,26 @@ export default function CCPlayerCards() {
       {cardProps && !loadingProfile && (
         <>
           {/* Player info header */}
-          <div className="flex items-center gap-4 mb-6 p-4 bg-gray-900/50 rounded-xl border border-gray-800">
-            <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
+          <div className="cd-panel cd-corners flex items-center gap-4 mb-6 p-4 rounded-xl relative overflow-hidden">
+            <div className="cd-data-overlay" />
+            <div className="w-12 h-12 rounded-full bg-[var(--cd-edge)] flex items-center justify-center overflow-hidden ring-1 ring-[var(--cd-cyan-dim)] relative z-1">
               {cardProps.avatarUrl ? (
                 <img src={cardProps.avatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
-                <User className="w-6 h-6 text-gray-500" />
+                <User className="w-6 h-6 text-[var(--cd-text-dim)]" />
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-bold">{cardProps.playerName}</h2>
-              <p className="text-sm text-gray-400">
+            <div className="relative z-1">
+              <h2 className="text-lg font-bold cd-head" style={{ letterSpacing: '0.08em' }}>{cardProps.playerName}</h2>
+              <p className="text-sm text-[var(--cd-text-mid)]">
                 {cardProps.teamName || 'Free Agent'}
                 {cardProps.seasonName ? ` · ${cardProps.seasonName}` : ''}
                 {cardProps.role ? ` · ${cardProps.role}` : ''}
               </p>
             </div>
-            <div className="ml-auto text-right">
-              <div className="text-2xl font-black text-amber-400">{cardProps.stats?.gamesPlayed || 0}</div>
-              <div className="text-xs text-gray-500 uppercase">Games</div>
+            <div className="ml-auto text-right relative z-1">
+              <div className="text-2xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{cardProps.stats?.gamesPlayed || 0}</div>
+              <div className="text-xs text-[var(--cd-text-dim)] uppercase tracking-wider cd-head">Games</div>
             </div>
           </div>
 
@@ -151,8 +152,8 @@ export default function CCPlayerCards() {
           <div className="flex gap-1 mb-6 flex-wrap">
             <button
               onClick={() => setSelectedRarity('all')}
-              className={`px-3 py-1.5 text-xs rounded-lg font-bold cursor-pointer transition-colors ${
-                selectedRarity === 'all' ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+              className={`px-3 py-1.5 text-xs rounded-lg font-bold cursor-pointer transition-all cd-head ${
+                selectedRarity === 'all' ? 'bg-white/20 text-white' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cd-pill hover:bg-[var(--cd-border)]'
               }`}
             >
               All Rarities
@@ -161,10 +162,10 @@ export default function CCPlayerCards() {
               <button
                 key={r}
                 onClick={() => setSelectedRarity(r)}
-                className={`px-3 py-1.5 text-xs rounded-lg font-bold capitalize cursor-pointer transition-colors ${
-                  selectedRarity === r ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+                className={`px-3 py-1.5 text-xs rounded-lg font-bold capitalize cursor-pointer transition-all cd-head ${
+                  selectedRarity === r ? 'text-black' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cd-pill hover:bg-[var(--cd-border)]'
                 }`}
-                style={selectedRarity === r ? { backgroundColor: RARITIES[r]?.color } : undefined}
+                style={selectedRarity === r ? { backgroundColor: RARITIES[r]?.color, boxShadow: `0 0 10px ${RARITIES[r]?.color}44` } : undefined}
               >
                 {r}
               </button>
@@ -172,7 +173,7 @@ export default function CCPlayerCards() {
           </div>
 
           {/* Cards grid */}
-          <div className="flex flex-wrap gap-8">
+          <div className="flex flex-wrap gap-8 cd-stagger">
             {rarities.map((rarity) => {
               const info = RARITIES[rarity]
               const holoEffect = getHoloEffect(rarity)
@@ -198,9 +199,9 @@ export default function CCPlayerCards() {
 
       {/* Empty state */}
       {!selectedPlayer && !loadingProfile && (
-        <div className="text-center py-20 text-gray-600">
-          <User className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-bold">Search for a player above</p>
+        <div className="text-center py-20 text-[var(--cd-text-dim)]">
+          <User className="w-16 h-16 mx-auto mb-4 opacity-20" />
+          <p className="text-lg font-bold cd-head">Search for a player above</p>
           <p className="text-sm mt-1">Their card will be generated with real stats in all 6 rarities</p>
         </div>
       )}
@@ -223,14 +224,22 @@ function buildCardProps(data) {
     ? (gameHistory || []).filter(g => g.player_team_id === teamId)
     : gameHistory || []
 
-  // Build avatar URL from Discord data
-  let avatarUrl = null
-  if (player.discord_id && player.discord_avatar) {
-    avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
-  }
-
   // Compute best god from team-filtered games
   const bestGod = computeBestGod(teamGames)
+
+  // Compute most played god across all games (for avatar fallback)
+  const mostPlayedGod = computeMostPlayedGod(gameHistory || [])
+
+  // Build avatar URL — respect user preference
+  let avatarUrl = null
+  const allowAvatar = player.allow_discord_avatar !== false
+  if (allowAvatar && player.discord_id && player.discord_avatar) {
+    avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
+  } else if (mostPlayedGod) {
+    // Use most played god's card art
+    avatarUrl = `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${mostPlayedGod}/Default/t_GodCard_${mostPlayedGod}.png`
+  }
+  // If no avatar and no games, avatarUrl stays null — TradingCard will show role fallback
 
   // Compute stats from team-filtered games
   let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
@@ -296,4 +305,17 @@ function computeBestGod(gameHistory) {
     games: best.games,
     winRate: best.games > 0 ? (best.wins / best.games) * 100 : 0,
   }
+}
+
+function computeMostPlayedGod(gameHistory) {
+  if (!gameHistory?.length) return null
+  const counts = {}
+  for (const g of gameHistory) {
+    if (!g.god_played) continue
+    counts[g.god_played] = (counts[g.god_played] || 0) + 1
+  }
+  const entries = Object.entries(counts)
+  if (!entries.length) return null
+  entries.sort((a, b) => b[1] - a[1])
+  return entries[0][0] // god name string (e.g. "Zeus")
 }

@@ -329,7 +329,7 @@ export default function PassionDisplay() {
                     )}
                 </Link>
 
-                {/* Currency counter — swaps between Passion and Ember on Card Clash pages */}
+                {/* Currency counter — swaps between Passion and Cores on Compdeck pages */}
                 <div ref={menuRef} className="relative">
                     <button
                         onClick={() => { setOpen(!open); setClaimResult(null) }}
@@ -338,8 +338,8 @@ export default function PassionDisplay() {
                         {!isCardClash && <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>}
                         {isCardClash ? (
                             <>
-                                <img src={emberIcon} alt="Ember" className="h-5 w-auto object-contain" />
-                                <span className="text-sm font-semibold text-orange-400 tabular-nums min-w-[2ch]">
+                                <img src={emberIcon} alt="Cores" className="h-5 w-auto object-contain" />
+                                <span className="text-sm font-semibold text-[#00e5ff] tabular-nums min-w-[2ch]">
                                     {ember.balance}
                                 </span>
                             </>
@@ -354,8 +354,8 @@ export default function PassionDisplay() {
                         )}
                         {(canClaimDaily && !claimResult || claimableCount > 0) && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isCardClash ? '#f97316' : '#f8c56a' }} />
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isCardClash ? '#f97316' : '#f8c56a' }} />
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
                             </span>
                         )}
                     </button>
@@ -364,14 +364,14 @@ export default function PassionDisplay() {
                         <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-14 sm:top-full mt-0 sm:mt-2 w-auto sm:w-72 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
                             {isCardClash ? (
                                 <>
-                                    {/* ═══ Card Clash Dropdown ═══ */}
-                                    {/* Ember Balance header */}
+                                    {/* ═══ Compdeck Dropdown ═══ */}
+                                    {/* Core Balance header */}
                                     <div className="px-4 py-3 border-b border-white/10">
                                         <div className="flex items-center gap-3">
-                                            <img src={emberIcon} alt="Ember" className="h-8 w-auto object-contain" />
+                                            <img src={emberIcon} alt="Cores" className="h-8 w-auto object-contain" />
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs font-bold text-white/50 uppercase tracking-wider">Ember</div>
-                                                <span className="text-xl font-bold text-orange-400 tabular-nums">{ember.balance}</span>
+                                                <div className="text-xs font-bold text-white/50 uppercase tracking-wider">Cores</div>
+                                                <span className="text-xl font-bold text-[#00e5ff] tabular-nums">{ember.balance}</span>
                                             </div>
                                         </div>
                                         {/* Secondary: Passion balance */}
@@ -381,11 +381,11 @@ export default function PassionDisplay() {
                                         </div>
                                     </div>
 
-                                    {/* Daily Ember claim */}
+                                    {/* Daily Core claim */}
                                     <div className="px-4 py-3 border-b border-white/10">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="text-xs text-white/50">
-                                                Ember Streak: <span className="text-orange-400 font-bold">{ember.currentStreak || 0}</span>
+                                                Core Streak: <span className="text-[#00e5ff] font-bold">{ember.currentStreak || 0}</span>
                                             </div>
                                         </div>
 
@@ -394,14 +394,14 @@ export default function PassionDisplay() {
                                                 onClick={handleEmberClaim}
                                                 disabled={emberClaiming}
                                                 className="w-full py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
-                                                style={{ background: 'linear-gradient(135deg, #c2410c, #f97316)', color: '#fff' }}
+                                                style={{ background: 'linear-gradient(135deg, #00a0c0, #00e5ff)', color: '#000' }}
                                             >
-                                                {emberClaiming ? 'Claiming...' : `Claim ${10 + Math.min((ember.currentStreak || 0), 10)} Ember`}
+                                                {emberClaiming ? 'Claiming...' : `Claim ${10 + Math.min((ember.currentStreak || 0), 10)} Cores`}
                                             </button>
                                         ) : emberClaimResult ? (
                                             <div className="text-center py-2 text-sm">
-                                                <span className="text-orange-400 font-bold">+{emberClaimResult.earned}</span>
-                                                <span className="text-white/50 ml-1">Ember claimed!</span>
+                                                <span className="text-[#00e5ff] font-bold">+{emberClaimResult.earned}</span>
+                                                <span className="text-white/50 ml-1">Cores claimed!</span>
                                                 {emberClaimResult.streakBonus > 0 && (
                                                     <div className="text-xs text-orange-400/70 mt-0.5">
                                                         includes +{emberClaimResult.streakBonus} streak bonus
@@ -411,14 +411,14 @@ export default function PassionDisplay() {
                                         ) : (
                                             <div className="text-center py-2 text-xs text-white/50">
                                                 {emberCountdown
-                                                    ? <>Next claim in <span className="text-orange-400 font-mono font-medium tabular-nums">{emberCountdown}</span></>
+                                                    ? <>Next claim in <span className="text-[#00e5ff] font-mono font-medium tabular-nums">{emberCountdown}</span></>
                                                     : 'Come back tomorrow!'
                                                 }
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Card Clash Links */}
+                                    {/* Compdeck Links */}
                                     <div className="py-1">
                                         <Link to="/cardclash?tab=packs" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
@@ -540,9 +540,9 @@ export default function PassionDisplay() {
                                                 className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                                 <span className="flex items-center gap-2">
                                                     <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
-                                                    Card Clash
+                                                    Compdeck
                                                 </span>
-                                                <span className="text-xs font-bold text-orange-400 tabular-nums">{ember.balance}</span>
+                                                <span className="text-xs font-bold text-[#00e5ff] tabular-nums">{ember.balance}</span>
                                             </Link>
                                         )}
                                     </div>

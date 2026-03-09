@@ -65,7 +65,7 @@ export default function CardSharePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0f] px-4 py-12">
-      <PageTitle title={`${card.playerName} - Card Clash`} />
+      <PageTitle title={`${card.playerName} - Compdeck`} />
 
       <div ref={wrapperRef} className="card-share-wrapper">
         <TradingCardHolo rarity={holoEffect} role={card.role} holoType="reverse">
@@ -75,7 +75,7 @@ export default function CardSharePage() {
 
       <div className="text-center space-y-2 mt-6">
         <div className="text-gray-700 text-[10px] tracking-wider uppercase">
-          SMITE 2 Card Clash
+          SMITE 2 Compdeck
         </div>
       </div>
     </div>

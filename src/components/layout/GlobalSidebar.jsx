@@ -11,7 +11,7 @@ import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
     X, User, Trophy, Flame, Wrench, Shield,
-    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, Crown, ArrowLeftRight
+    ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, Cpu, ArrowLeftRight
 } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
 
@@ -368,8 +368,8 @@ export default function GlobalSidebar() {
                                 {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
                                     <SidebarLink to="/cardclash" active={isActive('/cardclash')}>
                                         <span className="flex items-center gap-3">
-                                            <Crown className="w-4 h-4 shrink-0 text-amber-400" />
-                                            Card Clash
+                                            <Cpu className="w-4 h-4 shrink-0 text-[#00e5ff]" />
+                                            Compdeck
                                         </span>
                                     </SidebarLink>
                                 )}

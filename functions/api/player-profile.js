@@ -17,16 +17,18 @@ const handler = async (event) => {
     const sql = getDB()
 
     try {
-        // 1. Player info + claim status
+        // 1. Player info + claim status + avatar preference
         const [player] = await sql`
             SELECT
                 p.id, p.name, p.slug, p.discord_name, p.tracker_url,
                 u.discord_id AS claimed_discord_id,
                 u.discord_username AS claimed_discord_username,
                 u.discord_avatar AS claimed_discord_avatar,
-                CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
+                CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed,
+                COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar
             FROM players p
             LEFT JOIN users u ON u.linked_player_id = p.id
+            LEFT JOIN user_preferences up ON up.user_id = u.id
             WHERE p.slug = ${slug}
         `
 
@@ -230,6 +232,7 @@ const handler = async (event) => {
                     discord_id: player.claimed_discord_id,
                     discord_username: player.claimed_discord_username,
                     discord_avatar: player.claimed_discord_avatar,
+                    allow_discord_avatar: player.allow_discord_avatar,
                     passion_balance: passionRow?.balance ?? null,
                     total_earned: passionRow?.total_earned ?? null,
                 },

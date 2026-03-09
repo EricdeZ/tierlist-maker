@@ -108,9 +108,11 @@ async function handleSharedCard(sql, params) {
   try {
     const [player] = await sql`
       SELECT p.id, p.name, p.slug,
-             u.discord_id, u.discord_avatar
+             u.discord_id, u.discord_avatar,
+             COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar
       FROM players p
       LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN user_preferences up ON up.user_id = u.id
       WHERE p.slug = ${playerSlug}
     `
     if (!player) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Player not found' }) }
@@ -142,7 +144,7 @@ async function handleSharedCard(sql, params) {
     `
 
     let avatarUrl = null
-    if (player.discord_id && player.discord_avatar) {
+    if (player.allow_discord_avatar && player.discord_id && player.discord_avatar) {
       avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
     }
 

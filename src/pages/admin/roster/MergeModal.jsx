@@ -26,7 +26,7 @@ export function MergeModal({ globalPlayers, onClose, onMerge, opLoading }) {
 
     const filterPlayers = (query, excludeId) => {
         const q = query.trim().toLowerCase()
-        if (q.length < 2) return []
+        if (q.length < 1) return []
         return globalPlayers
             .filter(p => p.name.toLowerCase().includes(q) && (!excludeId || p.player_id !== excludeId))
             .slice(0, 10)

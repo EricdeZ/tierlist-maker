@@ -81,10 +81,10 @@ export default function CCCardCatalog() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Card Catalog</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          {GODS.length} gods, {ITEMS.length} items, {MINIONS.length} minions, {BUFFS.length} buffs, {CONSUMABLES.length} consumables &mdash; {RARITY_ORDER.length} rarities each
+      <div className="mb-6 cd-section-accent pb-3">
+        <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Card Catalog</h1>
+        <p className="text-sm text-[var(--cd-text-mid)] mt-1">
+          <span className="cd-num text-[var(--cd-cyan)]">{GODS.length}</span> gods, <span className="cd-num text-[var(--cd-cyan)]">{ITEMS.length}</span> items, <span className="cd-num text-[var(--cd-cyan)]">{MINIONS.length}</span> minions, <span className="cd-num text-[var(--cd-cyan)]">{BUFFS.length}</span> buffs, <span className="cd-num text-[var(--cd-cyan)]">{CONSUMABLES.length}</span> consumables &mdash; {RARITY_ORDER.length} rarities each
         </p>
       </div>
 
@@ -94,13 +94,13 @@ export default function CCCardCatalog() {
           <button
             key={t.key}
             onClick={() => setActiveType(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
+            className={`cd-clip-tag px-5 py-2 text-sm font-bold transition-all cursor-pointer cd-head tracking-wider ${
               activeType === t.key
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                ? 'cd-pill-active'
+                : 'bg-[var(--cd-edge)] text-[var(--cd-text-mid)] border border-[var(--cd-border)] cd-pill hover:bg-[var(--cd-border)]'
             }`}
           >
-            {t.label}{t.count != null && <span className="text-xs opacity-60"> ({t.count})</span>}
+            {t.label}{t.count != null && <span className="text-xs opacity-60 cd-num"> ({t.count})</span>}
           </button>
         ))}
       </div>
@@ -112,15 +112,15 @@ export default function CCCardCatalog() {
           placeholder="Search..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 w-48"
+          className="cd-input rounded-lg px-3 py-1.5 text-sm w-48"
         />
 
         {/* Rarity filter */}
         <div className="flex gap-1">
           <button
             onClick={() => setSelectedRarity('all')}
-            className={`px-2 py-1 text-xs rounded font-bold ${
-              selectedRarity === 'all' ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+            className={`px-2.5 py-1 text-xs rounded font-bold transition-all cd-head ${
+              selectedRarity === 'all' ? 'bg-white/20 text-white' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cd-pill hover:bg-[var(--cd-border)]'
             }`}
           >
             All
@@ -129,10 +129,10 @@ export default function CCCardCatalog() {
             <button
               key={r}
               onClick={() => setSelectedRarity(r)}
-              className={`px-2 py-1 text-xs rounded font-bold capitalize ${
-                selectedRarity === r ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+              className={`px-2.5 py-1 text-xs rounded font-bold capitalize transition-all cd-head ${
+                selectedRarity === r ? 'text-black' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cd-pill hover:bg-[var(--cd-border)]'
               }`}
-              style={selectedRarity === r ? { backgroundColor: RARITIES[r]?.color } : undefined}
+              style={selectedRarity === r ? { backgroundColor: RARITIES[r]?.color, boxShadow: `0 0 10px ${RARITIES[r]?.color}44` } : undefined}
             >
               {r}
             </button>
@@ -146,8 +146,8 @@ export default function CCCardCatalog() {
               <button
                 key={cls}
                 onClick={() => setClassFilter(cls)}
-                className={`px-2 py-1 text-xs rounded font-bold ${
-                  classFilter === cls ? 'bg-amber-500/20 text-amber-400' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+                className={`px-2.5 py-1 text-xs rounded font-bold transition-all cd-head ${
+                  classFilter === cls ? 'cd-pill-active' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cd-pill hover:bg-[var(--cd-border)]'
                 }`}
               >
                 {cls}
@@ -158,8 +158,8 @@ export default function CCCardCatalog() {
 
         {/* Card size slider */}
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-gray-500">{cardSize}px</span>
-          <input type="range" min={100} max={400} value={cardSize} onChange={e => setCardSize(parseInt(e.target.value))} className="w-24 accent-amber-500" />
+          <span className="text-xs text-[var(--cd-text-dim)] cd-mono">{cardSize}px</span>
+          <input type="range" min={100} max={400} value={cardSize} onChange={e => setCardSize(parseInt(e.target.value))} className="w-24" />
         </div>
       </div>
 
@@ -168,30 +168,31 @@ export default function CCCardCatalog() {
         <div className="space-y-10">
           {rarities.map(rarity => (
             <RaritySection key={rarity} rarity={rarity}>
-              <div className="flex flex-col items-center gap-2">
-                <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="holo">
-                    <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
-                  </TradingCardHolo>
+              {rarity === 'common' ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
+                    <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="reverse">
+                      <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
+                    </TradingCardHolo>
+                  </div>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player</span>
                 </div>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player (Holo)</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="reverse">
-                    <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
-                  </TradingCardHolo>
-                </div>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player (Rev)</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
-                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="full">
-                    <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
-                  </TradingCardHolo>
-                </div>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player (Full)</span>
-              </div>
+              ) : (
+                <>
+                  {['holo', 'reverse', 'full'].map(holoType => (
+                    <div key={holoType} className="flex flex-col items-center gap-2">
+                      <div className="card-overview-slot" style={{ width: cardSize, height: cardSize * (88 / 63), '--slot-scale': cardSize / 340 }}>
+                        <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType={holoType}>
+                          <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
+                        </TradingCardHolo>
+                      </div>
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+                        Player ({holoType === 'holo' ? 'Holo' : holoType === 'reverse' ? 'Rev' : 'Full'})
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
               <div className="flex flex-col items-center gap-2">
                 <TradingCardHolo rarity={getHoloEffect(rarity)} role="ADC" holoType="reverse" size={cardSize}>
                   <GameCard type="god" rarity={rarity} data={applyOverride('god', GODS[0].slug, GODS[0])} />
@@ -305,14 +306,18 @@ function RaritySection({ rarity, children }) {
   const info = RARITIES[rarity]
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4 sticky top-16 z-10 bg-(--color-bg)/95 backdrop-blur-sm py-2">
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: info?.color }} />
-        <h3 className="text-lg font-bold uppercase tracking-wider" style={{ color: info?.color }}>
+      <div className="text-center py-4 mb-4">
+        <h3
+          className="text-2xl cd-rarity-neon"
+          style={{ '--cd-rarity-color': info?.color }}
+        >
           {info?.name || rarity}
         </h3>
       </div>
-      <div className="flex flex-wrap gap-4">
-        {children}
+      <div className="cd-full-bleed">
+        <div className="flex flex-wrap gap-4 cd-stagger justify-center px-4">
+          {children}
+        </div>
       </div>
     </div>
   )

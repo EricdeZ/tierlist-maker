@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PageTitle from '../../components/PageTitle'
+import '../../pages/cardclash/compdeck.css'
 import CCAdminCards from './cardclash/CCAdminCards'
 import CCAdminGods from './cardclash/CCAdminGods'
 import CCAdminItems from './cardclash/CCAdminItems'
@@ -27,23 +28,23 @@ export default function CardClashAdmin() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-12">
-      <PageTitle title="Card Clash Admin" noindex />
+      <PageTitle title="Compdeck Admin" noindex />
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-amber-400">Card Clash Admin</h1>
+      <div className="mb-6 cd-section-accent pb-3">
+        <h1 className="text-2xl font-bold text-[var(--cd-cyan)] cd-head cd-text-glow">Compdeck Admin</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">Manage cards, gods, items, and game economy</p>
       </div>
 
       {/* Tab navigation */}
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4">
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--cd-border)] pb-4">
         {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
+            className={`cd-clip-tag flex items-center gap-2 px-5 py-2 text-sm font-bold transition-all cursor-pointer cd-head tracking-wider ${
               activeTab === tab.key
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'bg-[var(--color-secondary)] text-[var(--color-text-secondary)] border border-white/10 hover:bg-white/10'
+                ? 'cd-pill-active'
+                : 'bg-[var(--cd-edge)] text-[var(--cd-text-mid)] border border-[var(--cd-border)] cd-pill'
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

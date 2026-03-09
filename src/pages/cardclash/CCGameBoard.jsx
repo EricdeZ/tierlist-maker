@@ -75,7 +75,7 @@ export default function GameBoard() {
   if (!gameState) {
     return (
       <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold mb-4">SMITE Card Clash - Full Game</h1>
+        <h1 className="text-2xl font-bold mb-4">SMITE Compdeck - Full Game</h1>
         <p className="text-gray-400 mb-8 max-w-lg mx-auto">
           Three lanes. Towers, Phoenixes, and a Titan. Deploy gods, cast abilities, equip items,
           and destroy the enemy Titan to win.
