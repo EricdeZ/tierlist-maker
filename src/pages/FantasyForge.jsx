@@ -52,7 +52,7 @@ export default function FantasyForge() {
 
     // Market filters
     const [search, setSearch] = useState('')
-    const [sortBy, setSortBy] = useState('perf-desc')
+    const [sortBy, setSortBy] = useState('change-desc')
     const [teamFilter, setTeamFilter] = useState('')
     const [roleFilter, setRoleFilter] = useState('')
 
