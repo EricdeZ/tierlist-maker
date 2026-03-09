@@ -34,6 +34,11 @@ const PERF_DEFAULTS = {
 
 const MS_PER_DAY = 86400000
 
+/** Truncate a timestamp to midnight UTC (for comparing timestamptz against date columns) */
+function toMidnightUTC(ms) {
+    return ms - (ms % MS_PER_DAY)
+}
+
 /**
  * Load performance config from forge_config table, falling back to defaults.
  */
@@ -533,11 +538,18 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
     const sets = []
     let currentSet = null
     const playerMatchIds = new Set()
+    const skippedGames = []
     for (const game of games) {
         const gameTime = new Date(game.match_date).getTime()
-        if (gameTime < marketStartTime) continue
+        if (gameTime < marketStartTime) {
+            skippedGames.push({ date: game.match_date, god: game.god_played, matchId: game.match_id, reason: 'before_market' })
+            continue
+        }
         const avgs = roleAvgMap[game.role]
-        if (!avgs) continue
+        if (!avgs) {
+            skippedGames.push({ date: game.match_date, god: game.god_played, matchId: game.match_id, reason: 'no_role_avg', role: game.role })
+            continue
+        }
         playerMatchIds.add(game.match_id)
         if (!currentSet || currentSet.matchId !== game.match_id) {
             currentSet = { matchId: game.match_id, gameData: [], gameTime }
@@ -674,7 +686,7 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         }
     }
 
-    return { multiplier, trace, finalInactivityDecay, hasGames }
+    return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames }
 }
 
 /**
@@ -943,7 +955,7 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     const updates = []
     const processedSparkIds = new Set()
-    const marketStartTime = new Date(market.created_at).getTime()
+    const marketStartTime = toMidnightUTC(new Date(market.created_at).getTime())
 
     for (const [lpId, games] of playerGamesMap) {
         const spark = sparkMap.get(lpId)
@@ -1341,7 +1353,10 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
 
     // Replay this player's games with full trace
     const playerGames = playerGamesMap.get(lpId) || []
-    const marketStartTime = new Date(spark.market_created_at).getTime()
+    const marketStartTime = toMidnightUTC(new Date(spark.market_created_at).getTime())
+
+    // Count total raw games in SQL results for this player (before JS-level filters)
+    const totalRawGames = playerGames.length
 
     const result = replayPlayerGames({
         games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
@@ -1360,6 +1375,9 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
             COMPRESS_K: cfg.COMPRESS_K, PERF_FLOOR: cfg.PERF_FLOOR,
         },
         games: result.trace,
+        skippedGames: result.skippedGames,
+        totalRawGames,
+        marketOpenDate: new Date(marketStartTime).toISOString().split('T')[0],
         finalInactivityDecay: result.finalInactivityDecay,
         finalMultiplier: result.multiplier,
     }

@@ -320,9 +320,30 @@ export default function SingleMatchReport() {
                 editData.scheduled_match_id = mr.editData.scheduled_match_id
                 editData.team1_id = mr.editData.team1_id || editData.team1_id
                 editData.team2_id = mr.editData.team2_id || editData.team2_id
+                editData.team1_name = mr.editData.team1_name || editData.team1_name
+                editData.team2_name = mr.editData.team2_name || editData.team2_name
                 editData.week = mr.editData.week || editData.week
                 editData.date = mr.editData.date || editData.date
                 editData.best_of = mr.editData.best_of || editData.best_of
+            }
+
+            // Normalize left/right players per game to match team1/team2 ordering
+            const rosterPlayers = adminData?.players || []
+            for (const game of editData.games) {
+                const leftTeamIds = (game.left_players || [])
+                    .filter(p => p.matched_lp_id)
+                    .map(p => rosterPlayers.find(r => r.league_player_id === p.matched_lp_id)?.team_id)
+                    .filter(Boolean)
+                if (leftTeamIds.length) {
+                    const counts = {}
+                    for (const id of leftTeamIds) counts[id] = (counts[id] || 0) + 1
+                    const leftTeamId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+                    if (String(leftTeamId) === String(editData.team2_id)) {
+                        const tmp = game.left_players
+                        game.left_players = game.right_players
+                        game.right_players = tmp
+                    }
+                }
             }
             editData.season_id = mr.editData?.season_id || editData.season_id
 

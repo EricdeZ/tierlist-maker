@@ -562,7 +562,7 @@ function factorColor(v) {
 }
 
 function PlayerBreakdown({ data }) {
-    const { player, games, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg } = data
+    const { player, games, skippedGames, totalRawGames, marketOpenDate, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg } = data
     const playerRoleAvgs = roleAvgs[player.role] || roleAvgs[Object.keys(roleAvgs)[0]]
 
     return (
@@ -582,6 +582,29 @@ function PlayerBreakdown({ data }) {
                 </div>
             </div>
 
+            {/* Diagnostics: market open date + game counts */}
+            {(totalRawGames != null || marketOpenDate) && (
+                <div className="text-xs text-[var(--color-text-secondary)]">
+                    {marketOpenDate && <span>Market opened: {marketOpenDate}</span>}
+                    {totalRawGames != null && <span className="ml-3">SQL games: {totalRawGames} | Counted: {games.length}{skippedGames?.length > 0 ? ` | Skipped: ${skippedGames.length}` : ''}</span>}
+                </div>
+            )}
+
+            {/* Skipped games warning */}
+            {skippedGames?.length > 0 && (
+                <div className="text-xs bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
+                    <span className="text-yellow-400 font-medium">Skipped games:</span>
+                    <ul className="mt-1 space-y-0.5 text-[var(--color-text-secondary)]">
+                        {skippedGames.map((g, i) => (
+                            <li key={i}>
+                                {g.date} — {g.god || '?'} — {g.reason === 'before_market' ? 'before market open' : `no role avg for "${g.role}"`}
+                                {g.matchId && <span className="opacity-50 ml-1">(match #{g.matchId})</span>}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {/* Role averages reference */}
             {playerRoleAvgs && (
                 <div className="text-xs text-[var(--color-text-secondary)]">
@@ -592,7 +615,10 @@ function PlayerBreakdown({ data }) {
 
             {/* Per-game table */}
             {games.length === 0 ? (
-                <div className="text-xs text-[var(--color-text-secondary)] py-2">No post-market games found (multiplier affected only by inactivity decay).</div>
+                <div className="text-xs text-[var(--color-text-secondary)] py-2">
+                    No post-market games found (multiplier affected only by inactivity decay).
+                    {totalRawGames === 0 && ' No games found in SQL query — check player role, roster_status, and game is_completed flags.'}
+                </div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
