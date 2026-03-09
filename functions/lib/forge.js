@@ -774,15 +774,19 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         const gameTime = set.gameTime
         const multBeforeSet = multiplier
 
-        // 1. Count missed team matches between sets — added as one compound virtual game to the average
+        // 1. Count missed team matches before this set — added as one compound virtual game to the average
         const setSnap = getCfgAtTime(configHistory, gameTime, cfg)
         let missedBetween = 0
         let inactivityFactor = null
         if (lastGameTime !== null) {
+            // Between sets: missed matches after last game, before this one
             missedBetween = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId)).length
-            if (missedBetween > 0) {
-                inactivityFactor = Math.pow(setSnap.INACTIVITY_DECAY, missedBetween)
-            }
+        } else {
+            // Before first set: missed matches since market open (or join), before first game
+            missedBetween = teamMatches.filter(m => m.date < gameTime && !playerMatchIds.has(m.matchId)).length
+        }
+        if (missedBetween > 0) {
+            inactivityFactor = Math.pow(setSnap.INACTIVITY_DECAY, missedBetween)
         }
 
         // 2. Per-set regression toward 1.0
