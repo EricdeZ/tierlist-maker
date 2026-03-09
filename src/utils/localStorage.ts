@@ -1,4 +1,4 @@
-// src/utils/localStorage.js
+// src/utils/localStorage.ts
 /**
  * Utilities for managing rankings in localStorage.
  * Storage key is now parameterized so rankings are scoped per division.
@@ -6,17 +6,29 @@
 
 const DEFAULT_KEY = 'tierlist-rankings'
 
+export interface RankingsData {
+    rankings: Record<string, unknown[]>
+    selectedStat: string
+    playerStatOverrides: Record<string, unknown>
+}
+
+interface StoredData extends RankingsData {
+    timestamp: string
+    version: string
+}
+
 /**
  * Save rankings to localStorage
- * @param {Object} rankings - The rankings object to save
- * @param {string} [storageKey] - Optional custom storage key (e.g. scoped by division)
- * @param {Object} [extra] - Optional extra fields to persist (e.g. selectedStat, playerStatOverrides)
  */
-export const saveRankingsToStorage = (rankings, storageKey = DEFAULT_KEY, extra = {}) => {
+export const saveRankingsToStorage = (
+    rankings: Record<string, unknown[]>,
+    storageKey: string = DEFAULT_KEY,
+    extra: Record<string, unknown> = {},
+): void => {
     try {
-        const dataToSave = {
+        const dataToSave: StoredData = {
             rankings,
-            ...extra,
+            ...extra as Partial<RankingsData>,
             timestamp: new Date().toISOString(),
             version: '2.1'
         }
@@ -28,10 +40,8 @@ export const saveRankingsToStorage = (rankings, storageKey = DEFAULT_KEY, extra 
 
 /**
  * Load rankings from localStorage
- * @param {string} [storageKey] - Optional custom storage key
- * @returns {Object|null} The saved rankings object or null if not found/invalid
  */
-export const loadRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
+export const loadRankingsFromStorage = (storageKey: string = DEFAULT_KEY): RankingsData | null => {
     try {
         const saved = localStorage.getItem(storageKey)
         if (!saved) return null
@@ -57,9 +67,8 @@ export const loadRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
 
 /**
  * Clear rankings from localStorage
- * @param {string} [storageKey] - Optional custom storage key
  */
-export const clearRankingsFromStorage = (storageKey = DEFAULT_KEY) => {
+export const clearRankingsFromStorage = (storageKey: string = DEFAULT_KEY): void => {
     try {
         localStorage.removeItem(storageKey)
     } catch (error) {

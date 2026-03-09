@@ -4,7 +4,7 @@ import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
 import { fetchGuildMembers } from '../lib/discord.js'
-import { cleanupForgeAfterTeamChange } from '../lib/forge.js'
+import { cleanupForgeAfterTeamChange } from '../lib/forge/helpers.js'
 
 
 const handler = async (event) => {

@@ -1,7 +1,7 @@
 // Fantasy Forge — core helpers for the player investment market.
 
-import { grantPassion } from './passion.js'
-import { pushChallengeProgress } from './challenges.js'
+import { grantPassion } from '../passion.js'
+import { pushChallengeProgress } from '../challenges.js'
 
 // ═══════════════════════════════════════════════════
 // Configuration

@@ -11,6 +11,8 @@
     "lint": "eslint .",
     "preview": "wrangler pages dev dist",
     "deploy": "vite build && wrangler pages deploy dist --project-name=smite-companion",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "video": "node scripts/video-generator/runner.js"
   },
   "dependencies": {
@@ -27,6 +29,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
@@ -36,9 +41,12 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "jsdom": "^28.1.0",
     "playwright": "^1.58.2",
     "postcss": "^8.5.6",
+    "typescript": "^5.9.3",
     "vite": "^7.1.2",
+    "vitest": "^4.0.18",
     "wrangler": "^4.65.0"
   }
 }

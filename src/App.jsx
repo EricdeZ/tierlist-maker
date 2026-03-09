@@ -1,100 +1,118 @@
 // src/App.jsx
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { PassionProvider } from './context/PassionContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
+import AdminLayout from './components/layout/AdminLayout'
+import CodexLayout from './components/layout/CodexLayout'
 import DivisionLayout from './components/layout/DivisionLayout'
+import ScrollToTop from './components/ScrollToTop'
+
+// Eager — critical path (first paint)
 import Homepage from './pages/Homepage'
 import NotFound from './pages/NotFound'
 
-// Division pages
-import DivisionOverview from './pages/division/DivisionOverview'
-import Standings from './pages/division/Standings'
-import Matches from './pages/division/Matches'
-import MatchDetail from './pages/division/MatchDetail'
-import Teams from './pages/division/Teams'
-import TeamDetail from './pages/division/TeamDetail'
-import PlayerProfile from './pages/division/PlayerProfile'
-import Stats from "./pages/Stats.jsx";
-import Rankings from "./pages/Rankings.jsx";
-import TierListFeed from "./pages/division/TierListFeed.jsx";
-import Transactions from "./pages/division/Transactions.jsx"
-import LeagueOverview from "./pages/LeagueOverview.jsx";
-import LeaguesBrowse from "./pages/LeaguesBrowse.jsx";
-import ScrollToTop from "./components/ScrollToTop.jsx";
+// Lazy page wrapper — each page gets its own chunk + Suspense boundary
+function PageLoader() {
+    return <div className="flex items-center justify-center h-64"><div className="animate-pulse text-gray-400">Loading...</div></div>
+}
 
-// Admin
-import AdminLayout from './components/layout/AdminLayout'
-import AdminLanding from "./pages/admin/AdminLanding.jsx";
-import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
-import RosterManager from "./pages/admin/RosterManager.jsx";
-import MatchManager from "./pages/admin/MatchManager.jsx";
-import PlayerManager from "./pages/admin/PlayerManager.jsx";
-import LeagueManager from "./pages/admin/LeagueManager.jsx";
-import UserManager from "./pages/admin/UserManager.jsx";
-import ClaimManager from "./pages/admin/ClaimManager.jsx";
-import PermissionManager from "./pages/admin/PermissionManager.jsx";
-import AuditLog from "./pages/admin/AuditLog.jsx";
-import ScheduleManager from "./pages/admin/ScheduleManager.jsx";
-import DiscordQueue from "./pages/admin/DiscordQueue.jsx";
-import DiscordReview from "./pages/admin/DiscordReview.jsx";
-import BannedContentManager from "./pages/admin/BannedContentManager.jsx";
-import ProfilePage from "./pages/ProfilePage.jsx";
-import DraftSimulator from "./pages/DraftSimulator.jsx";
-import TierListPage from "./pages/TierListPage.jsx";
-import PassionLeaderboard from "./pages/PassionLeaderboard.jsx";
-import Challenges from "./pages/Challenges.jsx";
-import CoinFlip from "./pages/CoinFlip.jsx";
-import PassionShop from "./pages/PassionShop.jsx";
-import ReferralPage from "./pages/ReferralPage.jsx";
-import ChallengeManager from "./pages/admin/ChallengeManager.jsx";
-import DebugTools from "./pages/admin/DebugTools.jsx";
-import DataReportManager from "./pages/admin/DataReportManager.jsx";
-import Predictions from "./pages/Predictions.jsx";
-import MatchupDetail from "./pages/MatchupDetail.jsx";
-import FeaturedStream from "./pages/FeaturedStream.jsx"
-import AGLSignup from "./pages/AGLSignup.jsx";
-import OrgPage from "./pages/OrgPage.jsx";
-import OrgManager from "./pages/admin/OrgManager.jsx";
-import FantasyForge from "./pages/FantasyForge.jsx";
-import ForgePlayerPage from "./pages/forge/ForgePlayerPage.jsx";
-import GodTierList from "./pages/GodTierList.jsx";
-import ScrimPlanner from "./pages/ScrimPlanner.jsx";
-import MyTeams from "./pages/MyTeams.jsx";
-import TheArcade from "./pages/TheArcade.jsx";
-import Feedback from "./pages/Feedback.jsx";
-import Support from "./pages/Support.jsx";
-import FeedbackManager from "./pages/admin/FeedbackManager.jsx";
-import TeamManager from "./pages/admin/TeamManager.jsx";
-import ArcadeNpcManager from "./pages/admin/ArcadeNpcManager.jsx";
-import LeagueStaff from "./pages/admin/LeagueStaff.jsx";
-import DiscordRosterSync from "./pages/admin/DiscordRosterSync.jsx";
-import RoleSync from "./pages/admin/RoleSync.jsx";
-import ForgeConfig from "./pages/admin/ForgeConfig.jsx";
-import ForgeAdmin from "./pages/admin/ForgeAdmin.jsx";
-import ReferralManager from "./pages/admin/ReferralManager.jsx";
-import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
-import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
-import StageManager from "./pages/admin/StageManager.jsx";
-import StaffSettings from "./pages/admin/StaffSettings.jsx";
-import SingleMatchReport from "./pages/admin/SingleMatchReport.jsx";
-import CardPreview from "./pages/admin/CardPreview.jsx";
-import CardClashAdmin from "./pages/admin/CardClashAdmin.jsx";
-import Features from "./pages/Features.jsx";
-import Players from "./pages/Players.jsx";
-import SnoozOverlay from "./pages/SnoozOverlay.jsx";
-import CardClashPage from "./pages/CardClashPage.jsx";
-import CardSharePage from "./pages/cardclash/CardSharePage.jsx";
-import BgRemover from "./pages/BgRemover.jsx";
-// Codex
-import CodexLayout from './components/layout/CodexLayout'
-import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
-import CodexItems from "./pages/codex/CodexItems.jsx";
-import CodexGods from "./pages/codex/CodexGods.jsx";
-import CodexImages from "./pages/codex/CodexImages.jsx";
-import CodexWordle from "./pages/codex/CodexWordle.jsx";
+function lp(importFn) {
+    const Component = lazy(importFn)
+    return function LazyPage(props) {
+        return <Suspense fallback={<PageLoader />}><Component {...props} /></Suspense>
+    }
+}
+
+// ── Division pages ──
+const DivisionOverview = lp(() => import('./pages/division/DivisionOverview'))
+const Standings = lp(() => import('./pages/division/Standings'))
+const Matches = lp(() => import('./pages/division/Matches'))
+const MatchDetail = lp(() => import('./pages/division/MatchDetail'))
+const Teams = lp(() => import('./pages/division/Teams'))
+const TeamDetail = lp(() => import('./pages/division/TeamDetail'))
+const PlayerProfile = lp(() => import('./pages/division/PlayerProfile'))
+const Stats = lp(() => import('./pages/Stats'))
+const Rankings = lp(() => import('./pages/Rankings'))
+const TierListFeed = lp(() => import('./pages/division/TierListFeed'))
+const Transactions = lp(() => import('./pages/division/Transactions'))
+const LeagueOverview = lp(() => import('./pages/LeagueOverview'))
+const LeaguesBrowse = lp(() => import('./pages/LeaguesBrowse'))
+
+// ── Admin pages ──
+const AdminLanding = lp(() => import('./pages/admin/AdminLanding'))
+const AdminDashboard = lp(() => import('./pages/admin/AdminDashboard'))
+const RosterManager = lp(() => import('./pages/admin/RosterManager'))
+const MatchManager = lp(() => import('./pages/admin/MatchManager'))
+const PlayerManager = lp(() => import('./pages/admin/PlayerManager'))
+const LeagueManager = lp(() => import('./pages/admin/LeagueManager'))
+const UserManager = lp(() => import('./pages/admin/UserManager'))
+const ClaimManager = lp(() => import('./pages/admin/ClaimManager'))
+const PermissionManager = lp(() => import('./pages/admin/PermissionManager'))
+const AuditLog = lp(() => import('./pages/admin/AuditLog'))
+const ScheduleManager = lp(() => import('./pages/admin/ScheduleManager'))
+const DiscordQueue = lp(() => import('./pages/admin/DiscordQueue'))
+const DiscordReview = lp(() => import('./pages/admin/DiscordReview'))
+const BannedContentManager = lp(() => import('./pages/admin/BannedContentManager'))
+const ChallengeManager = lp(() => import('./pages/admin/ChallengeManager'))
+const DebugTools = lp(() => import('./pages/admin/DebugTools'))
+const DataReportManager = lp(() => import('./pages/admin/DataReportManager'))
+const OrgManager = lp(() => import('./pages/admin/OrgManager'))
+const FeedbackManager = lp(() => import('./pages/admin/FeedbackManager'))
+const TeamManager = lp(() => import('./pages/admin/TeamManager'))
+const LeagueStaff = lp(() => import('./pages/admin/LeagueStaff'))
+const DiscordRosterSync = lp(() => import('./pages/admin/DiscordRosterSync'))
+const RoleSync = lp(() => import('./pages/admin/RoleSync'))
+const ForgeConfig = lp(() => import('./pages/admin/ForgeConfig'))
+const ForgeAdmin = lp(() => import('./pages/admin/ForgeAdmin'))
+const ReferralManager = lp(() => import('./pages/admin/ReferralManager'))
+const CommunityTeamAdmin = lp(() => import('./pages/admin/CommunityTeamAdmin'))
+const ScrimAdmin = lp(() => import('./pages/admin/ScrimAdmin'))
+const StageManager = lp(() => import('./pages/admin/StageManager'))
+const StaffSettings = lp(() => import('./pages/admin/StaffSettings'))
+const SingleMatchReport = lp(() => import('./pages/admin/SingleMatchReport'))
+const CardPreview = lp(() => import('./pages/admin/CardPreview'))
+const CardClashAdmin = lp(() => import('./pages/admin/CardClashAdmin'))
+const ArcadeNpcManager = lp(() => import('./pages/admin/ArcadeNpcManager'))
+
+// ── Codex pages ──
+const CodexDashboard = lp(() => import('./pages/codex/CodexDashboard'))
+const CodexItems = lp(() => import('./pages/codex/CodexItems'))
+const CodexGods = lp(() => import('./pages/codex/CodexGods'))
+const CodexImages = lp(() => import('./pages/codex/CodexImages'))
+const CodexWordle = lp(() => import('./pages/codex/CodexWordle'))
+
+// ── Public feature pages ──
+const ProfilePage = lp(() => import('./pages/ProfilePage'))
+const DraftSimulator = lp(() => import('./pages/DraftSimulator'))
+const TierListPage = lp(() => import('./pages/TierListPage'))
+const PassionLeaderboard = lp(() => import('./pages/PassionLeaderboard'))
+const Challenges = lp(() => import('./pages/Challenges'))
+const CoinFlip = lp(() => import('./pages/CoinFlip'))
+const PassionShop = lp(() => import('./pages/PassionShop'))
+const ReferralPage = lp(() => import('./pages/ReferralPage'))
+const Predictions = lp(() => import('./pages/Predictions'))
+const MatchupDetail = lp(() => import('./pages/MatchupDetail'))
+const FeaturedStream = lp(() => import('./pages/FeaturedStream'))
+const AGLSignup = lp(() => import('./pages/AGLSignup'))
+const OrgPage = lp(() => import('./pages/OrgPage'))
+const FantasyForge = lp(() => import('./pages/FantasyForge'))
+const ForgePlayerPage = lp(() => import('./pages/forge/ForgePlayerPage'))
+const GodTierList = lp(() => import('./pages/GodTierList'))
+const ScrimPlanner = lp(() => import('./pages/ScrimPlanner'))
+const MyTeams = lp(() => import('./pages/MyTeams'))
+const TheArcade = lp(() => import('./pages/TheArcade'))
+const Feedback = lp(() => import('./pages/Feedback'))
+const Support = lp(() => import('./pages/Support'))
+const Features = lp(() => import('./pages/Features'))
+const Players = lp(() => import('./pages/Players'))
+const SnoozOverlay = lp(() => import('./pages/SnoozOverlay'))
+const CardClashPage = lp(() => import('./pages/CardClashPage'))
+const CardSharePage = lp(() => import('./pages/cardclash/CardSharePage'))
+const BgRemover = lp(() => import('./pages/BgRemover'))
 
 function App() {
     return (

@@ -3,7 +3,7 @@ import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
-import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange } from '../lib/forge.js'
+import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange } from '../lib/forge/helpers.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {

@@ -3,7 +3,7 @@ import { getDB, adminHeaders as headers, transaction } from '../lib/db.js'
 import { requireAnyPermission, getLeagueIdFromSeason, getLeagueIdFromMatch } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
-import { recalcForgePerformance } from '../lib/forge.js'
+import { recalcForgePerformance } from '../lib/forge/helpers.js'
 import { advanceFromMatch } from '../lib/advancement.js'
 
 const handler = async (event) => {

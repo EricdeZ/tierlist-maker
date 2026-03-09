@@ -3,7 +3,7 @@ import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { invalidatePerformanceChallenges } from '../lib/challenges.js'
-import { liquidateMarketBySeason } from '../lib/forge.js'
+import { liquidateMarketBySeason } from '../lib/forge/helpers.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {

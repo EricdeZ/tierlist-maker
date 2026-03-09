@@ -3,7 +3,7 @@ import { getDB, adminHeaders } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { grantPassion } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
-import { recalcForgePerformance, getPlayerBreakdown } from '../lib/forge.js'
+import { recalcForgePerformance, getPlayerBreakdown } from '../lib/forge/helpers.js'
 
 const NUMERIC_KEYS = [
     'game_decay', 'supply_weight', 'expectation_weight', 'inactivity_decay',

@@ -5,7 +5,7 @@ import { requirePermission, getLeagueIdFromSeason } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
 import { updateMatchChallenges } from '../lib/challenges.js'
 import { resolvePredictions } from '../lib/predictions.js'
-import { updateForgeAfterMatch } from '../lib/forge.js'
+import { updateForgeAfterMatch } from '../lib/forge/helpers.js'
 import { sendChannelMessage } from '../lib/discord.js'
 import { advanceFromMatch } from '../lib/advancement.js'
 

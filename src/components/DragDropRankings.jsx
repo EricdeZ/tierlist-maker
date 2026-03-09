@@ -1,5 +1,5 @@
 // src/components/DragDropRankings.jsx - Refactored to use DivisionContext
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { exportRankingsAsImage } from '../utils/canvasExport'
@@ -14,32 +14,10 @@ import { usePlayerStats } from '../hooks/usePlayerStats'
 import { usePassion } from '../context/PassionContext'
 import TeamLogo from './TeamLogo'
 
-// Import role images
-import soloImage from '../assets/roles/solo.webp'
-import jungleImage from '../assets/roles/jungle.webp'
-import midImage from '../assets/roles/mid.webp'
-import suppImage from '../assets/roles/supp.webp'
-import adcImage from '../assets/roles/adc.webp'
-
-const roles = ['SOLO', 'JUNGLE', 'MID', 'SUPPORT', 'ADC']
-
-const roleImages = {
-    'SOLO': soloImage,
-    'JUNGLE': jungleImage,
-    'MID': midImage,
-    'SUPPORT': suppImage,
-    'ADC': adcImage
-}
-
-const STAT_TYPES = [
-    { key: 'none', label: 'No Stats', buttonLabel: 'No Stats' },
-    { key: 'kda', label: 'KDA', buttonLabel: 'KDA' },
-    { key: 'killsPerGame', label: 'K/G', buttonLabel: 'Kills / Game' },
-    { key: 'deathsPerGame', label: 'D/G', buttonLabel: 'Deaths / Game' },
-    { key: 'assistsPerGame', label: 'A/G', buttonLabel: 'Assists / Game' },
-    { key: 'damagePerGame', label: 'Dmg/G', buttonLabel: 'Damage / Game' },
-    { key: 'mitigationsPerGame', label: 'Mit/G', buttonLabel: 'Mitigations / Game' },
-]
+import { roles, roleImages, STAT_TYPES } from './rankings/constants'
+import { useDragDrop } from './rankings/useDragDrop'
+import { useStatLocking } from './rankings/useStatLocking'
+import PlayerCard from './rankings/PlayerCard'
 
 const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) => {
     // Use DivisionContext instead of hardcoded hook
@@ -102,16 +80,8 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
     const [rankings, setRankings] = useState(
         savedData?.rankings || { SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] }
     )
-    const [selectedStat, setSelectedStat] = useState(savedData?.selectedStat || 'none')
-    // Locked stats: when a player is placed, we snapshot the current selectedStat
-    const [lockedStats, setLockedStats] = useState(savedData?.playerStatOverrides || {})
 
-    const [draggedItem, setDraggedItem] = useState(null)
-    const [dragOverZone, setDragOverZone] = useState(null)
-    const [dragOverIndex, setDragOverIndex] = useState(null)
     const [isExporting, setIsExporting] = useState(false)
-    const [applyAllOpen, setApplyAllOpen] = useState(false)
-    const applyAllRef = useRef(null)
     const [teamsPanelOpen, setTeamsPanelOpen] = useState(true)
     const [teamsPanelPosition, setTeamsPanelPosition] = useState('bottom') // 'bottom' | 'right'
     const [teamsPanelHeight, setTeamsPanelHeight] = useState(0)
@@ -122,6 +92,39 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
     const teamsPanelRef = useRef(null)
     const resizeStartY = useRef(0)
     const resizeStartHeight = useRef(0)
+
+    // Stat locking hook
+    const {
+        selectedStat, setSelectedStat,
+        lockedStats, setLockedStats,
+        applyAllOpen, setApplyAllOpen,
+        applyPlacedOpen, setApplyPlacedOpen,
+        applyAllRef, applyPlacedRef,
+        lockPlayerStat, unlockPlayerStat,
+        getStatValue, getNumericStatValue,
+        applyAllByStat, applyToPlacedByStat,
+    } = useStatLocking({
+        rankings,
+        setRankings,
+        statsMap,
+        teams,
+        savedLockedStats: savedData?.playerStatOverrides,
+        savedSelectedStat: savedData?.selectedStat,
+    })
+
+    // Drag & drop hook
+    const {
+        draggedItem, dragOverZone, dragOverIndex,
+        handleDragStart, handleDragEnd, handleDragOver,
+        handleDragEnter, handleDragLeave, handleDrop,
+        getDisplayRankings,
+    } = useDragDrop({
+        rankings,
+        setRankings,
+        lockPlayerStat,
+        showSpotlight,
+        setSpotlightPlayer,
+    })
 
     // Check for mobile/small screen
     useEffect(() => {
@@ -151,39 +154,6 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
         }
         isInitialMount.current = false
     }, [rankings, storageKey, selectedStat, lockedStats, trackAction])
-
-    // Cleanup drag state
-    useEffect(() => {
-        const handleDragEnd = () => {
-            setDraggedItem(null)
-            setDragOverZone(null)
-            setDragOverIndex(null)
-        }
-        document.addEventListener('dragend', handleDragEnd)
-        document.addEventListener('mouseup', handleDragEnd)
-        return () => {
-            document.removeEventListener('dragend', handleDragEnd)
-            document.removeEventListener('mouseup', handleDragEnd)
-        }
-    }, [])
-
-    // Auto-scroll when dragging near viewport edges
-    useEffect(() => {
-        const EDGE_ZONE = 80
-        const SCROLL_SPEED = 12
-
-        const onDragOver = (e) => {
-            const y = e.clientY
-            if (y < EDGE_ZONE) {
-                window.scrollBy(0, -SCROLL_SPEED)
-            } else if (y > window.innerHeight - EDGE_ZONE) {
-                window.scrollBy(0, SCROLL_SPEED)
-            }
-        }
-
-        window.addEventListener('dragover', onDragOver)
-        return () => window.removeEventListener('dragover', onDragOver)
-    }, [])
 
     // Spotlight modal dragging
     useEffect(() => {
@@ -277,36 +247,6 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
         return team ? team.name : 'Unknown Team'
     }
 
-    const getStatValue = useCallback((playerName, statType) => {
-        if (statType === 'none') return null
-        const stats = statsMap.get(playerName)
-        if (!stats) return null
-
-        switch (statType) {
-            case 'kda': return { value: stats.kda.toFixed(2), label: 'KDA' }
-            case 'killsPerGame': return { value: stats.avgStats.avgKills.toFixed(1), label: 'K/G' }
-            case 'deathsPerGame': return { value: stats.avgStats.avgDeaths.toFixed(1), label: 'D/G' }
-            case 'assistsPerGame': return { value: stats.avgStats.avgAssists.toFixed(1), label: 'A/G' }
-            case 'damagePerGame': return { value: Math.round(stats.avgStats.avgDamage).toLocaleString(), label: 'Dmg/G' }
-            case 'mitigationsPerGame': return { value: Math.round(stats.avgStats.avgMitigated).toLocaleString(), label: 'Mit/G' }
-            default: return null
-        }
-    }, [statsMap])
-
-    const getNumericStatValue = useCallback((playerName, statType) => {
-        const stats = statsMap.get(playerName)
-        if (!stats) return -Infinity
-        switch (statType) {
-            case 'kda': return stats.kda
-            case 'killsPerGame': return stats.avgStats.avgKills
-            case 'deathsPerGame': return stats.avgStats.avgDeaths
-            case 'assistsPerGame': return stats.avgStats.avgAssists
-            case 'damagePerGame': return stats.avgStats.avgDamage
-            case 'mitigationsPerGame': return stats.avgStats.avgMitigated
-            default: return -Infinity
-        }
-    }, [statsMap])
-
     // Build a lookup from player name → slug for profile links
     const playerSlugMap = useMemo(() => {
         const map = new Map()
@@ -319,107 +259,73 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
         return map
     }, [teams])
 
-    const applyAllByStat = useCallback((statType) => {
-        if (!teams || statType === 'none') return
-
-        // Gather all players grouped by their primary role (skip players with 0 games)
-        const byRole = { SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] }
-        for (const team of teams) {
-            for (const p of team.playersWithRoles || []) {
-                const role = p.role?.toUpperCase()
-                if (role && byRole[role]) {
-                    const stats = statsMap.get(p.name)
-                    if (stats && stats.stats.gamesPlayed > 0) {
-                        byRole[role].push(p.name)
-                    }
-                }
-            }
-        }
-
-        // Sort each role group by the stat (deaths ascending, everything else descending)
-        const ascending = statType === 'deathsPerGame'
-        for (const role of roles) {
-            byRole[role].sort((a, b) => {
-                const va = getNumericStatValue(a, statType)
-                const vb = getNumericStatValue(b, statType)
-                return ascending ? va - vb : vb - va
-            })
-        }
-
-        // Lock all players to this stat
-        const newLocked = {}
-        for (const role of roles) {
-            for (const name of byRole[role]) {
-                newLocked[name] = statType
-            }
-        }
-
-        setRankings(byRole)
-        setSelectedStat(statType)
-        setLockedStats(newLocked)
-        setApplyAllOpen(false)
-    }, [teams, statsMap, getNumericStatValue])
-
-    const [applyPlacedOpen, setApplyPlacedOpen] = useState(false)
-    const applyPlacedRef = useRef(null)
-
-    const applyToPlacedByStat = useCallback((statType) => {
-        if (statType === 'none') return
-
-        const ascending = statType === 'deathsPerGame'
-        const newRankings = {}
-        const newLocked = { ...lockedStats }
-
-        for (const role of roles) {
-            const sorted = [...(rankings[role] || [])].sort((a, b) => {
-                const va = getNumericStatValue(a, statType)
-                const vb = getNumericStatValue(b, statType)
-                return ascending ? va - vb : vb - va
-            })
-            newRankings[role] = sorted
-            for (const name of sorted) {
-                newLocked[name] = statType
-            }
-        }
-
-        setRankings(newRankings)
-        setSelectedStat(statType)
-        setLockedStats(newLocked)
-        setApplyPlacedOpen(false)
-    }, [rankings, lockedStats, getNumericStatValue])
-
-    // Close apply-all / apply-placed dropdowns on outside click
-    useEffect(() => {
-        if (!applyAllOpen && !applyPlacedOpen) return
-        const handleClick = (e) => {
-            if (applyAllOpen && applyAllRef.current && !applyAllRef.current.contains(e.target)) {
-                setApplyAllOpen(false)
-            }
-            if (applyPlacedOpen && applyPlacedRef.current && !applyPlacedRef.current.contains(e.target)) {
-                setApplyPlacedOpen(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClick)
-        return () => document.removeEventListener('mousedown', handleClick)
-    }, [applyAllOpen, applyPlacedOpen])
-
-    // Lock a player's stat at the current selectedStat when they're first placed
-    const lockPlayerStat = useCallback((playerName) => {
-        if (selectedStat !== 'none' && !lockedStats[playerName]) {
-            setLockedStats(prev => ({ ...prev, [playerName]: selectedStat }))
-        }
-    }, [selectedStat, lockedStats])
-
-    const unlockPlayerStat = useCallback((playerName) => {
-        setLockedStats(prev => {
-            const updated = { ...prev }
-            delete updated[playerName]
-            return updated
-        })
-    }, [])
-
     // Compute set of all ranked players (used to hide from teams panel)
     const rankedPlayers = useMemo(() => new Set(Object.values(rankings).flat()), [rankings])
+
+    const removeFromRanking = (role, index) => {
+        const player = rankings[role][index]
+        setRankings(prev => ({
+            ...prev,
+            [role]: prev[role].filter((_, i) => i !== index)
+        }))
+        if (player) unlockPlayerStat(player)
+    }
+
+    const clearAllRankings = () => {
+        setRankings({ SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] })
+        setLockedStats({})
+        clearRankingsFromStorage(storageKey)
+    }
+
+    const exportAsImageHandler = async () => {
+        setIsExporting(true)
+        try {
+            const hasAnyStats = Object.keys(lockedStats).length > 0
+            const statInfo = hasAnyStats
+                ? { lockedStats, getStatValue }
+                : null
+            const title = `${league.slug.toUpperCase()} Tierlist`
+            const subtitle = division?.name ? `${division.name}${season ? ` \u2014 ${season.name}` : ''}` : undefined
+            exportRankingsAsImage(rankings, teams, 'player-rankings', title, statInfo, subtitle)
+        } finally {
+            setTimeout(() => setIsExporting(false), 1000)
+        }
+    }
+
+    const addToMobileRanking = (player) => {
+        lockPlayerStat(player)
+        setRankings(prev => {
+            // Prevent duplicates in the same role
+            if (prev[mobileRole].includes(player)) return prev
+            // Remove from any other role first
+            const updated = { ...prev }
+            for (const role of roles) {
+                if (role !== mobileRole && updated[role].includes(player)) {
+                    updated[role] = updated[role].filter(p => p !== player)
+                }
+            }
+            return { ...updated, [mobileRole]: [...updated[mobileRole], player] }
+        })
+    }
+
+    const removeFromMobileRanking = (role, index) => {
+        const player = rankings[role][index]
+        setRankings(prev => ({
+            ...prev,
+            [role]: prev[role].filter((_, i) => i !== index)
+        }))
+        if (player) unlockPlayerStat(player)
+    }
+
+    const moveMobileRanking = (role, index, direction) => {
+        setRankings(prev => {
+            const list = [...prev[role]]
+            const newIndex = index + direction
+            if (newIndex < 0 || newIndex >= list.length) return prev
+            ;[list[index], list[newIndex]] = [list[newIndex], list[index]]
+            return { ...prev, [role]: list }
+        })
+    }
 
     // Loading state
     if (loading) {
@@ -458,185 +364,6 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                 <p className="text-yellow-300/80">No teams found for this division.</p>
             </div>
         )
-    }
-
-    // --- Drag & Drop handlers ---
-    const handleDragStart = (e, player, sourceTeam, sourceRole = null, sourceIndex = null) => {
-        if (showSpotlight) setSpotlightPlayer(player)
-        setDraggedItem({
-            player,
-            sourceTeam,
-            sourceRole,
-            sourceIndex,
-            type: sourceRole ? 'ranking' : 'team'
-        })
-        e.dataTransfer.effectAllowed = 'move'
-    }
-
-    const handleDragEnd = () => {
-        setTimeout(() => {
-            setDraggedItem(null)
-            setDragOverZone(null)
-            setDragOverIndex(null)
-        }, 50)
-    }
-
-    const handleDragOver = (e) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-    }
-
-    const handleDragEnter = (e, role, index = null) => {
-        e.preventDefault()
-        setDragOverZone(role)
-        setDragOverIndex(index)
-    }
-
-    const handleDragLeave = (e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            setDragOverZone(null)
-            setDragOverIndex(null)
-        }
-    }
-
-    const handleDrop = (e, targetRole, targetIndex = null) => {
-        e.preventDefault()
-        setDragOverZone(null)
-        setDragOverIndex(null)
-        if (!draggedItem) return
-
-        const { player, sourceRole, sourceIndex } = draggedItem
-
-        if (sourceRole && targetRole) {
-            if (sourceRole === targetRole) {
-                if (sourceIndex === targetIndex) {
-                    setDraggedItem(null)
-                    return
-                }
-                setRankings(prev => {
-                    const newList = [...prev[sourceRole]]
-                    const [movedPlayer] = newList.splice(sourceIndex, 1)
-                    const insertIndex = targetIndex !== null ? targetIndex : newList.length
-                    newList.splice(insertIndex, 0, movedPlayer)
-                    return { ...prev, [sourceRole]: newList }
-                })
-            } else {
-                setRankings(prev => {
-                    const sourceList = [...prev[sourceRole]]
-                    sourceList.splice(sourceIndex, 1)
-                    const targetList = [...prev[targetRole]]
-                    const insertIndex = targetIndex !== null ? targetIndex : targetList.length
-                    targetList.splice(insertIndex, 0, player)
-                    return { ...prev, [sourceRole]: sourceList, [targetRole]: targetList }
-                })
-            }
-        } else if (!sourceRole && targetRole) {
-            // New placement from teams panel — lock the current stat
-            lockPlayerStat(player)
-            setRankings(prev => {
-                const newList = [...prev[targetRole]]
-                const insertIndex = targetIndex !== null ? targetIndex : newList.length
-                newList.splice(insertIndex, 0, player)
-                return { ...prev, [targetRole]: newList }
-            })
-        }
-
-        setDraggedItem(null)
-    }
-
-    const removeFromRanking = (role, index) => {
-        const player = rankings[role][index]
-        setRankings(prev => ({
-            ...prev,
-            [role]: prev[role].filter((_, i) => i !== index)
-        }))
-        if (player) unlockPlayerStat(player)
-    }
-
-    const clearAllRankings = () => {
-        setRankings({ SOLO: [], JUNGLE: [], MID: [], SUPPORT: [], ADC: [] })
-        setLockedStats({})
-        clearRankingsFromStorage(storageKey)
-    }
-
-    const exportAsImageHandler = async () => {
-        setIsExporting(true)
-        try {
-            const hasAnyStats = Object.keys(lockedStats).length > 0
-            const statInfo = hasAnyStats
-                ? { lockedStats, getStatValue }
-                : null
-            const title = `${league.slug.toUpperCase()} Tierlist`
-            const subtitle = division?.name ? `${division.name}${season ? ` \u2014 ${season.name}` : ''}` : undefined
-            exportRankingsAsImage(rankings, teams, 'player-rankings', title, statInfo, subtitle)
-        } finally {
-            setTimeout(() => setIsExporting(false), 1000)
-        }
-    }
-
-    const getDisplayRankings = (role) => {
-        if (!draggedItem || dragOverZone !== role) return rankings[role]
-
-        const { player, sourceRole, sourceIndex } = draggedItem
-
-        if (!sourceRole) {
-            const newList = [...rankings[role]]
-            const insertIndex = dragOverIndex !== null ? dragOverIndex : newList.length
-            newList.splice(insertIndex, 0, player)
-            return newList
-        }
-
-        if (sourceRole === role) {
-            const newList = [...rankings[role]]
-            newList.splice(sourceIndex, 1)
-            if (dragOverIndex !== null) {
-                const adjustedIndex = dragOverIndex > sourceIndex ? dragOverIndex - 1 : dragOverIndex
-                newList.splice(adjustedIndex, 0, player)
-            } else {
-                newList.push(player)
-            }
-            return newList
-        } else {
-            const newList = [...rankings[role]]
-            const insertIndex = dragOverIndex !== null ? dragOverIndex : newList.length
-            newList.splice(insertIndex, 0, player)
-            return newList
-        }
-    }
-
-    const addToMobileRanking = (player) => {
-        lockPlayerStat(player)
-        setRankings(prev => {
-            // Prevent duplicates in the same role
-            if (prev[mobileRole].includes(player)) return prev
-            // Remove from any other role first
-            const updated = { ...prev }
-            for (const role of roles) {
-                if (role !== mobileRole && updated[role].includes(player)) {
-                    updated[role] = updated[role].filter(p => p !== player)
-                }
-            }
-            return { ...updated, [mobileRole]: [...updated[mobileRole], player] }
-        })
-    }
-
-    const removeFromMobileRanking = (role, index) => {
-        const player = rankings[role][index]
-        setRankings(prev => ({
-            ...prev,
-            [role]: prev[role].filter((_, i) => i !== index)
-        }))
-        if (player) unlockPlayerStat(player)
-    }
-
-    const moveMobileRanking = (role, index, direction) => {
-        setRankings(prev => {
-            const list = [...prev[role]]
-            const newIndex = index + direction
-            if (newIndex < 0 || newIndex >= list.length) return prev
-            ;[list[index], list[newIndex]] = [list[newIndex], list[index]]
-            return { ...prev, [role]: list }
-        })
     }
 
     if (isMobile) {
@@ -894,73 +621,28 @@ const DragDropRankings = ({ divisionSlug: propDivisionSlug, onPublish } = {}) =>
                             <div className={`p-2 rounded border-2 border-transparent transition-colors grow min-h-90 ${
                                 dragOverZone === role ? 'bg-blue-900/20 border-blue-400/30' : ''
                             }`}>
-                                {getDisplayRankings(role).map((player, index) => {
-                                    const teamColor = getPlayerTeamColor(player)
-                                    const textColor = getContrastColor(teamColor)
-                                    const isDraggedItem = draggedItem && draggedItem.player === player
-                                    const isOriginalPosition = draggedItem &&
-                                        draggedItem.sourceRole === role &&
-                                        draggedItem.sourceIndex === index &&
-                                        rankings[role][index] === player
-                                    const locked = lockedStats[player]
-                                    const stat = locked ? getStatValue(player, locked) : null
-
-                                    return (
-                                        <div key={`${role}-${player}-${index}`}>
-                                            <div
-                                                className="h-3 -mb-1"
-                                                onDragOver={handleDragOver}
-                                                onDragEnter={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDragEnter(e, role, index)
-                                                }}
-                                                onDrop={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDrop(e, role, index)
-                                                }}
-                                            />
-                                            <div
-                                                className={`px-2.5 py-2 rounded shadow cursor-move border group hover:shadow-md transition-all ${
-                                                    isDraggedItem && isOriginalPosition ? 'opacity-30' :
-                                                        isDraggedItem && draggedItem.sourceRole !== role ? 'opacity-70 scale-95' : ''
-                                                }`}
-                                                style={{ backgroundColor: teamColor, borderColor: teamColor, color: textColor }}
-                                                draggable
-                                                onMouseDown={() => showSpotlight && setSpotlightPlayer(player)}
-                                                onDragStart={(e) => handleDragStart(e, player, null, role, index)}
-                                                onDragEnd={handleDragEnd}
-                                                onDragOver={handleDragOver}
-                                                onDragEnter={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDragEnter(e, role, index)
-                                                }}
-                                                onDrop={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDrop(e, role, index)
-                                                }}
-                                                title={`${player} (${getPlayerTeamName(player)})`}
-                                            >
-                                                <div className="flex justify-between items-center gap-1">
-                                                    <span className="text-sm font-medium truncate min-w-0">{player}</span>
-                                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                        {stat && (
-                                                            <span className="text-[10px] font-bold opacity-75 tabular-nums whitespace-nowrap">
-                                                                {stat.value} <span className="font-medium opacity-80">{stat.label}</span>
-                                                            </span>
-                                                        )}
-                                                        <button
-                                                            onClick={() => removeFromRanking(role, index)}
-                                                            className="opacity-0 group-hover:opacity-100 text-sm transition-opacity"
-                                                            style={{ color: textColor }}
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
+                                {getDisplayRankings(role).map((player, index) => (
+                                    <PlayerCard
+                                        key={`${role}-${player}-${index}`}
+                                        player={player}
+                                        role={role}
+                                        index={index}
+                                        teamColor={getPlayerTeamColor(player)}
+                                        draggedItem={draggedItem}
+                                        lockedStats={lockedStats}
+                                        getStatValue={getStatValue}
+                                        handleDragStart={handleDragStart}
+                                        handleDragEnd={handleDragEnd}
+                                        handleDragOver={handleDragOver}
+                                        handleDragEnter={handleDragEnter}
+                                        handleDrop={handleDrop}
+                                        removeFromRanking={removeFromRanking}
+                                        showSpotlight={showSpotlight}
+                                        setSpotlightPlayer={setSpotlightPlayer}
+                                        getPlayerTeamName={getPlayerTeamName}
+                                        rankings={rankings}
+                                    />
+                                ))}
 
                                 <div
                                     className="h-3"
