@@ -805,8 +805,9 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
                   kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
                 avgs, game.role
             )
-            const expected = 1 + snap.EXPECTATION_WEIGHT * spark.total_sparks
-            const denom = 1 + snap.SUPPLY_WEIGHT * spark.total_sparks
+            const heatSparks = spark.recalc_sparks ?? spark.total_sparks
+            const expected = 1 + snap.EXPECTATION_WEIGHT * heatSparks
+            const denom = 1 + snap.SUPPLY_WEIGHT * heatSparks
             const heat = 1 + (rawScore - expected) / denom
             const heatWithoutExp = 1 + (rawScore - 1) / denom
             const expImpact = heatWithoutExp !== 0 ? (heat / heatWithoutExp - 1) : 0
@@ -902,7 +903,9 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         }
     }
 
-    return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames,
+    const postForgeGameCount = sets.reduce((sum, s) => sum + s.gameData.length, 0)
+
+    return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames, postForgeGameCount,
         _debug: { teamId: spark.team_id, teamMatchCount: teamMatches.length, playerMatchCount: playerMatchIds.size, setsCount: sets.length, transfers: playerTransfers.length } }
 }
 
@@ -1112,6 +1115,7 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     const sparks = await sql`
         SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.sell_pressure, ps.sell_pressure_updated_at,
+               ps.recalc_sparks, ps.recalc_game_count,
                lp.team_id, lp.is_active, lp.player_id,
                COALESCE(lp.joined_date, rt.transfer_date) as team_joined_at
         FROM player_sparks ps
@@ -1192,7 +1196,12 @@ export async function recalcForgePerformance(sql, seasonId) {
         const multiplier = result.multiplier
         const dp = decaySellPressure(Number(spark.sell_pressure), spark.sell_pressure_updated_at)
         const newPrice = calcPrice(market.base_price, multiplier, spark.total_sparks, dp)
-        updates.push({ sparkId: spark.id, multiplier, newPrice, decayedPressure: dp })
+        const hasNewGames = result.postForgeGameCount > (spark.recalc_game_count || 0)
+        updates.push({
+            sparkId: spark.id, multiplier, newPrice, decayedPressure: dp,
+            snapshotSparks: hasNewGames ? spark.total_sparks : null,
+            newGameCount: hasNewGames ? result.postForgeGameCount : null,
+        })
     }
 
     // Process players with sparks but no games in the season
@@ -1241,6 +1250,25 @@ export async function recalcForgePerformance(sql, seasonId) {
     }
 
     if (updates.length === 0) return { status: 'skipped', reason: 'no_updates', detail: `No spark records found for this market` }
+
+    // ── Snapshot supply for players with new games (independent of approval gate) ──
+    const snapshotUpdates = updates.filter(u => u.snapshotSparks !== null)
+    if (snapshotUpdates.length > 0) {
+        const ssIds = snapshotUpdates.map(u => u.sparkId)
+        const ssSparks = snapshotUpdates.map(u => u.snapshotSparks)
+        const ssGameCounts = snapshotUpdates.map(u => u.newGameCount)
+        await sql`
+            UPDATE player_sparks AS ps SET
+                recalc_sparks = v.rs,
+                recalc_game_count = v.gc
+            FROM (
+                SELECT UNNEST(${ssIds}::int[]) AS id,
+                       UNNEST(${ssSparks}::int[]) AS rs,
+                       UNNEST(${ssGameCounts}::int[]) AS gc
+            ) AS v
+            WHERE ps.id = v.id
+        `
+    }
 
     // ── Approval gate: queue or apply immediately ──
 
@@ -1352,7 +1380,7 @@ export async function recalcForgePerformance(sql, seasonId) {
  */
 export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
     const [spark] = await sql`
-        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.market_id,
+        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.recalc_sparks, ps.market_id,
                ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier,
                ps.current_price, fm.base_price, fm.created_at as market_created_at,
                fm.season_id, COALESCE(p.name, 'Unknown') as player_name,
