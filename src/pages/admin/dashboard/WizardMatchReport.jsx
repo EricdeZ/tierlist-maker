@@ -337,7 +337,30 @@ function ConfirmStep({ matchInfo, onConfirm }) {
 // STEP: SELECT SCREENSHOTS
 // ═══════════════════════════════════════════════════
 
-function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, onExtract, extracting, error, selectedCount }) {
+function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, pastedImages, onPaste, onRemovePasted, onExtract, extracting, error, selectedCount }) {
+    const [dragOver, setDragOver] = useState(false)
+    const fileInputRef = useRef(null)
+
+    // Global paste listener
+    useEffect(() => {
+        const handler = (e) => {
+            const files = e.clipboardData?.files
+            if (files?.length) {
+                e.preventDefault()
+                onPaste(files)
+            }
+        }
+        window.addEventListener('paste', handler)
+        return () => window.removeEventListener('paste', handler)
+    }, [onPaste])
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault()
+        setDragOver(false)
+        const files = e.dataTransfer?.files
+        if (files?.length) onPaste(files)
+    }, [onPaste])
+
     if (extracting) {
         return (
             <div className="py-16 text-center">
@@ -358,41 +381,94 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, onExtrac
                 </p>
             </div>
 
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                    {queueItems.length} screenshot{queueItems.length !== 1 ? 's' : ''} available
-                </span>
-                <button onClick={onSelectAll} className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition">
-                    {queueItems.every(q => selected[q.id]) ? 'Deselect All' : 'Select All'}
-                </button>
+            {/* Paste / drop zone */}
+            <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`mb-4 border-2 border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition ${
+                    dragOver
+                        ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'
+                        : 'border-[var(--color-border)] hover:border-white/30'
+                }`}
+            >
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                    Paste, drop, or click to add screenshots
+                </p>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={e => { if (e.target.files?.length) { onPaste(e.target.files); e.target.value = '' } }}
+                />
             </div>
 
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-6">
-                {queueItems.map(item => (
-                    <div
-                        key={item.id}
-                        onClick={() => onToggle(item.id)}
-                        className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
-                            selected[item.id]
-                                ? 'border-green-500 ring-1 ring-green-500/30'
-                                : 'border-transparent hover:border-white/20'
-                        }`}
-                    >
-                        <img
-                            src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
-                            alt="" className="w-full h-full object-cover" loading="lazy"
-                            onError={e => { e.target.style.display = 'none' }}
-                        />
-                        {selected[item.id] && (
-                            <div className="absolute inset-0 bg-green-600/30 flex items-center justify-center">
-                                <svg className="w-5 h-5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M2 6l3 3 5-5" />
-                                </svg>
+            {/* Pasted images */}
+            {pastedImages.length > 0 && (
+                <div className="mb-4">
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-2 block">
+                        Pasted screenshots ({pastedImages.length})
+                    </span>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                        {pastedImages.map(img => (
+                            <div key={img.id} className="relative aspect-[16/10] rounded-lg overflow-hidden border-2 border-green-500 ring-1 ring-green-500/30">
+                                <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                                <button
+                                    onClick={() => onRemovePasted(img.id)}
+                                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center text-[10px] leading-none"
+                                >
+                                    &times;
+                                </button>
+                                <div className="absolute inset-0 bg-green-600/20 pointer-events-none" />
                             </div>
-                        )}
+                        ))}
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
+
+            {/* Discord queue items */}
+            {queueItems.length > 0 && (
+                <>
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                            {queueItems.length} from Discord
+                        </span>
+                        <button onClick={onSelectAll} className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition">
+                            {queueItems.every(q => selected[q.id]) ? 'Deselect All' : 'Select All'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-6">
+                        {queueItems.map(item => (
+                            <div
+                                key={item.id}
+                                onClick={() => onToggle(item.id)}
+                                className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+                                    selected[item.id]
+                                        ? 'border-green-500 ring-1 ring-green-500/30'
+                                        : 'border-transparent hover:border-white/20'
+                                }`}
+                            >
+                                <img
+                                    src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
+                                    alt="" className="w-full h-full object-cover" loading="lazy"
+                                    onError={e => { e.target.style.display = 'none' }}
+                                />
+                                {selected[item.id] && (
+                                    <div className="absolute inset-0 bg-green-600/30 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M2 6l3 3 5-5" />
+                                        </svg>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
 
             {error && (
                 <div className="mb-4 px-3 py-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
