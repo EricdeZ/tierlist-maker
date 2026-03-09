@@ -52,6 +52,12 @@ export default function ForgeConfig() {
     const [sortCol, setSortCol] = useState('delta')
     const [sortDir, setSortDir] = useState('desc')
 
+    // Sub spark cleanup state
+    const [subPreview, setSubPreview] = useState(null)
+    const [subLoading, setSubLoading] = useState(false)
+    const [subExecuting, setSubExecuting] = useState(false)
+    const [subMessage, setSubMessage] = useState(null)
+
     useEffect(() => {
         loadPending()
         if (isOwner) loadConfig()
@@ -193,6 +199,37 @@ export default function ForgeConfig() {
             setPendingMessage({ type: 'error', text: err.message })
         } finally {
             setRecalcing(false)
+        }
+    }
+
+    const handleSubPreview = async () => {
+        setSubLoading(true)
+        setSubMessage(null)
+        setSubPreview(null)
+        try {
+            const result = await adminFetch('forge-config', { method: 'GET', params: { action: 'cleanup-subs' } })
+            setSubPreview(result.preview)
+            if (result.preview.length === 0) {
+                setSubMessage({ type: 'success', text: 'No sub sparks found — nothing to clean up.' })
+            }
+        } catch (err) {
+            setSubMessage({ type: 'error', text: err.message })
+        } finally {
+            setSubLoading(false)
+        }
+    }
+
+    const handleSubExecute = async () => {
+        setSubExecuting(true)
+        setSubMessage(null)
+        try {
+            const result = await adminFetch('forge-config', { method: 'POST', params: { action: 'cleanup-subs' } })
+            setSubPreview(null)
+            setSubMessage({ type: 'success', text: `Cleanup done: ${result.moved} moved, ${result.deleted} deleted, ${result.orphaned} orphaned.` })
+        } catch (err) {
+            setSubMessage({ type: 'error', text: err.message })
+        } finally {
+            setSubExecuting(false)
         }
     }
 
@@ -538,6 +575,93 @@ export default function ForgeConfig() {
                                 className="px-4 py-2 rounded-lg text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                                 {rejecting ? 'Rejecting...' : 'Reject All'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ── Sub Spark Cleanup ── */}
+            <div className="mt-8">
+                <hr className="border-white/10 mb-6" />
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="font-heading text-lg font-bold text-[var(--color-text)]">Sub Spark Cleanup</h2>
+                    <button
+                        onClick={handleSubPreview}
+                        disabled={subLoading}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--color-text-secondary)] bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {subLoading ? 'Scanning...' : 'Scan for Sub Sparks'}
+                    </button>
+                </div>
+                <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+                    Find sparks incorrectly linked to sub roster entries and move them to the player's main profile.
+                </p>
+
+                {subMessage && (
+                    <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
+                        subMessage.type === 'error'
+                            ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                            : 'bg-green-500/10 border border-green-500/30 text-green-400'
+                    }`}>
+                        {subMessage.text}
+                    </div>
+                )}
+
+                {subPreview && subPreview.length > 0 && (
+                    <>
+                        <div className="rounded-xl border border-white/10 overflow-hidden mb-4" style={{ backgroundColor: 'var(--color-card, var(--color-secondary))' }}>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/10">
+                                            <th className="text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Player</th>
+                                            <th className="text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Sub Team</th>
+                                            <th className="text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Main Team</th>
+                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Holdings</th>
+                                            <th className="text-right text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Sparks</th>
+                                            <th className="text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider px-4 py-3">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {subPreview.map(row => (
+                                            <tr key={row.sparkId} className="border-b border-white/5">
+                                                <td className="px-4 py-2 text-sm text-[var(--color-text)]">{row.playerName}</td>
+                                                <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">{row.subTeam || '—'}</td>
+                                                <td className="px-4 py-2 text-sm text-[var(--color-text)]">
+                                                    {row.action === 'orphaned'
+                                                        ? <span className="text-red-400">No main LP found</span>
+                                                        : <>{row.targetTeam || '—'} <span className="text-xs text-[var(--color-text-secondary)]">({row.targetStatus})</span></>
+                                                    }
+                                                </td>
+                                                <td className="px-4 py-2 text-sm text-right text-[var(--color-text-secondary)]">{row.holdings}</td>
+                                                <td className="px-4 py-2 text-sm text-right text-[var(--color-text-secondary)]">{row.totalSparks}</td>
+                                                <td className="px-4 py-2 text-sm">
+                                                    {row.action === 'move' && <span className="text-amber-400">Move holdings</span>}
+                                                    {row.action === 'delete' && <span className="text-[var(--color-text-secondary)]">Delete (empty)</span>}
+                                                    {row.action === 'orphaned' && <span className="text-red-400">Skip (orphaned)</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleSubExecute}
+                                disabled={subExecuting}
+                                className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {subExecuting ? 'Executing...' : `Approve Cleanup (${subPreview.filter(r => r.action !== 'orphaned').length})`}
+                            </button>
+                            <button
+                                onClick={() => { setSubPreview(null); setSubMessage(null) }}
+                                disabled={subExecuting}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--color-text-secondary)] bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Cancel
                             </button>
                         </div>
                     </>

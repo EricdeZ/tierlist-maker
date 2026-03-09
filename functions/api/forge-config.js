@@ -59,6 +59,11 @@ const handler = async (event) => {
                 return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(breakdown) }
             }
 
+            if (action === 'cleanup-subs') {
+                const result = await cleanupSubSparks(sql, true)
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
+            }
+
             const [config] = await sql`SELECT * FROM forge_config LIMIT 1`
             if (!config) {
                 await sql`INSERT INTO forge_config DEFAULT VALUES ON CONFLICT DO NOTHING`

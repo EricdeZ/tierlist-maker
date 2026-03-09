@@ -282,110 +282,153 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
  * Find and relink sparks attached to sub league_players to the same player's
  * non-sub LP in the same season. Merges holdings if the non-sub LP already
  * has a spark. Deletes empty sub sparks with no holdings.
+ * When dryRun=true, returns a preview of what would happen without making changes.
  */
-export async function cleanupSubSparks(sql) {
+export async function cleanupSubSparks(sql, dryRun = false) {
     // Find all sparks on sub league_players
     const subSparks = await sql`
         SELECT ps.id as spark_id, ps.league_player_id as sub_lp_id, ps.market_id,
                ps.total_sparks, ps.perf_multiplier, ps.current_price,
                ps.sell_pressure, ps.sell_pressure_updated_at,
-               lp.player_id, lp.season_id,
-               fm.base_price
+               lp.player_id, lp.season_id, lp.roster_status as sub_roster_status,
+               fm.base_price,
+               p.name as player_name,
+               t_sub.name as sub_team_name
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
+        JOIN players p ON lp.player_id = p.id
+        LEFT JOIN teams t_sub ON lp.team_id = t_sub.id
         JOIN forge_markets fm ON ps.market_id = fm.id
         WHERE lp.roster_status = 'sub'
     `
-    if (subSparks.length === 0) return { moved: 0, deleted: 0, orphaned: 0 }
+    if (subSparks.length === 0) {
+        return dryRun ? { preview: [] } : { moved: 0, deleted: 0, orphaned: 0 }
+    }
 
     let moved = 0, deleted = 0, orphaned = 0
+    const preview = []
 
     for (const sub of subSparks) {
         // Find non-sub LP for same player in same season
         const [mainLp] = await sql`
-            SELECT id FROM league_players
-            WHERE player_id = ${sub.player_id}
-              AND season_id = ${sub.season_id}
-              AND roster_status != 'sub'
-              AND is_active = true
-            ORDER BY CASE roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
+            SELECT lp.id, lp.roster_status, t.name as team_name
+            FROM league_players lp
+            LEFT JOIN teams t ON lp.team_id = t.id
+            WHERE lp.player_id = ${sub.player_id}
+              AND lp.season_id = ${sub.season_id}
+              AND lp.roster_status != 'sub'
+              AND lp.is_active = true
+            ORDER BY CASE lp.roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
             LIMIT 1
         `
-
-        if (!mainLp) {
-            orphaned++
-            continue
-        }
 
         // Check if sub spark has any holdings
         const [holdingCount] = await sql`
             SELECT COUNT(*) as cnt FROM spark_holdings WHERE spark_id = ${sub.spark_id} AND sparks > 0
         `
+        const holdings = Number(holdingCount.cnt)
 
-        if (Number(holdingCount.cnt) === 0) {
-            // No holdings — just delete the sub spark and its history
-            await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
-            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
-            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+        if (!mainLp) {
+            if (dryRun) {
+                preview.push({
+                    action: 'orphaned',
+                    playerName: sub.player_name,
+                    sparkId: sub.spark_id,
+                    subLpId: sub.sub_lp_id,
+                    subTeam: sub.sub_team_name,
+                    holdings,
+                    totalSparks: Number(sub.total_sparks),
+                })
+            }
+            orphaned++
+            continue
+        }
+
+        if (holdings === 0) {
+            if (dryRun) {
+                preview.push({
+                    action: 'delete',
+                    playerName: sub.player_name,
+                    sparkId: sub.spark_id,
+                    subLpId: sub.sub_lp_id,
+                    subTeam: sub.sub_team_name,
+                    targetLpId: mainLp.id,
+                    targetTeam: mainLp.team_name,
+                    targetStatus: mainLp.roster_status,
+                    holdings: 0,
+                    totalSparks: Number(sub.total_sparks),
+                })
+            } else {
+                await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
+                await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
+                await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+            }
             deleted++
             continue
         }
 
-        // Has holdings — find or create spark on the main LP and move everything
-        let [mainSpark] = await sql`
-            SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
-            FROM player_sparks
-            WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
-        `
-        if (!mainSpark) {
-            [mainSpark] = await sql`
-                INSERT INTO player_sparks (market_id, league_player_id, current_price)
-                VALUES (${sub.market_id}, ${mainLp.id}, ${sub.base_price})
-                ON CONFLICT (market_id, league_player_id) DO NOTHING
-                RETURNING id, total_sparks, sell_pressure, sell_pressure_updated_at
+        // Has holdings — will move to main LP
+        if (dryRun) {
+            const [existingMain] = await sql`
+                SELECT id FROM player_sparks
+                WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
+            `
+            preview.push({
+                action: 'move',
+                playerName: sub.player_name,
+                sparkId: sub.spark_id,
+                subLpId: sub.sub_lp_id,
+                subTeam: sub.sub_team_name,
+                targetLpId: mainLp.id,
+                targetTeam: mainLp.team_name,
+                targetStatus: mainLp.roster_status,
+                targetHasExistingSpark: !!existingMain,
+                holdings,
+                totalSparks: Number(sub.total_sparks),
+            })
+        } else {
+            let [mainSpark] = await sql`
+                SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
+                FROM player_sparks
+                WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
             `
             if (!mainSpark) {
                 [mainSpark] = await sql`
-                    SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
-                    FROM player_sparks
-                    WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
+                    INSERT INTO player_sparks (market_id, league_player_id, current_price)
+                    VALUES (${sub.market_id}, ${mainLp.id}, ${sub.base_price})
+                    ON CONFLICT (market_id, league_player_id) DO NOTHING
+                    RETURNING id, total_sparks, sell_pressure, sell_pressure_updated_at
+                `
+                if (!mainSpark) {
+                    [mainSpark] = await sql`
+                        SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
+                        FROM player_sparks
+                        WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
+                    `
+                }
+                await sql`
+                    INSERT INTO spark_price_history (spark_id, price, trigger)
+                    VALUES (${mainSpark.id}, ${sub.base_price}, 'init')
                 `
             }
-            await sql`
-                INSERT INTO spark_price_history (spark_id, price, trigger)
-                VALUES (${mainSpark.id}, ${sub.base_price}, 'init')
-            `
-        }
 
-        // Move holdings
-        await sql`
-            UPDATE spark_holdings SET spark_id = ${mainSpark.id}
-            WHERE spark_id = ${sub.spark_id}
-        `
-        // Move transactions
-        await sql`
-            UPDATE spark_transactions SET spark_id = ${mainSpark.id}
-            WHERE spark_id = ${sub.spark_id}
-        `
-        // Move price history
-        await sql`
-            UPDATE spark_price_history SET spark_id = ${mainSpark.id}
-            WHERE spark_id = ${sub.spark_id}
-        `
-        // Update main spark totals
-        await sql`
-            UPDATE player_sparks
-            SET total_sparks = total_sparks + ${sub.total_sparks},
-                sell_pressure = sell_pressure + ${Number(sub.sell_pressure) || 0},
-                updated_at = NOW()
-            WHERE id = ${mainSpark.id}
-        `
-        // Delete the sub spark
-        await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
-        await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+            await sql`UPDATE spark_holdings SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
+            await sql`UPDATE spark_transactions SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
+            await sql`UPDATE spark_price_history SET spark_id = ${mainSpark.id} WHERE spark_id = ${sub.spark_id}`
+            await sql`
+                UPDATE player_sparks
+                SET total_sparks = total_sparks + ${sub.total_sparks},
+                    sell_pressure = sell_pressure + ${Number(sub.sell_pressure) || 0},
+                    updated_at = NOW()
+                WHERE id = ${mainSpark.id}
+            `
+            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
+            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
+        }
         moved++
     }
 
+    if (dryRun) return { preview }
     return { moved, deleted, orphaned }
 }
 
@@ -1018,6 +1061,7 @@ export async function recalcForgePerformance(sql, seasonId) {
             ORDER BY created_at DESC LIMIT 1
         ) rt ON true
         WHERE ps.market_id = ${market.id}
+          AND lp.roster_status != 'sub'
     `
 
     // All completed non-forfeit matches this season, grouped by team → sorted match dates
