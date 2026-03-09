@@ -58,8 +58,11 @@ async function getBalance(sql, user) {
     const canClaimDaily = lastClaimDate !== todayUTC
 
     // Reset conversions_today if it's a new day
+    const lastConvDate = eb.last_conversion_date
+        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
+        : null
     let conversionsToday = eb.conversions_today || 0
-    if (eb.last_conversion_date && eb.last_conversion_date !== todayUTC) {
+    if (lastConvDate && lastConvDate !== todayUTC) {
         conversionsToday = 0
     }
 
@@ -145,8 +148,11 @@ async function convertPassion(sql, user) {
     const todayUTC = now.toISOString().slice(0, 10)
 
     // Reset daily conversions if new day
+    const lastConvDate = eb.last_conversion_date
+        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
+        : null
     let conversionsToday = eb.conversions_today || 0
-    if (eb.last_conversion_date && eb.last_conversion_date !== todayUTC) {
+    if (lastConvDate && lastConvDate !== todayUTC) {
         conversionsToday = 0
     }
 

@@ -338,7 +338,7 @@ export default function PassionDisplay() {
                         {!isCardClash && <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>}
                         {isCardClash ? (
                             <>
-                                <img src={emberIcon} alt="Cores" className="h-5 w-auto object-contain" />
+                                <img id="ember-balance-icon" src={emberIcon} alt="Cores" className="h-5 w-auto object-contain" />
                                 <span className="text-sm font-semibold text-[#00e5ff] tabular-nums min-w-[2ch]">
                                     {ember.balance}
                                 </span>

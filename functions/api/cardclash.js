@@ -33,6 +33,9 @@ const handler = async (event) => {
       switch (action) {
         case 'load': return await handleLoad(sql, user)
         case 'definition-overrides': return await handleDefinitionOverrides(sql)
+        case 'collection-catalog': return await handleCollectionCatalog(sql)
+        case 'collection-owned': return await handleCollectionOwned(sql, user)
+        case 'collection-set': return await handleCollectionSet(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -211,6 +214,89 @@ async function handleSharedCard(sql, params) {
     console.error('shared-card error:', error)
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal error' }) }
   }
+}
+
+// ═══ GET: Collection catalog (static — same for all users, cacheable) ═══
+async function handleCollectionCatalog(sql) {
+  const playerSetSummaries = await sql`
+    SELECT
+      d.league_slug, d.division_tier, d.division_slug, d.season_slug,
+      s.name AS season_name, s.is_active,
+      d.league_id,
+      COUNT(*)::int AS total
+    FROM cc_player_defs d
+    JOIN seasons s ON d.season_id = s.id
+    GROUP BY d.league_slug, d.division_tier, d.division_slug, d.season_slug, s.name, s.is_active, d.league_id
+    ORDER BY d.league_slug, d.division_tier, d.season_slug
+  `
+
+  const playerSets = playerSetSummaries.map(s => ({
+    key: `${s.league_slug}-d${s.division_tier}-${s.season_slug}`,
+    leagueSlug: s.league_slug,
+    leagueId: s.league_id,
+    divisionTier: s.division_tier,
+    divisionSlug: s.division_slug,
+    seasonSlug: s.season_slug,
+    seasonName: s.season_name,
+    seasonActive: s.is_active,
+    total: s.total,
+  }))
+
+  return { statusCode: 200, headers, body: JSON.stringify({ playerSets }) }
+}
+
+// ═══ GET: Collection owned (lightweight — only user's ownership data) ═══
+async function handleCollectionOwned(sql, user) {
+  const [gameCards, playerCards] = await Promise.all([
+    sql`
+      SELECT card_type, god_id, array_agg(DISTINCT rarity) AS rarities
+      FROM cc_cards
+      WHERE owner_id = ${user.id} AND card_type != 'player'
+      GROUP BY card_type, god_id
+    `,
+    sql`
+      SELECT def_id, array_agg(DISTINCT rarity) AS rarities
+      FROM cc_cards
+      WHERE owner_id = ${user.id} AND card_type = 'player' AND def_id IS NOT NULL
+      GROUP BY def_id
+    `,
+  ])
+
+  const gameMap = {}
+  for (const c of gameCards) gameMap[`${c.card_type}:${c.god_id}`] = c.rarities
+
+  const playerMap = {}
+  for (const c of playerCards) playerMap[c.def_id] = c.rarities
+
+  return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap }) }
+}
+
+// ═══ GET: Collection set defs (static — cacheable, no ownership) ═══
+async function handleCollectionSet(sql, params) {
+  const { setKey } = params || {}
+  if (!setKey) return { statusCode: 400, headers, body: JSON.stringify({ error: 'setKey required' }) }
+
+  const defs = await sql`
+    SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
+           d.role, d.avatar_url,
+           d.league_slug, d.division_tier, d.season_slug
+    FROM cc_player_defs d
+    WHERE d.league_slug || '-d' || d.division_tier || '-' || d.season_slug = ${setKey}
+    ORDER BY d.card_index
+  `
+
+  const cards = defs.map(d => ({
+    defId: d.id,
+    cardIndex: d.card_index,
+    playerName: d.player_name,
+    playerSlug: d.player_slug,
+    teamName: d.team_name,
+    teamColor: d.team_color,
+    role: d.role,
+    avatarUrl: d.avatar_url,
+  }))
+
+  return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
 }
 
 // ═══ GET: Definition overrides ═══

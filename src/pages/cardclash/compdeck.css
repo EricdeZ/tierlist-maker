@@ -861,3 +861,221 @@
 .cd-scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
+
+
+/* ═══════════════════════════════════════════════════
+   CONVERTER — Back Alley Exchange
+   ═══════════════════════════════════════════════════ */
+
+/* Dark alley atmosphere — purple-tinted vignette */
+.cd-alley {
+    position: relative;
+}
+
+.cd-alley::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 15%, rgba(180, 74, 255, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(0, 229, 255, 0.03) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 70%, rgba(255, 45, 120, 0.03) 0%, transparent 40%),
+        linear-gradient(180deg, rgba(0,0,0,0.2) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.4) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Fog effect at bottom */
+.cd-alley-fog {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(180deg, transparent, rgba(180, 74, 255, 0.03), rgba(0, 229, 255, 0.02));
+    pointer-events: none;
+    z-index: 0;
+    animation: cd-fog-drift 8s ease-in-out infinite;
+}
+
+@keyframes cd-fog-drift {
+    0%, 100% { opacity: 0.5; transform: translateY(0); }
+    50% { opacity: 0.8; transform: translateY(-10px); }
+}
+
+/* Terminal display — green-on-black CRT look */
+.cd-terminal {
+    font-variant-ligatures: none;
+    border-left: 2px solid rgba(74, 222, 128, 0.15);
+    box-shadow: inset 0 0 20px rgba(0, 8, 4, 0.5);
+}
+
+.cd-terminal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.15) 2px,
+        rgba(0, 0, 0, 0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Machine container */
+.cd-machine {
+    transition: all 0.3s ease;
+    max-width: 560px;
+    width: 100%;
+}
+
+.cd-machine-active {
+    animation: cd-machine-shake 0.15s ease-in-out infinite;
+}
+
+@keyframes cd-machine-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-1px); }
+    75% { transform: translateX(1px); }
+}
+
+/* Gear spinning */
+.cd-gear-spin {
+    animation: spin 8s linear infinite;
+}
+
+.cd-gear-spin-reverse {
+    animation: spin 6s linear infinite reverse;
+}
+
+.cd-gear-spin-fast {
+    animation: spin 0.8s linear infinite;
+}
+
+.cd-gear-spin-fast-reverse {
+    animation: spin 0.6s linear infinite reverse;
+}
+
+/* Flying particles */
+@keyframes cd-particle-fly {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+    35% {
+        transform: translate(calc(var(--dx) * 0.35), calc(var(--dy) * 0.35 + var(--arc))) scale(1.5);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(0.2);
+        opacity: 0;
+    }
+}
+
+/* Side pipe flow — animated gradient traveling down */
+.cd-pipe-flow {
+    background: linear-gradient(180deg,
+        transparent 0%, var(--cd-cyan-dim) 30%,
+        var(--cd-magenta-dim) 60%, transparent 100%);
+    background-size: 100% 80px;
+    animation: cd-pipe-travel 2s linear infinite;
+}
+
+.cd-pipe-flow-reverse {
+    background: linear-gradient(180deg,
+        transparent 0%, var(--cd-magenta-dim) 30%,
+        var(--cd-cyan-dim) 60%, transparent 100%);
+    background-size: 100% 80px;
+    animation: cd-pipe-travel 2s linear infinite reverse;
+}
+
+@keyframes cd-pipe-travel {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 80px; }
+}
+
+/* Energy flow — horizontal animated gradient in the pipe */
+.cd-energy-flow {
+    background: linear-gradient(90deg,
+        transparent 0%, rgba(0, 229, 255, 0.4) 20%,
+        rgba(180, 74, 255, 0.3) 50%,
+        rgba(0, 229, 255, 0.4) 80%, transparent 100%);
+    background-size: 200% 100%;
+    animation: cd-energy-travel 1.5s ease-in-out infinite;
+}
+
+@keyframes cd-energy-travel {
+    0% { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Scanline — subtle horizontal line sweeping down */
+.cd-scanline {
+    background: linear-gradient(180deg,
+        transparent 0%, transparent 45%,
+        rgba(0, 229, 255, 0.06) 49%,
+        rgba(0, 229, 255, 0.12) 50%,
+        rgba(0, 229, 255, 0.06) 51%,
+        transparent 55%, transparent 100%);
+    background-size: 100% 200%;
+    animation: cd-scanline-sweep 3s linear infinite;
+}
+
+@keyframes cd-scanline-sweep {
+    0% { background-position: 0 -100%; }
+    100% { background-position: 0 100%; }
+}
+
+/* LED blink — used as inline animation name */
+@keyframes cd-led-blink {
+    0% { opacity: 0.4; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Mobile adjustments for converter */
+@media (max-width: 640px) {
+    .cd-machine-active {
+        animation: none !important;
+    }
+
+    .cd-alley-fog {
+        animation: none !important;
+        opacity: 0.5;
+    }
+
+    .cd-pipe-flow,
+    .cd-pipe-flow-reverse {
+        animation: none !important;
+        opacity: 0.3;
+    }
+
+    .cd-energy-flow {
+        animation: none !important;
+        opacity: 0.3;
+    }
+
+    .cd-scanline {
+        animation: none !important;
+        display: none;
+    }
+}
+
+/* Reduced motion: disable converter animations */
+@media (prefers-reduced-motion: reduce) {
+    .cd-pipe-flow,
+    .cd-pipe-flow-reverse,
+    .cd-energy-flow,
+    .cd-scanline {
+        animation: none !important;
+    }
+
+    .cd-gear-spin,
+    .cd-gear-spin-reverse,
+    .cd-gear-spin-fast,
+    .cd-gear-spin-fast-reverse {
+        animation: none !important;
+    }
+}

@@ -24,7 +24,7 @@ export function formatDateEST(dateStr) {
         timeZone: 'America/New_York',
         weekday: 'short', month: 'short', day: 'numeric',
         hour: 'numeric', minute: '2-digit', hour12: true,
-    }) + ' EST'
+    }) + ' ET'
 }
 
 export function formatRelativeDate(dateStr) {

@@ -984,6 +984,15 @@ export const cardclashService = {
     async getSharedCard(token) {
         return apiCall('cardclash', { action: 'shared-card', token })
     },
+    async getCollectionCatalog() {
+        return apiCall('cardclash', { action: 'collection-catalog' })
+    },
+    async getCollectionOwned() {
+        return apiCall('cardclash', { action: 'collection-owned' })
+    },
+    async getCollectionSet(setKey) {
+        return apiCall('cardclash', { action: 'collection-set', setKey })
+    },
 }
 
 export const cardclashAdminService = {
@@ -1025,6 +1034,15 @@ export const cardclashAdminService = {
     },
     async generateShareLink(playerSlug, holoEffect, rarity) {
         return apiPost('cardclash-admin', { action: 'generate-share-link' }, { playerSlug, holoEffect, rarity })
+    },
+    async generatePlayerDefs(params) {
+        return apiPost('cardclash-admin', { action: 'generate-player-defs' }, params)
+    },
+    async freezeSeasonStats(seasonId) {
+        return apiPost('cardclash-admin', { action: 'freeze-season-stats' }, { seasonId })
+    },
+    async backfillCardDefs() {
+        return apiPost('cardclash-admin', { action: 'backfill-card-defs' }, {})
     },
 }
 

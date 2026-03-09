@@ -116,8 +116,11 @@ async function getBalance(sql, user) {
     const emberLastClaim = eb.last_daily_claim
         ? new Date(eb.last_daily_claim).toISOString().slice(0, 10)
         : null
+    const lastConvDate = eb.last_conversion_date
+        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
+        : null
     let emberConversionsToday = eb.conversions_today || 0
-    if (eb.last_conversion_date && eb.last_conversion_date !== todayUTC) {
+    if (lastConvDate && lastConvDate !== todayUTC) {
         emberConversionsToday = 0
     }
 

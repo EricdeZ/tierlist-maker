@@ -137,7 +137,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     const STEPS = [
         { title: 'Team', subtitle: 'Select Your Team' },
         { title: 'Date', subtitle: 'Choose a Date' },
-        { title: 'Time', subtitle: 'Set Time (EST)' },
+        { title: 'Time', subtitle: 'Set Time (ET)' },
         { title: 'Settings', subtitle: 'Pick Mode & Bans' },
         { title: 'Opponent', subtitle: 'Challenge & Tiers' },
         { title: 'Region', subtitle: 'Region & Confirmation' },
@@ -194,7 +194,11 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
     const assembleScheduledDate = () => {
         const h = Number(timeHour)
         const hour24 = timeAmPm === 'AM' ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12)
-        return `${selectedDate}T${String(hour24).padStart(2, '0')}:${timeMinute}:00-05:00`
+        // Determine whether the selected date is in EST (-05:00) or EDT (-04:00)
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' })
+            .formatToParts(new Date(`${selectedDate}T12:00:00Z`))
+        const offset = parts.find(p => p.type === 'timeZoneName').value === 'EDT' ? '-04:00' : '-05:00'
+        return `${selectedDate}T${String(hour24).padStart(2, '0')}:${timeMinute}:00${offset}`
     }
 
     const handleSubmit = async () => {
@@ -377,7 +381,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                             <div className="xp-info-box xp-info-box-warn flex items-center gap-2 p-2 mt-2" style={{ background: '#fffff0', border: '1px solid #c0a030' }}>
                                 <AlertTriangle size={14} style={{ color: '#c08030', flexShrink: 0 }} />
                                 <span className="xp-text xp-info-box-text" style={{ fontSize: 11, color: '#604000' }}>
-                                    All times are in <strong>Eastern Standard Time (EST)</strong>. Enter the time as you would read a clock in EST.
+                                    All times are in <strong>Eastern Time (ET)</strong>. Enter the time as you would read a clock in ET.
                                 </span>
                             </div>
                         </div>
@@ -621,7 +625,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Time:</span>
-                                        <span className="xp-text">{timeHour}:{timeMinute} {timeAmPm} EST</span>
+                                        <span className="xp-text">{timeHour}:{timeMinute} {timeAmPm} ET</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="xp-text" style={{ fontWeight: 700, width: 70, flexShrink: 0 }}>Pick Mode:</span>

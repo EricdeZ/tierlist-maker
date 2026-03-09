@@ -3,25 +3,34 @@ import { CardClashProvider, useCardClash } from './cardclash/CardClashContext'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/layout/Navbar'
-import { Package, BookOpen, UserSearch, Settings, Cpu } from 'lucide-react'
+import { Package, BookOpen, UserSearch, Settings, Cpu, Library, FlaskConical, ArrowRightLeft } from 'lucide-react'
 import './cardclash/compdeck.css'
 
 const CCPackShop = lazy(() => import('./cardclash/CCPackShop'))
 const CCCardCatalog = lazy(() => import('./cardclash/CCCardCatalog'))
 const CCPlayerCards = lazy(() => import('./cardclash/CCPlayerCards'))
 const CCSettings = lazy(() => import('./cardclash/CCSettings'))
+const CCCollection = lazy(() => import('./cardclash/CCCollection'))
+const CCTestPack = lazy(() => import('./cardclash/CCTestPack'))
+const CCConverter = lazy(() => import('./cardclash/CCConverter'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
     { key: 'catalog', label: 'Catalog', icon: BookOpen },
+    { key: 'collection', label: 'Collection', icon: Library },
+    { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
     // { key: 'players', label: 'Players', icon: UserSearch },
+    { key: 'testpack', label: 'Test Pack', icon: FlaskConical },
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
 ]
 
 const TAB_COMPONENTS = {
     packs: CCPackShop,
     catalog: CCCardCatalog,
+    collection: CCCollection,
+    convert: CCConverter,
     players: CCPlayerCards,
+    testpack: CCTestPack,
     settings: CCSettings,
 }
 

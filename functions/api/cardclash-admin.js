@@ -5,6 +5,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { SignJWT } from 'jose'
+import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs } from '../lib/cardclash-defs.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -44,6 +45,9 @@ const handler = async (event) => {
         case 'update-user-stats':  return await handleUpdateUserStats(sql, body)
         case 'save-definition-override': return await handleSaveDefinitionOverride(sql, body)
         case 'generate-share-link':     return await handleGenerateShareLink(body)
+        case 'generate-player-defs':   return await handleGeneratePlayerDefs(sql, body)
+        case 'freeze-season-stats':    return await handleFreezeSeasonStats(sql, body)
+        case 'backfill-card-defs':     return await handleBackfillCardDefs(sql)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -408,6 +412,50 @@ async function handleGenerateShareLink(body) {
     statusCode: 200, headers: adminHeaders,
     body: JSON.stringify({ token }),
   }
+}
+
+// ═══ POST: Generate player card definitions for a season ═══
+async function handleGeneratePlayerDefs(sql, body) {
+  const { seasonId, leagueId } = body
+  if (!seasonId && !leagueId) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonId or leagueId required' }) }
+  }
+
+  let results = []
+
+  if (seasonId) {
+    const result = await generatePlayerDefs(sql, parseInt(seasonId))
+    results.push({ seasonId: parseInt(seasonId), ...result })
+  } else {
+    // Generate for all seasons in the league
+    const seasons = await sql`
+      SELECT s.id FROM seasons s
+      JOIN divisions d ON s.division_id = d.id
+      WHERE d.league_id = ${parseInt(leagueId)}
+    `
+    for (const s of seasons) {
+      const result = await generatePlayerDefs(sql, s.id)
+      results.push({ seasonId: s.id, ...result })
+    }
+  }
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ results }) }
+}
+
+// ═══ POST: Freeze stats for a season ═══
+async function handleFreezeSeasonStats(sql, body) {
+  const { seasonId } = body
+  if (!seasonId) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonId required' }) }
+  }
+  const result = await freezeSeasonStats(sql, parseInt(seasonId))
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
+}
+
+// ═══ POST: Backfill def_id on existing player cards ═══
+async function handleBackfillCardDefs(sql) {
+  const result = await backfillCardDefs(sql)
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
 }
 
 // ═══ Formatter ═══

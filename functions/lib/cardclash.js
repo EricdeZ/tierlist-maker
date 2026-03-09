@@ -1,6 +1,7 @@
 // Server-side Card Clash logic: pack opening
 import { grantEmber } from './ember.js'
 import { GODS, ITEMS, CONSUMABLES, CLASS_ROLE, getGodImageUrl, getItemImageUrl } from './cardclash-data.js'
+import { computePlayerStats } from './cardclash-defs.js'
 
 const RARITIES = {
   common:    { name: 'Common',    dropRate: 0.60, color: '#9ca3af', holoEffects: ['common'] },
@@ -116,7 +117,57 @@ function generateConsumableCard(rarity) {
 }
 
 async function generatePlayerCard(sql, rarity, leagueId) {
-  // Pick a random player from the league with season/team context
+  // Try to use definitions first (preferred path)
+  const defs = leagueId
+    ? await sql`SELECT * FROM cc_player_defs WHERE league_id = ${leagueId} ORDER BY RANDOM() LIMIT 1`
+    : await sql`SELECT * FROM cc_player_defs ORDER BY RANDOM() LIMIT 1`
+
+  const def = defs[0]
+  if (!def) {
+    // Fallback: no defs generated yet, pick random league_player
+    return generatePlayerCardLegacy(sql, rarity, leagueId)
+  }
+
+  // Get stats (frozen or live)
+  const stats = def.frozen_stats || await computePlayerStats(sql, def.player_id, def.team_id, def.season_id)
+  const role = (def.role || 'adc').toUpperCase()
+
+  // Avatar: use def's avatar, or fall back to best god icon
+  let avatarUrl = def.avatar_url
+  if (!avatarUrl && stats.bestGod) {
+    const slug = stats.bestGod.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+    avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
+  }
+
+  return {
+    card_type: 'player',
+    god_id: `player-${def.player_id}-t${def.team_id}`,
+    god_name: def.player_name,
+    god_class: role,
+    role: role.toLowerCase(),
+    rarity,
+    serial_number: Math.floor(Math.random() * 9999) + 1,
+    holo_effect: rollHoloEffect(rarity),
+    image_url: avatarUrl || '',
+    acquired_via: 'pack',
+    def_id: def.id,
+    card_data: {
+      defId: def.id,
+      playerId: def.player_id,
+      teamName: def.team_name,
+      teamColor: def.team_color || '#6366f1',
+      seasonName: def.season_slug,
+      leagueName: def.league_slug,
+      divisionName: def.division_slug,
+      role,
+      stats,
+      bestGod: stats.bestGod,
+    },
+  }
+}
+
+// Legacy fallback when no cc_player_defs exist yet
+async function generatePlayerCardLegacy(sql, rarity, leagueId) {
   const players = leagueId
     ? await sql`
       SELECT lp.id as lp_id, lp.team_id, p.id, p.name, p.main_role,
@@ -151,58 +202,48 @@ async function generatePlayerCard(sql, rarity, leagueId) {
   const player = players[0]
   if (!player) return generateCard(rarity)
 
-  // Aggregate game stats for this player on this team
   const [stats] = await sql`
-    SELECT
-      COUNT(*)::int as games_played,
-      COUNT(*) FILTER (WHERE g.winner_team_id = ${player.team_id})::int as wins,
-      COALESCE(SUM(pgs.kills), 0)::int as total_kills,
-      COALESCE(SUM(pgs.deaths), 0)::int as total_deaths,
-      COALESCE(SUM(pgs.assists), 0)::int as total_assists,
-      COALESCE(AVG(pgs.damage), 0)::int as avg_damage,
-      COALESCE(AVG(pgs.mitigated), 0)::int as avg_mitigated
+    SELECT COUNT(*)::int as games_played,
+           COUNT(*) FILTER (WHERE g.winner_team_id = ${player.team_id})::int as wins,
+           COALESCE(SUM(pgs.kills), 0)::int as total_kills,
+           COALESCE(SUM(pgs.deaths), 0)::int as total_deaths,
+           COALESCE(SUM(pgs.assists), 0)::int as total_assists,
+           COALESCE(AVG(pgs.damage), 0)::int as avg_damage,
+           COALESCE(AVG(pgs.mitigated), 0)::int as avg_mitigated
     FROM player_game_stats pgs
     JOIN games g ON g.id = pgs.game_id
     WHERE pgs.league_player_id = ${player.lp_id}
   `
 
-  // Find best god (most played)
   const bestGods = await sql`
     SELECT god_played, COUNT(*)::int as games,
            COUNT(*) FILTER (WHERE g.winner_team_id = ${player.team_id})::int as wins
-    FROM player_game_stats pgs
-    JOIN games g ON g.id = pgs.game_id
-    WHERE pgs.league_player_id = ${player.lp_id}
-      AND pgs.god_played IS NOT NULL
-    GROUP BY god_played
-    ORDER BY games DESC
-    LIMIT 1
+    FROM player_game_stats pgs JOIN games g ON g.id = pgs.game_id
+    WHERE pgs.league_player_id = ${player.lp_id} AND pgs.god_played IS NOT NULL
+    GROUP BY god_played ORDER BY games DESC LIMIT 1
   `
-  const bestGod = bestGods[0]
 
   let avatarUrl = null
   if (player.discord_id && player.discord_avatar) {
     avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
-  } else if (bestGod) {
-    const slug = bestGod.god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+  } else if (bestGods[0]) {
+    const slug = bestGods[0].god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
   }
 
-  const gp = stats?.games_played || 0
-  const w = stats?.wins || 0
-  const k = stats?.total_kills || 0
-  const d = stats?.total_deaths || 0
-  const a = stats?.total_assists || 0
+  const gp = stats?.games_played || 0, w = stats?.wins || 0
+  const k = stats?.total_kills || 0, d = stats?.total_deaths || 0, a = stats?.total_assists || 0
   const role = (player.main_role || 'adc').toUpperCase()
 
   let bestGodData = null
-  if (bestGod) {
-    const slug = bestGod.god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+  if (bestGods[0]) {
+    const bg = bestGods[0]
+    const slug = bg.god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     bestGodData = {
-      name: bestGod.god_played,
+      name: bg.god_played,
       imageUrl: `https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`,
-      games: bestGod.games,
-      winRate: bestGod.games > 0 ? Math.round((bestGod.wins / bestGod.games) * 1000) / 10 : 0,
+      games: bg.games,
+      winRate: bg.games > 0 ? Math.round((bg.wins / bg.games) * 1000) / 10 : 0,
     }
   }
 
@@ -226,15 +267,11 @@ async function generatePlayerCard(sql, rarity, leagueId) {
       divisionName: player.division_name,
       role,
       stats: {
-        gamesPlayed: gp,
-        wins: w,
+        gamesPlayed: gp, wins: w,
         winRate: gp > 0 ? Math.round((w / gp) * 1000) / 10 : 0,
         kda: d > 0 ? Math.round(((k + a / 2) / d) * 10) / 10 : k + a / 2,
-        avgDamage: stats?.avg_damage || 0,
-        avgMitigated: stats?.avg_mitigated || 0,
-        totalKills: k,
-        totalDeaths: d,
-        totalAssists: a,
+        avgDamage: stats?.avg_damage || 0, avgMitigated: stats?.avg_mitigated || 0,
+        totalKills: k, totalDeaths: d, totalAssists: a,
       },
       bestGod: bestGodData,
     },
@@ -279,8 +316,8 @@ export async function openPack(sql, userId, packType, testMode) {
   const newCards = []
   for (const card of cards) {
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, image_url, acquired_via, card_type, card_data)
-      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null})
+      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, image_url, acquired_via, card_type, card_data, def_id)
+      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder

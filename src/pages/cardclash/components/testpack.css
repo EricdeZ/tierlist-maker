@@ -1,0 +1,274 @@
+/* ============================================
+   Test Pack — Enhancement Playground
+   ============================================ */
+
+/* --- Wrapper --- */
+.testpack-wrap {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  /* Tier colors for overlay elements (mirrors PackArt.css) */
+  --pack-accent: #d2b138;
+  --pack-accent-light: #f0d878;
+  --pack-accent-dark: #8a7420;
+  --mx: 50%;
+  --my: 50%;
+}
+
+.testpack-wrap[data-tier="standard"]  { --pack-accent: #6a7a8a; --pack-accent-light: #a0b0c0; --pack-accent-dark: #3a4a5a; }
+.testpack-wrap[data-tier="premium"]   { --pack-accent: #2563eb; --pack-accent-light: #7db4ff; --pack-accent-dark: #1a3a8a; }
+.testpack-wrap[data-tier="elite"]     { --pack-accent: #7c3aed; --pack-accent-light: #b888ff; --pack-accent-dark: #4a1a8a; }
+.testpack-wrap[data-tier="legendary"] { --pack-accent: #d97706; --pack-accent-light: #fcd34d; --pack-accent-dark: #78350f; }
+.testpack-wrap[data-tier="mixed"]     { --pack-accent: #6366f1; --pack-accent-light: #a5b4fc; --pack-accent-dark: #3730a3; }
+.testpack-wrap[data-tier="osl-mixed"] { --pack-accent: #d2b138; --pack-accent-light: #f0d878; --pack-accent-dark: #8a7420; }
+.testpack-wrap[data-tier="bsl-mixed"] { --pack-accent: #2795cf; --pack-accent-light: #6bc0f0; --pack-accent-dark: #155a7a; }
+
+/* Scale up pack for testing visibility */
+.testpack-wrap .pack-art {
+  width: 280px;
+}
+
+/* Pack layer sits above thickness edges */
+.testpack-pack-layer {
+  position: relative;
+  z-index: 1;
+}
+
+/* All overlay elements hidden by default */
+.enh-overlay {
+  position: absolute;
+  pointer-events: none;
+  display: none;
+}
+
+
+/* ============================================
+   1. Rounded Corners
+   Subtle border-radius like real foil packaging
+   ============================================ */
+.enh-rounded .pack-art {
+  border-radius: 4px;
+}
+
+
+/* ============================================
+   2. Ambient Glow Shadow
+   Stronger drop shadow + tier-colored glow
+   ============================================ */
+.enh-shadow .pack-art {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.7),
+    0 0 40px color-mix(in srgb, var(--pack-accent) 30%, transparent),
+    0 0 80px color-mix(in srgb, var(--pack-accent) 12%, transparent);
+}
+
+.enh-shadow .pack-art:hover {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.8),
+    0 0 60px color-mix(in srgb, var(--pack-accent) 40%, transparent),
+    0 0 120px color-mix(in srgb, var(--pack-accent) 18%, transparent);
+}
+
+
+/* ============================================
+   3. Inner Metallic Frame
+   Uses ::after on pack-art so it follows 3D tilt
+   ============================================ */
+.enh-frame .pack-art::after {
+  content: '';
+  position: absolute;
+  inset: 14px 10px;
+  z-index: 12;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 0 8px rgba(255, 255, 255, 0.04),
+    0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+
+/* ============================================
+   4. Embossed Title
+   Stamped-into-metal look with highlight edge
+   ============================================ */
+.enh-emboss .pack-art__title-text {
+  text-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.3),
+    0 2px 1px rgba(255, 255, 255, 0.08),
+    0 0 12px var(--pack-accent),
+    0 0 30px color-mix(in srgb, var(--pack-accent) 40%, transparent);
+}
+
+.enh-emboss .pack-art__subtitle-text {
+  text-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 8px var(--pack-accent);
+}
+
+
+/* ============================================
+   5. Holographic Strip
+   Rainbow-shifting prismatic band across pack
+   ============================================ */
+.enh-holo .enh-holo-el {
+  display: block;
+  left: 0;
+  right: 0;
+  top: 8.5%;
+  height: 3%;
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    #ff0000cc, #ff8800cc, #ffff00cc, #00ff00cc,
+    #00ffffcc, #0088ffcc, #8800ffcc, #ff00ffcc, #ff0000cc
+  );
+  background-size: 200% 100%;
+  mix-blend-mode: screen;
+  animation: holo-shift 3s linear infinite;
+  mask-image: linear-gradient(90deg, transparent 2%, black 8%, black 92%, transparent 98%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 2%, black 8%, black 92%, transparent 98%);
+}
+
+@keyframes holo-shift {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+
+/* ============================================
+   6. Package Creases
+   Fold lines suggesting physical wrapper
+   ============================================ */
+.enh-creases .enh-creases-el {
+  display: block;
+  inset: 0;
+  z-index: 2;
+  background:
+    /* Center vertical fold */
+    linear-gradient(90deg,
+      transparent 48.5%,
+      rgba(255, 255, 255, 0.025) 49%,
+      rgba(0, 0, 0, 0.04) 51%,
+      transparent 51.5%
+    ),
+    /* Diagonal crease upper-left */
+    linear-gradient(165deg,
+      transparent 28%,
+      rgba(255, 255, 255, 0.015) 29%,
+      rgba(0, 0, 0, 0.025) 30%,
+      transparent 31%
+    ),
+    /* Diagonal crease lower area */
+    linear-gradient(195deg,
+      transparent 62%,
+      rgba(255, 255, 255, 0.012) 63%,
+      rgba(0, 0, 0, 0.02) 64%,
+      transparent 65%
+    ),
+    /* Horizontal wrinkle */
+    linear-gradient(180deg,
+      transparent 38%,
+      rgba(255, 255, 255, 0.01) 38.5%,
+      rgba(0, 0, 0, 0.015) 39%,
+      transparent 39.5%
+    );
+}
+
+
+/* ============================================
+   7. Surface Noise
+   Fine grain texture from SVG turbulence
+   ============================================ */
+.enh-noise .enh-noise-el {
+  display: block;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.08;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+
+/* ============================================
+   8. Pack Thickness (3D side edges)
+   Uses ::before on pack-art so it tilts with the
+   pack. translateZ pushes it behind the face.
+   ============================================ */
+.enh-thickness .pack-art {
+  /* Needed so the back face is behind the front */
+  transform-style: preserve-3d;
+}
+
+.enh-thickness .pack-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Push behind the pack face */
+  transform: translateZ(-8px);
+  background: color-mix(in srgb, var(--pack-accent-dark) 50%, black);
+  box-shadow:
+    1px 1px 0 0 color-mix(in srgb, var(--pack-accent-dark) 60%, black),
+    2px 2px 0 0 color-mix(in srgb, var(--pack-accent-dark) 55%, black),
+    3px 3px 0 0 color-mix(in srgb, var(--pack-accent-dark) 50%, black),
+    4px 4px 0 0 color-mix(in srgb, var(--pack-accent-dark) 45%, black),
+    5px 5px 0 0 color-mix(in srgb, var(--pack-accent-dark) 40%, black),
+    6px 6px 0 0 color-mix(in srgb, var(--pack-accent-dark) 35%, black),
+    7px 7px 0 0 color-mix(in srgb, var(--pack-accent-dark) 30%, black),
+    8px 8px 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+
+/* ============================================
+   9. Foil Stamp (metallic logo + gradient title)
+   Distinct reflective zones for branding areas
+   ============================================ */
+.enh-foil-stamp .pack-art__logo {
+  filter:
+    drop-shadow(0 0 6px var(--pack-accent-light))
+    drop-shadow(0 0 14px var(--pack-accent))
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8));
+}
+
+.enh-foil-stamp .pack-art__title-text {
+  background: linear-gradient(
+    105deg,
+    var(--pack-accent) 0%,
+    var(--pack-accent-light) 20%,
+    #ffffff 45%,
+    var(--pack-accent-light) 55%,
+    var(--pack-accent) 80%,
+    var(--pack-accent-light) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: foil-text-shift 4s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 8px var(--pack-accent));
+}
+
+.enh-foil-stamp .pack-art__subtitle-text {
+  color: var(--pack-accent-light);
+  filter: drop-shadow(0 0 4px var(--pack-accent));
+}
+
+@keyframes foil-text-shift {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+
+/* ============================================
+   10. More Tilt
+   Tighter perspective + JS amplifies rotation
+   ============================================ */
+.enh-more-tilt .pack-art-wrap {
+  perspective: 300px;
+}
