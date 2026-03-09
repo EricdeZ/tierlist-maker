@@ -586,17 +586,29 @@ function PlayerNameInput({ player, onChange, rosterPlayers }) {
             ? 'bg-amber-500' // sub
             : 'bg-red-500' // unknown
 
+    const showMatchedName = player.matched_name && player.matched_name !== player.player_name
+
     return (
         <div className="relative" ref={containerRef}>
             <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${statusDot}`} />
-                <input
-                    type="text"
-                    value={open ? query : player.player_name}
-                    onChange={e => { setQuery(e.target.value); setOpen(true) }}
-                    onFocus={() => { setQuery(player.player_name || ''); setOpen(true) }}
-                    className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-sm text-[var(--color-text)] transition-colors py-1"
-                />
+                <div className="flex-1 min-w-0">
+                    <input
+                        type="text"
+                        value={open ? query : player.player_name}
+                        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+                        onFocus={() => { setQuery(player.player_name || ''); setOpen(true) }}
+                        className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-sm text-[var(--color-text)] transition-colors py-1"
+                    />
+                    {showMatchedName && (
+                        <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5 flex items-center gap-1">
+                            <span>&rarr; {player.matched_name}</span>
+                            {player.match_source === 'alias' && (
+                                <span className="text-blue-400/70">(alias)</span>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
             {open && filtered.length > 0 && (
                 <div className="absolute z-50 top-full left-0 mt-1 w-64 border rounded-lg shadow-xl max-h-48 overflow-y-auto"
@@ -740,34 +752,41 @@ function RolePicker({ player, onUpdate, allPlayers, side, gameIndex, updatePlaye
     )
 }
 
+function RolePlayerRow({ player, side, index, gameIndex, allPlayers, updatePlayer }) {
+    return (
+        <div className="flex items-center justify-between py-0.5">
+            <div className="flex items-center gap-1.5 w-28 shrink-0">
+                {player.role_played && ROLE_IMAGES[player.role_played] ? (
+                    <img src={ROLE_IMAGES[player.role_played]} alt={player.role_played} className="w-4 h-4 shrink-0 opacity-70" />
+                ) : (
+                    <span className="w-4 h-4 shrink-0 rounded-full border border-dashed border-[var(--color-text-secondary)]/30" />
+                )}
+                <span className="text-xs text-[var(--color-text)] truncate">{player.player_name}</span>
+            </div>
+            <RolePicker
+                player={player}
+                onUpdate={updates => updatePlayer(gameIndex, side, index, updates)}
+                allPlayers={allPlayers}
+                side={side} gameIndex={gameIndex} updatePlayer={updatePlayer}
+            />
+        </div>
+    )
+}
+
 function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, updatePlayer, onNext }) {
     return (
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
                     {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
-                            <RolePicker
-                                player={p}
-                                onUpdate={updates => updatePlayer(gameIndex, 'left', i, updates)}
-                                allPlayers={game.left_players}
-                                side="left" gameIndex={gameIndex} updatePlayer={updatePlayer}
-                            />
-                        </div>
+                        <RolePlayerRow key={i} player={p} side="left" index={i}
+                            gameIndex={gameIndex} allPlayers={game.left_players} updatePlayer={updatePlayer} />
                     ))}
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
                     {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
-                            <RolePicker
-                                player={p}
-                                onUpdate={updates => updatePlayer(gameIndex, 'right', i, updates)}
-                                allPlayers={game.right_players}
-                                side="right" gameIndex={gameIndex} updatePlayer={updatePlayer}
-                            />
-                        </div>
+                        <RolePlayerRow key={i} player={p} side="right" index={i}
+                            gameIndex={gameIndex} allPlayers={game.right_players} updatePlayer={updatePlayer} />
                     ))}
                 </TeamColumn>
             </div>
