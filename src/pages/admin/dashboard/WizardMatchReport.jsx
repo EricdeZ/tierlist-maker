@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { GodAutocomplete } from './GodAutocomplete'
 import { ROLE_IMAGES, ROLE_LIST, API } from './constants'
 import { getAuthHeaders } from '../../../services/adminApi.js'
+import FloatingImageViewer from '../../../components/admin/FloatingImageViewer'
 
 const GAME_SUBSTEPS = ['winner', 'names', 'gods', 'roles', 'kda', 'damage', 'mitigated']
 const SUBSTEP_LABELS = {
@@ -20,6 +21,8 @@ export default function WizardMatchReport({
 }) {
     const [stepIndex, setStepIndex] = useState(0)
     const [selectedScreenshots, setSelectedScreenshots] = useState({})
+    const [viewerOpen, setViewerOpen] = useState(false)
+    const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
     const prevStatusRef = useRef(status)
 
     // Build step list dynamically based on number of games
@@ -89,6 +92,22 @@ export default function WizardMatchReport({
         await onExtract(ids)
     }, [selectedScreenshots, onExtract])
 
+    // Screenshot tracking
+    const selectedIds = useMemo(() =>
+        Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number).sort((a, b) => a - b),
+        [selectedScreenshots],
+    )
+
+    const allViewerQueueIds = useMemo(() => {
+        const otherIds = queueItems.filter(q => !selectedIds.includes(q.id)).map(q => q.id)
+        return [...selectedIds, ...otherIds]
+    }, [selectedIds, queueItems])
+
+    const openViewer = useCallback((initialIndex = 0) => {
+        setViewerInitialIndex(initialIndex)
+        setViewerOpen(true)
+    }, [])
+
     // Team info helpers
     const team1Name = editData?.team1_name || matchInfo?.team1_name || 'Team 1'
     const team2Name = editData?.team2_name || matchInfo?.team2_name || 'Team 2'
@@ -129,6 +148,9 @@ export default function WizardMatchReport({
                     editData={editData}
                     team1Name={team1Name} team2Name={team2Name}
                     team1Id={team1Id} team2Id={team2Id}
+                    selectedIds={selectedIds}
+                    queueItems={queueItems}
+                    onViewScreenshot={openViewer}
                     onStartAudit={next}
                 />
             )
@@ -160,51 +182,75 @@ export default function WizardMatchReport({
             adminData, updatePlayer, updateGame, onNext: next,
         }
 
-        switch (substep) {
-            case 'winner': return <WinnerStep {...gameProps} />
-            case 'names': return <NamesStep {...gameProps} />
-            case 'gods': return <GodsStep {...gameProps} />
-            case 'roles': return <RolesStep {...gameProps} />
-            case 'kda': return <KDAStep {...gameProps} />
-            case 'damage': return <DamageStep {...gameProps} />
-            case 'mitigated': return <MitigatedStep {...gameProps} />
-            default: return null
-        }
+        const substepContent = (() => {
+            switch (substep) {
+                case 'winner': return <WinnerStep {...gameProps} />
+                case 'names': return <NamesStep {...gameProps} />
+                case 'gods': return <GodsStep {...gameProps} />
+                case 'roles': return <RolesStep {...gameProps} />
+                case 'kda': return <KDAStep {...gameProps} />
+                case 'damage': return <DamageStep {...gameProps} />
+                case 'mitigated': return <MitigatedStep {...gameProps} />
+                default: return null
+            }
+        })()
+
+        return (
+            <div>
+                <GameScreenshotBar
+                    gameIndex={gameIndex}
+                    selectedIds={selectedIds}
+                    queueItems={queueItems}
+                    onViewScreenshot={openViewer}
+                />
+                {substepContent}
+            </div>
+        )
     }
 
     return (
-        <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden">
-            {/* Progress bar */}
-            <div className="h-1 bg-white/5">
-                <div
-                    className="h-full bg-[var(--color-accent)] transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
-
-            {/* Step indicator */}
-            <div className="px-6 pt-4 pb-2 flex items-center justify-between">
-                <div>
-                    <span className="text-xs text-[var(--color-text-secondary)]">
-                        Step {stepIndex + 1} of {steps.length}
-                    </span>
-                    <h2 className="text-lg font-bold text-[var(--color-text)]">{step.label}</h2>
+        <>
+            <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden">
+                {/* Progress bar */}
+                <div className="h-1 bg-white/5">
+                    <div
+                        className="h-full bg-[var(--color-accent)] transition-all duration-500 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
                 </div>
-                {stepIndex > 0 && step.id !== 'screenshots' && (
-                    <button
-                        onClick={prev}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition"
-                    >
-                        &larr; Back
-                    </button>
-                )}
+
+                {/* Step indicator */}
+                <div className="px-6 pt-4 pb-2 flex items-center justify-between">
+                    <div>
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                            Step {stepIndex + 1} of {steps.length}
+                        </span>
+                        <h2 className="text-lg font-bold text-[var(--color-text)]">{step.label}</h2>
+                    </div>
+                    {stepIndex > 0 && step.id !== 'screenshots' && (
+                        <button
+                            onClick={prev}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition"
+                        >
+                            &larr; Back
+                        </button>
+                    )}
+                </div>
+
+                {/* Step content */}
+                <div className="px-6 pb-6">
+                    {renderStep()}
+                </div>
             </div>
 
-            {/* Step content */}
-            <div className="px-6 pb-6">
-                {renderStep()}
-            </div>
-        </div>
+            {viewerOpen && allViewerQueueIds.length > 0 && (
+                <FloatingImageViewer
+                    queueItemIds={allViewerQueueIds}
+                    onClose={() => setViewerOpen(false)}
+                    initialIndex={viewerInitialIndex}
+                />
+            )}
+        </>
     )
 }
 
@@ -329,14 +375,18 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, onExtrac
 // STEP: OVERVIEW
 // ═══════════════════════════════════════════════════
 
-function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, onStartAudit }) {
+function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, selectedIds, queueItems, onViewScreenshot, onStartAudit }) {
     const games = editData?.games || []
+    const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
+    const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
+    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
+
     return (
         <div className="py-4">
             <p className="text-sm text-[var(--color-text-secondary)] mb-6">
                 {games.length} game{games.length !== 1 ? 's' : ''} extracted. Review the summary below, then start the audit.
             </p>
-            <div className="space-y-3 mb-8">
+            <div className="space-y-3 mb-6">
                 {games.map((g, i) => {
                     const winnerId = g.winning_team_id
                     const winnerName = String(winnerId) === String(team1Id) ? team1Name : String(winnerId) === String(team2Id) ? team2Name : 'Not set'
@@ -344,19 +394,48 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, onStar
                     const rightCount = (g.right_players || []).filter(p => p.matched_lp_id).length
                     const totalPlayers = (g.left_players?.length || 0) + (g.right_players?.length || 0)
                     const matchedCount = leftCount + rightCount
+                    const screenshotId = selectedIds[i]
                     return (
                         <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-white/3 border border-[var(--color-border)]">
-                            <span className="text-sm font-bold text-[var(--color-text)] w-16">Game {i + 1}</span>
+                            {screenshotId && (
+                                <button
+                                    onClick={() => onViewScreenshot(i)}
+                                    className="w-16 aspect-[16/10] rounded overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)] transition shrink-0"
+                                >
+                                    <img src={imgUrl(screenshotId)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                </button>
+                            )}
+                            <span className="text-sm font-bold text-[var(--color-text)] w-16 shrink-0">Game {i + 1}</span>
                             <span className={`text-xs ${winnerId ? 'text-green-400' : 'text-red-400'}`}>
                                 {winnerId ? `${winnerName} wins` : 'No winner'}
                             </span>
                             <span className={`text-xs ml-auto ${matchedCount === totalPlayers ? 'text-green-400' : 'text-amber-400'}`}>
-                                {matchedCount}/{totalPlayers} players matched
+                                {matchedCount}/{totalPlayers} matched
                             </span>
                         </div>
                     )
                 })}
             </div>
+
+            {otherScreenshots.length > 0 && (
+                <div className="mb-6">
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-2 block">
+                        Other matched screenshots
+                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                        {otherScreenshots.map((item, idx) => (
+                            <button
+                                key={item.id}
+                                onClick={() => onViewScreenshot(selectedIds.length + idx)}
+                                className="w-20 aspect-[16/10] rounded-lg overflow-hidden border border-[var(--color-border)] hover:border-white/30 transition opacity-60 hover:opacity-100"
+                            >
+                                <img src={imgUrl(item.id)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="flex justify-center">
                 <button
                     onClick={onStartAudit}
@@ -364,6 +443,65 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, onStar
                 >
                     Start Audit
                 </button>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════
+// GAME SCREENSHOT BAR
+// ═══════════════════════════════════════════════════
+
+function GameScreenshotBar({ gameIndex, selectedIds, queueItems, onViewScreenshot }) {
+    const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
+    const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
+
+    const gameScreenshotId = selectedIds[gameIndex]
+    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
+
+    if (!gameScreenshotId && !otherScreenshots.length) return null
+
+    return (
+        <div className="mb-5 pb-4 border-b border-[var(--color-border)]">
+            <div className="flex items-start gap-4">
+                {gameScreenshotId && (
+                    <div>
+                        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5 block">
+                            Game {gameIndex + 1} screenshot
+                        </span>
+                        <button
+                            onClick={() => onViewScreenshot(gameIndex)}
+                            className="relative w-44 aspect-[16/10] rounded-lg overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)] transition group"
+                        >
+                            <img src={imgUrl(gameScreenshotId)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition">
+                                <span className="text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition bg-black/50 px-2 py-0.5 rounded">
+                                    Click to zoom
+                                </span>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {otherScreenshots.length > 0 && (
+                    <div>
+                        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5 block">
+                            Other screenshots
+                        </span>
+                        <div className="flex gap-1.5 flex-wrap">
+                            {otherScreenshots.map((item, idx) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => onViewScreenshot(selectedIds.length + idx)}
+                                    className="w-16 aspect-[16/10] rounded overflow-hidden border border-[var(--color-border)] hover:border-white/30 transition opacity-50 hover:opacity-100"
+                                >
+                                    <img src={imgUrl(item.id)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -529,8 +667,8 @@ function GodsStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Colo
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
                     {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center gap-2 py-1">
-                            <span className="text-xs text-[var(--color-text-secondary)] w-24 truncate">{p.player_name}</span>
+                        <div key={i} className="flex items-center gap-2 py-0.5">
+                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
                             <div className="flex-1">
                                 <GodAutocomplete
                                     value={p.god_played || ''}
@@ -543,8 +681,8 @@ function GodsStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Colo
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
                     {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center gap-2 py-1">
-                            <span className="text-xs text-[var(--color-text-secondary)] w-24 truncate">{p.player_name}</span>
+                        <div key={i} className="flex items-center gap-2 py-0.5">
+                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
                             <div className="flex-1">
                                 <GodAutocomplete
                                     value={p.god_played || ''}
@@ -608,7 +746,7 @@ function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
                     {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
+                        <div key={i} className="flex items-center justify-between py-0.5">
                             <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
                             <RolePicker
                                 player={p}
@@ -621,7 +759,7 @@ function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
                     {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
+                        <div key={i} className="flex items-center justify-between py-0.5">
                             <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
                             <RolePicker
                                 player={p}
@@ -643,14 +781,45 @@ function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
 // GAME STEP: KDA
 // ═══════════════════════════════════════════════════
 
-function StatInput({ value, onChange, width = 'w-14' }) {
+function StatInput({ value, onChange, className = '' }) {
     return (
         <input
             type="number"
             value={value ?? ''}
             onChange={e => onChange(e.target.value === '' ? 0 : parseInt(e.target.value))}
-            className={`${width} bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-text)] text-right py-1 transition-colors`}
+            className={`bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-text)] text-right py-1 transition-colors ${className}`}
         />
+    )
+}
+
+function KDATable({ players, side, gameIndex, updatePlayer }) {
+    return (
+        <table className="w-full text-xs">
+            <thead>
+                <tr className="text-[10px] text-[var(--color-text-secondary)]">
+                    <th className="text-left font-normal pb-1.5">Player</th>
+                    <th className="text-right font-normal pb-1.5 w-12">K</th>
+                    <th className="text-right font-normal pb-1.5 w-12">D</th>
+                    <th className="text-right font-normal pb-1.5 w-12">A</th>
+                </tr>
+            </thead>
+            <tbody>
+                {(players || []).map((p, i) => (
+                    <tr key={i}>
+                        <td className="text-[var(--color-text)] truncate max-w-0 py-0.5">{p.player_name}</td>
+                        <td className="w-12 py-0.5">
+                            <StatInput value={p.kills} onChange={v => updatePlayer(gameIndex, side, i, { kills: v })} className="w-full" />
+                        </td>
+                        <td className="w-12 py-0.5">
+                            <StatInput value={p.deaths} onChange={v => updatePlayer(gameIndex, side, i, { deaths: v })} className="w-full" />
+                        </td>
+                        <td className="w-12 py-0.5">
+                            <StatInput value={p.assists} onChange={v => updatePlayer(gameIndex, side, i, { assists: v })} className="w-full" />
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
     )
 }
 
@@ -659,36 +828,10 @@ function KDAStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
-                    <div className="flex items-center gap-2 mb-1 text-[10px] text-[var(--color-text-secondary)]">
-                        <span className="w-24">Player</span>
-                        <span className="w-14 text-right">K</span>
-                        <span className="w-14 text-right">D</span>
-                        <span className="w-14 text-right">A</span>
-                    </div>
-                    {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center gap-2 py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
-                            <StatInput value={p.kills} onChange={v => updatePlayer(gameIndex, 'left', i, { kills: v })} />
-                            <StatInput value={p.deaths} onChange={v => updatePlayer(gameIndex, 'left', i, { deaths: v })} />
-                            <StatInput value={p.assists} onChange={v => updatePlayer(gameIndex, 'left', i, { assists: v })} />
-                        </div>
-                    ))}
+                    <KDATable players={game.left_players} side="left" gameIndex={gameIndex} updatePlayer={updatePlayer} />
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
-                    <div className="flex items-center gap-2 mb-1 text-[10px] text-[var(--color-text-secondary)]">
-                        <span className="w-24">Player</span>
-                        <span className="w-14 text-right">K</span>
-                        <span className="w-14 text-right">D</span>
-                        <span className="w-14 text-right">A</span>
-                    </div>
-                    {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center gap-2 py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
-                            <StatInput value={p.kills} onChange={v => updatePlayer(gameIndex, 'right', i, { kills: v })} />
-                            <StatInput value={p.deaths} onChange={v => updatePlayer(gameIndex, 'right', i, { deaths: v })} />
-                            <StatInput value={p.assists} onChange={v => updatePlayer(gameIndex, 'right', i, { assists: v })} />
-                        </div>
-                    ))}
+                    <KDATable players={game.right_players} side="right" gameIndex={gameIndex} updatePlayer={updatePlayer} />
                 </TeamColumn>
             </div>
             <CorrectButton onClick={onNext} />
@@ -706,18 +849,26 @@ function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Co
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
+                    <div className="flex items-center justify-between mb-1 text-[10px] text-[var(--color-text-secondary)]">
+                        <span>Player</span>
+                        <span className="w-20 text-right">Damage</span>
+                    </div>
                     {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
-                            <span className="text-xs text-[var(--color-text)] w-28 truncate">{p.player_name}</span>
-                            <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'left', i, { player_damage: v })} width="w-20" />
+                        <div key={i} className="flex items-center justify-between py-0.5">
+                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'left', i, { player_damage: v })} className="w-20" />
                         </div>
                     ))}
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
+                    <div className="flex items-center justify-between mb-1 text-[10px] text-[var(--color-text-secondary)]">
+                        <span>Player</span>
+                        <span className="w-20 text-right">Damage</span>
+                    </div>
                     {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
-                            <span className="text-xs text-[var(--color-text)] w-28 truncate">{p.player_name}</span>
-                            <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'right', i, { player_damage: v })} width="w-20" />
+                        <div key={i} className="flex items-center justify-between py-0.5">
+                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'right', i, { player_damage: v })} className="w-20" />
                         </div>
                     ))}
                 </TeamColumn>
@@ -737,18 +888,26 @@ function MitigatedStep({ game, gameIndex, team1Name, team2Name, team1Color, team
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
+                    <div className="flex items-center justify-between mb-1 text-[10px] text-[var(--color-text-secondary)]">
+                        <span>Player</span>
+                        <span className="w-20 text-right">Mitigated</span>
+                    </div>
                     {(game.left_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
-                            <span className="text-xs text-[var(--color-text)] w-28 truncate">{p.player_name}</span>
-                            <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'left', i, { mitigated: v })} width="w-20" />
+                        <div key={i} className="flex items-center justify-between py-0.5">
+                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'left', i, { mitigated: v })} className="w-20" />
                         </div>
                     ))}
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
+                    <div className="flex items-center justify-between mb-1 text-[10px] text-[var(--color-text-secondary)]">
+                        <span>Player</span>
+                        <span className="w-20 text-right">Mitigated</span>
+                    </div>
                     {(game.right_players || []).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between py-1">
-                            <span className="text-xs text-[var(--color-text)] w-28 truncate">{p.player_name}</span>
-                            <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'right', i, { mitigated: v })} width="w-20" />
+                        <div key={i} className="flex items-center justify-between py-0.5">
+                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'right', i, { mitigated: v })} className="w-20" />
                         </div>
                     ))}
                 </TeamColumn>
