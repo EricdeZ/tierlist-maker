@@ -863,8 +863,12 @@ function GameDetail({ game: g, cfg }) {
         <div className="space-y-3 text-xs">
             {/* Inactivity decay if applied */}
             {g.inactivityDecay && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 text-red-400">
-                    Inactivity: {g.inactivityDecay.weeks} missed match{g.inactivityDecay.weeks > 1 ? 'es' : ''} &rarr; virtual game factor {g.inactivityDecay.compoundFactor.toFixed(4)} ({g.inactivityDecay.gameCount} total in avg)
+                <div className="bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 text-red-400 space-y-0.5">
+                    <div className="font-medium">Inactivity: {g.inactivityDecay.weeks} missed match{g.inactivityDecay.weeks > 1 ? 'es' : ''}</div>
+                    <div className="text-red-400/80">
+                        Virtual game: {cfg.INACTIVITY_DECAY}<sup>{g.inactivityDecay.weeks}</sup> = <span className="font-mono font-medium text-red-400">{g.inactivityDecay.compoundFactor.toFixed(4)}</span>
+                        <span className="ml-1">(averaged with {g.inactivityDecay.gameCount - 1} real game{g.inactivityDecay.gameCount - 1 !== 1 ? 's' : ''})</span>
+                    </div>
                 </div>
             )}
 
@@ -945,11 +949,18 @@ function GameDetail({ game: g, cfg }) {
                 </div>
                 {g.isLastInSet && (
                     <div>
-                        <span className="font-medium">{g.setGameCount > 1 ? `Set avg (${g.setGameCount} games):` : 'Pipeline:'}</span>{' '}
-                        {g.setGameCount > 1 && <span className="font-mono">{g.setAvgFactor.toFixed(4)} avg factor &rarr; </span>}
-                        decayed({g.gameDecay.after.toFixed(4)}) &times; {g.setGameCount > 1 ? 'avg' : 'factor'}({g.setAvgFactor.toFixed(4)})
-                        = <span className="text-[var(--color-text)] font-mono">{g.preCompression.toFixed(4)}</span>
-                        &rarr; compress = <span className={`font-mono font-medium ${g.multiplierAfter > 1 ? 'text-green-400' : g.multiplierAfter < 1 ? 'text-red-400' : 'text-[var(--color-text)]'}`}>{g.multiplierAfter.toFixed(4)}</span>
+                        {(() => {
+                            const ia = g.inactivityDecay
+                            const totalGames = ia ? ia.gameCount : g.setGameCount
+                            const label = totalGames > 1 ? `Avg (${g.setGameCount} game${g.setGameCount > 1 ? 's' : ''}${ia ? ' + inactivity' : ''}):` : 'Pipeline:'
+                            return <>
+                                <span className="font-medium">{label}</span>{' '}
+                                {totalGames > 1 && <span className="font-mono">{g.setAvgFactor.toFixed(4)} avg &rarr; </span>}
+                                decayed({g.gameDecay.after.toFixed(4)}) &times; {totalGames > 1 ? 'avg' : 'factor'}({g.setAvgFactor.toFixed(4)})
+                                = <span className="text-[var(--color-text)] font-mono">{g.preCompression.toFixed(4)}</span>
+                                &rarr; compress = <span className={`font-mono font-medium ${g.multiplierAfter > 1 ? 'text-green-400' : g.multiplierAfter < 1 ? 'text-red-400' : 'text-[var(--color-text)]'}`}>{g.multiplierAfter.toFixed(4)}</span>
+                            </>
+                        })()}
                     </div>
                 )}
             </div>
