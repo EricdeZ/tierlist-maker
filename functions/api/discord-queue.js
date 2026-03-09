@@ -405,6 +405,9 @@ async function fetchImages(sql, body, allowedLeagues) {
         }
     }
 
+    // Sort by queue_item_id (auto-increment, so chronological) to preserve game order
+    images.sort((a, b) => a.queue_item_id - b.queue_item_id)
+
     return { statusCode: 200, headers, body: JSON.stringify({ images }) }
 }
 

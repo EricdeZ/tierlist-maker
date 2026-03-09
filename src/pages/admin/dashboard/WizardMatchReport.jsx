@@ -84,7 +84,7 @@ export default function WizardMatchReport({
 
     // Handle extract
     const handleExtract = useCallback(async () => {
-        const ids = Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number)
+        const ids = Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number).sort((a, b) => a - b)
         if (!ids.length) return
         await onExtract(ids)
     }, [selectedScreenshots, onExtract])
