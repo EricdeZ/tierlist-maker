@@ -686,7 +686,7 @@ function factorColor(v) {
 }
 
 function PlayerBreakdown({ data }) {
-    const { player, games, skippedGames, totalRawGames, diagnostic, marketOpenDate, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg } = data
+    const { player, games, skippedGames, totalRawGames, diagnostic, marketOpenDate, finalInactivityDecay, finalMultiplier, roleAvgs, config: cfg, _debug } = data
     const playerRoleAvgs = roleAvgs[player.role] || roleAvgs[Object.keys(roleAvgs)[0]]
 
     return (
@@ -711,6 +711,7 @@ function PlayerBreakdown({ data }) {
                 <div className="text-xs text-[var(--color-text-secondary)]">
                     {marketOpenDate && <span>Market opened: {marketOpenDate}</span>}
                     {totalRawGames != null && <span className="ml-3">SQL games: {totalRawGames} | Counted: {games.length}{skippedGames?.length > 0 ? ` | Skipped: ${skippedGames.length}` : ''}</span>}
+                    {_debug && <span className="ml-3">Team matches: {_debug.teamMatchCount} | Player matches: {_debug.playerMatchCount} | Sets: {_debug.setsCount}</span>}
                 </div>
             )}
 

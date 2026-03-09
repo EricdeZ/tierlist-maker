@@ -874,7 +874,8 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         }
     }
 
-    return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames }
+    return { multiplier, trace, finalInactivityDecay, hasGames, skippedGames,
+        _debug: { teamId: spark.team_id, teamMatchCount: teamMatches.length, playerMatchCount: playerMatchIds.size, setsCount: sets.length } }
 }
 
 /**
@@ -1615,6 +1616,7 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
         marketOpenDate: new Date(marketStartTime).toISOString().split('T')[0],
         finalInactivityDecay: result.finalInactivityDecay,
         finalMultiplier: result.multiplier,
+        _debug: result._debug,
     }
 }
 
