@@ -1251,25 +1251,6 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     if (updates.length === 0) return { status: 'skipped', reason: 'no_updates', detail: `No spark records found for this market` }
 
-    // ── Snapshot supply for players with new games (independent of approval gate) ──
-    const snapshotUpdates = updates.filter(u => u.snapshotSparks !== null)
-    if (snapshotUpdates.length > 0) {
-        const ssIds = snapshotUpdates.map(u => u.sparkId)
-        const ssSparks = snapshotUpdates.map(u => u.snapshotSparks)
-        const ssGameCounts = snapshotUpdates.map(u => u.newGameCount)
-        await sql`
-            UPDATE player_sparks AS ps SET
-                recalc_sparks = v.rs,
-                recalc_game_count = v.gc
-            FROM (
-                SELECT UNNEST(${ssIds}::int[]) AS id,
-                       UNNEST(${ssSparks}::int[]) AS rs,
-                       UNNEST(${ssGameCounts}::int[]) AS gc
-            ) AS v
-            WHERE ps.id = v.id
-        `
-    }
-
     // ── Approval gate: queue or apply immediately ──
 
     if (cfg.PERFORMANCE_APPROVAL) {
@@ -1309,16 +1290,36 @@ export async function recalcForgePerformance(sql, seasonId) {
                 UNNEST(${pNewPrices}::numeric[]),
                 ${recalcAt}::timestamptz
         `
+        // Snapshot supply for players with new games (bookkeeping — not gated by approval)
+        const snapshotUpdates = updates.filter(u => u.snapshotSparks !== null)
+        if (snapshotUpdates.length > 0) {
+            const ssIds = snapshotUpdates.map(u => u.sparkId)
+            const ssSparks = snapshotUpdates.map(u => u.snapshotSparks)
+            const ssGameCounts = snapshotUpdates.map(u => u.newGameCount)
+            await sql`
+                UPDATE player_sparks AS ps SET
+                    recalc_sparks = v.rs,
+                    recalc_game_count = v.gc
+                FROM (
+                    SELECT UNNEST(${ssIds}::int[]) AS id,
+                           UNNEST(${ssSparks}::int[]) AS rs,
+                           UNNEST(${ssGameCounts}::int[]) AS gc
+                ) AS v
+                WHERE ps.id = v.id
+            `
+        }
         return { status: 'queued', updates: updates.length, approval: true } // Skip applying — wait for admin approval
     }
 
     // ── Apply immediately (approval off) ──
 
-    // Batch UPDATE all player_sparks (also persist decayed sell pressure)
+    // Batch UPDATE all player_sparks (also persist decayed sell pressure + snapshot)
     const sparkIds = updates.map(u => u.sparkId)
     const multipliers = updates.map(u => u.multiplier)
     const prices = updates.map(u => u.newPrice)
     const pressures = updates.map(u => u.decayedPressure)
+    const recalcSparks = updates.map(u => u.snapshotSparks)
+    const recalcGameCounts = updates.map(u => u.newGameCount)
 
     await sql`
         UPDATE player_sparks AS ps SET
@@ -1326,13 +1327,17 @@ export async function recalcForgePerformance(sql, seasonId) {
             current_price = v.price,
             sell_pressure = v.sp,
             sell_pressure_updated_at = CASE WHEN v.sp > 0 THEN NOW() ELSE NULL END,
+            recalc_sparks = COALESCE(v.rs, ps.recalc_sparks),
+            recalc_game_count = COALESCE(v.gc, ps.recalc_game_count),
             last_perf_update = NOW(),
             updated_at = NOW()
         FROM (
             SELECT UNNEST(${sparkIds}::int[]) AS id,
                    UNNEST(${multipliers}::numeric[]) AS mult,
                    UNNEST(${prices}::numeric[]) AS price,
-                   UNNEST(${pressures}::numeric[]) AS sp
+                   UNNEST(${pressures}::numeric[]) AS sp,
+                   UNNEST(${recalcSparks}::int[]) AS rs,
+                   UNNEST(${recalcGameCounts}::int[]) AS gc
         ) AS v
         WHERE ps.id = v.id
     `

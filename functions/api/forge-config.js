@@ -1,5 +1,5 @@
 import { adapt } from '../lib/adapter.js'
-import { getDB, adminHeaders } from '../lib/db.js'
+import { getDB, adminHeaders, transaction } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { grantPassion } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
@@ -173,7 +173,8 @@ const handler = async (event) => {
             if (action === 'recalc') {
                 const body = event.body ? JSON.parse(event.body) : {}
                 if (body.season_id) {
-                    const result = await recalcForgePerformance(sql, body.season_id)
+                    // Use WebSocket transaction to avoid subrequest limit (each HTTP query = 1 subrequest)
+                    const result = await transaction(tx => recalcForgePerformance(tx, body.season_id))
                     return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result || { status: 'unknown' }) }
                 }
                 // Recalc all open markets
@@ -186,7 +187,8 @@ const handler = async (event) => {
                 const results = []
                 let totalUpdates = 0
                 for (const m of openMarkets) {
-                    const result = await recalcForgePerformance(sql, m.season_id)
+                    // Each market gets its own WebSocket transaction (1 subrequest each)
+                    const result = await transaction(tx => recalcForgePerformance(tx, m.season_id))
                     results.push({ seasonId: m.season_id, ...result })
                     totalUpdates += result?.updates || 0
                 }
