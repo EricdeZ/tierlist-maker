@@ -14,36 +14,67 @@ class ErrorBoundary extends Component {
 
     componentDidCatch(error, errorInfo) {
         console.error('ErrorBoundary caught:', error, errorInfo)
+        // Auto-reload once on chunk load failures (stale deploy)
+        if (this.isChunkError(error)) {
+            const reloaded = sessionStorage.getItem('chunk-reload')
+            if (!reloaded) {
+                sessionStorage.setItem('chunk-reload', '1')
+                window.location.reload()
+                return
+            }
+        }
+    }
+
+    isChunkError(error) {
+        const msg = error?.message || ''
+        return msg.includes('Failed to fetch dynamically imported module') ||
+            msg.includes('Loading chunk') ||
+            msg.includes('Loading CSS chunk') ||
+            (error?.name === 'TypeError' && msg.includes('importing a module'))
     }
 
     render() {
         if (this.state.hasError) {
+            const isChunk = this.isChunkError(this.state.error)
             return (
                 <div className="min-h-screen bg-(--color-primary) flex items-center justify-center px-4">
                     <div className="text-center max-w-md">
                         <h1 className="font-heading text-5xl font-bold text-(--color-accent) mb-4">
-                            Oops
+                            {isChunk ? 'Update Available' : 'Oops'}
                         </h1>
                         <p className="text-lg text-(--color-text) mb-2">
-                            Something went wrong.
+                            {isChunk ? 'A new version has been deployed.' : 'Something went wrong.'}
                         </p>
                         <p className="text-sm text-(--color-text-secondary) mb-6">
-                            {this.state.error?.message || 'An unexpected error occurred.'}
+                            {isChunk
+                                ? 'Reload the page to get the latest version.'
+                                : (this.state.error?.message || 'An unexpected error occurred.')}
                         </p>
                         <div className="flex gap-3 justify-center">
-                            <button
-                                onClick={() => this.setState({ hasError: false, error: null })}
-                                className="px-5 py-2.5 bg-white/10 text-(--color-text) rounded-lg font-semibold hover:bg-white/20 transition-colors"
-                            >
-                                Try Again
-                            </button>
-                            <Link
-                                to="/"
-                                onClick={() => this.setState({ hasError: false, error: null })}
-                                className="px-5 py-2.5 bg-(--color-accent) text-(--color-primary) rounded-lg font-semibold hover:opacity-90 transition-opacity"
-                            >
-                                ← Back to Home
-                            </Link>
+                            {isChunk ? (
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="px-5 py-2.5 bg-(--color-accent) text-(--color-primary) rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                                >
+                                    Reload Page
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => this.setState({ hasError: false, error: null })}
+                                        className="px-5 py-2.5 bg-white/10 text-(--color-text) rounded-lg font-semibold hover:bg-white/20 transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
+                                    <Link
+                                        to="/"
+                                        onClick={() => this.setState({ hasError: false, error: null })}
+                                        className="px-5 py-2.5 bg-(--color-accent) text-(--color-primary) rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                                    >
+                                        ← Back to Home
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
