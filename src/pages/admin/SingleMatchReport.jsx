@@ -591,6 +591,8 @@ export default function SingleMatchReport() {
                     adminData={adminData}
                     queueItems={discordItems}
                     onExtract={extractFromScreenshots}
+                    onAddImages={(files) => addImages(mrIdRef.current, files)}
+                    onExtractPasted={processOne}
                     status={matchReport.status}
                     error={matchReport.error}
                     onSubmit={submitOne}

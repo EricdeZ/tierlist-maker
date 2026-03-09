@@ -16,11 +16,12 @@ const SUBSTEP_LABELS = {
 
 export default function WizardMatchReport({
     matchInfo, editData, onUpdateEditData, adminData,
-    queueItems, onExtract, status, error,
+    queueItems, onExtract, onAddImages, onExtractPasted, status, error,
     onSubmit, isSubmitting, submitResult,
 }) {
     const [stepIndex, setStepIndex] = useState(0)
     const [selectedScreenshots, setSelectedScreenshots] = useState({})
+    const [pastedImages, setPastedImages] = useState([])
     const [viewerOpen, setViewerOpen] = useState(false)
     const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
     const prevStatusRef = useRef(status)
@@ -85,12 +86,37 @@ export default function WizardMatchReport({
         })
     }, [onUpdateEditData])
 
+    // Paste handler
+    const handlePaste = useCallback((files) => {
+        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+        if (!imageFiles.length) return
+        const newPasted = imageFiles.map((file, i) => ({
+            id: `paste_${Date.now()}_${i}`,
+            preview: URL.createObjectURL(file),
+        }))
+        setPastedImages(prev => [...prev, ...newPasted])
+        onAddImages(imageFiles)
+    }, [onAddImages])
+
+    const removePastedImage = useCallback((id) => {
+        setPastedImages(prev => {
+            const img = prev.find(p => p.id === id)
+            if (img?.preview) URL.revokeObjectURL(img.preview)
+            return prev.filter(p => p.id !== id)
+        })
+    }, [])
+
     // Handle extract
     const handleExtract = useCallback(async () => {
         const ids = Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number).sort((a, b) => a - b)
-        if (!ids.length) return
-        await onExtract(ids)
-    }, [selectedScreenshots, onExtract])
+        if (ids.length > 0) {
+            // Discord images get added to liveImagesRef then processOne runs (includes pasted too)
+            await onExtract(ids)
+        } else if (pastedImages.length > 0) {
+            // Pasted images already in liveImagesRef, just run extraction
+            await onExtractPasted()
+        }
+    }, [selectedScreenshots, pastedImages, onExtract, onExtractPasted])
 
     // Screenshot tracking
     const selectedIds = useMemo(() =>
@@ -98,10 +124,21 @@ export default function WizardMatchReport({
         [selectedScreenshots],
     )
 
-    const allViewerQueueIds = useMemo(() => {
-        const otherIds = queueItems.filter(q => !selectedIds.includes(q.id)).map(q => q.id)
-        return [...selectedIds, ...otherIds]
-    }, [selectedIds, queueItems])
+    const allViewerImages = useMemo(() => {
+        const token = encodeURIComponent(localStorage.getItem('auth_token') || '')
+        const pastedImgs = pastedImages.map(p => ({ id: p.id, preview: p.preview }))
+        const selectedImgs = selectedIds.map(qId => ({
+            id: `q_${qId}`,
+            preview: `${API}/discord-image?queueId=${qId}&token=${token}`,
+        }))
+        const otherImgs = queueItems
+            .filter(q => !selectedIds.includes(q.id))
+            .map(q => ({
+                id: `q_${q.id}`,
+                preview: `${API}/discord-image?queueId=${q.id}&token=${token}`,
+            }))
+        return [...pastedImgs, ...selectedImgs, ...otherImgs]
+    }, [pastedImages, selectedIds, queueItems])
 
     const openViewer = useCallback((initialIndex = 0) => {
         setViewerInitialIndex(initialIndex)
@@ -123,6 +160,7 @@ export default function WizardMatchReport({
         }
 
         if (step.id === 'screenshots') {
+            const queueSelectedCount = Object.values(selectedScreenshots).filter(Boolean).length
             return (
                 <ScreenshotsStep
                     queueItems={queueItems}
@@ -134,10 +172,13 @@ export default function WizardMatchReport({
                         queueItems.forEach(q => { s[q.id] = !allSelected })
                         setSelectedScreenshots(s)
                     }}
+                    pastedImages={pastedImages}
+                    onPaste={handlePaste}
+                    onRemovePasted={removePastedImage}
                     onExtract={handleExtract}
                     extracting={status === 'processing'}
                     error={error}
-                    selectedCount={Object.values(selectedScreenshots).filter(Boolean).length}
+                    selectedCount={queueSelectedCount + pastedImages.length}
                 />
             )
         }
@@ -148,6 +189,7 @@ export default function WizardMatchReport({
                     editData={editData}
                     team1Name={team1Name} team2Name={team2Name}
                     team1Id={team1Id} team2Id={team2Id}
+                    pastedImages={pastedImages}
                     selectedIds={selectedIds}
                     queueItems={queueItems}
                     onViewScreenshot={openViewer}
@@ -199,6 +241,7 @@ export default function WizardMatchReport({
             <div>
                 <GameScreenshotBar
                     gameIndex={gameIndex}
+                    pastedImages={pastedImages}
                     selectedIds={selectedIds}
                     queueItems={queueItems}
                     onViewScreenshot={openViewer}
@@ -243,9 +286,9 @@ export default function WizardMatchReport({
                 </div>
             </div>
 
-            {viewerOpen && allViewerQueueIds.length > 0 && (
+            {viewerOpen && allViewerImages.length > 0 && (
                 <FloatingImageViewer
-                    queueItemIds={allViewerQueueIds}
+                    images={allViewerImages}
                     onClose={() => setViewerOpen(false)}
                     initialIndex={viewerInitialIndex}
                 />
@@ -375,11 +418,12 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, onExtrac
 // STEP: OVERVIEW
 // ═══════════════════════════════════════════════════
 
-function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, selectedIds, queueItems, onViewScreenshot, onStartAudit }) {
+function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, pastedImages, selectedIds, queueItems, onViewScreenshot, onStartAudit }) {
     const games = editData?.games || []
     const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
     const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
     const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
+    const pastedCount = pastedImages.length
 
     return (
         <div className="py-4">
@@ -394,15 +438,18 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, select
                     const rightCount = (g.right_players || []).filter(p => p.matched_lp_id).length
                     const totalPlayers = (g.left_players?.length || 0) + (g.right_players?.length || 0)
                     const matchedCount = leftCount + rightCount
-                    const screenshotId = selectedIds[i]
+                    const isPasted = i < pastedCount
+                    const screenshotSrc = isPasted
+                        ? pastedImages[i]?.preview
+                        : (() => { const qId = selectedIds[i - pastedCount]; return qId ? imgUrl(qId) : null })()
                     return (
                         <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-white/3 border border-[var(--color-border)]">
-                            {screenshotId && (
+                            {screenshotSrc && (
                                 <button
                                     onClick={() => onViewScreenshot(i)}
                                     className="w-16 aspect-[16/10] rounded overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)] transition shrink-0"
                                 >
-                                    <img src={imgUrl(screenshotId)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={screenshotSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
                                 </button>
                             )}
                             <span className="text-sm font-bold text-[var(--color-text)] w-16 shrink-0">Game {i + 1}</span>
@@ -453,19 +500,26 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, select
 // GAME SCREENSHOT BAR
 // ═══════════════════════════════════════════════════
 
-function GameScreenshotBar({ gameIndex, selectedIds, queueItems, onViewScreenshot }) {
+function GameScreenshotBar({ gameIndex, pastedImages, selectedIds, queueItems, onViewScreenshot }) {
     const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
     const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
 
-    const gameScreenshotId = selectedIds[gameIndex]
-    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
+    // Game screenshots: pasted images first, then selected queue items
+    const pastedCount = pastedImages.length
+    const isPasted = gameIndex < pastedCount
+    const gameScreenshotSrc = isPasted
+        ? pastedImages[gameIndex]?.preview
+        : (() => { const qId = selectedIds[gameIndex - pastedCount]; return qId ? imgUrl(qId) : null })()
 
-    if (!gameScreenshotId && !otherScreenshots.length) return null
+    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
+    const totalExtracted = pastedCount + selectedIds.length
+
+    if (!gameScreenshotSrc && !otherScreenshots.length) return null
 
     return (
         <div className="mb-5 pb-4 border-b border-[var(--color-border)]">
             <div className="flex items-start gap-4">
-                {gameScreenshotId && (
+                {gameScreenshotSrc && (
                     <div>
                         <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1.5 block">
                             Game {gameIndex + 1} screenshot
@@ -474,7 +528,7 @@ function GameScreenshotBar({ gameIndex, selectedIds, queueItems, onViewScreensho
                             onClick={() => onViewScreenshot(gameIndex)}
                             className="relative w-44 aspect-[16/10] rounded-lg overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)] transition group"
                         >
-                            <img src={imgUrl(gameScreenshotId)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            <img src={gameScreenshotSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition">
                                 <span className="text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition bg-black/50 px-2 py-0.5 rounded">
                                     Click to zoom
@@ -493,7 +547,7 @@ function GameScreenshotBar({ gameIndex, selectedIds, queueItems, onViewScreensho
                             {otherScreenshots.map((item, idx) => (
                                 <button
                                     key={item.id}
-                                    onClick={() => onViewScreenshot(selectedIds.length + idx)}
+                                    onClick={() => onViewScreenshot(totalExtracted + idx)}
                                     className="w-16 aspect-[16/10] rounded overflow-hidden border border-[var(--color-border)] hover:border-white/30 transition opacity-50 hover:opacity-100"
                                 >
                                     <img src={imgUrl(item.id)} alt="" className="w-full h-full object-cover" loading="lazy" />
