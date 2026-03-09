@@ -750,26 +750,24 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         const gameTime = set.gameTime
         const multBeforeSet = multiplier
 
-        // 1. Process missed team matches as virtual sets (each goes through game_decay + INACTIVITY_DECAY factor)
+        // 1. Count missed team matches between sets — added as one compound virtual game to the average
         const setSnap = getCfgAtTime(configHistory, gameTime, cfg)
         let missedBetween = 0
+        let inactivityFactor = null
         if (lastGameTime !== null) {
-            const missed = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId))
-            missedBetween = missed.length
-            for (const m of missed) {
-                const mSnap = getCfgAtTime(configHistory, m.date, cfg)
-                const mDecayed = 1 + (multiplier - 1) * mSnap.GAME_DECAY
-                multiplier = compressMultiplier(mDecayed * mSnap.INACTIVITY_DECAY, cfg)
+            missedBetween = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId)).length
+            if (missedBetween > 0) {
+                inactivityFactor = Math.pow(setSnap.INACTIVITY_DECAY, missedBetween)
             }
         }
 
         // 2. Per-set regression toward 1.0
-        const multAfterInactivity = multiplier
         const decayed = 1 + (multiplier - 1) * setSnap.GAME_DECAY
 
         // 3. Calculate per-game factors and average them across the set
+        //    If there was inactivity, INACTIVITY_DECAY^N is added as one virtual game
         const setEntries = []
-        let factorSum = 0
+        let factorSum = inactivityFactor || 0
         for (const { game, avgs } of set.gameData) {
             const gameTimeMs = new Date(game.match_date).getTime()
             const snap = getCfgAtTime(configHistory, gameTimeMs, cfg)
@@ -838,21 +836,22 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
             }
         }
 
-        const avgFactor = factorSum / set.gameData.length
+        const gameCount = set.gameData.length + (inactivityFactor ? 1 : 0)
+        const avgFactor = factorSum / gameCount
         const preCompression = decayed * avgFactor
         multiplier = compressMultiplier(preCompression, cfg)
 
         // Annotate trace entries with set info
-        const inactivityApplied = missedBetween > 0
-            ? { weeks: missedBetween, factor: setSnap.INACTIVITY_DECAY, multBefore: multBeforeSet, multAfter: multAfterInactivity }
+        const inactivityApplied = inactivityFactor
+            ? { weeks: missedBetween, compoundFactor: inactivityFactor, gameCount }
             : null
         for (let i = 0; i < setEntries.length; i++) {
             const entry = setEntries[i]
-            entry.setGameCount = setEntries.length
+            entry.setGameCount = set.gameData.length
             entry.setPosition = i + 1
             entry.isLastInSet = (i === setEntries.length - 1)
             entry.inactivityDecay = (i === 0) ? inactivityApplied : null
-            entry.gameDecay = { before: multAfterInactivity, after: decayed }
+            entry.gameDecay = { before: multBeforeSet, after: decayed }
             entry.setAvgFactor = avgFactor
             entry.preCompression = preCompression
             entry.multiplierAfter = multiplier
@@ -862,18 +861,16 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         lastGameTime = gameTime
     }
 
-    // Final inactivity decay — each missed match is a virtual set (game_decay + INACTIVITY_DECAY factor)
+    // Final inactivity decay — one virtual set with compound factor INACTIVITY_DECAY^N
     let finalInactivityDecay = null
     if (lastGameTime !== null) {
-        const missedSinceLast = teamMatches.filter(m => m.date > lastGameTime && !playerMatchIds.has(m.matchId))
-        if (missedSinceLast.length > 0) {
+        const missedSinceLast = teamMatches.filter(m => m.date > lastGameTime && !playerMatchIds.has(m.matchId)).length
+        if (missedSinceLast > 0) {
             const before = multiplier
-            for (const m of missedSinceLast) {
-                const mSnap = getCfgAtTime(configHistory, m.date, cfg)
-                const mDecayed = 1 + (multiplier - 1) * mSnap.GAME_DECAY
-                multiplier = compressMultiplier(mDecayed * mSnap.INACTIVITY_DECAY, cfg)
-            }
-            finalInactivityDecay = { weeks: missedSinceLast.length, before, after: multiplier }
+            const decayed = 1 + (multiplier - 1) * cfg.GAME_DECAY
+            const factor = Math.pow(cfg.INACTIVITY_DECAY, missedSinceLast)
+            multiplier = compressMultiplier(decayed * factor, cfg)
+            finalInactivityDecay = { weeks: missedSinceLast, before, after: multiplier }
         }
     }
 
