@@ -750,24 +750,20 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
         const gameTime = set.gameTime
         const multBeforeSet = multiplier
 
-        // 1. Inactivity decay between sets (only for team matches the player missed)
+        // 1. Count missed team matches between sets (included as virtual games in averaging)
         const setSnap = getCfgAtTime(configHistory, gameTime, cfg)
-        let inactivityApplied = null
+        let missedBetween = 0
         if (lastGameTime !== null) {
-            const missedMatches = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId)).length
-            if (missedMatches > 0) {
-                const factor = Math.pow(setSnap.INACTIVITY_DECAY, missedMatches)
-                multiplier = compressMultiplier(multiplier * factor, cfg)
-                inactivityApplied = { weeks: missedMatches, factor, multAfter: multiplier }
-            }
+            missedBetween = teamMatches.filter(m => m.date > lastGameTime && m.date < gameTime && !playerMatchIds.has(m.matchId)).length
         }
 
         // 2. Per-set regression toward 1.0
         const decayed = 1 + (multiplier - 1) * setSnap.GAME_DECAY
 
         // 3. Calculate per-game factors and average them across the set
+        //    Missed matches count as virtual games with factor = INACTIVITY_DECAY
         const setEntries = []
-        let factorSum = 0
+        let factorSum = missedBetween * setSnap.INACTIVITY_DECAY
         for (const { game, avgs } of set.gameData) {
             const gameTimeMs = new Date(game.match_date).getTime()
             const snap = getCfgAtTime(configHistory, gameTimeMs, cfg)
@@ -836,17 +832,21 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
             }
         }
 
-        const avgFactor = factorSum / set.gameData.length
+        const totalFactorCount = set.gameData.length + missedBetween
+        const avgFactor = factorSum / totalFactorCount
         const preCompression = decayed * avgFactor
         multiplier = compressMultiplier(preCompression, cfg)
 
         // Annotate trace entries with set info
+        const inactivityInAvg = missedBetween > 0
+            ? { weeks: missedBetween, virtualFactor: setSnap.INACTIVITY_DECAY, totalFactorCount }
+            : null
         for (let i = 0; i < setEntries.length; i++) {
             const entry = setEntries[i]
             entry.setGameCount = setEntries.length
             entry.setPosition = i + 1
             entry.isLastInSet = (i === setEntries.length - 1)
-            entry.inactivityDecay = (i === 0) ? inactivityApplied : null
+            entry.inactivityDecay = (i === 0) ? inactivityInAvg : null
             entry.gameDecay = { before: multBeforeSet, after: decayed }
             entry.setAvgFactor = avgFactor
             entry.preCompression = preCompression

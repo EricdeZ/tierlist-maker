@@ -864,7 +864,7 @@ function GameDetail({ game: g, cfg }) {
             {/* Inactivity decay if applied */}
             {g.inactivityDecay && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 text-red-400">
-                    Inactivity decay: {g.inactivityDecay.weeks}w gap — mult {g.multiplierBefore.toFixed(4)} &rarr; {g.inactivityDecay.multAfter.toFixed(4)}
+                    Inactivity: {g.inactivityDecay.weeks} missed match{g.inactivityDecay.weeks > 1 ? 'es' : ''} averaged in as {g.inactivityDecay.virtualFactor.toFixed(2)}x ({g.inactivityDecay.totalFactorCount} total factors)
                 </div>
             )}
 
