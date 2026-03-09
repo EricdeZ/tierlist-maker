@@ -809,12 +809,13 @@ export async function recalcForgePerformance(sql, seasonId) {
         JOIN matches m ON g.match_id = m.id
         JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
         WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
           AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
           AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
         ORDER BY m.date ASC, g.id ASC
     `
 
-    if (allGames.length === 0) return { status: 'skipped', reason: 'no_games', detail: 'No completed games found for this season' }
+    if (allGames.length === 0) return { status: 'skipped', reason: 'no_games', detail: 'No completed games found for this season (players may all be subs or have no role)' }
 
     // ── Pre-computation: player strengths, god averages, opponent lookup ──
 
@@ -1251,6 +1252,7 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
         JOIN matches m ON g.match_id = m.id
         JOIN team_kills tk ON tk.game_id = pgs.game_id AND tk.team_side = pgs.team_side
         WHERE lp.season_id = ${seasonId}
+          AND lp.roster_status != 'sub'
           AND COALESCE(pgs.role_played, lp.role) IS NOT NULL
           AND LOWER(COALESCE(pgs.role_played, lp.role)) != 'fill'
         ORDER BY m.date ASC, g.id ASC
