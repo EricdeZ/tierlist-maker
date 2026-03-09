@@ -285,108 +285,88 @@ export async function ensurePlayerSparks(sql, marketId, seasonId) {
  * When dryRun=true, returns a preview of what would happen without making changes.
  */
 export async function cleanupSubSparks(sql, dryRun = false) {
+    if (dryRun) {
+        // Single query preview — no per-row loops
+        const preview = await sql`
+            SELECT ps.id as "sparkId", ps.league_player_id as "subLpId", ps.market_id,
+                   ps.total_sparks, p.name as "playerName", t_sub.name as "subTeam",
+                   main_lp.id as "targetLpId", main_lp.roster_status as "targetStatus",
+                   t_main.name as "targetTeam",
+                   COALESCE(holdings.cnt, 0)::integer as holdings,
+                   CASE
+                       WHEN main_lp.id IS NULL THEN 'orphaned'
+                       WHEN COALESCE(holdings.cnt, 0) = 0 THEN 'delete'
+                       ELSE 'move'
+                   END as action
+            FROM player_sparks ps
+            JOIN league_players lp ON ps.league_player_id = lp.id
+            JOIN players p ON lp.player_id = p.id
+            LEFT JOIN teams t_sub ON lp.team_id = t_sub.id
+            JOIN forge_markets fm ON ps.market_id = fm.id
+            LEFT JOIN LATERAL (
+                SELECT lp2.id, lp2.roster_status, lp2.team_id
+                FROM league_players lp2
+                WHERE lp2.player_id = lp.player_id
+                  AND lp2.season_id = lp.season_id
+                  AND lp2.roster_status != 'sub'
+                  AND lp2.is_active = true
+                ORDER BY CASE lp2.roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
+                LIMIT 1
+            ) main_lp ON true
+            LEFT JOIN teams t_main ON main_lp.team_id = t_main.id
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*)::integer as cnt FROM spark_holdings sh
+                WHERE sh.spark_id = ps.id AND sh.sparks > 0
+            ) holdings ON true
+            WHERE lp.roster_status = 'sub'
+            ORDER BY p.name
+        `
+        return { preview: preview.map(r => ({ ...r, totalSparks: Number(r.total_sparks) })) }
+    }
+
     // Find all sparks on sub league_players
     const subSparks = await sql`
         SELECT ps.id as spark_id, ps.league_player_id as sub_lp_id, ps.market_id,
                ps.total_sparks, ps.perf_multiplier, ps.current_price,
                ps.sell_pressure, ps.sell_pressure_updated_at,
-               lp.player_id, lp.season_id, lp.roster_status as sub_roster_status,
-               fm.base_price,
-               p.name as player_name,
-               t_sub.name as sub_team_name
+               lp.player_id, lp.season_id,
+               fm.base_price
         FROM player_sparks ps
         JOIN league_players lp ON ps.league_player_id = lp.id
-        JOIN players p ON lp.player_id = p.id
-        LEFT JOIN teams t_sub ON lp.team_id = t_sub.id
         JOIN forge_markets fm ON ps.market_id = fm.id
         WHERE lp.roster_status = 'sub'
     `
-    if (subSparks.length === 0) {
-        return dryRun ? { preview: [] } : { moved: 0, deleted: 0, orphaned: 0 }
-    }
+    if (subSparks.length === 0) return { moved: 0, deleted: 0, orphaned: 0 }
 
     let moved = 0, deleted = 0, orphaned = 0
-    const preview = []
 
     for (const sub of subSparks) {
-        // Find non-sub LP for same player in same season
         const [mainLp] = await sql`
-            SELECT lp.id, lp.roster_status, t.name as team_name
-            FROM league_players lp
-            LEFT JOIN teams t ON lp.team_id = t.id
-            WHERE lp.player_id = ${sub.player_id}
-              AND lp.season_id = ${sub.season_id}
-              AND lp.roster_status != 'sub'
-              AND lp.is_active = true
-            ORDER BY CASE lp.roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
+            SELECT id FROM league_players
+            WHERE player_id = ${sub.player_id}
+              AND season_id = ${sub.season_id}
+              AND roster_status != 'sub'
+              AND is_active = true
+            ORDER BY CASE roster_status WHEN 'captain' THEN 0 WHEN 'co_captain' THEN 1 ELSE 2 END
             LIMIT 1
         `
 
-        // Check if sub spark has any holdings
+        if (!mainLp) { orphaned++; continue }
+
         const [holdingCount] = await sql`
             SELECT COUNT(*) as cnt FROM spark_holdings WHERE spark_id = ${sub.spark_id} AND sparks > 0
         `
-        const holdings = Number(holdingCount.cnt)
 
-        if (!mainLp) {
-            if (dryRun) {
-                preview.push({
-                    action: 'orphaned',
-                    playerName: sub.player_name,
-                    sparkId: sub.spark_id,
-                    subLpId: sub.sub_lp_id,
-                    subTeam: sub.sub_team_name,
-                    holdings,
-                    totalSparks: Number(sub.total_sparks),
-                })
-            }
-            orphaned++
-            continue
-        }
-
-        if (holdings === 0) {
-            if (dryRun) {
-                preview.push({
-                    action: 'delete',
-                    playerName: sub.player_name,
-                    sparkId: sub.spark_id,
-                    subLpId: sub.sub_lp_id,
-                    subTeam: sub.sub_team_name,
-                    targetLpId: mainLp.id,
-                    targetTeam: mainLp.team_name,
-                    targetStatus: mainLp.roster_status,
-                    holdings: 0,
-                    totalSparks: Number(sub.total_sparks),
-                })
-            } else {
-                await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
-                await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
-                await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
-            }
+        if (Number(holdingCount.cnt) === 0) {
+            await sql`DELETE FROM spark_price_history WHERE spark_id = ${sub.spark_id}`
+            await sql`DELETE FROM forge_pending_updates WHERE spark_id = ${sub.spark_id}`
+            await sql`DELETE FROM player_sparks WHERE id = ${sub.spark_id}`
             deleted++
             continue
         }
 
-        // Has holdings — will move to main LP
-        if (dryRun) {
-            const [existingMain] = await sql`
-                SELECT id FROM player_sparks
-                WHERE league_player_id = ${mainLp.id} AND market_id = ${sub.market_id}
-            `
-            preview.push({
-                action: 'move',
-                playerName: sub.player_name,
-                sparkId: sub.spark_id,
-                subLpId: sub.sub_lp_id,
-                subTeam: sub.sub_team_name,
-                targetLpId: mainLp.id,
-                targetTeam: mainLp.team_name,
-                targetStatus: mainLp.roster_status,
-                targetHasExistingSpark: !!existingMain,
-                holdings,
-                totalSparks: Number(sub.total_sparks),
-            })
-        } else {
+        // Has holdings — move to main LP
+        {
             let [mainSpark] = await sql`
                 SELECT id, total_sparks, sell_pressure, sell_pressure_updated_at
                 FROM player_sparks
@@ -428,7 +408,6 @@ export async function cleanupSubSparks(sql, dryRun = false) {
         moved++
     }
 
-    if (dryRun) return { preview }
     return { moved, deleted, orphaned }
 }
 
