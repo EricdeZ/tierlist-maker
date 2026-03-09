@@ -220,15 +220,44 @@ export function MatchReportCard({
 
     const discordGroups = useMemo(() => groupDiscordItems(filteredDiscordItems), [filteredDiscordItems])
 
-    const discordSelectedIds = Object.keys(discordSelectedImages).filter(k => discordSelectedImages[k]).map(Number)
+    const discordSelectedIds = Object.entries(discordSelectedImages)
+        .filter(([, v]) => v)
+        .sort(([, a], [, b]) => a - b)
+        .map(([k]) => Number(k))
     const discordSelectedCount = discordSelectedIds.length
 
-    const toggleDiscordImage = (id) => setDiscordSelectedImages(prev => ({ ...prev, [id]: !prev[id] }))
+    const toggleDiscordImage = (id) => setDiscordSelectedImages(prev => {
+        if (prev[id]) {
+            const removed = prev[id]
+            const next = { ...prev }
+            delete next[id]
+            for (const k in next) {
+                if (next[k] > removed) next[k]--
+            }
+            return next
+        }
+        const max = Math.max(0, ...Object.values(prev).filter(Boolean))
+        return { ...prev, [id]: max + 1 }
+    })
     const toggleDiscordGroup = (group) => {
         const allSelected = group.items.every(item => discordSelectedImages[item.id])
-        const next = { ...discordSelectedImages }
-        for (const item of group.items) next[item.id] = !allSelected
-        setDiscordSelectedImages(next)
+        if (allSelected) {
+            // Deselect all in group, renumber remaining
+            const toRemove = new Set(group.items.map(item => item.id))
+            const next = {}
+            const remaining = Object.entries(discordSelectedImages)
+                .filter(([k, v]) => v && !toRemove.has(Number(k)))
+                .sort(([, a], [, b]) => a - b)
+            remaining.forEach(([k], i) => { next[k] = i + 1 })
+            setDiscordSelectedImages(next)
+        } else {
+            const next = { ...discordSelectedImages }
+            let max = Math.max(0, ...Object.values(next).filter(Boolean))
+            for (const item of group.items) {
+                if (!next[item.id]) next[item.id] = ++max
+            }
+            setDiscordSelectedImages(next)
+        }
     }
     const isDiscordGroupSelected = (group) => group.items.every(item => discordSelectedImages[item.id])
     const isDiscordGroupPartial = (group) => group.items.some(item => discordSelectedImages[item.id]) && !isDiscordGroupSelected(group)
@@ -607,11 +636,12 @@ export function MatchReportCard({
                                                                 onError={e => { e.target.style.display = 'none' }}
                                                             />
                                                             {discordSelectedImages[item.id] && (
-                                                                <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center">
-                                                                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                                                        <path d="M2 6l3 3 5-5" />
-                                                                    </svg>
-                                                                </div>
+                                                                <>
+                                                                    <div className="absolute inset-0 bg-blue-600/30 pointer-events-none" />
+                                                                    <span className="absolute top-0 left-0 bg-blue-600/90 text-white text-[7px] font-bold px-0.5 rounded-br">
+                                                                        GAME {discordSelectedImages[item.id]}
+                                                                    </span>
+                                                                </>
                                                             )}
                                                         </div>
                                                     ))}

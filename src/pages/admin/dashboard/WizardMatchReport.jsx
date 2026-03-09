@@ -20,8 +20,8 @@ export default function WizardMatchReport({
     onSubmit, isSubmitting, submitResult,
 }) {
     const [stepIndex, setStepIndex] = useState(0)
-    const [selectedScreenshots, setSelectedScreenshots] = useState({})
-    const [pastedImages, setPastedImages] = useState([])
+    const [selections, setSelections] = useState({}) // { [pasteId|queueId]: gameNumber }
+    const [pastedImages, setPastedImages] = useState([]) // { id, preview, file }
     const [viewerOpen, setViewerOpen] = useState(false)
     const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
     const prevStatusRef = useRef(status)
@@ -86,17 +86,39 @@ export default function WizardMatchReport({
         })
     }, [onUpdateEditData])
 
-    // Paste handler
+    // Unified toggle for both pasted and discord selections
+    const toggleSelection = useCallback((key) => {
+        setSelections(prev => {
+            if (prev[key]) {
+                const removed = prev[key]
+                const next = { ...prev }
+                delete next[key]
+                for (const k in next) if (next[k] > removed) next[k]--
+                return next
+            }
+            const max = Math.max(0, ...Object.values(prev).filter(Boolean))
+            return { ...prev, [key]: max + 1 }
+        })
+    }, [])
+
+    // Paste handler — auto-selects with next game numbers
     const handlePaste = useCallback((files) => {
         const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
         if (!imageFiles.length) return
         const newPasted = imageFiles.map((file, i) => ({
             id: `paste_${Date.now()}_${i}`,
             preview: URL.createObjectURL(file),
+            file,
         }))
         setPastedImages(prev => [...prev, ...newPasted])
-        onAddImages(imageFiles)
-    }, [onAddImages])
+        // Auto-select with next game numbers
+        setSelections(prev => {
+            const next = { ...prev }
+            let max = Math.max(0, ...Object.values(next).filter(Boolean))
+            for (const img of newPasted) next[img.id] = ++max
+            return next
+        })
+    }, [])
 
     const removePastedImage = useCallback((id) => {
         setPastedImages(prev => {
@@ -104,41 +126,70 @@ export default function WizardMatchReport({
             if (img?.preview) URL.revokeObjectURL(img.preview)
             return prev.filter(p => p.id !== id)
         })
+        // Also deselect
+        setSelections(prev => {
+            if (!prev[id]) return prev
+            const removed = prev[id]
+            const next = { ...prev }
+            delete next[id]
+            for (const k in next) if (next[k] > removed) next[k]--
+            return next
+        })
     }, [])
 
-    // Handle extract
-    const handleExtract = useCallback(async () => {
-        const ids = Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number).sort((a, b) => a - b)
-        if (ids.length > 0) {
-            // Discord images get added to liveImagesRef then processOne runs (includes pasted too)
-            await onExtract(ids)
-        } else if (pastedImages.length > 0) {
-            // Pasted images already in liveImagesRef, just run extraction
-            await onExtractPasted()
-        }
-    }, [selectedScreenshots, pastedImages, onExtract, onExtractPasted])
+    // Derive selected IDs sorted by game number — split into pasted and discord
+    const pastedIds = useMemo(() => new Set(pastedImages.map(p => p.id)), [pastedImages])
 
-    // Screenshot tracking
-    const selectedIds = useMemo(() =>
-        Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k]).map(Number).sort((a, b) => a - b),
-        [selectedScreenshots],
+    const selectedDiscordIds = useMemo(() =>
+        Object.entries(selections)
+            .filter(([k, v]) => v && !pastedIds.has(k))
+            .sort(([, a], [, b]) => a - b)
+            .map(([k]) => Number(k)),
+        [selections, pastedIds],
     )
 
+    const selectedPastedInOrder = useMemo(() =>
+        Object.entries(selections)
+            .filter(([k, v]) => v && pastedIds.has(k))
+            .sort(([, a], [, b]) => a - b)
+            .map(([k]) => pastedImages.find(p => p.id === k))
+            .filter(Boolean),
+        [selections, pastedIds, pastedImages],
+    )
+
+    const selectedCount = useMemo(() =>
+        Object.values(selections).filter(Boolean).length,
+        [selections],
+    )
+
+    // Handle extract — add selected pasted files to liveRef, then process
+    const handleExtract = useCallback(async () => {
+        if (selectedPastedInOrder.length > 0) {
+            onAddImages(selectedPastedInOrder.map(p => p.file))
+        }
+        if (selectedDiscordIds.length > 0) {
+            await onExtract(selectedDiscordIds)
+        } else if (selectedPastedInOrder.length > 0) {
+            await onExtractPasted()
+        }
+    }, [selectedPastedInOrder, selectedDiscordIds, onAddImages, onExtract, onExtractPasted])
+
+    // All images for viewer: selected pasted, selected discord, other discord
     const allViewerImages = useMemo(() => {
         const token = encodeURIComponent(localStorage.getItem('auth_token') || '')
-        const pastedImgs = pastedImages.map(p => ({ id: p.id, preview: p.preview }))
-        const selectedImgs = selectedIds.map(qId => ({
+        const pastedImgs = selectedPastedInOrder.map(p => ({ id: p.id, preview: p.preview }))
+        const selectedImgs = selectedDiscordIds.map(qId => ({
             id: `q_${qId}`,
             preview: `${API}/discord-image?queueId=${qId}&token=${token}`,
         }))
         const otherImgs = queueItems
-            .filter(q => !selectedIds.includes(q.id))
+            .filter(q => !selectedDiscordIds.includes(q.id))
             .map(q => ({
                 id: `q_${q.id}`,
                 preview: `${API}/discord-image?queueId=${q.id}&token=${token}`,
             }))
         return [...pastedImgs, ...selectedImgs, ...otherImgs]
-    }, [pastedImages, selectedIds, queueItems])
+    }, [selectedPastedInOrder, selectedDiscordIds, queueItems])
 
     const openViewer = useCallback((initialIndex = 0) => {
         setViewerInitialIndex(initialIndex)
@@ -160,17 +211,36 @@ export default function WizardMatchReport({
         }
 
         if (step.id === 'screenshots') {
-            const queueSelectedCount = Object.values(selectedScreenshots).filter(Boolean).length
             return (
                 <ScreenshotsStep
                     queueItems={queueItems}
-                    selected={selectedScreenshots}
-                    onToggle={id => setSelectedScreenshots(p => ({ ...p, [id]: !p[id] }))}
+                    selections={selections}
+                    onToggle={toggleSelection}
                     onSelectAll={() => {
-                        const allSelected = queueItems.every(q => selectedScreenshots[q.id])
-                        const s = {}
-                        queueItems.forEach(q => { s[q.id] = !allSelected })
-                        setSelectedScreenshots(s)
+                        const allSelected = queueItems.every(q => selections[q.id])
+                        if (allSelected) {
+                            // Remove all discord selections, keep pasted
+                            setSelections(prev => {
+                                const next = {}
+                                const removed = []
+                                for (const [k, v] of Object.entries(prev)) {
+                                    if (pastedIds.has(k)) next[k] = v
+                                    else removed.push(v)
+                                }
+                                // Renumber pasted to fill gaps
+                                const entries = Object.entries(next).sort(([, a], [, b]) => a - b)
+                                const renumbered = {}
+                                entries.forEach(([k], i) => { renumbered[k] = i + 1 })
+                                return renumbered
+                            })
+                        } else {
+                            setSelections(prev => {
+                                const next = { ...prev }
+                                let max = Math.max(0, ...Object.values(next).filter(Boolean))
+                                queueItems.forEach(q => { if (!next[q.id]) next[q.id] = ++max })
+                                return next
+                            })
+                        }
                     }}
                     pastedImages={pastedImages}
                     onPaste={handlePaste}
@@ -178,7 +248,7 @@ export default function WizardMatchReport({
                     onExtract={handleExtract}
                     extracting={status === 'processing'}
                     error={error}
-                    selectedCount={queueSelectedCount + pastedImages.length}
+                    selectedCount={selectedCount}
                 />
             )
         }
@@ -189,8 +259,8 @@ export default function WizardMatchReport({
                     editData={editData}
                     team1Name={team1Name} team2Name={team2Name}
                     team1Id={team1Id} team2Id={team2Id}
-                    pastedImages={pastedImages}
-                    selectedIds={selectedIds}
+                    selectedPasted={selectedPastedInOrder}
+                    selectedDiscordIds={selectedDiscordIds}
                     queueItems={queueItems}
                     onViewScreenshot={openViewer}
                     onStartAudit={next}
@@ -241,8 +311,8 @@ export default function WizardMatchReport({
             <div>
                 <GameScreenshotBar
                     gameIndex={gameIndex}
-                    pastedImages={pastedImages}
-                    selectedIds={selectedIds}
+                    selectedPasted={selectedPastedInOrder}
+                    selectedDiscordIds={selectedDiscordIds}
                     queueItems={queueItems}
                     onViewScreenshot={openViewer}
                 />
@@ -337,7 +407,7 @@ function ConfirmStep({ matchInfo, onConfirm }) {
 // STEP: SELECT SCREENSHOTS
 // ═══════════════════════════════════════════════════
 
-function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, pastedImages, onPaste, onRemovePasted, onExtract, extracting, error, selectedCount }) {
+function ScreenshotsStep({ queueItems, selections, onToggle, onSelectAll, pastedImages, onPaste, onRemovePasted, onExtract, extracting, error, selectedCount }) {
     const [dragOver, setDragOver] = useState(false)
     const fileInputRef = useRef(null)
 
@@ -413,18 +483,36 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, pastedIm
                         Pasted screenshots ({pastedImages.length})
                     </span>
                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                        {pastedImages.map(img => (
-                            <div key={img.id} className="relative aspect-[16/10] rounded-lg overflow-hidden border-2 border-green-500 ring-1 ring-green-500/30">
-                                <img src={img.preview} alt="" className="w-full h-full object-cover" />
-                                <button
-                                    onClick={() => onRemovePasted(img.id)}
-                                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center text-[10px] leading-none"
+                        {pastedImages.map((img) => {
+                            const gameNum = selections[img.id]
+                            return (
+                                <div
+                                    key={img.id}
+                                    onClick={() => onToggle(img.id)}
+                                    className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+                                        gameNum
+                                            ? 'border-green-500 ring-1 ring-green-500/30'
+                                            : 'border-transparent hover:border-white/20'
+                                    }`}
                                 >
-                                    &times;
-                                </button>
-                                <div className="absolute inset-0 bg-green-600/20 pointer-events-none" />
-                            </div>
-                        ))}
+                                    <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                                    {gameNum && (
+                                        <>
+                                            <div className="absolute inset-0 bg-green-600/20 pointer-events-none" />
+                                            <span className="absolute top-0.5 left-0.5 bg-green-600/90 text-white text-[9px] font-bold px-1 rounded">
+                                                GAME {gameNum}
+                                            </span>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onRemovePasted(img.id) }}
+                                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center text-[10px] leading-none"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             )}
@@ -437,35 +525,39 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, pastedIm
                             {queueItems.length} from Discord
                         </span>
                         <button onClick={onSelectAll} className="text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition">
-                            {queueItems.every(q => selected[q.id]) ? 'Deselect All' : 'Select All'}
+                            {queueItems.every(q => selections[q.id]) ? 'Deselect All' : 'Select All'}
                         </button>
                     </div>
 
                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-6">
-                        {queueItems.map(item => (
-                            <div
-                                key={item.id}
-                                onClick={() => onToggle(item.id)}
-                                className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
-                                    selected[item.id]
-                                        ? 'border-green-500 ring-1 ring-green-500/30'
-                                        : 'border-transparent hover:border-white/20'
-                                }`}
-                            >
-                                <img
-                                    src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
-                                    alt="" className="w-full h-full object-cover" loading="lazy"
-                                    onError={e => { e.target.style.display = 'none' }}
-                                />
-                                {selected[item.id] && (
-                                    <div className="absolute inset-0 bg-green-600/30 flex items-center justify-center">
-                                        <svg className="w-5 h-5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M2 6l3 3 5-5" />
-                                        </svg>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                        {queueItems.map(item => {
+                            const gameNum = selections[item.id]
+                            return (
+                                <div
+                                    key={item.id}
+                                    onClick={() => onToggle(item.id)}
+                                    className={`relative aspect-[16/10] rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+                                        gameNum
+                                            ? 'border-green-500 ring-1 ring-green-500/30'
+                                            : 'border-transparent hover:border-white/20'
+                                    }`}
+                                >
+                                    <img
+                                        src={`${API}/discord-image?queueId=${item.id}&token=${encodeURIComponent(localStorage.getItem('auth_token') || '')}`}
+                                        alt="" className="w-full h-full object-cover" loading="lazy"
+                                        onError={e => { e.target.style.display = 'none' }}
+                                    />
+                                    {gameNum && (
+                                        <>
+                                            <div className="absolute inset-0 bg-green-600/30 pointer-events-none" />
+                                            <span className="absolute top-0.5 left-0.5 bg-green-600/90 text-white text-[9px] font-bold px-1 rounded">
+                                                GAME {gameNum}
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                 </>
             )}
@@ -494,12 +586,12 @@ function ScreenshotsStep({ queueItems, selected, onToggle, onSelectAll, pastedIm
 // STEP: OVERVIEW
 // ═══════════════════════════════════════════════════
 
-function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, pastedImages, selectedIds, queueItems, onViewScreenshot, onStartAudit }) {
+function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, selectedPasted, selectedDiscordIds, queueItems, onViewScreenshot, onStartAudit }) {
     const games = editData?.games || []
     const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
     const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
-    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
-    const pastedCount = pastedImages.length
+    const otherScreenshots = queueItems.filter(q => !selectedDiscordIds.includes(q.id))
+    const pastedCount = selectedPasted.length
 
     return (
         <div className="py-4">
@@ -516,8 +608,8 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, pasted
                     const matchedCount = leftCount + rightCount
                     const isPasted = i < pastedCount
                     const screenshotSrc = isPasted
-                        ? pastedImages[i]?.preview
-                        : (() => { const qId = selectedIds[i - pastedCount]; return qId ? imgUrl(qId) : null })()
+                        ? selectedPasted[i]?.preview
+                        : (() => { const qId = selectedDiscordIds[i - pastedCount]; return qId ? imgUrl(qId) : null })()
                     return (
                         <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-white/3 border border-[var(--color-border)]">
                             {screenshotSrc && (
@@ -549,7 +641,7 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, pasted
                         {otherScreenshots.map((item, idx) => (
                             <button
                                 key={item.id}
-                                onClick={() => onViewScreenshot(selectedIds.length + idx)}
+                                onClick={() => onViewScreenshot(pastedCount + selectedDiscordIds.length + idx)}
                                 className="w-20 aspect-[16/10] rounded-lg overflow-hidden border border-[var(--color-border)] hover:border-white/30 transition opacity-60 hover:opacity-100"
                             >
                                 <img src={imgUrl(item.id)} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -576,19 +668,19 @@ function OverviewStep({ editData, team1Name, team2Name, team1Id, team2Id, pasted
 // GAME SCREENSHOT BAR
 // ═══════════════════════════════════════════════════
 
-function GameScreenshotBar({ gameIndex, pastedImages, selectedIds, queueItems, onViewScreenshot }) {
+function GameScreenshotBar({ gameIndex, selectedPasted, selectedDiscordIds, queueItems, onViewScreenshot }) {
     const token = useMemo(() => encodeURIComponent(localStorage.getItem('auth_token') || ''), [])
     const imgUrl = (qId) => `${API}/discord-image?queueId=${qId}&token=${token}`
 
     // Game screenshots: pasted images first, then selected queue items
-    const pastedCount = pastedImages.length
+    const pastedCount = selectedPasted.length
     const isPasted = gameIndex < pastedCount
     const gameScreenshotSrc = isPasted
-        ? pastedImages[gameIndex]?.preview
-        : (() => { const qId = selectedIds[gameIndex - pastedCount]; return qId ? imgUrl(qId) : null })()
+        ? selectedPasted[gameIndex]?.preview
+        : (() => { const qId = selectedDiscordIds[gameIndex - pastedCount]; return qId ? imgUrl(qId) : null })()
 
-    const otherScreenshots = queueItems.filter(q => !selectedIds.includes(q.id))
-    const totalExtracted = pastedCount + selectedIds.length
+    const otherScreenshots = queueItems.filter(q => !selectedDiscordIds.includes(q.id))
+    const totalExtracted = pastedCount + selectedDiscordIds.length
 
     if (!gameScreenshotSrc && !otherScreenshots.length) return null
 
@@ -793,6 +885,35 @@ function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
                 </TeamColumn>
             </div>
             <CorrectButton onClick={onNext} />
+
+            {/* Legend */}
+            <div className="mt-4 pt-3 border-t border-[var(--color-border)] space-y-1.5">
+                <div className="flex items-center gap-4 text-[10px] text-[var(--color-text-secondary)]">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 shrink-0" /> Matched to roster — still verify it's correct</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" /> Sub (not on this team's roster)</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Unmatched — click to search roster</span>
+                </div>
+                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    When a name shows <span className="text-[var(--color-text)]">&rarr; Roster Name</span> below it, the player was matched via an alias. <span className="text-blue-400/70">(alias)</span> confirms the alias used.
+                </p>
+            </div>
+        </div>
+    )
+}
+
+
+// ─── Reusable player label with god icon ───
+
+function PlayerLabel({ player, gods, className = 'w-24' }) {
+    const godImg = player.god_played && gods?.find(g => g.name === player.god_played)?.image_url
+    return (
+        <div className={`flex items-center gap-1.5 shrink-0 min-w-0 ${className}`}>
+            {godImg ? (
+                <img src={godImg} alt="" className="w-4 h-4 rounded-sm shrink-0" />
+            ) : (
+                <span className="w-4 h-4 shrink-0" />
+            )}
+            <span className="text-xs text-[var(--color-text)] truncate">{player.player_name}</span>
         </div>
     )
 }
@@ -810,7 +931,7 @@ function GodsStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Colo
                 <TeamColumn label={team1Name} color={team1Color}>
                     {(game.left_players || []).map((p, i) => (
                         <div key={i} className="flex items-center gap-2 py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} />
                             <div className="flex-1">
                                 <GodAutocomplete
                                     value={p.god_played || ''}
@@ -824,7 +945,7 @@ function GodsStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Colo
                 <TeamColumn label={team2Name} color={team2Color}>
                     {(game.right_players || []).map((p, i) => (
                         <div key={i} className="flex items-center gap-2 py-0.5">
-                            <span className="text-xs text-[var(--color-text)] w-24 truncate">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} />
                             <div className="flex-1">
                                 <GodAutocomplete
                                     value={p.god_played || ''}
@@ -882,16 +1003,16 @@ function RolePicker({ player, onUpdate, allPlayers, side, gameIndex, updatePlaye
     )
 }
 
-function RolePlayerRow({ player, side, index, gameIndex, allPlayers, updatePlayer }) {
+function RolePlayerRow({ player, side, index, gameIndex, allPlayers, updatePlayer, gods }) {
     return (
         <div className="flex items-center justify-between py-0.5">
-            <div className="flex items-center gap-1.5 w-28 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
                 {player.role_played && ROLE_IMAGES[player.role_played] ? (
                     <img src={ROLE_IMAGES[player.role_played]} alt={player.role_played} className="w-4 h-4 shrink-0 opacity-70" />
                 ) : (
                     <span className="w-4 h-4 shrink-0 rounded-full border border-dashed border-[var(--color-text-secondary)]/30" />
                 )}
-                <span className="text-xs text-[var(--color-text)] truncate">{player.player_name}</span>
+                <PlayerLabel player={player} gods={gods} className="w-28" />
             </div>
             <RolePicker
                 player={player}
@@ -903,20 +1024,21 @@ function RolePlayerRow({ player, side, index, gameIndex, allPlayers, updatePlaye
     )
 }
 
-function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, updatePlayer, onNext }) {
+function RolesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, updatePlayer, onNext }) {
+    const gods = adminData?.gods || []
     return (
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
                     {(game.left_players || []).map((p, i) => (
                         <RolePlayerRow key={i} player={p} side="left" index={i}
-                            gameIndex={gameIndex} allPlayers={game.left_players} updatePlayer={updatePlayer} />
+                            gameIndex={gameIndex} allPlayers={game.left_players} updatePlayer={updatePlayer} gods={gods} />
                     ))}
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
                     {(game.right_players || []).map((p, i) => (
                         <RolePlayerRow key={i} player={p} side="right" index={i}
-                            gameIndex={gameIndex} allPlayers={game.right_players} updatePlayer={updatePlayer} />
+                            gameIndex={gameIndex} allPlayers={game.right_players} updatePlayer={updatePlayer} gods={gods} />
                     ))}
                 </TeamColumn>
             </div>
@@ -941,7 +1063,7 @@ function StatInput({ value, onChange, className = '' }) {
     )
 }
 
-function KDATable({ players, side, gameIndex, updatePlayer }) {
+function KDATable({ players, side, gameIndex, updatePlayer, gods }) {
     return (
         <table className="w-full text-xs">
             <thead>
@@ -955,7 +1077,7 @@ function KDATable({ players, side, gameIndex, updatePlayer }) {
             <tbody>
                 {(players || []).map((p, i) => (
                     <tr key={i}>
-                        <td className="text-[var(--color-text)] truncate max-w-0 py-0.5">{p.player_name}</td>
+                        <td className="py-0.5"><PlayerLabel player={p} gods={gods} /></td>
                         <td className="w-12 py-0.5">
                             <StatInput value={p.kills} onChange={v => updatePlayer(gameIndex, side, i, { kills: v })} className="w-full" />
                         </td>
@@ -972,15 +1094,16 @@ function KDATable({ players, side, gameIndex, updatePlayer }) {
     )
 }
 
-function KDAStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, updatePlayer, onNext }) {
+function KDAStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, updatePlayer, onNext }) {
+    const gods = adminData?.gods || []
     return (
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
                 <TeamColumn label={team1Name} color={team1Color}>
-                    <KDATable players={game.left_players} side="left" gameIndex={gameIndex} updatePlayer={updatePlayer} />
+                    <KDATable players={game.left_players} side="left" gameIndex={gameIndex} updatePlayer={updatePlayer} gods={gods} />
                 </TeamColumn>
                 <TeamColumn label={team2Name} color={team2Color}>
-                    <KDATable players={game.right_players} side="right" gameIndex={gameIndex} updatePlayer={updatePlayer} />
+                    <KDATable players={game.right_players} side="right" gameIndex={gameIndex} updatePlayer={updatePlayer} gods={gods} />
                 </TeamColumn>
             </div>
             <CorrectButton onClick={onNext} />
@@ -993,7 +1116,8 @@ function KDAStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color
 // GAME STEP: DAMAGE
 // ═══════════════════════════════════════════════════
 
-function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, updatePlayer, onNext }) {
+function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, updatePlayer, onNext }) {
+    const gods = adminData?.gods || []
     return (
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -1004,7 +1128,7 @@ function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Co
                     </div>
                     {(game.left_players || []).map((p, i) => (
                         <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} className="flex-1 mr-2" />
                             <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'left', i, { player_damage: v })} className="w-20" />
                         </div>
                     ))}
@@ -1016,7 +1140,7 @@ function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Co
                     </div>
                     {(game.right_players || []).map((p, i) => (
                         <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} className="flex-1 mr-2" />
                             <StatInput value={p.player_damage} onChange={v => updatePlayer(gameIndex, 'right', i, { player_damage: v })} className="w-20" />
                         </div>
                     ))}
@@ -1032,7 +1156,8 @@ function DamageStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Co
 // GAME STEP: MITIGATED
 // ═══════════════════════════════════════════════════
 
-function MitigatedStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, updatePlayer, onNext }) {
+function MitigatedStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, updatePlayer, onNext }) {
+    const gods = adminData?.gods || []
     return (
         <div>
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -1043,7 +1168,7 @@ function MitigatedStep({ game, gameIndex, team1Name, team2Name, team1Color, team
                     </div>
                     {(game.left_players || []).map((p, i) => (
                         <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} className="flex-1 mr-2" />
                             <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'left', i, { mitigated: v })} className="w-20" />
                         </div>
                     ))}
@@ -1055,7 +1180,7 @@ function MitigatedStep({ game, gameIndex, team1Name, team2Name, team1Color, team
                     </div>
                     {(game.right_players || []).map((p, i) => (
                         <div key={i} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs text-[var(--color-text)] truncate flex-1 mr-2">{p.player_name}</span>
+                            <PlayerLabel player={p} gods={gods} className="flex-1 mr-2" />
                             <StatInput value={p.mitigated} onChange={v => updatePlayer(gameIndex, 'right', i, { mitigated: v })} className="w-20" />
                         </div>
                     ))}
