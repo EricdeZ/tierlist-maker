@@ -1218,7 +1218,7 @@ function MergeModal({ players, onClose, onMerge, merging }) {
 
     const filterPlayers = (query, excludeId) => {
         const q = query.trim().toLowerCase()
-        if (q.length < 2) return []
+        if (q.length < 1) return []
         return players
             .filter(p => {
                 if (excludeId && p.id === excludeId) return false
