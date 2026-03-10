@@ -1,5 +1,6 @@
 /* ============================================
    Trading Card — Premium dark + gold design
+   Container-query based (cqi) — scales to any width
    ============================================ */
 
 /* --- Rarity border palettes (gold = common default) --- */
@@ -50,6 +51,7 @@
 
 /* ============================================
    Card Shell — outer gold frame
+   Container query root — all child sizes use cqi
    ============================================ */
 .trading-card {
     width: 340px;
@@ -62,6 +64,7 @@
     flex-shrink: 0;
     position: relative;
     box-shadow: inset 0 1px 0 var(--gold-edge), inset 0 -1px 0 var(--gold-dark);
+    container-type: inline-size;
 }
 
 /* When inside holo wrapper, fill the container */
@@ -74,9 +77,9 @@
 .card-border {
     width: 100%;
     height: 100%;
-    border-radius: 10px;
+    border-radius: 3.05cqi;
     background: linear-gradient(180deg, var(--gold-edge) 0%, var(--gold) 3%, var(--gold-dark) 97%, #5a4820 100%);
-    padding: 2px;
+    padding: 0.61cqi;
 }
 
 /* ============================================
@@ -85,7 +88,7 @@
 .card-body {
     width: 100%;
     height: 100%;
-    border-radius: 8px;
+    border-radius: 2.44cqi;
     background: var(--body-bg);
     display: flex;
     flex-direction: column;
@@ -103,7 +106,7 @@
     background-size: 3px 3px;
     pointer-events: none;
     z-index: 1;
-    border-radius: 8px;
+    border-radius: 2.44cqi;
 }
 
 /* ============================================
@@ -113,7 +116,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px 0;
+    padding: 1.83cqi 3.05cqi 0;
     position: relative;
     z-index: 2;
 }
@@ -122,8 +125,8 @@
 .card-top-right {
     display: flex;
     align-items: center;
-    gap: 4px;
-    min-width: 60px;
+    gap: 1.22cqi;
+    min-width: 18.29cqi;
 }
 
 .trading-card--player .card-top-left {
@@ -138,22 +141,22 @@
 }
 
 .card-stage-label {
-    font-size: 9px;
+    font-size: 2.74cqi;
     font-weight: 700;
     color: var(--accent-light);
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 0.46cqi;
 }
 
 .card-hp-label {
-    font-size: 9px;
+    font-size: 2.74cqi;
     font-weight: 700;
     color: var(--text-dim);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.15cqi;
 }
 
 .card-hp-value {
-    font-size: 18px;
+    font-size: 5.49cqi;
     font-weight: 900;
     color: var(--text-bright);
     line-height: 1;
@@ -162,8 +165,8 @@
 
 /* Centered role emblem */
 .card-emblem {
-    width: 30px;
-    height: 30px;
+    width: 9.15cqi;
+    height: 9.15cqi;
     border-radius: 50%;
     background: radial-gradient(circle, var(--accent-dark), var(--body-bg));
     border: 2px solid var(--gold);
@@ -174,8 +177,8 @@
 }
 
 .card-emblem img {
-    width: 18px;
-    height: 18px;
+    width: 5.49cqi;
+    height: 5.49cqi;
     object-fit: contain;
     filter: brightness(1.2);
 }
@@ -184,17 +187,17 @@
    Player Name Bar
    ============================================ */
 .card-name-bar {
-    padding: 2px 12px 3px;
+    padding: 0.61cqi 3.66cqi 0.91cqi;
     text-align: center;
     position: relative;
     z-index: 2;
 }
 
 .card-name {
-    font-size: 15px;
+    font-size: 4.57cqi;
     font-weight: 800;
     color: var(--text-bright);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.15cqi;
     text-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
 
@@ -202,7 +205,7 @@
    Image Frame — ornate border
    ============================================ */
 .card-image-wrap {
-    padding: 0 10px;
+    padding: 0 3.05cqi;
     position: relative;
     z-index: 2;
 }
@@ -237,41 +240,50 @@
 }
 
 .card-image-placeholder img {
-    width: 56px;
-    height: 56px;
+    width: 17.07cqi;
+    height: 17.07cqi;
     opacity: 0.15;
     object-fit: contain;
+}
+
+.card-image-initials {
+    font-size: 14.63cqi;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    opacity: 0.35;
+    text-shadow: 0 0 30px currentColor;
+    font-family: var(--font-head, system-ui);
 }
 
 /* Corner accents on image frame */
 .card-corner {
     position: absolute;
-    width: 10px;
-    height: 10px;
+    width: 3.05cqi;
+    height: 3.05cqi;
     border-color: var(--gold-light);
     border-style: solid;
     z-index: 3;
 }
-.card-corner-tl { top: 0; left: 10px; border-width: 2px 0 0 2px; }
-.card-corner-tr { top: 0; right: 10px; border-width: 2px 2px 0 0; }
-.card-corner-bl { bottom: 0; left: 10px; border-width: 0 0 2px 2px; }
-.card-corner-br { bottom: 0; right: 10px; border-width: 0 2px 2px 0; }
+.card-corner-tl { top: 0; left: 3.05cqi; border-width: 2px 0 0 2px; }
+.card-corner-tr { top: 0; right: 3.05cqi; border-width: 2px 2px 0 0; }
+.card-corner-bl { bottom: 0; left: 3.05cqi; border-width: 0 0 2px 2px; }
+.card-corner-br { bottom: 0; right: 3.05cqi; border-width: 0 2px 2px 0; }
 
 /* ============================================
    Info Bar (Team / Season)
    ============================================ */
 .card-info-bar {
-    padding: 3px 12px 1px;
+    padding: 0.91cqi 3.66cqi 0.30cqi;
     text-align: center;
     position: relative;
     z-index: 2;
 }
 
 .card-info-text {
-    font-size: 7.5px;
+    font-size: 2.29cqi;
     font-weight: 600;
     color: var(--text-dim);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.15cqi;
     text-transform: uppercase;
 }
 
@@ -280,7 +292,7 @@
    ============================================ */
 .card-stats-section {
     flex: 1;
-    padding: 0 10px;
+    padding: 0 3.05cqi;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -293,27 +305,27 @@
     gap: 1px;
     background: var(--body-border);
     border: 1px solid var(--body-border);
-    border-radius: 4px;
+    border-radius: 1.22cqi;
     overflow: hidden;
 }
 
 .card-stat-row {
     display: flex;
     align-items: center;
-    padding: 3px 8px;
-    gap: 6px;
+    padding: 0.91cqi 2.44cqi;
+    gap: 1.83cqi;
     background: var(--body-surface);
 }
 
 .card-stat-energy {
     display: flex;
-    gap: 3px;
+    gap: 0.91cqi;
     flex-shrink: 0;
 }
 
 .card-energy-circle {
-    width: 16px;
-    height: 16px;
+    width: 4.88cqi;
+    height: 4.88cqi;
     border-radius: 50%;
     background: radial-gradient(circle, var(--accent-dark), #1a1a22);
     display: flex;
@@ -324,8 +336,8 @@
 }
 
 .card-energy-circle img {
-    width: 11px;
-    height: 11px;
+    width: 3.35cqi;
+    height: 3.35cqi;
     object-fit: contain;
 }
 
@@ -337,24 +349,24 @@
 }
 
 .card-stat-name {
-    font-size: 11px;
+    font-size: 3.35cqi;
     font-weight: 700;
     color: var(--text);
     line-height: 1.2;
 }
 
 .card-stat-sub {
-    font-size: 7px;
+    font-size: 2.13cqi;
     color: var(--text-dim);
     font-style: italic;
 }
 
 .card-stat-value {
-    font-size: 16px;
+    font-size: 4.88cqi;
     font-weight: 900;
     color: var(--gold-light);
     flex-shrink: 0;
-    min-width: 36px;
+    min-width: 10.98cqi;
     text-align: right;
     font-variant-numeric: tabular-nums;
     text-shadow: 0 0 6px var(--accent-glow);
@@ -365,10 +377,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 2px;
-    padding: 2px 0;
+    margin-top: 0.61cqi;
+    padding: 0.61cqi 0;
     border: 1px solid var(--body-border);
-    border-radius: 4px;
+    border-radius: 1.22cqi;
     background: var(--body-surface);
 }
 
@@ -376,11 +388,11 @@
     flex: 1;
     text-align: center;
     line-height: 1;
-    padding: 1px 0;
+    padding: 0.30cqi 0;
 }
 
 .card-record-val {
-    font-size: 11px;
+    font-size: 3.35cqi;
     font-weight: 800;
     color: var(--text-bright);
     display: block;
@@ -389,19 +401,19 @@
 }
 
 .card-record-label {
-    font-size: 6.5px;
+    font-size: 1.98cqi;
     font-weight: 700;
     color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.24cqi;
     display: block;
     line-height: 1;
-    margin-top: 1px;
+    margin-top: 0.30cqi;
 }
 
 .card-record-divider {
     width: 1px;
-    height: 16px;
+    height: 4.88cqi;
     background: var(--body-border);
     flex-shrink: 0;
 }
@@ -410,29 +422,29 @@
    Flavor Text
    ============================================ */
 .card-flavor {
-    margin: 2px 10px 0;
-    padding: 3px 8px;
+    margin: 0.61cqi 3.05cqi 0;
+    padding: 0.91cqi 2.44cqi;
     border: 1px solid var(--body-border);
-    border-radius: 4px;
+    border-radius: 1.22cqi;
     background: var(--body-surface);
     position: relative;
     z-index: 2;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 1.83cqi;
 }
 
 .card-flavor-img {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
+    width: 6.10cqi;
+    height: 6.10cqi;
+    border-radius: 0.91cqi;
     object-fit: cover;
     flex-shrink: 0;
     border: 1px solid var(--gold-dark);
 }
 
 .card-flavor-text {
-    font-size: 7px;
+    font-size: 2.13cqi;
     color: var(--text-dim);
     font-style: italic;
     line-height: 1.4;
@@ -442,7 +454,7 @@
    Footer
    ============================================ */
 .card-footer {
-    padding: 2px 10px 4px;
+    padding: 0.61cqi 3.05cqi 1.22cqi;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -453,39 +465,39 @@
 .card-footer-left {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 7px;
+    gap: 1.22cqi;
+    font-size: 2.13cqi;
     color: var(--text-dim);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.09cqi;
 }
 
 .card-footer-icon {
-    width: 10px;
-    height: 10px;
+    width: 3.05cqi;
+    height: 3.05cqi;
     object-fit: contain;
     opacity: 0.5;
 }
 
 .card-footer-set {
-    font-size: 8px;
+    font-size: 2.44cqi;
     font-weight: 700;
     color: var(--gold);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.15cqi;
 }
 
 /* ============================================
    Player variant — name top-left, role top-right, no HP, bigger image
    ============================================ */
 .trading-card--player .card-top-banner {
-    padding: 6px 10px 1px;
+    padding: 1.83cqi 3.05cqi 0.30cqi;
 }
 
 .trading-card--player .card-top-left .card-name {
-    font-size: 15px;
+    font-size: 4.57cqi;
     font-weight: 800;
     color: var(--text-bright);
     text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.09cqi;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -493,20 +505,20 @@
 }
 
 .trading-card--player .card-top-right {
-    gap: 5px;
+    gap: 1.52cqi;
 }
 
 .card-emblem--sm {
-    width: 26px;
-    height: 26px;
+    width: 7.93cqi;
+    height: 7.93cqi;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .card-emblem--sm img {
-    width: 26px;
-    height: 26px;
+    width: 7.93cqi;
+    height: 7.93cqi;
     object-fit: contain;
     filter: brightness(1.2) drop-shadow(0 0 4px var(--accent-glow));
 }
@@ -517,48 +529,25 @@
 
 /* 1st Edition badge — inline next to player name */
 .card-edition-badge {
-    font-size: 9px;
+    font-size: 2.74cqi;
     font-weight: 800;
     color: var(--gold);
-    letter-spacing: 0.3px;
+    letter-spacing: 0.09cqi;
     white-space: nowrap;
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
 .trading-card--player .card-info-bar {
-    padding: 2px 12px 1px;
+    padding: 0.61cqi 3.66cqi 0.30cqi;
 }
 
 .trading-card--player .card-flavor {
-    margin: 2px 10px 0;
-    padding: 3px 8px;
+    margin: 0.61cqi 3.05cqi 0;
+    padding: 0.91cqi 2.44cqi;
 }
 
 .trading-card--player .card-footer {
-    padding: 2px 10px 4px;
-}
-
-/* ============================================
-   Overview slot — scale TradingCard to match GameCard (240px)
-   ============================================ */
-.card-overview-slot {
-    width: 240px;
-    aspect-ratio: 63 / 88;
-}
-
-.card-overview-slot .holo-card {
-    transform: scale(var(--slot-scale, calc(240 / 340)));
-    transform-origin: top left;
-}
-
-.card-overview-slot > .trading-card {
-    transform: scale(var(--slot-scale, calc(240 / 340)));
-    transform-origin: top left;
-}
-
-/* Stretch player banner so image aligns with GameCard (38px from card top) */
-.card-overview-slot .card-top-banner {
-    min-height: 46px;
+    padding: 0.61cqi 3.05cqi 1.22cqi;
 }
 
 /* ============================================
@@ -580,13 +569,4 @@
 .card-share-wrapper > .trading-card {
     transform: scale(var(--share-scale, 1));
     transform-origin: top center;
-}
-
-/* ============================================
-   Responsive
-   ============================================ */
-@media (max-width: 400px) {
-    .trading-card {
-        width: 280px;
-    }
 }

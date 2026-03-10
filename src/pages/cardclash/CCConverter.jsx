@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useCardClash } from './CardClashContext'
 import { Cog, AlertTriangle, ChevronRight } from 'lucide-react'
 import passionCoin from '../../assets/passion/passion.png'
+import coinSide from '../../assets/passion/flipping3.png'
 import emberIcon from '../../assets/ember.png'
 
 const BASE_COST = 50
@@ -10,6 +11,7 @@ const MULTIPLIER = 1.7
 const CORES_PER_PACK = 10
 const getCost = (n) => Math.round(BASE_COST * Math.pow(MULTIPLIER, n))
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
 
 // ═══════════════════════════════════════════════
 // Rate Gauge — compact gas valve for inside machine
@@ -102,6 +104,9 @@ function TerminalDisplay({ conversionsToday, nextCost, processing }) {
         <div className="text-green-500/80">
           <span className="text-green-500/40">$</span> sys.status
         </div>
+        <div className="text-green-400/70 mt-1">
+          {'>'}  enter coin to convert
+        </div>
         <div className="text-green-500/50 mt-1">
           CONV_TODAY: <span className="text-green-400/90">{conversionsToday}</span>
         </div>
@@ -128,11 +133,150 @@ function TerminalDisplay({ conversionsToday, nextCost, processing }) {
 
 
 // ═══════════════════════════════════════════════
-// Conversion Machine — everything lives here
+// Draggable Coin
+// ═══════════════════════════════════════════════
+function DraggableCoin({ slotRef, onInsert, onElevatedDrop, canAfford, disabled, shouldWarn, nextCost, onHoverSlot }) {
+  const coinRef = useRef(null)
+  const drag = useRef({ active: false, originX: 0, originY: 0 })
+  const [dragging, setDragging] = useState(false)
+
+  const getSlotCenter = () => {
+    if (!slotRef.current) return null
+    const sr = slotRef.current.getBoundingClientRect()
+    return { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 }
+  }
+
+  const isOverSlot = (clientX, clientY) => {
+    const center = getSlotCenter()
+    if (!center) return false
+    const dist = Math.sqrt((clientX - center.x) ** 2 + (clientY - center.y) ** 2)
+    return dist < 55
+  }
+
+  // Calculate rotation (0°→90°) based on proximity to slot
+  const getRotation = (clientX, clientY) => {
+    const center = getSlotCenter()
+    if (!center) return 0
+    const dist = Math.sqrt((clientX - center.x) ** 2 + (clientY - center.y) ** 2)
+    const maxDist = 300 // start rotating within 300px
+    if (dist >= maxDist) return 0
+    const progress = 1 - dist / maxDist
+    return Math.min(progress * 90, 90)
+  }
+
+  const handlePointerDown = (e) => {
+    if (!canAfford || disabled) return
+    e.preventDefault()
+    const el = coinRef.current
+    if (!el) return
+    el.setPointerCapture(e.pointerId)
+    const rect = el.getBoundingClientRect()
+    drag.current = {
+      active: true,
+      originX: rect.left + rect.width / 2,
+      originY: rect.top + rect.height / 2,
+    }
+    el.style.transition = 'none'
+    setDragging(true)
+  }
+
+  const handlePointerMove = (e) => {
+    if (!drag.current.active) return
+    const el = coinRef.current
+    if (!el) return
+    const dx = e.clientX - drag.current.originX
+    const dy = e.clientY - drag.current.originY
+    const rot = getRotation(e.clientX, e.clientY)
+    el.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.05)`
+    onHoverSlot(isOverSlot(e.clientX, e.clientY))
+  }
+
+  const handlePointerUp = (e) => {
+    if (!drag.current.active) return
+    drag.current.active = false
+    const el = coinRef.current
+    if (!el) return
+
+    const over = isOverSlot(e.clientX, e.clientY)
+    onHoverSlot(false)
+
+    if (over && canAfford) {
+      if (shouldWarn) {
+        // Elevated rate — snap back, parent shows warning
+        el.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        el.style.transform = ''
+        setTimeout(() => setDragging(false), 400)
+        onElevatedDrop()
+        return
+      }
+      // Animate coin into slot (vertical slit — shrink width, keep height)
+      const center = getSlotCenter()
+      const dx = center.x - drag.current.originX
+      const dy = center.y - drag.current.originY
+      el.style.transition = 'transform 0.35s ease-in, opacity 0.3s ease-in 0.05s'
+      el.style.transform = `translate(${dx}px, ${dy}px) rotate(90deg) scaleX(0.15) scaleY(0.5)`
+      el.style.opacity = '0'
+      setTimeout(() => onInsert(), 350)
+    } else {
+      // Snap back
+      el.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+      el.style.transform = ''
+      setTimeout(() => setDragging(false), 500)
+    }
+  }
+
+  // Reset styles on mount (coin reappearing)
+  useEffect(() => {
+    const el = coinRef.current
+    if (el) {
+      el.style.transform = ''
+      el.style.opacity = ''
+      el.style.transition = ''
+    }
+  }, [])
+
+  return (
+    <div className="flex flex-col items-center shrink-0 sm:self-center">
+      <img
+        ref={coinRef}
+        src={coinSide}
+        alt="Drag to convert"
+        className={`w-32 sm:w-36 select-none ${
+          canAfford && !disabled && !dragging ? 'cursor-grab cd-coin-float'
+            : dragging ? 'cursor-grabbing'
+            : 'opacity-25 cursor-not-allowed'
+        }`}
+        style={{
+          touchAction: 'none',
+          filter: canAfford && !disabled ? 'drop-shadow(0 8px 20px rgba(200,160,50,0.4))' : 'none',
+        }}
+        draggable={false}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      />
+      {canAfford && !disabled && !dragging && (
+        <div className="text-[11px] text-amber-400/35 cd-head tracking-wider mt-0.5">
+          Drag to insert
+        </div>
+      )}
+      {!canAfford && !disabled && (
+        <div className="text-[11px] text-white/20 cd-head tracking-wider mt-0.5">
+          Need {nextCost} Passion
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════
+// Conversion Machine
 // ═══════════════════════════════════════════════
 function ConversionMachine({
   processing, nextCost, passion, ember, result, conversionsToday,
   inputRef, outputRef, passionDisplayRef, coresDisplayRef,
+  slotRef, isOverSlot,
 }) {
   return (
     <div className={`cd-machine relative ${processing ? 'cd-machine-active' : ''}`}>
@@ -146,7 +290,7 @@ function ConversionMachine({
         }}
       />
 
-      {/* Machine body — no border, no rounded, solid bg */}
+      {/* Machine body */}
       <div className="relative overflow-hidden"
         style={{ background: 'linear-gradient(180deg, #0a0e1c, #060a14, #040810)' }}>
 
@@ -158,13 +302,45 @@ function ConversionMachine({
         <div className="absolute top-0 bottom-0 left-0 w-[2px]" style={{ background: 'rgba(0,229,255,0.08)' }} />
         <div className="absolute top-0 bottom-0 right-0 w-[2px]" style={{ background: 'rgba(0,229,255,0.08)' }} />
 
-        {/* ── Top section: Gas Valve + Terminal ── */}
-        <div className="flex items-start justify-between px-5 sm:px-8 pt-5 pb-3 relative">
-          {/* Gas valve */}
-          <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} />
+        {/* ── Top section: Coin Slot (left) + Gauge + Terminal ── */}
+        <div className="flex items-stretch px-5 sm:px-8 pt-5 pb-3 relative gap-4 sm:gap-5">
+          {/* Vertical coin slot — top-left */}
+          <div ref={slotRef} className="shrink-0 flex flex-col items-center">
+            <div className="text-[11px] text-white/60 uppercase tracking-[0.15em] cd-head mb-1.5 whitespace-nowrap">
+              Insert
+            </div>
+            <div className="relative w-5 flex-1 min-h-[100px] overflow-hidden transition-all duration-300"
+              style={{
+                background: '#020406',
+                borderLeft: `1px solid ${isOverSlot ? 'rgba(248,197,106,0.5)' : 'rgba(255,255,255,0.06)'}`,
+                borderRight: `1px solid ${isOverSlot ? 'rgba(248,197,106,0.5)' : 'rgba(255,255,255,0.06)'}`,
+                boxShadow: isOverSlot
+                  ? '0 0 20px rgba(248,197,106,0.3), inset 0 0 12px rgba(248,197,106,0.15)'
+                  : 'inset 2px 0 6px rgba(0,0,0,0.8)',
+              }}>
+              {/* Inner glow when active */}
+              {isOverSlot && (
+                <div className="absolute inset-0 animate-pulse"
+                  style={{ background: 'linear-gradient(180deg, transparent, rgba(248,197,106,0.2), transparent)' }} />
+              )}
+              {/* Vertical label */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[8px] uppercase tracking-[0.2em] cd-head"
+                  style={{
+                    color: isOverSlot ? 'rgba(248,197,106,0.8)' : 'rgba(255,255,255,0.08)',
+                    writingMode: 'vertical-rl', textOrientation: 'mixed',
+                  }}>
+                  Coin
+                </span>
+              </div>
+            </div>
+          </div>
 
-          {/* Terminal display */}
-          <TerminalDisplay conversionsToday={conversionsToday} nextCost={nextCost} processing={processing} />
+          {/* Gauge + Terminal */}
+          <div className="flex-1 flex items-start justify-between">
+            <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} />
+            <TerminalDisplay conversionsToday={conversionsToday} nextCost={nextCost} processing={processing} />
+          </div>
         </div>
 
         {/* ── Center section: Input → Gears → Output ── */}
@@ -181,43 +357,33 @@ function ConversionMachine({
               <div className="text-[11px] text-amber-400/50 uppercase tracking-wider cd-head">In</div>
             </div>
 
-            {/* Arrow */}
             <ChevronRight className="w-4 h-4 text-white/8 shrink-0" />
 
-            {/* GEARS — the big center */}
+            {/* GEARS */}
             <div className="relative flex items-center justify-center w-32 h-32 sm:w-40 sm:h-40 shrink-0">
-              {/* Outer glow ring */}
               <div className="absolute inset-0 rounded-full"
                 style={{
-                  boxShadow: processing
-                    ? '0 0 30px rgba(0,229,255,0.15), 0 0 60px rgba(0,229,255,0.05)'
-                    : 'none',
+                  boxShadow: processing ? '0 0 30px rgba(0,229,255,0.15), 0 0 60px rgba(0,229,255,0.05)' : 'none',
                   transition: 'box-shadow 0.5s',
                 }}
               />
-
-              {/* Big outer gear */}
               <Cog className={`absolute w-32 h-32 sm:w-40 sm:h-40 ${processing ? 'cd-gear-spin-fast' : 'cd-gear-spin'}`}
                 style={{
                   color: processing ? 'rgba(0,229,255,0.5)' : 'rgba(0,229,255,0.12)',
                   filter: processing ? 'drop-shadow(0 0 8px rgba(0,229,255,0.3))' : 'none',
                   transition: 'color 0.5s, filter 0.5s',
                 }} />
-              {/* Medium counter-gear */}
               <Cog className={`absolute w-20 h-20 sm:w-24 sm:h-24 ${processing ? 'cd-gear-spin-fast-reverse' : 'cd-gear-spin-reverse'}`}
                 style={{
                   color: processing ? 'rgba(255,45,120,0.4)' : 'rgba(255,45,120,0.08)',
                   filter: processing ? 'drop-shadow(0 0 6px rgba(255,45,120,0.2))' : 'none',
                   transition: 'color 0.5s, filter 0.5s',
                 }} />
-              {/* Small inner gear */}
               <Cog className={`absolute w-10 h-10 sm:w-12 sm:h-12 ${processing ? 'cd-gear-spin-fast' : 'cd-gear-spin'}`}
                 style={{
                   color: processing ? 'rgba(180,74,255,0.5)' : 'rgba(180,74,255,0.1)',
                   transition: 'color 0.5s',
                 }} />
-
-              {/* Center core */}
               <div className="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full z-10"
                 style={{
                   background: processing
@@ -235,7 +401,6 @@ function ConversionMachine({
               </div>
             </div>
 
-            {/* Arrow */}
             <ChevronRight className="w-4 h-4 text-white/8 shrink-0" />
 
             {/* Output port */}
@@ -254,7 +419,6 @@ function ConversionMachine({
         {/* ── Rate display ── */}
         <div className="mx-5 sm:mx-8 mb-4">
           <div className="flex items-center justify-center gap-4 py-3 px-5 bg-black/40 relative overflow-hidden">
-            {/* Subtle scan line */}
             <div className="absolute inset-0 cd-scanline pointer-events-none" />
             <div className="flex items-center gap-2 relative z-1">
               <img src={passionCoin} alt="" className="w-7 h-7" />
@@ -270,11 +434,9 @@ function ConversionMachine({
           </div>
         </div>
 
-        {/* ── Bottom section: Passion + Cores balances + LEDs ── */}
+        {/* ── Bottom section: Balances + LEDs ── */}
         <div className="flex items-center justify-between px-5 sm:px-8 pb-5">
-          {/* Balances side by side */}
           <div className="flex items-center gap-6">
-            {/* Passion balance */}
             <div ref={passionDisplayRef} className="flex items-center gap-2">
               <img src={passionCoin} alt="" className="w-8 h-8" />
               <div>
@@ -284,8 +446,6 @@ function ConversionMachine({
                 <div className="text-[10px] text-amber-400/45 uppercase tracking-wider cd-head mt-0.5">Passion</div>
               </div>
             </div>
-
-            {/* Cores balance */}
             <div ref={coresDisplayRef} className="flex items-center gap-2">
               <img src={emberIcon} alt="" className="h-8 w-auto object-contain" />
               <div>
@@ -297,17 +457,12 @@ function ConversionMachine({
             </div>
           </div>
 
-          {/* Status LEDs */}
           <div className="flex items-center gap-1.5">
             {[...Array(9)].map((_, i) => (
               <div key={i} className="w-2 h-2 rounded-full transition-all"
                 style={{
                   background: processing
-                    ? [
-                        'var(--cd-cyan)', 'var(--cd-magenta)', 'var(--cd-purple)',
-                        'var(--cd-cyan)', '#22c55e', 'var(--cd-magenta)',
-                        'var(--cd-cyan)', 'var(--cd-purple)', 'var(--cd-cyan)',
-                      ][i]
+                    ? ['var(--cd-cyan)', 'var(--cd-magenta)', 'var(--cd-purple)', 'var(--cd-cyan)', '#22c55e', 'var(--cd-magenta)', 'var(--cd-cyan)', 'var(--cd-purple)', 'var(--cd-cyan)'][i]
                     : i % 3 === 0 ? 'rgba(0,229,255,0.15)' : '#111a2a',
                   boxShadow: processing
                     ? `0 0 8px ${['var(--cd-cyan)', 'var(--cd-magenta)', 'var(--cd-purple)', 'var(--cd-cyan)', '#22c55e', 'var(--cd-magenta)', 'var(--cd-cyan)', 'var(--cd-purple)', 'var(--cd-cyan)'][i]}`
@@ -425,9 +580,9 @@ function RateSchedule({ conversionsToday }) {
   }))
 
   return (
-    <div className="mt-6 max-w-md mx-auto">
+    <div className="mt-6 max-w-md mx-auto px-4 sm:px-0">
       <div className="text-xs text-white/30 uppercase tracking-[0.2em] mb-3 cd-head text-center">Rate Schedule</div>
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
         {entries.map(e => {
           const ratio = e.cost / BASE_COST
           const color = ratio <= 1 ? '#00e5ff' : ratio < 2 ? '#22c55e' : ratio < 3.5 ? '#ff8c00' : ratio < 6 ? '#ff2d78' : '#ef4444'
@@ -461,10 +616,13 @@ export default function CCConverter() {
   const [result, setResult] = useState(null)
   const [localConversions, setLocalConversions] = useState(null)
   const [localNextCost, setLocalNextCost] = useState(null)
+  const [isOverSlot, setIsOverSlot] = useState(false)
+  const [coinVisible, setCoinVisible] = useState(true)
   const inputRef = useRef(null)
   const outputRef = useRef(null)
   const passionDisplayRef = useRef(null)
   const coresDisplayRef = useRef(null)
+  const slotRef = useRef(null)
 
   const conversionsToday = localConversions ?? ember.conversionsToday ?? 0
   const nextCost = localNextCost ?? ember.nextConversionCost ?? getCost(conversionsToday)
@@ -493,15 +651,11 @@ export default function CCConverter() {
     setTimeout(() => setParticles(prev => prev.filter(p => !ids.includes(p.id))), 2000)
   }, [])
 
-  const handleConvertClick = () => {
-    if (!canAfford) return
-    if (conversionsToday > 0) setShowWarning(true)
-    else doConvert()
-  }
-
-  const doConvert = async () => {
+  // Core conversion logic — shared by drag and button paths
+  const doConvert = useCallback(async () => {
     setShowWarning(false)
     setConverting(true)
+    setCoinVisible(false)
     setResult(null)
 
     spawnParticles(passionDisplayRef.current, inputRef.current, 8, '#f8c56a')
@@ -520,29 +674,50 @@ export default function CCConverter() {
 
       await sleep(1000)
       setConverting(false)
+      // Coin reappears after machine finishes
+      setTimeout(() => setCoinVisible(true), 500)
       setTimeout(() => setResult(null), 4000)
     } catch {
       setConverting(false)
+      setCoinVisible(true)
     }
+  }, [convertPassionToEmber, spawnParticles])
+
+  // Drag dropped on slot — convert immediately
+  const handleCoinInsert = useCallback(() => {
+    doConvert()
+  }, [doConvert])
+
+  // Drag dropped on slot at elevated rate — show warning, snap coin back
+  const handleElevatedDrop = useCallback(() => {
+    setShowWarning(true)
+  }, [])
+
+  // Button click fallback
+  const handleConvertClick = () => {
+    if (!canAfford) return
+    if (conversionsToday > 0) setShowWarning(true)
+    else doConvert()
+  }
+
+  // Warning confirmed (from either drag or button)
+  const handleWarningConfirm = () => {
+    doConvert()
   }
 
   return (
     <div className="cd-alley pb-12">
       <div className="cd-alley-fog" />
 
-      {/* ── Header Sign: Passion → Cores with "no refunds" tag ── */}
-      <div className="flex flex-col items-center mt-6 mb-10">
-        <div className="flex items-center gap-6 px-10 py-5 rounded-2xl border border-white/6 bg-black/30 relative">
-          {/* Passion icon */}
-          <img src={passionCoin} alt="Passion" className="w-16 h-16 sm:w-20 sm:h-20" />
-          {/* Arrow */}
-          <svg className="w-12 h-12 sm:w-14 sm:h-14 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      {/* ── Header Sign ── */}
+      <div className="flex flex-col items-center mt-6 mb-6 sm:mb-10">
+        <div className="flex items-center gap-4 sm:gap-6 px-6 sm:px-10 py-4 sm:py-5 rounded-2xl border border-white/6 bg-black/30 relative">
+          <img src={passionCoin} alt="Passion" className="w-12 h-12 sm:w-20 sm:h-20" />
+          <svg className="w-8 h-8 sm:w-14 sm:h-14 text-white/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
-          {/* Cores icon */}
-          <img src={emberIcon} alt="Cores" className="h-16 sm:h-20 w-auto object-contain" />
+          <img src={emberIcon} alt="Cores" className="h-12 sm:h-20 w-auto object-contain" />
 
-          {/* "No refunds" tag — dangling from bottom-right */}
           <div className="absolute -bottom-3 right-4 px-3 rounded bg-[var(--cd-magenta)]/15 border border-[var(--cd-magenta)]/25 -rotate-3 flex items-center"
             style={{ transformOrigin: 'top right', height: '18px' }}>
             <span className="text-[9px] font-bold uppercase tracking-wider"
@@ -551,29 +726,174 @@ export default function CCConverter() {
             </span>
           </div>
         </div>
-        <p className="text-xs text-white/30 mt-7 cd-head tracking-widest">
+        <p className="text-[10px] sm:text-xs text-white/30 mt-5 sm:mt-7 cd-head tracking-widest">
           Rates increase with each daily conversion
         </p>
       </div>
 
-      {/* ── The Machine ── */}
-      <div className="flex justify-center mb-5 px-2">
-        <ConversionMachine
-          processing={converting}
-          nextCost={nextCost}
-          passion={passion}
-          ember={ember}
-          result={result}
-          conversionsToday={conversionsToday}
-          inputRef={inputRef}
-          outputRef={outputRef}
-          passionDisplayRef={passionDisplayRef}
-          coresDisplayRef={coresDisplayRef}
-        />
+      {/* ══════════════════════════════════════════════
+          MOBILE LAYOUT
+         ══════════════════════════════════════════════ */}
+      <div className="sm:hidden px-4 mb-4">
+        {/* Rate gauge */}
+        <div className="flex justify-center mb-5">
+          <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} />
+        </div>
+
+        {/* Gears */}
+        <div className="flex justify-center mb-5">
+          <div className="relative flex items-center justify-center w-28 h-28">
+            <Cog className={`absolute w-28 h-28 ${converting ? 'cd-gear-spin-fast' : 'cd-gear-spin'}`}
+              style={{
+                color: converting ? 'rgba(0,229,255,0.5)' : 'rgba(0,229,255,0.12)',
+                filter: converting ? 'drop-shadow(0 0 8px rgba(0,229,255,0.3))' : 'none',
+                transition: 'color 0.5s, filter 0.5s',
+              }} />
+            <Cog className={`absolute w-[68px] h-[68px] ${converting ? 'cd-gear-spin-fast-reverse' : 'cd-gear-spin-reverse'}`}
+              style={{
+                color: converting ? 'rgba(255,45,120,0.4)' : 'rgba(255,45,120,0.08)',
+                filter: converting ? 'drop-shadow(0 0 6px rgba(255,45,120,0.2))' : 'none',
+                transition: 'color 0.5s, filter 0.5s',
+              }} />
+            <Cog className={`absolute w-8 h-8 ${converting ? 'cd-gear-spin-fast' : 'cd-gear-spin'}`}
+              style={{
+                color: converting ? 'rgba(180,74,255,0.5)' : 'rgba(180,74,255,0.1)',
+                transition: 'color 0.5s',
+              }} />
+            <div className="relative w-4 h-4 rounded-full z-10"
+              style={{
+                background: converting
+                  ? 'radial-gradient(circle, var(--cd-cyan), rgba(0,229,255,0.3))'
+                  : 'radial-gradient(circle, rgba(0,229,255,0.3), rgba(0,229,255,0.05))',
+                boxShadow: converting
+                  ? '0 0 15px var(--cd-cyan), 0 0 30px rgba(0,229,255,0.4)'
+                  : '0 0 4px rgba(0,229,255,0.2)',
+                transition: 'all 0.3s',
+              }}>
+              {converting && (
+                <div className="absolute inset-0 rounded-full animate-ping"
+                  style={{ background: 'rgba(0,229,255,0.3)' }} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Rate summary */}
+        <div className="flex items-center justify-center gap-3 py-3 px-4 bg-black/40 mb-5 relative overflow-hidden">
+          <div className="absolute inset-0 cd-scanline pointer-events-none" />
+          <div className="flex items-center gap-1.5 relative z-1">
+            <img src={passionCoin} alt="" className="w-6 h-6" />
+            <span className="text-2xl font-black text-amber-400 tabular-nums cd-num">{nextCost}</span>
+          </div>
+          <svg className="w-5 h-5 text-white/20 relative z-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+          <div className="flex items-center gap-1.5 relative z-1">
+            <span className="text-2xl font-black text-[var(--cd-cyan)] tabular-nums cd-num cd-text-glow">{CORES_PER_PACK}</span>
+            <img src={emberIcon} alt="" className="h-6 w-auto object-contain" />
+          </div>
+        </div>
+
+        {/* Result flash */}
+        {result && !converting && (
+          <div className="text-center py-2 mb-3 cd-result-flash rounded-lg">
+            <span className="text-sm text-amber-400 font-bold cd-num">-{result.passionSpent}</span>
+            <span className="text-white/30 mx-2">{">"}</span>
+            <span className="text-sm text-[var(--cd-cyan)] font-bold cd-num cd-text-glow">+{result.emberGained} Cores</span>
+          </div>
+        )}
+
+        {/* Convert button */}
+        <button onClick={handleConvertClick} disabled={!canAfford || converting}
+          className={`w-full py-3 rounded-lg text-sm font-bold cd-head tracking-[0.15em] transition-all mb-2 ${
+            converting ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)]/50 cursor-wait'
+              : canAfford ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20 cursor-pointer'
+              : 'bg-white/3 text-white/15 cursor-not-allowed'
+          }`}>
+          {converting ? 'Converting...' : canAfford ? `Convert (${nextCost} Passion)` : `Need ${nextCost} Passion`}
+        </button>
+
+        {/* Balances — compact text line */}
+        <div className="text-center text-[11px] text-white/30 mb-4 cd-mono">
+          <span className="text-amber-400/60">{result ? result.passionBalance : passion}</span>
+          <span className="text-white/15"> Passion</span>
+          <span className="text-white/10 mx-1.5">&middot;</span>
+          <span className="text-[var(--cd-cyan)]/60">{result ? result.emberBalance : (ember.balance || 0)}</span>
+          <span className="text-white/15"> Cores</span>
+        </div>
+
+        {/* Rate info */}
+        {conversionsToday > 0 && !converting && (
+          <div className="text-center text-[11px] text-white/30 mb-3">
+            <span style={{ color: multiplier > 3 ? '#ff2d78' : multiplier > 1.5 ? '#ff8c00' : 'var(--cd-cyan)' }}>
+              {multiplier.toFixed(1)}x base rate
+            </span>
+            <span className="text-white/15 mx-1.5">&middot;</span>
+            Resets at midnight UTC
+          </div>
+        )}
+
+        {/* LED strip */}
+        <div className="flex items-center justify-center gap-1.5 mb-2">
+          {[...Array(9)].map((_, i) => (
+            <div key={i} className="w-2 h-2 rounded-full transition-all"
+              style={{
+                background: converting
+                  ? ['var(--cd-cyan)', 'var(--cd-magenta)', 'var(--cd-purple)', 'var(--cd-cyan)', '#22c55e', 'var(--cd-magenta)', 'var(--cd-cyan)', 'var(--cd-purple)', 'var(--cd-cyan)'][i]
+                  : i % 3 === 0 ? 'rgba(0,229,255,0.15)' : '#111a2a',
+                boxShadow: converting
+                  ? `0 0 8px ${['var(--cd-cyan)', 'var(--cd-magenta)', 'var(--cd-purple)', 'var(--cd-cyan)', '#22c55e', 'var(--cd-magenta)', 'var(--cd-cyan)', 'var(--cd-purple)', 'var(--cd-cyan)'][i]}`
+                  : 'none',
+                transitionDelay: `${i * 0.04}s`,
+                animation: converting ? `cd-led-blink 0.6s ease-in-out ${i * 0.08}s infinite alternate` : 'none',
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* ── Convert button ── */}
-      <div className="flex justify-center mb-2">
+      {/* ══════════════════════════════════════════════
+          DESKTOP LAYOUT
+         ══════════════════════════════════════════════ */}
+
+      {/* Machine (centered) with coin floating in front */}
+      <div className="hidden sm:flex justify-center mb-5 px-2">
+        <div className="relative">
+          <ConversionMachine
+            processing={converting}
+            nextCost={nextCost}
+            passion={passion}
+            ember={ember}
+            result={result}
+            conversionsToday={conversionsToday}
+            inputRef={inputRef}
+            outputRef={outputRef}
+            passionDisplayRef={passionDisplayRef}
+            coresDisplayRef={coresDisplayRef}
+            slotRef={slotRef}
+            isOverSlot={isOverSlot}
+          />
+
+          {/* Coin floating in front of machine, near the slot */}
+          {coinVisible && (
+            <div className="absolute z-20" style={{ left: '-170px', top: '20px', animation: 'cd-fade-in 0.5s ease' }}>
+              <DraggableCoin
+                slotRef={slotRef}
+                onInsert={handleCoinInsert}
+                onElevatedDrop={handleElevatedDrop}
+                canAfford={canAfford}
+                disabled={converting}
+                shouldWarn={conversionsToday > 0}
+                nextCost={nextCost}
+                onHoverSlot={setIsOverSlot}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop fallback button + result */}
+      <div className="hidden sm:flex justify-center mb-2">
         {result && !converting ? (
           <div className="text-center py-3 px-8 cd-result-flash rounded-xl">
             <div className="text-base">
@@ -583,20 +903,19 @@ export default function CCConverter() {
             </div>
             <div className="text-xs text-white/35 mt-1">Next: {result.nextConversionCost} Passion</div>
           </div>
-        ) : (
-          <button onClick={handleConvertClick} disabled={!canAfford || converting}
-            className={`px-10 py-3.5 rounded-xl font-bold text-base cd-head tracking-[0.2em] transition-all cursor-pointer ${
-              canAfford && !converting ? 'cd-btn-solid cd-btn-action' : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cursor-not-allowed border border-white/5'
+        ) : !converting && (
+          <button onClick={handleConvertClick} disabled={!canAfford}
+            className={`px-6 py-2 rounded-lg text-xs cd-head tracking-[0.15em] transition-all cursor-pointer ${
+              canAfford ? 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60 border border-white/8'
+                : 'text-white/15 cursor-not-allowed'
             }`}>
-            {converting ? (
-              <span className="flex items-center gap-2"><div className="cd-spinner w-4 h-4" />Processing...</span>
-            ) : canAfford ? `Convert ${nextCost} Passion` : `Need ${nextCost} Passion (have ${passion})`}
+            {canAfford ? `or click to convert (${nextCost})` : `Need ${nextCost} Passion`}
           </button>
         )}
       </div>
 
       {conversionsToday > 0 && !converting && (
-        <div className="text-center text-xs text-white/30 mb-2">
+        <div className="hidden sm:block text-center text-xs text-white/30 mb-2">
           <span style={{ color: multiplier > 3 ? '#ff2d78' : multiplier > 1.5 ? '#ff8c00' : 'var(--cd-cyan)' }}>
             {multiplier.toFixed(1)}x base rate
           </span>
@@ -606,7 +925,15 @@ export default function CCConverter() {
       )}
 
       <RateSchedule conversionsToday={conversionsToday} />
-      {showWarning && <WarningModal nextCost={nextCost} conversionsToday={conversionsToday} multiplier={multiplier} onConfirm={doConvert} onCancel={() => setShowWarning(false)} />}
+      {showWarning && (
+        <WarningModal
+          nextCost={nextCost}
+          conversionsToday={conversionsToday}
+          multiplier={multiplier}
+          onConfirm={handleWarningConfirm}
+          onCancel={() => setShowWarning(false)}
+        />
+      )}
       <FlyingParticles particles={particles} />
     </div>
   )

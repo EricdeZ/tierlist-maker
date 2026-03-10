@@ -252,6 +252,10 @@ export const passionService = {
     async earn(type, referenceId = null) {
         return apiPost('passion', { action: 'earn' }, { type, referenceId })
     },
+
+    async adminGrant(userId, amount, reason) {
+        return apiPost('passion-admin', {}, { userId, amount, reason })
+    },
 }
 
 export const coinflipService = {
@@ -992,6 +996,9 @@ export const cardclashService = {
     },
     async getCollectionSet(setKey) {
         return apiCall('cardclash', { action: 'collection-set', setKey })
+    },
+    async getCardDetail(defId) {
+        return apiCall('cardclash', { action: 'card-detail', defId })
     },
 }
 

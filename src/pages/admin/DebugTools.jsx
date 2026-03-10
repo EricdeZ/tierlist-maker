@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { usePassion } from '../../context/PassionContext'
 import { useAuth } from '../../context/AuthContext'
-import { challengeService, predictionsService } from '../../services/database'
+import { challengeService, predictionsService, passionService } from '../../services/database'
 import { RANK_THRESHOLDS, formatRank } from '../../config/ranks'
 import RankBadge from '../../components/RankBadge'
 import PageTitle from '../../components/PageTitle'
@@ -20,6 +20,13 @@ export default function DebugTools() {
     const [resetResult, setResetResult] = useState(null)
     const [refunding, setRefunding] = useState(false)
     const [refundResult, setRefundResult] = useState(null)
+    const [grantQuery, setGrantQuery] = useState('')
+    const [grantUsers, setGrantUsers] = useState([])
+    const [grantTarget, setGrantTarget] = useState(null)
+    const [grantAmount, setGrantAmount] = useState('')
+    const [grantReason, setGrantReason] = useState('')
+    const [granting, setGranting] = useState(false)
+    const [grantResult, setGrantResult] = useState(null)
 
     const selectedRank = RANK_THRESHOLDS[selectedRankIdx]
 
@@ -35,6 +42,39 @@ export default function DebugTools() {
             setResetResult({ error: err.message })
         } finally {
             setResetting(false)
+        }
+    }
+
+    const debounceRef = useRef(null)
+    useEffect(() => {
+        if (!grantQuery.trim() || grantTarget) {
+            setGrantUsers([])
+            return
+        }
+        clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const res = await challengeService.searchUsers(grantQuery.trim())
+                setGrantUsers(res.users || [])
+            } catch { /* ignore */ }
+        }, 300)
+        return () => clearTimeout(debounceRef.current)
+    }, [grantQuery, grantTarget])
+
+    const handleGrantPassion = async () => {
+        if (!grantTarget || !grantAmount) return
+        setGranting(true)
+        setGrantResult(null)
+        try {
+            const res = await passionService.adminGrant(grantTarget.id, Number(grantAmount), grantReason || undefined)
+            setGrantResult(res)
+            setGrantAmount('')
+            setGrantReason('')
+            refreshBalance()
+        } catch (err) {
+            setGrantResult({ error: err.message })
+        } finally {
+            setGranting(false)
         }
     }
 
@@ -133,6 +173,87 @@ export default function DebugTools() {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            {/* Grant Passion */}
+            <section className="bg-(--color-secondary) rounded-xl border border-(--color-accent)/20 p-6 mb-6">
+                <h2 className="font-heading text-lg font-bold text-(--color-accent) mb-4">
+                    Grant Passion
+                </h2>
+
+                {/* User search */}
+                <div className="mb-3">
+                    <input
+                        type="text"
+                        value={grantQuery}
+                        onChange={e => { setGrantQuery(e.target.value); setGrantTarget(null) }}
+                        placeholder="Search username..."
+                        className="w-full px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)/50"
+                    />
+                </div>
+
+                {/* User results */}
+                {grantUsers.length > 0 && !grantTarget && (
+                    <div className="mb-3 max-h-40 overflow-y-auto rounded-lg border border-white/10">
+                        {grantUsers.map(u => (
+                            <button
+                                key={u.id}
+                                onClick={() => { setGrantTarget(u); setGrantUsers([]) }}
+                                className="w-full text-left px-3 py-2 text-sm text-(--color-text) hover:bg-white/10 transition-colors border-b border-white/5 last:border-0"
+                            >
+                                {u.discord_username} <span className="text-(--color-text-secondary)">#{u.id}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Selected user */}
+                {grantTarget && (
+                    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-white/5">
+                        <span className="text-sm font-medium text-(--color-text)">{grantTarget.discord_username}</span>
+                        <span className="text-xs text-(--color-text-secondary)">#{grantTarget.id}</span>
+                        <button
+                            onClick={() => { setGrantTarget(null); setGrantResult(null) }}
+                            className="ml-auto text-xs text-(--color-text-secondary) hover:text-red-400 transition-colors"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                )}
+
+                {/* Amount + reason */}
+                <div className="flex gap-2 mb-3">
+                    <input
+                        type="number"
+                        value={grantAmount}
+                        onChange={e => setGrantAmount(e.target.value)}
+                        placeholder="Amount"
+                        className="w-28 px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)/50"
+                    />
+                    <input
+                        type="text"
+                        value={grantReason}
+                        onChange={e => setGrantReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        className="flex-1 px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-(--color-accent)/50"
+                    />
+                    <button
+                        onClick={handleGrantPassion}
+                        disabled={!grantTarget || !grantAmount || granting}
+                        className="px-5 py-2 rounded-lg font-bold text-sm transition-colors shrink-0 disabled:opacity-50"
+                        style={{ background: 'linear-gradient(135deg, #c4922e, #f8c56a)', color: '#0a0f1a' }}
+                    >
+                        {granting ? 'Granting...' : 'Grant'}
+                    </button>
+                </div>
+
+                {grantResult && (
+                    <div className={`text-xs p-2 rounded-lg ${grantResult.error ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {grantResult.error
+                            ? `Error: ${grantResult.error}`
+                            : `Granted ${grantResult.amount} Passion to ${grantResult.targetUsername}. New balance: ${grantResult.newBalance}`}
+                    </div>
+                )}
             </section>
 
             {/* Full Passion Reset */}

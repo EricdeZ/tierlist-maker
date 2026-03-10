@@ -1,5 +1,6 @@
 import './TradingCard.css'
 
+import passiontailsImg from '../assets/passion/passiontails.png'
 import soloImage from '../assets/roles/solo.webp'
 import jungleImage from '../assets/roles/jungle.webp'
 import midImage from '../assets/roles/mid.webp'
@@ -51,6 +52,8 @@ export default function TradingCard({
     leagueName,
     divisionName,
     rarity,
+    isConnected,
+    size,
 }) {
     const normalizedRole = normalizeRole(role)
     const roleImg = ROLE_IMAGES[normalizedRole]
@@ -58,7 +61,7 @@ export default function TradingCard({
     const isPlayer = variant === 'player'
 
     return (
-        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined}>
+        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined} style={size ? { width: size } : undefined}>
             {/* Gold outer border */}
             <div className="card-border">
                 {/* Dark inner body */}
@@ -103,12 +106,29 @@ export default function TradingCard({
                     {/* Image frame */}
                     <div className="card-image-wrap">
                         <div className="card-image-frame">
-                            {avatarUrl ? (
-                                <img src={avatarUrl} alt={playerName} onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
-                            ) : null}
-                            <div className="card-image-placeholder" style={avatarUrl ? { display: 'none' } : undefined}>
-                                <img src={roleImg} alt={normalizedRole} />
-                            </div>
+                            {isConnected === false ? (
+                                <div className="card-image-placeholder" style={{ position: 'relative' }}>
+                                    <img src={passiontailsImg} alt="Passionless" style={{ width: '100%', height: '100%', opacity: 0.5, objectFit: 'contain' }} />
+                                    <span style={{ position: 'absolute', bottom: '8px', left: 0, right: 0, fontSize: '10px', fontWeight: 700, color: 'var(--text-dim, #9a8a70)', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.3 }}>
+                                        Passionless<br />Not Connected
+                                    </span>
+                                </div>
+                            ) : (
+                                <>
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={playerName} onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
+                                    ) : null}
+                                    <div className="card-image-placeholder" style={avatarUrl ? { display: 'none' } : undefined}>
+                                        {isPlayer ? (
+                                            <span className="card-image-initials" style={{ color: teamColor || 'var(--accent)' }}>
+                                                {(playerName || '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase()}
+                                            </span>
+                                        ) : (
+                                            <img src={roleImg} alt={normalizedRole} />
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
                         {/* Corner accents */}
                         <div className="card-corner card-corner-tl" />
@@ -139,9 +159,9 @@ export default function TradingCard({
                                     </div>
                                     <div className="card-stat-info">
                                         <span className="card-stat-name">KDA Strike</span>
-                                        <span className="card-stat-sub">{stats.totalKills}/{stats.totalDeaths}/{stats.totalAssists}</span>
+                                        <span className="card-stat-sub">{stats.gamesPlayed ? `${stats.totalKills}/${stats.totalDeaths}/${stats.totalAssists}` : '—/—/—'}</span>
                                     </div>
-                                    <span className="card-stat-value">{stats.kda?.toFixed(1)}</span>
+                                    <span className="card-stat-value">{stats.gamesPlayed ? stats.kda?.toFixed(1) : '—'}</span>
                                 </div>
                                 {(!isPlayer || ROLE_STATS[normalizedRole] === 'damage') && (
                                     <div className="card-stat-row">
@@ -157,7 +177,7 @@ export default function TradingCard({
                                             <span className="card-stat-name">Damage</span>
                                             <span className="card-stat-sub">Avg per game</span>
                                         </div>
-                                        <span className="card-stat-value">{fmt(stats.avgDamage || 0)}</span>
+                                        <span className="card-stat-value">{stats.gamesPlayed ? fmt(stats.avgDamage || 0) : '—'}</span>
                                     </div>
                                 )}
                                 {(!isPlayer || ROLE_STATS[normalizedRole] === 'mitigated') && (
@@ -174,7 +194,7 @@ export default function TradingCard({
                                             <span className="card-stat-name">Mitigated</span>
                                             <span className="card-stat-sub">Avg per game</span>
                                         </div>
-                                        <span className="card-stat-value">{fmt(stats.avgMitigated || 0)}</span>
+                                        <span className="card-stat-value">{stats.gamesPlayed ? fmt(stats.avgMitigated || 0) : '—'}</span>
                                     </div>
                                 )}
                             </div>
@@ -182,17 +202,17 @@ export default function TradingCard({
                             {/* Record bar */}
                             <div className="card-record-bar">
                                 <div className="card-record-item">
-                                    <span className="card-record-val">{stats.winRate?.toFixed(0)}%</span>
+                                    <span className="card-record-val">{stats.gamesPlayed ? `${stats.winRate?.toFixed(0)}%` : '—'}</span>
                                     <span className="card-record-label">WR</span>
                                 </div>
                                 <div className="card-record-divider" />
                                 <div className="card-record-item">
-                                    <span className="card-record-val">{stats.wins || 0}W-{(stats.gamesPlayed || 0) - (stats.wins || 0)}L</span>
+                                    <span className="card-record-val">{stats.gamesPlayed ? `${stats.wins || 0}W-${(stats.gamesPlayed || 0) - (stats.wins || 0)}L` : '—'}</span>
                                     <span className="card-record-label">Record</span>
                                 </div>
                                 <div className="card-record-divider" />
                                 <div className="card-record-item">
-                                    <span className="card-record-val">{stats.gamesPlayed || 0}</span>
+                                    <span className="card-record-val">{stats.gamesPlayed || '—'}</span>
                                     <span className="card-record-label">Games</span>
                                 </div>
                             </div>

@@ -1402,15 +1402,6 @@
     clip-path: inset(8.6% 5.3% 47% 5.3%);
 }
 
-/* Holo mode — player variant in overview slot (taller banner) */
-.card-overview-slot .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine,
-.card-overview-slot .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine::before,
-.card-overview-slot .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine::after,
-.card-overview-slot .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__glare,
-.card-overview-slot .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__glare::after {
-    clip-path: inset(11.4% 5.3% 44.3% 5.3%);
-}
-
 /* ============================================
    Reverse mode — effect on everything except image
    Polygon traces the card edge, then cuts out the image rect
@@ -1444,21 +1435,6 @@
     );
 }
 
-/* ============================================
-   Reverse mode — player variant in overview slot
-   Banner is taller (min-height:46px), image shifts down
-   Image at (18,54)→(322,264.5) of 340×474.6 card
-   ============================================ */
-.card-overview-slot .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine,
-.card-overview-slot .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine::before,
-.card-overview-slot .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine::after,
-.card-overview-slot .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__glare,
-.card-overview-slot .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__glare::after {
-    clip-path: polygon(evenodd,
-        0% 0%, 100% 0%, 100% 100%, 0% 100%,
-        5.3% 11.4%, 94.7% 11.4%, 94.7% 55.7%, 5.3% 55.7%
-    );
-}
 
 /* ============================================
    Responsive

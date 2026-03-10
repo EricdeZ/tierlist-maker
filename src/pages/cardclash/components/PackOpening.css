@@ -493,9 +493,7 @@
   height: 100% !important;
 }
 
-/* Player cards use the shared card-overview-slot from TradingCard.css
-   (transform: scale for fixed-width TradingCard).
-   Non-player cards use TradingCardHolo size prop + GameCard container queries. */
+/* Both card types use container queries for native scaling. */
 
 
 /* Dismissed card — shrinks away */

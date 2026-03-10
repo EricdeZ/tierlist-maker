@@ -394,8 +394,8 @@ const tools = [
         btnClass: 'bg-orange-600 hover:bg-orange-700',
     },
     {
-        title: 'Compdeck Admin',
-        description: 'Manage the Compdeck card game. Browse and edit all player cards, view god and item definitions, tune economy parameters, and adjust image positioning and holo effects.',
+        title: 'The Vault Admin',
+        description: 'Manage The Vault card game. Browse and edit all player cards, view god and item definitions, tune economy parameters, and adjust image positioning and holo effects.',
         path: '/admin/cardclash',
         permission: 'cardclash_manage',
         globalOnly: true,

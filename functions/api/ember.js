@@ -46,7 +46,7 @@ async function getBalance(sql, user) {
 
     const [eb] = await sql`
         SELECT balance, last_daily_claim, current_streak, longest_streak,
-               conversions_today, last_conversion_date
+               conversions_today, last_conversion_date::text
         FROM ember_balances WHERE user_id = ${user.id}
     `
 
@@ -58,9 +58,7 @@ async function getBalance(sql, user) {
     const canClaimDaily = lastClaimDate !== todayUTC
 
     // Reset conversions_today if it's a new day
-    const lastConvDate = eb.last_conversion_date
-        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
-        : null
+    const lastConvDate = eb.last_conversion_date || null
     let conversionsToday = eb.conversions_today || 0
     if (lastConvDate && lastConvDate !== todayUTC) {
         conversionsToday = 0
@@ -141,16 +139,14 @@ async function convertPassion(sql, user) {
     await ensureEmberBalance(sql, user.id)
 
     const [eb] = await sql`
-        SELECT conversions_today, last_conversion_date FROM ember_balances WHERE user_id = ${user.id}
+        SELECT conversions_today, last_conversion_date::text FROM ember_balances WHERE user_id = ${user.id}
     `
 
     const now = new Date()
     const todayUTC = now.toISOString().slice(0, 10)
 
     // Reset daily conversions if new day
-    const lastConvDate = eb.last_conversion_date
-        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
-        : null
+    const lastConvDate = eb.last_conversion_date || null
     let conversionsToday = eb.conversions_today || 0
     if (lastConvDate && lastConvDate !== todayUTC) {
         conversionsToday = 0

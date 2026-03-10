@@ -36,6 +36,7 @@ const handler = async (event) => {
         case 'collection-catalog': return await handleCollectionCatalog(sql)
         case 'collection-owned': return await handleCollectionOwned(sql, user)
         case 'collection-set': return await handleCollectionSet(sql, event.queryStringParameters)
+        case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -112,7 +113,8 @@ async function handleSharedCard(sql, params) {
     const [player] = await sql`
       SELECT p.id, p.name, p.slug,
              u.discord_id, u.discord_avatar,
-             COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar
+             COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar,
+             CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
       FROM players p
       LEFT JOIN users u ON u.linked_player_id = p.id
       LEFT JOIN user_preferences up ON up.user_id = u.id
@@ -195,6 +197,7 @@ async function handleSharedCard(sql, params) {
           divisionName: latestSeason?.division_name || '',
           role: (latestSeason?.role || 'ADC').toUpperCase(),
           avatarUrl,
+          isConnected: player.is_claimed,
           stats: {
             gamesPlayed,
             wins,
@@ -223,10 +226,14 @@ async function handleCollectionCatalog(sql) {
       d.league_slug, d.division_tier, d.division_slug, d.season_slug,
       s.name AS season_name, s.is_active,
       d.league_id,
-      COUNT(*)::int AS total
+      div.name AS division_name,
+      COUNT(*)::int AS total,
+      array_agg(d.id ORDER BY d.card_index) AS def_ids
     FROM cc_player_defs d
     JOIN seasons s ON d.season_id = s.id
-    GROUP BY d.league_slug, d.division_tier, d.division_slug, d.season_slug, s.name, s.is_active, d.league_id
+    JOIN divisions div ON d.division_id = div.id
+    GROUP BY d.league_slug, d.division_tier, d.division_slug, d.season_slug,
+             s.name, s.is_active, d.league_id, div.name
     ORDER BY d.league_slug, d.division_tier, d.season_slug
   `
 
@@ -236,10 +243,12 @@ async function handleCollectionCatalog(sql) {
     leagueId: s.league_id,
     divisionTier: s.division_tier,
     divisionSlug: s.division_slug,
+    divisionName: s.division_name,
     seasonSlug: s.season_slug,
     seasonName: s.season_name,
     seasonActive: s.is_active,
     total: s.total,
+    defIds: s.def_ids,
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ playerSets }) }
@@ -279,8 +288,11 @@ async function handleCollectionSet(sql, params) {
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
            d.role, d.avatar_url,
-           d.league_slug, d.division_tier, d.season_slug
+           d.league_slug, d.division_tier, d.season_slug,
+           CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM cc_player_defs d
+    LEFT JOIN players p ON p.slug = d.player_slug
+    LEFT JOIN users u ON u.linked_player_id = p.id
     WHERE d.league_slug || '-d' || d.division_tier || '-' || d.season_slug = ${setKey}
     ORDER BY d.card_index
   `
@@ -294,9 +306,95 @@ async function handleCollectionSet(sql, params) {
     teamColor: d.team_color,
     role: d.role,
     avatarUrl: d.avatar_url,
+    isConnected: d.is_claimed,
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
+}
+
+// ═══ GET: Card detail — player stats for a card definition ═══
+async function handleCardDetail(sql, params) {
+  const { defId } = params || {}
+  if (!defId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'defId required' }) }
+
+  // Use direct FK columns (season_id, division_id) instead of slug reverse-lookup
+  const [def] = await sql`
+    SELECT d.player_slug, d.season_id,
+           s.name AS season_name, l.name AS league_name, div.name AS division_name
+    FROM cc_player_defs d
+    JOIN seasons s ON d.season_id = s.id
+    JOIN divisions div ON d.division_id = div.id
+    JOIN leagues l ON s.league_id = l.id
+    WHERE d.id = ${defId}
+  `
+  if (!def) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Definition not found' }) }
+
+  const [player] = await sql`
+    SELECT p.id,
+           CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
+    FROM players p
+    LEFT JOIN users u ON u.linked_player_id = p.id
+    WHERE p.slug = ${def.player_slug}
+  `
+  if (!player) return { statusCode: 200, headers, body: JSON.stringify({ stats: null }) }
+
+  const games = await sql`
+    SELECT pgs.kills, pgs.deaths, pgs.assists, pgs.damage, pgs.mitigated,
+           pgs.god_played, pgs.team_side, g.winner_team_id,
+           CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END AS player_team_id
+    FROM player_game_stats pgs
+    JOIN league_players lp ON pgs.league_player_id = lp.id
+    JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
+    JOIN matches m ON g.match_id = m.id
+    WHERE lp.player_id = ${player.id} AND lp.season_id = ${def.season_id}
+  `
+
+  let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
+  const godMap = {}
+  for (const g of games) {
+    gamesPlayed++
+    if (g.winner_team_id === g.player_team_id) wins++
+    kills += parseInt(g.kills) || 0
+    deaths += parseInt(g.deaths) || 0
+    assists += parseInt(g.assists) || 0
+    totalDamage += parseInt(g.damage) || 0
+    totalMitigated += parseInt(g.mitigated) || 0
+    if (g.god_played) {
+      if (!godMap[g.god_played]) godMap[g.god_played] = { name: g.god_played, games: 0, wins: 0 }
+      godMap[g.god_played].games++
+      if (g.winner_team_id === g.player_team_id) godMap[g.god_played].wins++
+    }
+  }
+
+  const gods = Object.values(godMap).sort((a, b) => b.games - a.games)
+  const best = gods[0] || null
+  let bestGod = null
+  if (best) {
+    const slug = best.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+    bestGod = {
+      name: best.name,
+      imageUrl: `https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`,
+      games: best.games,
+      winRate: best.games > 0 ? (best.wins / best.games) * 100 : 0,
+    }
+  }
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      stats: {
+        gamesPlayed, wins,
+        winRate: gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0,
+        kda: deaths > 0 ? (kills + assists / 2) / deaths : kills + assists / 2,
+        avgDamage: gamesPlayed > 0 ? Math.round(totalDamage / gamesPlayed) : 0,
+        avgMitigated: gamesPlayed > 0 ? Math.round(totalMitigated / gamesPlayed) : 0,
+        totalKills: kills, totalDeaths: deaths, totalAssists: assists,
+      },
+      bestGod,
+      seasonName: def.season_name,
+      isConnected: player.is_claimed,
+    }),
+  }
 }
 
 // ═══ GET: Definition overrides ═══

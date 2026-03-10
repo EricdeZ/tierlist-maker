@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
 import PackArt from './components/PackArt'
-import PackArt3D from './components/PackArt3D'
 import './components/testpack.css'
 
 const TIERS = [
@@ -38,7 +37,6 @@ const ENHANCEMENTS = [
 
 export default function CCTestPack() {
   const [tier, setTier] = useState('osl-mixed')
-  const [mode, setMode] = useState('2d')
   const [active, setActive] = useState({})
   const wrapRef = useRef(null)
 
@@ -85,110 +83,78 @@ export default function CCTestPack() {
 
   return (
     <div className="py-8">
-      {/* Mode toggle + tier selector */}
       <div className="flex items-center justify-center gap-4 mb-8">
-        <div className="flex rounded-lg overflow-hidden border border-white/20">
-          {['2d', '3d'].map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-                mode === m
-                  ? 'bg-white/15 text-white'
-                  : 'bg-white/4 text-white/40 hover:text-white/60'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
         {tierSelector}
       </div>
 
-      {mode === '2d' ? (
-        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12">
-          {/* 2D Pack preview */}
-          <div className="flex flex-col items-center gap-6">
-            <div
-              ref={wrapRef}
-              className={`testpack-wrap ${classes}`}
-              data-tier={tier}
-              onMouseMove={handleMouseMove}
-            >
-              <div className="testpack-pack-layer">
-                <PackArt
-                  tier={tier}
-                  name={display.name}
-                  subtitle={display.subtitle}
-                  cardCount={6}
-                  seed={5}
-                />
-              </div>
-              <div className="enh-overlay enh-holo-el" />
-              <div className="enh-overlay enh-creases-el" />
-              <div className="enh-overlay enh-noise-el" />
+      <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12">
+        {/* Pack preview */}
+        <div className="flex flex-col items-center gap-6">
+          <div
+            ref={wrapRef}
+            className={`testpack-wrap ${classes}`}
+            data-tier={tier}
+            onMouseMove={handleMouseMove}
+          >
+            <div className="testpack-pack-layer">
+              <PackArt
+                tier={tier}
+                name={display.name}
+                subtitle={display.subtitle}
+                cardCount={6}
+                seed={5}
+              />
             </div>
-            <div className="text-xs text-white/30 text-center">Hover to see 3D tilt + glare</div>
+            <div className="enh-overlay enh-holo-el" />
+            <div className="enh-overlay enh-creases-el" />
+            <div className="enh-overlay enh-noise-el" />
           </div>
+          <div className="text-xs text-white/30 text-center">Hover to see 3D tilt + glare</div>
+        </div>
 
-          {/* Toggle panel */}
-          <div className="flex flex-col gap-1 bg-white/5 rounded-lg p-5 min-w-[280px]">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white/70">Enhancements</h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => toggleAll(true)}
-                  className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/50 hover:text-white/80 cursor-pointer"
-                >
-                  All On
-                </button>
-                <button
-                  onClick={() => toggleAll(false)}
-                  className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/50 hover:text-white/80 cursor-pointer"
-                >
-                  All Off
-                </button>
-              </div>
-            </div>
-
-            {ENHANCEMENTS.map(({ key, label, desc }) => (
-              <label
-                key={key}
-                className={`flex items-start gap-3 cursor-pointer p-2 rounded transition-colors ${
-                  active[key] ? 'bg-white/8' : 'hover:bg-white/4'
-                }`}
+        {/* Toggle panel */}
+        <div className="flex flex-col gap-1 bg-white/5 rounded-lg p-5 min-w-[280px]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/70">Enhancements</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => toggleAll(true)}
+                className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/50 hover:text-white/80 cursor-pointer"
               >
-                <input
-                  type="checkbox"
-                  checked={!!active[key]}
-                  onChange={() => toggle(key)}
-                  className="mt-0.5 accent-amber-400"
-                />
-                <div>
-                  <div className={`text-sm font-semibold ${active[key] ? 'text-amber-300' : 'text-white/80'}`}>
-                    {label}
-                  </div>
-                  <div className="text-[11px] text-white/40 leading-tight">{desc}</div>
+                All On
+              </button>
+              <button
+                onClick={() => toggleAll(false)}
+                className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/50 hover:text-white/80 cursor-pointer"
+              >
+                All Off
+              </button>
+            </div>
+          </div>
+
+          {ENHANCEMENTS.map(({ key, label, desc }) => (
+            <label
+              key={key}
+              className={`flex items-start gap-3 cursor-pointer p-2 rounded transition-colors ${
+                active[key] ? 'bg-white/8' : 'hover:bg-white/4'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={!!active[key]}
+                onChange={() => toggle(key)}
+                className="mt-0.5 accent-amber-400"
+              />
+              <div>
+                <div className={`text-sm font-semibold ${active[key] ? 'text-amber-300' : 'text-white/80'}`}>
+                  {label}
                 </div>
-              </label>
-            ))}
-          </div>
+                <div className="text-[11px] text-white/40 leading-tight">{desc}</div>
+              </div>
+            </label>
+          ))}
         </div>
-      ) : (
-        <div className="flex flex-col items-center">
-          <PackArt3D
-            tier={tier}
-            name={display.name}
-            subtitle={display.subtitle}
-            cardCount={6}
-            seed={5}
-            width={280}
-          />
-          <div className="text-xs text-white/30 text-center mt-2">
-            Hover to tilt — click Flip to see back
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }

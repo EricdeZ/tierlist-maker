@@ -64,9 +64,7 @@ function toPlayerCardProps(card) {
 }
 
 /**
- * Reusable card renderer — same pattern as the catalog.
- * - Player cards: card-overview-slot + TradingCard (transform: scale)
- * - Other cards:  TradingCardHolo(size) + GameCard (container queries)
+ * Reusable card renderer — both card types use container queries for native scaling.
  * Pass holo=false to skip the TradingCardHolo wrapper (e.g. inside flip animation).
  */
 function PackCard({ card, size, holo = true }) {
@@ -78,16 +76,14 @@ function PackCard({ card, size, holo = true }) {
     : ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
 
   if (isPlayer) {
-    const inner = holo
-      ? <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse">
+    if (holo) {
+      return (
+        <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size={size}>
           <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
         </TradingCardHolo>
-      : <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
-    return (
-      <div className="card-overview-slot" style={{ width: size, height: size * (88 / 63), '--slot-scale': size / 340 }}>
-        {inner}
-      </div>
-    )
+      )
+    }
+    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={size} />
   }
 
   const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} />

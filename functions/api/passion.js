@@ -82,7 +82,7 @@ async function getBalance(sql, user) {
         `,
         sql`
             SELECT balance, last_daily_claim, current_streak, longest_streak,
-                   conversions_today, last_conversion_date
+                   conversions_today, last_conversion_date::text
             FROM ember_balances WHERE user_id = ${user.id}
         `,
         sql`
@@ -116,9 +116,7 @@ async function getBalance(sql, user) {
     const emberLastClaim = eb.last_daily_claim
         ? new Date(eb.last_daily_claim).toISOString().slice(0, 10)
         : null
-    const lastConvDate = eb.last_conversion_date
-        ? new Date(eb.last_conversion_date).toISOString().slice(0, 10)
-        : null
+    const lastConvDate = eb.last_conversion_date || null
     let emberConversionsToday = eb.conversions_today || 0
     if (lastConvDate && lastConvDate !== todayUTC) {
         emberConversionsToday = 0

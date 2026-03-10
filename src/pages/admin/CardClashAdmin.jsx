@@ -28,10 +28,10 @@ export default function CardClashAdmin() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-12">
-      <PageTitle title="Compdeck Admin" noindex />
+      <PageTitle title="The Vault Admin" noindex />
 
       <div className="mb-6 cd-section-accent pb-3">
-        <h1 className="text-2xl font-bold text-[var(--cd-cyan)] cd-head cd-text-glow">Compdeck Admin</h1>
+        <h1 className="text-2xl font-bold text-[var(--cd-cyan)] cd-head cd-text-glow">The Vault Admin</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">Manage cards, gods, items, and game economy</p>
       </div>
 

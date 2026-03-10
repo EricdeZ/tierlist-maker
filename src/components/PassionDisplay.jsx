@@ -418,6 +418,48 @@ export default function PassionDisplay() {
                                         )}
                                     </div>
 
+                                    {/* Daily Passion claim */}
+                                    <div className="px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-1.5 text-xs text-white/50">
+                                                <img src={passionCoin} alt="" className="w-3.5 h-3.5" />
+                                                Passion Streak: <span className="text-[#f8c56a] font-bold">{currentStreak}</span>
+                                            </div>
+                                        </div>
+
+                                        {canClaimDaily && !claimResult ? (
+                                            <button
+                                                onClick={handleClaim}
+                                                disabled={claiming}
+                                                className="w-full py-2 rounded-lg hover:opacity-90 font-bold text-sm transition-all disabled:opacity-50 relative overflow-hidden"
+                                                style={{ background: 'linear-gradient(135deg, #c4922e, #f8c56a)', color: '#0a0f1a' }}
+                                            >
+                                                {claiming ? 'Claiming...' : 'Claim Daily Passion'}
+                                                {showExplosion && (
+                                                    <img src={passionsplosion} alt=""
+                                                        className="absolute inset-0 w-full h-full object-contain animate-explosion pointer-events-none" />
+                                                )}
+                                            </button>
+                                        ) : claimResult ? (
+                                            <div className="text-center py-2 text-sm">
+                                                <span className="text-[#f8c56a] font-bold">+{claimResult.earned}</span>
+                                                <span className="text-white/50 ml-1">Passion earned!</span>
+                                                {claimResult.streakBonus > 0 && (
+                                                    <div className="text-xs text-[#f8c56a]/70 mt-0.5">
+                                                        includes +{claimResult.streakBonus} streak bonus
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-2 text-xs text-white/50">
+                                                {countdown
+                                                    ? <>Next claim in <span className="text-[#f8c56a] font-mono font-medium tabular-nums">{countdown}</span></>
+                                                    : 'Come back tomorrow!'
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* Compdeck Links */}
                                     <div className="py-1">
                                         <Link to="/cardclash?tab=packs" onClick={() => setOpen(false)}
@@ -540,7 +582,7 @@ export default function PassionDisplay() {
                                                 className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                                 <span className="flex items-center gap-2">
                                                     <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
-                                                    Compdeck
+                                                    The Vault
                                                 </span>
                                                 <span className="text-xs font-bold text-[#00e5ff] tabular-nums">{ember.balance}</span>
                                             </Link>

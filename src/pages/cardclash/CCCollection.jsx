@@ -1,33 +1,33 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { cardclashService } from '../../services/database'
-import { getGameCardEntries, getPlayerCardNumber, GAME_CARD_TYPES, TOTAL_GAME_CARDS } from '../../data/cardclash/cardIndex'
+import { getGameCardEntries, getPlayerCardNumber, TOTAL_GAME_CARDS } from '../../data/cardclash/cardIndex'
 import { RARITIES } from '../../data/cardclash/economy'
 import { GODS } from '../../data/cardclash/gods'
 import { ITEMS } from '../../data/cardclash/items'
-import { MINIONS } from '../../data/cardclash/minions'
-import { BUFFS, CONSUMABLES } from '../../data/cardclash/buffs'
+import { CONSUMABLES } from '../../data/cardclash/buffs'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
+import CardZoomModal from './components/CardZoomModal'
+import { getLeagueLogo } from '../../utils/leagueImages'
+import { getDivisionImage } from '../../utils/divisionImages'
 import { Library, Trophy } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
-const BATTLEFIELD_TYPES = ['minion', 'buff', 'consumable']
+
+// Only types acquirable in packs
+const COLLECTION_TYPES = ['god', 'item', 'consumable']
 
 const GAME_SECTIONS = [
   { type: 'god', label: 'Gods', icon: '⚔' },
   { type: 'item', label: 'Items', icon: '🛡' },
-  { type: 'battlefield', label: 'Battlefield', icon: '🏟' },
+  { type: 'consumable', label: 'Consumables', icon: '🧪' },
 ]
-
-const BATTLEFIELD_LABELS = { minion: 'Minions', buff: 'Buffs', consumable: 'Consumables' }
 
 // Full data lookups for rendering actual cards
 const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
 const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
-const MINION_MAP = new Map(MINIONS.map(m => [m.type, m]))
-const BUFF_MAP = new Map(BUFFS.map(b => [b.id, b]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
-const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, minion: MINION_MAP, buff: BUFF_MAP, consumable: CONSUMABLE_MAP }
+const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
 function entryGodId(entry, type) {
   if (type === 'god') return entry.identifier
@@ -35,7 +35,7 @@ function entryGodId(entry, type) {
 }
 
 function entryDataKey(entry, type) {
-  return entry.identifier || entry.godId?.replace(/^(item|minion|buff|consumable)-/, '')
+  return entry.identifier || entry.godId?.replace(/^(item|consumable)-/, '')
 }
 
 function highestRarity(ownedRarities) {
@@ -69,7 +69,6 @@ function cacheSet(key, data) {
 
 const CARD_SIZE = 150
 const PLAYER_CARD_SIZE = 160
-const PLAYER_SLOT_SCALE = PLAYER_CARD_SIZE / 340
 
 export default function CCCollection() {
   const [loading, setLoading] = useState(true)
@@ -79,6 +78,7 @@ export default function CCCollection() {
   const [loadingSet, setLoadingSet] = useState(null)
   const [activeSection, setActiveSection] = useState('god')
   const [defOverrides, setDefOverrides] = useState({})
+  const [zoomedCard, setZoomedCard] = useState(null)
   const loadedSetsRef = useRef(new Set())
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function CCCollection() {
     if (loadedSetsRef.current.has(setKey)) return
     loadedSetsRef.current.add(setKey)
 
-    const cached = cacheGet(`cd-set-${setKey}`, SET_DEF_TTL)
+    const cached = cacheGet(`cd-set2-${setKey}`, SET_DEF_TTL)
     if (cached) {
       setSetDefs(prev => ({ ...prev, [setKey]: cached }))
       return
@@ -122,7 +122,7 @@ export default function CCCollection() {
     setLoadingSet(setKey)
     try {
       const data = await cardclashService.getCollectionSet(setKey)
-      cacheSet(`cd-set-${setKey}`, data.cards)
+      cacheSet(`cd-set2-${setKey}`, data.cards)
       setSetDefs(prev => ({ ...prev, [setKey]: data.cards }))
     } catch {}
     setLoadingSet(null)
@@ -134,11 +134,11 @@ export default function CCCollection() {
     }
   }, [activeSection, loadPlayerSet])
 
-  // Build game entries with ownership merged
+  // Build game entries with ownership merged (only collectible types)
   const gameEntries = useMemo(() => {
     if (!owned) return {}
     const result = {}
-    for (const type of GAME_CARD_TYPES) {
+    for (const type of COLLECTION_TYPES) {
       const entries = getGameCardEntries(type)
       result[type] = entries.map(e => {
         const godId = entryGodId(e, type)
@@ -149,47 +149,16 @@ export default function CCCollection() {
     return result
   }, [owned])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="cd-spinner w-8 h-8" />
-      </div>
-    )
-  }
+  // Derived data — all hooks must be above early returns
+  // Use defIds from catalog to compute collected counts without needing lazy-loaded set defs
+  const playerSets = useMemo(() => {
+    if (!catalog || !owned) return []
+    return (catalog.playerSets || []).filter(s => s.seasonActive).map(set => {
+      const collected = (set.defIds || []).filter(id => !!owned.playerCards?.[id]).length
+      return { ...set, collected }
+    })
+  }, [catalog, owned])
 
-  if (!catalog || !owned) {
-    return (
-      <div className="text-center py-20 text-[var(--cd-text-dim)]">
-        <Library className="w-16 h-16 mx-auto mb-4 opacity-20" />
-        <p className="text-lg font-bold cd-head">Failed to load collection</p>
-      </div>
-    )
-  }
-
-  // Game card totals (per type + battlefield combined)
-  const gameTotals = {}
-  let totalGameCollected = 0
-  for (const type of GAME_CARD_TYPES) {
-    const entries = gameEntries[type] || []
-    const collected = entries.filter(e => e.collected).length
-    gameTotals[type] = { total: entries.length, collected }
-    totalGameCollected += collected
-  }
-  // Battlefield combined total
-  gameTotals.battlefield = {
-    total: BATTLEFIELD_TYPES.reduce((s, t) => s + (gameTotals[t]?.total || 0), 0),
-    collected: BATTLEFIELD_TYPES.reduce((s, t) => s + (gameTotals[t]?.collected || 0), 0),
-  }
-
-  // Player sets with collected counts + grouped by league+season
-  const playerSets = (catalog.playerSets || []).map(set => {
-    const defs = setDefs[set.key]
-    let collected = 0
-    if (defs) collected = defs.filter(d => !!owned.playerCards?.[d.defId]).length
-    return { ...set, collected }
-  })
-
-  // Group: league+season → divisions
   const leagueSeasonGroups = useMemo(() => {
     const groups = new Map()
     for (const set of playerSets) {
@@ -209,6 +178,20 @@ export default function CCCollection() {
     return [...groups.values()]
   }, [playerSets])
 
+  const { gameTotals, totalGameCollected, totalGameCards } = useMemo(() => {
+    const totals = {}
+    let collected = 0
+    let total = 0
+    for (const type of COLLECTION_TYPES) {
+      const entries = gameEntries[type] || []
+      const c = entries.filter(e => e.collected).length
+      totals[type] = { total: entries.length, collected: c }
+      collected += c
+      total += entries.length
+    }
+    return { gameTotals: totals, totalGameCollected: collected, totalGameCards: total }
+  }, [gameEntries])
+
   const totalPlayerCards = playerSets.reduce((s, set) => s + set.total, 0)
   const totalPlayerCollected = playerSets.reduce((s, set) => s + set.collected, 0)
 
@@ -218,13 +201,31 @@ export default function CCCollection() {
     ? playerSets.find(s => s.key === activePlayerSetKey)
     : null
 
-  const activePlayerCards = activePlayerSetKey && setDefs[activePlayerSetKey]
-    ? setDefs[activePlayerSetKey].map(d => ({
-        ...d,
-        collected: !!owned.playerCards?.[d.defId],
-        ownedRarities: owned.playerCards?.[d.defId] || [],
-      }))
-    : []
+  const activePlayerCards = useMemo(() => {
+    if (!activePlayerSetKey || !setDefs[activePlayerSetKey] || !owned) return []
+    return setDefs[activePlayerSetKey].map(d => ({
+      ...d,
+      collected: !!owned.playerCards?.[d.defId],
+      ownedRarities: owned.playerCards?.[d.defId] || [],
+    }))
+  }, [activePlayerSetKey, setDefs, owned])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="cd-spinner w-8 h-8" />
+      </div>
+    )
+  }
+
+  if (!catalog || !owned) {
+    return (
+      <div className="text-center py-20 text-[var(--cd-text-dim)]">
+        <Library className="w-16 h-16 mx-auto mb-4 opacity-20" />
+        <p className="text-lg font-bold cd-head">Failed to load collection</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6">
@@ -233,7 +234,7 @@ export default function CCCollection() {
         <div className="flex gap-6 mt-2 text-sm">
           <div className="text-[var(--cd-text-mid)]">
             Game Cards: <span className="text-[var(--cd-cyan)] cd-num font-bold">{totalGameCollected}</span>
-            <span className="text-[var(--cd-text-dim)]">/{TOTAL_GAME_CARDS}</span>
+            <span className="text-[var(--cd-text-dim)]">/{totalGameCards}</span>
           </div>
           {totalPlayerCards > 0 && (
             <div className="text-[var(--cd-text-mid)]">
@@ -263,7 +264,7 @@ export default function CCCollection() {
               >
                 <span className="text-xs">{s.icon}</span>
                 <span className="flex-1">{s.label}</span>
-                <span className="text-[10px] cd-num opacity-60">{t.collected}/{t.total}</span>
+                <span className="text-xs cd-num text-[var(--cd-text)]">{t.collected}/{t.total}</span>
               </button>
             )
           })}
@@ -271,31 +272,36 @@ export default function CCCollection() {
           {leagueSeasonGroups.length > 0 && (
             <>
               <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mt-4 mb-2 cd-head">Player Sets</div>
-              {leagueSeasonGroups.map(group => (
-                <div key={group.key}>
-                  <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-[var(--cd-text-dim)] uppercase tracking-wider cd-head">
-                    <span>{group.label}</span>
-                    {group.seasonActive && <span className="text-[8px] text-emerald-400">LIVE</span>}
+              {leagueSeasonGroups.map(group => {
+                const leagueLogo = getLeagueLogo(group.leagueSlug)
+                return (
+                  <div key={group.key}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-[var(--cd-text-dim)] uppercase tracking-wider cd-head">
+                      {leagueLogo && <img src={leagueLogo} alt="" className="w-4 h-4 object-contain" />}
+                      <span>{group.label}</span>
+                    </div>
+                    {group.divisions.map(set => {
+                      const active = activeSection === `player:${set.key}`
+                      const divImg = getDivisionImage(set.leagueSlug, set.divisionSlug, set.divisionTier)
+                      return (
+                        <button
+                          key={set.key}
+                          onClick={() => setActiveSection(`player:${set.key}`)}
+                          className={`w-full flex items-center gap-2 px-3 pl-6 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
+                            active
+                              ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
+                              : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
+                          }`}
+                        >
+                          {divImg && <img src={divImg} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                          <span className="flex-1 truncate">{set.divisionName || `Division ${set.divisionTier}`}</span>
+                          <span className="text-xs cd-num text-[var(--cd-text)]">{set.collected}/{set.total}</span>
+                        </button>
+                      )
+                    })}
                   </div>
-                  {group.divisions.map(set => {
-                    const active = activeSection === `player:${set.key}`
-                    return (
-                      <button
-                        key={set.key}
-                        onClick={() => setActiveSection(`player:${set.key}`)}
-                        className={`w-full flex items-center gap-2 px-3 pl-6 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
-                          active
-                            ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
-                            : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
-                        }`}
-                      >
-                        <span className="flex-1 truncate">Division {set.divisionTier}</span>
-                        <span className="text-[10px] cd-num opacity-60">{set.collected}/{set.total}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
+                )
+              })}
             </>
           )}
         </div>
@@ -308,6 +314,7 @@ export default function CCCollection() {
               entries={gameEntries.god || []}
               totals={gameTotals.god}
               applyOverride={applyOverride}
+              onZoom={setZoomedCard}
             />
           )}
           {activeSection === 'item' && (
@@ -316,13 +323,16 @@ export default function CCCollection() {
               entries={gameEntries.item || []}
               totals={gameTotals.item}
               applyOverride={applyOverride}
+              onZoom={setZoomedCard}
             />
           )}
-          {activeSection === 'battlefield' && (
-            <BattlefieldGrid
-              gameEntries={gameEntries}
-              gameTotals={gameTotals}
+          {activeSection === 'consumable' && (
+            <GameCardGrid
+              type="consumable"
+              entries={gameEntries.consumable || []}
+              totals={gameTotals.consumable}
               applyOverride={applyOverride}
+              onZoom={setZoomedCard}
             />
           )}
           {isPlayerSection && activePlayerSetMeta && (
@@ -334,11 +344,20 @@ export default function CCCollection() {
               <PlayerCardGrid
                 meta={activePlayerSetMeta}
                 cards={activePlayerCards}
+                onZoom={setZoomedCard}
               />
             )
           )}
         </div>
       </div>
+
+      {zoomedCard && (
+        <CardZoomModal
+          onClose={() => setZoomedCard(null)}
+          gameCard={zoomedCard.gameCard}
+          playerCard={zoomedCard.playerCard}
+        />
+      )}
     </div>
   )
 }
@@ -384,13 +403,13 @@ function RarityPips({ ownedRarities }) {
 
 // ═══ Game card grids ═══
 
-function GameCardGrid({ type, entries, totals, applyOverride, label }) {
+function GameCardGrid({ type, entries, totals, applyOverride, onZoom }) {
   const section = GAME_SECTIONS.find(s => s.type === type)
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-2">
-        <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">{label || section?.label || type}</h2>
+        <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">{section?.label || type}</h2>
         {totals?.collected === totals?.total && totals?.total > 0 && (
           <Trophy className="w-4 h-4 text-[var(--cd-gold)]" />
         )}
@@ -399,42 +418,14 @@ function GameCardGrid({ type, entries, totals, applyOverride, label }) {
 
       <div className="flex flex-wrap gap-3">
         {entries.map(entry => (
-          <CollectionSlot key={entry.index} entry={entry} type={type} applyOverride={applyOverride} />
+          <CollectionSlot key={entry.index} entry={entry} type={type} applyOverride={applyOverride} onZoom={onZoom} />
         ))}
       </div>
     </div>
   )
 }
 
-function BattlefieldGrid({ gameEntries, gameTotals, applyOverride }) {
-  const bf = gameTotals.battlefield
-  return (
-    <div>
-      <div className="flex items-center gap-3 mb-2">
-        <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">Battlefield</h2>
-        {bf?.collected === bf?.total && bf?.total > 0 && (
-          <Trophy className="w-4 h-4 text-[var(--cd-gold)]" />
-        )}
-      </div>
-      <ProgressBar collected={bf?.collected || 0} total={bf?.total || 0} />
-
-      <div className="space-y-6">
-        {BATTLEFIELD_TYPES.map(type => (
-          <div key={type}>
-            <h3 className="text-xs font-bold text-[var(--cd-text-dim)] uppercase tracking-wider mb-3 cd-head">{BATTLEFIELD_LABELS[type]}</h3>
-            <div className="flex flex-wrap gap-3">
-              {(gameEntries[type] || []).map(entry => (
-                <CollectionSlot key={entry.index} entry={entry} type={type} applyOverride={applyOverride} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CollectionSlot({ entry, type, applyOverride }) {
+function CollectionSlot({ entry, type, applyOverride, onZoom }) {
   if (entry.collected) {
     const dataKey = entryDataKey(entry, type)
     const dataMap = DATA_MAPS[type]
@@ -444,7 +435,7 @@ function CollectionSlot({ entry, type, applyOverride }) {
     const data = applyOverride(type, dataKey, fullData)
 
     return (
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data } })}>
         <GameCard type={type} rarity={rarity} data={data} size={CARD_SIZE} />
         <RarityPips ownedRarities={entry.ownedRarities} />
       </div>
@@ -454,12 +445,12 @@ function CollectionSlot({ entry, type, applyOverride }) {
   return (
     <div className="flex flex-col items-center">
       <div
-        className="rounded-lg border border-[var(--cd-edge)] bg-[var(--cd-edge)]/30 flex flex-col items-center justify-center opacity-40"
+        className="rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/40 flex flex-col items-center justify-center"
         style={{ width: CARD_SIZE, aspectRatio: '63/88' }}
       >
         <div className="text-[9px] cd-num text-[var(--cd-text-dim)] mb-1">{entry.index}</div>
-        <div className="text-[11px] font-bold text-[var(--cd-text-mid)] cd-head text-center px-2 leading-tight">{entry.name}</div>
-        <div className="text-[10px] text-[var(--cd-text-dim)] mt-0.5">???</div>
+        <div className="text-[11px] font-bold text-[var(--cd-text-dim)] cd-head text-center px-2 leading-tight">{entry.name}</div>
+        <div className="text-[10px] text-[var(--cd-text-dim)]/60 mt-0.5">???</div>
       </div>
     </div>
   )
@@ -467,7 +458,7 @@ function CollectionSlot({ entry, type, applyOverride }) {
 
 // ═══ Player card grid ═══
 
-function PlayerCardGrid({ meta, cards }) {
+function PlayerCardGrid({ meta, cards, onZoom }) {
   const teams = useMemo(() => {
     const map = new Map()
     for (const card of cards) {
@@ -478,18 +469,19 @@ function PlayerCardGrid({ meta, cards }) {
     return [...map.values()]
   }, [cards])
 
-  const divLabel = `Division ${meta.divisionTier}`
+  const leagueLogo = getLeagueLogo(meta.leagueSlug)
+  const divImg = getDivisionImage(meta.leagueSlug, meta.divisionSlug, meta.divisionTier)
+  const divLabel = meta.divisionName || `Division ${meta.divisionTier}`
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-2">
+        {leagueLogo && <img src={leagueLogo} alt="" className="w-6 h-6 object-contain" />}
         <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">
           {meta.leagueSlug.toUpperCase()} (S{seasonNumber(meta.seasonSlug)})
-          <span className="text-[var(--cd-text-mid)] ml-2 text-base">{divLabel}</span>
         </h2>
-        {meta.seasonActive && (
-          <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold uppercase cd-head">Live</span>
-        )}
+        {divImg && <img src={divImg} alt="" className="w-5 h-5 object-contain" />}
+        <span className="text-base font-bold cd-head text-[var(--cd-text-mid)]">{divLabel}</span>
         {meta.collected === meta.total && meta.total > 0 && (
           <Trophy className="w-4 h-4 text-[var(--cd-gold)]" />
         )}
@@ -511,7 +503,7 @@ function PlayerCardGrid({ meta, cards }) {
 
             <div className="flex flex-wrap gap-3">
               {team.cards.map(card => (
-                <PlayerSlot key={card.defId} card={card} meta={meta} />
+                <PlayerSlot key={card.defId} card={card} meta={meta} onZoom={onZoom} />
               ))}
             </div>
           </div>
@@ -521,27 +513,49 @@ function PlayerCardGrid({ meta, cards }) {
   )
 }
 
-function PlayerSlot({ card, meta }) {
+// Empty stats structure — keeps the card layout but no values
+const EMPTY_STATS = {
+  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
+  avgDamage: 0, avgMitigated: 0,
+  totalKills: 0, totalDeaths: 0, totalAssists: 0,
+}
+
+function PlayerSlot({ card, meta, onZoom }) {
   const cardNumber = getPlayerCardNumber(meta.leagueSlug, meta.divisionTier, meta.seasonSlug, card.cardIndex)
 
   if (card.collected) {
     const rarity = highestRarity(card.ownedRarities)
 
+    const handleZoom = () => onZoom({
+      playerCard: {
+        defId: card.defId,
+        playerName: card.playerName,
+        teamName: card.teamName,
+        teamColor: card.teamColor,
+        role: card.role,
+        avatarUrl: card.avatarUrl,
+        rarity,
+        leagueName: meta.leagueSlug.toUpperCase(),
+        divisionName: meta.divisionName || `Division ${meta.divisionTier}`,
+      },
+    })
+
     return (
-      <div className="flex flex-col items-center">
-        <div className="card-overview-slot" style={{ width: PLAYER_CARD_SIZE, aspectRatio: '63/88', '--slot-scale': PLAYER_SLOT_SCALE }}>
-          <TradingCard
-            playerName={card.playerName}
-            teamName={card.teamName}
-            teamColor={card.teamColor}
-            role={card.role}
-            avatarUrl={card.avatarUrl}
-            variant="player"
-            rarity={rarity}
-            leagueName={meta.leagueSlug.toUpperCase()}
-            divisionName={`Division ${meta.divisionTier}`}
-          />
-        </div>
+      <div className="flex flex-col items-center card-zoomable" onClick={handleZoom}>
+        <TradingCard
+          playerName={card.playerName}
+          teamName={card.teamName}
+          teamColor={card.teamColor}
+          role={card.role}
+          avatarUrl={card.avatarUrl}
+          variant="player"
+          rarity={rarity}
+          leagueName={meta.leagueSlug.toUpperCase()}
+          divisionName={meta.divisionName || `Division ${meta.divisionTier}`}
+          stats={EMPTY_STATS}
+          isConnected={card.isConnected}
+          size={PLAYER_CARD_SIZE}
+        />
         <RarityPips ownedRarities={card.ownedRarities} />
       </div>
     )
@@ -550,12 +564,12 @@ function PlayerSlot({ card, meta }) {
   return (
     <div className="flex flex-col items-center">
       <div
-        className="rounded-lg border border-[var(--cd-edge)] bg-[var(--cd-edge)]/30 flex flex-col items-center justify-center opacity-40"
+        className="rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/40 flex flex-col items-center justify-center"
         style={{ width: PLAYER_CARD_SIZE, aspectRatio: '63/88' }}
       >
         <div className="text-[9px] cd-num text-[var(--cd-text-dim)] mb-1">{cardNumber}</div>
-        <div className="text-[11px] font-bold text-[var(--cd-text-mid)] cd-head text-center px-2 leading-tight">{card.playerName}</div>
-        <div className="text-[10px] text-[var(--cd-text-dim)] mt-0.5">???</div>
+        <div className="text-[11px] font-bold text-[var(--cd-text-dim)] cd-head text-center px-2 leading-tight">{card.playerName}</div>
+        <div className="text-[10px] text-[var(--cd-text-dim)]/60 mt-0.5">???</div>
       </div>
     </div>
   )

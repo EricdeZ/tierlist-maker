@@ -70,6 +70,49 @@
 
 
 /* ═══════════════════════════════════════════════════
+   NEON HERO BANNER
+   ═══════════════════════════════════════════════════ */
+
+.vault-banner {
+    background: linear-gradient(
+        90deg,
+        #000810, #001020, #002040, #004060, #006880,
+        #00b8d4, #00e5ff, #00b8d4, #006880,
+        #004060, #002040, #001020, #000810
+    );
+    background-size: 400% 100%;
+    animation: vault-banner-flow 20s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.vault-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.5));
+    pointer-events: none;
+}
+
+.vault-banner::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cd-cyan), var(--cd-cyan-dim), transparent);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+}
+
+@keyframes vault-banner-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+
+/* ═══════════════════════════════════════════════════
    CLIP-PATH SHAPES
    ═══════════════════════════════════════════════════ */
 
@@ -925,6 +968,16 @@
     z-index: 2;
 }
 
+/* Draggable coin — gentle floating hover */
+@keyframes cd-coin-float {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50% { transform: translateY(-8px) rotate(1deg); }
+}
+
+.cd-coin-float {
+    animation: cd-coin-float 3s ease-in-out infinite;
+}
+
 /* Machine container */
 .cd-machine {
     transition: all 0.3s ease;
@@ -1061,6 +1114,10 @@
         animation: none !important;
         display: none;
     }
+
+    .cd-coin-float {
+        animation: none !important;
+    }
 }
 
 /* Reduced motion: disable converter animations */
@@ -1068,7 +1125,8 @@
     .cd-pipe-flow,
     .cd-pipe-flow-reverse,
     .cd-energy-flow,
-    .cd-scanline {
+    .cd-scanline,
+    .cd-coin-float {
         animation: none !important;
     }
 
@@ -1078,4 +1136,73 @@
     .cd-gear-spin-fast-reverse {
         animation: none !important;
     }
+}
+
+/* ═══════════════════════════════════════════════════
+   Card Zoom Modal
+   ═══════════════════════════════════════════════════ */
+
+.card-zoom-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+}
+
+.card-zoom-backdrop.card-zoom-in {
+    animation: cd-zoom-backdrop-in 0.25s ease-out forwards;
+}
+
+.card-zoom-backdrop.card-zoom-out {
+    animation: cd-zoom-backdrop-out 0.2s ease-in forwards;
+}
+
+.card-zoom-content {
+    position: relative;
+}
+
+.card-zoom-in .card-zoom-content {
+    animation: cd-zoom-card-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.card-zoom-out .card-zoom-content {
+    animation: cd-zoom-card-out 0.2s ease-in forwards;
+}
+
+/* Clickable cursor on zoomable cards */
+.card-zoomable {
+    cursor: pointer;
+}
+
+.card-zoomable:hover {
+    filter: brightness(1.05);
+}
+
+/* Disable hover transform on cards inside zoom modal */
+.card-zoom-content .game-card:hover {
+    transform: none;
+}
+
+@keyframes cd-zoom-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes cd-zoom-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes cd-zoom-card-in {
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cd-zoom-card-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.9); }
 }

@@ -179,11 +179,9 @@ export default function CCPlayerCards() {
               const holoEffect = getHoloEffect(rarity)
               return (
                 <div key={rarity} className="flex flex-col items-center gap-2">
-                  <div className="card-overview-slot">
-                    <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse">
-                      <TradingCard {...cardProps} variant="player" rarity={rarity} />
-                    </TradingCardHolo>
-                  </div>
+                  <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse" size={240}>
+                    <TradingCard {...cardProps} variant="player" rarity={rarity} />
+                  </TradingCardHolo>
                   <span
                     className="text-xs font-bold uppercase tracking-wider"
                     style={{ color: info?.color }}
@@ -262,6 +260,7 @@ function buildCardProps(data) {
     divisionName: latestSeason?.division_name || '',
     role: role.toUpperCase(),
     avatarUrl,
+    isConnected: player.is_claimed,
     stats: {
       gamesPlayed,
       wins,
