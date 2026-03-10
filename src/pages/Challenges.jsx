@@ -7,6 +7,7 @@ import Navbar from '../components/layout/Navbar'
 import RankBanner from '../components/RankBanner'
 import { CHALLENGE_TIERS, TIER_MAP, getTierColor, getTierLabel } from '../config/challengeTiers'
 import passionCoin from '../assets/passion/passion.png'
+import emberIcon from '../assets/ember.png'
 import uniqueIcon from '../assets/ranks/unique.png'
 
 const DiscordIcon = ({ className }) => (
@@ -83,6 +84,20 @@ function buildDisplayList(challenges, activeTier) {
             })
     }
 
+    // Category filter (e.g. "vault") — show all matching, incomplete first
+    if (activeTier === 'vault') {
+        return Object.values(challenges).flat()
+            .filter(ch => ch.category === 'vault')
+            .sort((a, b) => {
+                if (a.claimable && !b.claimable) return -1
+                if (!a.claimable && b.claimable) return 1
+                if (a.completed && !b.completed) return 1
+                if (!a.completed && b.completed) return -1
+                if (a.progress !== b.progress) return b.progress - a.progress
+                return a.targetValue - b.targetValue
+            })
+    }
+
     // When filtering by a specific tier, show incomplete + claimable only
     // Unique tier: always show all (including taken) as a showcase
     if (activeTier !== 'all') {
@@ -144,7 +159,7 @@ function buildDisplayList(challenges, activeTier) {
 // ═══════════════════════════════════════════════════
 // Tier Filter Bar — horizontal scroll with fade hint
 // ═══════════════════════════════════════════════════
-function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCount }) {
+function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCount, vaultCount }) {
     const scrollRef = useRef(null)
     const [canScroll, setCanScroll] = useState(false)
     const [atEnd, setAtEnd] = useState(false)
@@ -207,6 +222,19 @@ function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCou
                         {tier.label}
                     </button>
                 ))}
+                {vaultCount > 0 && (
+                    <button
+                        onClick={() => setActiveTier('vault')}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1.5 ${
+                            activeTier === 'vault'
+                                ? 'bg-[#00e5ff] text-[#0a0f1a]'
+                                : 'bg-white/[0.04] text-[#00e5ff]/70 hover:bg-white/10'
+                        }`}
+                    >
+                        <img src={emberIcon} alt="" className="w-4 h-4 object-contain" />
+                        Vault
+                    </button>
+                )}
                 {completedCount > 0 && (
                     <button
                         onClick={() => setActiveTier('completed')}
@@ -275,6 +303,10 @@ export default function Challenges() {
         return Object.values(challengeData).flat().filter(ch => ch.completed).length
     }, [challengeData])
 
+    const vaultCount = useMemo(() => {
+        return Object.values(challengeData).flat().filter(ch => ch.category === 'vault').length
+    }, [challengeData])
+
     const handleClaim = async (challengeId, buttonEl) => {
         setClaimingId(challengeId)
         try {
@@ -322,6 +354,7 @@ export default function Challenges() {
                         activeTier={activeTier}
                         setActiveTier={setActiveTier}
                         completedCount={completedCount}
+                        vaultCount={vaultCount}
                     />
                 )}
 
@@ -490,9 +523,17 @@ function ChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim,
                                 {getTierLabel(ch.tier)}
                             </span>
                         )}
-                        <div className="flex items-center gap-1">
-                            <span className="text-sm font-bold" style={{ color: '#f8c56a' }}>+{ch.reward}</span>
-                            <img src={passionCoin} alt="" className="w-4 h-4" />
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm font-bold" style={{ color: '#f8c56a' }}>+{ch.reward}</span>
+                                <img src={passionCoin} alt="" className="w-4 h-4" />
+                            </div>
+                            {ch.emberReward > 0 && (
+                                <div className="flex items-center gap-1">
+                                    <span className="text-sm font-bold text-[#00e5ff]">+{ch.emberReward}</span>
+                                    <img src={emberIcon} alt="" className="w-4 h-4" />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

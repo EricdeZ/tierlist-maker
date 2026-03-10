@@ -12,16 +12,6 @@ const RARITIES = {
   mythic:    { name: 'Mythic',    dropRate: 0.0005, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
 }
 
-const PACKS = {
-  standard:     { name: 'Standard Pack', cost: 10, cards: 3, guarantees: [{ minRarity: 'uncommon', count: 1 }] },
-  premium:      { name: 'Premium Pack',  cost: 27, cards: 5, guarantees: [{ minRarity: 'rare', count: 1 }] },
-  elite:        { name: 'Elite Pack',    cost: 65, cards: 5, guarantees: [{ minRarity: 'epic', count: 1 }, { minRarity: 'rare', count: 2 }] },
-  legendary:    { name: 'Legendary Pack', cost: 200, cards: 7, guarantees: [{ minRarity: 'legendary', count: 1 }] },
-  mixed:        { name: 'Mixed Pack',    cost: 20, cards: 6, guarantees: [] },
-  'osl-mixed':  { name: 'OSL Pack',     cost: 20, cards: 6, guarantees: [], leagueId: 2 },
-  'bsl-mixed':  { name: 'BSL Pack',     cost: 20, cards: 6, guarantees: [], leagueId: 3 },
-}
-
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 
 function rollRarity(minRarity = 'common') {
@@ -46,6 +36,12 @@ function rollHoloEffect(rarity) {
   return RARITY_HOLO_MAP[rarity] || 'common'
 }
 
+function rollHoloType(rarity) {
+  if (rarity === 'common') return null
+  const types = ['holo', 'reverse', 'full']
+  return types[Math.floor(Math.random() * types.length)]
+}
+
 function generateCard(rarity) {
   const god = GODS[Math.floor(Math.random() * GODS.length)]
   const role = CLASS_ROLE[god.class] || 'mid'
@@ -58,6 +54,7 @@ function generateCard(rarity) {
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
     image_url: getGodImageUrl(god),
     acquired_via: 'pack',
     card_data: {
@@ -79,6 +76,7 @@ function generateItemCard(rarity) {
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
     image_url: getItemImageUrl(item),
     acquired_via: 'pack',
     card_data: {
@@ -103,6 +101,7 @@ function generateConsumableCard(rarity) {
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
     image_url: con.imageUrl,
     acquired_via: 'pack',
     card_data: {
@@ -148,6 +147,7 @@ async function generatePlayerCard(sql, rarity, leagueId) {
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
     image_url: avatarUrl || '',
     acquired_via: 'pack',
     def_id: def.id,
@@ -256,6 +256,7 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
     image_url: avatarUrl || '',
     acquired_via: 'pack',
     card_data: {
@@ -296,28 +297,28 @@ export async function ensureStats(sql, userId) {
 // ════════════════════════════════════════════
 // Open a pack
 // ════════════════════════════════════════════
-export async function openPack(sql, userId, packType, testMode) {
-  const pack = PACKS[packType]
+export async function openPack(sql, userId, packType, { skipPayment = false } = {}) {
+  const [pack] = await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
   if (!pack) throw new Error('Invalid pack type')
 
-  if (!testMode && pack.cost > 0) {
+  if (!skipPayment && pack.cost > 0) {
     const [bal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${userId}`
     if (!bal || bal.balance < pack.cost) throw new Error('Not enough Ember')
     await grantEmber(sql, userId, 'cc_pack', -pack.cost, `Card Clash: ${pack.name}`)
   }
 
   let cards
-  if (packType === 'mixed' || pack.leagueId) {
-    cards = await generateMixedPack(sql, pack.leagueId)
+  if (pack.category === 'mixed') {
+    cards = await generateMixedPack(sql, pack.league_id)
   } else {
-    cards = generateRarityPack(pack)
+    cards = generateRarityPack({ cards: pack.cards_per_pack, guarantees: pack.guarantees || [] })
   }
 
   const newCards = []
   for (const card of cards) {
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, image_url, acquired_via, card_type, card_data, def_id)
-      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -366,6 +367,37 @@ async function generateMixedPack(sql, leagueId) {
     const card = type === 'player'
       ? await generatePlayerCard(sql, rarity, leagueId)
       : generateCardByType(type, rarity)
+    card._revealOrder = i
+    cards.push(card)
+  }
+
+  return cards
+}
+
+// Gift pack: 5 cards, both leagues, no wildcard slot
+// Slot 0-3: god/item/consumable (common), one guaranteed player card
+// Slot 4: guaranteed uncommon+ rarity upgrade
+export async function generateGiftPack(sql) {
+  const nonPlayerTypes = ['god', 'item', 'consumable']
+  const playerSlot = Math.floor(Math.random() * 4) // 0-3
+
+  const cards = []
+  for (let i = 0; i < 5; i++) {
+    const minRarity = i === 4 ? 'uncommon' : 'common'
+    const rarity = rollRarity(minRarity)
+
+    let type
+    if (i === playerSlot) {
+      type = 'player'
+    } else {
+      type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]
+    }
+
+    // No leagueId filter — pulls from both leagues
+    const card = type === 'player'
+      ? await generatePlayerCard(sql, rarity, null)
+      : generateCardByType(type, rarity)
+    card.acquired_via = 'gift'
     card._revealOrder = i
     cards.push(card)
   }

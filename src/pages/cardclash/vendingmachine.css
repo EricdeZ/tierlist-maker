@@ -1,0 +1,825 @@
+/* ═══════════════════════════════════════════════
+   Vending Machine — Japanese-style Card Vending
+   Warm whites, soft red accents, clean illumination
+   ═══════════════════════════════════════════════ */
+
+.vm-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0 3rem;
+}
+
+/* ── Machine Shell ── */
+.vm-body {
+  width: 580px;
+  background: linear-gradient(180deg, #d6d4da 0%, #cccad0 40%, #c2c0c6 100%);
+  border: 1px solid #b5b2b9;
+  border-radius: 14px 14px 6px 6px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 1px rgba(255, 255, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Header Strip — warm red banner ── */
+.vm-header {
+  background: linear-gradient(180deg, #c0342e, #a22a25);
+  padding: 12px 20px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 2px 12px rgba(192, 52, 46, 0.3);
+}
+
+.vm-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+}
+
+.vm-header-text {
+  font-family: 'Teko', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Main Area (glass + controls) ── */
+.vm-main {
+  display: flex;
+  padding: 12px;
+  gap: 12px;
+}
+
+/* ── Glass Window — warm backlit ── */
+.vm-glass {
+  flex: 1;
+  position: relative;
+  background: linear-gradient(180deg, #0c0a0e, #08060a);
+  border: 1px solid #a5a2aa;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Warm fluorescent backlight glow */
+.vm-backlight {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 248, 230, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 70%, rgba(255, 240, 220, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.vm-glass-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  padding: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass reflection overlay */
+.vm-glass-reflection {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 35%, transparent 65%, rgba(255, 255, 255, 0.015) 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Subtle scanline sweep */
+.vm-glass-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(180deg,
+    transparent 0%, transparent 45%,
+    rgba(255, 248, 230, 0.03) 49%,
+    rgba(255, 248, 230, 0.05) 50%,
+    rgba(255, 248, 230, 0.03) 51%,
+    transparent 55%, transparent 100%);
+  background-size: 100% 200%;
+  animation: vm-scanline 5s linear infinite;
+}
+
+@keyframes vm-scanline {
+  0% { background-position: 0 -100%; }
+  100% { background-position: 0 100%; }
+}
+
+/* ── Pack Slot ── */
+.vm-slot {
+  position: relative;
+  height: 174px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 4px 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-radius: 4px;
+}
+
+/* Spotlight cone shining down into each slot */
+.vm-slot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(180deg,
+    rgba(255, 248, 230, 0.10) 0%,
+    rgba(255, 248, 230, 0.04) 40%,
+    transparent 75%);
+  clip-path: polygon(32% 0%, 68% 0%, 100% 100%, 0% 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.vm-slot:hover {
+  background: rgba(255, 248, 230, 0.04);
+}
+
+.vm-slot-selected {
+  background: rgba(255, 248, 230, 0.06);
+  box-shadow: inset 0 0 20px rgba(255, 248, 230, 0.05);
+}
+
+.vm-slot-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 220, 160, 0.35);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: vm-slot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes vm-slot-pulse {
+  0%, 100% { border-color: rgba(255, 220, 160, 0.25); }
+  50% { border-color: rgba(255, 220, 160, 0.5); }
+}
+
+/* Slot code label */
+.vm-slot-code {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  z-index: 2;
+}
+
+.vm-slot-selected .vm-slot-code {
+  color: #ffd080;
+  text-shadow: 0 0 6px rgba(255, 208, 128, 0.4);
+}
+
+/* Pack art container */
+.vm-slot-pack {
+  transform: scale(0.55);
+  transform-origin: center center;
+  margin: -48px 0 -44px;
+  pointer-events: none;
+  transition: transform 0.3s;
+}
+
+.vm-slot:hover .vm-slot-pack {
+  transform: scale(0.58);
+}
+
+/* Pack name */
+.vm-slot-name {
+  font-family: 'Teko', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.2);
+  text-align: center;
+  margin-top: -2px;
+  z-index: 2;
+}
+
+.vm-slot-selected .vm-slot-name {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Price label */
+.vm-slot-price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  z-index: 2;
+}
+
+.vm-slot-selected .vm-slot-price {
+  color: #ffd080;
+}
+
+.vm-price-icon {
+  width: 14px;
+  height: auto;
+}
+
+/* Stock counter */
+.vm-slot-stock {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.05em;
+  z-index: 2;
+  margin-top: 1px;
+}
+
+/* Sold-out overlay */
+.vm-sold-out-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  border-radius: 4px;
+}
+
+.vm-sold-out-text {
+  font-family: 'Teko', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #ff4444;
+  text-shadow: 0 0 12px rgba(255, 68, 68, 0.4);
+  transform: rotate(-12deg);
+}
+
+/* Vacant slot (no pack loaded) */
+.vm-slot-vacant {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.vm-slot-empty-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  z-index: 2;
+}
+
+/* Shelf under each pack */
+.vm-shelf {
+  position: absolute;
+  bottom: 28px;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: linear-gradient(180deg, #3a3540, #2a2630);
+  border-radius: 1px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+
+/* ── Control Panel ── */
+.vm-controls {
+  width: 164px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* LCD Display — warm amber */
+.vm-display {
+  background: #0a0804;
+  border: 1px solid #a0a098;
+  border-radius: 6px;
+  padding: 12px 10px;
+  position: relative;
+  overflow: hidden;
+  min-height: 62px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.vm-display::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.12) 2px, rgba(0, 0, 0, 0.12) 4px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vm-display-line1 {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffcc55;
+  text-shadow: 0 0 8px rgba(255, 204, 85, 0.5);
+  position: relative;
+  z-index: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vm-display-line2 {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: rgba(255, 204, 85, 0.45);
+  margin-top: 2px;
+  position: relative;
+  z-index: 2;
+  letter-spacing: 0.05em;
+}
+
+.vm-display-error .vm-display-line1 {
+  color: #ff5544;
+  text-shadow: 0 0 8px rgba(255, 85, 68, 0.5);
+}
+
+.vm-display-error .vm-display-line2 {
+  color: rgba(255, 85, 68, 0.45);
+}
+
+/* ── Keypad — rounded, clean ── */
+.vm-keypad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 5px;
+}
+
+.vm-key {
+  height: 36px;
+  border: 1px solid #a5a2aa;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #e2e0e6, #d4d2d8);
+  color: #4a4a4a;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.vm-key::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 6px 6px 0 0;
+}
+
+.vm-key:hover {
+  background: linear-gradient(180deg, #eceaee, #e2e0e6);
+  border-color: #c0342e;
+  color: #c0342e;
+  box-shadow: 0 2px 8px rgba(192, 52, 46, 0.12);
+}
+
+.vm-key:active {
+  transform: scale(0.95);
+  background: linear-gradient(180deg, #d4d2d8, #c8c6cc);
+}
+
+.vm-key-clr {
+  font-size: 11px;
+  color: #888;
+}
+
+.vm-key-clr:hover {
+  color: #c0342e;
+  border-color: #c0342e;
+  box-shadow: 0 2px 8px rgba(192, 52, 46, 0.1);
+}
+
+/* ── Coin Slot ── */
+.vm-coin-slot {
+  position: relative;
+  height: 52px;
+  border: 1px solid #a5a2aa;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #d6d4da, #cccad0);
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.vm-coin-slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.vm-coin-opening {
+  width: 40px;
+  height: 4px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s;
+}
+
+.vm-coin-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.vm-coin-ready {
+  border-color: #c0342e;
+  animation: vm-coin-pulse 1.5s ease-in-out infinite;
+}
+
+.vm-coin-ready .vm-coin-opening {
+  border-color: #c0342e;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 6px rgba(192, 52, 46, 0.25);
+}
+
+.vm-coin-ready .vm-coin-label {
+  color: #c0342e;
+}
+
+@keyframes vm-coin-pulse {
+  0%, 100% { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06); }
+  50% { box-shadow: 0 2px 12px rgba(192, 52, 46, 0.15); }
+}
+
+.vm-coin-inserted {
+  border-color: #3aaa55;
+}
+
+.vm-coin-inserted .vm-coin-label {
+  color: #2d8a44;
+}
+
+/* Coin drop animation */
+.vm-coin-anim {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: auto;
+  animation: vm-coin-drop 0.4s ease-in forwards;
+  z-index: 5;
+  filter: drop-shadow(0 0 6px rgba(255, 208, 128, 0.5));
+}
+
+@keyframes vm-coin-drop {
+  0% { top: -20px; opacity: 1; }
+  80% { opacity: 1; }
+  100% { top: 18px; opacity: 0; }
+}
+
+/* ── VEND Button — red when ready ── */
+.vm-vend-btn {
+  height: 44px;
+  border: 2px solid #a5a2aa;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #d6d4da, #cccad0);
+  font-family: 'Teko', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #bbb;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.vm-vend-btn:disabled {
+  cursor: not-allowed;
+}
+
+.vm-vend-ready {
+  border-color: #c0342e;
+  color: #fff;
+  background: linear-gradient(180deg, #c0342e, #9a2822);
+  box-shadow: 0 0 18px rgba(192, 52, 46, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.vm-vend-ready:hover {
+  background: linear-gradient(180deg, #d43a33, #b0302a);
+  box-shadow: 0 0 28px rgba(192, 52, 46, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: scale(1.02);
+}
+
+.vm-vend-ready:active {
+  transform: scale(0.97);
+}
+
+/* Shine sweep on ready */
+.vm-vend-ready::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; bottom: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  animation: vm-vend-shine 2s ease-in-out infinite;
+}
+
+@keyframes vm-vend-shine {
+  0% { left: -100%; }
+  50%, 100% { left: 200%; }
+}
+
+/* ── Balance Display ── */
+.vm-balance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid #a5a2aa;
+  border-radius: 4px;
+}
+
+.vm-balance-icon {
+  width: 16px;
+  height: auto;
+}
+
+.vm-balance-amount {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+}
+
+.vm-balance-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: #999;
+  letter-spacing: 0.15em;
+}
+
+
+/* ── Dispensing Tray ── */
+.vm-tray {
+  position: relative;
+  margin: 0 12px 12px;
+  min-height: 80px;
+}
+
+.vm-tray-inner {
+  background: #1a181e;
+  border: 1px solid #a5a2aa;
+  border-radius: 6px;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Rubber flap */
+.vm-tray-flap {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 6px;
+  background: linear-gradient(180deg, #444, #333);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.vm-tray-empty-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.vm-tray-pack {
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: vm-tray-arrive 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.vm-tray-pack:hover .vm-tray-grab {
+  color: #ffd080;
+  text-shadow: 0 0 8px rgba(255, 208, 128, 0.4);
+}
+
+.vm-tray-pack-art {
+  transform: scale(0.55);
+  margin: -48px 0 -44px;
+  pointer-events: none;
+}
+
+.vm-tray-grab {
+  font-family: 'Teko', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  animation: vm-grab-pulse 1s ease-in-out infinite;
+}
+
+@keyframes vm-tray-arrive {
+  0% { transform: translateY(-40px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes vm-grab-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ── Machine Base ── */
+.vm-base {
+  height: 14px;
+  background: linear-gradient(180deg, #b8b6bc, #a6a4aa, #9e9ca2);
+  border-top: 1px solid #c4c2c8;
+  border-radius: 0 0 6px 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ══════════════════════════════════════════════════════
+   ALLEY SCENE — SVG illustration backdrop
+   ══════════════════════════════════════════════════════ */
+
+/* Full-bleed: break out of the max-width container to fill viewport */
+.alley {
+  position: relative;
+  min-height: 700px;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  padding: 2rem 1rem 0;
+  overflow: hidden;
+  background: #050308;
+}
+
+.alley-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Neon sign flicker */
+.alley-neon {
+  animation: alley-neon-flicker 8s ease-in-out infinite;
+}
+
+@keyframes alley-neon-flicker {
+  0%, 100% { opacity: 0.8; }
+  3% { opacity: 0.3; }
+  4% { opacity: 0.8; }
+  40% { opacity: 0.85; }
+  41% { opacity: 0.4; }
+  42% { opacity: 0.85; }
+  68% { opacity: 0.75; }
+  69% { opacity: 0.5; }
+  70% { opacity: 0.8; }
+}
+
+/* ── Content layer ── */
+.alley-content {
+  position: relative;
+  z-index: 1;
+  padding-bottom: 90px;
+}
+
+/* Center the machine in the alley */
+.alley-content .vm-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Shrink the machine a bit */
+.alley-content .vm-body {
+  width: 520px;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.7),
+    0 0 1px rgba(255,255,255,0.15),
+    inset 0 1px 0 rgba(255,200,80,0.15),
+    0 -6px 40px rgba(255,200,80,0.06),
+    6px 0 30px rgba(255,200,80,0.04),
+    -4px 0 20px rgba(255,200,80,0.02);
+}
+
+/* Warm lamp light falling on top of machine */
+.alley-content .vm-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(255,200,80,0.045) 0%,
+    rgba(255,200,80,0.02) 30%,
+    transparent 55%);
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 14px 14px 6px 6px;
+}
+
+
+/* ═══════════════════════════════════════════════
+   DISPENSING ANIMATIONS
+   ═══════════════════════════════════════════════ */
+
+/* Machine rumble during dispensing */
+.vm-dispensing {
+  animation: vm-rumble 0.15s ease-in-out infinite;
+}
+
+@keyframes vm-rumble {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-1.5px); }
+  75% { transform: translateX(1.5px); }
+}
+
+/* Pack shakes then falls — stays visible (no opacity fade) */
+.vm-pack-drop {
+  animation: vm-pack-fall 1.6s ease-in forwards;
+}
+
+@keyframes vm-pack-fall {
+  0%  { transform: scale(0.55) translateY(0) translateX(0); }
+  6%  { transform: scale(0.55) translateY(0) translateX(-4px); }
+  12% { transform: scale(0.55) translateY(0) translateX(4px); }
+  18% { transform: scale(0.55) translateY(0) translateX(-3px); }
+  24% { transform: scale(0.55) translateY(0) translateX(3px); }
+  30% { transform: scale(0.55) translateY(0) translateX(-2px); }
+  36% { transform: scale(0.55) translateY(0) translateX(0); }
+  100% { transform: scale(0.55) translateY(300px) translateX(0); }
+}
+
+/* Empty slot after dispensing */
+.vm-slot-empty .vm-slot-pack {
+  visibility: hidden;
+}
+
+
+/* ═══════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-glass-scanline,
+  .vm-coin-ready,
+  .vm-vend-ready::after,
+  .vm-tray-pack,
+  .vm-dispensing,
+  .vm-pack-drop,
+  .vm-coin-anim,
+  .alley-neon {
+    animation: none !important;
+  }
+
+  .vm-slot-selected::after {
+    animation: none !important;
+    border-color: rgba(255, 220, 160, 0.4);
+  }
+
+  .vm-tray-grab {
+    animation: none !important;
+    opacity: 1;
+  }
+}

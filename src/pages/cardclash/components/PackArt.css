@@ -52,6 +52,7 @@
 .pack-art[data-tier="mixed"]      { --pack-accent: #6366f1; --pack-accent-light: #a5b4fc; --pack-accent-dark: #3730a3; }
 .pack-art[data-tier="osl-mixed"]  { --pack-accent: #d2b138; --pack-accent-light: #f0d878; --pack-accent-dark: #8a7420; }
 .pack-art[data-tier="bsl-mixed"]  { --pack-accent: #2795cf; --pack-accent-light: #6bc0f0; --pack-accent-dark: #155a7a; }
+.pack-art[data-tier="gift"]       { --pack-accent: #dc2626; --pack-accent-light: #f87171; --pack-accent-dark: #7f1d1d; }
 
 /* ============================================
    Crimped / serrated edges (top + bottom seal)

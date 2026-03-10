@@ -1,13 +1,13 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { useCardClash } from './CardClashContext';
 import { usePassion } from '../../context/PassionContext';
-import { PACKS, RARITIES } from '../../data/cardclash/economy';
-import { ITEMS } from '../../data/cardclash/items';
-import { CONSUMABLES } from '../../data/cardclash/buffs';
+import { PACKS } from '../../data/cardclash/economy';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import CDChargeButton from './components/CDChargeButton';
 import emberIcon from '../../assets/ember.png';
+
+const CCPackSale = lazy(() => import('./CCPackSale'));
 
 const LEAGUE_PACKS = ['osl-mixed', 'bsl-mixed']
 
@@ -219,10 +219,52 @@ function DailyClaim({ ember, onClaim }) {
 }
 
 // ═══════════════════════════════════════════════
-// Main Pack Shop
+// Top-level toggle — SHOP vs LIMITED SALE
 // ═══════════════════════════════════════════════
-export default function PackShop() {
-  const { passion, ember, buyPack, testMode, convertPassionToEmber } = useCardClash();
+export default function PackShopRouter() {
+  const [mode, setMode] = useState('shop');
+  return (
+    <>
+      <div className="flex justify-center gap-2 mb-4 relative z-40">
+        <button
+          onClick={() => setMode('shop')}
+          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+            mode === 'shop'
+              ? 'bg-white/10 text-white border-white/30'
+              : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
+          }`}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, letterSpacing: '0.2em' }}
+        >
+          SHOP
+        </button>
+        <button
+          onClick={() => setMode('sale')}
+          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+            mode === 'sale'
+              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+              : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
+          }`}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, letterSpacing: '0.2em' }}
+        >
+          LIMITED SALE
+        </button>
+      </div>
+      {mode === 'shop' ? (
+        <PackShop />
+      ) : (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
+          <CCPackSale />
+        </Suspense>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Main Pack Shop (original)
+// ═══════════════════════════════════════════════
+function PackShop() {
+  const { passion, ember, buyPack, convertPassionToEmber } = useCardClash();
   const { claimEmberDaily } = usePassion();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -240,84 +282,13 @@ export default function PackShop() {
     }
   }, [buyPack]);
 
-  const [lastTest, setLastTest] = useState(null);
   const closeResult = () => setOpenResult(null);
-
-  const godNames = ['Zeus', 'Athena', 'Anubis', 'Thor', 'Hecate', 'Bellona', 'Ares', 'Medusa'];
-  const godUrl = (name) => `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${name}/Default/t_GodCard_${name}.png`;
-
-  const testAllRarities = useCallback(() => {
-    const allRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
-    const fakeCards = allRarities.map((rarity, i) => ({
-      godName: godNames[i],
-      godClass: ['Mage', 'Warrior', 'Hunter', 'Guardian', 'Assassin', 'Mage'][i],
-      imageUrl: godUrl(godNames[i]),
-      ability: { name: `${RARITIES[rarity].name} Ability`, description: `A ${rarity} test ability.` },
-      godId: i + 1,
-      serialNumber: 2000 + i,
-      rarity,
-      isNew: true,
-    }));
-    const result = { cards: fakeCards, packName: 'All Rarities Test', packType: 'osl-mixed', _skipToStack: true };
-    setLastTest(result);
-    setOpenResult(result);
-  }, []);
-
-  const testMixedPack = useCallback((packType, packName) => {
-    const rarityKeys = Object.keys(RARITIES);
-    const nonPlayerTypes = ['god', 'item', 'consumable'];
-    const allTypes = ['god', 'item', 'consumable', 'player'];
-
-    const makeCard = (type, rarity, order) => {
-      if (type === 'player') {
-        return { cardType: 'player', godName: 'TestPlayer', godClass: 'ADC',
-          imageUrl: '', cardData: { role: 'ADC', teamName: 'Test Team', teamColor: '#6366f1' },
-          godId: 'player-test', serialNumber: 3000 + order, rarity, isNew: true, _revealOrder: order };
-      }
-      if (type === 'item') {
-        const pick = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-        return { cardType: 'item', godName: pick.name, godClass: pick.category,
-          imageUrl: pick.imageKey ? `https://cdn.smitesource.com/cdn-cgi/image/width=128,format=auto,quality=75/${pick.imageKey}.png` : '',
-          cardData: { category: pick.category, manaCost: pick.manaCost, effects: pick.effects, passive: pick.passive },
-          godId: `item-${pick.id}`, serialNumber: 3000 + order, rarity, isNew: true, _revealOrder: order };
-      }
-      if (type === 'consumable') {
-        const pick = CONSUMABLES[Math.floor(Math.random() * CONSUMABLES.length)];
-        return { cardType: 'consumable', godName: pick.name, godClass: 'Consumable',
-          imageUrl: pick.imageUrl || '', cardData: { color: pick.color, description: pick.description, manaCost: pick.manaCost },
-          godId: `con-${pick.id}`, serialNumber: 3000 + order, rarity, isNew: true, _revealOrder: order };
-      }
-      const g = godNames[Math.floor(Math.random() * godNames.length)];
-      return { cardType: 'god', godName: g, godClass: 'Mage', imageUrl: godUrl(g),
-        ability: { name: 'Test Ability', description: 'A test ability.' },
-        godId: Math.floor(Math.random() * 100), serialNumber: 3000 + order,
-        rarity, isNew: true, _revealOrder: order };
-    };
-
-    const playerSlot = Math.floor(Math.random() * 5);
-    const rareRarities = ['uncommon', 'rare', 'epic', 'legendary', 'mythic'];
-    const base = [];
-    for (let i = 0; i < 6; i++) {
-      const rarity = i === 4
-        ? rareRarities[Math.floor(Math.random() * rareRarities.length)]
-        : rarityKeys[Math.floor(Math.random() * (i === 5 ? 6 : 3))];
-      let type;
-      if (i === playerSlot) type = 'player';
-      else if (i === 5) type = allTypes[Math.floor(Math.random() * 4)];
-      else type = nonPlayerTypes[Math.floor(Math.random() * 3)];
-      base.push(makeCard(type, rarity, i));
-    }
-
-    const result = { cards: base, packName: packName || 'Mixed Pack', packType: packType || 'mixed', _skipTear: true };
-    setLastTest(result);
-    setOpenResult(result);
-  }, []);
 
   const emberBalance = ember?.balance ?? 0;
   const [focusedPack, setFocusedPack] = useState(null);
   const focused = focusedPack ? PACKS[focusedPack] : null;
   const focusedMeta = focusedPack ? PACK_META[focusedPack] : null;
-  const focusedAfford = focused ? (testMode || emberBalance >= focused.cost) : false;
+  const focusedAfford = focused ? emberBalance >= focused.cost : false;
   const rowRef = useRef(null);
   const packRefs = useRef({});
   const [packOffset, setPackOffset] = useState({ x: 0, y: 0 });
@@ -355,7 +326,7 @@ export default function PackShop() {
             const meta = PACK_META[key];
             const isSelected = focusedPack === key;
             const isOther = focusedPack && !isSelected;
-            const canAfford = testMode || emberBalance >= pack.cost;
+            const canAfford = emberBalance >= pack.cost;
 
             return (
               <div
@@ -499,60 +470,18 @@ export default function PackShop() {
         )}
 
         {/* ═══ Divider ═══ */}
-        {!testMode && <div className="cd-divider max-w-lg mx-auto mb-8" />}
+        <div className="cd-divider max-w-lg mx-auto mb-8" />
 
         {/* ═══ Core Economy Panel ═══ */}
-        {!testMode && (
-          <div className="max-w-md mx-auto mb-8">
-            <div className="text-center mb-4">
-              <h3 className="cd-head text-sm text-[var(--cd-text-mid)] tracking-widest">Get Cores</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 cd-stagger">
-              <DailyClaim ember={ember} onClaim={claimEmberDaily} />
-              <CoreConversion ember={ember} passion={passion} onConvert={convertPassionToEmber} />
-            </div>
+        <div className="max-w-md mx-auto mb-8">
+          <div className="text-center mb-4">
+            <h3 className="cd-head text-sm text-[var(--cd-text-mid)] tracking-widest">Get Cores</h3>
           </div>
-        )}
-
-        {/* Dev: test opening animation */}
-        {testMode && (
-        <div className="mt-6 flex justify-center gap-3 flex-wrap">
-          <button
-            onClick={() => testMixedPack('osl-mixed', 'OSL Pack')}
-            className="cd-clip-tag px-4 py-1 text-xs font-bold cd-head tracking-wider cd-btn-magenta"
-          >
-            Test OSL
-          </button>
-          <button
-            onClick={() => testMixedPack('bsl-mixed', 'BSL Pack')}
-            className="cd-clip-tag px-4 py-1 text-xs font-bold cd-head tracking-wider cd-btn"
-          >
-            Test BSL
-          </button>
-          <button
-            onClick={testAllRarities}
-            className="cd-clip-tag px-4 py-1 text-xs font-bold cd-head tracking-wider bg-[var(--cd-purple)]/15 border border-[var(--cd-purple)]/30 text-[var(--cd-purple)] hover:bg-[var(--cd-purple)]/25 transition-all"
-          >
-            Test All Rarities
-          </button>
-          {lastTest && !openResult && (
-            <>
-              <button
-                onClick={() => setOpenResult({ ...lastTest })}
-                className="cd-clip-tag px-4 py-1 text-xs font-bold cd-head tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all"
-              >
-                Replay last
-              </button>
-              <button
-                onClick={() => setOpenResult({ ...lastTest, _skipToStack: true })}
-                className="cd-clip-tag px-4 py-1 text-xs font-bold cd-head tracking-wider bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all"
-              >
-                Skip to stack
-              </button>
-            </>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 cd-stagger">
+            <DailyClaim ember={ember} onClaim={claimEmberDaily} />
+            <CoreConversion ember={ember} passion={passion} onConvert={convertPassionToEmber} />
           </div>
-        )}
+        </div>
       </div>
 
       {/* Loading overlay while buying pack */}
@@ -575,13 +504,6 @@ export default function PackShop() {
           packType={openResult.packType}
           onClose={closeResult}
           onOpenMore={closeResult}
-          skipTear={openResult._skipTear}
-          skipToStack={openResult._skipToStack}
-          onReplay={(openResult._skipTear || openResult._skipToStack) ? () => {
-            const flags = openResult._skipToStack ? { _skipToStack: true } : { _skipTear: true };
-            setOpenResult(null);
-            setTimeout(() => setOpenResult({ ...lastTest, ...flags }), 50);
-          } : undefined}
         />
       )}
     </div>

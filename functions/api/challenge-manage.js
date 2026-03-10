@@ -83,24 +83,25 @@ const handler = async (event) => {
 // Create a challenge
 // ═══════════════════════════════════════════════════
 async function createChallenge(sql, body, admin) {
-    const { title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label } = body
+    const { title, description, category, type, reward, ember_reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label } = body
 
     if (!title || !stat_key || !target_value) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'title, stat_key, and target_value are required' }) }
     }
 
-    const validCategories = ['engagement', 'league', 'performance', 'social']
+    const validCategories = ['engagement', 'league', 'performance', 'social', 'vault']
     const validTypes = ['one_time', 'repeatable']
     const validTiers = ['daily', 'clay', 'amber', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'obsidian', 'master', 'demigod', 'deity']
 
     const [created] = await sql`
-        INSERT INTO challenges (title, description, category, type, reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label)
+        INSERT INTO challenges (title, description, category, type, reward, ember_reward, target_value, stat_key, repeat_cooldown, sort_order, tier, gives_badge, badge_label)
         VALUES (
             ${title},
             ${description || null},
             ${validCategories.includes(category) ? category : 'engagement'},
             ${validTypes.includes(type) ? type : 'one_time'},
             ${reward || 10},
+            ${ember_reward || 0},
             ${target_value},
             ${stat_key},
             ${repeat_cooldown || null},

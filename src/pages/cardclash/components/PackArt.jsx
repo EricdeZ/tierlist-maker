@@ -12,6 +12,7 @@ const PACK_FEATURED_GODS = {
   mixed: ['Discordia', 'Freya', 'NuWa', 'Pele', 'Sol'],
   'osl-mixed': ['Zeus', 'Athena', 'Ares', 'Poseidon', 'Hercules'],
   'bsl-mixed': ['Anubis', 'Ra', 'Hades', 'Agni', 'Bakasura'],
+  gift: ['Cupid', 'Cupid', 'Cupid', 'Cupid', 'Cupid'],
 }
 
 function getFeaturedGodUrl(tier, seed) {

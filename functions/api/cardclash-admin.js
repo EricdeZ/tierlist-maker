@@ -305,8 +305,8 @@ async function handleGrantCard(sql, body) {
   const serialNumber = Math.floor(Math.random() * 9999) + 1
 
   const [card] = await sql`
-    INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, image_url, acquired_via)
-    VALUES (${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${imageUrl || ''}, 'admin_grant')
+    INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via)
+    VALUES (${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${rarity && rarity !== 'common' ? ['holo','reverse','full'][Math.floor(Math.random()*3)] : null}, ${imageUrl || ''}, 'admin_grant')
     RETURNING *
   `
 

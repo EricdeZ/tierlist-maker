@@ -2,11 +2,13 @@
 // GET: load state, definition overrides, shared card | POST: open-pack
 
 import { adapt } from '../lib/adapter.js'
-import { getDB, headers } from '../lib/db.js'
+import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
-import { ensureStats, openPack } from '../lib/cardclash.js'
-import { ensureEmberBalance } from '../lib/ember.js'
+import { ensureStats, openPack, generateGiftPack } from '../lib/cardclash.js'
+import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
+import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
+import { tick, collectIncome, slotCard, unslotCard, getCardRates } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -37,6 +39,9 @@ const handler = async (event) => {
         case 'collection-owned': return await handleCollectionOwned(sql, user)
         case 'collection-set': return await handleCollectionSet(sql, event.queryStringParameters)
         case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
+        case 'gifts': return await handleLoadGifts(sql, user)
+        case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
+        case 'starting-five': return await handleStartingFive(sql, user)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -45,6 +50,13 @@ const handler = async (event) => {
       const body = event.body ? JSON.parse(event.body) : {}
       switch (action) {
         case 'open-pack': return await handleOpenPack(sql, user, body)
+        case 'send-gift': return await handleSendGift(sql, user, body, event)
+        case 'open-gift': return await handleOpenGift(sql, user, body)
+        case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
+        case 'dismantle': return await handleDismantle(sql, user, body)
+        case 'slot-card': return await handleSlotCard(sql, user, body)
+        case 'unslot-card': return await handleUnslotCard(sql, user, body)
+        case 'collect-income': return await handleCollectIncome(sql, user)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -61,10 +73,33 @@ async function handleLoad(sql, user) {
   await ensureStats(sql, user.id)
   await ensureEmberBalance(sql, user.id)
 
-  const [collection, stats, ember] = await Promise.all([
+  // Expire stale trades
+  await sql`
+    UPDATE cc_trades SET status = 'expired', updated_at = NOW()
+    WHERE status IN ('waiting', 'active')
+      AND last_polled_at < NOW() - make_interval(mins => 2)
+  `
+
+  const [collection, stats, ember, packTypes, salePacks, tradeCount] = await Promise.all([
     sql`SELECT * FROM cc_cards WHERE owner_id = ${user.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
+    sql`SELECT * FROM cc_pack_types WHERE enabled = true ORDER BY sort_order`,
+    sql`
+      SELECT s.*, pt.name AS base_name, pt.description AS base_description,
+             pt.cards_per_pack, pt.category, pt.league_id
+      FROM cc_pack_sales s
+      JOIN cc_pack_types pt ON s.pack_type_id = pt.id
+      WHERE s.active = true
+        AND (s.starts_at IS NULL OR s.starts_at <= NOW())
+        AND (s.ends_at IS NULL OR s.ends_at > NOW())
+      ORDER BY s.sort_order
+    `,
+    sql`
+      SELECT COUNT(*)::int AS count FROM cc_trades
+      WHERE (player_b_id = ${user.id} AND status = 'waiting')
+         OR ((player_a_id = ${user.id} OR player_b_id = ${user.id}) AND status = 'active')
+    `,
   ])
 
   return {
@@ -73,23 +108,115 @@ async function handleLoad(sql, user) {
       collection: collection.map(formatCard),
       stats: formatStats(stats[0]),
       emberBalance: ember[0]?.balance || 0,
+      packTypes: packTypes.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        cost: p.cost,
+        cards: p.cards_per_pack,
+        guarantees: p.guarantees || [],
+        category: p.category,
+        leagueId: p.league_id,
+        sortOrder: p.sort_order,
+      })),
+      salePacks: salePacks.map(s => ({
+        id: s.id,
+        packTypeId: s.pack_type_id,
+        name: s.name || s.base_name,
+        description: s.description || s.base_description,
+        price: s.price,
+        stock: s.stock,
+        initialStock: s.initial_stock,
+        cards: s.cards_per_pack,
+        category: s.category,
+        leagueId: s.league_id,
+        sortOrder: s.sort_order,
+        startsAt: s.starts_at,
+        endsAt: s.ends_at,
+      })),
+      pendingTradeCount: tradeCount[0]?.count || 0,
     }),
   }
 }
 
 // ═══ POST: Open pack ═══
 async function handleOpenPack(sql, user, body) {
-  const { packType, testMode } = body
-  const result = await openPack(sql, user.id, packType, !!testMode)
+  const { packType, saleId } = body
+
+  // Sale purchase — atomic stock decrement + payment in transaction
+  if (saleId) {
+    return await handleSalePurchase(sql, user, saleId)
+  }
+
+  const result = await openPack(sql, user.id, packType)
   const cards = result.cards.map((c) => {
     const formatted = formatCard(c)
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push failed:', err))
+
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
     packType,
     cards,
+  }) }
+}
+
+// ═══ POST: Sale purchase — transactional stock + payment ═══
+async function handleSalePurchase(sql, user, saleId) {
+  const result = await transaction(async (tx) => {
+    // Lock the sale row and verify availability
+    const [sale] = await tx`
+      SELECT s.*, pt.id AS pack_type_id_ref
+      FROM cc_pack_sales s
+      JOIN cc_pack_types pt ON s.pack_type_id = pt.id
+      WHERE s.id = ${saleId} AND s.active = true
+        AND (s.starts_at IS NULL OR s.starts_at <= NOW())
+        AND (s.ends_at IS NULL OR s.ends_at > NOW())
+      FOR UPDATE
+    `
+    if (!sale) throw new Error('Sale not available')
+    if (sale.stock <= 0) throw new Error('Sold out')
+
+    const [updated] = await tx`
+      UPDATE cc_pack_sales SET stock = stock - 1
+      WHERE id = ${saleId} AND stock > 0
+      RETURNING stock
+    `
+    if (!updated) throw new Error('Sold out')
+
+    // Charge sale price
+    if (sale.price > 0) {
+      const [bal] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
+      if (!bal || bal.balance < sale.price) throw new Error('Not enough Ember')
+      await grantEmber(tx, user.id, 'cc_pack', -sale.price, `Card Clash: ${sale.name || 'Sale Pack'}`)
+    }
+
+    const packResult = await openPack(tx, user.id, sale.pack_type_id, { skipPayment: true })
+    return { ...packResult, stock: updated.stock }
+  })
+
+  const cards = result.cards.map((c) => {
+    const formatted = formatCard(c)
+    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+    return formatted
+  })
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push failed:', err))
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    packName: result.packName,
+    packType: result.packType,
+    cards,
+    stock: result.stock,
   }) }
 }
 
@@ -397,6 +524,167 @@ async function handleCardDetail(sql, params) {
   }
 }
 
+// ═══ GET: Load gifts (sent + received) ═══
+const MAX_GIFTS = 5
+
+async function handleLoadGifts(sql, user) {
+  const [sent, received, unseenCount] = await Promise.all([
+    sql`
+      SELECT g.id, g.recipient_id, g.message, g.created_at,
+             u.discord_username AS recipient_name, u.discord_avatar AS recipient_avatar, u.discord_id AS recipient_discord_id
+      FROM cc_gifts g
+      JOIN users u ON u.id = g.recipient_id
+      WHERE g.sender_id = ${user.id}
+      ORDER BY g.created_at DESC
+    `,
+    sql`
+      SELECT g.id, g.sender_id, g.message, g.opened, g.seen, g.created_at, g.opened_at,
+             u.discord_username AS sender_name, u.discord_avatar AS sender_avatar, u.discord_id AS sender_discord_id
+      FROM cc_gifts g
+      JOIN users u ON u.id = g.sender_id
+      WHERE g.recipient_id = ${user.id}
+      ORDER BY g.created_at DESC
+    `,
+    sql`SELECT COUNT(*)::int AS count FROM cc_gifts WHERE recipient_id = ${user.id} AND seen = false`,
+  ])
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      sent: sent.map(g => ({
+        id: g.id, recipientId: g.recipient_id, recipientName: g.recipient_name,
+        recipientAvatar: g.recipient_discord_id && g.recipient_avatar
+          ? `https://cdn.discordapp.com/avatars/${g.recipient_discord_id}/${g.recipient_avatar}.webp?size=64` : null,
+        message: g.message, createdAt: g.created_at,
+      })),
+      received: received.map(g => ({
+        id: g.id, senderId: g.sender_id, senderName: g.sender_name,
+        senderAvatar: g.sender_discord_id && g.sender_avatar
+          ? `https://cdn.discordapp.com/avatars/${g.sender_discord_id}/${g.sender_avatar}.webp?size=64` : null,
+        message: g.message, opened: g.opened, seen: g.seen,
+        createdAt: g.created_at, openedAt: g.opened_at,
+      })),
+      giftsRemaining: MAX_GIFTS - sent.length,
+      unseenCount: unseenCount[0]?.count || 0,
+    }),
+  }
+}
+
+// ═══ POST: Send a gift pack ═══
+async function handleSendGift(sql, user, body, event) {
+  const { recipientId, message } = body
+  if (!recipientId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Recipient required' }) }
+  if (recipientId === user.id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot gift yourself' }) }
+
+  // Check gift limit
+  const [sentCount] = await sql`SELECT COUNT(*)::int AS count FROM cc_gifts WHERE sender_id = ${user.id}`
+  if (sentCount.count >= MAX_GIFTS) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No gifts remaining' }) }
+  }
+
+  // Check recipient exists
+  const [recipient] = await sql`SELECT id FROM users WHERE id = ${recipientId}`
+  if (!recipient) return { statusCode: 400, headers, body: JSON.stringify({ error: 'User not found' }) }
+
+  // Check not already gifted to this user
+  const [existing] = await sql`SELECT id FROM cc_gifts WHERE sender_id = ${user.id} AND recipient_id = ${recipientId}`
+  if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already sent a gift to this user' }) }
+
+  const trimmedMsg = message ? message.trim().slice(0, 200) : null
+
+  await sql`
+    INSERT INTO cc_gifts (sender_id, recipient_id, message)
+    VALUES (${user.id}, ${recipientId}, ${trimmedMsg})
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true, giftsRemaining: MAX_GIFTS - sentCount.count - 1 }) }
+}
+
+// ═══ POST: Open a received gift ═══
+async function handleOpenGift(sql, user, body) {
+  const { giftId } = body
+  if (!giftId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift ID required' }) }
+
+  const [gift] = await sql`
+    SELECT * FROM cc_gifts WHERE id = ${giftId} AND recipient_id = ${user.id} AND opened = false
+  `
+  if (!gift) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already opened' }) }
+
+  // Generate gift pack cards
+  const cards = await generateGiftPack(sql)
+
+  // Insert cards into user's collection
+  const newCards = []
+  for (const card of cards) {
+    const [inserted] = await sql`
+      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+      VALUES (${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+      RETURNING *
+    `
+    if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
+    newCards.push(inserted)
+  }
+
+  // Mark gift as opened
+  await sql`UPDATE cc_gifts SET opened = true, seen = true, opened_at = NOW() WHERE id = ${giftId}`
+
+  // Update stats
+  await ensureStats(sql, user.id)
+  await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${user.id}`
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      packName: 'Gift Pack',
+      packType: 'gift',
+      cards: newCards.map(c => {
+        const formatted = formatCard(c)
+        if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+        return formatted
+      }),
+      senderName: gift.sender_id ? undefined : undefined, // included in gift data already
+    }),
+  }
+}
+
+// ═══ POST: Mark all gifts as seen ═══
+async function handleMarkGiftsSeen(sql, user) {
+  await sql`UPDATE cc_gifts SET seen = true WHERE recipient_id = ${user.id} AND seen = false`
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ GET: Search users for gifting ═══
+async function handleSearchUsers(sql, user, params) {
+  const { q } = params || {}
+  if (!q || q.trim().length < 2) {
+    return { statusCode: 200, headers, body: JSON.stringify({ users: [] }) }
+  }
+
+  const query = q.trim()
+  const results = await sql`
+    SELECT u.id, u.discord_username, u.discord_avatar, u.discord_id, p.name AS player_name
+    FROM users u
+    LEFT JOIN players p ON p.id = u.linked_player_id
+    WHERE u.id != ${user.id}
+      AND (u.discord_username ILIKE ${'%' + query + '%'} OR p.name ILIKE ${'%' + query + '%'})
+    ORDER BY u.discord_username ASC
+    LIMIT 10
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      users: results.map(u => ({
+        id: u.id,
+        discordUsername: u.discord_username,
+        playerName: u.player_name,
+        avatar: u.discord_id && u.discord_avatar
+          ? `https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.webp?size=64` : null,
+      })),
+    }),
+  }
+}
+
 // ═══ GET: Definition overrides ═══
 async function handleDefinitionOverrides(sql) {
   const overrides = await sql`SELECT type, definition_id, metadata FROM cc_definition_overrides`
@@ -405,6 +693,113 @@ async function handleDefinitionOverrides(sql) {
     map[`${o.type}:${o.definition_id}`] = o.metadata || {}
   }
   return { statusCode: 200, headers, body: JSON.stringify({ overrides: map }) }
+}
+
+// ═══ POST: Dismantle cards for Ember ═══
+const DISMANTLE_VALUES = {
+  common: 0.2, uncommon: 1, rare: 3, epic: 8, legendary: 25, mythic: 75,
+}
+
+async function handleDismantle(sql, user, body) {
+  const { cardIds } = body
+  if (!Array.isArray(cardIds) || cardIds.length === 0) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No cards selected' }) }
+  }
+  if (cardIds.length > 200) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Too many cards (max 200)' }) }
+  }
+
+  // Fetch cards owned by user
+  const cards = await sql`
+    SELECT id, rarity FROM cc_cards
+    WHERE id = ANY(${cardIds}) AND owner_id = ${user.id}
+  `
+  if (cards.length === 0) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found' }) }
+  }
+
+  // Calculate total (fractional sum, floor at the end)
+  let rawTotal = 0
+  for (const card of cards) {
+    rawTotal += DISMANTLE_VALUES[card.rarity] || 0
+  }
+  const emberGained = Math.floor(rawTotal)
+
+  if (emberGained < 1) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Selected cards are worth less than 1 Ember' }) }
+  }
+
+  // Delete the cards
+  const validIds = cards.map(c => c.id)
+  await sql`DELETE FROM cc_cards WHERE id = ANY(${validIds}) AND owner_id = ${user.id}`
+
+  // Grant ember
+  const { balance } = await grantEmber(sql, user.id, 'dismantle', emberGained, `Dismantled ${validIds.length} card${validIds.length > 1 ? 's' : ''}`)
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ dismantled: validIds.length, emberGained, balance }),
+  }
+}
+
+// ═══ Starting 5 ═══
+
+function formatS5Response(state, extra = {}) {
+  const cardsWithRates = state.cards.map(c => ({
+    ...formatCard(c),
+    slotRole: c.slot_role,
+    passionPerHour: getCardRates(c.holo_type, c.rarity).passionPerHour,
+    coresPerHour: getCardRates(c.holo_type, c.rarity).coresPerHour,
+  }))
+
+  const totalPassionPerHour = cardsWithRates.reduce((s, c) => s + c.passionPerHour, 0)
+  const totalCoresPerHour = cardsWithRates.reduce((s, c) => s + c.coresPerHour, 0)
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      ...extra,
+      cards: cardsWithRates,
+      passionPending: state.passionPending,
+      coresPending: state.coresPending,
+      lastTick: state.lastTick,
+      totalPassionPerHour,
+      totalCoresPerHour,
+      passionCap: state.passionCap || totalPassionPerHour * 48,
+      coresCap: state.coresCap || totalCoresPerHour * 48,
+    }),
+  }
+}
+
+async function handleStartingFive(sql, user) {
+  const state = await tick(sql, user.id)
+  return formatS5Response(state)
+}
+
+async function handleSlotCard(sql, user, body) {
+  const { cardId, role } = body
+  if (!cardId || !role) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId and role required' }) }
+  }
+  const state = await slotCard(sql, user.id, cardId, role)
+  return formatS5Response(state)
+}
+
+async function handleUnslotCard(sql, user, body) {
+  const { role } = body
+  if (!role) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'role required' }) }
+  }
+  const state = await unslotCard(sql, user.id, role)
+  return formatS5Response(state)
+}
+
+async function handleCollectIncome(sql, user) {
+  const result = await collectIncome(sql, user.id)
+  return formatS5Response(result, {
+    passionGranted: result.passionGranted,
+    coresGranted: result.coresGranted,
+  })
 }
 
 // ═══ Formatters ═══
@@ -421,6 +816,7 @@ function formatCard(row) {
     xp: row.xp,
     serialNumber: row.serial_number,
     holoEffect: row.holo_effect,
+    holoType: row.holo_type,
     imageUrl: row.image_url,
     ability: row.ability,
     metadata: row.metadata || {},
@@ -428,6 +824,7 @@ function formatCard(row) {
     acquiredAt: row.created_at,
     cardType: row.card_type || 'god',
     cardData: row.card_data || null,
+    defId: row.def_id || null,
   }
 }
 

@@ -1,6 +1,14 @@
-import { RARITIES, PACKS } from '../../../data/cardclash/economy'
+import { useState, useEffect } from 'react'
+import { RARITIES } from '../../../data/cardclash/economy'
+import { cardclashService } from '../../../services/database'
 
 export default function CCAdminEconomy() {
+  const [packTypes, setPackTypes] = useState([])
+
+  useEffect(() => {
+    cardclashService.load().then(data => setPackTypes(data.packTypes || []))
+  }, [])
+
   return (
     <div className="space-y-6">
       {/* Rarity config */}
@@ -45,33 +53,42 @@ export default function CCAdminEconomy() {
 
       {/* Pack types */}
       <Section title="Pack Types">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(PACKS).map(([key, pack]) => (
-            <div key={key} className="bg-black/20 rounded-xl p-4 space-y-2">
-              <h4 className="font-bold text-amber-400">{pack.name}</h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div><span className="text-[var(--color-text-secondary)]">Cost:</span> <strong>{pack.cost} Passion</strong></div>
-                <div><span className="text-[var(--color-text-secondary)]">Cards:</span> <strong>{pack.cards}</strong></div>
-              </div>
-              {pack.guarantees.length > 0 && (
-                <div className="text-xs text-[var(--color-text-secondary)]">
-                  <strong>Guarantees:</strong>
-                  {pack.guarantees.map((g, i) => (
-                    <span key={i} className="ml-1">{g.count}x {g.minRarity}+</span>
-                  ))}
+        {packTypes.length === 0 ? (
+          <p className="text-sm text-[var(--color-text-secondary)]">Loading...</p>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {packTypes.map(pack => (
+              <div key={pack.id} className="bg-black/20 rounded-xl p-4 space-y-2">
+                <h4 className="font-bold text-amber-400">{pack.name}</h4>
+                <div className="text-xs text-white/40 font-mono">{pack.id}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div><span className="text-[var(--color-text-secondary)]">Cost:</span> <strong>{pack.cost} Ember</strong></div>
+                  <div><span className="text-[var(--color-text-secondary)]">Cards:</span> <strong>{pack.cards}</strong></div>
+                  <div><span className="text-[var(--color-text-secondary)]">Category:</span> <strong>{pack.category}</strong></div>
+                  {pack.leagueId && (
+                    <div><span className="text-[var(--color-text-secondary)]">League:</span> <strong>#{pack.leagueId}</strong></div>
+                  )}
                 </div>
-              )}
-              {pack.description && (
-                <div className="text-xs text-[var(--color-text-secondary)]">{pack.description}</div>
-              )}
-            </div>
-          ))}
-        </div>
+                {pack.guarantees?.length > 0 && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    <strong>Guarantees:</strong>
+                    {pack.guarantees.map((g, i) => (
+                      <span key={i} className="ml-1">{g.count}x {g.minRarity}+</span>
+                    ))}
+                  </div>
+                )}
+                {pack.description && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">{pack.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
         <p className="text-sm text-amber-400">
-          Economy values are defined in <code className="bg-black/30 px-1 rounded">src/data/cardclash/economy.js</code> and <code className="bg-black/30 px-1 rounded">functions/lib/cardclash.js</code>.
+          Pack types are managed in the <code className="bg-black/30 px-1 rounded">cc_pack_types</code> database table. Rarity values are defined in <code className="bg-black/30 px-1 rounded">src/data/cardclash/economy.js</code>.
         </p>
       </div>
     </div>

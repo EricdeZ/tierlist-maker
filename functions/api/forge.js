@@ -653,6 +653,42 @@ async function getLeaderboard(sql, params) {
             JOIN forge_markets fm ON ps.market_id = fm.id
             WHERE ps.market_id = ${market.id} AND sh.sparks > 0
             GROUP BY sh.user_id
+        ),
+        free_spark_detail AS (
+            SELECT
+                fst.user_id,
+                fst.spark_id,
+                fst.free_count,
+                fst.free_cost,
+                LEAST(fst.free_count, COALESCE(sh.sparks, 0)) as free_held,
+                GREATEST(fst.free_count - COALESCE(sh.sparks, 0), 0) as free_sold,
+                ps.current_price,
+                COALESCE(cool.avg_cool_price, ps.current_price) as avg_cool_price
+            FROM (
+                SELECT user_id, spark_id, SUM(sparks) as free_count, SUM(total_cost) as free_cost
+                FROM spark_transactions
+                WHERE type IN ('tutorial_fuel', 'referral_fuel')
+                GROUP BY user_id, spark_id
+            ) fst
+            JOIN player_sparks ps ON fst.spark_id = ps.id
+            LEFT JOIN spark_holdings sh ON sh.user_id = fst.user_id AND sh.spark_id = fst.spark_id AND sh.sparks > 0
+            LEFT JOIN LATERAL (
+                SELECT SUM(total_cost)::numeric / NULLIF(SUM(sparks), 0) as avg_cool_price
+                FROM spark_transactions
+                WHERE user_id = fst.user_id AND spark_id = fst.spark_id AND type IN ('cool', 'liquidate')
+            ) cool ON true
+            WHERE ps.market_id = ${market.id}
+        ),
+        free_spark_value AS (
+            SELECT
+                user_id,
+                COALESCE(SUM(GREATEST(0, free_held * current_price - (free_held::numeric / NULLIF(free_count, 0)) * free_cost)), 0) as free_held_gain,
+                COALESCE(SUM(GREATEST(0, free_sold * avg_cool_price - (free_sold::numeric / NULLIF(free_count, 0)) * free_cost)), 0) as free_sold_gain,
+                COALESCE(SUM(free_held * current_price), 0) as free_held_value,
+                COALESCE(SUM(free_sold * avg_cool_price), 0) as free_sold_proceeds,
+                COALESCE(SUM((free_held::numeric / NULLIF(free_count, 0)) * free_cost), 0) as free_held_cost
+            FROM free_spark_detail
+            GROUP BY user_id
         )
         SELECT
             COALESCE(uh.user_id, ut.user_id) as user_id,
@@ -664,19 +700,20 @@ async function getLeaderboard(sql, params) {
             COALESCE(uh.holdings_count, 0)::integer as holdings_count,
             COALESCE(uh.total_sparks, 0)::integer as total_sparks,
             (
-                COALESCE(uh.sell_value, 0)
+                COALESCE(uh.sell_value, 0) - COALESCE(fv.free_held_value, 0)
                 - COALESCE(ut.regular_fuel_costs, 0)
-                - COALESCE(ut.free_fuel_costs, 0)
-                + COALESCE(ut.realized_proceeds, 0)
+                + COALESCE(ut.realized_proceeds, 0) - COALESCE(fv.free_sold_proceeds, 0)
+                + COALESCE(fv.free_held_gain, 0) + COALESCE(fv.free_sold_gain, 0)
             )::integer as total_profit,
             (
-                COALESCE(ut.realized_proceeds, 0)
+                COALESCE(ut.realized_proceeds, 0) - COALESCE(fv.free_sold_proceeds, 0)
                 - COALESCE(ut.regular_fuel_costs, 0)
-                - COALESCE(ut.free_fuel_costs, 0)
-                + COALESCE(uh.remaining_invested, 0)
+                + COALESCE(uh.remaining_invested, 0) - COALESCE(fv.free_held_cost, 0)
+                + COALESCE(fv.free_sold_gain, 0)
             )::integer as realized_profit
         FROM user_holdings uh
         FULL OUTER JOIN user_transactions ut ON uh.user_id = ut.user_id
+        LEFT JOIN free_spark_value fv ON fv.user_id = COALESCE(uh.user_id, ut.user_id)
         JOIN users u ON COALESCE(uh.user_id, ut.user_id) = u.id
         LEFT JOIN players pl ON u.linked_player_id = pl.id
     `

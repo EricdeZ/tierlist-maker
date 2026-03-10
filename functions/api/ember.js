@@ -3,6 +3,7 @@ import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { grantPassion } from '../lib/passion.js'
 import { ensureEmberBalance, grantEmber, getConversionCost, EMBER_RULES } from '../lib/ember.js'
+import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -122,6 +123,11 @@ async function claimDaily(sql, user) {
         WHERE user_id = ${user.id}
     `
 
+    // Push vault challenge progress (fire-and-forget)
+    getVaultStats(sql, user.id)
+        .then(stats => pushChallengeProgress(sql, user.id, stats))
+        .catch(err => console.error('Vault challenge push (daily) failed:', err))
+
     return {
         statusCode: 200, headers,
         body: JSON.stringify({
@@ -186,6 +192,11 @@ async function convertPassion(sql, user) {
     const [updatedPb] = await sql`SELECT balance FROM passion_balances WHERE user_id = ${user.id}`
 
     const nextCost = getConversionCost(newConversions)
+
+    // Push vault challenge progress (fire-and-forget)
+    getVaultStats(sql, user.id)
+        .then(stats => pushChallengeProgress(sql, user.id, stats))
+        .catch(err => console.error('Vault challenge push (convert) failed:', err))
 
     return {
         statusCode: 200, headers,

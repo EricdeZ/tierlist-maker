@@ -189,6 +189,11 @@
     50% { box-shadow: 0 0 16px rgba(0, 229, 255, 0.15), 0 0 40px rgba(0, 229, 255, 0.06); }
 }
 
+@keyframes vault-shimmer-banner {
+    0%, 100% { border-color: rgba(0, 229, 255, 0.15); }
+    50% { border-color: rgba(0, 229, 255, 0.35); box-shadow: 0 0 12px rgba(0, 229, 255, 0.08); }
+}
+
 @keyframes cd-neon-flicker {
     0%, 18%, 22%, 25%, 53%, 57%, 100% {
         text-shadow: 0 0 8px var(--cd-cyan-dim), 0 0 20px rgba(0, 229, 255, 0.3), 0 0 40px rgba(0, 229, 255, 0.1);

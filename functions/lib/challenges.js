@@ -25,6 +25,9 @@ export const FORGE_KEYS = ['sparks_fueled', 'sparks_cooled', 'forge_profit', 'fo
 // Discord stat keys (tracked by user_id via discord_guild_members)
 export const DISCORD_KEYS = ['discord_joined']
 
+// Vault stat keys (tracked by user_id via cc_stats / ember_balances / ember_transactions)
+export const VAULT_KEYS = ['packs_opened', 'daily_cores_claimed', 'cores_converted']
+
 /**
  * Update challenge progress for a user based on known current stat values.
  * Finds all active, uncompleted challenges matching the provided stat keys,
@@ -244,7 +247,7 @@ export async function catchupAllUsers(sql, linkedUsers) {
  * Uses aggregate queries + single bulk upsert instead of per-user loops.
  */
 async function bulkRecalcNonPerfChallenges(sql) {
-    const allStatKeys = [...SCRIM_KEYS, ...REFERRAL_KEYS, ...FORGE_KEYS, ...DISCORD_KEYS]
+    const allStatKeys = [...SCRIM_KEYS, ...REFERRAL_KEYS, ...FORGE_KEYS, ...DISCORD_KEYS, ...VAULT_KEYS]
     const challenges = await sql`
         SELECT id, stat_key FROM challenges
         WHERE is_active = true AND stat_key = ANY(${allStatKeys})
@@ -264,6 +267,7 @@ async function bulkRecalcNonPerfChallenges(sql) {
     const hasReferral = challenges.some(c => REFERRAL_KEYS.includes(c.stat_key))
     const hasForge = challenges.some(c => FORGE_KEYS.includes(c.stat_key))
     const hasDiscord = challenges.some(c => DISCORD_KEYS.includes(c.stat_key))
+    const hasVault = challenges.some(c => VAULT_KEYS.includes(c.stat_key))
 
     // Bulk stats — a few aggregate queries instead of per-user loops
     const [scrimStats, referralStats, forgeStats, discordStats] = await Promise.all([
@@ -303,6 +307,24 @@ async function bulkRecalcNonPerfChallenges(sql) {
         ` : [],
     ])
 
+    // Vault stats — aggregate from cc_stats and ember_transactions
+    const [vaultPackStats, vaultClaimStats, vaultConvertStats] = hasVault ? await Promise.all([
+        sql`
+            SELECT user_id, COALESCE(packs_opened, 0)::integer as packs_opened
+            FROM cc_stats WHERE packs_opened > 0
+        `,
+        sql`
+            SELECT user_id, COUNT(*)::integer as daily_cores_claimed
+            FROM ember_transactions WHERE type = 'daily_claim'
+            GROUP BY user_id
+        `,
+        sql`
+            SELECT user_id, COUNT(*)::integer as cores_converted
+            FROM ember_transactions WHERE type = 'passion_convert'
+            GROUP BY user_id
+        `,
+    ]) : [[], [], []]
+
     // Forge profit + perf held need separate queries (different tables)
     const [forgeProfitStats, forgePerfStats] = hasForge ? await Promise.all([
         sql`
@@ -339,6 +361,9 @@ async function bulkRecalcNonPerfChallenges(sql) {
     for (const s of forgeProfitStats) merge(s.user_id, { forge_profit: s.forge_profit })
     for (const s of forgePerfStats) merge(s.user_id, { forge_perf_updates_held: s.forge_perf_updates_held })
     for (const s of discordStats) merge(s.user_id, { discord_joined: s.discord_joined })
+    for (const s of vaultPackStats) merge(s.user_id, { packs_opened: s.packs_opened })
+    for (const s of vaultClaimStats) merge(s.user_id, { daily_cores_claimed: s.daily_cores_claimed })
+    for (const s of vaultConvertStats) merge(s.user_id, { cores_converted: s.cores_converted })
 
     // Build bulk upsert arrays
     const upsertUserIds = []
@@ -747,6 +772,65 @@ export async function recalcDiscordChallenges(sql, userId) {
     // stale check re-triggers on every page load until they actually join
     if (stats.discord_joined === 0) return
 
+    const statKeys = Object.keys(stats)
+
+    const challenges = await sql`
+        SELECT c.id, c.stat_key, c.target_value
+        FROM challenges c
+        LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${userId}
+        WHERE c.is_active = true AND c.stat_key = ANY(${statKeys})
+          AND (uc.completed IS NULL OR uc.completed = false)
+    `
+
+    if (challenges.length === 0) return
+
+    const challengeIds = challenges.map(c => c.id)
+    const currentValues = challenges.map(c => Number(stats[c.stat_key] || 0))
+
+    await sql`
+        INSERT INTO user_challenges (user_id, challenge_id, current_value)
+        SELECT ${userId}, unnest(${challengeIds}::int[]), unnest(${currentValues}::int[])
+        ON CONFLICT (user_id, challenge_id)
+        DO UPDATE SET current_value = EXCLUDED.current_value
+    `
+}
+
+
+/**
+ * Get vault stats for a user (by user_id).
+ * Returns packs opened, daily core claims, and conversions done.
+ */
+export async function getVaultStats(sql, userId) {
+    const [[packRow], [claimRow], [convRow]] = await Promise.all([
+        sql`
+            SELECT COALESCE(packs_opened, 0)::integer as count
+            FROM cc_stats WHERE user_id = ${userId}
+        `,
+        sql`
+            SELECT COUNT(*)::integer as count
+            FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'daily_claim'
+        `,
+        sql`
+            SELECT COUNT(*)::integer as count
+            FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'passion_convert'
+        `,
+    ])
+
+    return {
+        packs_opened: packRow?.count ?? 0,
+        daily_cores_claimed: claimRow?.count ?? 0,
+        cores_converted: convRow?.count ?? 0,
+    }
+}
+
+
+/**
+ * Lazy recalc for vault challenges. Called on challenges page load.
+ */
+export async function recalcVaultChallenges(sql, userId) {
+    const stats = await getVaultStats(sql, userId)
     const statKeys = Object.keys(stats)
 
     const challenges = await sql`

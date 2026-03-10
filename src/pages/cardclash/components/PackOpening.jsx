@@ -117,7 +117,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
   const particleIdRef = useRef(0)
   const antSparkTimerRef = useRef(null)
 
-  const isMixed = result.packType === 'mixed' || result.cards.some(c => c._revealOrder != null || c.card_type)
+  const isMixed = (result.packType || '').includes('mixed') || result.cards.some(c => c._revealOrder != null || c.card_type)
   const cards = useMemo(() => {
     const sorted = [...result.cards]
     if (isMixed && sorted.some(c => c._revealOrder != null)) {

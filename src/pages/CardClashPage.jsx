@@ -3,7 +3,7 @@ import { CardClashProvider, useCardClash } from './cardclash/CardClashContext'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/layout/Navbar'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './cardclash/VaultHeroBanner'
 import './cardclash/compdeck.css'
@@ -14,11 +14,23 @@ const CCPlayerCards = lazy(() => import('./cardclash/CCPlayerCards'))
 const CCSettings = lazy(() => import('./cardclash/CCSettings'))
 const CCCollection = lazy(() => import('./cardclash/CCCollection'))
 const CCConverter = lazy(() => import('./cardclash/CCConverter'))
+const CCChallenges = lazy(() => import('./cardclash/CCChallenges'))
+const CCMarketplace = lazy(() => import('./cardclash/CCMarketplace'))
+const CCGifts = lazy(() => import('./cardclash/CCGifts'))
+const CCTrading = lazy(() => import('./cardclash/CCTrading'))
+const CCDismantle = lazy(() => import('./cardclash/CCDismantle'))
+const CCStartingFive = lazy(() => import('./cardclash/CCStartingFive'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
+    { key: 'lineup', label: 'Starting 5', icon: Users },
     { key: 'collection', label: 'Collection', icon: Library },
+    { key: 'gifts', label: 'Gifts', icon: Gift },
+    { key: 'trade', label: 'Trade', icon: Handshake },
+    { key: 'market', label: 'Market', icon: Store },
+    { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
+    { key: 'challenges', label: 'Challenges', icon: Star },
     // { key: 'players', label: 'Players', icon: UserSearch },
     { key: 'catalog', label: 'Catalog', icon: BookOpen },
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
@@ -26,9 +38,15 @@ const TABS = [
 
 const TAB_COMPONENTS = {
     packs: CCPackShop,
+    lineup: CCStartingFive,
     catalog: CCCardCatalog,
     collection: CCCollection,
+    gifts: CCGifts,
+    trade: CCTrading,
+    market: CCMarketplace,
+    dismantle: CCDismantle,
     convert: CCConverter,
+    challenges: CCChallenges,
     players: CCPlayerCards,
     settings: CCSettings,
 }
@@ -55,7 +73,8 @@ export default function CardClashPage() {
 function CardClashInner() {
     const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { testMode, setTestMode, loading, loaded } = useCardClash()
+    const { loading, loaded, giftData, pendingTradeCount } = useCardClash()
+    const unseenGifts = giftData?.unseenCount || 0
     const activeTab = searchParams.get('tab') || 'packs'
     const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
 
@@ -101,6 +120,14 @@ function CardClashInner() {
                             >
                                 <Icon className={`w-4 h-4 ${active ? 'cd-icon-glow' : ''}`} />
                                 {tab.label}
+                                {tab.key === 'gifts' && unseenGifts > 0 && (
+                                    <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[var(--cd-cyan)] text-[10px] font-bold text-black flex items-center justify-center cd-text-glow">
+                                        {unseenGifts}
+                                    </span>
+                                )}
+                                {tab.key === 'trade' && pendingTradeCount > 0 && (
+                                    <span className="w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
+                                )}
                                 {active && (
                                     <span className="absolute bottom-0 left-0 right-0 cd-tab-active cd-neon-shine" />
                                 )}
@@ -108,23 +135,22 @@ function CardClashInner() {
                         )
                     })}
 
-                    <div className="ml-auto flex items-center gap-3 pb-3">
-                        <button
-                            onClick={() => setTestMode(!testMode)}
-                            className={`cd-clip-tag text-[11px] px-4 py-1 font-bold uppercase tracking-wider transition-all cursor-pointer border cd-head ${
-                                testMode
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 hover:shadow-[0_0_12px_rgba(245,158,11,0.15)]'
-                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(52,211,153,0.15)]'
-                            }`}
-                        >
-                            {testMode ? 'TEST' : 'LIVE'}
-                        </button>
-                    </div>
                 </div>
 
-                <p className="text-[10px] text-white/25 mt-2 mb-6">
+                <p className={`text-[10px] text-white/25 mt-2 ${unseenGifts > 0 && activeTab !== 'gifts' ? 'mb-2' : 'mb-6'}`}>
                     SMITE 2 is a registered trademark of Hi-Rez Studios. Trademarks are the property of their respective owners. Game materials copyright Hi-Rez Studios. Hi-Rez Studios has not endorsed and is not responsible for this site or its content.
                 </p>
+
+                {unseenGifts > 0 && activeTab !== 'gifts' && (
+                    <button
+                        onClick={() => setTab('gifts')}
+                        className="w-full mb-4 py-2 px-4 rounded-lg bg-[var(--cd-cyan)]/[0.06] border border-[var(--cd-cyan)]/20 flex items-center justify-center gap-2 text-xs font-bold text-[var(--cd-cyan)] cd-head tracking-wider hover:bg-[var(--cd-cyan)]/[0.12] transition-all cursor-pointer"
+                        style={{ animation: 'vault-shimmer-banner 3s ease-in-out infinite' }}
+                    >
+                        <Gift className="w-3.5 h-3.5" />
+                        You have {unseenGifts} new gift{unseenGifts > 1 ? 's' : ''} waiting!
+                    </button>
+                )}
 
                 {/* Content */}
                 {loading && !loaded ? (

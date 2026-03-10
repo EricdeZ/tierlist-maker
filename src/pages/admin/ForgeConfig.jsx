@@ -757,7 +757,7 @@ function PlayerBreakdown({ data }) {
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="min-w-[900px] text-xs">
                         <thead>
                             <tr className="border-b border-white/10">
                                 <th className="text-left px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">#</th>
@@ -765,6 +765,8 @@ function PlayerBreakdown({ data }) {
                                 <th className="text-left px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">God</th>
                                 <th className="text-center px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">W/L</th>
                                 <th className="text-center px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">K/D/A</th>
+                                <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium whitespace-nowrap" title="Sparks snapshot used for calc">Spk</th>
+                                <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium whitespace-nowrap" title="Price snapshot used for calc">P.Snap</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Raw</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Exp</th>
                                 <th className="text-right px-2 py-1.5 text-[var(--color-text-secondary)] font-medium">Heat</th>
@@ -781,7 +783,7 @@ function PlayerBreakdown({ data }) {
                                 <React.Fragment key={i}>
                                     {g.inactivityDecay && (
                                         <tr className="bg-red-500/5 border-y border-red-500/20">
-                                            <td colSpan={14} className="px-2 py-1.5 text-xs text-red-400">
+                                            <td colSpan={16} className="px-2 py-1.5 text-xs text-red-400">
                                                 <span className="font-medium">{g.inactivityDecay.weeks} missed match{g.inactivityDecay.weeks > 1 ? 'es' : ''}</span>
                                                 <span className="font-mono ml-2">virtual game: {cfg.INACTIVITY_DECAY}<sup>{g.inactivityDecay.weeks}</sup> = {g.inactivityDecay.compoundFactor.toFixed(4)}</span>
                                                 <span className="text-red-400/60 ml-2">(averaged with {g.inactivityDecay.gameCount - 1} real game{g.inactivityDecay.gameCount - 1 !== 1 ? 's' : ''})</span>
@@ -835,6 +837,10 @@ function GameRow({ game: g, index: i, cfg }) {
                 <td className="px-2 py-1.5 text-[var(--color-text)]">{g.god || '—'}</td>
                 <td className={`px-2 py-1.5 text-center font-medium ${g.won ? 'text-green-400' : 'text-red-400'}`}>{g.won ? 'W' : 'L'}</td>
                 <td className="px-2 py-1.5 text-center text-[var(--color-text)] font-mono">{g.stats.kills}/{g.stats.deaths}/{g.stats.assists}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-[var(--color-text-secondary)]">{g.calcSparks ?? '—'}</td>
+                <td className={`px-2 py-1.5 text-right font-mono ${g.calcHeat != null ? (g.calcHeat > 50 ? 'text-green-400' : g.calcHeat < 50 ? 'text-red-400' : 'text-[var(--color-text-secondary)]') : 'text-[var(--color-text-secondary)]'}`}>
+                    {g.calcHeat != null ? g.calcHeat.toFixed(0) : '—'}
+                </td>
                 <td className={`px-2 py-1.5 text-right font-mono ${g.rawScore > 1.1 ? 'text-green-400' : g.rawScore < 0.9 ? 'text-red-400' : 'text-[var(--color-text)]'}`}>
                     {g.rawScore.toFixed(3)}
                 </td>
@@ -866,7 +872,7 @@ function GameRow({ game: g, index: i, cfg }) {
             </tr>
             {expanded && (
                 <tr>
-                    <td colSpan={14} className="bg-black/30 px-4 py-3">
+                    <td colSpan={16} className="bg-black/30 px-4 py-3">
                         <GameDetail game={g} cfg={cfg} />
                     </td>
                 </tr>

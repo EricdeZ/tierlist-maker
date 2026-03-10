@@ -979,8 +979,11 @@ export const cardclashService = {
     async load() {
         return apiCall('cardclash', { action: 'load' })
     },
-    async openPack(packType, testMode) {
-        return apiPost('cardclash', { action: 'open-pack' }, { packType, testMode })
+    async openPack(packType) {
+        return apiPost('cardclash', { action: 'open-pack' }, { packType })
+    },
+    async openSalePack(saleId, packType) {
+        return apiPost('cardclash', { action: 'open-pack' }, { saleId, packType })
     },
     async getDefinitionOverrides() {
         return apiCall('cardclash', { action: 'definition-overrides' })
@@ -999,6 +1002,93 @@ export const cardclashService = {
     },
     async getCardDetail(defId) {
         return apiCall('cardclash', { action: 'card-detail', defId })
+    },
+    async loadGifts() {
+        return apiCall('cardclash', { action: 'gifts' })
+    },
+    async searchUsers(q) {
+        return apiCall('cardclash', { action: 'search-users', q })
+    },
+    async sendGift(recipientId, message) {
+        return apiPost('cardclash', { action: 'send-gift' }, { recipientId, message })
+    },
+    async openGift(giftId) {
+        return apiPost('cardclash', { action: 'open-gift' }, { giftId })
+    },
+    async markGiftsSeen() {
+        return apiPost('cardclash', { action: 'mark-gifts-seen' }, {})
+    },
+    async dismantleCards(cardIds) {
+        return apiPost('cardclash', { action: 'dismantle' }, { cardIds })
+    },
+    loadStartingFive() {
+        return apiCall('cardclash', { action: 'starting-five' })
+    },
+    slotCard(cardId, role) {
+        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role })
+    },
+    unslotCard(role) {
+        return apiPost('cardclash', { action: 'unslot-card' }, { role })
+    },
+    collectIncome() {
+        return apiPost('cardclash', { action: 'collect-income' }, {})
+    },
+}
+
+export const marketplaceService = {
+    async list(params = {}) {
+        return apiCall('marketplace', { action: 'list', ...params })
+    },
+    async getMyListings() {
+        return apiCall('marketplace', { action: 'my-listings' })
+    },
+    async create(data) {
+        return apiPost('marketplace', { action: 'create' }, data)
+    },
+    async buy(data) {
+        return apiPost('marketplace', { action: 'buy' }, data)
+    },
+    async cancel(listingId) {
+        return apiPost('marketplace', { action: 'cancel' }, { listingId })
+    },
+}
+
+export const tradingService = {
+    async pending() {
+        return apiCall('trading', { action: 'pending' })
+    },
+    async poll(tradeId) {
+        return apiCall('trading', { action: 'poll', tradeId })
+    },
+    async history() {
+        return apiCall('trading', { action: 'history' })
+    },
+    async searchUsers(q) {
+        return apiCall('trading', { action: 'search-users', q })
+    },
+    async create(targetUserId) {
+        return apiPost('trading', { action: 'create' }, { targetUserId })
+    },
+    async join(tradeId) {
+        return apiPost('trading', { action: 'join' }, { tradeId })
+    },
+    async addCard(tradeId, cardId) {
+        return apiPost('trading', { action: 'add-card' }, { tradeId, cardId })
+    },
+    async removeCard(tradeId, cardId) {
+        return apiPost('trading', { action: 'remove-card' }, { tradeId, cardId })
+    },
+    async setCore(tradeId, amount) {
+        return apiPost('trading', { action: 'set-core' }, { tradeId, amount })
+    },
+    async ready(tradeId) {
+        return apiPost('trading', { action: 'ready' }, { tradeId })
+    },
+    async confirm(tradeId) {
+        return apiPost('trading', { action: 'confirm' }, { tradeId })
+    },
+    async cancel(tradeId) {
+        return apiPost('trading', { action: 'cancel' }, { tradeId })
     },
 }
 

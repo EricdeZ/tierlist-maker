@@ -11,9 +11,13 @@ export function CardClashProvider({ children }) {
 
   const [collection, setCollection] = useState([])
   const [stats, setStats] = useState({ packsOpened: 0, embers: 0 })
+  const [packTypes, setPackTypes] = useState([])
+  const [salePacks, setSalePacks] = useState([])
+  const [pendingTradeCount, setPendingTradeCount] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [testMode, setTestMode] = useState(true)
+  const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, unseenCount: 0 })
+  const [startingFive, setStartingFive] = useState(null)
 
   useEffect(() => {
     if (!user) return
@@ -23,6 +27,9 @@ export function CardClashProvider({ children }) {
       if (cancelled) return
       setCollection(ccData.collection || [])
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
+      setPackTypes(ccData.packTypes || [])
+      setSalePacks(ccData.salePacks || [])
+      setPendingTradeCount(ccData.pendingTradeCount || 0)
       setLoaded(true)
       setLoading(false)
     }).catch(err => {
@@ -35,6 +42,86 @@ export function CardClashProvider({ children }) {
 
   const passion = passionCtx?.balance ?? 0
   const ember = passionCtx?.ember ?? { balance: 0 }
+
+  const refreshCollection = useCallback(async () => {
+    try {
+      const ccData = await cardclashService.load()
+      setCollection(ccData.collection || [])
+    } catch (err) {
+      console.error('Failed to refresh collection:', err)
+    }
+  }, [])
+
+  const refreshGifts = useCallback(async () => {
+    try {
+      const data = await cardclashService.loadGifts()
+      setGiftData(data)
+    } catch (err) {
+      console.error('Failed to load gifts:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (loaded) refreshGifts()
+  }, [loaded, refreshGifts])
+
+  const sendGift = useCallback(async (recipientId, message) => {
+    const result = await cardclashService.sendGift(recipientId, message)
+    await refreshGifts()
+    return result
+  }, [refreshGifts])
+
+  const openGift = useCallback(async (giftId) => {
+    const result = await cardclashService.openGift(giftId)
+    setCollection(prev => [...prev, ...result.cards])
+    setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
+    await refreshGifts()
+    return result
+  }, [refreshGifts])
+
+  const markGiftsSeen = useCallback(async () => {
+    await cardclashService.markGiftsSeen()
+    setGiftData(prev => ({ ...prev, unseenCount: 0, received: prev.received.map(g => ({ ...g, seen: true })) }))
+  }, [])
+
+  const loadStartingFive = useCallback(async () => {
+    try {
+      const data = await cardclashService.loadStartingFive()
+      setStartingFive(data)
+    } catch (err) {
+      console.error('Failed to load Starting 5:', err)
+    }
+  }, [])
+
+  const slotS5Card = useCallback(async (cardId, role) => {
+    const data = await cardclashService.slotCard(cardId, role)
+    setStartingFive(data)
+    return data
+  }, [])
+
+  const unslotS5Card = useCallback(async (role) => {
+    const data = await cardclashService.unslotCard(role)
+    setStartingFive(data)
+    return data
+  }, [])
+
+  const collectS5Income = useCallback(async () => {
+    const data = await cardclashService.collectIncome()
+    setStartingFive(data)
+    await passionCtx?.refreshBalance?.()
+    return data
+  }, [passionCtx])
+
+  useEffect(() => {
+    if (loaded) loadStartingFive()
+  }, [loaded, loadStartingFive])
+
+  const dismantleCards = useCallback(async (cardIds) => {
+    const result = await cardclashService.dismantleCards(cardIds)
+    setCollection(prev => prev.filter(c => !cardIds.includes(c.id)))
+    passionCtx?.refreshBalance?.()
+    return result
+  }, [passionCtx])
 
   const convertPassionToEmber = useCallback(async () => {
     try {
@@ -49,22 +136,44 @@ export function CardClashProvider({ children }) {
 
   const buyPack = useCallback(async (packType) => {
     try {
-      const result = await cardclashService.openPack(packType, testMode)
+      const result = await cardclashService.openPack(packType)
       setCollection(prev => [...prev, ...result.cards])
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
-      if (!testMode) passionCtx?.refreshBalance?.()
+      passionCtx?.refreshBalance?.()
       return result
     } catch (err) {
       console.error('Failed to open pack:', err)
       throw err
     }
-  }, [testMode, passionCtx])
+  }, [passionCtx])
+
+  const buySalePack = useCallback(async (saleId) => {
+    try {
+      const sale = salePacks.find(s => s.id === saleId)
+      if (!sale) throw new Error('Sale not found')
+      const result = await cardclashService.openSalePack(saleId, sale.packTypeId)
+      setCollection(prev => [...prev, ...result.cards])
+      setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
+      setSalePacks(prev => prev.map(s =>
+        s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
+      ))
+      passionCtx?.refreshBalance?.()
+      return result
+    } catch (err) {
+      console.error('Failed to open sale pack:', err)
+      throw err
+    }
+  }, [salePacks, passionCtx])
 
   return (
     <CardClashContext.Provider value={{
-      collection, passion, ember, stats,
-      loaded, loading, testMode, setTestMode,
-      buyPack, convertPassionToEmber,
+      collection, passion, ember, stats, packTypes, salePacks,
+      loaded, loading,
+      buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
+      claimEmberDaily: passionCtx?.claimEmberDaily,
+      giftData, sendGift, openGift, markGiftsSeen, refreshGifts,
+      startingFive, loadStartingFive, slotS5Card, unslotS5Card, collectS5Income,
+      pendingTradeCount, setPendingTradeCount,
     }}>
       {children}
     </CardClashContext.Provider>

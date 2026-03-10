@@ -709,7 +709,7 @@ export async function updateForgeAfterMatch(sql, matchId) {
  *
  * Returns { multiplier, trace, finalInactivityDecay, hasGames }
  */
-function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates, transfers }) {
+function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, basePrice, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates, transfers }) {
     const halfLife = cfg.DECAY_HALF_LIFE
     let multiplier = 1.0
     let lastGameTime = null
@@ -762,12 +762,16 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
             // Sort by date since we merged from multiple teams
             teamMatches.sort((a, b) => a.date - b.date)
         } else {
-            // No transfers — simple case: current team matches since join date
+            // No transfers — simple case: current team matches since join date or market open (whichever is later)
             const allTeamMatches = teamMatchDates.get(spark.team_id) || []
             const joinedAt = spark.team_joined_at ? new Date(spark.team_joined_at).getTime() : 0
-            teamMatches = joinedAt > 0 ? allTeamMatches.filter(m => m.date >= joinedAt) : allTeamMatches
+            const startFrom = Math.max(joinedAt, marketStartTime)
+            teamMatches = allTeamMatches.filter(m => m.date >= startFrom)
         }
     }
+
+    let runningGameIndex = 0
+    const priceSnapshots = spark.price_snapshots || []
 
     for (const set of sets) {
         hasGames = true
@@ -805,8 +809,18 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
                   kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
                 avgs, game.role
             )
-            const heatSparks = spark.recalc_sparks ?? spark.total_sparks
-            const expected = 1 + snap.EXPECTATION_WEIGHT * heatSparks
+            runningGameIndex++
+            let heatSparks = 0
+            let priceSnap = basePrice
+            for (const ps of priceSnapshots) {
+                if (runningGameIndex > ps.gc) {
+                    priceSnap = ps.price
+                    heatSparks = ps.sparks ?? 0
+                }
+            }
+            const sparksExp = snap.EXPECTATION_WEIGHT * heatSparks
+            const priceExp = snap.EXPECTATION_WEIGHT * (priceSnap - basePrice)
+            const expected = 1 + 0.5 * sparksExp + 0.5 * priceExp
             const denom = 1 + snap.SUPPLY_WEIGHT * heatSparks
             const heat = 1 + (rawScore - expected) / denom
             const heatWithoutExp = 1 + (rawScore - 1) / denom
@@ -848,6 +862,7 @@ function replayPlayerGames({ games, spark, cfg, configHistory, marketStartTime, 
                              kp: Number(game.kp), damage: Number(game.damage), mitigated: Number(game.mitigated) },
                     roleAvgs: avgs, multiplierBefore: multBeforeSet, rawScore, expected,
                     expectationWeight: snap.EXPECTATION_WEIGHT, expImpact,
+                    calcSparks: heatSparks, calcHeat: priceSnap,
                     statBreakdown: {
                         kills:     { norm: normKills, weight: w.kills || 0, contribution: (w.kills || 0) * normKills },
                         deaths:    { norm: normDeaths, weight: w.deaths || 0, contribution: (w.deaths || 0) * normDeaths },
@@ -1115,7 +1130,7 @@ export async function recalcForgePerformance(sql, seasonId) {
 
     const sparks = await sql`
         SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.sell_pressure, ps.sell_pressure_updated_at,
-               ps.recalc_sparks, ps.recalc_game_count,
+               ps.recalc_sparks, ps.price_snapshots, ps.recalc_game_count, ps.perf_multiplier, ps.current_price,
                lp.team_id, lp.is_active, lp.player_id,
                COALESCE(lp.joined_date, rt.transfer_date) as team_joined_at
         FROM player_sparks ps
@@ -1184,7 +1199,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         if (!spark) continue
 
         const result = replayPlayerGames({
-            games, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, teamMatchDates,
+            games, spark, cfg, configHistory, marketStartTime, basePrice: market.base_price, roleAvgMap, godAvgMap, getTeamStrength, now, lpId, teamMatchDates,
             transfers: playerTransfers.get(spark.player_id) || [],
         })
 
@@ -1199,7 +1214,7 @@ export async function recalcForgePerformance(sql, seasonId) {
         const hasNewGames = result.postForgeGameCount > (spark.recalc_game_count || 0)
         updates.push({
             sparkId: spark.id, multiplier, newPrice, decayedPressure: dp,
-            snapshotSparks: hasNewGames ? spark.total_sparks : null,
+            snapshotPriceEntry: hasNewGames ? { gc: result.postForgeGameCount, price: Number(spark.current_price), sparks: spark.total_sparks } : null,
             newGameCount: hasNewGames ? result.postForgeGameCount : null,
         })
     }
@@ -1290,19 +1305,19 @@ export async function recalcForgePerformance(sql, seasonId) {
                 UNNEST(${pNewPrices}::numeric[]),
                 ${recalcAt}::timestamptz
         `
-        // Snapshot supply for players with new games (bookkeeping — not gated by approval)
-        const snapshotUpdates = updates.filter(u => u.snapshotSparks !== null)
+        // Snapshot price + sparks for players with new games (bookkeeping — not gated by approval)
+        const snapshotUpdates = updates.filter(u => u.snapshotPriceEntry !== null)
         if (snapshotUpdates.length > 0) {
             const ssIds = snapshotUpdates.map(u => u.sparkId)
-            const ssSparks = snapshotUpdates.map(u => u.snapshotSparks)
+            const ssPriceEntries = snapshotUpdates.map(u => JSON.stringify(u.snapshotPriceEntry))
             const ssGameCounts = snapshotUpdates.map(u => u.newGameCount)
             await sql`
                 UPDATE player_sparks AS ps SET
-                    recalc_sparks = v.rs,
+                    price_snapshots = ps.price_snapshots || v.pe::jsonb,
                     recalc_game_count = v.gc
                 FROM (
                     SELECT UNNEST(${ssIds}::int[]) AS id,
-                           UNNEST(${ssSparks}::int[]) AS rs,
+                           UNNEST(${ssPriceEntries}::text[]) AS pe,
                            UNNEST(${ssGameCounts}::int[]) AS gc
                 ) AS v
                 WHERE ps.id = v.id
@@ -1318,7 +1333,7 @@ export async function recalcForgePerformance(sql, seasonId) {
     const multipliers = updates.map(u => u.multiplier)
     const prices = updates.map(u => u.newPrice)
     const pressures = updates.map(u => u.decayedPressure)
-    const recalcSparks = updates.map(u => u.snapshotSparks)
+    const recalcPriceEntries = updates.map(u => u.snapshotPriceEntry ? JSON.stringify(u.snapshotPriceEntry) : null)
     const recalcGameCounts = updates.map(u => u.newGameCount)
 
     await sql`
@@ -1327,7 +1342,7 @@ export async function recalcForgePerformance(sql, seasonId) {
             current_price = v.price,
             sell_pressure = v.sp,
             sell_pressure_updated_at = CASE WHEN v.sp > 0 THEN NOW() ELSE NULL END,
-            recalc_sparks = COALESCE(v.rs, ps.recalc_sparks),
+            price_snapshots = CASE WHEN v.pe IS NOT NULL THEN ps.price_snapshots || v.pe::jsonb ELSE ps.price_snapshots END,
             recalc_game_count = COALESCE(v.gc, ps.recalc_game_count),
             last_perf_update = NOW(),
             updated_at = NOW()
@@ -1336,7 +1351,7 @@ export async function recalcForgePerformance(sql, seasonId) {
                    UNNEST(${multipliers}::numeric[]) AS mult,
                    UNNEST(${prices}::numeric[]) AS price,
                    UNNEST(${pressures}::numeric[]) AS sp,
-                   UNNEST(${recalcSparks}::int[]) AS rs,
+                   UNNEST(${recalcPriceEntries}::text[]) AS pe,
                    UNNEST(${recalcGameCounts}::int[]) AS gc
         ) AS v
         WHERE ps.id = v.id
@@ -1385,8 +1400,8 @@ export async function recalcForgePerformance(sql, seasonId) {
  */
 export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
     const [spark] = await sql`
-        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.recalc_sparks, ps.market_id,
-               ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier,
+        SELECT ps.id, ps.league_player_id, ps.total_sparks, ps.recalc_sparks, ps.price_snapshots, ps.recalc_game_count, ps.market_id,
+               ps.sell_pressure, ps.sell_pressure_updated_at, ps.perf_multiplier, ps.current_price,
                ps.current_price, fm.base_price, fm.created_at as market_created_at,
                fm.season_id, COALESCE(p.name, 'Unknown') as player_name,
                LOWER(COALESCE(lp.role, 'fill')) as player_role,
@@ -1669,7 +1684,7 @@ export async function getPlayerBreakdown(sql, sparkId, recalcAt) {
     }))
 
     const result = replayPlayerGames({
-        games: playerGames, spark, cfg, configHistory, marketStartTime, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
+        games: playerGames, spark, cfg, configHistory, marketStartTime, basePrice: spark.base_price, roleAvgMap, godAvgMap, getTeamStrength, now, lpId,
         gameTeamPlayers, playerStrengthMap, gamePlayerNames, teamMatchDates,
         transfers: playerTransferList,
     })

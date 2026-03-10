@@ -356,6 +356,7 @@ export default function CCCollection() {
           onClose={() => setZoomedCard(null)}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
+          canSell={zoomedCard.canSell}
         />
       )}
     </div>
@@ -435,7 +436,7 @@ function CollectionSlot({ entry, type, applyOverride, onZoom }) {
     const data = applyOverride(type, dataKey, fullData)
 
     return (
-      <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data } })}>
+      <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data, identifier: entryGodId(entry, type) }, canSell: true })}>
         <GameCard type={type} rarity={rarity} data={data} size={CARD_SIZE} />
         <RarityPips ownedRarities={entry.ownedRarities} />
       </div>
@@ -538,6 +539,7 @@ function PlayerSlot({ card, meta, onZoom }) {
         leagueName: meta.leagueSlug.toUpperCase(),
         divisionName: meta.divisionName || `Division ${meta.divisionTier}`,
       },
+      canSell: true,
     })
 
     return (
