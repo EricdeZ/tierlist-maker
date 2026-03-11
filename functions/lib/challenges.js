@@ -33,6 +33,7 @@ export const VAULT_KEYS = [
     'best_marketplace_sale', 'gifts_sent', 'gifts_opened',
     'starting_five_filled', 'starting_five_rare_count', 'starting_five_epic_count',
     'income_collected', 'max_conversions_day',
+    'total_cards_owned', 'unique_gods_owned', 'total_cores_earned',
 ]
 
 /**
@@ -321,6 +322,7 @@ async function bulkRecalcNonPerfChallenges(sql) {
         vaultGiftsSentStats, vaultGiftsOpenedStats,
         vaultLineupStats, vaultLineupRareStats, vaultLineupEpicStats,
         vaultMaxConvStats,
+        vaultTotalCardsStats, vaultUniqueGodsStats, vaultTotalCoresStats,
     ] = hasVault ? await Promise.all([
         sql`
             SELECT user_id,
@@ -395,7 +397,20 @@ async function bulkRecalcNonPerfChallenges(sql) {
                 GROUP BY user_id, DATE(created_at)
             ) sub GROUP BY user_id
         `,
-    ]) : [[], [], [], [], [], [], [], [], [], [], [], [], []]
+        sql`
+            SELECT owner_id AS user_id, COUNT(*)::integer as total_cards_owned
+            FROM cc_cards GROUP BY owner_id
+        `,
+        sql`
+            SELECT owner_id AS user_id, COUNT(DISTINCT god_id)::integer as unique_gods_owned
+            FROM cc_cards GROUP BY owner_id
+        `,
+        sql`
+            SELECT user_id, COALESCE(SUM(amount), 0)::integer as total_cores_earned
+            FROM ember_transactions WHERE amount > 0
+            GROUP BY user_id
+        `,
+    ]) : [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []]
 
     // Forge profit + perf held need separate queries (different tables)
     const [forgeProfitStats, forgePerfStats] = hasForge ? await Promise.all([
@@ -451,6 +466,9 @@ async function bulkRecalcNonPerfChallenges(sql) {
     for (const s of vaultLineupRareStats) merge(s.user_id, { starting_five_rare_count: s.starting_five_rare_count })
     for (const s of vaultLineupEpicStats) merge(s.user_id, { starting_five_epic_count: s.starting_five_epic_count })
     for (const s of vaultMaxConvStats) merge(s.user_id, { max_conversions_day: s.max_conversions_day })
+    for (const s of vaultTotalCardsStats) merge(s.user_id, { total_cards_owned: s.total_cards_owned })
+    for (const s of vaultUniqueGodsStats) merge(s.user_id, { unique_gods_owned: s.unique_gods_owned })
+    for (const s of vaultTotalCoresStats) merge(s.user_id, { total_cores_earned: s.total_cores_earned })
 
     // Build bulk upsert arrays
     const upsertUserIds = []
@@ -894,6 +912,7 @@ export async function getVaultStats(sql, userId) {
         [giftsSentRow], [giftsOpenedRow],
         [lineupRow], [lineupRareRow], [lineupEpicRow],
         [maxConvRow], [rarityRow],
+        [totalCardsRow], [uniqueGodsRow], [totalCoresRow],
     ] = await Promise.all([
         // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
         sql`
@@ -979,6 +998,21 @@ export async function getVaultStats(sql, userId) {
                 GROUP BY god_id
             ) sub
         `,
+        // Total cards owned
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_cards
+            WHERE owner_id = ${userId}
+        `,
+        // Unique gods owned
+        sql`
+            SELECT COUNT(DISTINCT god_id)::integer as count FROM cc_cards
+            WHERE owner_id = ${userId}
+        `,
+        // Total lifetime Cores earned (all positive ember transactions)
+        sql`
+            SELECT COALESCE(SUM(amount), 0)::integer as total FROM ember_transactions
+            WHERE user_id = ${userId} AND amount > 0
+        `,
     ])
 
     return {
@@ -999,6 +1033,9 @@ export async function getVaultStats(sql, userId) {
         income_collected: statsRow?.income_collections ?? 0,
         max_conversions_day: maxConvRow?.max_conv ?? 0,
         max_card_rarities: rarityRow?.max_rarities ?? 0,
+        total_cards_owned: totalCardsRow?.count ?? 0,
+        unique_gods_owned: uniqueGodsRow?.count ?? 0,
+        total_cores_earned: totalCoresRow?.total ?? 0,
     }
 }
 
