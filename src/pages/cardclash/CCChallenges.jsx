@@ -11,6 +11,7 @@ export default function CCChallenges() {
   const { updateFromClaim, challengeNotifications } = usePassion()
   const [challengeData, setChallengeData] = useState({})
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [claimingId, setClaimingId] = useState(null)
   const [justClaimed, setJustClaimed] = useState({})
 
@@ -22,6 +23,11 @@ export default function CCChallenges() {
   }, [])
 
   useEffect(() => { loadChallenges() }, [loadChallenges])
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    loadChallenges().finally(() => setRefreshing(false))
+  }
 
   useEffect(() => {
     if (challengeNotifications.length > 0) loadChallenges()
@@ -82,9 +88,21 @@ export default function CCChallenges() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h2 className="cd-head text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Core Challenges</h2>
-        <p className="text-xs text-white/40 mt-1">Complete challenges to earn bonus Cores</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="cd-head text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Core Challenges</h2>
+          <p className="text-xs text-white/40 mt-1">Complete challenges to earn bonus Cores</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="p-2 rounded-lg text-white/40 hover:text-[var(--cd-cyan)] hover:bg-white/[0.05] transition-all disabled:opacity-50 cursor-pointer"
+          title="Refresh progress"
+        >
+          <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -183,6 +183,7 @@ async function generatePlayerCard(sql, rarity, leagueId) {
       role,
       stats,
       bestGod: stats.bestGod,
+      isConnected: !!prefRow,
     },
   }
 }
@@ -293,6 +294,7 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
       leagueName: player.league_name,
       divisionName: player.division_name,
       role,
+      isConnected: !!player.discord_id,
       stats: {
         gamesPlayed: gp, wins: w,
         winRate: gp > 0 ? Math.round((w / gp) * 1000) / 10 : 0,
@@ -356,6 +358,7 @@ async function generatePlayerCardByDivisions(sql, rarity, divisionIds) {
       role,
       stats,
       bestGod: stats.bestGod,
+      isConnected: !!prefRow,
     },
   }
 }

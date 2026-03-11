@@ -64,6 +64,7 @@ function toPlayerCardProps(card) {
     stats: cd.stats || null,
     bestGod: cd.bestGod || null,
     isFirstEdition: card.isFirstEdition || card.is_first_edition || false,
+    isConnected: cd.isConnected,
   }
 }
 
