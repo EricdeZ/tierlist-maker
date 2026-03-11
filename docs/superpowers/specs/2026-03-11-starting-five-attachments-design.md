@@ -7,10 +7,10 @@ Expand each Starting 5 slot from a single player card to a **player + god + item
 ## Attachment Rules
 
 - Each slot can hold: **1 player card** (base, existing) + **1 god card** + **1 item card**
-- **God** must match the slot's role (warrior→solo, assassin→jungle, mage→mid, guardian→support, hunter→adc)
+- **God** must match the slot's role — god cards already store the mapped SMITE role (`solo`/`jungle`/`mid`/`support`/`adc`) in their `role` column, so validation is simply `godCard.role === slotRole`
 - **Item** has no role restriction — any item in any slot
-- Both must have a **holo type** (holo/reverse/full) — no non-holo attachments
-- Both must be **>= the player card's rarity** (e.g., epic player requires epic+ god/item)
+- Both must have a **holo type** (holo/reverse/full) — commons (`holo_type = NULL`) cannot be attached
+- Both must be **>= the player card's rarity** — use `RARITIES[rarity].tier` from `economy.js` where lower tier = higher rarity (mythic=0, common=5). Comparison: `attachmentTier <= playerTier` means attachment is at least as rare
 - Same restrictions as player cards: can't be listed on marketplace, can't be in active trade, can't be slotted elsewhere
 
 ## Bonus Percentages
@@ -62,9 +62,13 @@ Add two columns to `cc_lineups` for god and item attachments:
 ```sql
 ALTER TABLE cc_lineups ADD COLUMN god_card_id INTEGER REFERENCES cc_cards(id) ON DELETE SET NULL;
 ALTER TABLE cc_lineups ADD COLUMN item_card_id INTEGER REFERENCES cc_cards(id) ON DELETE SET NULL;
+
+-- Prevent same card from being attached in multiple slots
+CREATE UNIQUE INDEX IF NOT EXISTS cc_lineups_god_uniq ON cc_lineups(god_card_id) WHERE god_card_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cc_lineups_item_uniq ON cc_lineups(item_card_id) WHERE item_card_id IS NOT NULL;
 ```
 
-No new tables needed. The existing `cc_lineups` row per (user_id, role) now holds up to 3 card references: `card_id` (player), `god_card_id`, `item_card_id`.
+No new tables needed. The existing `cc_lineups` row per (user_id, role) now holds up to 3 card references: `card_id` (player), `god_card_id`, `item_card_id`. Partial unique indexes enforce that a card can only be attached once across all slots.
 
 ### Constants
 
@@ -147,19 +151,9 @@ All on existing `/api/cardclash` endpoint:
 
 ## Tick Calculation Update
 
-In `tick()`, the income accrual loop changes from:
+### DB Query
 
-```javascript
-const { passionPerHour, coresPerHour } = getCardRates(card.holo_type, card.rarity)
-```
-
-to:
-
-```javascript
-const { passionPerHour, coresPerHour } = getSlotRates(card, card.godCard, card.itemCard)
-```
-
-The DB query in `tick()` needs to JOIN god/item cards:
+`tick()` query JOINs god/item cards:
 
 ```sql
 SELECT l.role AS slot_role, c.*,
@@ -174,15 +168,59 @@ LEFT JOIN cc_cards i ON l.item_card_id = i.id
 WHERE l.user_id = $1 AND l.card_id IS NOT NULL
 ```
 
+### Row Reshaping
+
+Each result row contains flat columns. Before use, reshape into structured objects:
+
+```javascript
+const godCard = row.god_id ? { id: row.god_id, rarity: row.god_rarity, holo_type: row.god_holo_type, ... } : null
+const itemCard = row.item_id ? { id: row.item_id, rarity: row.item_rarity, holo_type: row.item_holo_type, ... } : null
+```
+
+### Accrual Loop
+
+Uses `getSlotRates(playerCard, godCard, itemCard)` instead of `getCardRates(holoType, rarity)`:
+
+```javascript
+for (const row of rows) {
+  const godCard = reshapeGod(row)
+  const itemCard = reshapeItem(row)
+  const { passionPerHour, coresPerHour } = getSlotRates(row, godCard, itemCard)
+  passionAccrued += passionPerHour * elapsedHours
+  coresAccrued += coresPerHour * elapsedHours
+}
+```
+
+### Cap Calculation
+
+`getTotalDailyRates()` must also use `getSlotRates()` so the 2-day cap reflects effective (post-multiplier) rates, not base player rates.
+
 ## Slot/Unslot Behavior
 
 - **Slotting an attachment** auto-collects pending income first (same as player slot)
-- **Unslotting a player** also unslots its god and item (cascade clear)
-- **Swapping a player** for a different one unslots attachments if they no longer meet the rarity floor
+- **Unslotting a player** also clears its `god_card_id` and `item_card_id` in the same UPDATE
+- **Swapping a player** for a different one: after replacing the player card, check each attachment's rarity against the new player's rarity. Clear any attachment that no longer meets the floor. This check happens inside `slotCard()` after the UPSERT.
 - **Selling/dismantling** a card that's an attachment auto-removes it via `ON DELETE SET NULL`
-- **Marketplace listing** validation must also check attachment slots (can't list a card that's attached)
+- **Dismantling** validation: the existing check in `cardclash.js` that prevents dismantling slotted cards must expand its query to also check `god_card_id` and `item_card_id`
+
+### Cross-cutting cc_lineups queries
+
+All existing queries that check if a card is in `cc_lineups` must be updated to check all three columns. Affected locations:
+
+- **Marketplace listing** (`marketplace.js`): check `card_id = $1 OR god_card_id = $1 OR item_card_id = $1`
+- **Marketplace purchase** (`marketplace.js`): clearing lineup on ownership transfer must also `SET god_card_id = NULL WHERE god_card_id = ANY(...)` and same for `item_card_id`
+- **Trading validation** (`trading.js`): check all three columns when verifying cards aren't slotted
+- **Trade execution** (`trading.js`): clear all three column references on ownership transfer
+- **Dismantle** (`cardclash.js`): expand the NOT EXISTS check to cover all three columns
 
 ## Frontend Changes
+
+### Context Updates (CardClashContext)
+
+- `slotS5Card(cardId, role)` → `slotS5Card(cardId, role, slotType = 'player')` — add slotType param
+- Add `unslotS5Attachment(role, slotType)` for removing god/item attachments
+- Response parsing: extract `godCard`/`itemCard` from each card in the response array
+- `slottedCardIds` set must include god and item card IDs (for collection filtering)
 
 ### Slot UI (CCStartingFive.jsx)
 
@@ -190,7 +228,7 @@ Each filled slot expands to show the player card with two smaller attachment are
 - **God slot** — below or beside the player card, smaller card display with role icon
 - **Item slot** — below or beside the god slot, smaller card display
 
-Empty attachment slots show a "+" button. Clicking opens a filtered picker modal.
+Empty attachment slots show a "+" button (only visible when a player card is slotted). Clicking opens a filtered picker modal.
 
 ### Attachment Picker Modal
 
@@ -198,9 +236,11 @@ Reuses the existing card picker pattern but filtered for:
 - **God picker**: owned god cards matching slot role, holo_type not null, rarity >= player rarity, not already attached elsewhere, not listed/trading
 - **Item picker**: owned item cards, holo_type not null, rarity >= player rarity, not already attached elsewhere, not listed/trading
 
+Collection filtering must exclude cards that are attached as `godCard` or `itemCard` in any slot (not just player card IDs).
+
 ### Rate Display
 
-Each slot shows the effective (post-multiplier) rate instead of base rate. A tooltip or breakdown can show: `base × god bonus × item bonus = effective`.
+Each slot shows the effective (post-multiplier) rate instead of base rate. The live-ticking income counter (`useEffect` interval) must use `effectivePassionPerHour` and `effectiveCoresPerHour` from the response totals.
 
 ### Slot Animation
 
