@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useCardClash } from './CardClashContext'
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, getHoloEffect } from '../../data/cardclash/economy'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, getHoloEffect } from '../../data/cardclash/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
@@ -68,6 +68,32 @@ function getIncomeRate(card) {
   if (ht === 'holo') return { passion: STARTING_FIVE_RATES.holo?.[r] || 0, cores: 0 }
   if (ht === 'reverse') return { passion: 0, cores: STARTING_FIVE_RATES.reverse?.[r] || 0 }
   return { passion: 0, cores: 0 }
+}
+
+function getAttachmentBonus(attachment, type) {
+  if (!attachment) return { passionMult: 1, coresMult: 1 }
+  const bonuses = ATTACHMENT_BONUSES[type]
+  if (!bonuses) return { passionMult: 1, coresMult: 1 }
+  const pBonus = bonuses.passion[attachment.rarity] || 0
+  const cBonus = bonuses.cores[attachment.rarity] || 0
+  let passionMult = 1, coresMult = 1
+  if (attachment.holoType === 'holo') passionMult = 1 + pBonus
+  else if (attachment.holoType === 'reverse') coresMult = 1 + cBonus
+  else if (attachment.holoType === 'full') {
+    passionMult = 1 + pBonus * FULL_HOLO_ATTACHMENT_RATIO
+    coresMult = 1 + cBonus * FULL_HOLO_ATTACHMENT_RATIO
+  }
+  return { passionMult, coresMult }
+}
+
+function getEffectiveIncomeRate(card) {
+  const base = getIncomeRate(card)
+  const god = getAttachmentBonus(card.godCard, 'god')
+  const item = getAttachmentBonus(card.itemCard, 'item')
+  return {
+    passion: base.passion * god.passionMult * item.passionMult,
+    cores: base.cores * god.coresMult * item.coresMult,
+  }
 }
 
 function HoloTypeIcon({ holoType, size = 14 }) {
@@ -138,7 +164,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, collectS5Income, getDefOverride } = useCardClash()
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, getDefOverride } = useCardClash()
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
   const [slotAnimation, setSlotAnimation] = useState(null)
@@ -186,6 +212,17 @@ export default function CCStartingFive() {
     return map
   }, [startingFive?.cards])
 
+  const allSlottedIds = useMemo(() => {
+    if (!startingFive?.cards) return new Set()
+    const ids = new Set()
+    for (const card of startingFive.cards) {
+      ids.add(card.id)
+      if (card.godCard) ids.add(card.godCard.id)
+      if (card.itemCard) ids.add(card.itemCard.id)
+    }
+    return ids
+  }, [startingFive?.cards])
+
   const handleSlot = useCallback(async (cardId, role) => {
     setSlotting(true)
     try {
@@ -213,6 +250,33 @@ export default function CCStartingFive() {
       console.error('Failed to unslot card:', err)
     }
   }, [unslotS5Card])
+
+  const [attachPickerState, setAttachPickerState] = useState(null)
+
+  const handleAttachSlot = useCallback(async (cardId, role, slotType) => {
+    setSlotting(true)
+    try {
+      await slotS5Card(cardId, role, slotType)
+      const card = collection.find(c => c.id === cardId)
+      if (card) {
+        setSlotAnimation({ role, rarity: card.rarity, color: RARITIES[card.rarity]?.color || '#9ca3af' })
+        setTimeout(() => setSlotAnimation(null), 800)
+      }
+      setAttachPickerState(null)
+    } catch (err) {
+      console.error('Failed to attach card:', err)
+    } finally {
+      setSlotting(false)
+    }
+  }, [slotS5Card, collection])
+
+  const handleAttachUnslot = useCallback(async (role, slotType) => {
+    try {
+      await unslotS5Attachment(role, slotType)
+    } catch (err) {
+      console.error('Failed to unslot attachment:', err)
+    }
+  }, [unslotS5Attachment])
 
   const handleCollect = useCallback(async () => {
     if (collecting) return
@@ -380,6 +444,9 @@ export default function CCStartingFive() {
                     onToggleOptions={() => setOptionsRole(optionsRole === role.key ? null : role.key)}
                     size={slotSize}
                     override={getDefOverride(card)}
+                    onAttachPicker={(r, st) => setAttachPickerState({ role: r, slotType: st })}
+                    onAttachRemove={(r, st) => handleAttachUnslot(r, st)}
+                    getDefOverride={getDefOverride}
                   />
                 ) : (
                   <EmptySlot role={role} onClick={() => setPickerRole(role.key)} size={slotSize} />
@@ -396,8 +463,23 @@ export default function CCStartingFive() {
           role={pickerRole}
           collection={collection}
           slottedCards={slottedCards}
+          allSlottedIds={allSlottedIds}
           onSelect={handleSlot}
           onClose={() => setPickerRole(null)}
+          slotting={slotting}
+          getDefOverride={getDefOverride}
+        />
+      )}
+
+      {attachPickerState && (
+        <AttachmentPicker
+          role={attachPickerState.role}
+          slotType={attachPickerState.slotType}
+          collection={collection}
+          allSlottedIds={allSlottedIds}
+          playerRarity={slottedCards[attachPickerState.role]?.rarity}
+          onSelect={handleAttachSlot}
+          onClose={() => setAttachPickerState(null)}
           slotting={slotting}
           getDefOverride={getDefOverride}
         />
@@ -483,9 +565,9 @@ function EmptySlot({ role, onClick, size = 170 }) {
 }
 
 
-function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override }) {
+function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override, onAttachPicker, onAttachRemove, getDefOverride }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
-  const income = getIncomeRate(card)
+  const income = getEffectiveIncomeRate(card)
   const type = getCardType(card)
   const isPlayer = type === 'player'
 
@@ -532,16 +614,38 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           {income.passion > 0 && (
             <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
               <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
-              {income.passion}/d
+              {income.passion % 1 === 0 ? income.passion : income.passion.toFixed(1)}/d
             </span>
           )}
           {income.cores > 0 && (
             <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
               <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
-              {income.cores}/d
+              {income.cores % 1 === 0 ? income.cores : income.cores.toFixed(1)}/d
             </span>
           )}
         </div>
+      </div>
+
+      {/* Attachment slots */}
+      <div className="flex items-start justify-center gap-2 mt-2">
+        <AttachmentSlot
+          attachment={card.godCard}
+          slotType="god"
+          role={role.key}
+          onAttach={() => onAttachPicker(role.key, 'god')}
+          onRemove={() => onAttachRemove(role.key, 'god')}
+          size={size}
+          getDefOverride={getDefOverride}
+        />
+        <AttachmentSlot
+          attachment={card.itemCard}
+          slotType="item"
+          role={role.key}
+          onAttach={() => onAttachPicker(role.key, 'item')}
+          onRemove={() => onAttachRemove(role.key, 'item')}
+          size={size}
+          getDefOverride={getDefOverride}
+        />
       </div>
 
       {/* Options dropdown */}
@@ -567,6 +671,52 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+
+function AttachmentSlot({ attachment, slotType, role, onAttach, onRemove, size = 170, getDefOverride }) {
+  const attachSize = Math.round(size * 0.4)
+
+  if (!attachment) {
+    return (
+      <button
+        onClick={onAttach}
+        className="group flex flex-col items-center justify-center rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] hover:border-[var(--cd-cyan)]/20 hover:bg-[var(--cd-cyan)]/[0.02] transition-all cursor-pointer"
+        style={{ width: attachSize, height: Math.round(attachSize * 88 / 63) }}
+        title={`Attach ${slotType}`}
+      >
+        <Plus size={10} className="text-white/15 group-hover:text-[var(--cd-cyan)]/40 transition-colors" />
+        <span className="text-[7px] text-white/15 group-hover:text-[var(--cd-cyan)]/40 font-bold cd-head tracking-wider mt-0.5 transition-colors">
+          {slotType === 'god' ? 'GOD' : 'ITEM'}
+        </span>
+      </button>
+    )
+  }
+
+  const color = RARITIES[attachment.rarity]?.color || '#9ca3af'
+  const type = getCardType(attachment)
+  const cardOverride = getDefOverride?.(attachment)
+
+  return (
+    <div className="relative group">
+      <div style={{ width: attachSize }}>
+        <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={attachSize}>
+          <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} size={attachSize} />
+        </TradingCardHolo>
+      </div>
+      <div className="text-center mt-0.5">
+        <div className="text-[7px] font-bold text-white/50 truncate cd-head" style={{ maxWidth: attachSize }}>{attachment.godName}</div>
+        <div className="text-[7px] font-bold cd-head" style={{ color }}>{RARITIES[attachment.rarity]?.name}</div>
+      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove() }}
+        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+        title="Remove"
+      >
+        <X size={8} className="text-white" />
+      </button>
     </div>
   )
 }
@@ -668,18 +818,13 @@ function SlotAnimationOverlay({ config, rarity }) {
 }
 
 
-function CardPicker({ role, collection, slottedCards, onSelect, onClose, slotting, getDefOverride }) {
+function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const Icon = roleInfo?.icon || Shield
 
   // Filter eligible cards
   const eligibleCards = useMemo(() => {
-    const slottedIds = new Set(
-      Object.values(slottedCards)
-        .filter(c => c.slotRole !== role) // exclude the card currently in THIS slot (swap case)
-        .map(c => c.id)
-    )
-
+    const currentPlayerInSlot = slottedCards[role]?.id
     return collection
       .filter(card => {
         const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
@@ -687,21 +832,17 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
         if (!card.holoType && card.rarity !== 'common') return false
         const type = getCardType(card)
         if (type !== 'player') return false
-        if (slottedIds.has(card.id)) return false
+        if (card.id !== currentPlayerInSlot && allSlottedIds.has(card.id)) return false
         return true
       })
       .sort((a, b) => {
-        // Best rarity first
         const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
         if (rDiff !== 0) return rDiff
-        // Then by income
         const aIncome = getIncomeRate(a)
         const bIncome = getIncomeRate(b)
-        const aTotal = aIncome.passion + aIncome.cores
-        const bTotal = bIncome.passion + bIncome.cores
-        return bTotal - aTotal
+        return (bIncome.passion + bIncome.cores) - (aIncome.passion + aIncome.cores)
       })
-  }, [collection, slottedCards, role])
+  }, [collection, slottedCards, allSlottedIds, role])
 
   return (
     <div
@@ -741,6 +882,86 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
                   key={card.id}
                   card={card}
                   onSelect={() => onSelect(card.id, role)}
+                  disabled={slotting}
+                  override={getDefOverride(card)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, onSelect, onClose, slotting, getDefOverride }) {
+  const roleInfo = ROLES.find(r => r.key === role)
+  const Icon = roleInfo?.icon || Shield
+  const playerTier = RARITY_TIER[playerRarity] || 0
+
+  const eligibleCards = useMemo(() => {
+    return collection
+      .filter(card => {
+        const type = getCardType(card)
+        if (type !== slotType) return false
+        if (!card.holoType) return false
+        if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
+        if (slotType === 'god') {
+          const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
+          if (cardRole !== role) return false
+        }
+        if (allSlottedIds.has(card.id)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        if (rDiff !== 0) return rDiff
+        return (a.godName || '').localeCompare(b.godName || '')
+      })
+  }, [collection, allSlottedIds, role, slotType, playerTier])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <div className="flex items-center gap-2">
+            <Icon size={18} className="text-[var(--cd-cyan)]" />
+            <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
+              Attach {slotType === 'god' ? 'God' : 'Item'}{slotType === 'god' ? ` \u2014 ${roleInfo?.label}` : ''}
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          {eligibleCards.length === 0 ? (
+            <div className="text-center py-12 text-white/30">
+              <Icon size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">No eligible {slotType} cards</p>
+              <p className="text-xs text-white/20 mt-1">
+                {slotType === 'god'
+                  ? `Need a holo god card with ${roleInfo?.label} role, ${playerRarity}+ rarity`
+                  : `Need a holo item card, ${playerRarity}+ rarity`
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {eligibleCards.map(card => (
+                <PickerCard
+                  key={card.id}
+                  card={card}
+                  onSelect={() => onSelect(card.id, role, slotType)}
                   disabled={slotting}
                   override={getDefOverride(card)}
                 />
