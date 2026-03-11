@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/cardclash.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, getCardRates } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, getCardRates, getSlotRates, getAttachmentBonusInfo } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -60,6 +60,7 @@ const handler = async (event) => {
         case 'dismantle': return await handleDismantle(sql, user, body)
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
+        case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
         case 'redeem-code': return await handleRedeemCode(sql, user, body)
         case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
@@ -908,7 +909,7 @@ async function handleDismantle(sql, user, body) {
       )
       AND NOT EXISTS (
         SELECT 1 FROM cc_lineups l
-        WHERE l.card_id = c.id AND l.user_id = ${user.id}
+        WHERE (l.card_id = c.id OR l.god_card_id = c.id OR l.item_card_id = c.id) AND l.user_id = ${user.id}
       )
   `
   if (cards.length === 0) {
@@ -965,15 +966,26 @@ async function handleDismantle(sql, user, body) {
 // ═══ Starting 5 ═══
 
 function formatS5Response(state, extra = {}) {
-  const cardsWithRates = state.cards.map(c => ({
-    ...formatCard(c),
-    slotRole: c.slot_role,
-    passionPerHour: getCardRates(c.holo_type, c.rarity).passionPerHour,
-    coresPerHour: getCardRates(c.holo_type, c.rarity).coresPerHour,
-  }))
+  const cardsWithRates = state.cards.map(c => {
+    const godCard = c._godCard || null
+    const itemCard = c._itemCard || null
+    const baseRates = getCardRates(c.holo_type, c.rarity)
+    const effectiveRates = getSlotRates(c, godCard, itemCard)
 
-  const totalPassionPerHour = cardsWithRates.reduce((s, c) => s + c.passionPerHour, 0)
-  const totalCoresPerHour = cardsWithRates.reduce((s, c) => s + c.coresPerHour, 0)
+    return {
+      ...formatCard(c),
+      slotRole: c.slot_role,
+      passionPerHour: baseRates.passionPerHour,
+      coresPerHour: baseRates.coresPerHour,
+      effectivePassionPerHour: effectiveRates.passionPerHour,
+      effectiveCoresPerHour: effectiveRates.coresPerHour,
+      godCard: godCard ? { ...formatCard(godCard), ...getAttachmentBonusInfo(godCard, 'god') } : null,
+      itemCard: itemCard ? { ...formatCard(itemCard), ...getAttachmentBonusInfo(itemCard, 'item') } : null,
+    }
+  })
+
+  const totalPassionPerHour = cardsWithRates.reduce((s, c) => s + c.effectivePassionPerHour, 0)
+  const totalCoresPerHour = cardsWithRates.reduce((s, c) => s + c.effectiveCoresPerHour, 0)
 
   return {
     statusCode: 200, headers,
@@ -997,13 +1009,12 @@ async function handleStartingFive(sql, user) {
 }
 
 async function handleSlotCard(sql, user, body) {
-  const { cardId, role } = body
+  const { cardId, role, slotType } = body
   if (!cardId || !role) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId and role required' }) }
   }
-  const state = await slotCard(sql, user.id, cardId, role)
+  const state = await slotCard(sql, user.id, cardId, role, slotType || 'player')
 
-  // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
     .catch(err => console.error('Vault challenge push (slot) failed:', err))
@@ -1022,6 +1033,20 @@ async function handleUnslotCard(sql, user, body) {
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
     .catch(err => console.error('Vault challenge push (unslot) failed:', err))
+
+  return formatS5Response(state)
+}
+
+async function handleUnslotAttachment(sql, user, body) {
+  const { role, slotType } = body
+  if (!role || !slotType) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'role and slotType required' }) }
+  }
+  const state = await unslotAttachment(sql, user.id, role, slotType)
+
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (unslot-attachment) failed:', err))
 
   return formatS5Response(state)
 }
