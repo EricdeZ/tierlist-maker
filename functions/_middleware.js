@@ -106,6 +106,8 @@ const STATIC_ROUTES = {
             'Open packs, collect trading cards, build your binder, and trade with other players. The ultimate SMITE 2 card collecting experience.',
         keywords: 'SMITE 2 cards, SMITE 2 trading cards, card collecting, The Vault, SMITE 2 Companion',
         image: VAULT_IMAGE,
+        imageWidth: '478',
+        imageHeight: '595',
     },
 }
 
@@ -457,6 +459,7 @@ async function resolveOrg(apiBase, orgSlug, path) {
 // ── Vault resolver ──
 
 const VAULT_CRUMB = { name: 'The Vault', url: `${SITE_URL}/vault` }
+const VAULT_DIMS = { imageWidth: '478', imageHeight: '595' }
 
 async function resolveVault(apiBase, segments, path) {
     if (segments.length < 2) return null // handled by static route
@@ -474,6 +477,7 @@ async function resolveVault(apiBase, segments, path) {
                 description: `Check out this${rarity} ${playerName} trading card from The Vault on SMITE 2 Companion.`,
                 keywords: `${playerName}, SMITE 2 trading card, The Vault, SMITE 2 cards`,
                 image: VAULT_IMAGE,
+                ...VAULT_DIMS,
                 url: `${SITE_URL}${path}`,
                 jsonLd: [breadcrumbList([HOME_CRUMB, VAULT_CRUMB, { name: `${playerName} Card`, url: `${SITE_URL}${path}` }])],
             }
@@ -484,6 +488,7 @@ async function resolveVault(apiBase, segments, path) {
             description: 'View a shared trading card from The Vault on SMITE 2 Companion.',
             keywords: 'SMITE 2 trading card, The Vault, SMITE 2 cards',
             image: VAULT_IMAGE,
+            ...VAULT_DIMS,
             url: `${SITE_URL}${path}`,
         }
     }
@@ -500,6 +505,7 @@ async function resolveVault(apiBase, segments, path) {
                 description: `Browse ${ownerName}'s ${binderName} with ${cardCount} card${cardCount !== 1 ? 's' : ''} in The Vault on SMITE 2 Companion.`,
                 keywords: `${ownerName}, SMITE 2 binder, The Vault, SMITE 2 cards, card collection`,
                 image: VAULT_IMAGE,
+                ...VAULT_DIMS,
                 url: `${SITE_URL}${path}`,
                 jsonLd: [breadcrumbList([HOME_CRUMB, VAULT_CRUMB, { name: `${ownerName}'s ${binderName}`, url: `${SITE_URL}${path}` }])],
             }
@@ -509,6 +515,7 @@ async function resolveVault(apiBase, segments, path) {
             description: 'View a shared binder from The Vault on SMITE 2 Companion.',
             keywords: 'SMITE 2 binder, The Vault, SMITE 2 cards',
             image: VAULT_IMAGE,
+            ...VAULT_DIMS,
             url: `${SITE_URL}${path}`,
         }
     }
@@ -611,6 +618,8 @@ function injectOGTags(html, tags) {
         [/(<meta property="og:description" content=")[^"]*"/, `$1${escapeAttr(tags.description)}"`],
         [/(<meta property="og:url" content=")[^"]*"/, `$1${escapeAttr(tags.url)}"`],
         [/(<meta property="og:image" content=")[^"]*"/, `$1${escapeAttr(tags.image)}"`],
+        ...(tags.imageWidth ? [[/(<meta property="og:image:width" content=")[^"]*"/, `$1${tags.imageWidth}"`]] : []),
+        ...(tags.imageHeight ? [[/(<meta property="og:image:height" content=")[^"]*"/, `$1${tags.imageHeight}"`]] : []),
         [/(<meta property="og:image:alt" content=")[^"]*"/, `$1${escapeAttr(imageAlt)}"`],
         [/(<meta name="description" content=")[^"]*"/, `$1${escapeAttr(tags.description)}"`],
         [/(<meta name="twitter:title" content=")[^"]*"/, `$1${escapeAttr(tags.title)}"`],

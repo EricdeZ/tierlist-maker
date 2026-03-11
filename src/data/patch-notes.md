@@ -1,22 +1,37 @@
 # What's New
 
-## [Build Your Team](/team) — Create Your Squad
-- Assemble a community team with a custom name, logo, and colors
-- Invite players directly, share an invite link, or accept join requests
-- Promote members to co-captain to help manage the roster
-- Browse and discover other teams filtered by competitive tier
-- Teams with 5+ members unlock the ability to post and accept scrims
+## [The Vault](/vault) — Collect, Trade, Compete
 
-## [Scrim Planner](/scrims) — Find Your Next Match
-- Post scrims with a guided wizard — pick your date, time, game mode, and region
-- Filter open scrims by league, tier, region, or division to find the right opponents
-- Challenge a specific team directly or open it up for anyone to accept
-- Track everything in My Scrims — upcoming matches, pending confirmations, and results
-- Report outcomes after the match and build your team's reliability score
-- Blacklist teams you don't want to play against
-- Earn Passion through scrim challenges
+A full trading card experience built into the companion app.
+
+### Packs & Collection
+- Open packs to collect **Gods, Items, Consumables, and Player** cards across 6 rarity tiers
+- Browse the complete card catalog and track your collection progress
+- Dismantle unwanted cards into Cores
+
+### Starting Five
+- Slot cards into 5 SMITE roles to earn passive **Passion and Cores** daily
+- Attach bonus cards for income multipliers and use consumables for one-time boosts
+- Income cap grows over time — collect before it fills up
+
+### Marketplace & Trading
+- Buy and sell cards with other players using Cores
+- Send trade offers and negotiate directly with other collectors
+- Send up to 5 free gift packs per day to friends
+
+### Binder
+- Curate a **10-page visual binder** to showcase your best cards
+- Pick from 10 color themes and share a link so others can flip through it
+
+### Challenges
+- Complete collection objectives across 8 categories (packs, trading, marketplace, and more)
+- Earn Passion and Cores for hitting milestones
+
+---
 
 ## Also New
+- **[Community Teams](/team)** — assemble a squad, invite players, and unlock scrims at 5 members
+- **[Scrim Planner](/scrims)** — post scrims, find opponents, track results, build a reliability score
 - **[Fantasy Forge](/forge)** — invest Sparks in players, track your portfolio, compete on the profit leaderboard
 
 ---
