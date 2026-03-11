@@ -9,7 +9,11 @@ import { Search, X, Handshake, Loader2, Check, Plus, History } from 'lucide-reac
 export default function CCTrading() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, pendingTradeCount, setPendingTradeCount } = useCardClash()
+  const { collection, pendingTradeCount, setPendingTradeCount, startingFive } = useCardClash()
+
+  const s5CardIds = useMemo(() =>
+    new Set((startingFive?.cards || []).map(c => c.id)),
+  [startingFive])
 
   const [view, setView] = useState('inbox')
   const [pending, setPending] = useState([])
@@ -161,6 +165,7 @@ export default function CCTrading() {
           onEnd={handleTradeEnd}
           setError={setError}
           setSuccess={setSuccess}
+          s5CardIds={s5CardIds}
         />
       )}
 
@@ -392,7 +397,7 @@ function UserSearchModal({ onClose, onSelect, currentUserId }) {
 // ═══════════════════════════════════════
 // Trade Room
 // ═══════════════════════════════════════
-function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess }) {
+function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess, s5CardIds }) {
   const [trade, setTrade] = useState(null)
   const [tradeCards, setTradeCards] = useState([])
   const [actionLoading, setActionLoading] = useState(false)
@@ -436,8 +441,8 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   [myCards])
 
   const availableCards = useMemo(() =>
-    collection.filter(c => !myCardIds.has(c.id)),
-  [collection, myCardIds])
+    collection.filter(c => !myCardIds.has(c.id) && !s5CardIds.has(c.id)),
+  [collection, myCardIds, s5CardIds])
 
   const handleAddCard = async (cardId) => {
     setActionLoading(true)

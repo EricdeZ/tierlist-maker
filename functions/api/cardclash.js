@@ -285,7 +285,7 @@ async function handleSharedCard(sql, params) {
     return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invalid or expired share link' }) }
   }
 
-  const { playerSlug, holoEffect, rarity } = payload
+  const { playerSlug, holoEffect, rarity, holoType } = payload
   if (!playerSlug) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid token' }) }
 
   try {
@@ -367,6 +367,7 @@ async function handleSharedCard(sql, params) {
       body: JSON.stringify({
         holoEffect: holoEffect || 'gold',
         rarity: rarity || 'legendary',
+        holoType: holoType || 'reverse',
         card: {
           playerName: player.name,
           teamName: latestSeason?.team_name || null,
@@ -828,7 +829,7 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Too many cards (max 200)' }) }
   }
 
-  // Fetch cards owned by user, excluding those locked on market or in active trades
+  // Fetch cards owned by user, excluding those locked on market, in active trades, or in Starting 5
   const cards = await sql`
     SELECT c.id, c.rarity FROM cc_cards c
     WHERE c.id = ANY(${cardIds}) AND c.owner_id = ${user.id}
@@ -841,9 +842,13 @@ async function handleDismantle(sql, user, body) {
         JOIN cc_trades t ON tc.trade_id = t.id
         WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM cc_lineups l
+        WHERE l.card_id = c.id AND l.user_id = ${user.id}
+      )
   `
   if (cards.length === 0) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be listed on the market or in a trade' }) }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be in your Starting 5, listed on the market, or in a trade' }) }
   }
 
   // Calculate total (fractional sum, floor at the end)

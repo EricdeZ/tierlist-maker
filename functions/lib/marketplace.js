@@ -99,9 +99,11 @@ export async function buyListing(tx, buyerId, listingId) {
   await grantEmber(tx, buyerId, 'cc_market_buy', -price, `Marketplace: bought card #${listing.card_id}`)
   await grantEmber(tx, listing.seller_id, 'cc_market_sell', price, `Marketplace: sold card #${listing.card_id}`)
 
-  // Both sides pay fee
+  // Buyer always pays fee; seller is exempt at minimum price (1 Core)
   await grantEmber(tx, buyerId, 'cc_market_fee', -fee, 'Marketplace fee (buyer)')
-  await grantEmber(tx, listing.seller_id, 'cc_market_fee', -fee, 'Marketplace fee (seller)')
+  if (price > 1) {
+    await grantEmber(tx, listing.seller_id, 'cc_market_fee', -fee, 'Marketplace fee (seller)')
+  }
 
   // Transfer card ownership
   await tx`UPDATE cc_cards SET owner_id = ${buyerId} WHERE id = ${listing.card_id}`

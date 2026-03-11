@@ -1141,6 +1141,9 @@ export const vendingRestockService = {
     async restock(id, amount) {
         return apiPost('vending-restock', { action: 'restock' }, { id, amount })
     },
+    async edit(id, data) {
+        return apiPost('vending-restock', { action: 'edit' }, { id, ...data })
+    },
     async toggle(id) {
         return apiPost('vending-restock', { action: 'toggle' }, { id })
     },

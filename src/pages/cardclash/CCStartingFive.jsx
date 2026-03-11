@@ -48,6 +48,7 @@ function toPlayerCardProps(card) {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
+    rarity: card.rarity,
     stats: EMPTY_STATS,
     isFirstEdition: card.isFirstEdition || false,
   }
@@ -404,6 +405,7 @@ export default function CCStartingFive() {
           onClose={() => setZoomedCard(null)}
           playerCard={getCardType(zoomedCard) === 'player' ? toPlayerCardProps(zoomedCard) : undefined}
           gameCard={getCardType(zoomedCard) !== 'player' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard) } : undefined}
+          holoType={zoomedCard.holoType}
         />
       )}
 

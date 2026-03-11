@@ -31,6 +31,7 @@ const handler = async (event) => {
       switch (action) {
         case 'create':  return await handleCreate(sql, body)
         case 'restock': return await handleRestock(sql, body)
+        case 'edit':    return await handleEdit(sql, body)
         case 'toggle':  return await handleToggle(sql, body)
         case 'delete':  return await handleDelete(sql, body)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
@@ -116,6 +117,32 @@ async function handleRestock(sql, body) {
   const [updated] = await sql`
     UPDATE cc_pack_sales
     SET stock = stock + ${amount}, initial_stock = initial_stock + ${amount}
+    WHERE id = ${id}
+    RETURNING *
+  `
+  if (!updated) return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'Sale not found' }) }
+
+  const [full] = await sql`
+    SELECT s.*, pt.name AS base_name, pt.description AS base_description,
+           pt.cards_per_pack, pt.category, pt.league_id, pt.cost AS base_cost
+    FROM cc_pack_sales s
+    JOIN cc_pack_types pt ON s.pack_type_id = pt.id
+    WHERE s.id = ${id}
+  `
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ sale: formatSale(full) }) }
+}
+
+// ═══ POST: Edit a listing's name, price, or sort order ═══
+async function handleEdit(sql, body) {
+  const { id, name, price, sortOrder } = body
+  if (!id) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'id required' }) }
+
+  const [updated] = await sql`
+    UPDATE cc_pack_sales
+    SET name = ${name || null},
+        price = COALESCE(${price != null ? price : null}, price),
+        sort_order = COALESCE(${sortOrder != null ? sortOrder : null}, sort_order)
     WHERE id = ${id}
     RETURNING *
   `

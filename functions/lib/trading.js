@@ -111,6 +111,14 @@ export async function addCard(tx, userId, tradeId, cardId) {
   `
   if (listed) throw new Error('Card is listed on the marketplace')
 
+  // Check card not in Starting 5
+  const [inLineup] = await tx`
+    SELECT role FROM cc_lineups
+    WHERE card_id = ${cardId} AND user_id = ${userId}
+    LIMIT 1
+  `
+  if (inLineup) throw new Error('Card is in your Starting 5 lineup — remove it first')
+
   // Check max cards per side
   const [{ count }] = await tx`
     SELECT COUNT(*)::int AS count FROM cc_trade_cards

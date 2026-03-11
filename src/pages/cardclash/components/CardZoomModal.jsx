@@ -22,7 +22,7 @@ function calculateFee(price) {
   return Math.max(raw, MARKETPLACE.minFee)
 }
 
-export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }) {
+export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, holoType: holoTypeProp }) {
   const { collection } = useCardClash()
   const [stats, setStats] = useState(null)
   const [bestGod, setBestGod] = useState(null)
@@ -121,6 +121,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
   const rarity = displayRarity
   const rarityInfo = RARITIES[rarity]
   const holoEffect = getHoloEffect(rarity)
+  const holoType = holoTypeProp || 'reverse'
 
   // Determine role for holo effect
   const role = playerCard
@@ -149,7 +150,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
         ) : (
           <>
             {gameCard && (
-              <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size="min(340px, 85vw)">
+              <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size="min(340px, 85vw)">
                 <GameCard
                   type={gameCard.type}
                   rarity={rarity}
@@ -159,7 +160,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
             )}
 
             {playerCard && (
-              <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse">
+              <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType}>
                 <TradingCard
                   playerName={playerCard.playerName}
                   teamName={playerCard.teamName}

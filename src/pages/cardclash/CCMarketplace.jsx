@@ -75,7 +75,11 @@ function MarketCard({ card, size }) {
 export default function CCMarketplace() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, refreshCollection } = useCardClash()
+  const { collection, refreshCollection, startingFive } = useCardClash()
+
+  const s5CardIds = useMemo(() =>
+    new Set((startingFive?.cards || []).map(c => c.id)),
+  [startingFive])
 
   const [view, setView] = useState('browse')
   const [listings, setListings] = useState([])
@@ -161,8 +165,8 @@ export default function CCMarketplace() {
   }, [myListings])
 
   const listableCards = useMemo(() => {
-    return collection.filter(c => !listedCardIds.has(c.id))
-  }, [collection, listedCardIds])
+    return collection.filter(c => !listedCardIds.has(c.id) && !s5CardIds.has(c.id))
+  }, [collection, listedCardIds, s5CardIds])
 
   const handleBuy = async (listingId) => {
     setActionLoading(true)

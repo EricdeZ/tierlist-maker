@@ -52,7 +52,7 @@ function CoresLabel({ value, className = '', iconSize = 'h-4' }) {
 }
 
 export default function CCDismantle() {
-  const { collection, dismantleCards } = useCardClash()
+  const { collection, dismantleCards, startingFive } = useCardClash()
   const [selected, setSelected] = useState(new Set())
   const [dismantling, setDismantling] = useState(false)
   const [result, setResult] = useState(null)
@@ -60,12 +60,16 @@ export default function CCDismantle() {
   const [filterType, setFilterType] = useState('all')
   const [showRates, setShowRates] = useState(false)
 
+  const s5CardIds = useMemo(() =>
+    new Set((startingFive?.cards || []).map(c => c.id)),
+  [startingFive])
+
   const cards = useMemo(() => {
-    let list = [...collection]
+    let list = collection.filter(c => !s5CardIds.has(c.id))
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
     return list
-  }, [collection, filterRarity, filterType])
+  }, [collection, filterRarity, filterType, s5CardIds])
 
   const toggle = useCallback((id) => {
     setSelected(prev => {

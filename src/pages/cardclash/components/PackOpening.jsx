@@ -77,10 +77,12 @@ function PackCard({ card, size, holo = true }) {
     ? ((card.cardData || card.card_data || {}).role || 'ADC')
     : ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
 
+  const holoType = card.holoType || card.holo_type || 'reverse'
+
   if (isPlayer) {
     if (holo) {
       return (
-        <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size={size}>
+        <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size={size}>
           <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
         </TradingCardHolo>
       )
@@ -91,7 +93,7 @@ function PackCard({ card, size, holo = true }) {
   const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} />
   if (holo) {
     return (
-      <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size={size}>
+      <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size={size}>
         {gameCard}
       </TradingCardHolo>
     )

@@ -155,3 +155,5 @@ deno.lock
 git-temp/
 scripts/video-generator/output/
 scripts/video-generator/.tmp/
+
+.playwright-mcp/

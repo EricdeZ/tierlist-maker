@@ -391,10 +391,10 @@ export async function ensureStats(sql, userId) {
 // Grant starter packs (2 OSL + 2 BSL) on first visit
 // ════════════════════════════════════════════
 export async function grantStarterPacks(sql, userId) {
-  const [existing] = await sql`
-    SELECT 1 FROM cc_pack_inventory WHERE user_id = ${userId} AND source = 'starter' LIMIT 1
+  const [stats] = await sql`
+    SELECT starter_packs_granted FROM cc_stats WHERE user_id = ${userId}
   `
-  if (existing) return
+  if (stats?.starter_packs_granted) return
   const packs = ['osl-mixed', 'osl-mixed', 'bsl-mixed', 'bsl-mixed']
   for (const packType of packs) {
     await sql`
@@ -402,6 +402,7 @@ export async function grantStarterPacks(sql, userId) {
       VALUES (${userId}, ${packType}, 'starter')
     `
   }
+  await sql`UPDATE cc_stats SET starter_packs_granted = true WHERE user_id = ${userId}`
 }
 
 // ════════════════════════════════════════════

@@ -396,13 +396,14 @@ async function handleSaveDefinitionOverride(sql, body) {
 
 // ═══ POST: Generate share link for a player card preview ═══
 async function handleGenerateShareLink(body) {
-  const { playerSlug, holoEffect, rarity } = body
+  const { playerSlug, holoEffect, rarity, holoType } = body
   if (!playerSlug) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'playerSlug required' }) }
 
   const token = await new SignJWT({
     playerSlug,
     holoEffect: holoEffect || 'gold',
     rarity: rarity || 'legendary',
+    holoType: holoType || 'reverse',
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()

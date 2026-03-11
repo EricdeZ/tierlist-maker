@@ -17,6 +17,10 @@ export default function VendingRestock() {
   const [restockId, setRestockId] = useState(null)
   const [restockAmount, setRestockAmount] = useState('')
 
+  // Edit inline
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', price: '', sortOrder: '' })
+
   const load = useCallback(async () => {
     try {
       const data = await vendingRestockService.load()
@@ -60,6 +64,30 @@ export default function VendingRestock() {
       setSales(prev => prev.map(s => s.id === id ? data.sale : s))
       setRestockId(null)
       setRestockAmount('')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const startEdit = (sale) => {
+    setEditId(sale.id)
+    setEditForm({
+      name: sale.name !== sale.baseName ? sale.name : '',
+      price: String(sale.price),
+      sortOrder: String(sale.sortOrder || 0),
+    })
+    setRestockId(null)
+  }
+
+  const handleEdit = async (id) => {
+    try {
+      const data = await vendingRestockService.edit(id, {
+        name: editForm.name || undefined,
+        price: editForm.price ? parseInt(editForm.price) : undefined,
+        sortOrder: editForm.sortOrder ? parseInt(editForm.sortOrder) : undefined,
+      })
+      setSales(prev => prev.map(s => s.id === id ? data.sale : s))
+      setEditId(null)
     } catch (err) {
       setError(err.message)
     }
@@ -252,6 +280,12 @@ export default function VendingRestock() {
                     </button>
                   )}
                   <button
+                    onClick={() => startEdit(sale)}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                  <button
                     onClick={() => handleToggle(sale.id)}
                     className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       sale.active
@@ -269,6 +303,56 @@ export default function VendingRestock() {
                   </button>
                 </div>
               </div>
+
+              {editId === sale.id && (
+                <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={sale.baseName}
+                      className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/10 text-sm text-white"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Price (Cores)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.price}
+                      onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
+                      placeholder={String(sale.baseCost)}
+                      className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/10 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Sort Order</label>
+                    <input
+                      type="number"
+                      value={editForm.sortOrder}
+                      onChange={e => setEditForm(f => ({ ...f, sortOrder: e.target.value }))}
+                      className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/10 text-sm text-white"
+                    />
+                  </div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <button
+                      onClick={() => handleEdit(sale.id)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditId(null)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white/70 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -61,14 +61,14 @@ export default function CardSharePage() {
     )
   }
 
-  const { card, holoEffect, rarity } = data
+  const { card, holoEffect, rarity, holoType } = data
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0f] px-4 py-12">
       <PageTitle title={`${card.playerName} - The Vault`} />
 
       <div ref={wrapperRef} className="card-share-wrapper">
-        <TradingCardHolo rarity={holoEffect} role={card.role} holoType="reverse">
+        <TradingCardHolo rarity={holoEffect} role={card.role} holoType={holoType || 'reverse'}>
           <TradingCard {...card} variant="player" rarity={rarity} />
         </TradingCardHolo>
       </div>
