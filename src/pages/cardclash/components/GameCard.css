@@ -419,6 +419,40 @@
   clip-path: inset(11.3% 5.8% 25.4% 5.8%);
 }
 
+/* ============================================
+   Small card — hide text-heavy sections, show only name + image
+   Triggers below ~120px container width
+   ============================================ */
+@container (max-width: 120px) {
+  .game-card__ability,
+  .game-card__subtitle,
+  .game-card__footer,
+  .game-card__type-label,
+  .game-card__top-stat {
+    display: none;
+  }
+
+  .game-card__top {
+    height: auto;
+    padding: 2cqi 3cqi;
+  }
+
+  .game-card__top-name {
+    font-size: 8cqi;
+  }
+
+  .game-card__image-wrap {
+    flex: 1;
+    min-height: 0;
+    padding: 1cqi 3cqi 2cqi;
+  }
+
+  .game-card__image {
+    height: 100%;
+    aspect-ratio: unset;
+  }
+}
+
 @media (max-width: 400px) {
   .game-card { width: 200px; }
   .game-card.compact { width: 150px; }

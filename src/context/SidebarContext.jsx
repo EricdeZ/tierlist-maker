@@ -44,8 +44,10 @@ export const SidebarProvider = ({ children }) => {
     )
 }
 
+const NOOP = () => {}
+const FALLBACK = { isOpen: false, open: NOOP, close: NOOP, toggle: NOOP, hasUsedShortcut: true }
+
 export const useSidebar = () => {
     const ctx = useContext(SidebarContext)
-    if (!ctx) throw new Error('useSidebar must be used within SidebarProvider')
-    return ctx
+    return ctx || FALLBACK
 }
