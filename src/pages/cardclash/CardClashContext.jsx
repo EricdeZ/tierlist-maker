@@ -120,14 +120,20 @@ export function CardClashProvider({ children }) {
     }
   }, [])
 
-  const slotS5Card = useCallback(async (cardId, role) => {
-    const data = await cardclashService.slotCard(cardId, role)
+  const slotS5Card = useCallback(async (cardId, role, slotType = 'player') => {
+    const data = await cardclashService.slotCard(cardId, role, slotType)
     setStartingFive(data)
     return data
   }, [])
 
   const unslotS5Card = useCallback(async (role) => {
     const data = await cardclashService.unslotCard(role)
+    setStartingFive(data)
+    return data
+  }, [])
+
+  const unslotS5Attachment = useCallback(async (role, slotType) => {
+    const data = await cardclashService.unslotAttachment(role, slotType)
     setStartingFive(data)
     return data
   }, [])
@@ -218,7 +224,7 @@ export function CardClashProvider({ children }) {
       buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
-      startingFive, loadStartingFive, slotS5Card, unslotS5Card, collectS5Income,
+      startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income,
       pendingTradeCount, setPendingTradeCount,
       inventory, openInventoryPack,
     }}>

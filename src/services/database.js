@@ -1033,11 +1033,14 @@ export const cardclashService = {
     loadStartingFive() {
         return apiCall('cardclash', { action: 'starting-five' })
     },
-    slotCard(cardId, role) {
-        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role })
+    slotCard(cardId, role, slotType = 'player') {
+        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role, slotType })
     },
     unslotCard(role) {
         return apiPost('cardclash', { action: 'unslot-card' }, { role })
+    },
+    unslotAttachment(role, slotType) {
+        return apiPost('cardclash', { action: 'unslot-attachment' }, { role, slotType })
     },
     collectIncome() {
         return apiPost('cardclash', { action: 'collect-income' }, {})
