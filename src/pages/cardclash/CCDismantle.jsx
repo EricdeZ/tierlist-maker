@@ -70,6 +70,7 @@ export default function CCDismantle() {
     let list = collection.filter(c => !s5CardIds.has(c.id))
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
+    list.sort((a, b) => (a.godName || '').localeCompare(b.godName || ''))
     return list
   }, [collection, filterRarity, filterType, s5CardIds])
 
