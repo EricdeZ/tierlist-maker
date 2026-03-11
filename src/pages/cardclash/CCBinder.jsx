@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useCardClash } from './CardClashContext'
 import GameCard from './components/GameCard'
-import { ChevronLeft, ChevronRight, Share2, Settings, X, Copy, Check, BookMarked } from 'lucide-react'
+import TradingCard from '../../components/TradingCard'
+import { ChevronLeft, ChevronRight, Share2, Settings, X, Check, BookMarked } from 'lucide-react'
 import './binder.css'
 
 const PAGES = 10
@@ -369,12 +370,7 @@ function BinderPage({ page, side, color, cardsBySlot, onSlotClick, onRemoveCard 
             >
               {card && (
                 <>
-                  <GameCard
-                    type={card.cardType || 'god'}
-                    rarity={card.rarity}
-                    data={cardToGameCardData(card)}
-                    size={null}
-                  />
+                  <BinderCardRender card={card} />
                   <button
                     className="binder-slot__remove"
                     onClick={(e) => onRemoveCard(page, slot, e)}
@@ -417,14 +413,7 @@ function BinderPageContent({ page, color, cardsBySlot }) {
               key={key}
               className={`binder-slot ${card ? 'binder-slot--filled' : 'binder-slot--empty'}`}
             >
-              {card && (
-                <GameCard
-                  type={card.cardType || 'god'}
-                  rarity={card.rarity}
-                  data={cardToGameCardData(card)}
-                  size={null}
-                />
-              )}
+              {card && <BinderCardRender card={card} />}
             </div>
           )
         })}
@@ -498,84 +487,65 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
               No available cards found
             </div>
           )}
-          {available.map(card => (
-            <div
-              key={card.id}
-              className="binder-picker__card"
-              onClick={() => onPick(card.id)}
-            >
-              <GameCard
-                type={card.cardType || 'god'}
-                rarity={card.rarity}
-                data={cardToGameCardData(card)}
-                compact
-                size={130}
-              />
-            </div>
-          ))}
+          {available.map(card => {
+            const isPlayer = (card.cardType || 'god') === 'player'
+            return (
+              <div
+                key={card.id}
+                className="binder-picker__card"
+                onClick={() => onPick(card.id)}
+              >
+                {isPlayer ? (
+                  <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={130} />
+                ) : (
+                  <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} compact size={130} />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
   )
 }
 
-// Convert our card format to GameCard's expected data shape
-function cardToGameCardData(card) {
+const EMPTY_STATS = {
+  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
+  avgDamage: 0, avgMitigated: 0,
+  totalKills: 0, totalDeaths: 0, totalAssists: 0,
+}
+
+function toGameCardData(card) {
   const type = card.cardType || 'god'
-
-  if (type === 'player') {
-    return {
-      name: card.godName,
-      role: card.role,
-      serialNumber: card.serialNumber,
-      imageUrl: card.imageUrl,
-      teamName: card.cardData?.teamName,
-      teamColor: card.cardData?.teamColor,
-      class: card.godClass,
-      id: card.id,
-    }
+  const cd = card.cardData || {}
+  const base = {
+    name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
+    id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
   }
+  if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
+  if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
+  if (type === 'consumable') return { ...base, color: cd.color || '#10b981', description: cd.description || '', manaCost: cd.manaCost || 1 }
+  return base
+}
 
-  if (type === 'item') {
-    return {
-      name: card.godName,
-      serialNumber: card.serialNumber,
-      imageUrl: card.imageUrl,
-      imageKey: card.cardData?.imageKey,
-      manaCost: card.cardData?.manaCost,
-      effects: card.cardData?.effects,
-      passive: card.cardData?.passive,
-      category: card.cardData?.category || card.godClass,
-      metadata: card.metadata,
-      id: card.id,
-    }
-  }
-
-  if (type === 'consumable') {
-    return {
-      name: card.godName,
-      serialNumber: card.serialNumber,
-      imageUrl: card.imageUrl,
-      imageKey: card.cardData?.imageKey,
-      manaCost: card.cardData?.manaCost,
-      description: card.cardData?.description,
-      color: card.cardData?.color,
-      icon: card.cardData?.icon,
-      metadata: card.metadata,
-      id: card.id,
-    }
-  }
-
-  // god
+function toPlayerCardProps(card) {
+  const cd = card.cardData || {}
   return {
-    name: card.godName,
-    class: card.godClass,
-    role: card.role,
-    serialNumber: card.serialNumber,
-    imageUrl: card.imageUrl,
-    imageKey: card.cardData?.imageKey || card.godId,
-    ability: card.ability,
-    metadata: card.metadata,
-    id: card.id,
+    playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
+    role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
+    leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
+    stats: EMPTY_STATS,
+    bestGod: cd.bestGod
+      ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
+      : (card.bestGodName ? { name: card.bestGodName } : null),
+    isFirstEdition: card.isFirstEdition || false,
   }
+}
+
+function BinderCardRender({ card }) {
+  const isPlayer = (card.cardType || 'god') === 'player'
+  if (isPlayer) {
+    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
+  }
+  return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} />
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { cardclashService } from '../../services/database'
 import GameCard from './components/GameCard'
+import TradingCard from '../../components/TradingCard'
 import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react'
 import Navbar from '../../components/layout/Navbar'
 import './binder.css'
@@ -9,6 +10,12 @@ import './compdeck.css'
 
 const PAGES = 10
 const SLOTS_PER_PAGE = 9
+
+const EMPTY_STATS = {
+  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
+  avgDamage: 0, avgMitigated: 0,
+  totalKills: 0, totalDeaths: 0, totalAssists: 0,
+}
 
 function lighten(hex, pct) {
   const [r, g, b] = hexToRgb(hex)
@@ -41,18 +48,39 @@ function getBinderBg(color) {
   return `linear-gradient(145deg, ${lighten(color, 20)}, ${color}, ${darken(color, 20)})`
 }
 
-function cardToGameCardData(card) {
+function toGameCardData(card) {
   const type = card.cardType || 'god'
-  if (type === 'player') {
-    return { name: card.godName, role: card.role, serialNumber: card.serialNumber, imageUrl: card.imageUrl, teamName: card.cardData?.teamName, teamColor: card.cardData?.teamColor, class: card.godClass, id: card.id }
+  const cd = card.cardData || {}
+  const base = {
+    name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
+    id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
   }
-  if (type === 'item') {
-    return { name: card.godName, serialNumber: card.serialNumber, imageUrl: card.imageUrl, imageKey: card.cardData?.imageKey, manaCost: card.cardData?.manaCost, effects: card.cardData?.effects, passive: card.cardData?.passive, category: card.cardData?.category || card.godClass, metadata: card.metadata, id: card.id }
+  if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
+  if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
+  if (type === 'consumable') return { ...base, color: cd.color || '#10b981', description: cd.description || '', manaCost: cd.manaCost || 1 }
+  return base
+}
+
+function toPlayerCardProps(card) {
+  const cd = card.cardData || {}
+  return {
+    playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
+    role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
+    leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
+    stats: EMPTY_STATS,
+    bestGod: cd.bestGod
+      ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
+      : (card.bestGodName ? { name: card.bestGodName } : null),
+    isFirstEdition: card.isFirstEdition || false,
   }
-  if (type === 'consumable') {
-    return { name: card.godName, serialNumber: card.serialNumber, imageUrl: card.imageUrl, imageKey: card.cardData?.imageKey, manaCost: card.cardData?.manaCost, description: card.cardData?.description, color: card.cardData?.color, metadata: card.metadata, id: card.id }
+}
+
+function ShareCardRender({ card }) {
+  const isPlayer = (card.cardType || 'god') === 'player'
+  if (isPlayer) {
+    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
   }
-  return { name: card.godName, class: card.godClass, role: card.role, serialNumber: card.serialNumber, imageUrl: card.imageUrl, imageKey: card.cardData?.imageKey || card.godId, ability: card.ability, metadata: card.metadata, id: card.id }
+  return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} />
 }
 
 export default function BinderSharePage() {
@@ -229,9 +257,7 @@ function ReadOnlyPage({ page, side, color, cardsBySlot }) {
           const card = cardsBySlot[key]
           return (
             <div key={key} className={`binder-slot ${card ? 'binder-slot--filled' : 'binder-slot--empty'}`} style={{ cursor: 'default' }}>
-              {card && (
-                <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={cardToGameCardData(card)} size={null} />
-              )}
+              {card && <ShareCardRender card={card} />}
             </div>
           )
         })}
@@ -252,7 +278,7 @@ function PageContent({ page, color, cardsBySlot }) {
           const card = cardsBySlot[key]
           return (
             <div key={key} className={`binder-slot ${card ? 'binder-slot--filled' : 'binder-slot--empty'}`}>
-              {card && <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={cardToGameCardData(card)} size={null} />}
+              {card && <ShareCardRender card={card} />}
             </div>
           )
         })}
