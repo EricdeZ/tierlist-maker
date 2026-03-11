@@ -3,7 +3,7 @@ import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { grantPassion, getRank, getNextRank, formatRank } from '../lib/passion.js'
 import { grantEmber } from '../lib/ember.js'
-import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, DISCORD_KEYS, VAULT_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, recalcDiscordChallenges, recalcVaultChallenges, pushChallengeProgress } from '../lib/challenges.js'
+import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, DISCORD_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, recalcDiscordChallenges, recalcVaultChallenges, pushChallengeProgress } from '../lib/challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -158,19 +158,9 @@ async function listChallenges(sql, user) {
         console.error('Discord challenge recalc failed:', err)
     }
 
-    // Lazy recalc for vault challenges (all authenticated users)
+    // Always recalc vault challenges (catches missed fire-and-forget pushes)
     try {
-        const vaultStale = await sql`
-            SELECT c.id FROM challenges c
-            LEFT JOIN user_challenges uc ON uc.challenge_id = c.id AND uc.user_id = ${user.id}
-            WHERE c.is_active = true
-              AND c.stat_key = ANY(${VAULT_KEYS})
-              AND (uc.current_value IS NULL OR uc.current_value < 0)
-            LIMIT 1
-        `
-        if (vaultStale.length > 0) {
-            await recalcVaultChallenges(sql, user.id)
-        }
+        await recalcVaultChallenges(sql, user.id)
     } catch (err) {
         console.error('Vault challenge recalc failed:', err)
     }
