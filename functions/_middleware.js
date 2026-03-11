@@ -8,7 +8,7 @@ const DEFAULT_KEYWORDS =
     'SMITE 2, SMITE 2 stats, SMITE 2 tracker, SMITE 2 competitive, SMITE 2 esports, SMITE 2 builds, SMITE 2 gods, SMITE 2 tier list, SMITE 2 draft, SMITE 2 league, SMITE competitive, smitecomp'
 
 const FORGE_IMAGE = `${SITE_URL}/forge.png`
-const VAULT_IMAGE = `${SITE_URL}/vault.png`
+const VAULT_IMAGE = `${SITE_URL}/vault-og.png`
 
 const RESERVED_PATHS = new Set(['draft', 'tierlist', 'admin', 'profile', 'api', 'assets', 'leaderboard', 'challenges', 'coinflip', 'shop', 'predictions', 'matchup', 'leagues', 'twitch', 'forge', 'org', 'god-tierlist', 'scrims', 'arcade', 'feedback', 'support', 'features', 'referral', 'agl', 'vault'])
 
