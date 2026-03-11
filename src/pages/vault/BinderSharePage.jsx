@@ -5,17 +5,12 @@ import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react'
 import Navbar from '../../components/layout/Navbar'
+import PageTitle from '../../components/PageTitle'
 import './binder.css'
 import './compdeck.css'
 
 const PAGES = 10
 const SLOTS_PER_PAGE = 9
-
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0,
-  totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
 
 function lighten(hex, pct) {
   const [r, g, b] = hexToRgb(hex)
@@ -67,18 +62,19 @@ function toPlayerCardProps(card) {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
-    stats: EMPTY_STATS,
+    seasonName: cd.seasonName || '',
     bestGod: cd.bestGod
       ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
       : (card.bestGodName ? { name: card.bestGodName } : null),
     isFirstEdition: card.isFirstEdition || false,
+    isConnected: cd.isConnected,
   }
 }
 
 function ShareCardRender({ card }) {
   const isPlayer = (card.cardType || 'god') === 'player'
   if (isPlayer) {
-    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
+    return <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} />
   }
   return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} />
 }
@@ -147,9 +143,14 @@ export default function BinderSharePage() {
     )
   }
 
+  const binderTitle = data?.owner?.username
+    ? `${data.owner.username}'s ${data.binder?.name || 'Binder'} - The Vault`
+    : 'Shared Binder - The Vault'
+
   if (showCover) {
     return (
       <div className="compdeck">
+        <PageTitle title={binderTitle} />
         <Navbar />
         <div className="flex flex-col items-center gap-6 py-12 px-4 max-w-[1400px] mx-auto">
           {data.owner && (
@@ -185,6 +186,7 @@ export default function BinderSharePage() {
 
   return (
     <div className="compdeck">
+      <PageTitle title={binderTitle} />
       <Navbar />
       <div className="max-w-[1400px] mx-auto px-4 py-6">
         {data.owner && (

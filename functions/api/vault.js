@@ -468,7 +468,8 @@ async function handleCollectionOwned(sql, user) {
       GROUP BY card_type, god_id
     `,
     sql`
-      SELECT def_id, array_agg(DISTINCT rarity) AS rarities
+      SELECT def_id, array_agg(DISTINCT rarity) AS rarities,
+             array_agg(DISTINCT rarity) FILTER (WHERE is_first_edition) AS fe_rarities
       FROM cc_cards
       WHERE owner_id = ${user.id} AND card_type = 'player' AND def_id IS NOT NULL
       GROUP BY def_id
@@ -479,9 +480,13 @@ async function handleCollectionOwned(sql, user) {
   for (const c of gameCards) gameMap[`${c.card_type}:${c.god_id}`] = c.rarities
 
   const playerMap = {}
-  for (const c of playerCards) playerMap[c.def_id] = c.rarities
+  const feMap = {}
+  for (const c of playerCards) {
+    playerMap[c.def_id] = c.rarities
+    if (c.fe_rarities?.length) feMap[c.def_id] = c.fe_rarities
+  }
 
-  return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap }) }
+  return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap, firstEditions: feMap }) }
 }
 
 // ═══ GET: Collection set defs (static — cacheable, no ownership) ═══

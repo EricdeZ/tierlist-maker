@@ -220,7 +220,7 @@ function DivisionPicker({ divisions, selected, onChange }) {
 }
 
 function PackForm({ initial, divisions, onSave, onCancel, saving }) {
-  const isEdit = !!initial
+  const isEdit = !!initial?.id
   const [form, setForm] = useState({
     id: initial?.id || '',
     name: initial?.name || '',
@@ -528,6 +528,7 @@ export default function PackCreator() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [mode, setMode] = useState(null) // null | 'create' | packId (edit)
+  const [template, setTemplate] = useState(null)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -555,6 +556,7 @@ export default function PackCreator() {
         setPackTypes(prev => prev.map(p => p.id === data.id ? result.packType : p))
       }
       setMode(null)
+      setTemplate(null)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -612,10 +614,10 @@ export default function PackCreator() {
       {mode && (
         <div className="mb-6">
           <PackForm
-            initial={editingPack}
+            initial={mode === 'create' ? template : editingPack}
             divisions={divisions}
             onSave={handleSave}
-            onCancel={() => setMode(null)}
+            onCancel={() => { setMode(null); setTemplate(null) }}
             saving={saving}
           />
         </div>
@@ -669,6 +671,12 @@ export default function PackCreator() {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => { setTemplate({ ...pt, id: '' }); setMode('create') }}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-white/50 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Template
+                </button>
                 <button
                   onClick={() => setMode(pt.id)}
                   className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors cursor-pointer"

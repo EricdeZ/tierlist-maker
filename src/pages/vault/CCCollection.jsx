@@ -254,6 +254,7 @@ export default function CCCollection() {
       ...d,
       collected: !!owned.playerCards?.[d.defId],
       ownedRarities: owned.playerCards?.[d.defId] || [],
+      feRarities: owned.firstEditions?.[d.defId] || [],
     }))
   }, [activePlayerSetKey, setDefs, owned])
 
@@ -269,6 +270,7 @@ export default function CCCollection() {
           ...d,
           collected: !!owned.playerCards?.[d.defId],
           ownedRarities: owned.playerCards?.[d.defId] || [],
+          feRarities: owned.firstEditions?.[d.defId] || [],
           _setMeta: set,
         })
       }
@@ -536,7 +538,7 @@ export default function CCCollection() {
                     return (
                       <PlayerSlot
                         key={card.defId}
-                        card={{ ...card, collected, ownedRarities }}
+                        card={{ ...card, collected, ownedRarities, feRarities: owned.firstEditions?.[card.defId] || [] }}
                         meta={meta}
                         onZoom={setZoomedCard}
                       />
@@ -835,18 +837,12 @@ function PlayerCardGrid({ meta, cards, onZoom }) {
   )
 }
 
-// Empty stats structure — keeps the card layout but no values
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0,
-  totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
-
 function PlayerSlot({ card, meta, onZoom }) {
   const cardNumber = getPlayerCardNumber(meta.leagueSlug, meta.divisionTier, meta.seasonSlug, card.cardIndex)
 
   if (card.collected) {
     const rarity = highestRarity(card.ownedRarities)
+    const isFirstEdition = card.feRarities?.includes(rarity) || false
 
     const handleZoom = () => onZoom({
       playerCard: {
@@ -857,10 +853,13 @@ function PlayerSlot({ card, meta, onZoom }) {
         role: card.role,
         avatarUrl: card.avatarUrl,
         bestGodName: card.bestGodName || null,
+        bestGod: card.bestGodName ? { name: card.bestGodName } : null,
         isConnected: card.isConnected,
+        isFirstEdition,
         rarity,
         leagueName: meta.leagueSlug.toUpperCase(),
         divisionName: meta.divisionName || `Division ${meta.divisionTier}`,
+        seasonName: card.seasonName || '',
         ownedRarities: card.ownedRarities,
       },
       canSell: true,
@@ -874,13 +873,12 @@ function PlayerSlot({ card, meta, onZoom }) {
           teamColor={card.teamColor}
           role={card.role}
           avatarUrl={card.avatarUrl}
-          variant="player"
           rarity={rarity}
           leagueName={meta.leagueSlug.toUpperCase()}
           divisionName={meta.divisionName || `Division ${meta.divisionTier}`}
-          stats={EMPTY_STATS}
           bestGod={card.bestGodName ? { name: card.bestGodName } : null}
           isConnected={card.isConnected}
+          isFirstEdition={isFirstEdition}
           size={PLAYER_CARD_SIZE}
         />
         <RarityPips ownedRarities={card.ownedRarities} />

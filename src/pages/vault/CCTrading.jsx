@@ -27,10 +27,6 @@ const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
 const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
 
 function CoreLabel({ value, size = 'sm', className = '' }) {
   const sizes = { xs: 'h-3', sm: 'h-3.5', md: 'h-4', lg: 'h-5' }
@@ -717,6 +713,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           seasonName: cd?.seasonName,
           isConnected: cd?.isConnected,
           isFirstEdition: cd?.isFirstEdition,
+          bestGod: cd?.bestGod ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null),
         }
       })
     } else {
@@ -1319,11 +1316,9 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
                 teamColor={cardData?.teamColor || '#6366f1'}
                 role={cardData?.role || card.role || 'ADC'}
                 avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
-                variant="player"
                 rarity={card.rarity}
                 leagueName={cardData?.leagueName || ''}
                 divisionName={cardData?.divisionName || ''}
-                stats={EMPTY_STATS}
                 bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
                 isFirstEdition={cardData?.isFirstEdition}
                 isConnected={cardData?.isConnected}
@@ -1597,11 +1592,9 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
               teamColor={cardData?.teamColor || '#6366f1'}
               role={cardData?.role || card.role || 'ADC'}
               avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
-              variant="player"
               rarity={card.rarity}
               leagueName={cardData?.leagueName || ''}
               divisionName={cardData?.divisionName || ''}
-              stats={EMPTY_STATS}
               bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
               isFirstEdition={cardData?.isFirstEdition}
               isConnected={cardData?.isConnected}
@@ -1672,11 +1665,9 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
             teamColor={cardData?.teamColor || '#6366f1'}
             role={cardData?.role || card.role || 'ADC'}
             avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
-            variant="player"
             rarity={card.rarity}
             leagueName={cardData?.leagueName || ''}
             divisionName={cardData?.divisionName || ''}
-            stats={EMPTY_STATS}
             bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
             isFirstEdition={card.isFirstEdition || false}
             isConnected={cardData?.isConnected}

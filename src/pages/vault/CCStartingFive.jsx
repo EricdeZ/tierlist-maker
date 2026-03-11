@@ -7,14 +7,19 @@ import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
-import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap } from 'lucide-react'
+import soloIcon from '../../assets/roles/solo.webp'
+import jungleIcon from '../../assets/roles/jungle.webp'
+import midIcon from '../../assets/roles/mid.webp'
+import suppIcon from '../../assets/roles/supp.webp'
+import adcIcon from '../../assets/roles/adc.webp'
+import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap } from 'lucide-react'
 
 const ROLES = [
-  { key: 'solo', label: 'SOLO', icon: Shield },
-  { key: 'jungle', label: 'JUNGLE', icon: TreePine },
-  { key: 'mid', label: 'MID', icon: Sparkles },
-  { key: 'support', label: 'SUPPORT', icon: Heart },
-  { key: 'adc', label: 'ADC', icon: Crosshair },
+  { key: 'solo', label: 'SOLO', icon: soloIcon },
+  { key: 'jungle', label: 'JUNGLE', icon: jungleIcon },
+  { key: 'mid', label: 'MID', icon: midIcon },
+  { key: 'support', label: 'SUPPORT', icon: suppIcon },
+  { key: 'adc', label: 'ADC', icon: adcIcon },
 ]
 
 const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
@@ -37,23 +42,20 @@ function toGameCardData(card, override) {
   return base
 }
 
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
-
 function toPlayerCardProps(card) {
   const cd = card.cardData || {}
   return {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
-    rarity: card.rarity,
-    stats: EMPTY_STATS,
+    seasonName: cd.seasonName || '',
     bestGod: cd.bestGod
       ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
       : (card.bestGodName ? { name: card.bestGodName } : null),
     isFirstEdition: card.isFirstEdition || false,
+    isConnected: cd.isConnected,
+    defId: card.defId,
+    rarity: card.rarity,
   }
 }
 
@@ -183,7 +185,13 @@ export default function CCStartingFive() {
   const [showConsumablePicker, setShowConsumablePicker] = useState(false)
   const [usingConsumable, setUsingConsumable] = useState(false)
   const [boostNotif, setBoostNotif] = useState(null)
+  const [error, setError] = useState(null)
   const slotSize = useSlotSize()
+
+  const showError = useCallback((msg) => {
+    setError(msg)
+    setTimeout(() => setError(null), 4000)
+  }, [])
 
   // Live-ticking income counter
   const [displayPassion, setDisplayPassion] = useState(0)
@@ -247,20 +255,20 @@ export default function CCStartingFive() {
       }
       setPickerRole(null)
     } catch (err) {
-      console.error('Failed to slot card:', err)
+      showError(err.message || 'Failed to slot card')
     } finally {
       setSlotting(false)
     }
-  }, [slotS5Card, collection])
+  }, [slotS5Card, collection, showError])
 
   const handleUnslot = useCallback(async (role) => {
     try {
       await unslotS5Card(role)
       setOptionsRole(null)
     } catch (err) {
-      console.error('Failed to unslot card:', err)
+      showError(err.message || 'Failed to remove card')
     }
-  }, [unslotS5Card])
+  }, [unslotS5Card, showError])
 
   const [attachPickerState, setAttachPickerState] = useState(null)
 
@@ -275,19 +283,19 @@ export default function CCStartingFive() {
       }
       setAttachPickerState(null)
     } catch (err) {
-      console.error('Failed to attach card:', err)
+      showError(err.message || 'Failed to attach card')
     } finally {
       setSlotting(false)
     }
-  }, [slotS5Card, collection])
+  }, [slotS5Card, collection, showError])
 
   const handleAttachUnslot = useCallback(async (role, slotType) => {
     try {
       await unslotS5Attachment(role, slotType)
     } catch (err) {
-      console.error('Failed to unslot attachment:', err)
+      showError(err.message || 'Failed to remove attachment')
     }
-  }, [unslotS5Attachment])
+  }, [unslotS5Attachment, showError])
 
   const handleCollect = useCallback(async () => {
     if (collecting) return
@@ -298,11 +306,11 @@ export default function CCStartingFive() {
       setCollectNotif({ passion: Math.floor(prev.passion), cores: Math.floor(prev.cores) })
       setTimeout(() => setCollectNotif(null), 3000)
     } catch (err) {
-      console.error('Failed to collect income:', err)
+      showError(err.message || 'Failed to collect income')
     } finally {
       setCollecting(false)
     }
-  }, [collecting, collectS5Income, displayPassion, displayCores])
+  }, [collecting, collectS5Income, displayPassion, displayCores, showError])
 
   const handleUseConsumable = useCallback(async (cardId) => {
     if (usingConsumable) return
@@ -313,11 +321,11 @@ export default function CCStartingFive() {
       setBoostNotif({ pct: Math.round(result.boostPct * 100) })
       setTimeout(() => setBoostNotif(null), 3000)
     } catch (err) {
-      console.error('Failed to use consumable:', err)
+      showError(err.message || 'Failed to use consumable')
     } finally {
       setUsingConsumable(false)
     }
-  }, [usingConsumable, boostS5WithConsumable])
+  }, [usingConsumable, boostS5WithConsumable, showError])
 
   const passionCap = startingFive?.passionCap || 0
   const coresCap = startingFive?.coresCap || 0
@@ -470,14 +478,13 @@ export default function CCStartingFive() {
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
         {ROLES.map(role => {
           const card = slottedCards[role.key]
-          const Icon = role.icon
           const isAnimating = slotAnimation?.role === role.key
 
           return (
             <div key={role.key} className="flex flex-col items-center gap-2">
               {/* Role label */}
               <div className="flex items-center gap-1.5 mb-1">
-                <Icon size={14} className="text-white/40" />
+                <img src={role.icon} alt={role.label} className="w-4 h-4 opacity-60" />
                 <span className="text-xs font-bold text-white/40 cd-head tracking-wider">{role.label}</span>
               </div>
 
@@ -608,6 +615,12 @@ export default function CCStartingFive() {
           100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {error && (
+        <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg border bg-red-500/10 border-red-500/20 text-red-400 text-sm font-bold cd-head">
+          {error}
+        </div>
+      )}
     </div>
   )
 }
@@ -768,14 +781,14 @@ function TutorialModal({ onClose }) {
 
 
 function EmptySlot({ role, onClick, size = 170 }) {
-  const Icon = role.icon
+  const iconSize = size < 150 ? 22 : 28
   return (
     <button
       onClick={onClick}
       className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
       style={{ width: size, aspectRatio: '63/88' }}
     >
-      <Icon size={size < 150 ? 22 : 28} className="text-white/[0.08] group-hover:text-[var(--cd-cyan)]/30 transition-colors mb-2" />
+      <img src={role.icon} alt={role.label} style={{ width: iconSize, height: iconSize }} className="opacity-[0.08] group-hover:opacity-30 transition-opacity mb-2" />
       <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
         <Plus size={12} />
         Slot Card
@@ -807,18 +820,42 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         }}
         onClick={onToggleOptions}
       >
-        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
-          {isPlayer ? (
-            <TradingCard
-              {...toPlayerCardProps(card)}
-              variant="player"
-              rarity={card.rarity}
-              size={size}
-            />
-          ) : (
+        {isPlayer ? (
+          <TradingCard
+            {...toPlayerCardProps(card)}
+            rarity={card.rarity}
+            size={size}
+            holo={{ rarity: getHoloEffect(card.rarity), holoType: card.holoType || 'reverse' }}
+          />
+        ) : (
+          <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
             <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
-          )}
-        </TradingCardHolo>
+          </TradingCardHolo>
+        )}
+
+        {/* Options dropdown - positioned right under the card */}
+        {optionsOpen && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg overflow-hidden shadow-xl" style={{ minWidth: 130 }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onZoom() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <ZoomIn size={12} /> Zoom
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onSwap() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <ArrowRightLeft size={12} /> Swap
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <Trash2 size={12} /> Remove
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Card info below */}
@@ -867,29 +904,6 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         />
       </div>
 
-      {/* Options dropdown */}
-      {optionsOpen && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg overflow-hidden shadow-xl" style={{ minWidth: 130 }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); onZoom() }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
-          >
-            <ZoomIn size={12} /> Zoom
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onSwap() }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
-          >
-            <ArrowRightLeft size={12} /> Swap
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer cd-head tracking-wider"
-          >
-            <Trash2 size={12} /> Remove
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -1216,18 +1230,18 @@ function PickerCard({ card, onSelect, disabled, override }) {
       className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="transition-all group-hover:scale-[1.03]">
-        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={120}>
-          {isPlayer ? (
-            <TradingCard
-              {...toPlayerCardProps(card)}
-              variant="player"
-              rarity={card.rarity}
-              size={120}
-            />
-          ) : (
+        {isPlayer ? (
+          <TradingCard
+            {...toPlayerCardProps(card)}
+            rarity={card.rarity}
+            size={120}
+            holo={{ rarity: getHoloEffect(card.rarity), holoType: card.holoType || 'reverse' }}
+          />
+        ) : (
+          <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={120}>
             <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
-          )}
-        </TradingCardHolo>
+          </TradingCardHolo>
+        )}
       </div>
 
       <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>

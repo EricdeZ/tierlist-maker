@@ -25,3 +25,13 @@ export function getPlayerInitials(name) {
     if (!name) return '?'
     return name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
+
+/**
+ * Resolve initial image source for a player card.
+ * Priority: avatarUrl → god card art (if connected) → null (triggers passionless/initials)
+ */
+export function resolvePlayerImage({ avatarUrl, bestGodName, isConnected }) {
+    if (avatarUrl) return { src: avatarUrl, isGodImage: false }
+    if (bestGodName && isConnected !== false) return { src: getGodCardUrl(bestGodName), isGodImage: true }
+    return { src: null, isGodImage: false }
+}

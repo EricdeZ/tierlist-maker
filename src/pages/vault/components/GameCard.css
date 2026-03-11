@@ -232,10 +232,11 @@
    Subtitle (class/category info)
    ============================================ */
 .game-card__subtitle {
-  padding: 0.22cqi 3.45cqi 0;
+  padding: 0 3.45cqi;
   text-align: center;
   position: relative;
   z-index: 2;
+  line-height: 1;
 }
 
 .game-card__subtitle span {

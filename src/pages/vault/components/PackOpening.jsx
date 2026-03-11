@@ -44,9 +44,6 @@ function toGameCardData(card, override) {
   if (type === 'consumable') {
     return { ...base, color: cd.color || '#10b981', description: cd.description || 'Consumable card', manaCost: cd.manaCost || 1 }
   }
-  if (type === 'player') {
-    return { ...base, role: cd.role || card.role, teamName: cd.teamName, teamColor: cd.teamColor, cardData: cd }
-  }
   return base
 }
 
@@ -76,23 +73,20 @@ function PackCard({ card, size, holo = true, override }) {
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const holoEffect = getHoloEffect(card.rarity)
-  const role = isPlayer
-    ? ((card.cardData || card.card_data || {}).role || 'ADC')
-    : ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
-
   const holoType = card.holoType || card.holo_type || 'reverse'
 
   if (isPlayer) {
-    if (holo) {
-      return (
-        <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size={size}>
-          <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
-        </TradingCardHolo>
-      )
-    }
-    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={size} />
+    return (
+      <TradingCard
+        {...toPlayerCardProps(card)}
+        rarity={card.rarity}
+        size={size}
+        holo={holo ? { rarity: holoEffect, holoType } : undefined}
+      />
+    )
   }
 
+  const role = ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
   const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} />
   if (holo) {
     return (

@@ -26,9 +26,10 @@ function itemCatSlug(category) {
 
 export default function GameCard({ type = 'god', rarity = 'common', data, compact, size, onClick }) {
   const rarityInfo = RARITIES[rarity] || RARITIES.common
-  const role = (type === 'god' || type === 'player') ? (CLASS_ROLE[data.class] || data.role?.toLowerCase() || 'mid') : null
-  const style = {}
-  if (size) { style.width = size; style['--card-scale'] = size / 240 }
+  const role = type === 'god' ? (CLASS_ROLE[data.class] || data.role?.toLowerCase() || 'mid') : null
+  const scale = size ? parseFloat(size) / 240 : NaN
+  const style = { '--card-scale': Number.isFinite(scale) ? scale : 1 }
+  if (size) style.width = size
   if (onClick) style.cursor = 'pointer'
 
   return (
@@ -44,7 +45,6 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
       <div className="game-card__border">
         <div className="game-card__body">
           {type === 'god' && <GodCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
-          {type === 'player' && <PlayerCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
           {type === 'item' && <ItemCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
           {type === 'minion' && <MinionCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
           {type === 'buff' && <BuffCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
@@ -82,7 +82,7 @@ function GodCardContent({ data, rarity, rarityInfo }) {
         <div className="game-card__ability">
           <div className="game-card__ability-name">
             {ABILITY_ICONS[data.ability.type] && (
-              <span style={{ opacity: 0.5, marginRight: 4, fontSize: 8 }}>[{ABILITY_ICONS[data.ability.type]}]</span>
+              <span style={{ opacity: 0.5, marginRight: '1.72cqi', fontSize: '3.45cqi' }}>[{ABILITY_ICONS[data.ability.type]}]</span>
             )}
             {data.ability.name}
           </div>
@@ -251,50 +251,6 @@ function ConsumableCardContent({ data, rarity, rarityInfo }) {
 
       <div className="game-card__footer">
         <span className="game-card__serial">Single use</span>
-        <span className="game-card__rarity-label">{rarityInfo.name}</span>
-      </div>
-    </>
-  )
-}
-
-function PlayerCardContent({ data, rarity, rarityInfo }) {
-  const role = data.role?.toLowerCase() || 'adc'
-  const imageUrl = data.imageUrl
-  const teamName = data.teamName || data.cardData?.teamName || ''
-  const teamColor = data.teamColor || data.cardData?.teamColor || '#6366f1'
-
-  return (
-    <>
-      <div className="game-card__top">
-        <span className="game-card__top-name">{data.name}</span>
-        <span className="game-card__type-label">{role}</span>
-      </div>
-
-      <div className="game-card__image-wrap">
-        <div className="game-card__image" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: `linear-gradient(180deg, ${teamColor}22, #0a0a0e)` }}>
-          {imageUrl ? (
-            <img src={imageUrl} alt={data.name} loading="lazy" style={{ width: '70%', height: '70%', objectFit: 'cover', borderRadius: '50%' }} />
-          ) : (
-            <div className="game-card__image-placeholder" style={{ fontSize: '17cqi', color: teamColor }}>
-              {data.name?.[0] || 'P'}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="game-card__subtitle">
-        <span style={{ color: teamColor }}>{teamName || 'Free Agent'}</span>
-      </div>
-
-      <div className="game-card__ability">
-        <div className="game-card__ability-name" style={{ textAlign: 'center', fontSize: '4cqi' }}>PLAYER CARD</div>
-        <div className="game-card__ability-desc" style={{ textAlign: 'center' }}>
-          League competitor
-        </div>
-      </div>
-
-      <div className="game-card__footer">
-        <span className="game-card__serial">#{data.serialNumber || data.id || '???'}</span>
         <span className="game-card__rarity-label">{rarityInfo.name}</span>
       </div>
     </>

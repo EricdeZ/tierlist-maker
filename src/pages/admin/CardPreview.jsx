@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import TradingCard from '../../components/TradingCard'
-import TradingCardHolo from '../../components/TradingCardHolo'
 
 const ROLES = ['ADC', 'SOLO', 'JUNGLE', 'MID', 'SUPPORT']
 
@@ -163,9 +162,7 @@ export default function CardPreview() {
                         const tierInfo = rarityInfo ? TIER_LABELS[rarityInfo.tier] : null
                         return (
                             <div key={cardProps.playerName} className="flex flex-col items-center gap-3">
-                                <TradingCardHolo rarity={rarity} role={cardProps.role}>
-                                    <TradingCard {...cardProps} />
-                                </TradingCardHolo>
+                                <TradingCard {...cardProps} holo={{ rarity, holoType: 'full' }} />
                                 <span className="text-sm font-bold text-(--color-text)">{cardProps.playerName}</span>
                                 <div className="flex items-center gap-2">
                                     {tierInfo && (
@@ -201,27 +198,19 @@ export default function CardPreview() {
                             {tierRarities.map(({ key, label, desc }) => (
                                 <div key={key} className="flex flex-col items-center gap-2">
                                     {key === 'common' ? (
-                                        <TradingCardHolo rarity={key} role={selectedRole}>
-                                            <TradingCard {...makeSampleCard(selectedRole)} />
-                                        </TradingCardHolo>
+                                        <TradingCard {...makeSampleCard(selectedRole)} holo={{ rarity: key, holoType: 'reverse' }} />
                                     ) : (
                                         <div className="flex gap-4">
                                             <div className="flex flex-col items-center gap-1">
-                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="holo">
-                                                    <TradingCard {...makeSampleCard(selectedRole)} />
-                                                </TradingCardHolo>
+                                                <TradingCard {...makeSampleCard(selectedRole)} holo={{ rarity: key, holoType: 'holo' }} />
                                                 <span className="text-[10px] text-(--color-text-secondary)">Holo</span>
                                             </div>
                                             <div className="flex flex-col items-center gap-1">
-                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="reverse">
-                                                    <TradingCard {...makeSampleCard(selectedRole)} />
-                                                </TradingCardHolo>
+                                                <TradingCard {...makeSampleCard(selectedRole)} holo={{ rarity: key, holoType: 'reverse' }} />
                                                 <span className="text-[10px] text-(--color-text-secondary)">Reverse</span>
                                             </div>
                                             <div className="flex flex-col items-center gap-1">
-                                                <TradingCardHolo rarity={key} role={selectedRole} holoType="full">
-                                                    <TradingCard {...makeSampleCard(selectedRole)} />
-                                                </TradingCardHolo>
+                                                <TradingCard {...makeSampleCard(selectedRole)} holo={{ rarity: key, holoType: 'full' }} />
                                                 <span className="text-[10px] text-(--color-text-secondary)">Full Art</span>
                                             </div>
                                         </div>
@@ -243,27 +232,19 @@ export default function CardPreview() {
                         {RARITIES.map(({ key, label }) => (
                             <div key={key} className="flex flex-col items-center gap-2">
                                 {key === 'common' ? (
-                                    <TradingCardHolo rarity={key} role={role}>
-                                        <TradingCard {...makeSampleCard(role)} />
-                                    </TradingCardHolo>
+                                    <TradingCard {...makeSampleCard(role)} holo={{ rarity: key, holoType: 'reverse' }} />
                                 ) : (
                                     <div className="flex gap-3">
                                         <div className="flex flex-col items-center gap-1">
-                                            <TradingCardHolo rarity={key} role={role} holoType="holo">
-                                                <TradingCard {...makeSampleCard(role)} />
-                                            </TradingCardHolo>
+                                            <TradingCard {...makeSampleCard(role)} holo={{ rarity: key, holoType: 'holo' }} />
                                             <span className="text-[10px] text-(--color-text-secondary)">Holo</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1">
-                                            <TradingCardHolo rarity={key} role={role} holoType="reverse">
-                                                <TradingCard {...makeSampleCard(role)} />
-                                            </TradingCardHolo>
+                                            <TradingCard {...makeSampleCard(role)} holo={{ rarity: key, holoType: 'reverse' }} />
                                             <span className="text-[10px] text-(--color-text-secondary)">Reverse</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1">
-                                            <TradingCardHolo rarity={key} role={role} holoType="full">
-                                                <TradingCard {...makeSampleCard(role)} />
-                                            </TradingCardHolo>
+                                            <TradingCard {...makeSampleCard(role)} holo={{ rarity: key, holoType: 'full' }} />
                                             <span className="text-[10px] text-(--color-text-secondary)">Full Art</span>
                                         </div>
                                     </div>

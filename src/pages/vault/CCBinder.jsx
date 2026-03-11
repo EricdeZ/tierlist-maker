@@ -63,6 +63,7 @@ export default function CCBinder() {
   const [binderColor, setBinderColor] = useState('#8b5e3c')
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
   const [mobilePage, setMobilePage] = useState(1)
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
@@ -124,16 +125,29 @@ export default function CCBinder() {
     setPickerSlot({ page, slot })
   }, [cardsBySlot])
 
+  const showError = useCallback((msg) => {
+    setError(msg)
+    setTimeout(() => setError(null), 4000)
+  }, [])
+
   const handlePickCard = useCallback(async (cardId) => {
     if (!pickerSlot) return
-    await binderSlotCard(cardId, pickerSlot.page, pickerSlot.slot)
-    setPickerSlot(null)
-  }, [pickerSlot, binderSlotCard])
+    try {
+      await binderSlotCard(cardId, pickerSlot.page, pickerSlot.slot)
+      setPickerSlot(null)
+    } catch (err) {
+      showError(err.message || 'Failed to add card to binder')
+    }
+  }, [pickerSlot, binderSlotCard, showError])
 
   const handleRemoveCard = useCallback(async (page, slot, e) => {
     e.stopPropagation()
-    await binderUnslotCard(page, slot)
-  }, [binderUnslotCard])
+    try {
+      await binderUnslotCard(page, slot)
+    } catch (err) {
+      showError(err.message || 'Failed to remove card')
+    }
+  }, [binderUnslotCard, showError])
 
   const handleSaveSettings = useCallback(async () => {
     setSaving(true)
@@ -411,6 +425,12 @@ export default function CCBinder() {
           targetSlot={pickerSlot.slot}
         />
       )}
+
+      {error && (
+        <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg border bg-red-500/10 border-red-500/20 text-red-400 text-sm font-bold cd-head">
+          {error}
+        </div>
+      )}
     </div>
   )
 }
@@ -570,7 +590,7 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
                 onClick={() => onPick(card.id)}
               >
                 {isPlayer ? (
-                  <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={130} />
+                  <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={130} />
                 ) : (
                   <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} compact size={130} />
                 )}
@@ -581,12 +601,6 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
       </div>
     </div>
   )
-}
-
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0,
-  totalKills: 0, totalDeaths: 0, totalAssists: 0,
 }
 
 function toGameCardData(card) {
@@ -608,18 +622,21 @@ function toPlayerCardProps(card) {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
-    stats: EMPTY_STATS,
+    seasonName: cd.seasonName || '',
     bestGod: cd.bestGod
       ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
       : (card.bestGodName ? { name: card.bestGodName } : null),
     isFirstEdition: card.isFirstEdition || false,
+    isConnected: cd.isConnected,
+    defId: card.defId,
+    rarity: card.rarity,
   }
 }
 
 function BinderCardRender({ card }) {
   const isPlayer = (card.cardType || 'god') === 'player'
   if (isPlayer) {
-    return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} />
+    return <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} />
   }
   return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} />
 }

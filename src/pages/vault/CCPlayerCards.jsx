@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { globalPlayerService, profileService } from '../../services/database'
 import TradingCard from '../../components/TradingCard'
-import TradingCardHolo from '../../components/TradingCardHolo'
 import PlayerAvatar from '../../components/PlayerAvatar'
 import { RARITIES, getHoloEffect } from '../../data/vault/economy'
 import { Search, Loader2, User } from 'lucide-react'
@@ -184,9 +183,7 @@ export default function CCPlayerCards() {
               const holoEffect = getHoloEffect(rarity)
               return (
                 <div key={rarity} className="flex flex-col items-center gap-2">
-                  <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse" size={240}>
-                    <TradingCard {...cardProps} variant="player" rarity={rarity} />
-                  </TradingCardHolo>
+                  <TradingCard {...cardProps} rarity={rarity} size={240} holo={{ rarity: holoEffect, holoType: 'reverse' }} />
                   <span
                     className="text-xs font-bold uppercase tracking-wider"
                     style={{ color: info?.color }}

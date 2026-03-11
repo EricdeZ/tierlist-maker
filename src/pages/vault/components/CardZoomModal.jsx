@@ -3,17 +3,11 @@ import { createPortal } from 'react-dom'
 import GameCard from './GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
-import { vaultService, marketplaceService } from '../../../services/database'
+import { marketplaceService } from '../../../services/database'
 import { RARITIES, getHoloEffect, MARKETPLACE } from '../../../data/vault/economy'
 import { CLASS_ROLE } from '../../../data/vault/gods'
 import { useVault } from '../VaultContext'
 import { X, Tag } from 'lucide-react'
-
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0,
-  totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 
@@ -24,12 +18,6 @@ function calculateFee(price) {
 
 export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, holoType: holoTypeProp }) {
   const { collection } = useVault()
-  const [stats, setStats] = useState(null)
-  const [bestGod, setBestGod] = useState(null)
-  const [bestGodName, setBestGodName] = useState(playerCard?.bestGodName || null)
-  const [seasonName, setSeasonName] = useState(playerCard?.seasonName || null)
-  const [isConnected, setIsConnected] = useState(playerCard?.isConnected)
-  const [loadingStats, setLoadingStats] = useState(!!playerCard?.defId)
   const [closing, setClosing] = useState(false)
 
   // Rarity switcher
@@ -58,20 +46,6 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [handleClose])
-
-  useEffect(() => {
-    if (!playerCard?.defId) return
-    setLoadingStats(true)
-    vaultService.getCardDetail(playerCard.defId).then(data => {
-      if (data.stats) setStats(data.stats)
-      if (data.bestGod) setBestGod(data.bestGod)
-      if (data.bestGodName) setBestGodName(data.bestGodName)
-      if (data.seasonName) setSeasonName(data.seasonName)
-      if (data.isConnected !== undefined) setIsConnected(data.isConnected)
-    }).catch(err => {
-      console.error('Failed to load card stats:', err)
-    }).finally(() => setLoadingStats(false))
-  }, [playerCard?.defId])
 
   // Find owned instances of this card (used for sell + holoType lookup)
   const ownedInstances = useMemo(() => {
@@ -163,33 +137,22 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
         )}
 
         {playerCard && (
-          <div className="relative">
-            <div style={{ opacity: loadingStats ? 0 : 1, transition: 'opacity 0.2s ease' }}>
-              <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType}>
-                <TradingCard
-                  playerName={playerCard.playerName}
-                  teamName={playerCard.teamName}
-                  teamColor={playerCard.teamColor}
-                  role={playerCard.role}
-                  avatarUrl={playerCard.avatarUrl}
-                  variant="player"
-                  rarity={rarity}
-                  leagueName={playerCard.leagueName}
-                  divisionName={playerCard.divisionName}
-                  seasonName={seasonName}
-                  stats={stats || EMPTY_STATS}
-                  bestGod={bestGod || (bestGodName ? { name: bestGodName } : null)}
-                  isConnected={isConnected}
-                  isFirstEdition={playerCard.isFirstEdition}
-                />
-              </TradingCardHolo>
-            </div>
-            {loadingStats && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                <div className="cd-spinner w-8 h-8" />
-              </div>
-            )}
-          </div>
+          <TradingCard
+            playerName={playerCard.playerName}
+            teamName={playerCard.teamName}
+            teamColor={playerCard.teamColor}
+            role={playerCard.role}
+            avatarUrl={playerCard.avatarUrl}
+            rarity={rarity}
+            leagueName={playerCard.leagueName}
+            divisionName={playerCard.divisionName}
+            seasonName={playerCard.seasonName}
+            bestGod={playerCard.bestGod}
+            isConnected={playerCard.isConnected}
+            isFirstEdition={matchedInstance?.isFirstEdition ?? playerCard?.isFirstEdition}
+            loadStats={playerCard.defId}
+            holo={{ rarity: holoEffect, holoType }}
+          />
         )}
 
         <div className="mt-3 text-center">

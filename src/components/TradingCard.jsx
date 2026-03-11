@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
+import useHoloEffect from '../hooks/useHoloEffect'
+import { resolvePlayerImage, getGodCardUrl, getPlayerInitials } from '../utils/playerAvatar'
 import './TradingCard.css'
+import './TradingCardHolo.css'
 
 import passiontailsImg from '../assets/passion/passiontails.png'
 import soloImage from '../assets/roles/solo.webp'
@@ -7,7 +10,6 @@ import jungleImage from '../assets/roles/jungle.webp'
 import midImage from '../assets/roles/mid.webp'
 import suppImage from '../assets/roles/supp.webp'
 import adcImage from '../assets/roles/adc.webp'
-import { getGodCardUrl } from '../utils/playerAvatar'
 
 const ROLE_IMAGES = {
     'SOLO': soloImage,
@@ -30,7 +32,6 @@ const fmt = (num) => {
     return Math.round(num).toLocaleString()
 }
 
-// Player variant: 2 stats per role (KDA always first)
 const ROLE_STATS = {
     'SOLO':    'mitigated',
     'SUPPORT': 'mitigated',
@@ -46,37 +47,62 @@ export default function TradingCard({
     seasonName,
     role,
     avatarUrl,
-    level,
-    power,
-    stats,
-    bestGod,
-    variant,
+    stats: statsProp,
+    bestGod: bestGodProp,
     leagueName,
     divisionName,
     rarity,
-    isConnected,
+    isConnected: isConnectedProp,
     isFirstEdition,
     size,
+    holo,
+    loadStats,
 }) {
     const normalizedRole = normalizeRole(role)
     const roleImg = ROLE_IMAGES[normalizedRole]
-    const hp = stats?.gamesPlayed ? stats.gamesPlayed * 10 : 0
-    const isPlayer = variant === 'player'
 
-    // Fallback chain: Discord → Passionless (if not connected) → God card art → Initials
-    const godCardFallbackUrl = bestGod?.name && isConnected !== false ? getGodCardUrl(bestGod.name) : null
-    const [imgSrc, setImgSrc] = useState(avatarUrl || godCardFallbackUrl)
-    const [imgFailed, setImgFailed] = useState(false)
-    const [isGodImage, setIsGodImage] = useState(!avatarUrl && !!godCardFallbackUrl)
+    // --- loadStats: fetch card detail from API ---
+    const [fetchedData, setFetchedData] = useState(null)
+    const [loadingStats, setLoadingStats] = useState(!!loadStats)
 
     useEffect(() => {
-        setImgSrc(avatarUrl || godCardFallbackUrl)
+        if (!loadStats) return
+        setLoadingStats(true)
+        setFetchedData(null)
+        import('../services/database').then(({ vaultService }) =>
+            vaultService.getCardDetail(loadStats)
+        ).then(data => {
+            setFetchedData(data)
+        }).catch(err => {
+            console.error('Failed to load card stats:', err)
+        }).finally(() => setLoadingStats(false))
+    }, [loadStats])
+
+    // Merge fetched data over props
+    const stats = fetchedData?.stats || statsProp
+    const bestGod = fetchedData?.bestGod || bestGodProp || (
+        fetchedData?.bestGodName ? { name: fetchedData.bestGodName } : null
+    )
+    const seasonNameResolved = fetchedData?.seasonName || seasonName
+    const isConnected = fetchedData?.isConnected !== undefined ? fetchedData.isConnected : isConnectedProp
+
+    // --- Image fallback chain ---
+    const bestGodName = bestGod?.name
+    const initial = resolvePlayerImage({ avatarUrl, bestGodName, isConnected })
+    const godCardFallbackUrl = bestGodName && isConnected !== false ? getGodCardUrl(bestGodName) : null
+
+    const [imgSrc, setImgSrc] = useState(initial.src)
+    const [imgFailed, setImgFailed] = useState(false)
+    const [isGodImage, setIsGodImage] = useState(initial.isGodImage)
+
+    useEffect(() => {
+        const resolved = resolvePlayerImage({ avatarUrl, bestGodName, isConnected })
+        setImgSrc(resolved.src)
         setImgFailed(false)
-        setIsGodImage(!avatarUrl && !!godCardFallbackUrl)
-    }, [avatarUrl, godCardFallbackUrl])
+        setIsGodImage(resolved.isGodImage)
+    }, [avatarUrl, bestGodName, isConnected])
 
     const handleImgError = () => {
-        // If Discord avatar failed, try god card (only for connected players)
         if (imgSrc === avatarUrl && godCardFallbackUrl && imgSrc !== godCardFallbackUrl) {
             setImgSrc(godCardFallbackUrl)
             setIsGodImage(true)
@@ -85,48 +111,42 @@ export default function TradingCard({
         }
     }
 
-    return (
-        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined} style={size ? { width: size, '--card-scale': size / 340 } : undefined}>
+    // --- Holo effect (always called — React rules of hooks) ---
+    const { cardRef, dynamicStyles, interacting, active, handlers } = useHoloEffect()
+    const roleClass = normalizedRole.toLowerCase()
+
+    // --- Loading placeholder ---
+    if (loadingStats) {
+        const loadingSize = size || 340
+        return (
+            <div style={{ width: loadingSize, aspectRatio: '63 / 88', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="cd-spinner w-8 h-8" />
+            </div>
+        )
+    }
+
+    // --- Render card content ---
+    const cardStyle = !holo && size ? { width: size, '--card-scale': size / 340 } : undefined
+
+    const cardContent = (
+        <div className="trading-card trading-card--player" data-role={normalizedRole} data-rarity={rarity || undefined} style={cardStyle}>
             {/* Gold outer border */}
             <div className="card-border">
                 {/* Dark inner body */}
                 <div className="card-body">
 
-                    {isPlayer ? (
-                        <div className="card-top-banner">
-                            <div className="card-top-left">
-                                <span className="card-name">{playerName}</span>
-                                {isFirstEdition && <span className="card-edition-badge">1st Edition</span>}
-                            </div>
-                            <div className="card-top-right">
-                                <span className="card-stage-label">{normalizedRole}</span>
-                                <div className="card-emblem card-emblem--sm">
-                                    <img src={roleImg} alt={normalizedRole} />
-                                </div>
+                    <div className="card-top-banner">
+                        <div className="card-top-left">
+                            <span className="card-name">{playerName}</span>
+                            {isFirstEdition && <span className="card-edition-badge">1st Edition</span>}
+                        </div>
+                        <div className="card-top-right">
+                            <span className="card-stage-label">{normalizedRole}</span>
+                            <div className="card-emblem card-emblem--sm">
+                                <img src={roleImg} alt={normalizedRole} />
                             </div>
                         </div>
-                    ) : (
-                        <>
-                            {/* Top banner with role emblem */}
-                            <div className="card-top-banner">
-                                <div className="card-top-left">
-                                    <span className="card-stage-label">{normalizedRole}</span>
-                                </div>
-                                <div className="card-emblem">
-                                    <img src={roleImg} alt={normalizedRole} />
-                                </div>
-                                <div className="card-top-right">
-                                    <span className="card-hp-label">HP</span>
-                                    <span className="card-hp-value">{hp}</span>
-                                </div>
-                            </div>
-
-                            {/* Player name */}
-                            <div className="card-name-bar">
-                                <span className="card-name">{playerName}</span>
-                            </div>
-                        </>
-                    )}
+                    </div>
 
                     {/* Image frame — fallback: Discord → Passionless → God Card → Initials */}
                     <div className="card-image-wrap">
@@ -147,13 +167,9 @@ export default function TradingCard({
                                 />
                             ) : (
                                 <div className="card-image-placeholder">
-                                    {isPlayer ? (
-                                        <span className="card-image-initials" style={{ color: teamColor || 'var(--accent)' }}>
-                                            {(playerName || '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase()}
-                                        </span>
-                                    ) : (
-                                        <img src={roleImg} alt={normalizedRole} />
-                                    )}
+                                    <span className="card-image-initials" style={{ color: teamColor || 'var(--accent)' }}>
+                                        {getPlayerInitials(playerName)}
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -164,87 +180,82 @@ export default function TradingCard({
                         <div className="card-corner card-corner-br" />
                     </div>
 
-                    {/* Team / Season info */}
+                    {/* Team / League / Division info */}
                     <div className="card-info-bar">
                         <span className="card-info-text">
-                            {isPlayer
-                                ? [teamName, leagueName, divisionName].filter(Boolean).join(' \u00b7 ')
-                                : [teamName, seasonName].filter(Boolean).join(' \u00b7 ')
-                            }
+                            {[teamName, leagueName, divisionName].filter(Boolean).join(' \u00b7 ')}
                         </span>
                     </div>
 
-                    {/* Stats section */}
-                    {stats && (
-                        <div className="card-stats-section">
-                            <div className="card-stats-grid">
+                    {/* Stats section — always rendered, dashes when no data */}
+                    <div className="card-stats-section">
+                        <div className="card-stats-grid">
+                            <div className="card-stat-row">
+                                <div className="card-stat-energy">
+                                    <div className="card-energy-circle">
+                                        <img src={roleImg} alt="" />
+                                    </div>
+                                </div>
+                                <div className="card-stat-info">
+                                    <span className="card-stat-name">KDA Strike</span>
+                                    <span className="card-stat-sub">{stats?.gamesPlayed ? `${stats.totalKills}/${stats.totalDeaths}/${stats.totalAssists}` : '\u2014/\u2014/\u2014'}</span>
+                                </div>
+                                <span className="card-stat-value">{stats?.gamesPlayed ? stats.kda?.toFixed(1) : '\u2014'}</span>
+                            </div>
+                            {ROLE_STATS[normalizedRole] === 'damage' && (
                                 <div className="card-stat-row">
                                     <div className="card-stat-energy">
                                         <div className="card-energy-circle">
                                             <img src={roleImg} alt="" />
                                         </div>
+                                        <div className="card-energy-circle">
+                                            <img src={roleImg} alt="" />
+                                        </div>
                                     </div>
                                     <div className="card-stat-info">
-                                        <span className="card-stat-name">KDA Strike</span>
-                                        <span className="card-stat-sub">{stats.gamesPlayed ? `${stats.totalKills}/${stats.totalDeaths}/${stats.totalAssists}` : '—/—/—'}</span>
+                                        <span className="card-stat-name">Damage</span>
+                                        <span className="card-stat-sub">Avg per game</span>
                                     </div>
-                                    <span className="card-stat-value">{stats.gamesPlayed ? stats.kda?.toFixed(1) : '—'}</span>
+                                    <span className="card-stat-value">{stats?.gamesPlayed ? fmt(stats.avgDamage || 0) : '\u2014'}</span>
                                 </div>
-                                {(!isPlayer || ROLE_STATS[normalizedRole] === 'damage') && (
-                                    <div className="card-stat-row">
-                                        <div className="card-stat-energy">
-                                            <div className="card-energy-circle">
-                                                <img src={roleImg} alt="" />
-                                            </div>
-                                            <div className="card-energy-circle">
-                                                <img src={roleImg} alt="" />
-                                            </div>
+                            )}
+                            {ROLE_STATS[normalizedRole] === 'mitigated' && (
+                                <div className="card-stat-row">
+                                    <div className="card-stat-energy">
+                                        <div className="card-energy-circle">
+                                            <img src={roleImg} alt="" />
                                         </div>
-                                        <div className="card-stat-info">
-                                            <span className="card-stat-name">Damage</span>
-                                            <span className="card-stat-sub">Avg per game</span>
+                                        <div className="card-energy-circle">
+                                            <img src={roleImg} alt="" />
                                         </div>
-                                        <span className="card-stat-value">{stats.gamesPlayed ? fmt(stats.avgDamage || 0) : '—'}</span>
                                     </div>
-                                )}
-                                {(!isPlayer || ROLE_STATS[normalizedRole] === 'mitigated') && (
-                                    <div className="card-stat-row">
-                                        <div className="card-stat-energy">
-                                            <div className="card-energy-circle">
-                                                <img src={roleImg} alt="" />
-                                            </div>
-                                            <div className="card-energy-circle">
-                                                <img src={roleImg} alt="" />
-                                            </div>
-                                        </div>
-                                        <div className="card-stat-info">
-                                            <span className="card-stat-name">Mitigated</span>
-                                            <span className="card-stat-sub">Avg per game</span>
-                                        </div>
-                                        <span className="card-stat-value">{stats.gamesPlayed ? fmt(stats.avgMitigated || 0) : '—'}</span>
+                                    <div className="card-stat-info">
+                                        <span className="card-stat-name">Mitigated</span>
+                                        <span className="card-stat-sub">Avg per game</span>
                                     </div>
-                                )}
-                            </div>
+                                    <span className="card-stat-value">{stats?.gamesPlayed ? fmt(stats.avgMitigated || 0) : '\u2014'}</span>
+                                </div>
+                            )}
+                        </div>
 
-                            {/* Record bar */}
-                            <div className="card-record-bar">
-                                <div className="card-record-item">
-                                    <span className="card-record-val">{stats.gamesPlayed ? `${stats.winRate?.toFixed(0)}%` : '—'}</span>
-                                    <span className="card-record-label">WR</span>
-                                </div>
-                                <div className="card-record-divider" />
-                                <div className="card-record-item">
-                                    <span className="card-record-val">{stats.gamesPlayed ? `${stats.wins || 0}W-${(stats.gamesPlayed || 0) - (stats.wins || 0)}L` : '—'}</span>
-                                    <span className="card-record-label">Record</span>
-                                </div>
-                                <div className="card-record-divider" />
-                                <div className="card-record-item">
-                                    <span className="card-record-val">{stats.gamesPlayed || '—'}</span>
-                                    <span className="card-record-label">Games</span>
-                                </div>
+                        {/* Record bar */}
+                        <div className="card-record-bar">
+                            <div className="card-record-item">
+                                <span className="card-record-val">{stats?.gamesPlayed ? `${stats.winRate?.toFixed(0)}%` : '\u2014'}</span>
+                                <span className="card-record-label">WR</span>
+                            </div>
+                            <div className="card-record-divider" />
+                            <div className="card-record-item">
+                                <span className="card-record-val">{stats?.gamesPlayed ? `${stats.wins || 0}W-${(stats.gamesPlayed || 0) - (stats.wins || 0)}L` : '\u2014'}</span>
+                                <span className="card-record-label">Record</span>
+                            </div>
+                            <div className="card-record-divider" />
+                            <div className="card-record-item">
+                                <span className="card-record-val">{stats?.gamesPlayed || '\u2014'}</span>
+                                <span className="card-record-label">Games</span>
                             </div>
                         </div>
-                    )}
+                    </div>
 
                     {/* Flavor text */}
                     <div className="card-flavor">
@@ -267,11 +278,37 @@ export default function TradingCard({
                             <img src={roleImg} alt="" className="card-footer-icon" />
                             <span>{teamName || 'Free Agent'}</span>
                         </div>
-                        <span className="card-footer-set">{seasonName}</span>
+                        <span className="card-footer-set">{seasonNameResolved}</span>
                     </div>
 
                 </div>
             </div>
+
         </div>
     )
+
+    // --- Holo wrapper ---
+    if (holo) {
+        return (
+            <div
+                className={`holo-card ${roleClass} ${interacting ? 'interacting' : ''} ${active ? 'active' : ''}`}
+                data-rarity={holo.rarity}
+                data-holo-type={holo.holoType}
+                style={{ ...dynamicStyles, ...(size ? { width: size, '--card-scale': size / 340 } : {}) }}
+                ref={cardRef}
+            >
+                <div className="holo-card__translater">
+                    <div className="holo-card__rotator" {...handlers}>
+                        <div className="holo-card__front">
+                            {cardContent}
+                            <div className="holo-card__shine" />
+                            <div className="holo-card__glare" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    return cardContent
 }

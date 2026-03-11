@@ -420,19 +420,19 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
 
   const newCards = []
   for (const card of cards) {
-    // Check if this is the first-ever pull of this player card at this rarity
-    // Only track first editions when the Vault is publicly open
-    let isFirstEdition = false
-    if (card.card_type === 'player' && card.def_id && process.env.VAULT_OPEN === 'true') {
-      const [existing] = await sql`
-        SELECT 1 FROM cc_cards WHERE def_id = ${card.def_id} AND rarity = ${card.rarity} LIMIT 1
-      `
-      isFirstEdition = !existing
-    }
+    // Atomic first-edition check + insert in a single statement to minimize race window.
+    // First edition = first-ever pull of this player def_id at this rarity (only when Vault is public).
+    const checkFE = card.card_type === 'player' && !!card.def_id && process.env.VAULT_OPEN === 'true'
 
     const [inserted] = await sql`
       INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, is_first_edition)
-      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null}, ${isFirstEdition})
+      SELECT ${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity},
+             ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url},
+             ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}::jsonb,
+             ${card.def_id || null},
+             ${checkFE}::boolean AND NOT EXISTS (
+               SELECT 1 FROM cc_cards WHERE def_id = ${card.def_id || 0} AND rarity = ${card.rarity}
+             )
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder

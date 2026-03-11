@@ -28,9 +28,11 @@ export default function CCGifts() {
           <h2 className="cd-head text-base sm:text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Gifts</h2>
           <p className="text-[11px] sm:text-xs text-white/40 mt-1">Send gift packs to other players</p>
         </div>
-        <div className="cd-head text-[11px] sm:text-xs text-white/50 tracking-wider shrink-0">
-          <span className="text-[var(--cd-cyan)] font-bold">{giftsRemaining}</span> / 5 <span className="hidden sm:inline">free gifts </span>left
-        </div>
+        {giftsRemaining > 0 && (
+          <div className="cd-head text-[11px] sm:text-xs text-white/50 tracking-wider shrink-0">
+            <span className="text-[var(--cd-cyan)] font-bold">{giftsRemaining}</span> / 5 <span className="hidden sm:inline">free gifts </span>left
+          </div>
+        )}
       </div>
 
       {/* Sub-tabs */}
@@ -243,57 +245,59 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
       )}
 
       {/* ═══ Free Gift Packs ═══ */}
-      <div className="mb-8">
-        <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">Free Gift Packs</div>
-        <div className="flex items-center justify-center gap-5 sm:gap-8 flex-wrap pb-2">
-          {Array.from({ length: totalPacks }).map((_, i) => {
-            const isSent = i < freeGiftsSent.length
-            const recipient = isSent ? freeGiftsSent[i] : null
+      {giftsRemaining > 0 && (
+        <div className="mb-8">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">Free Gift Packs</div>
+          <div className="flex items-center justify-center gap-5 sm:gap-8 flex-wrap pb-2">
+            {Array.from({ length: totalPacks }).map((_, i) => {
+              const isSent = i < freeGiftsSent.length
+              const recipient = isSent ? freeGiftsSent[i] : null
 
-            return (
-              <div
-                key={i}
-                className="flex flex-col items-center gap-3"
-                style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.1}s both` }}
-              >
-                <div className={`relative transition-all duration-300 ${isSent ? 'opacity-30 grayscale' : 'hover:scale-105'}`}>
-                  <PackArt
-                    tier="gift"
-                    name="Gift Pack"
-                    subtitle="5 Cards"
-                    cardCount={5}
-                    seed={i}
-                    compact
-                  />
-                  {isSent && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-black/70 rounded-lg px-3 py-1.5 text-[10px] text-white/60 cd-head tracking-wider font-bold uppercase">
-                        Sent
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-3"
+                  style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.1}s both` }}
+                >
+                  <div className={`relative transition-all duration-300 ${isSent ? 'opacity-30 grayscale' : 'hover:scale-105'}`}>
+                    <PackArt
+                      tier="gift"
+                      name="Gift Pack"
+                      subtitle="5 Cards"
+                      cardCount={5}
+                      seed={i}
+                      compact
+                    />
+                    {isSent && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-black/70 rounded-lg px-3 py-1.5 text-[10px] text-white/60 cd-head tracking-wider font-bold uppercase">
+                          Sent
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {isSent ? (
+                    <div className="text-center">
+                      <div className="text-[10px] text-white/30 cd-head truncate max-w-[120px]">
+                        To: {recipient.recipientName}
                       </div>
                     </div>
+                  ) : (
+                    <button
+                      onClick={() => setSendingPack({ packType: 'gift' })}
+                      className="px-4 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_12px_rgba(220,38,38,0.15)]"
+                    >
+                      <Send className="w-3 h-3 inline mr-1.5" />
+                      Send
+                    </button>
                   )}
                 </div>
-
-                {isSent ? (
-                  <div className="text-center">
-                    <div className="text-[10px] text-white/30 cd-head truncate max-w-[120px]">
-                      To: {recipient.recipientName}
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setSendingPack({ packType: 'gift' })}
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_12px_rgba(220,38,38,0.15)]"
-                  >
-                    <Send className="w-3 h-3 inline mr-1.5" />
-                    Send
-                  </button>
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ═══ Purchased Packs Inventory ═══ */}
       {giftInventory.length > 0 && (

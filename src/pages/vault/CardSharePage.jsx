@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import TradingCard from '../../components/TradingCard'
-import TradingCardHolo from '../../components/TradingCardHolo'
 import { vaultService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 
@@ -68,9 +67,7 @@ export default function CardSharePage() {
       <PageTitle title={`${card.playerName} - The Vault`} />
 
       <div ref={wrapperRef} className="card-share-wrapper">
-        <TradingCardHolo rarity={holoEffect} role={card.role} holoType={holoType || 'reverse'}>
-          <TradingCard {...card} variant="player" rarity={rarity} />
-        </TradingCardHolo>
+        <TradingCard {...card} rarity={rarity} holo={{ rarity: holoEffect, holoType: holoType || 'reverse' }} />
       </div>
 
       <div className="text-center space-y-2 mt-6">

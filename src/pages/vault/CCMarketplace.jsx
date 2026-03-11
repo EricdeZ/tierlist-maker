@@ -7,7 +7,7 @@ import { RARITIES } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
-import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle } from 'lucide-react'
+import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
@@ -25,12 +25,6 @@ const MIN_FEE = 1
 const MAX_LISTINGS = 15
 const BROWSE_CARD_SIZE = 140
 const CREATE_CARD_SIZE = 120
-
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0,
-  totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
 
 function calcFee(price) {
   return Math.max(Math.floor(price * FEE_RATE), MIN_FEE)
@@ -62,13 +56,13 @@ function MarketCard({ card, size }) {
         teamColor={d.teamColor}
         role={card.role || d.role}
         avatarUrl={card.imageUrl}
-        variant="player"
         rarity={card.rarity}
         leagueName={d.leagueName}
         divisionName={d.divisionName}
-        stats={EMPTY_STATS}
+        seasonName={d.seasonName}
         bestGod={d.bestGod ? { ...d.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
         isFirstEdition={card.isFirstEdition}
+        isConnected={d.isConnected}
         size={size}
       />
     )
@@ -238,6 +232,10 @@ export default function CCMarketplace() {
         rarity: card.rarity,
         leagueName: card.cardData?.leagueName,
         divisionName: card.cardData?.divisionName,
+        seasonName: card.cardData?.seasonName,
+        bestGod: card.cardData?.bestGod || (card.bestGodName ? { name: card.bestGodName } : null),
+        isConnected: card.cardData?.isConnected,
+        isFirstEdition: card.isFirstEdition,
       }})
     } else {
       setZoomedCard({ gameCard: { type, rarity: card.rarity, data: buildCardData(card, getDefOverride(card)) } })
@@ -307,6 +305,7 @@ export default function CCMarketplace() {
           onBuy={(listing) => setBuyModal(listing)}
           onZoom={handleCardZoom}
           userId={user?.id}
+          onRefresh={fetchListings}
         />
       )}
 
@@ -362,7 +361,7 @@ function BrowseView({
   rarity, toggleRarity,
   cardType, toggleCardType,
   sort, setSort,
-  setPage, onBuy, onZoom, userId,
+  setPage, onBuy, onZoom, userId, onRefresh,
 }) {
   return (
     <>
@@ -436,8 +435,16 @@ function BrowseView({
         )}
       </div>
 
-      <div className="text-xs text-white/30 mb-3 cd-head">
-        {total} listing{total !== 1 ? 's' : ''} found
+      <div className="flex items-center gap-2 text-xs text-white/30 mb-3 cd-head">
+        <span>{total} listing{total !== 1 ? 's' : ''} found</span>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="text-white/30 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer disabled:opacity-30"
+          title="Refresh listings"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {loading ? (

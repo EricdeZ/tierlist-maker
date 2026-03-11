@@ -148,51 +148,6 @@
     letter-spacing: 0.46cqi;
 }
 
-.card-hp-label {
-    font-size: 2.74cqi;
-    font-weight: 700;
-    color: var(--text-dim);
-    letter-spacing: 0.15cqi;
-}
-
-.card-hp-value {
-    font-size: 5.49cqi;
-    font-weight: 900;
-    color: var(--text-bright);
-    line-height: 1;
-    text-shadow: 0 0 8px var(--accent-glow);
-}
-
-/* Centered role emblem */
-.card-emblem {
-    width: 9.15cqi;
-    height: 9.15cqi;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--accent-dark), var(--body-bg));
-    border: 2px solid var(--gold);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 12px var(--accent-glow), inset 0 0 6px rgba(0,0,0,0.5);
-}
-
-.card-emblem img {
-    width: 5.49cqi;
-    height: 5.49cqi;
-    object-fit: contain;
-    filter: brightness(1.2);
-}
-
-/* ============================================
-   Player Name Bar
-   ============================================ */
-.card-name-bar {
-    padding: 0.61cqi 3.66cqi 0.91cqi;
-    text-align: center;
-    position: relative;
-    z-index: 2;
-}
-
 .card-name {
     font-size: 4.57cqi;
     font-weight: 800;
@@ -285,6 +240,10 @@
     color: var(--text-dim);
     letter-spacing: 0.15cqi;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 /* ============================================
@@ -538,7 +497,7 @@
 }
 
 .trading-card--player .card-info-bar {
-    padding: 0.61cqi 3.66cqi 0.30cqi;
+    padding: 1.22cqi 3.66cqi 0.91cqi;
 }
 
 .trading-card--player .card-flavor {

@@ -29,7 +29,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const navigate = useNavigate()
-    const avatarUrl = usePlayerAvatar(player)
+    const { avatarUrl } = usePlayerAvatar(player)
     const forgeProfileUrl = isLeagueWide && player.divisionSlug
         ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}?from=all`
         : seasonSlugs

@@ -78,6 +78,8 @@ async function getBalance(sql, user) {
             conversionsToday,
             nextConversionCost,
             conversionEmberAmount: EMBER_RULES.conversion_ember_amount,
+            conversionMultiplier: EMBER_RULES.conversion_multiplier,
+            conversionBaseCost: EMBER_RULES.conversion_base_passion,
         }),
     }
 }

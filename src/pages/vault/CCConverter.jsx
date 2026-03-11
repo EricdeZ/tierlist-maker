@@ -6,18 +6,18 @@ import passionCoin from '../../assets/passion/passion.png'
 import coinSide from '../../assets/passion/flipping3.png'
 import emberIcon from '../../assets/ember.png'
 
-const BASE_COST = 50
-const MULTIPLIER = 1.7
 const CORES_PER_PACK = 10
-const getCost = (n) => Math.round(BASE_COST * Math.pow(MULTIPLIER, n))
+const FALLBACK_BASE_COST = 50
+const FALLBACK_MULTIPLIER = 1.3
+const getCost = (n, base, mult) => Math.round(base * Math.pow(mult, n))
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 
 // ═══════════════════════════════════════════════
 // Rate Gauge — compact gas valve for inside machine
 // ═══════════════════════════════════════════════
-function RateGauge({ conversionsToday, nextCost }) {
-  const ratio = nextCost / BASE_COST
+function RateGauge({ conversionsToday, nextCost, baseCost }) {
+  const ratio = nextCost / baseCost
   const pressure = Math.min(((ratio - 1) / 7) * 100, 100)
   const needleAngle = -90 + (pressure / 100) * 180
 
@@ -89,10 +89,10 @@ function RateGauge({ conversionsToday, nextCost }) {
 // ═══════════════════════════════════════════════
 // Terminal Display — top-right readout
 // ═══════════════════════════════════════════════
-function TerminalDisplay({ conversionsToday, nextCost, processing }) {
+function TerminalDisplay({ conversionsToday, nextCost, processing, baseCost }) {
   const now = new Date()
   const timeStr = now.toISOString().slice(11, 19)
-  const multiplier = nextCost / BASE_COST
+  const multiplier = nextCost / baseCost
 
   return (
     <div className="cd-terminal w-44 sm:w-52 overflow-hidden relative"
@@ -281,7 +281,7 @@ function DraggableCoin({ slotRef, onInsert, onElevatedDrop, canAfford, disabled,
 // Conversion Machine
 // ═══════════════════════════════════════════════
 function ConversionMachine({
-  processing, nextCost, passion, ember, result, conversionsToday,
+  processing, nextCost, passion, ember, result, conversionsToday, baseCost,
   inputRef, outputRef, passionDisplayRef, coresDisplayRef,
   slotRef, isOverSlot, isDragging,
 }) {
@@ -346,8 +346,8 @@ function ConversionMachine({
 
           {/* Gauge + Terminal */}
           <div className="flex-1 flex items-start justify-between">
-            <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} />
-            <TerminalDisplay conversionsToday={conversionsToday} nextCost={nextCost} processing={processing} />
+            <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} baseCost={baseCost} />
+            <TerminalDisplay conversionsToday={conversionsToday} nextCost={nextCost} processing={processing} baseCost={baseCost} />
           </div>
         </div>
 
@@ -495,7 +495,7 @@ function ConversionMachine({
 // ═══════════════════════════════════════════════
 // Warning Modal
 // ═══════════════════════════════════════════════
-function WarningModal({ nextCost, conversionsToday, multiplier, onConfirm, onCancel }) {
+function WarningModal({ nextCost, conversionsToday, multiplier, baseCost, conversionMultiplier, onConfirm, onCancel }) {
   const color = multiplier > 4 ? '#ef4444' : multiplier > 2.5 ? '#ff2d78' : '#ff8c00'
 
   return createPortal(
@@ -515,7 +515,7 @@ function WarningModal({ nextCost, conversionsToday, multiplier, onConfirm, onCan
         <div className="rounded-lg p-3 mb-4" style={{ background: color + '08', border: `1px solid ${color}15` }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-white/40">Base rate</span>
-            <span className="text-xs text-white/50 cd-mono">{BASE_COST} Passion</span>
+            <span className="text-xs text-white/50 cd-mono">{baseCost} Passion</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold" style={{ color }}>Current rate</span>
@@ -527,7 +527,7 @@ function WarningModal({ nextCost, conversionsToday, multiplier, onConfirm, onCan
           <div className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 cd-head">If you continue...</div>
           <div className="flex gap-1">
             {[0, 1, 2].map(offset => {
-              const cost = getCost(conversionsToday + 1 + offset)
+              const cost = getCost(conversionsToday + 1 + offset, baseCost, conversionMultiplier)
               return (
                 <div key={offset} className="flex-1 text-center py-1.5 rounded bg-white/3 border border-white/5">
                   <div className="text-[9px] text-white/20">Next{offset > 0 ? ` +${offset + 1}` : ''}</div>
@@ -582,9 +582,9 @@ function FlyingParticles({ particles }) {
 // ═══════════════════════════════════════════════
 // Rate Schedule
 // ═══════════════════════════════════════════════
-function RateSchedule({ conversionsToday }) {
+function RateSchedule({ conversionsToday, baseCost, multiplier: mult }) {
   const entries = [...Array(6)].map((_, i) => ({
-    n: i, cost: getCost(i), done: i < conversionsToday, current: i === conversionsToday,
+    n: i, cost: getCost(i, baseCost, mult), done: i < conversionsToday, current: i === conversionsToday,
   }))
 
   return (
@@ -592,7 +592,7 @@ function RateSchedule({ conversionsToday }) {
       <div className="text-xs text-white/30 uppercase tracking-[0.2em] mb-3 cd-head text-center">Rate Schedule</div>
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
         {entries.map(e => {
-          const ratio = e.cost / BASE_COST
+          const ratio = e.cost / baseCost
           const color = ratio <= 1 ? '#00e5ff' : ratio < 2 ? '#22c55e' : ratio < 3.5 ? '#ff8c00' : ratio < 6 ? '#ff2d78' : '#ef4444'
           return (
             <div key={e.n} className={`text-center py-2.5 rounded-lg border transition-all ${
@@ -633,9 +633,11 @@ export default function CCConverter() {
   const coresDisplayRef = useRef(null)
   const slotRef = useRef(null)
 
+  const baseCost = ember.conversionBaseCost ?? FALLBACK_BASE_COST
+  const conversionMultiplier = ember.conversionMultiplier ?? FALLBACK_MULTIPLIER
   const conversionsToday = localConversions ?? ember.conversionsToday ?? 0
-  const nextCost = localNextCost ?? ember.nextConversionCost ?? getCost(conversionsToday)
-  const multiplier = nextCost / BASE_COST
+  const nextCost = localNextCost ?? ember.nextConversionCost ?? getCost(conversionsToday, baseCost, conversionMultiplier)
+  const multiplier = nextCost / baseCost
   const canAfford = passion >= nextCost
 
   const spawnParticles = useCallback((fromEl, toEl, count, color) => {
@@ -714,6 +716,17 @@ export default function CCConverter() {
     doConvert()
   }
 
+  if (ember.conversionMultiplier == null) {
+    return (
+      <div className="cd-alley pb-12">
+        <div className="cd-alley-fog" />
+        <div className="flex items-center justify-center pt-24">
+          <div className="w-6 h-6 border-2 border-[var(--cd-cyan)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="cd-alley pb-12">
       <div className="cd-alley-fog" />
@@ -783,7 +796,7 @@ export default function CCConverter() {
           </div>
 
           {/* Rate gauge */}
-          <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} />
+          <RateGauge conversionsToday={conversionsToday} nextCost={nextCost} baseCost={baseCost} />
         </div>
 
         {/* Rate summary — compact */}
@@ -878,6 +891,7 @@ export default function CCConverter() {
             ember={ember}
             result={result}
             conversionsToday={conversionsToday}
+            baseCost={baseCost}
             inputRef={inputRef}
             outputRef={outputRef}
             passionDisplayRef={passionDisplayRef}
@@ -942,12 +956,14 @@ export default function CCConverter() {
         </div>
       )}
 
-      <RateSchedule conversionsToday={conversionsToday} />
+      <RateSchedule conversionsToday={conversionsToday} baseCost={baseCost} multiplier={conversionMultiplier} />
       {showWarning && (
         <WarningModal
           nextCost={nextCost}
           conversionsToday={conversionsToday}
           multiplier={multiplier}
+          baseCost={baseCost}
+          conversionMultiplier={conversionMultiplier}
           onConfirm={handleWarningConfirm}
           onCancel={() => setShowWarning(false)}
         />

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
+import PageTitle from '../components/PageTitle'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
@@ -100,6 +101,10 @@ function VaultInner() {
         return () => clearInterval(id)
     }, [refreshBalance])
     const activeTab = searchParams.get('tab') || 'packs'
+    const activeTabLabel = TABS.find(t => t.key === activeTab)?.label
+    const pageTitle = activeTabLabel && activeTab !== 'packs'
+        ? `${activeTabLabel} - The Vault`
+        : 'The Vault'
     const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
 
     const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length
@@ -130,6 +135,7 @@ function VaultInner() {
 
     return (
         <div className="compdeck">
+            <PageTitle title={pageTitle} />
             <Navbar branding={branding} />
 
             <div className={`relative ${activeTab === 'packs' ? 'hidden sm:block' : ''}`} style={{ zIndex: 1 }}>

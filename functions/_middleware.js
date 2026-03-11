@@ -8,8 +8,9 @@ const DEFAULT_KEYWORDS =
     'SMITE 2, SMITE 2 stats, SMITE 2 tracker, SMITE 2 competitive, SMITE 2 esports, SMITE 2 builds, SMITE 2 gods, SMITE 2 tier list, SMITE 2 draft, SMITE 2 league, SMITE competitive, smitecomp'
 
 const FORGE_IMAGE = `${SITE_URL}/forge.png`
+const VAULT_IMAGE = `${SITE_URL}/vault.png`
 
-const RESERVED_PATHS = new Set(['draft', 'tierlist', 'admin', 'profile', 'api', 'assets', 'leaderboard', 'challenges', 'coinflip', 'shop', 'predictions', 'matchup', 'leagues', 'twitch', 'forge', 'org', 'god-tierlist', 'scrims', 'arcade', 'feedback', 'support', 'features', 'referral', 'agl'])
+const RESERVED_PATHS = new Set(['draft', 'tierlist', 'admin', 'profile', 'api', 'assets', 'leaderboard', 'challenges', 'coinflip', 'shop', 'predictions', 'matchup', 'leagues', 'twitch', 'forge', 'org', 'god-tierlist', 'scrims', 'arcade', 'feedback', 'support', 'features', 'referral', 'agl', 'vault'])
 
 const STATIC_ROUTES = {
     '/': {
@@ -98,6 +99,13 @@ const STATIC_ROUTES = {
         title: `Refer a Friend | ${SITE_NAME}`,
         description: 'Invite friends to SMITE 2 Companion and earn Passion rewards for both of you.',
         keywords: 'SMITE 2 Companion referral, refer a friend, Passion rewards',
+    },
+    '/vault': {
+        title: `The Vault - Collect & Trade SMITE 2 Cards | ${SITE_NAME}`,
+        description:
+            'Open packs, collect trading cards, build your binder, and trade with other players. The ultimate SMITE 2 card collecting experience.',
+        keywords: 'SMITE 2 cards, SMITE 2 trading cards, card collecting, The Vault, SMITE 2 Companion',
+        image: VAULT_IMAGE,
     },
 }
 
@@ -446,6 +454,68 @@ async function resolveOrg(apiBase, orgSlug, path) {
     }
 }
 
+// ── Vault resolver ──
+
+const VAULT_CRUMB = { name: 'The Vault', url: `${SITE_URL}/vault` }
+
+async function resolveVault(apiBase, segments, path) {
+    if (segments.length < 2) return null // handled by static route
+
+    // /vault/share/:token — shared card preview
+    if (segments[1] === 'share' && segments[2]) {
+        const data = await apiFetch(apiBase, 'vault', { action: 'shared-card', token: segments[2] })
+        if (data?.card) {
+            const playerName = data.card.playerName || 'Player'
+            const teamName = data.card.teamName
+            const rarity = data.rarity ? ` ${data.rarity.charAt(0).toUpperCase() + data.rarity.slice(1)}` : ''
+            const teamInfo = teamName ? ` (${teamName})` : ''
+            return {
+                title: `${playerName}${rarity} Card${teamInfo} | The Vault`,
+                description: `Check out this${rarity} ${playerName} trading card from The Vault on SMITE 2 Companion.`,
+                keywords: `${playerName}, SMITE 2 trading card, The Vault, SMITE 2 cards`,
+                image: VAULT_IMAGE,
+                url: `${SITE_URL}${path}`,
+                jsonLd: [breadcrumbList([HOME_CRUMB, VAULT_CRUMB, { name: `${playerName} Card`, url: `${SITE_URL}${path}` }])],
+            }
+        }
+        // Fallback if token is invalid/expired
+        return {
+            title: `Shared Card | The Vault`,
+            description: 'View a shared trading card from The Vault on SMITE 2 Companion.',
+            keywords: 'SMITE 2 trading card, The Vault, SMITE 2 cards',
+            image: VAULT_IMAGE,
+            url: `${SITE_URL}${path}`,
+        }
+    }
+
+    // /vault/binder/:token — shared binder preview
+    if (segments[1] === 'binder' && segments[2]) {
+        const data = await apiFetch(apiBase, 'vault', { action: 'binder-view', token: segments[2] })
+        if (data?.owner) {
+            const ownerName = data.owner.username || 'Player'
+            const binderName = data.binder?.name || 'Binder'
+            const cardCount = data.cards?.length || 0
+            return {
+                title: `${ownerName}'s ${binderName} | The Vault`,
+                description: `Browse ${ownerName}'s ${binderName} with ${cardCount} card${cardCount !== 1 ? 's' : ''} in The Vault on SMITE 2 Companion.`,
+                keywords: `${ownerName}, SMITE 2 binder, The Vault, SMITE 2 cards, card collection`,
+                image: VAULT_IMAGE,
+                url: `${SITE_URL}${path}`,
+                jsonLd: [breadcrumbList([HOME_CRUMB, VAULT_CRUMB, { name: `${ownerName}'s ${binderName}`, url: `${SITE_URL}${path}` }])],
+            }
+        }
+        return {
+            title: `Shared Binder | The Vault`,
+            description: 'View a shared binder from The Vault on SMITE 2 Companion.',
+            keywords: 'SMITE 2 binder, The Vault, SMITE 2 cards',
+            image: VAULT_IMAGE,
+            url: `${SITE_URL}${path}`,
+        }
+    }
+
+    return null
+}
+
 // ── Main resolver ──
 
 async function resolveOGTags(apiBase, path) {
@@ -484,6 +554,12 @@ async function resolveOGTags(apiBase, path) {
         const result = await resolveForge(apiBase, segments, path)
         if (result) return result
         return { ...STATIC_ROUTES['/forge'], image: FORGE_IMAGE, url: `${SITE_URL}${path}` }
+    }
+
+    if (segments[0] === 'vault') {
+        const result = await resolveVault(apiBase, segments, path)
+        if (result) return result
+        return { ...STATIC_ROUTES['/vault'], image: VAULT_IMAGE, url: `${SITE_URL}${path}` }
     }
 
     if (segments[0] === 'org' && segments[1]) {

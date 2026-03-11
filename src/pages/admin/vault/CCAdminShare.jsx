@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { globalPlayerService, profileService, vaultAdminService } from '../../../services/database'
 import TradingCard from '../../../components/TradingCard'
-import TradingCardHolo from '../../../components/TradingCardHolo'
 import { Search, Loader2, User, Link2, Copy, Check } from 'lucide-react'
 
 const HOLO_OPTIONS = [
@@ -227,9 +226,7 @@ export default function CCAdminShare() {
               <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
             </div>
           ) : cardProps ? (
-            <TradingCardHolo rarity={holoEffect} role={cardProps.role} holoType="reverse">
-              <TradingCard {...cardProps} variant="player" rarity={rarity} />
-            </TradingCardHolo>
+            <TradingCard {...cardProps} rarity={rarity} holo={{ rarity: holoEffect, holoType: 'reverse' }} />
           ) : (
             <div className="py-20 text-center text-[var(--color-text-secondary)]">
               <User className="w-12 h-12 mx-auto mb-3 opacity-20" />

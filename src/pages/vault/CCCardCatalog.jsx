@@ -169,18 +169,14 @@ export default function CCCardCatalog() {
             <RaritySection key={rarity} rarity={rarity}>
               {rarity === 'common' ? (
                 <div className="flex flex-col items-center gap-2">
-                  <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType="reverse" size={cardSize}>
-                    <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
-                  </TradingCardHolo>
+                  <TradingCard {...SAMPLE_PLAYER} rarity={rarity} size={cardSize} holo={{ rarity: getHoloEffect(rarity), holoType: 'reverse' }} />
                   <span className="text-[10px] text-gray-500 uppercase tracking-wider">Player</span>
                 </div>
               ) : (
                 <>
                   {['holo', 'reverse', 'full'].map(holoType => (
                     <div key={holoType} className="flex flex-col items-center gap-2">
-                      <TradingCardHolo rarity={getHoloEffect(rarity)} role="JUNGLE" holoType={holoType} size={cardSize}>
-                        <TradingCard {...SAMPLE_PLAYER} variant="player" rarity={rarity} />
-                      </TradingCardHolo>
+                      <TradingCard {...SAMPLE_PLAYER} rarity={rarity} size={cardSize} holo={{ rarity: getHoloEffect(rarity), holoType }} />
                       <span className="text-[10px] text-gray-500 uppercase tracking-wider">
                         Player ({holoType === 'holo' ? 'Holo' : holoType === 'reverse' ? 'Rev' : 'Full'})
                       </span>

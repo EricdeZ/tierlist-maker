@@ -26,22 +26,20 @@ function toGameCardData(card, override) {
   return base
 }
 
-const EMPTY_STATS = {
-  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
-  avgDamage: 0, avgMitigated: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0,
-}
-
 function toPlayerCardProps(card) {
   const cd = card.cardData || {}
   return {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
-    stats: EMPTY_STATS,
+    seasonName: cd.seasonName || '',
     bestGod: cd.bestGod
       ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
       : (card.bestGodName ? { name: card.bestGodName } : null),
     isFirstEdition: card.isFirstEdition || false,
+    isConnected: cd.isConnected,
+    defId: card.defId,
+    rarity: card.rarity,
   }
 }
 
@@ -355,7 +353,7 @@ function DismantleSlot({ card, isSelected, onToggle, override }) {
       onClick={() => onToggle(card.id)}
     >
       {isPlayer ? (
-        <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={CARD_SIZE} />
+        <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={CARD_SIZE} />
       ) : (
         <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={CARD_SIZE} />
       )}
