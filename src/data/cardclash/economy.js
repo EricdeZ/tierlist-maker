@@ -65,3 +65,18 @@ export const STARTING_FIVE_RATES = {
 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
+
+// Attachment bonuses — percentage multipliers on the player's base income
+// God cards give larger bonuses than items; cores bonuses are higher than passion
+export const ATTACHMENT_BONUSES = {
+  god: {
+    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50 },
+    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80 },
+  },
+  item: {
+    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30 },
+    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60 },
+  },
+};
+
+export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
