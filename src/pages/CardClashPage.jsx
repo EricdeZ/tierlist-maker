@@ -2,10 +2,12 @@ import { lazy, Suspense } from 'react'
 import { CardClashProvider, useCardClash } from './cardclash/CardClashContext'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './cardclash/VaultHeroBanner'
+import VaultTabBar from './cardclash/VaultTabBar'
 import './cardclash/compdeck.css'
 
 const CCPackShop = lazy(() => import('./cardclash/CCPackShop'))
@@ -52,13 +54,22 @@ const TAB_COMPONENTS = {
 }
 
 export default function CardClashPage() {
-    const { user } = useAuth()
+    const { user, hasPermission } = useAuth()
 
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
                 <h1 className="text-2xl font-bold mb-2">The Vault</h1>
                 <p className="text-(--color-text-secondary) mb-4">Log in to access The Vault</p>
+            </div>
+        )
+    }
+
+    if (!FEATURE_FLAGS.VAULT_OPEN && !hasPermission('vault_early_access')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <h1 className="text-2xl font-bold mb-2">The Vault</h1>
+                <p className="text-(--color-text-secondary) mb-4">The Vault is not yet available. Check back soon!</p>
             </div>
         )
     }
@@ -85,7 +96,7 @@ function CardClashInner() {
     const ActiveComponent = TAB_COMPONENTS[activeTab] || CCPackShop
 
     const branding = (
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
             <img src={vaultLogo} alt="" className="h-6 cd-icon-glow" />
             <span className="cd-head text-sm font-black" style={{ letterSpacing: '0.15em' }}>
                 <span className="text-[var(--cd-cyan)] cd-text-glow">THE</span>
@@ -102,9 +113,9 @@ function CardClashInner() {
                 <VaultHeroBanner />
             </div>
 
-            <main className="relative z-1 max-w-[1400px] mx-auto px-4 pt-6">
-                {/* Tab switcher */}
-                <div className="relative z-10 flex items-center gap-6 border-b border-[var(--cd-border)] pb-0">
+            <main className="relative z-1 max-w-[1400px] mx-auto px-4 pt-6 pb-20 sidebar:pb-0">
+                {/* Tab switcher — desktop only (>=1400px) */}
+                <div className="relative z-10 hidden sidebar:flex items-center gap-6 border-b border-[var(--cd-border)] pb-0">
                     {visibleTabs.map(tab => {
                         const Icon = tab.icon
                         const active = activeTab === tab.key
@@ -137,9 +148,10 @@ function CardClashInner() {
 
                 </div>
 
-                <p className={`text-[10px] text-white/25 mt-2 ${unseenGifts > 0 && activeTab !== 'gifts' ? 'mb-2' : 'mb-6'}`}>
+                <p className={`hidden sm:block text-[10px] text-white/25 mt-2 ${unseenGifts > 0 && activeTab !== 'gifts' ? 'mb-2' : 'mb-6'}`}>
                     SMITE 2 is a registered trademark of Hi-Rez Studios. Trademarks are the property of their respective owners. Game materials copyright Hi-Rez Studios. Hi-Rez Studios has not endorsed and is not responsible for this site or its content.
                 </p>
+                <div className="sm:hidden mb-4" />
 
                 {unseenGifts > 0 && activeTab !== 'gifts' && (
                     <button
@@ -166,7 +178,22 @@ function CardClashInner() {
                         <ActiveComponent />
                     </Suspense>
                 )}
+                {/* Mobile footer trademark */}
+                <p className="sm:hidden text-[9px] text-white/15 mt-8 mb-4 text-center leading-relaxed px-2">
+                    SMITE 2 is a registered trademark of Hi-Rez Studios. Trademarks are the property of their respective owners. Game materials copyright Hi-Rez Studios. Hi-Rez Studios has not endorsed and is not responsible for this site or its content.
+                </p>
             </main>
+
+            {/* Mobile/tablet bottom tab bar — shown below 1400px */}
+            <div className="sidebar:hidden vault-tab-bar-wrap">
+                <VaultTabBar
+                    tabs={visibleTabs}
+                    activeTab={activeTab}
+                    onTabChange={setTab}
+                    unseenGifts={unseenGifts}
+                    pendingTradeCount={pendingTradeCount}
+                />
+            </div>
         </div>
     )
 }

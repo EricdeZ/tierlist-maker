@@ -38,6 +38,7 @@ function toPlayerCardProps(card) {
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     stats: EMPTY_STATS,
+    isFirstEdition: card.isFirstEdition || false,
   }
 }
 
@@ -130,14 +131,14 @@ export default function CCDismantle() {
   return (
     <div className="pb-32">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold cd-head text-[var(--cd-text)] flex items-center gap-2">
-            <Hammer className="w-5 h-5 text-[var(--cd-cyan)]" />
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold cd-head text-[var(--cd-text)] flex items-center gap-2">
+            <Hammer className="w-5 h-5 text-[var(--cd-cyan)] shrink-0" />
             Dismantle
           </h2>
-          <p className="text-xs text-[var(--cd-text-dim)] mt-1">
-            Select cards to break down into Cores. Minimum 1 Core to dismantle.
+          <p className="text-[11px] sm:text-xs text-[var(--cd-text-dim)] mt-1">
+            Select cards to break down into Cores.
           </p>
         </div>
         <button
@@ -217,7 +218,7 @@ export default function CCDismantle() {
       </div>
 
       {/* Card grid */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
         {cards.map(card => (
           <DismantleSlot
             key={card.id}
@@ -254,19 +255,19 @@ export default function CCDismantle() {
       {/* Bottom bar */}
       {selected.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--cd-border)] bg-[#0a0e14]/95 backdrop-blur-md">
-          <div className="max-w-[1400px] mx-auto px-4 py-4 flex items-center gap-6">
+          <div className="max-w-[1400px] mx-auto px-4 py-3 sm:py-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
             {/* Breakdown */}
-            <div className="flex items-center gap-3 flex-1">
-              <div className="text-base text-white cd-head font-bold">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="text-sm sm:text-base text-white cd-head font-bold shrink-0">
                 <span className="text-[var(--cd-cyan)] cd-num">{selectedCount}</span> card{selectedCount !== 1 ? 's' : ''}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2 flex-wrap">
                 {RARITY_ORDER.map(r => {
                   const count = breakdown[r]
                   if (!count) return null
                   return (
-                    <span key={r} className="text-xs cd-num px-1.5 py-0.5 rounded font-bold" style={{ color: RARITIES[r].color, backgroundColor: RARITIES[r].color + '15' }}>
-                      {count} {RARITIES[r].name}
+                    <span key={r} className="text-[10px] sm:text-xs cd-num px-1 sm:px-1.5 py-0.5 rounded font-bold" style={{ color: RARITIES[r].color, backgroundColor: RARITIES[r].color + '15' }}>
+                      {count}<span className="hidden sm:inline"> {RARITIES[r].name}</span>
                     </span>
                   )
                 })}

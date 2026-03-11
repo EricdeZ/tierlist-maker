@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import PackArt from './PackArt'
 import GameCard from './GameCard'
 import TradingCard from '../../../components/TradingCard'
@@ -60,6 +61,7 @@ function toPlayerCardProps(card) {
     avatarUrl: card.imageUrl || card.image_url || '',
     stats: cd.stats || null,
     bestGod: cd.bestGod || null,
+    isFirstEdition: card.isFirstEdition || card.is_first_edition || false,
   }
 }
 
@@ -95,6 +97,137 @@ function PackCard({ card, size, holo = true }) {
     )
   }
   return gameCard
+}
+
+function SummaryView({ cards, result, onOpenMore, onClose }) {
+  const gridRef = useRef(null)
+  const [activeIdx, setActiveIdx] = useState(0)
+  const [zoomedIdx, setZoomedIdx] = useState(null)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 920
+
+  // Lock scroll on parent when zoom is active
+  useEffect(() => {
+    if (zoomedIdx === null) return
+    const el = document.querySelector('.pack-opening')
+    if (!el) return
+    el.style.overflowY = 'hidden'
+    const prevent = (e) => e.preventDefault()
+    el.addEventListener('wheel', prevent, { passive: false })
+    el.addEventListener('touchmove', prevent, { passive: false })
+    return () => {
+      el.style.overflowY = ''
+      el.removeEventListener('wheel', prevent)
+      el.removeEventListener('touchmove', prevent)
+    }
+  }, [zoomedIdx])
+
+  const cardSize = useMemo(() => {
+    if (typeof window === 'undefined') return 200
+    const w = window.innerWidth
+    const h = window.innerHeight
+    if (w <= 920) {
+      // Mobile: use most of screen height, cap at 80% viewport width for spacing
+      // Overhead: summary padding (80) + gaps (60) + title (25) + dots (20) + buttons (44) + grid padding (60) ≈ 290
+      const availableHeight = h - 290
+      const fromHeight = Math.floor(availableHeight * 63 / 88)
+      const fromWidth = Math.floor(w * 0.8)
+      return Math.min(fromHeight, fromWidth)
+    }
+    // Desktop: use available height, fit all cards in one row
+    const availableHeight = h - 180
+    const maxFromHeight = Math.floor(availableHeight * 63 / 88)
+    const availableWidth = w - 80
+    const perCard = Math.floor((availableWidth - (cards.length - 1) * 12) / cards.length)
+    return Math.min(maxFromHeight, perCard)
+  }, [cards.length])
+
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const onScroll = () => {
+      const children = el.children
+      if (!children.length) return
+      const center = el.scrollLeft + el.clientWidth / 2
+      let closest = 0
+      let minDist = Infinity
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i]
+        const childCenter = child.offsetLeft - el.offsetLeft + child.offsetWidth / 2
+        const dist = Math.abs(center - childCenter)
+        if (dist < minDist) { minDist = dist; closest = i }
+      }
+      setActiveIdx(closest)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [cards.length])
+
+  const scrollTo = useCallback((idx) => {
+    const el = gridRef.current
+    if (!el || !el.children[idx]) return
+    el.children[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }, [])
+
+  return (
+    <div className="pack-opening__summary">
+      <h2 className="pack-opening__summary-title">{result.packName}</h2>
+      <div className="pack-opening__summary-grid" ref={gridRef} style={{ '--card-size': `${cardSize}px` }}>
+        {cards.map((card, i) => (
+          <div
+            key={i}
+            className="pack-opening__summary-card"
+            style={{ '--si': i, cursor: 'pointer' }}
+            onClickCapture={(e) => { e.stopPropagation(); isMobile ? scrollTo(i) : setZoomedIdx(i) }}
+          >
+            <PackCard card={card} size={cardSize} holo />
+            {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
+          </div>
+        ))}
+      </div>
+      {/* Mobile dots */}
+      <div className="pack-opening__summary-dots">
+        {cards.map((_, i) => (
+          <span
+            key={i}
+            className={`pack-opening__summary-dot${i === activeIdx ? ' active' : ''}`}
+            onClick={() => scrollTo(i)}
+          />
+        ))}
+      </div>
+      {/* Desktop zoom overlay */}
+      {zoomedIdx !== null && (
+        <div className="pack-opening__zoom-overlay" onClick={() => setZoomedIdx(null)}>
+          <div className="pack-opening__zoom-card" onClick={e => e.stopPropagation()}>
+            <PackCard card={cards[zoomedIdx]} size={340} holo />
+            {cards[zoomedIdx].isNew && <div className="pack-opening__zoom-new">NEW</div>}
+          </div>
+          <div className="pack-opening__zoom-nav">
+            <button
+              className="pack-opening__zoom-arrow"
+              disabled={zoomedIdx === 0}
+              onClick={(e) => { e.stopPropagation(); setZoomedIdx(zoomedIdx - 1) }}
+            >‹</button>
+            <span className="pack-opening__zoom-counter">{zoomedIdx + 1} / {cards.length}</span>
+            <button
+              className="pack-opening__zoom-arrow"
+              disabled={zoomedIdx === cards.length - 1}
+              onClick={(e) => { e.stopPropagation(); setZoomedIdx(zoomedIdx + 1) }}
+            >›</button>
+          </div>
+        </div>
+      )}
+      <div className="pack-opening__summary-actions">
+        {onOpenMore && (
+          <button onClick={onOpenMore} className="pack-opening__summary-btn pack-opening__summary-btn--primary">
+            Open More
+          </button>
+        )}
+        <button onClick={onClose} className="pack-opening__summary-btn pack-opening__summary-btn--secondary">
+          Close
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
@@ -410,7 +543,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
     return `${base + bonus}ms`
   }
 
-  return (
+  return createPortal(
     <div className="pack-opening" data-phase={phase}>
       <div className="pack-opening__bg" />
 
@@ -516,7 +649,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                 <div className="pack-opening__ec-flip">
                   <div className="pack-opening__ec-back"><CardBack /></div>
                   <div className="pack-opening__ec-front">
-                    <PackCard card={card} size={240} holo={false} />
+                    <PackCard card={card} holo={false} />
                     {isTop && topFlipPhase === 'revealed' && (
                       <div className={`pack-opening__holo-shimmer${tier <= 1 ? ' holo-intense' : tier <= 2 ? ' holo-medium' : ''}`}
                         style={{ '--holo-color': cardColor }} />
@@ -571,27 +704,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
 
       {/* ═══ Summary — show all cards after reveal ═══ */}
       {phase === 'summary' && (
-        <div className="pack-opening__summary">
-          <h2 className="pack-opening__summary-title">{result.packName}</h2>
-          <div className="pack-opening__summary-grid">
-            {cards.map((card, i) => (
-              <div key={i} className="pack-opening__summary-card" style={{ '--si': i }}>
-                <PackCard card={card} size={140} holo />
-                {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
-              </div>
-            ))}
-          </div>
-          <div className="pack-opening__summary-actions">
-            {onOpenMore && (
-              <button onClick={onOpenMore} className="pack-opening__summary-btn pack-opening__summary-btn--primary">
-                Open More
-              </button>
-            )}
-            <button onClick={onClose} className="pack-opening__summary-btn pack-opening__summary-btn--secondary">
-              Close
-            </button>
-          </div>
-        </div>
+        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} onClose={onClose} />
       )}
 
       {onReplay && (
@@ -604,6 +717,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
           REPLAY
         </button>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }

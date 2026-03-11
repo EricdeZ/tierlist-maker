@@ -410,6 +410,52 @@ const tools = [
         btnClass: 'bg-amber-600 hover:bg-amber-700',
     },
     {
+        title: 'Vending Restock',
+        description: 'Stock the vending machine with limited sale packs. Create listings, set prices and quantities, restock sold-out slots, and toggle availability.',
+        path: '/admin/vending-restock',
+        permission: 'permission_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+        ),
+        accent: 'from-amber-500/20 to-amber-600/5',
+        border: 'border-amber-500/20 hover:border-amber-500/40',
+        iconColor: 'text-amber-400',
+        btnClass: 'bg-amber-600 hover:bg-amber-700',
+    },
+    {
+        title: 'Pack Creator',
+        description: 'Create and configure pack types with per-slot card type and rarity constraints, weighted probabilities, division-based player pools, and custom colors.',
+        path: '/admin/pack-creator',
+        permission: 'permission_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+            </svg>
+        ),
+        accent: 'from-orange-500/20 to-orange-600/5',
+        border: 'border-orange-500/20 hover:border-orange-500/40',
+        iconColor: 'text-orange-400',
+        btnClass: 'bg-orange-600 hover:bg-orange-700',
+    },
+    {
+        title: 'Redeem Codes',
+        description: 'Create and manage pack redeem codes. Generate single-use or per-person codes that grant specific packs when redeemed by players.',
+        path: '/admin/redeem-codes',
+        permission: 'permission_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" />
+            </svg>
+        ),
+        accent: 'from-amber-500/20 to-amber-600/5',
+        border: 'border-amber-500/20 hover:border-amber-500/40',
+        iconColor: 'text-amber-400',
+        btnClass: 'bg-amber-600 hover:bg-amber-700',
+    },
+    {
         title: 'Audit Log',
         description: 'View a chronological log of all admin actions. Filter by user, endpoint, action, and date range to track changes and investigate issues.',
         path: '/admin/auditlog',

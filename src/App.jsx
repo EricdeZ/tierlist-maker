@@ -82,6 +82,9 @@ import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import SingleMatchReport from "./pages/admin/SingleMatchReport.jsx";
 import CardPreview from "./pages/admin/CardPreview.jsx";
 import CardClashAdmin from "./pages/admin/CardClashAdmin.jsx";
+import VendingRestock from "./pages/admin/VendingRestock.jsx";
+import PackCreator from "./pages/admin/PackCreator.jsx";
+import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
 import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
@@ -151,6 +154,9 @@ function App() {
                                 <Route path="scrim-admin" element={<ProtectedRoute requiredPermission="league_manage"><ScrimAdmin /></ProtectedRoute>} />
                                 <Route path="card-preview" element={<ProtectedRoute requiredPermission="permission_manage"><CardPreview /></ProtectedRoute>} />
                                 <Route path="cardclash" element={<ProtectedRoute requiredPermission="cardclash_manage"><CardClashAdmin /></ProtectedRoute>} />
+                                <Route path="vending-restock" element={<ProtectedRoute requiredPermission="permission_manage"><VendingRestock /></ProtectedRoute>} />
+                                <Route path="pack-creator" element={<ProtectedRoute requiredPermission="permission_manage"><PackCreator /></ProtectedRoute>} />
+                                <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
                             </Route>
 

@@ -973,6 +973,9 @@ export const emberService = {
     async convert() {
         return apiPost('ember', { action: 'convert' })
     },
+    async adminGrant(userId, amount, reason) {
+        return apiPost('ember-admin', {}, { userId, amount, reason })
+    },
 }
 
 export const cardclashService = {
@@ -1009,14 +1012,17 @@ export const cardclashService = {
     async searchUsers(q) {
         return apiCall('cardclash', { action: 'search-users', q })
     },
-    async sendGift(recipientId, message) {
-        return apiPost('cardclash', { action: 'send-gift' }, { recipientId, message })
+    async sendGift(recipientId, message, packType = 'gift') {
+        return apiPost('cardclash', { action: 'send-gift' }, { recipientId, message, packType })
     },
     async openGift(giftId) {
         return apiPost('cardclash', { action: 'open-gift' }, { giftId })
     },
     async markGiftsSeen() {
         return apiPost('cardclash', { action: 'mark-gifts-seen' }, {})
+    },
+    async buyGiftPack(packType) {
+        return apiPost('cardclash', { action: 'buy-gift-pack' }, { packType })
     },
     async dismantleCards(cardIds) {
         return apiPost('cardclash', { action: 'dismantle' }, { cardIds })
@@ -1032,6 +1038,21 @@ export const cardclashService = {
     },
     collectIncome() {
         return apiPost('cardclash', { action: 'collect-income' }, {})
+    },
+    openInventoryPack(inventoryId) {
+        return apiPost('cardclash', { action: 'open-inventory-pack' }, { inventoryId })
+    },
+    redeemCode(code) {
+        return apiPost('cardclash', { action: 'redeem-code' }, { code })
+    },
+    adminListRedeemCodes() {
+        return apiCall('cardclash', { action: 'admin-redeem-codes' })
+    },
+    adminCreateRedeemCode(data) {
+        return apiPost('cardclash', { action: 'create-redeem-code' }, data)
+    },
+    adminToggleRedeemCode(codeId, active) {
+        return apiPost('cardclash', { action: 'toggle-redeem-code' }, { codeId, active })
     },
 }
 
@@ -1089,6 +1110,42 @@ export const tradingService = {
     },
     async cancel(tradeId) {
         return apiPost('trading', { action: 'cancel' }, { tradeId })
+    },
+}
+
+export const packCreatorService = {
+    async load() {
+        return apiCall('pack-creator', { action: 'load' })
+    },
+    async create(data) {
+        return apiPost('pack-creator', { action: 'create' }, data)
+    },
+    async update(data) {
+        return apiPost('pack-creator', { action: 'update' }, data)
+    },
+    async toggle(id) {
+        return apiPost('pack-creator', { action: 'toggle' }, { id })
+    },
+    async delete(id) {
+        return apiPost('pack-creator', { action: 'delete' }, { id })
+    },
+}
+
+export const vendingRestockService = {
+    async load() {
+        return apiCall('vending-restock', { action: 'load' })
+    },
+    async create(data) {
+        return apiPost('vending-restock', { action: 'create' }, data)
+    },
+    async restock(id, amount) {
+        return apiPost('vending-restock', { action: 'restock' }, { id, amount })
+    },
+    async toggle(id) {
+        return apiPost('vending-restock', { action: 'toggle' }, { id })
+    },
+    async delete(id) {
+        return apiPost('vending-restock', { action: 'delete' }, { id })
     },
 }
 

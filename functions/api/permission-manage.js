@@ -20,6 +20,7 @@ const PERMISSION_KEYS = [
     { key: 'league_preview',   label: 'League Preview',    description: 'View inactive seasons before they go live', scopeable: true },
     { key: 'league_staff_manage', label: 'League Staff Manage', description: 'Add and remove staff members for leagues', scopeable: true },
     { key: 'codex_edit',       label: 'Codex Editor',      description: 'Access and edit the Codex', scopeable: false },
+    { key: 'vault_early_access', label: 'Early Vault Access', description: 'Access The Vault before public release', scopeable: false },
 ]
 
 const VALID_KEYS = PERMISSION_KEYS.map(p => p.key)

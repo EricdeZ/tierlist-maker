@@ -15,7 +15,7 @@ const CAP_DAYS = 2
 const HOURS_PER_DAY = 24
 
 export function getCardRates(holoType, rarity) {
-  if (!holoType || rarity === 'common') return { passionPerHour: 0, coresPerHour: 0 }
+  if (!holoType) return { passionPerHour: 0, coresPerHour: 0 }
   let passionDaily = 0, coresDaily = 0
   if (holoType === 'holo') {
     passionDaily = RATES.holo[rarity] || 0
@@ -162,8 +162,7 @@ export async function slotCard(sql, userId, cardId, role) {
     FROM cc_cards WHERE id = ${cardId} AND owner_id = ${userId}
   `
   if (!card) throw new Error('Card not found')
-  if (card.rarity === 'common') throw new Error('Common cards cannot be slotted')
-  if (!card.holo_type) throw new Error('Card has no holo type')
+  if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
   if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
   if (card.role !== role) throw new Error(`Card role (${card.role}) does not match slot (${role})`)
 

@@ -25,8 +25,15 @@ export const FORGE_KEYS = ['sparks_fueled', 'sparks_cooled', 'forge_profit', 'fo
 // Discord stat keys (tracked by user_id via discord_guild_members)
 export const DISCORD_KEYS = ['discord_joined']
 
-// Vault stat keys (tracked by user_id via cc_stats / ember_balances / ember_transactions)
-export const VAULT_KEYS = ['packs_opened', 'daily_cores_claimed', 'cores_converted']
+// Vault stat keys (tracked by user_id via cc_stats / ember_balances / ember_transactions / cc_trades / cc_market_listings / cc_gifts / cc_lineups)
+export const VAULT_KEYS = [
+    'packs_opened', 'daily_cores_claimed', 'cores_converted',
+    'cards_dismantled', 'legendary_cards_dismantled',
+    'trades_completed', 'marketplace_sold', 'marketplace_bought',
+    'best_marketplace_sale', 'gifts_sent', 'gifts_opened',
+    'starting_five_filled', 'starting_five_rare_count', 'starting_five_epic_count',
+    'income_collected', 'max_conversions_day',
+]
 
 /**
  * Update challenge progress for a user based on known current stat values.
@@ -307,11 +314,21 @@ async function bulkRecalcNonPerfChallenges(sql) {
         ` : [],
     ])
 
-    // Vault stats — aggregate from cc_stats and ember_transactions
-    const [vaultPackStats, vaultClaimStats, vaultConvertStats] = hasVault ? await Promise.all([
+    // Vault stats — aggregate from cc_stats, ember_transactions, cc_trades, cc_market_listings, cc_gifts, cc_lineups
+    const [
+        vaultPackStats, vaultClaimStats, vaultConvertStats,
+        vaultTradeStats, vaultSoldStats, vaultBoughtStats, vaultBestSaleStats,
+        vaultGiftsSentStats, vaultGiftsOpenedStats,
+        vaultLineupStats, vaultLineupRareStats, vaultLineupEpicStats,
+        vaultMaxConvStats,
+    ] = hasVault ? await Promise.all([
         sql`
-            SELECT user_id, COALESCE(packs_opened, 0)::integer as packs_opened
-            FROM cc_stats WHERE packs_opened > 0
+            SELECT user_id,
+                COALESCE(packs_opened, 0)::integer as packs_opened,
+                COALESCE(cards_dismantled, 0)::integer as cards_dismantled,
+                COALESCE(legendary_cards_dismantled, 0)::integer as legendary_cards_dismantled,
+                COALESCE(income_collections, 0)::integer as income_collections
+            FROM cc_stats WHERE packs_opened > 0 OR cards_dismantled > 0 OR income_collections > 0
         `,
         sql`
             SELECT user_id, COUNT(*)::integer as daily_cores_claimed
@@ -323,7 +340,62 @@ async function bulkRecalcNonPerfChallenges(sql) {
             FROM ember_transactions WHERE type = 'passion_convert'
             GROUP BY user_id
         `,
-    ]) : [[], [], []]
+        sql`
+            SELECT user_id, COUNT(*)::integer as trades_completed FROM (
+                SELECT player_a_id AS user_id FROM cc_trades WHERE status = 'completed'
+                UNION ALL
+                SELECT player_b_id AS user_id FROM cc_trades WHERE status = 'completed'
+            ) sub GROUP BY user_id
+        `,
+        sql`
+            SELECT seller_id AS user_id, COUNT(*)::integer as marketplace_sold
+            FROM cc_market_listings WHERE status = 'sold'
+            GROUP BY seller_id
+        `,
+        sql`
+            SELECT buyer_id AS user_id, COUNT(*)::integer as marketplace_bought
+            FROM cc_market_listings WHERE status = 'sold' AND buyer_id IS NOT NULL
+            GROUP BY buyer_id
+        `,
+        sql`
+            SELECT seller_id AS user_id, COALESCE(MAX(core_price), 0)::integer as best_marketplace_sale
+            FROM cc_market_listings WHERE status = 'sold'
+            GROUP BY seller_id
+        `,
+        sql`
+            SELECT sender_id AS user_id, COUNT(*)::integer as gifts_sent
+            FROM cc_gifts GROUP BY sender_id
+        `,
+        sql`
+            SELECT recipient_id AS user_id, COUNT(*)::integer as gifts_opened
+            FROM cc_gifts WHERE opened = true
+            GROUP BY recipient_id
+        `,
+        sql`
+            SELECT user_id, COUNT(*)::integer as starting_five_filled
+            FROM cc_lineups WHERE card_id IS NOT NULL
+            GROUP BY user_id
+        `,
+        sql`
+            SELECT l.user_id, COUNT(*)::integer as starting_five_rare_count
+            FROM cc_lineups l JOIN cc_cards c ON l.card_id = c.id
+            WHERE l.card_id IS NOT NULL AND c.rarity IN ('rare', 'epic', 'legendary', 'mythic')
+            GROUP BY l.user_id
+        `,
+        sql`
+            SELECT l.user_id, COUNT(*)::integer as starting_five_epic_count
+            FROM cc_lineups l JOIN cc_cards c ON l.card_id = c.id
+            WHERE l.card_id IS NOT NULL AND c.rarity IN ('epic', 'legendary', 'mythic')
+            GROUP BY l.user_id
+        `,
+        sql`
+            SELECT user_id, MAX(daily_count)::integer as max_conversions_day FROM (
+                SELECT user_id, COUNT(*)::integer as daily_count
+                FROM ember_transactions WHERE type = 'passion_convert'
+                GROUP BY user_id, DATE(created_at)
+            ) sub GROUP BY user_id
+        `,
+    ]) : [[], [], [], [], [], [], [], [], [], [], [], [], []]
 
     // Forge profit + perf held need separate queries (different tables)
     const [forgeProfitStats, forgePerfStats] = hasForge ? await Promise.all([
@@ -361,9 +433,24 @@ async function bulkRecalcNonPerfChallenges(sql) {
     for (const s of forgeProfitStats) merge(s.user_id, { forge_profit: s.forge_profit })
     for (const s of forgePerfStats) merge(s.user_id, { forge_perf_updates_held: s.forge_perf_updates_held })
     for (const s of discordStats) merge(s.user_id, { discord_joined: s.discord_joined })
-    for (const s of vaultPackStats) merge(s.user_id, { packs_opened: s.packs_opened })
+    for (const s of vaultPackStats) merge(s.user_id, {
+        packs_opened: s.packs_opened,
+        cards_dismantled: s.cards_dismantled,
+        legendary_cards_dismantled: s.legendary_cards_dismantled,
+        income_collected: s.income_collections,
+    })
     for (const s of vaultClaimStats) merge(s.user_id, { daily_cores_claimed: s.daily_cores_claimed })
     for (const s of vaultConvertStats) merge(s.user_id, { cores_converted: s.cores_converted })
+    for (const s of vaultTradeStats) merge(s.user_id, { trades_completed: s.trades_completed })
+    for (const s of vaultSoldStats) merge(s.user_id, { marketplace_sold: s.marketplace_sold })
+    for (const s of vaultBoughtStats) merge(s.user_id, { marketplace_bought: s.marketplace_bought })
+    for (const s of vaultBestSaleStats) merge(s.user_id, { best_marketplace_sale: s.best_marketplace_sale })
+    for (const s of vaultGiftsSentStats) merge(s.user_id, { gifts_sent: s.gifts_sent })
+    for (const s of vaultGiftsOpenedStats) merge(s.user_id, { gifts_opened: s.gifts_opened })
+    for (const s of vaultLineupStats) merge(s.user_id, { starting_five_filled: s.starting_five_filled })
+    for (const s of vaultLineupRareStats) merge(s.user_id, { starting_five_rare_count: s.starting_five_rare_count })
+    for (const s of vaultLineupEpicStats) merge(s.user_id, { starting_five_epic_count: s.starting_five_epic_count })
+    for (const s of vaultMaxConvStats) merge(s.user_id, { max_conversions_day: s.max_conversions_day })
 
     // Build bulk upsert arrays
     const upsertUserIds = []
@@ -798,12 +885,22 @@ export async function recalcDiscordChallenges(sql, userId) {
 
 /**
  * Get vault stats for a user (by user_id).
- * Returns packs opened, daily core claims, and conversions done.
+ * Returns all vault-related stats for challenge tracking.
  */
 export async function getVaultStats(sql, userId) {
-    const [[packRow], [claimRow], [convRow]] = await Promise.all([
+    const [
+        [statsRow], [claimRow], [convRow],
+        [tradeRow], [soldRow], [boughtRow], [bestSaleRow],
+        [giftsSentRow], [giftsOpenedRow],
+        [lineupRow], [lineupRareRow], [lineupEpicRow],
+        [maxConvRow],
+    ] = await Promise.all([
+        // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
         sql`
-            SELECT COALESCE(packs_opened, 0)::integer as count
+            SELECT COALESCE(packs_opened, 0)::integer as packs_opened,
+                   COALESCE(cards_dismantled, 0)::integer as cards_dismantled,
+                   COALESCE(legendary_cards_dismantled, 0)::integer as legendary_cards_dismantled,
+                   COALESCE(income_collections, 0)::integer as income_collections
             FROM cc_stats WHERE user_id = ${userId}
         `,
         sql`
@@ -816,12 +913,83 @@ export async function getVaultStats(sql, userId) {
             FROM ember_transactions
             WHERE user_id = ${userId} AND type = 'passion_convert'
         `,
+        // Trades completed (either side)
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_trades
+            WHERE (player_a_id = ${userId} OR player_b_id = ${userId}) AND status = 'completed'
+        `,
+        // Marketplace sold
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_market_listings
+            WHERE seller_id = ${userId} AND status = 'sold'
+        `,
+        // Marketplace bought
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_market_listings
+            WHERE buyer_id = ${userId} AND status = 'sold'
+        `,
+        // Best marketplace sale price
+        sql`
+            SELECT COALESCE(MAX(core_price), 0)::integer as max_price FROM cc_market_listings
+            WHERE seller_id = ${userId} AND status = 'sold'
+        `,
+        // Gifts sent
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_gifts
+            WHERE sender_id = ${userId}
+        `,
+        // Gifts opened (as recipient)
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_gifts
+            WHERE recipient_id = ${userId} AND opened = true
+        `,
+        // Starting Five slots filled
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_lineups
+            WHERE user_id = ${userId} AND card_id IS NOT NULL
+        `,
+        // Starting Five rare+ count (rare, epic, legendary, mythic)
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_lineups l
+            JOIN cc_cards c ON l.card_id = c.id
+            WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
+              AND c.rarity IN ('rare', 'epic', 'legendary', 'mythic')
+        `,
+        // Starting Five epic+ count
+        sql`
+            SELECT COUNT(*)::integer as count FROM cc_lineups l
+            JOIN cc_cards c ON l.card_id = c.id
+            WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
+              AND c.rarity IN ('epic', 'legendary', 'mythic')
+        `,
+        // Max conversions in a single day
+        sql`
+            SELECT COALESCE(MAX(daily_count), 0)::integer as max_conv FROM (
+                SELECT COUNT(*)::integer as daily_count
+                FROM ember_transactions
+                WHERE user_id = ${userId} AND type = 'passion_convert'
+                GROUP BY DATE(created_at)
+            ) sub
+        `,
     ])
 
     return {
-        packs_opened: packRow?.count ?? 0,
+        packs_opened: statsRow?.packs_opened ?? 0,
         daily_cores_claimed: claimRow?.count ?? 0,
         cores_converted: convRow?.count ?? 0,
+        cards_dismantled: statsRow?.cards_dismantled ?? 0,
+        legendary_cards_dismantled: statsRow?.legendary_cards_dismantled ?? 0,
+        trades_completed: tradeRow?.count ?? 0,
+        marketplace_sold: soldRow?.count ?? 0,
+        marketplace_bought: boughtRow?.count ?? 0,
+        best_marketplace_sale: bestSaleRow?.max_price ?? 0,
+        gifts_sent: giftsSentRow?.count ?? 0,
+        gifts_opened: giftsOpenedRow?.count ?? 0,
+        starting_five_filled: lineupRow?.count ?? 0,
+        starting_five_rare_count: lineupRareRow?.count ?? 0,
+        starting_five_epic_count: lineupEpicRow?.count ?? 0,
+        income_collected: statsRow?.income_collections ?? 0,
+        max_conversions_day: maxConvRow?.max_conv ?? 0,
     }
 }
 

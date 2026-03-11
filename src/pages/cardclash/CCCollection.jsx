@@ -10,7 +10,7 @@ import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 
@@ -79,6 +79,7 @@ export default function CCCollection() {
   const [activeSection, setActiveSection] = useState('god')
   const [defOverrides, setDefOverrides] = useState({})
   const [zoomedCard, setZoomedCard] = useState(null)
+  const [viewMode, setViewMode] = useState('all') // 'all' | 'owned'
   const loadedSetsRef = useRef(new Set())
 
   useEffect(() => {
@@ -228,9 +229,22 @@ export default function CCCollection() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-0 sm:p-6">
       <div className="mb-6 cd-section-accent pb-3">
-        <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Collection</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Collection</h1>
+          <button
+            onClick={() => setViewMode(v => v === 'all' ? 'owned' : 'all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer cd-head ${
+              viewMode === 'owned'
+                ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
+                : 'bg-white/[0.04] text-[var(--cd-text-mid)] border border-transparent hover:bg-white/[0.06]'
+            }`}
+          >
+            {viewMode === 'owned' ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            {viewMode === 'owned' ? 'Owned' : 'All'}
+          </button>
+        </div>
         <div className="flex gap-6 mt-2 text-sm">
           <div className="text-[var(--cd-text-mid)]">
             Game Cards: <span className="text-[var(--cd-cyan)] cd-num font-bold">{totalGameCollected}</span>
@@ -245,65 +259,117 @@ export default function CCCollection() {
         </div>
       </div>
 
-      <div className="flex gap-6">
-        {/* Sidebar */}
-        <div className="w-52 shrink-0 space-y-1">
-          <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mb-2 cd-head">Game Cards</div>
-          {GAME_SECTIONS.map(s => {
-            const t = gameTotals[s.type] || { total: 0, collected: 0 }
-            const active = activeSection === s.type
-            return (
-              <button
-                key={s.type}
-                onClick={() => setActiveSection(s.type)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
-                  active
-                    ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
-                    : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
-                }`}
-              >
-                <span className="text-xs">{s.icon}</span>
-                <span className="flex-1">{s.label}</span>
-                <span className="text-xs cd-num text-[var(--cd-text)]">{t.collected}/{t.total}</span>
-              </button>
-            )
-          })}
-
-          {leagueSeasonGroups.length > 0 && (
-            <>
-              <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mt-4 mb-2 cd-head">Player Sets</div>
-              {leagueSeasonGroups.map(group => {
-                const leagueLogo = getLeagueLogo(group.leagueSlug)
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        {/* Sidebar — horizontal pills on mobile, vertical on desktop */}
+        <div className="lg:w-52 lg:shrink-0">
+          {/* Mobile: horizontal scrollable pills */}
+          <div className="lg:hidden relative">
+          <div className="flex gap-2 overflow-x-auto pb-2 pr-6" style={{ scrollbarWidth: 'none' }}>
+            {GAME_SECTIONS.map(s => {
+              const active = activeSection === s.type
+              return (
+                <button
+                  key={s.type}
+                  onClick={() => setActiveSection(s.type)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
+                    active
+                      ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
+                      : 'bg-white/[0.04] text-[var(--cd-text-mid)] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <span>{s.icon}</span>
+                  <span>{s.label}</span>
+                </button>
+              )
+            })}
+            {leagueSeasonGroups.flatMap(group =>
+              group.divisions.map(set => {
+                const active = activeSection === `player:${set.key}`
+                const divImg = getDivisionImage(set.leagueSlug, set.divisionSlug, set.divisionTier)
                 return (
-                  <div key={group.key}>
-                    <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-[var(--cd-text-dim)] uppercase tracking-wider cd-head">
-                      {leagueLogo && <img src={leagueLogo} alt="" className="w-4 h-4 object-contain" />}
-                      <span>{group.label}</span>
-                    </div>
-                    {group.divisions.map(set => {
-                      const active = activeSection === `player:${set.key}`
-                      const divImg = getDivisionImage(set.leagueSlug, set.divisionSlug, set.divisionTier)
-                      return (
-                        <button
-                          key={set.key}
-                          onClick={() => setActiveSection(`player:${set.key}`)}
-                          className={`w-full flex items-center gap-2 px-3 pl-6 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
-                            active
-                              ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
-                              : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
-                          }`}
-                        >
-                          {divImg && <img src={divImg} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                          <span className="flex-1 truncate">{set.divisionName || `Division ${set.divisionTier}`}</span>
-                          <span className="text-xs cd-num text-[var(--cd-text)]">{set.collected}/{set.total}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <button
+                    key={set.key}
+                    onClick={() => setActiveSection(`player:${set.key}`)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
+                      active
+                        ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
+                        : 'bg-white/[0.04] text-[var(--cd-text-mid)] hover:bg-white/[0.06]'
+                    }`}
+                  >
+                    {divImg && <img src={divImg} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                    <span>{set.divisionName || 'Division'}</span>
+                  </button>
                 )
-              })}
-            </>
-          )}
+              })
+            )}
+          </div>
+          {/* Scroll arrow hint */}
+          <div className="absolute right-0 top-0 bottom-2 w-8 flex items-center justify-center pointer-events-none" style={{ background: 'linear-gradient(to right, transparent, var(--cd-edge))' }}>
+            <svg className="w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+          </div>
+
+          {/* Desktop: existing vertical sidebar */}
+          <div className="hidden lg:block space-y-1">
+            <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mb-2 cd-head">Game Cards</div>
+            {GAME_SECTIONS.map(s => {
+              const t = gameTotals[s.type] || { total: 0, collected: 0 }
+              const active = activeSection === s.type
+              return (
+                <button
+                  key={s.type}
+                  onClick={() => setActiveSection(s.type)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
+                    active
+                      ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
+                      : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
+                  }`}
+                >
+                  <span className="text-xs">{s.icon}</span>
+                  <span className="flex-1">{s.label}</span>
+                  <span className="text-xs cd-num text-[var(--cd-text)]">{t.collected}/{t.total}</span>
+                </button>
+              )
+            })}
+
+            {leagueSeasonGroups.length > 0 && (
+              <>
+                <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mt-4 mb-2 cd-head">Player Sets</div>
+                {leagueSeasonGroups.map(group => {
+                  const leagueLogo = getLeagueLogo(group.leagueSlug)
+                  return (
+                    <div key={group.key}>
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-[var(--cd-text-dim)] uppercase tracking-wider cd-head">
+                        {leagueLogo && <img src={leagueLogo} alt="" className="w-4 h-4 object-contain" />}
+                        <span>{group.label}</span>
+                      </div>
+                      {group.divisions.map(set => {
+                        const active = activeSection === `player:${set.key}`
+                        const divImg = getDivisionImage(set.leagueSlug, set.divisionSlug, set.divisionTier)
+                        return (
+                          <button
+                            key={set.key}
+                            onClick={() => setActiveSection(`player:${set.key}`)}
+                            className={`w-full flex items-center gap-2 px-3 pl-6 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
+                              active
+                                ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
+                                : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
+                            }`}
+                          >
+                            {divImg && <img src={divImg} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                            <span className="flex-1 truncate">{set.divisionName || `Division ${set.divisionTier}`}</span>
+                            <span className="text-xs cd-num text-[var(--cd-text)]">{set.collected}/{set.total}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Main content */}
@@ -311,7 +377,7 @@ export default function CCCollection() {
           {activeSection === 'god' && (
             <GameCardGrid
               type="god"
-              entries={gameEntries.god || []}
+              entries={viewMode === 'owned' ? (gameEntries.god || []).filter(e => e.collected) : (gameEntries.god || [])}
               totals={gameTotals.god}
               applyOverride={applyOverride}
               onZoom={setZoomedCard}
@@ -320,7 +386,7 @@ export default function CCCollection() {
           {activeSection === 'item' && (
             <GameCardGrid
               type="item"
-              entries={gameEntries.item || []}
+              entries={viewMode === 'owned' ? (gameEntries.item || []).filter(e => e.collected) : (gameEntries.item || [])}
               totals={gameTotals.item}
               applyOverride={applyOverride}
               onZoom={setZoomedCard}
@@ -329,7 +395,7 @@ export default function CCCollection() {
           {activeSection === 'consumable' && (
             <GameCardGrid
               type="consumable"
-              entries={gameEntries.consumable || []}
+              entries={viewMode === 'owned' ? (gameEntries.consumable || []).filter(e => e.collected) : (gameEntries.consumable || [])}
               totals={gameTotals.consumable}
               applyOverride={applyOverride}
               onZoom={setZoomedCard}
@@ -343,7 +409,7 @@ export default function CCCollection() {
             ) : (
               <PlayerCardGrid
                 meta={activePlayerSetMeta}
-                cards={activePlayerCards}
+                cards={viewMode === 'owned' ? activePlayerCards.filter(c => c.collected) : activePlayerCards}
                 onZoom={setZoomedCard}
               />
             )
@@ -417,11 +483,18 @@ function GameCardGrid({ type, entries, totals, applyOverride, onZoom }) {
       </div>
       <ProgressBar collected={totals?.collected || 0} total={totals?.total || 0} />
 
-      <div className="flex flex-wrap gap-3">
-        {entries.map(entry => (
-          <CollectionSlot key={entry.index} entry={entry} type={type} applyOverride={applyOverride} onZoom={onZoom} />
-        ))}
-      </div>
+      {entries.length === 0 ? (
+        <div className="text-center py-12 text-[var(--cd-text-dim)]">
+          <Library className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          <p className="text-sm font-bold cd-head">No cards owned</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+          {entries.map(entry => (
+            <CollectionSlot key={entry.index} entry={entry} type={type} applyOverride={applyOverride} onZoom={onZoom} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -436,7 +509,7 @@ function CollectionSlot({ entry, type, applyOverride, onZoom }) {
     const data = applyOverride(type, dataKey, fullData)
 
     return (
-      <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data, identifier: entryGodId(entry, type) }, canSell: true })}>
+      <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data, identifier: entryGodId(entry, type), ownedRarities: entry.ownedRarities }, canSell: true })}>
         <GameCard type={type} rarity={rarity} data={data} size={CARD_SIZE} />
         <RarityPips ownedRarities={entry.ownedRarities} />
       </div>
@@ -489,6 +562,12 @@ function PlayerCardGrid({ meta, cards, onZoom }) {
       </div>
       <ProgressBar collected={meta.collected} total={meta.total} />
 
+      {cards.length === 0 ? (
+        <div className="text-center py-12 text-[var(--cd-text-dim)]">
+          <Library className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          <p className="text-sm font-bold cd-head">No cards owned</p>
+        </div>
+      ) : (
       <div className="space-y-6">
         {teams.map(team => (
           <div key={team.name}>
@@ -502,7 +581,7 @@ function PlayerCardGrid({ meta, cards, onZoom }) {
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
               {team.cards.map(card => (
                 <PlayerSlot key={card.defId} card={card} meta={meta} onZoom={onZoom} />
               ))}
@@ -510,6 +589,7 @@ function PlayerCardGrid({ meta, cards, onZoom }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   )
 }
@@ -538,6 +618,7 @@ function PlayerSlot({ card, meta, onZoom }) {
         rarity,
         leagueName: meta.leagueSlug.toUpperCase(),
         divisionName: meta.divisionName || `Division ${meta.divisionTier}`,
+        ownedRarities: card.ownedRarities,
       },
       canSell: true,
     })

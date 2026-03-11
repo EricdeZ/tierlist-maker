@@ -49,6 +49,7 @@ function toPlayerCardProps(card) {
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     stats: EMPTY_STATS,
+    isFirstEdition: card.isFirstEdition || false,
   }
 }
 
@@ -114,6 +115,25 @@ function getAnimationConfig(rarity) {
 }
 
 
+function useSlotSize() {
+  const [size, setSize] = useState(() => {
+    if (typeof window === 'undefined') return 170
+    if (window.innerWidth < 640) return 130
+    if (window.innerWidth < 1024) return 150
+    return 170
+  })
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 640) setSize(130)
+      else if (window.innerWidth < 1024) setSize(150)
+      else setSize(170)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return size
+}
+
 export default function CCStartingFive() {
   const { collection, startingFive, slotS5Card, unslotS5Card, collectS5Income } = useCardClash()
   const [pickerRole, setPickerRole] = useState(null)
@@ -123,6 +143,7 @@ export default function CCStartingFive() {
   const [collectNotif, setCollectNotif] = useState(null)
   const [slotting, setSlotting] = useState(false)
   const [zoomedCard, setZoomedCard] = useState(null)
+  const slotSize = useSlotSize()
 
   // Live-ticking income counter
   const [displayPassion, setDisplayPassion] = useState(0)
@@ -230,9 +251,9 @@ export default function CCStartingFive() {
       </div>
 
       {/* Income Dashboard */}
-      <div className="cd-panel cd-corners rounded-xl p-5 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-6">
+      <div className="cd-panel cd-corners rounded-xl p-4 sm:p-5 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+          <div className="flex items-center gap-4 sm:gap-6">
             {/* Passion income */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -240,7 +261,7 @@ export default function CCStartingFive() {
                 <span className="text-xs text-white/40 cd-head tracking-wider">PASSION</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold cd-num" style={{ color: '#f8c56a' }}>
+                <span className="text-lg sm:text-xl font-bold cd-num" style={{ color: '#f8c56a' }}>
                   {displayPassion.toFixed(1)}
                 </span>
                 {passionCap > 0 && (
@@ -248,7 +269,7 @@ export default function CCStartingFive() {
                 )}
               </div>
               {passionCap > 0 && (
-                <div className="w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
                     style={{
@@ -271,7 +292,7 @@ export default function CCStartingFive() {
                 <span className="text-xs text-white/40 cd-head tracking-wider">CORES</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold cd-num text-[var(--cd-cyan)]">
+                <span className="text-lg sm:text-xl font-bold cd-num text-[var(--cd-cyan)]">
                   {displayCores.toFixed(1)}
                 </span>
                 {coresCap > 0 && (
@@ -279,7 +300,7 @@ export default function CCStartingFive() {
                 )}
               </div>
               {coresCap > 0 && (
-                <div className="w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
                     style={{
@@ -301,7 +322,7 @@ export default function CCStartingFive() {
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {collecting ? 'Collecting...' : 'Collect'}
             </button>
@@ -327,7 +348,7 @@ export default function CCStartingFive() {
       </div>
 
       {/* 5 Role Slots */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
         {ROLES.map(role => {
           const card = slottedCards[role.key]
           const Icon = role.icon
@@ -354,9 +375,10 @@ export default function CCStartingFive() {
                     onZoom={() => { setOptionsRole(null); setZoomedCard(card) }}
                     optionsOpen={optionsRole === role.key}
                     onToggleOptions={() => setOptionsRole(optionsRole === role.key ? null : role.key)}
+                    size={slotSize}
                   />
                 ) : (
-                  <EmptySlot role={role} onClick={() => setPickerRole(role.key)} />
+                  <EmptySlot role={role} onClick={() => setPickerRole(role.key)} size={slotSize} />
                 )}
               </div>
             </div>
@@ -437,15 +459,15 @@ export default function CCStartingFive() {
 }
 
 
-function EmptySlot({ role, onClick }) {
+function EmptySlot({ role, onClick, size = 170 }) {
   const Icon = role.icon
   return (
     <button
       onClick={onClick}
       className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
-      style={{ width: 170, aspectRatio: '63/88' }}
+      style={{ width: size, aspectRatio: '63/88' }}
     >
-      <Icon size={28} className="text-white/[0.08] group-hover:text-[var(--cd-cyan)]/30 transition-colors mb-2" />
+      <Icon size={size < 150 ? 22 : 28} className="text-white/[0.08] group-hover:text-[var(--cd-cyan)]/30 transition-colors mb-2" />
       <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
         <Plus size={12} />
         Slot Card
@@ -455,7 +477,7 @@ function EmptySlot({ role, onClick }) {
 }
 
 
-function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions }) {
+function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170 }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getIncomeRate(card)
   const type = getCardType(card)
@@ -477,23 +499,23 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         }}
         onClick={onToggleOptions}
       >
-        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={170}>
+        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
           {isPlayer ? (
             <TradingCard
               {...toPlayerCardProps(card)}
               variant="player"
               rarity={card.rarity}
-              size={170}
+              size={size}
             />
           ) : (
-            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={170} />
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={size} />
           )}
         </TradingCardHolo>
       </div>
 
       {/* Card info below */}
       <div className="mt-2 text-center">
-        <div className="text-[11px] font-bold text-white/70 truncate cd-head" style={{ maxWidth: 170 }}>
+        <div className="text-[11px] font-bold text-white/70 truncate cd-head" style={{ maxWidth: size }}>
           {card.godName}
         </div>
         <div className="flex items-center justify-center gap-1.5 mt-0.5">
@@ -656,8 +678,7 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
       .filter(card => {
         const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
         if (cardRole !== role) return false
-        if (card.rarity === 'common') return false
-        if (!card.holoType) return false
+        if (!card.holoType && card.rarity !== 'common') return false
         const type = getCardType(card)
         if (type !== 'player') return false
         if (slottedIds.has(card.id)) return false
@@ -683,7 +704,7 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
       style={{ animation: 'cd-fade-in 0.2s ease-out' }}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-xl overflow-hidden"
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -705,7 +726,7 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
             <div className="text-center py-12 text-white/30">
               <Icon size={40} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm cd-head tracking-wider">No eligible cards</p>
-              <p className="text-xs text-white/20 mt-1">Need a holo/reverse/full card of uncommon+ rarity with the {roleInfo?.label} role</p>
+              <p className="text-xs text-white/20 mt-1">Need a player card with the {roleInfo?.label} role</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">

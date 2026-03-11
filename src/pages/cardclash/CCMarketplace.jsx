@@ -64,6 +64,7 @@ function MarketCard({ card, size }) {
         leagueName={d.leagueName}
         divisionName={d.divisionName}
         stats={EMPTY_STATS}
+        isFirstEdition={card.isFirstEdition}
         size={size}
       />
     )
@@ -248,10 +249,10 @@ export default function CCMarketplace() {
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-2 sm:gap-4 mb-6 overflow-x-auto">
         <button
           onClick={() => setView('browse')}
-          className={`cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+          className={`cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border shrink-0 ${
             view === 'browse'
               ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
               : 'text-white/40 border-white/10 hover:text-white/60'
@@ -262,28 +263,28 @@ export default function CCMarketplace() {
         </button>
         <button
           onClick={() => { setView('my-listings'); if (!myListings) fetchMyListings() }}
-          className={`cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+          className={`cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border shrink-0 ${
             view === 'my-listings'
               ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
               : 'text-white/40 border-white/10 hover:text-white/60'
           }`}
         >
           <Tag className="w-4 h-4" />
-          My Listings
+          <span className="hidden sm:inline">My </span>Listings
           {myActiveCount > 0 && (
             <span className="ml-1 text-xs bg-[var(--cd-cyan)]/20 px-1.5 py-0.5 rounded">{myActiveCount}/{MAX_LISTINGS}</span>
           )}
         </button>
         <button
           onClick={() => { setView('create'); if (!myListings) fetchMyListings() }}
-          className={`cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+          className={`cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border shrink-0 ${
             view === 'create'
               ? 'bg-[var(--cd-magenta)]/10 text-[var(--cd-magenta)] border-[var(--cd-magenta)]/30'
               : 'text-white/40 border-white/10 hover:text-white/60'
           }`}
         >
           <Plus className="w-4 h-4" />
-          Sell Card
+          Sell
         </button>
       </div>
 
@@ -385,13 +386,13 @@ function BrowseView({
         </select>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
         <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head">Rarity:</span>
         {RARITY_ORDER.map(r => (
           <button
             key={r}
             onClick={() => toggleRarity(r)}
-            className={`text-xs px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
               rarity.includes(r)
                 ? 'border-current bg-current/10'
                 : 'border-white/10 text-white/30 hover:text-white/50'
@@ -402,12 +403,12 @@ function BrowseView({
           </button>
         ))}
 
-        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head ml-3">Type:</span>
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Type:</span>
         {CARD_TYPES.map(t => (
           <button
             key={t}
             onClick={() => toggleCardType(t)}
-            className={`text-xs px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
               cardType.includes(t)
                 ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
                 : 'border-white/10 text-white/30 hover:text-white/50'
@@ -442,7 +443,7 @@ function BrowseView({
           <p className="text-sm mt-1">Try adjusting your filters</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
           {listings.map(listing => (
             <ListingCard
               key={listing.id}
@@ -552,7 +553,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
       {active.length > 0 && (
         <>
           <h3 className="cd-head text-sm text-[var(--cd-cyan)] mb-3 tracking-wider">Active Listings ({active.length}/{MAX_LISTINGS})</h3>
-          <div className="flex flex-wrap gap-4 mb-8">
+          <div className="flex flex-wrap gap-4 mb-8 justify-center sm:justify-start">
             {active.map(listing => (
                 <div key={listing.id} className="flex flex-col items-center" style={{ width: BROWSE_CARD_SIZE }}>
                   <div className="card-zoomable" onClick={() => onZoom(listing.card)}>
@@ -582,7 +583,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
       {past.length > 0 && (
         <>
           <h3 className="cd-head text-sm text-white/40 mb-3 tracking-wider">History</h3>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
             {past.map(listing => (
                 <div key={listing.id} className="flex flex-col items-center opacity-50" style={{ width: BROWSE_CARD_SIZE }}>
                   <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
@@ -649,7 +650,7 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
           <p className="text-sm">No cards available to sell</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
           {filtered.map(card => (
               <div
                 key={card.id}

@@ -100,10 +100,10 @@ export default function CCTrading() {
       )}
 
       {view !== 'room' && (
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-2 sm:gap-4 mb-6 flex-wrap">
           <button
             onClick={() => setView('inbox')}
-            className={`cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+            className={`cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
               view === 'inbox'
                 ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
                 : 'text-white/40 border-white/10 hover:text-white/60'
@@ -117,7 +117,7 @@ export default function CCTrading() {
           </button>
           <button
             onClick={() => setView('history')}
-            className={`cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+            className={`cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border ${
               view === 'history'
                 ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
                 : 'text-white/40 border-white/10 hover:text-white/60'
@@ -128,10 +128,10 @@ export default function CCTrading() {
           </button>
           <button
             onClick={() => setSearchModal(true)}
-            className="cd-head flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border bg-[var(--cd-magenta)]/10 text-[var(--cd-magenta)] border-[var(--cd-magenta)]/30 hover:bg-[var(--cd-magenta)]/20"
+            className="cd-head flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer border bg-[var(--cd-magenta)]/10 text-[var(--cd-magenta)] border-[var(--cd-magenta)]/30 hover:bg-[var(--cd-magenta)]/20"
           >
             <Plus className="w-4 h-4" />
-            Start Trade
+            <span className="hidden sm:inline">Start </span>Trade
           </button>
         </div>
       )}
@@ -227,12 +227,12 @@ function InboxView({ trades, onJoin, onCancel, onEnterRoom }) {
 
 function TradeRow({ trade, action, actionDisabled, onAction, onCancel }) {
   return (
-    <div className="flex items-center gap-4 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-4 mb-2">
+    <div className="flex items-center gap-3 sm:gap-4 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-3 sm:p-4 mb-2">
       {trade.partnerAvatar && (
-        <img src={trade.partnerAvatar} alt="" className="w-8 h-8 rounded-full" />
+        <img src={trade.partnerAvatar} alt="" className="w-8 h-8 rounded-full shrink-0" />
       )}
-      <div className="flex-1">
-        <div className="text-sm font-bold text-white">{trade.partnerName}</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-bold text-white truncate">{trade.partnerName}</div>
         <div className="text-[10px] text-white/30">
           {new Date(trade.createdAt).toLocaleString()}
         </div>
@@ -241,10 +241,10 @@ function TradeRow({ trade, action, actionDisabled, onAction, onCancel }) {
         <button
           onClick={onAction}
           disabled={actionDisabled}
-          className="cd-head text-xs font-bold uppercase tracking-wider px-4 py-2 rounded
+          className="cd-head text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 sm:px-4 py-2 rounded
             bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/30
             hover:bg-[var(--cd-cyan)]/20 transition-all cursor-pointer
-            disabled:opacity-50 disabled:cursor-default"
+            disabled:opacity-50 disabled:cursor-default shrink-0"
         >
           {action}
         </button>
@@ -252,10 +252,11 @@ function TradeRow({ trade, action, actionDisabled, onAction, onCancel }) {
       {onCancel && (
         <button
           onClick={onCancel}
-          className="cd-head text-xs font-bold uppercase tracking-wider px-3 py-2 rounded
-            text-red-400/60 border border-red-500/20 hover:bg-red-500/10 transition-all cursor-pointer"
+          className="cd-head text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 sm:px-3 py-2 rounded
+            text-red-400/60 border border-red-500/20 hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
         >
-          Cancel
+          <X className="w-3.5 h-3.5 sm:hidden" />
+          <span className="hidden sm:inline">Cancel</span>
         </button>
       )}
     </div>
@@ -307,43 +308,44 @@ function UserSearchModal({ onClose, onSelect, currentUserId }) {
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const debounceRef = useRef(null)
 
-  const doSearch = async () => {
-    if (query.length < 2) return
-    setSearching(true)
-    setSearchError('')
-    try {
-      const data = await tradingService.searchUsers(query)
-      setResults((data.users || []).filter(u => u.id !== currentUserId))
-    } catch (err) {
-      setSearchError(err.message)
-    } finally {
-      setSearching(false)
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([])
+      return
     }
-  }
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true)
+      setSearchError('')
+      try {
+        const data = await tradingService.searchUsers(query)
+        setResults((data.users || []).filter(u => u.id !== currentUserId))
+      } catch (err) {
+        setSearchError(err.message)
+      } finally {
+        setSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(debounceRef.current)
+  }, [query, currentUserId])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
         <h3 className="cd-head text-lg text-[var(--cd-magenta)] tracking-wider mb-4">Start Trade</h3>
 
-        <div className="flex gap-2 mb-4">
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
             placeholder="Search by username..."
-            className="flex-1 bg-[var(--cd-edge)] border border-[var(--cd-border)] text-white text-sm px-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/50"
+            className="w-full bg-[var(--cd-edge)] border border-[var(--cd-border)] text-white text-sm pl-9 pr-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/50"
             autoFocus
           />
-          <button
-            onClick={doSearch}
-            disabled={query.length < 2}
-            className="px-3 py-2 bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/30 rounded cursor-pointer hover:bg-[var(--cd-cyan)]/20 transition-all disabled:opacity-30"
-          >
-            <Search className="w-4 h-4" />
-          </button>
         </div>
 
         {searchError && <div className="text-sm text-red-400 mb-3">{searchError}</div>}
@@ -527,27 +529,27 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-6 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {trade.partnerAvatar && (
-            <img src={trade.partnerAvatar} alt="" className="w-8 h-8 rounded-full" />
+            <img src={trade.partnerAvatar} alt="" className="w-8 h-8 rounded-full shrink-0" />
           )}
-          <div>
-            <span className="cd-head text-sm text-white/40 tracking-wider">Trading with</span>
-            <span className="text-sm font-bold text-white ml-2">{trade.partnerName}</span>
+          <div className="min-w-0">
+            <span className="cd-head text-xs sm:text-sm text-white/40 tracking-wider">Trading with</span>
+            <span className="text-xs sm:text-sm font-bold text-white ml-1 sm:ml-2 truncate">{trade.partnerName}</span>
           </div>
         </div>
         <button
           onClick={handleCancel}
-          className="cd-head text-xs font-bold uppercase tracking-wider px-4 py-2 rounded
-            text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all cursor-pointer"
+          className="cd-head text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 sm:px-4 py-2 rounded
+            text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
         >
-          Cancel Trade
+          Cancel
         </button>
       </div>
 
       {/* Trade area: two columns */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {/* My offer */}
         <div className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">

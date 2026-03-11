@@ -45,6 +45,14 @@ export async function createListing(sql, userId, { cardId, price }) {
     throw new Error(`Maximum ${MARKET_RULES.max_listings_per_user} active listings allowed`)
   }
 
+  // Check card not already listed
+  const [existing] = await sql`
+    SELECT id FROM cc_market_listings
+    WHERE card_id = ${cardId} AND status = 'active'
+    LIMIT 1
+  `
+  if (existing) throw new Error('This card is already on the market!')
+
   if (!price || price < 1) throw new Error('Price must be at least 1 Core')
 
   const [listing] = await sql`

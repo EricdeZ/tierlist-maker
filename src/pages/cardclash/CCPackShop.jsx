@@ -1,10 +1,12 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useCardClash } from './CardClashContext';
 import { usePassion } from '../../context/PassionContext';
 import { PACKS } from '../../data/cardclash/economy';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import CDChargeButton from './components/CDChargeButton';
+import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
 
 const CCPackSale = lazy(() => import('./CCPackSale'));
@@ -17,121 +19,27 @@ const PACK_META = {
 };
 
 // ═══════════════════════════════════════════════
-// Gas Valve Gauge — shows conversion rate pressure
+// Convert Link
 // ═══════════════════════════════════════════════
-function GasValve({ conversionsToday, nextCost, baseCost }) {
-  const ratio = nextCost / baseCost
-  const pressure = Math.min((ratio - 1) / 4 * 100, 100)
-  const needleAngle = -90 + (pressure / 100) * 180
-
-  const getColor = (pct) => {
-    if (pct < 25) return '#00e5ff'
-    if (pct < 50) return '#b44aff'
-    if (pct < 75) return '#ff2d78'
-    return '#ef4444'
-  }
-  const color = getColor(pressure)
+function ConvertLink() {
+  const [, setSearchParams] = useSearchParams()
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Rate Pressure</div>
-      <div className="relative w-24 h-14 overflow-hidden">
-        <svg viewBox="0 0 100 55" className="w-full h-full">
-          <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="white" strokeOpacity="0.1" strokeWidth="6" strokeLinecap="round" />
-          <path d="M 10 50 A 40 40 0 0 1 30 17" fill="none" stroke="#00e5ff" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
-          <path d="M 30 17 A 40 40 0 0 1 50 10" fill="none" stroke="#b44aff" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
-          <path d="M 50 10 A 40 40 0 0 1 70 17" fill="none" stroke="#ff2d78" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
-          <path d="M 70 17 A 40 40 0 0 1 90 50" fill="none" stroke="#ef4444" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
-          <g transform={`rotate(${needleAngle}, 50, 50)`} style={{ transition: 'transform 0.5s ease-out' }}>
-            <line x1="50" y1="50" x2="50" y2="15" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="3" fill={color} />
-          </g>
-          <circle cx="50" cy="50" r="2" fill="white" fillOpacity="0.8" />
-        </svg>
+    <div
+      onClick={() => setSearchParams({ tab: 'convert' })}
+      className="cd-panel cd-corners rounded-xl p-4 cursor-pointer hover:bg-white/[0.03] transition-colors group"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <img src={emberIcon} alt="Cores" className="h-5 w-auto object-contain cd-icon-glow" />
+        <span className="text-sm font-bold text-[var(--cd-cyan)] cd-head">Passion &rarr; Cores</span>
       </div>
-      <div className="text-xs font-bold tabular-nums" style={{ color }}>
-        {conversionsToday === 0 ? 'Base rate' : `${ratio.toFixed(1)}x cost`}
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════
-// Core Conversion Panel
-// ═══════════════════════════════════════════════
-function CoreConversion({ ember, passion, onConvert }) {
-  const [converting, setConverting] = useState(false)
-  const [result, setResult] = useState(null)
-  const canAfford = passion >= ember.nextConversionCost
-
-  const handleConvert = async () => {
-    setConverting(true)
-    setResult(null)
-    try {
-      const res = await onConvert()
-      setResult(res)
-      setTimeout(() => setResult(null), 3000)
-    } catch (err) {
-      // error handled by context
-    }
-    setConverting(false)
-  }
-
-  return (
-    <div className="cd-panel cd-corners rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <img src={emberIcon} alt="Cores" className="h-5 w-auto object-contain cd-icon-glow" />
-          <span className="text-sm font-bold text-[var(--cd-cyan)] cd-head">Passion &rarr; Cores</span>
-        </div>
-        <GasValve
-          conversionsToday={ember.conversionsToday}
-          nextCost={ember.nextConversionCost}
-          baseCost={50}
-        />
-      </div>
-
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex-1 text-center">
-          <div className="text-2xl font-bold text-amber-400 tabular-nums cd-num">{ember.nextConversionCost}</div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider">Passion cost</div>
-        </div>
-        <svg className="w-5 h-5 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <p className="text-xs text-white/50 mb-3">Convert your Passion into Cores to open more packs.</p>
+      <div className="flex items-center gap-1.5 text-[11px] text-[var(--cd-cyan)]/70 cd-head tracking-wider group-hover:text-[var(--cd-cyan)] transition-colors">
+        <span>Convert Now</span>
+        <svg className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
         </svg>
-        <div className="flex-1 text-center">
-          <div className="flex items-center justify-center gap-1">
-            <div className="text-2xl font-bold text-[var(--cd-cyan)] tabular-nums cd-num cd-text-glow">{ember.conversionEmberAmount}</div>
-            <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
-          </div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider">Cores gained</div>
-        </div>
       </div>
-
-      {result ? (
-        <div className="text-center py-1.5 text-sm cd-result-flash rounded-lg">
-          <span className="text-[var(--cd-cyan)] font-bold cd-text-glow cd-num">+{result.emberGained}</span>
-          <span className="text-white/60 ml-1">Cores received</span>
-        </div>
-      ) : (
-        <button
-          onClick={handleConvert}
-          disabled={!canAfford || converting}
-          className={`w-full py-2 rounded-lg font-bold text-sm cd-head tracking-wider ${
-            canAfford
-              ? 'cd-btn-solid cd-btn-action'
-              : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cursor-not-allowed'
-          }`}
-        >
-          {converting ? 'Converting...' : canAfford ? 'Convert' : `Need ${ember.nextConversionCost} Passion`}
-        </button>
-      )}
-
-      {ember.conversionsToday > 0 && (
-        <div className="text-[10px] text-white/30 text-center mt-2">
-          {ember.conversionsToday} conversion{ember.conversionsToday !== 1 ? 's' : ''} today &mdash; rates reset at midnight UTC
-        </div>
-      )}
     </div>
   )
 }
@@ -219,37 +127,269 @@ function DailyClaim({ ember, onClaim }) {
 }
 
 // ═══════════════════════════════════════════════
-// Top-level toggle — SHOP vs LIMITED SALE
+// Complete Challenges Link
+// ═══════════════════════════════════════════════
+function ChallengesLink() {
+  const [, setSearchParams] = useSearchParams()
+
+  return (
+    <div
+      onClick={() => setSearchParams({ tab: 'challenges' })}
+      className="cd-panel cd-corners rounded-xl p-4 cursor-pointer hover:bg-white/[0.03] transition-colors group"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <img src={emberIcon} alt="Cores" className="h-5 w-auto object-contain cd-icon-glow" />
+        <span className="text-sm font-bold text-[var(--cd-cyan)] cd-head">Challenges</span>
+      </div>
+      <p className="text-xs text-white/50 mb-3">Complete challenges to earn Cores and Passion rewards.</p>
+      <div className="flex items-center gap-1.5 text-[11px] text-[var(--cd-cyan)]/70 cd-head tracking-wider group-hover:text-[var(--cd-cyan)] transition-colors">
+        <span>View Challenges</span>
+        <svg className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// "Not enough cores" hint — links to challenges or converter
+// ═══════════════════════════════════════════════
+function GetCoresHint({ claimableCount }) {
+  const [, setSearchParams] = useSearchParams()
+  const hasChallenges = claimableCount > 0
+
+  return (
+    <div className="mt-3 text-center text-xs text-white/40">
+      <span>Not enough Cores? </span>
+      <button
+        onClick={() => setSearchParams({ tab: hasChallenges ? 'challenges' : 'convert' })}
+        className="text-[var(--cd-cyan)] hover:text-[var(--cd-cyan)]/80 transition-colors cursor-pointer font-semibold"
+      >
+        {hasChallenges ? `Claim ${claimableCount} challenge${claimableCount !== 1 ? 's' : ''}` : 'Convert Passion'}
+      </button>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// My Packs — inventory + unopened gifts
+// ═══════════════════════════════════════════════
+function MyPacks() {
+  const { inventory, openInventoryPack, giftData, openGift } = useCardClash();
+  const [openResult, setOpenResult] = useState(null);
+  const [loading, setLoading] = useState(null);
+
+  const unopenedGifts = (giftData?.received || []).filter(g => !g.opened);
+  const hasAny = (inventory?.length || 0) + unopenedGifts.length > 0;
+
+  const handleOpenInventory = useCallback(async (item) => {
+    try {
+      setLoading(`inv-${item.id}`);
+      const result = await openInventoryPack(item.id);
+      if (!result) { setLoading(null); return; }
+      setOpenResult({ ...result, packType: item.packTypeId });
+      setLoading(null);
+    } catch (err) {
+      setLoading(null);
+      alert(err.message || 'Failed to open pack');
+    }
+  }, [openInventoryPack]);
+
+  const handleOpenGift = useCallback(async (gift) => {
+    try {
+      setLoading(`gift-${gift.id}`);
+      const result = await openGift(gift.id);
+      if (!result) { setLoading(null); return; }
+      setOpenResult(result);
+      setLoading(null);
+    } catch (err) {
+      setLoading(null);
+      alert(err.message || 'Failed to open gift');
+    }
+  }, [openGift]);
+
+  if (!hasAny) {
+    return (
+      <div className="text-center py-16">
+        <Package className="w-10 h-10 text-white/15 mx-auto mb-3" />
+        <p className="text-white/30 cd-head tracking-wider text-sm">No packs in your inventory</p>
+        <p className="text-white/20 text-xs mt-1">Buy packs from the Shop or receive gifts from friends</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Inventory Packs */}
+      {inventory.length > 0 && (
+        <div className="mb-8">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">
+            Starter Packs
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {inventory.map((item, i) => {
+              const pack = PACKS[item.packTypeId];
+              if (!pack) return null;
+              const meta = PACK_META[item.packTypeId];
+              const isOpening = loading === `inv-${item.id}`;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleOpenInventory(item)}
+                  disabled={!!loading}
+                  className="cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-white/[0.03] transition-all disabled:opacity-50 group"
+                  style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
+                >
+                  <div className="relative group-hover:scale-105 transition-transform">
+                    <PackArt
+                      tier={item.packTypeId}
+                      name={pack.name}
+                      subtitle={meta?.subtitle || ''}
+                      cardCount={pack.cards}
+                      seed={meta?.seed || 5}
+                      compact
+                    />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-cyan)' }}>
+                      {pack.name}
+                    </div>
+                    <div className="text-[10px] text-white/30">{pack.cards} cards</div>
+                  </div>
+                  {isOpening ? (
+                    <div className="cd-spinner w-4 h-4" />
+                  ) : (
+                    <span className="text-[10px] text-emerald-400/70 cd-head tracking-wider font-bold group-hover:text-emerald-400 transition-colors">
+                      TAP TO OPEN
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Unopened Gifts */}
+      {unopenedGifts.length > 0 && (
+        <div>
+          <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">
+            Gift Packs
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {unopenedGifts.map((gift, i) => {
+              const packType = gift.packType || 'gift';
+              const pack = PACKS[packType];
+              const isOpening = loading === `gift-${gift.id}`;
+              return (
+                <button
+                  key={gift.id}
+                  onClick={() => handleOpenGift(gift)}
+                  disabled={!!loading}
+                  className="cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-white/[0.03] transition-all disabled:opacity-50 group"
+                  style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
+                >
+                  <div className="relative group-hover:scale-105 transition-transform">
+                    <PackArt
+                      tier={packType}
+                      name={pack?.name || 'Gift Pack'}
+                      subtitle="Gift"
+                      cardCount={pack?.cards || 5}
+                      seed={i + 10}
+                      compact
+                    />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-bold cd-head tracking-wider text-red-400">
+                      From {gift.senderName}
+                    </div>
+                    {gift.message && (
+                      <div className="text-[10px] text-white/30 truncate max-w-[120px] italic">"{gift.message}"</div>
+                    )}
+                  </div>
+                  {isOpening ? (
+                    <div className="cd-spinner w-4 h-4" />
+                  ) : (
+                    <span className="text-[10px] text-emerald-400/70 cd-head tracking-wider font-bold group-hover:text-emerald-400 transition-colors">
+                      TAP TO OPEN
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Pack opening ceremony */}
+      {openResult && (
+        <PackOpening
+          result={openResult}
+          packType={openResult.packType}
+          onClose={() => setOpenResult(null)}
+          onOpenMore={() => setOpenResult(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Top-level toggle — MY PACKS / SHOP / LIMITED SALE
 // ═══════════════════════════════════════════════
 export default function PackShopRouter() {
+  const { inventory, giftData } = useCardClash();
   const [mode, setMode] = useState('shop');
+
+  const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length;
+  const myPacksCount = (inventory?.length || 0) + unopenedGifts;
+
   return (
     <>
-      <div className="flex justify-center gap-2 mb-4 relative z-40">
+      <div className="flex justify-center gap-1.5 sm:gap-2 -mt-2 sm:mt-0 mb-2 sm:mb-4 relative z-40">
+        <button
+          onClick={() => setMode('my-packs')}
+          className={`relative px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+            mode === 'my-packs'
+              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
+          }`}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
+        >
+          MY PACKS
+          {myPacksCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-[10px] font-bold text-black flex items-center justify-center">
+              {myPacksCount}
+            </span>
+          )}
+        </button>
         <button
           onClick={() => setMode('shop')}
-          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+          className={`px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
             mode === 'shop'
               ? 'bg-white/10 text-white border-white/30'
               : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
           }`}
-          style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, letterSpacing: '0.2em' }}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
         >
           SHOP
         </button>
         <button
           onClick={() => setMode('sale')}
-          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+          className={`px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
             mode === 'sale'
               ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
               : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
           }`}
-          style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, letterSpacing: '0.2em' }}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
         >
           LIMITED SALE
         </button>
       </div>
-      {mode === 'shop' ? (
+      {mode === 'my-packs' ? (
+        <MyPacks />
+      ) : mode === 'shop' ? (
         <PackShop />
       ) : (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
@@ -261,11 +401,147 @@ export default function PackShopRouter() {
 }
 
 // ═══════════════════════════════════════════════
+// Mobile Pack Showcase — fullscreen with tilt
+// ═══════════════════════════════════════════════
+function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableCount }) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const scrollRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Device orientation tilt (phone gyroscope only)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.gamma === null || e.beta === null) return;
+      const x = Math.max(-15, Math.min(15, e.gamma));
+      const y = Math.max(-15, Math.min(15, e.beta - 45));
+      setTilt({ x: x / 15 * 12, y: y / 15 * 8 });
+    };
+    window.addEventListener('deviceorientation', handler);
+    return () => window.removeEventListener('deviceorientation', handler);
+  }, []);
+
+  // Track which pack is visible via scroll position
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.offsetWidth);
+    setActiveIndex(Math.max(0, Math.min(idx, packs.length - 1)));
+  }, [packs.length]);
+
+  return (
+    <div className="sm:hidden">
+      {/* Horizontal snap scroll for packs */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex snap-x snap-mandatory overflow-x-auto -mx-4"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+      >
+        {packs.map((key) => {
+          const pack = PACKS[key];
+          const meta = PACK_META[key];
+          const canAfford = emberBalance >= pack.cost;
+
+          return (
+            <div key={key} className="snap-center shrink-0 w-full flex flex-col items-center px-4 pt-2 pb-4">
+              {/* Pack art with gyro 3D tilt */}
+              <div
+                className="relative"
+                style={{
+                  transform: `perspective(600px) rotateY(${tilt.x}deg) rotateX(${-tilt.y}deg)`,
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 0.15s ease-out',
+                }}
+              >
+                {/* Ambient glow — follows tilt */}
+                <div
+                  className="absolute -inset-16 rounded-3xl"
+                  style={{
+                    background: `radial-gradient(ellipse at ${50 + tilt.x * 2}% ${50 + tilt.y * 2}%, ${pack.color || 'var(--cd-cyan)'}40 0%, transparent 70%)`,
+                    filter: 'blur(40px)',
+                    opacity: 0.6,
+                  }}
+                />
+                {/* Specular highlight — shifts with tilt */}
+                <div
+                  className="absolute inset-0 rounded-xl pointer-events-none z-10"
+                  style={{
+                    background: `radial-gradient(ellipse at ${50 + tilt.x * 3}% ${40 + tilt.y * 3}%, rgba(255,255,255,0.15) 0%, transparent 55%)`,
+                  }}
+                />
+                <PackArt tier={key} name={pack.name} subtitle={meta.subtitle} cardCount={pack.cards} seed={meta.seed} />
+              </div>
+
+              {/* Pack info */}
+              <div className="w-full mt-5">
+                <h3 className="cd-head text-xl font-bold mb-0.5" style={{ color: pack.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
+                  {pack.name}
+                </h3>
+                <p className="text-xs text-white/40 cd-head tracking-widest mb-3">{meta.subtitle}</p>
+
+                <div className="flex gap-4 mb-4 text-[12px] text-white/50">
+                  <span><span className="text-white font-bold">6</span> cards</span>
+                  <span>1 <span className="font-bold" style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player</span>
+                  <span>1 <span className="text-green-400 font-bold">Rare+</span></span>
+                </div>
+
+                <div className="flex items-center gap-2.5 mb-4">
+                  <img src={emberIcon} alt="" className="h-5 w-auto object-contain cd-icon-glow" />
+                  <span className="text-2xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.cost}</span>
+                  <span className="text-sm text-white/40 cd-head tracking-wider">Cores</span>
+                </div>
+
+                <CDChargeButton
+                  label={canAfford ? `Open for ${pack.cost}` : `Need ${pack.cost} Cores`}
+                  onFire={() => onBuy(key)}
+                  disabled={!canAfford || !!openResult}
+                />
+                {!canAfford && <GetCoresHint claimableCount={claimableCount} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Scroll indicator dots */}
+      <div className="flex justify-center gap-3 mt-1 mb-1">
+        {packs.map((k, i) => {
+          const pack = PACKS[k];
+          return (
+            <button
+              key={k}
+              onClick={() => {
+                scrollRef.current?.scrollTo({ left: i * scrollRef.current.offsetWidth, behavior: 'smooth' });
+              }}
+              className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
+                i === activeIndex ? 'scale-125' : 'bg-white/20'
+              }`}
+              style={i === activeIndex ? {
+                background: pack.color || 'var(--cd-cyan)',
+                boxShadow: `0 0 8px ${pack.color || 'var(--cd-cyan)'}`,
+              } : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {/* Scroll down indicator */}
+      <div className="flex flex-col items-center mt-3 mb-1 animate-bounce">
+        <span className="text-[10px] text-white/20 cd-head tracking-widest mb-1">Scroll for more</span>
+        <svg className="w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // Main Pack Shop (original)
 // ═══════════════════════════════════════════════
 function PackShop() {
-  const { passion, ember, buyPack, convertPassionToEmber } = useCardClash();
-  const { claimEmberDaily } = usePassion();
+  const { ember, buyPack } = useCardClash();
+  const { claimEmberDaily, claimableCount } = usePassion();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -313,14 +589,14 @@ function PackShop() {
 
   return (
     <div>
-      {/* ═══ Pack Showcase ═══ */}
+      {/* ═══ Pack Showcase — Desktop (>=640px) ═══ */}
       <div
-        className="relative py-8"
+        className="relative py-8 hidden sm:block"
         style={{ minHeight: 420 }}
         onClick={() => focusedPack && setFocusedPack(null)}
       >
         {/* Packs row — always in place */}
-        <div ref={rowRef} className="flex items-center justify-center gap-8 sm:gap-16">
+        <div ref={rowRef} className="flex items-center justify-center gap-16">
           {LEAGUE_PACKS.map((key) => {
             const pack = PACKS[key];
             const meta = PACK_META[key];
@@ -439,6 +715,7 @@ function PackShop() {
                     onFire={() => handleBuyPack(focusedPack)}
                     disabled={!afford || !!openResult}
                   />
+                  {!afford && <GetCoresHint claimableCount={claimableCount} />}
 
                   <button
                     onClick={() => setFocusedPack(null)}
@@ -453,6 +730,15 @@ function PackShop() {
         </div>
       </div>
 
+      {/* ═══ Pack Showcase — Mobile (<640px) ═══ */}
+      <MobilePackShowcase
+        packs={LEAGUE_PACKS}
+        emberBalance={emberBalance}
+        onBuy={handleBuyPack}
+        openResult={openResult}
+        claimableCount={claimableCount}
+      />
+
       {/* ═══ Bottom UI — blurs when pack is focused ═══ */}
       <div
         className="transition-all duration-500 ease-out"
@@ -462,9 +748,9 @@ function PackShop() {
           pointerEvents: focusedPack ? 'none' : undefined,
         }}
       >
-        {/* Hint when nothing selected */}
+        {/* Hint when nothing selected — desktop only */}
         {!openResult && (
-          <div className="text-center text-[11px] text-white/20 cd-head tracking-widest mb-8 -mt-2">
+          <div className="hidden sm:block text-center text-[11px] text-white/20 cd-head tracking-widest mb-8 -mt-2">
             {focusedPack ? '' : 'Select a pack to open'}
           </div>
         )}
@@ -473,13 +759,14 @@ function PackShop() {
         <div className="cd-divider max-w-lg mx-auto mb-8" />
 
         {/* ═══ Core Economy Panel ═══ */}
-        <div className="max-w-md mx-auto mb-8">
+        <div className="max-w-3xl mx-auto mb-8">
           <div className="text-center mb-4">
             <h3 className="cd-head text-sm text-[var(--cd-text-mid)] tracking-widest">Get Cores</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 cd-stagger">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 cd-stagger">
             <DailyClaim ember={ember} onClaim={claimEmberDaily} />
-            <CoreConversion ember={ember} passion={passion} onConvert={convertPassionToEmber} />
+            <ConvertLink />
+            <ChallengesLink />
           </div>
         </div>
       </div>

@@ -50,7 +50,7 @@ export default function SidebarTrigger({ hideOnSmall = false }) {
     return (
         <button
             onClick={toggle}
-            className={`fixed top-3 left-3 z-[55] h-10 items-center gap-2 overflow-hidden
+            className={`fixed top-3 left-3 z-[55] h-[55px] items-center gap-2 overflow-hidden
                 rounded-xl border border-(--color-accent)/30
                 text-(--color-accent) hover:border-(--color-accent)/60
                 transition-all duration-500 ease-in-out cursor-pointer
@@ -59,17 +59,17 @@ export default function SidebarTrigger({ hideOnSmall = false }) {
                 ${isOpen ? 'bg-(--color-primary)/80 backdrop-blur-sm' : ''}
             `}
             style={{
-                width: isExpanded ? '175px' : '40px',
+                width: isExpanded ? '195px' : '55px',
                 ...(!isOpen ? {
                     background: isExpanded
-                        ? 'linear-gradient(135deg, rgba(248,197,106,0.2), rgba(248,197,106,0.08))'
-                        : 'linear-gradient(135deg, rgba(248,197,106,0.15), rgba(248,197,106,0.05))',
+                        ? 'linear-gradient(135deg, #2a1f0a, #1a1408)'
+                        : 'linear-gradient(135deg, #2a1f0a, #1a1408)',
                 } : {}),
             }}
             aria-label={isOpen ? 'Close menu' : `Open menu (${shortcutLabel})`}
         >
             <ChevronRight
-                className={`w-5 h-5 shrink-0 ml-[9px] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                className={`w-6 h-6 shrink-0 ml-[15px] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
                 strokeWidth={2.5}
             />
             <span

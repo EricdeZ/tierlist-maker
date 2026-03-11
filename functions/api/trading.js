@@ -7,6 +7,7 @@ import {
   addCard, removeCard, setCore, setReady,
   confirmTrade, pollTrade, expireStale,
 } from '../lib/trading.js'
+import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 
 const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -181,9 +182,21 @@ async function handleConfirm(user, body) {
   const { tradeId } = body
   if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
 
+  const sql = getDB()
   const result = await transaction(async (tx) => {
     return await confirmTrade(tx, user.id, parseInt(tradeId))
   })
+
+  // Push vault challenge progress for both traders (fire-and-forget)
+  if (result.status === 'completed' && result.trade) {
+    const pushForUser = (uid) =>
+      getVaultStats(sql, uid)
+        .then(stats => pushChallengeProgress(sql, uid, stats))
+        .catch(err => console.error('Vault challenge push (trade) failed:', err))
+    pushForUser(result.trade.player_a_id)
+    pushForUser(result.trade.player_b_id)
+  }
+
   return { statusCode: 200, headers, body: JSON.stringify(result) }
 }
 

@@ -335,6 +335,29 @@
     z-index: 1;
 }
 
+/* Suppress blazing effects on desktop when change <= 35% */
+@media (min-width: 640px) {
+    .forge-blazing-mobile-only.forge-blazing.forge-player-row-wrapper {
+        animation: none;
+    }
+    .forge-blazing-mobile-only .forge-fire-overlay,
+    .forge-blazing-mobile-only .forge-fire-bottom-glow {
+        display: none;
+    }
+    .forge-blazing-mobile-only .forge-heat-bar {
+        animation: none;
+        background: var(--forge-gold);
+        box-shadow: none;
+    }
+    .forge-blazing-mobile-only .forge-price-text {
+        background: none;
+        -webkit-background-clip: unset;
+        -webkit-text-fill-color: unset;
+        background-clip: unset;
+        filter: none;
+    }
+}
+
 /* Warm (0-10% gain) */
 .forge-warm .forge-heat-bar {
     background: var(--forge-gold);

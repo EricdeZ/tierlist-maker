@@ -31,6 +31,14 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
   const [loadingStats, setLoadingStats] = useState(!!playerCard?.defId)
   const [closing, setClosing] = useState(false)
 
+  // Rarity switcher
+  const ownedRarities = gameCard?.ownedRarities || playerCard?.ownedRarities || []
+  const sortedOwned = useMemo(
+    () => RARITY_ORDER.filter(r => ownedRarities.includes(r)),
+    [ownedRarities]
+  )
+  const [displayRarity, setDisplayRarity] = useState(gameCard?.rarity || playerCard?.rarity || 'common')
+
   // Sell form state
   const [sellMode, setSellMode] = useState(false)
   const [sellRarity, setSellRarity] = useState(null)
@@ -87,11 +95,10 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
   // Default sell rarity to the displayed rarity
   useEffect(() => {
     if (sellMode && sellableInstances.length > 0 && !sellRarity) {
-      const displayedRarity = gameCard?.rarity || playerCard?.rarity || 'common'
-      const match = sellableInstances.find(i => i.rarity === displayedRarity)
-      setSellRarity(match ? displayedRarity : sellableInstances[0].rarity)
+      const match = sellableInstances.find(i => i.rarity === displayRarity)
+      setSellRarity(match ? displayRarity : sellableInstances[0].rarity)
     }
-  }, [sellMode, sellableInstances, sellRarity, gameCard, playerCard])
+  }, [sellMode, sellableInstances, sellRarity, displayRarity])
 
   const selectedInstance = sellableInstances.find(i => i.rarity === sellRarity)
   const priceNum = parseInt(sellPrice, 10)
@@ -111,7 +118,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
     }
   }
 
-  const rarity = gameCard?.rarity || playerCard?.rarity || 'common'
+  const rarity = displayRarity
   const rarityInfo = RARITIES[rarity]
   const holoEffect = getHoloEffect(rarity)
 
@@ -136,16 +143,16 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
         </button>
 
         {showSpinner ? (
-          <div className="flex items-center justify-center" style={{ width: 340, aspectRatio: '63/88' }}>
+          <div className="flex items-center justify-center" style={{ width: 'min(340px, 85vw)', aspectRatio: '63/88' }}>
             <div className="cd-spinner w-8 h-8" />
           </div>
         ) : (
           <>
             {gameCard && (
-              <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size={340}>
+              <TradingCardHolo rarity={holoEffect} role={role} holoType="reverse" size="min(340px, 85vw)">
                 <GameCard
                   type={gameCard.type}
-                  rarity={gameCard.rarity}
+                  rarity={rarity}
                   data={gameCard.data}
                 />
               </TradingCardHolo>
@@ -167,6 +174,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
                   stats={stats || EMPTY_STATS}
                   bestGod={bestGod}
                   isConnected={isConnected}
+                  isFirstEdition={playerCard.isFirstEdition}
                 />
               </TradingCardHolo>
             )}
@@ -182,6 +190,30 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
           </span>
         </div>
 
+        {/* Rarity switcher */}
+        {sortedOwned.length > 1 && (
+          <div className="mt-2 flex gap-1.5 justify-center">
+            {sortedOwned.map(r => {
+              const ri = RARITIES[r]
+              const active = displayRarity === r
+              return (
+                <button
+                  key={r}
+                  onClick={() => { setDisplayRarity(r); setSellRarity(null) }}
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cd-head border transition-all cursor-pointer ${
+                    active
+                      ? 'border-current bg-current/10'
+                      : 'border-white/10 text-white/30 hover:text-white/60'
+                  }`}
+                  style={active ? { color: ri?.color, borderColor: `${ri?.color}44` } : undefined}
+                >
+                  {ri?.name || r}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Sell button / form */}
         {canSell && sellableInstances.length > 0 && !sellMode && !sellSuccess && (
           <button
@@ -195,30 +227,6 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell }
 
         {sellMode && !sellSuccess && (
           <div className="mt-3 w-full space-y-3">
-            {/* Rarity picker */}
-            {sellableInstances.length > 1 && (
-              <div className="flex gap-1.5 justify-center">
-                {sellableInstances.map(inst => {
-                  const ri = RARITIES[inst.rarity]
-                  const active = sellRarity === inst.rarity
-                  return (
-                    <button
-                      key={inst.rarity}
-                      onClick={() => setSellRarity(inst.rarity)}
-                      className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cd-head border transition-all cursor-pointer ${
-                        active
-                          ? 'border-current bg-current/10'
-                          : 'border-white/10 text-white/30 hover:text-white/60'
-                      }`}
-                      style={active ? { color: ri?.color, borderColor: `${ri?.color}44` } : undefined}
-                    >
-                      {ri?.name || inst.rarity}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
             {/* Price input */}
             <div className="flex items-center gap-2">
               <input

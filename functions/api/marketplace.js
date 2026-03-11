@@ -3,6 +3,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { createListing, cancelListing, buyListing, MARKET_RULES, calculateFee } from '../lib/marketplace.js'
+import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 
 const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -167,6 +168,14 @@ async function handleBuy(sql, user, body) {
   const result = await transaction(async (tx) => {
     return await buyListing(tx, user.id, listingId)
   })
+
+  // Push vault challenge progress for buyer and seller (fire-and-forget)
+  const pushForUser = (uid) =>
+    getVaultStats(sql, uid)
+      .then(stats => pushChallengeProgress(sql, uid, stats))
+      .catch(err => console.error('Vault challenge push (marketplace) failed:', err))
+  pushForUser(user.id)
+  if (result.listing?.seller_id) pushForUser(result.listing.seller_id)
 
   return {
     statusCode: 200, headers,

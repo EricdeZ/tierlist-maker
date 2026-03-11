@@ -125,7 +125,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 4px 4px 6px;
+  padding: 0;
   cursor: pointer;
   transition: background 0.2s;
   border-radius: 4px;
@@ -172,81 +172,84 @@
   50% { border-color: rgba(255, 220, 160, 0.5); }
 }
 
-/* Slot code label */
-.vm-slot-code {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.2);
-  z-index: 2;
+/* Pack art container — sits in the slot naturally */
+.vm-slot-pack {
+  transform: scale(0.44);
+  transform-origin: center bottom;
+  margin: -56px 0 0;
+  pointer-events: none;
+  transition: transform 0.3s;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
-.vm-slot-selected .vm-slot-code {
+.vm-slot:hover .vm-slot-pack {
+  transform: scale(0.47);
+}
+
+/* Label strip — like a real vending machine price tag */
+.vm-slot-label {
+  width: 100%;
+  background: linear-gradient(180deg, #1a1720, #12101a);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 6px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+  border-radius: 0 0 3px 3px;
+  min-height: 28px;
+}
+
+.vm-label-code {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.05em;
+}
+
+.vm-slot-selected .vm-label-code {
   color: #ffd080;
   text-shadow: 0 0 6px rgba(255, 208, 128, 0.4);
 }
 
-/* Pack art container */
-.vm-slot-pack {
-  transform: scale(0.55);
-  transform-origin: center center;
-  margin: -48px 0 -44px;
-  pointer-events: none;
-  transition: transform 0.3s;
-}
-
-.vm-slot:hover .vm-slot-pack {
-  transform: scale(0.58);
-}
-
-/* Pack name */
-.vm-slot-name {
-  font-family: 'Teko', sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.2);
-  text-align: center;
-  margin-top: -2px;
-  z-index: 2;
-}
-
-.vm-slot-selected .vm-slot-name {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-/* Price label */
-.vm-slot-price {
+.vm-label-price {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.45);
-  z-index: 2;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.vm-slot-selected .vm-slot-price {
+.vm-slot-selected .vm-label-price {
   color: #ffd080;
 }
 
 .vm-price-icon {
-  width: 14px;
+  width: 12px;
   height: auto;
+  opacity: 0.7;
 }
 
-/* Stock counter */
-.vm-slot-stock {
+.vm-slot-selected .vm-price-icon {
+  opacity: 1;
+}
+
+.vm-label-stock {
   font-family: 'Share Tech Mono', monospace;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.25);
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.2);
   letter-spacing: 0.05em;
-  z-index: 2;
-  margin-top: 1px;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 5;
 }
 
 /* Sold-out overlay */
@@ -286,16 +289,65 @@
   z-index: 2;
 }
 
-/* Shelf under each pack */
+/* Shelf under each pack — sits just above the label strip */
 .vm-shelf {
   position: absolute;
   bottom: 28px;
-  left: 8px;
-  right: 8px;
+  left: 4px;
+  right: 4px;
   height: 3px;
   background: linear-gradient(180deg, #3a3540, #2a2630);
   border-radius: 1px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Pack Zoom Modal ── */
+.vm-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  animation: vm-zoom-fade 0.25s ease-out;
+  cursor: pointer;
+}
+
+@keyframes vm-zoom-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.vm-zoom-content {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  cursor: default;
+  animation: vm-zoom-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-width: 90vw;
+}
+
+@keyframes vm-zoom-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.vm-zoom-pack-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .vm-zoom-content {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .vm-zoom-pack-wrap {
+    transform: scale(0.85);
+  }
 }
 
 
@@ -781,14 +833,14 @@
 }
 
 @keyframes vm-pack-fall {
-  0%  { transform: scale(0.55) translateY(0) translateX(0); }
-  6%  { transform: scale(0.55) translateY(0) translateX(-4px); }
-  12% { transform: scale(0.55) translateY(0) translateX(4px); }
-  18% { transform: scale(0.55) translateY(0) translateX(-3px); }
-  24% { transform: scale(0.55) translateY(0) translateX(3px); }
-  30% { transform: scale(0.55) translateY(0) translateX(-2px); }
-  36% { transform: scale(0.55) translateY(0) translateX(0); }
-  100% { transform: scale(0.55) translateY(300px) translateX(0); }
+  0%  { transform: scale(0.44) translateY(0) translateX(0); }
+  6%  { transform: scale(0.44) translateY(0) translateX(-4px); }
+  12% { transform: scale(0.44) translateY(0) translateX(4px); }
+  18% { transform: scale(0.44) translateY(0) translateX(-3px); }
+  24% { transform: scale(0.44) translateY(0) translateX(3px); }
+  30% { transform: scale(0.44) translateY(0) translateX(-2px); }
+  36% { transform: scale(0.44) translateY(0) translateX(0); }
+  100% { transform: scale(0.44) translateY(300px) translateX(0); }
 }
 
 /* Empty slot after dispensing */
@@ -796,6 +848,183 @@
   visibility: hidden;
 }
 
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — Mobile/tablet scaling
+   ═══════════════════════════════════════════════ */
+
+@media (max-width: 639px) {
+  .alley {
+    min-height: auto;
+    padding: 0.5rem 0.25rem 0;
+    background: #050308;
+  }
+
+  .alley-svg {
+    display: none;
+  }
+
+  .alley-content {
+    padding-bottom: 30px;
+  }
+
+  .alley-content .vm-body,
+  .vm-body {
+    width: 100%;
+    max-width: 320px;
+    border-radius: 10px 10px 4px 4px;
+  }
+
+  .vm-header {
+    padding: 6px 10px;
+  }
+
+  .vm-header-text {
+    font-size: 18px;
+    letter-spacing: 0.15em;
+  }
+
+  .vm-main {
+    flex-direction: column;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .vm-glass-inner {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .vm-slot {
+    height: 100px;
+    padding: 0;
+  }
+
+  .vm-slot-pack {
+    transform: scale(0.26);
+    margin: -30px 0 0;
+  }
+
+  .vm-slot-label {
+    padding: 2px 4px 3px;
+    min-height: 20px;
+  }
+
+  .vm-label-code {
+    font-size: 8px;
+  }
+
+  .vm-label-price {
+    font-size: 8px;
+    gap: 2px;
+  }
+
+  .vm-label-price .vm-price-icon {
+    width: 8px;
+  }
+
+  .vm-shelf {
+    bottom: 20px;
+  }
+
+  .vm-zoom-pack {
+    transform: scale(0.9);
+  }
+
+  .vm-zoom-info {
+    width: 260px;
+    padding: 12px 14px;
+  }
+
+  .vm-controls {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .vm-display {
+    padding: 6px 8px;
+  }
+
+  .vm-display-line1 {
+    font-size: 13px;
+  }
+
+  .vm-display-line2 {
+    font-size: 9px;
+  }
+
+  .vm-keypad {
+    gap: 3px;
+  }
+
+  .vm-key {
+    min-width: 26px;
+    min-height: 26px;
+    font-size: 10px;
+    padding: 2px;
+  }
+
+  .vm-vend-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+
+  .vm-coin-slot {
+    padding: 4px;
+  }
+
+  .vm-coin-label {
+    font-size: 7px;
+  }
+
+  .vm-coin-opening {
+    width: 30px;
+  }
+
+  .vm-tray {
+    min-height: 40px;
+  }
+
+  .vm-tray-inner {
+    min-height: 35px;
+    padding: 4px;
+  }
+
+  .vm-tray-grab {
+    font-size: 10px;
+  }
+
+  .vm-tray-pack-art {
+    transform: scale(0.6);
+  }
+
+  .vm-balance {
+    font-size: 11px;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .vm-balance-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .vm-base {
+    height: 8px;
+  }
+
+  .vm-sold-out-text {
+    font-size: 10px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .alley-content .vm-body,
+  .vm-body {
+    width: 440px;
+  }
+}
 
 /* ═══════════════════════════════════════════════
    REDUCED MOTION

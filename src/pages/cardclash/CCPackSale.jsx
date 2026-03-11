@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useCardClash } from './CardClashContext';
+import { PACKS } from '../../data/cardclash/economy';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import emberIcon from '../../assets/ember.png';
@@ -141,6 +142,100 @@ function AlleyScene({ children }) {
   );
 }
 
+// ═══ Pack Zoom Modal — shows pack details on click ═══
+
+function PackZoomModal({ slot, onClose }) {
+  const pack = slot.pack;
+  const packTypeId = pack.packTypeId || pack.id;
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div className="vm-zoom-overlay" onClick={onClose}>
+      <div className="vm-zoom-content" onClick={(e) => e.stopPropagation()}>
+        {/* Pack art with ambient glow */}
+        <div className="vm-zoom-pack-wrap">
+          <div
+            className="absolute -inset-20 rounded-3xl"
+            style={{
+              background: `radial-gradient(ellipse, ${PACKS[packTypeId]?.color || 'var(--cd-cyan)'}40 0%, transparent 70%)`,
+              filter: 'blur(60px)',
+              opacity: 0.7,
+            }}
+          />
+          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-4 rounded-full"
+            style={{ background: PACKS[packTypeId]?.color || 'var(--cd-cyan)', filter: 'blur(16px)', opacity: 0.5 }}
+          />
+          <PackArt
+            tier={packTypeId}
+            name={pack.name}
+            cardCount={pack.cards}
+            seed={PACK_SEEDS[packTypeId] ?? 0}
+          />
+        </div>
+
+        {/* Info panel — matches regular shop style */}
+        <div className="cd-panel cd-corners rounded-xl p-6 w-80 relative overflow-hidden">
+          <div className="cd-data-overlay" />
+          <div className="relative z-1">
+            <h3 className="cd-head text-2xl font-bold mb-1" style={{ color: PACKS[packTypeId]?.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
+              {pack.name}
+            </h3>
+            {pack.description && (
+              <p className="text-xs text-white/40 cd-head tracking-widest mb-5">{pack.description}</p>
+            )}
+
+            <div className="space-y-2.5 mb-6 text-[13px] text-white/60">
+              <div className="flex items-center gap-2.5">
+                <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12l4 6-10 13L2 9z" /></svg>
+                <span><span className="text-white font-bold">{pack.cards}</span> cards per pack</span>
+              </div>
+              {pack.category === 'mixed' && (
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" /></svg>
+                    <span>1 guaranteed <span className="font-bold" style={{ color: PACKS[packTypeId]?.color }}>Player</span> card</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-green-400/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
+                    <span>1 <span className="text-green-400 font-bold">Rare+</span> guaranteed slot</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" /></svg>
+                    <span>1 <span className="text-[var(--cd-cyan)] font-bold">Wildcard</span> slot</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 mb-4">
+              <img src={emberIcon} alt="" className="h-6 w-auto object-contain cd-icon-glow" />
+              <span className="text-3xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.price}</span>
+              <span className="text-sm text-white/40 cd-head tracking-wider">Cores</span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-white/30 cd-head tracking-widest">
+              <span>Stock</span>
+              <span className="text-white/50 font-bold">{pack.stock} <span className="font-normal text-white/20">/ {pack.initialStock}</span></span>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="mt-5 text-[11px] text-white/20 cd-head tracking-widest hover:text-white/40 transition-colors cursor-pointer w-full text-center"
+            >
+              ← Back
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══ Sale vending machine — always renders with min 6 slots ═══
 
 export default function SaleVendingMachine() {
@@ -159,6 +254,7 @@ export default function SaleVendingMachine() {
   const [pendingResult, setPendingResult] = useState(null);
   const [openResult, setOpenResult] = useState(null);
   const [error, setError] = useState('');
+  const [zoomedSlot, setZoomedSlot] = useState(null);
 
   const slotMap = useMemo(() => Object.fromEntries(slots.map(s => [s.code, s])), [slots]);
   const rowLetters = useMemo(() => [...new Set(slots.map(s => s.code[0]))], [slots]);
@@ -269,7 +365,6 @@ export default function SaleVendingMachine() {
                   const isEmpty = !pack;
                   const packTypeId = pack?.packTypeId || pack?.id;
                   const stock = pack ? pack.stock : 0;
-                  const initial = pack ? pack.initialStock : 0;
                   const soldOut = pack && stock <= 0;
                   const isSelected = inputCode === slot.code;
                   const isDispensing = phase === 'dispensing' && dispensedSlot?.code === slot.code;
@@ -280,6 +375,9 @@ export default function SaleVendingMachine() {
                       key={slot.code}
                       className={`vm-slot ${isSelected && !isEmpty ? 'vm-slot-selected' : ''} ${isDispensed ? 'vm-slot-empty' : ''} ${isEmpty ? 'vm-slot-vacant' : ''}`}
                       onClick={() => {
+                        if (phase === 'idle' && pack && !soldOut) {
+                          setZoomedSlot(slot);
+                        }
                         if (phase === 'idle') {
                           setInputCode(slot.code);
                           setCoinsInserted(false);
@@ -287,9 +385,9 @@ export default function SaleVendingMachine() {
                         }
                       }}
                     >
-                      <div className="vm-slot-code">{slot.code}</div>
                       {pack ? (
                         <>
+                          <span className="vm-label-stock">{stock}</span>
                           <div className={`vm-slot-pack ${isDispensing ? 'vm-pack-drop' : ''}`}>
                             <PackArt
                               tier={packTypeId}
@@ -299,13 +397,13 @@ export default function SaleVendingMachine() {
                               compact
                             />
                           </div>
-                          <div className="vm-slot-name">{pack.name}</div>
-                          <div className="vm-slot-price">
-                            <img src={emberIcon} alt="" className="vm-price-icon" />
-                            <span>{pack.price}</span>
-                          </div>
-                          <div className="vm-slot-stock">
-                            {stock}/{initial}
+                          <div className="vm-shelf" />
+                          <div className="vm-slot-label">
+                            <span className="vm-label-code">{slot.code}</span>
+                            <span className="vm-label-price">
+                              <img src={emberIcon} alt="" className="vm-price-icon" />
+                              {pack.price}
+                            </span>
                           </div>
                           {soldOut && (
                             <div className="vm-sold-out-overlay">
@@ -314,9 +412,14 @@ export default function SaleVendingMachine() {
                           )}
                         </>
                       ) : (
-                        <div className="vm-slot-empty-label">EMPTY</div>
+                        <>
+                          <div className="vm-slot-empty-label">EMPTY</div>
+                          <div className="vm-shelf" />
+                          <div className="vm-slot-label">
+                            <span className="vm-label-code">{slot.code}</span>
+                          </div>
+                        </>
                       )}
-                      <div className="vm-shelf" />
                     </div>
                   );
                 })}
@@ -403,6 +506,11 @@ export default function SaleVendingMachine() {
           />
         )}
       </div>
+
+      {/* Pack zoom modal */}
+      {zoomedSlot && zoomedSlot.pack && (
+        <PackZoomModal slot={zoomedSlot} onClose={() => setZoomedSlot(null)} />
+      )}
     </AlleyScene>
   );
 }

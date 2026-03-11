@@ -1168,6 +1168,7 @@
 
 .card-zoom-content {
     position: relative;
+    max-width: 90vw;
 }
 
 .card-zoom-in .card-zoom-content {
@@ -1210,4 +1211,12 @@
 @keyframes cd-zoom-card-out {
     from { opacity: 1; transform: scale(1); }
     to { opacity: 0; transform: scale(0.9); }
+}
+
+/* ═══════════════════════════════════════════════════
+   Pack Opening — hide chrome
+   ═══════════════════════════════════════════════════ */
+body:has(.pack-opening) nav,
+body:has(.pack-opening) .vault-tab-bar-wrap {
+    display: none !important;
 }

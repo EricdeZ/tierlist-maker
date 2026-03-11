@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useCardClash } from './CardClashContext'
 import { cardclashService } from '../../services/database'
-import { Gift, Send, Search, X, Package } from 'lucide-react'
+import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck } from 'lucide-react'
+import { PACKS } from '../../data/cardclash/economy'
 import PackOpening from './components/PackOpening'
 import PackArt from './components/PackArt'
+import emberIcon from '../../assets/ember.png'
+
+const GIFTABLE_PACKS = ['osl-mixed', 'bsl-mixed']
 
 export default function CCGifts() {
-  const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts } = useCardClash()
+  const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack, ember } = useCardClash()
   const [tab, setTab] = useState('received')
-  const [sendModal, setSendModal] = useState(null)
   const [openResult, setOpenResult] = useState(null)
 
   // Mark as seen when viewing received tab
@@ -18,17 +21,18 @@ export default function CCGifts() {
     }
   }, [tab, giftData.unseenCount, markGiftsSeen])
 
-  const { sent, received, giftsRemaining } = giftData
+  const { sent, received, giftsRemaining, giftInventory = [] } = giftData
+  const totalSendable = giftsRemaining + giftInventory.reduce((sum, i) => sum + i.quantity, 0)
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="cd-head text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Gifts</h2>
-          <p className="text-xs text-white/40 mt-1">Send gift packs to other players</p>
+      <div className="flex items-center justify-between mb-6 gap-2">
+        <div className="min-w-0">
+          <h2 className="cd-head text-base sm:text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Gifts</h2>
+          <p className="text-[11px] sm:text-xs text-white/40 mt-1">Send gift packs to other players</p>
         </div>
-        <div className="cd-head text-xs text-white/50 tracking-wider">
-          <span className="text-[var(--cd-cyan)] font-bold">{giftsRemaining}</span> / 5 gifts remaining
+        <div className="cd-head text-[11px] sm:text-xs text-white/50 tracking-wider shrink-0">
+          <span className="text-[var(--cd-cyan)] font-bold">{giftsRemaining}</span> / 5 <span className="hidden sm:inline">free gifts </span>left
         </div>
       </div>
 
@@ -36,8 +40,9 @@ export default function CCGifts() {
       <div className="flex gap-4 mb-6 border-b border-[var(--cd-border)]">
         {[
           { key: 'received', label: 'Received', count: received.filter(g => !g.opened).length },
-          { key: 'send', label: 'Send', count: 0 },
+          { key: 'send', label: 'Send', count: totalSendable },
           { key: 'sent', label: 'Sent', count: 0 },
+          { key: 'redeem', label: 'Redeem', count: 0 },
         ].map(t => (
           <button
             key={t.key}
@@ -58,13 +63,24 @@ export default function CCGifts() {
       </div>
 
       {tab === 'received' && <ReceivedGifts received={received} onOpen={openGift} setOpenResult={setOpenResult} />}
-      {tab === 'send' && <SendGiftSection giftsRemaining={giftsRemaining} sent={sent} onSend={sendGift} onRefresh={refreshGifts} />}
+      {tab === 'send' && (
+        <SendGiftSection
+          giftsRemaining={giftsRemaining}
+          giftInventory={giftInventory}
+          sent={sent}
+          emberBalance={ember?.balance ?? 0}
+          onSend={sendGift}
+          onRefresh={refreshGifts}
+          onBuyGiftPack={buyGiftPack}
+        />
+      )}
       {tab === 'sent' && <SentGifts sent={sent} />}
+      {tab === 'redeem' && <RedeemSection setOpenResult={setOpenResult} />}
 
       {openResult && (
         <PackOpening
           result={openResult}
-          packType="gift"
+          packType={openResult.packType || 'gift'}
           onClose={() => setOpenResult(null)}
           onOpenMore={() => setOpenResult(null)}
         />
@@ -101,6 +117,12 @@ function ReceivedGifts({ received, onOpen, setOpenResult }) {
   const unopened = received.filter(g => !g.opened)
   const opened = received.filter(g => g.opened)
 
+  const getPackLabel = (packType) => {
+    if (packType === 'gift') return '5 cards from both leagues'
+    const pack = PACKS[packType]
+    return pack ? `${pack.name} — ${pack.cards} cards` : 'Gift pack'
+  }
+
   return (
     <div className="space-y-3">
       {unopened.map((gift, i) => (
@@ -127,7 +149,7 @@ function ReceivedGifts({ received, onOpen, setOpenResult }) {
               {gift.message && (
                 <p className="text-xs text-white/50 mt-1 italic truncate">"{gift.message}"</p>
               )}
-              <p className="text-[11px] text-white/30 mt-0.5">5 cards from both leagues</p>
+              <p className="text-[11px] text-white/30 mt-0.5">{getPackLabel(gift.packType)}</p>
             </div>
             <button
               onClick={() => handleOpen(gift)}
@@ -183,18 +205,34 @@ function ReceivedGifts({ received, onOpen, setOpenResult }) {
   )
 }
 
-function SendGiftSection({ giftsRemaining, sent, onSend, onRefresh }) {
-  const [sendingIndex, setSendingIndex] = useState(null) // which pack slot has the modal open
+function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, onSend, onRefresh, onBuyGiftPack }) {
+  const [sendingPack, setSendingPack] = useState(null) // { packType, index? } for the send modal
   const [sentSuccess, setSentSuccess] = useState(false)
+  const [buying, setBuying] = useState(null)
+  const [buyResult, setBuyResult] = useState(null)
 
   const totalPacks = 5
-  const alreadySentTo = new Set(sent.map(g => g.recipientId))
+  const freeGiftsSent = sent.filter(g => g.packType === 'gift')
+  const alreadySentTo = new Set(freeGiftsSent.map(g => g.recipientId))
 
   const handleSent = async () => {
-    setSendingIndex(null)
+    setSendingPack(null)
     setSentSuccess(true)
     await onRefresh()
     setTimeout(() => setSentSuccess(false), 3000)
+  }
+
+  const handleBuy = async (packType) => {
+    setBuying(packType)
+    try {
+      await onBuyGiftPack(packType)
+      setBuyResult(packType)
+      setTimeout(() => setBuyResult(null), 2500)
+    } catch (err) {
+      alert(err.message || 'Failed to buy pack')
+    } finally {
+      setBuying(null)
+    }
   }
 
   return (
@@ -205,66 +243,177 @@ function SendGiftSection({ giftsRemaining, sent, onSend, onRefresh }) {
         </div>
       )}
 
-      <p className="text-center text-[11px] text-white/30 cd-head tracking-widest mb-8">
-        Select a gift pack to send to a friend
-      </p>
+      {/* ═══ Free Gift Packs ═══ */}
+      <div className="mb-8">
+        <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">Free Gift Packs</div>
+        <div className="flex items-center justify-center gap-5 sm:gap-8 flex-wrap pb-2">
+          {Array.from({ length: totalPacks }).map((_, i) => {
+            const isSent = i < freeGiftsSent.length
+            const recipient = isSent ? freeGiftsSent[i] : null
 
-      {/* 5 Gift Packs Row */}
-      <div className="flex items-center justify-center gap-5 sm:gap-8 flex-wrap pb-4">
-        {Array.from({ length: totalPacks }).map((_, i) => {
-          const isSent = i < sent.length
-          const recipient = isSent ? sent[i] : null
+            return (
+              <div
+                key={i}
+                className="flex flex-col items-center gap-3"
+                style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.1}s both` }}
+              >
+                <div className={`relative transition-all duration-300 ${isSent ? 'opacity-30 grayscale' : 'hover:scale-105'}`}>
+                  <PackArt
+                    tier="gift"
+                    name="Gift Pack"
+                    subtitle="5 Cards"
+                    cardCount={5}
+                    seed={i}
+                    compact
+                  />
+                  {isSent && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-black/70 rounded-lg px-3 py-1.5 text-[10px] text-white/60 cd-head tracking-wider font-bold uppercase">
+                        Sent
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-          return (
-            <div
-              key={i}
-              className="flex flex-col items-center gap-3"
-              style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.1}s both` }}
-            >
-              <div className={`relative transition-all duration-300 ${isSent ? 'opacity-30 grayscale' : 'hover:scale-105'}`}>
-                <PackArt
-                  tier="gift"
-                  name="Gift Pack"
-                  subtitle="5 Cards"
-                  cardCount={5}
-                  seed={i}
-                  compact
-                />
-                {isSent && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-black/70 rounded-lg px-3 py-1.5 text-[10px] text-white/60 cd-head tracking-wider font-bold uppercase">
-                      Sent
+                {isSent ? (
+                  <div className="text-center">
+                    <div className="text-[10px] text-white/30 cd-head truncate max-w-[120px]">
+                      To: {recipient.recipientName}
                     </div>
                   </div>
+                ) : (
+                  <button
+                    onClick={() => setSendingPack({ packType: 'gift' })}
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_12px_rgba(220,38,38,0.15)]"
+                  >
+                    <Send className="w-3 h-3 inline mr-1.5" />
+                    Send
+                  </button>
                 )}
               </div>
+            )
+          })}
+        </div>
+      </div>
 
-              {isSent ? (
-                <div className="text-center">
-                  <div className="text-[10px] text-white/30 cd-head truncate max-w-[120px]">
-                    To: {recipient.recipientName}
+      {/* ═══ Purchased Packs Inventory ═══ */}
+      {giftInventory.length > 0 && (
+        <div className="mb-8">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">Purchased Packs</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {giftInventory.map((item) => {
+              const pack = PACKS[item.packType]
+              if (!pack) return null
+              return (
+                <div
+                  key={item.packType}
+                  className="cd-panel cd-corners rounded-xl p-4 flex items-center gap-4"
+                  style={{ animation: 'vault-card-enter 0.4s ease-out' }}
+                >
+                  <div className="shrink-0">
+                    <PackArt tier={item.packType} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={7} compact />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-text)' }}>{pack.name}</div>
+                    <div className="text-[11px] text-white/40">{pack.cards} cards</div>
+                    <div className="text-xs text-white/50 mt-1">
+                      <span className="text-[var(--cd-cyan)] font-bold">{item.quantity}</span> in stock
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSendingPack({ packType: item.packType })}
+                    className="shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_12px_rgba(220,38,38,0.15)]"
+                  >
+                    <Send className="w-3 h-3 inline mr-1.5" />
+                    Send
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Buy More ═══ */}
+      <div className="cd-divider max-w-lg mx-auto mb-6" />
+
+      <div className="max-w-lg mx-auto">
+        <div className="flex items-center gap-2 mb-4">
+          <ShoppingCart className="w-4 h-4 text-[var(--cd-cyan)]" />
+          <span className="text-sm font-bold text-[var(--cd-text)] cd-head tracking-wider">Buy Packs to Gift</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {GIFTABLE_PACKS.map((key) => {
+            const pack = PACKS[key]
+            if (!pack) return null
+            const canAfford = emberBalance >= pack.cost
+            const isBuying = buying === key
+            const justBought = buyResult === key
+
+            return (
+              <div key={key} className="cd-panel cd-corners rounded-xl p-4" style={{ animation: 'vault-card-enter 0.4s ease-out 0.1s both' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <PackArt tier={key} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={8} compact />
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-text)' }}>{pack.name}</div>
+                    <div className="text-[11px] text-white/40">{pack.cards} cards per pack</div>
                   </div>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setSendingIndex(i)}
-                  className="px-4 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_12px_rgba(220,38,38,0.15)]"
-                >
-                  <Send className="w-3 h-3 inline mr-1.5" />
-                  Send
-                </button>
-              )}
-            </div>
-          )
-        })}
+
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <img src={emberIcon} alt="" className="h-4 w-auto object-contain cd-icon-glow" />
+                    <span className="text-lg font-bold text-[var(--cd-cyan)] cd-num">{pack.cost}</span>
+                    <span className="text-[10px] text-white/30">Cores</span>
+                  </div>
+                  {(() => {
+                    const inv = giftInventory.find(i => i.packType === key)
+                    return inv ? (
+                      <div className="text-[10px] text-white/40">
+                        <span className="text-[var(--cd-cyan)] font-bold">{inv.quantity}</span> owned
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+
+                {justBought ? (
+                  <div className="text-center py-1.5 text-sm cd-result-flash rounded-lg">
+                    <span className="text-emerald-400 font-bold">Purchased!</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleBuy(key)}
+                    disabled={!canAfford || isBuying}
+                    className={`w-full py-2 rounded-lg font-bold text-xs cd-head tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      canAfford
+                        ? 'cd-btn-solid cd-btn-action'
+                        : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cursor-not-allowed'
+                    }`}
+                  >
+                    {isBuying ? (
+                      <div className="cd-spinner w-3.5 h-3.5" />
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        {canAfford ? 'Buy' : `Need ${pack.cost} Cores`}
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Send Modal */}
-      {sendingIndex !== null && (
+      {sendingPack && (
         <SendGiftModal
-          alreadySentTo={alreadySentTo}
+          packType={sendingPack.packType}
+          alreadySentTo={sendingPack.packType === 'gift' ? alreadySentTo : null}
           onSend={onSend}
-          onClose={() => setSendingIndex(null)}
+          onClose={() => setSendingPack(null)}
           onSuccess={handleSent}
         />
       )}
@@ -272,7 +421,7 @@ function SendGiftSection({ giftsRemaining, sent, onSend, onRefresh }) {
   )
 }
 
-function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
+function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -280,6 +429,9 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const searchTimeout = useRef(null)
+
+  const pack = PACKS[packType]
+  const packLabel = pack ? pack.name : 'Gift Pack'
 
   const doSearch = useCallback(async (q) => {
     if (!q || q.trim().length < 2) {
@@ -315,7 +467,7 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
     if (!selectedUser) return
     setSending(true)
     try {
-      await onSend(selectedUser.id, message.trim() || null)
+      await onSend(selectedUser.id, message.trim() || null, packType)
       onSuccess()
     } catch (err) {
       console.error('Failed to send gift:', err)
@@ -337,7 +489,7 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
 
         <div className="flex items-center gap-3 mb-5">
           <Gift className="w-5 h-5 text-red-400" />
-          <h3 className="cd-head text-sm font-bold text-[var(--cd-text)] tracking-wider">Send Gift Pack</h3>
+          <h3 className="cd-head text-sm font-bold text-[var(--cd-text)] tracking-wider">Send {packLabel}</h3>
         </div>
 
         {/* Recipient search */}
@@ -366,14 +518,14 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
           {searchResults.length > 0 && !selectedUser && (
             <div className="mt-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] overflow-hidden max-h-48 overflow-y-auto">
               {searchResults.map(user => {
-                const alreadySent = alreadySentTo.has(user.id)
+                const blocked = alreadySentTo?.has(user.id)
                 return (
                   <button
                     key={user.id}
-                    onClick={() => !alreadySent && handleSelect(user)}
-                    disabled={alreadySent}
+                    onClick={() => !blocked && handleSelect(user)}
+                    disabled={blocked}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                      alreadySent ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/[0.04] cursor-pointer'
+                      blocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/[0.04] cursor-pointer'
                     }`}
                   >
                     {user.avatar ? (
@@ -387,7 +539,7 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
                       <div className="text-sm text-white/80 truncate">{user.discordUsername}</div>
                       {user.playerName && <div className="text-[10px] text-white/30">{user.playerName}</div>}
                     </div>
-                    {alreadySent && <span className="ml-auto text-[10px] text-white/25">Already gifted</span>}
+                    {blocked && <span className="ml-auto text-[10px] text-white/25">Already gifted</span>}
                   </button>
                 )
               })}
@@ -431,13 +583,13 @@ function SendGiftModal({ alreadySentTo, onSend, onClose, onSuccess }) {
           ) : (
             <>
               <Send className="w-4 h-4" />
-              Send Gift Pack
+              Send {packLabel}
             </>
           )}
         </button>
 
         <p className="text-[10px] text-white/20 mt-3 text-center">
-          Contains 5 cards from both leagues
+          {pack ? `${pack.cards} cards${pack.leagueName ? ` — ${pack.leagueName}` : ''}` : 'Contains 5 cards from both leagues'}
         </p>
       </div>
     </div>
@@ -457,36 +609,108 @@ function SentGifts({ sent }) {
 
   return (
     <div className="space-y-3">
-      {sent.map((gift, i) => (
-        <div
-          key={gift.id}
-          className="cd-panel cd-corners rounded-xl overflow-hidden"
-          style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
-        >
-          <div className="p-4 flex items-center gap-4">
-            <div className="shrink-0">
-              {gift.recipientAvatar ? (
-                <img src={gift.recipientAvatar} alt="" className="w-8 h-8 rounded-full" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/30 font-bold">
-                  {(gift.recipientName || '?')[0].toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-[var(--cd-text)] cd-head">{gift.recipientName}</span>
+      {sent.map((gift, i) => {
+        const pack = gift.packType !== 'gift' ? PACKS[gift.packType] : null
+        return (
+          <div
+            key={gift.id}
+            className="cd-panel cd-corners rounded-xl overflow-hidden"
+            style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
+          >
+            <div className="p-4 flex items-center gap-4">
+              <div className="shrink-0">
+                {gift.recipientAvatar ? (
+                  <img src={gift.recipientAvatar} alt="" className="w-8 h-8 rounded-full" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/30 font-bold">
+                    {(gift.recipientName || '?')[0].toUpperCase()}
+                  </div>
+                )}
               </div>
-              {gift.message && (
-                <p className="text-xs text-white/40 mt-0.5 italic truncate">"{gift.message}"</p>
-              )}
-            </div>
-            <div className="text-[10px] text-white/25 shrink-0">
-              {formatTimeAgo(gift.createdAt)}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[var(--cd-text)] cd-head">{gift.recipientName}</span>
+                  {pack && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5" style={{ color: pack.color || 'var(--cd-text)' }}>
+                      {pack.name}
+                    </span>
+                  )}
+                </div>
+                {gift.message && (
+                  <p className="text-xs text-white/40 mt-0.5 italic truncate">"{gift.message}"</p>
+                )}
+              </div>
+              <div className="text-[10px] text-white/25 shrink-0">
+                {formatTimeAgo(gift.createdAt)}
+              </div>
             </div>
           </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function RedeemSection({ setOpenResult }) {
+  const [code, setCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  const handleRedeem = async () => {
+    if (!code.trim()) return
+    setRedeeming(true)
+    setError(null)
+    setSuccess(false)
+    try {
+      const result = await cardclashService.redeemCode(code.trim())
+      setSuccess(true)
+      setCode('')
+      setOpenResult(result)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      setError(err.message || 'Failed to redeem code')
+    } finally {
+      setRedeeming(false)
+    }
+  }
+
+  return (
+    <div className="max-w-md mx-auto text-center">
+      <div className="py-8">
+        <TicketCheck className="w-10 h-10 text-[var(--cd-cyan)]/30 mx-auto mb-4" />
+        <h3 className="cd-head text-sm font-bold text-[var(--cd-text)] tracking-wider mb-2">Redeem a Code</h3>
+        <p className="text-xs text-white/30 mb-6">Enter a pack code to claim your cards</p>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(null) }}
+            onKeyDown={(e) => e.key === 'Enter' && !redeeming && handleRedeem()}
+            placeholder="ENTER CODE"
+            className="flex-1 px-4 py-3 rounded-lg bg-white/[0.04] border border-[var(--cd-border)] text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/40 transition-colors text-center tracking-widest cd-head font-bold uppercase"
+          />
+          <button
+            onClick={handleRedeem}
+            disabled={!code.trim() || redeeming}
+            className="px-6 py-3 rounded-lg font-bold text-xs cd-head tracking-wider transition-all cursor-pointer cd-btn-solid cd-btn-action disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {redeeming ? <div className="cd-spinner w-4 h-4" /> : 'Redeem'}
+          </button>
         </div>
-      ))}
+
+        {error && (
+          <div className="mt-4 py-2 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs cd-head tracking-wider">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mt-4 py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs cd-head tracking-wider">
+            Code redeemed successfully!
+          </div>
+        )}
+      </div>
     </div>
   )
 }

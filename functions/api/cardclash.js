@@ -3,9 +3,9 @@
 
 import { adapt } from '../lib/adapter.js'
 import { getDB, headers, transaction } from '../lib/db.js'
-import { requireAuth } from '../lib/auth.js'
+import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
-import { ensureStats, openPack, generateGiftPack } from '../lib/cardclash.js'
+import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/cardclash.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { tick, collectIncome, slotCard, unslotCard, getCardRates } from '../lib/starting-five.js'
@@ -42,6 +42,7 @@ const handler = async (event) => {
         case 'gifts': return await handleLoadGifts(sql, user)
         case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
         case 'starting-five': return await handleStartingFive(sql, user)
+        case 'admin-redeem-codes': return await handleAdminRedeemCodes(sql, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -50,13 +51,18 @@ const handler = async (event) => {
       const body = event.body ? JSON.parse(event.body) : {}
       switch (action) {
         case 'open-pack': return await handleOpenPack(sql, user, body)
+        case 'open-inventory-pack': return await handleOpenInventoryPack(sql, user, body)
         case 'send-gift': return await handleSendGift(sql, user, body, event)
         case 'open-gift': return await handleOpenGift(sql, user, body)
+        case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
+        case 'redeem-code': return await handleRedeemCode(sql, user, body)
+        case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
+        case 'toggle-redeem-code': return await handleToggleRedeemCode(sql, event, body)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -72,6 +78,7 @@ const handler = async (event) => {
 async function handleLoad(sql, user) {
   await ensureStats(sql, user.id)
   await ensureEmberBalance(sql, user.id)
+  await grantStarterPacks(sql, user.id)
 
   // Expire stale trades
   await sql`
@@ -80,7 +87,7 @@ async function handleLoad(sql, user) {
       AND last_polled_at < NOW() - make_interval(mins => 2)
   `
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory] = await Promise.all([
     sql`SELECT * FROM cc_cards WHERE owner_id = ${user.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
@@ -99,6 +106,13 @@ async function handleLoad(sql, user) {
       SELECT COUNT(*)::int AS count FROM cc_trades
       WHERE (player_b_id = ${user.id} AND status = 'waiting')
          OR ((player_a_id = ${user.id} OR player_b_id = ${user.id}) AND status = 'active')
+    `,
+    sql`
+      SELECT i.id, i.pack_type_id, i.source, i.created_at, pt.name
+      FROM cc_pack_inventory i
+      JOIN cc_pack_types pt ON i.pack_type_id = pt.id
+      WHERE i.user_id = ${user.id}
+      ORDER BY i.created_at
     `,
   ])
 
@@ -135,8 +149,46 @@ async function handleLoad(sql, user) {
         endsAt: s.ends_at,
       })),
       pendingTradeCount: tradeCount[0]?.count || 0,
+      inventory: inventory.map(i => ({
+        id: i.id,
+        packTypeId: i.pack_type_id,
+        packName: i.name,
+        source: i.source,
+        createdAt: i.created_at,
+      })),
     }),
   }
+}
+
+// ═══ POST: Open pack from inventory ═══
+async function handleOpenInventoryPack(sql, user, body) {
+  const { inventoryId } = body
+  if (!inventoryId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'inventoryId required' }) }
+
+  const [item] = await sql`
+    DELETE FROM cc_pack_inventory
+    WHERE id = ${inventoryId} AND user_id = ${user.id}
+    RETURNING pack_type_id
+  `
+  if (!item) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found in inventory' }) }
+
+  const result = await openPack(sql, user.id, item.pack_type_id, { skipPayment: true })
+  const cards = result.cards.map((c) => {
+    const formatted = formatCard(c)
+    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+    return formatted
+  })
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push failed:', err))
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    packName: result.packName,
+    packType: item.pack_type_id,
+    cards,
+  }) }
 }
 
 // ═══ POST: Open pack ═══
@@ -414,12 +466,14 @@ async function handleCollectionSet(sql, params) {
 
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
-           d.role, d.avatar_url,
+           d.role,
+           CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
            d.league_slug, d.division_tier, d.season_slug,
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM cc_player_defs d
     LEFT JOIN players p ON p.slug = d.player_slug
     LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN user_preferences up ON up.user_id = u.id
     WHERE d.league_slug || '-d' || d.division_tier || '-' || d.season_slug = ${setKey}
     ORDER BY d.card_index
   `
@@ -526,11 +580,12 @@ async function handleCardDetail(sql, params) {
 
 // ═══ GET: Load gifts (sent + received) ═══
 const MAX_GIFTS = 5
+const GIFTABLE_PACKS = ['osl-mixed', 'bsl-mixed']
 
 async function handleLoadGifts(sql, user) {
-  const [sent, received, unseenCount] = await Promise.all([
+  const [sent, received, unseenCount, inventory] = await Promise.all([
     sql`
-      SELECT g.id, g.recipient_id, g.message, g.created_at,
+      SELECT g.id, g.recipient_id, g.message, g.created_at, g.pack_type,
              u.discord_username AS recipient_name, u.discord_avatar AS recipient_avatar, u.discord_id AS recipient_discord_id
       FROM cc_gifts g
       JOIN users u ON u.id = g.recipient_id
@@ -538,7 +593,7 @@ async function handleLoadGifts(sql, user) {
       ORDER BY g.created_at DESC
     `,
     sql`
-      SELECT g.id, g.sender_id, g.message, g.opened, g.seen, g.created_at, g.opened_at,
+      SELECT g.id, g.sender_id, g.message, g.opened, g.seen, g.created_at, g.opened_at, g.pack_type,
              u.discord_username AS sender_name, u.discord_avatar AS sender_avatar, u.discord_id AS sender_discord_id
       FROM cc_gifts g
       JOIN users u ON u.id = g.sender_id
@@ -546,7 +601,10 @@ async function handleLoadGifts(sql, user) {
       ORDER BY g.created_at DESC
     `,
     sql`SELECT COUNT(*)::int AS count FROM cc_gifts WHERE recipient_id = ${user.id} AND seen = false`,
+    sql`SELECT pack_type, quantity FROM cc_gift_inventory WHERE user_id = ${user.id} AND quantity > 0`,
   ])
+
+  const freeGiftsSent = sent.filter(g => g.pack_type === 'gift')
 
   return {
     statusCode: 200, headers,
@@ -555,16 +613,17 @@ async function handleLoadGifts(sql, user) {
         id: g.id, recipientId: g.recipient_id, recipientName: g.recipient_name,
         recipientAvatar: g.recipient_discord_id && g.recipient_avatar
           ? `https://cdn.discordapp.com/avatars/${g.recipient_discord_id}/${g.recipient_avatar}.webp?size=64` : null,
-        message: g.message, createdAt: g.created_at,
+        message: g.message, createdAt: g.created_at, packType: g.pack_type,
       })),
       received: received.map(g => ({
         id: g.id, senderId: g.sender_id, senderName: g.sender_name,
         senderAvatar: g.sender_discord_id && g.sender_avatar
           ? `https://cdn.discordapp.com/avatars/${g.sender_discord_id}/${g.sender_avatar}.webp?size=64` : null,
         message: g.message, opened: g.opened, seen: g.seen,
-        createdAt: g.created_at, openedAt: g.opened_at,
+        createdAt: g.created_at, openedAt: g.opened_at, packType: g.pack_type,
       })),
-      giftsRemaining: MAX_GIFTS - sent.length,
+      giftsRemaining: MAX_GIFTS - freeGiftsSent.length,
+      giftInventory: inventory.map(i => ({ packType: i.pack_type, quantity: i.quantity })),
       unseenCount: unseenCount[0]?.count || 0,
     }),
   }
@@ -572,32 +631,82 @@ async function handleLoadGifts(sql, user) {
 
 // ═══ POST: Send a gift pack ═══
 async function handleSendGift(sql, user, body, event) {
-  const { recipientId, message } = body
+  const { recipientId, message, packType = 'gift' } = body
   if (!recipientId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Recipient required' }) }
   if (recipientId === user.id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot gift yourself' }) }
-
-  // Check gift limit
-  const [sentCount] = await sql`SELECT COUNT(*)::int AS count FROM cc_gifts WHERE sender_id = ${user.id}`
-  if (sentCount.count >= MAX_GIFTS) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No gifts remaining' }) }
-  }
 
   // Check recipient exists
   const [recipient] = await sql`SELECT id FROM users WHERE id = ${recipientId}`
   if (!recipient) return { statusCode: 400, headers, body: JSON.stringify({ error: 'User not found' }) }
 
-  // Check not already gifted to this user
-  const [existing] = await sql`SELECT id FROM cc_gifts WHERE sender_id = ${user.id} AND recipient_id = ${recipientId}`
-  if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already sent a gift to this user' }) }
+  if (packType === 'gift') {
+    // Free gift packs: limited to 5 total, one per recipient
+    const [sentCount] = await sql`SELECT COUNT(*)::int AS count FROM cc_gifts WHERE sender_id = ${user.id} AND pack_type = 'gift'`
+    if (sentCount.count >= MAX_GIFTS) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No free gifts remaining' }) }
+    }
+    const [existing] = await sql`SELECT id FROM cc_gifts WHERE sender_id = ${user.id} AND recipient_id = ${recipientId} AND pack_type = 'gift'`
+    if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already sent a free gift to this user' }) }
+  } else {
+    // Purchased packs: decrement from inventory
+    if (!GIFTABLE_PACKS.includes(packType)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid gift pack type' }) }
+    }
+    const [inv] = await sql`SELECT quantity FROM cc_gift_inventory WHERE user_id = ${user.id} AND pack_type = ${packType}`
+    if (!inv || inv.quantity <= 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No packs of this type in your gift inventory' }) }
+    }
+    await sql`UPDATE cc_gift_inventory SET quantity = quantity - 1 WHERE user_id = ${user.id} AND pack_type = ${packType}`
+  }
 
   const trimmedMsg = message ? message.trim().slice(0, 200) : null
 
   await sql`
-    INSERT INTO cc_gifts (sender_id, recipient_id, message)
-    VALUES (${user.id}, ${recipientId}, ${trimmedMsg})
+    INSERT INTO cc_gifts (sender_id, recipient_id, message, pack_type)
+    VALUES (${user.id}, ${recipientId}, ${trimmedMsg}, ${packType})
   `
 
-  return { statusCode: 200, headers, body: JSON.stringify({ success: true, giftsRemaining: MAX_GIFTS - sentCount.count - 1 }) }
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (gift send) failed:', err))
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ POST: Buy a pack for gifting ═══
+async function handleBuyGiftPack(sql, user, body) {
+  const { packType } = body || {}
+  if (!packType || !GIFTABLE_PACKS.includes(packType)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid pack type' }) }
+  }
+
+  const [pack] = await sql`SELECT id, cost, name FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
+  if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack type not found' }) }
+
+  await ensureEmberBalance(sql, user.id)
+  const [bal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
+  if (!bal || bal.balance < pack.cost) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Need ${pack.cost} Cores` }) }
+  }
+
+  await grantEmber(sql, user.id, 'cc_gift_pack', -pack.cost, `Card Clash: ${pack.name} (gift)`)
+
+  await sql`
+    INSERT INTO cc_gift_inventory (user_id, pack_type, quantity)
+    VALUES (${user.id}, ${packType}, 1)
+    ON CONFLICT (user_id, pack_type) DO UPDATE SET quantity = cc_gift_inventory.quantity + 1
+  `
+
+  const inventory = await sql`SELECT pack_type, quantity FROM cc_gift_inventory WHERE user_id = ${user.id} AND quantity > 0`
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      success: true,
+      giftInventory: inventory.map(i => ({ packType: i.pack_type, quantity: i.quantity })),
+    }),
+  }
 }
 
 // ═══ POST: Open a received gift ═══
@@ -610,39 +719,49 @@ async function handleOpenGift(sql, user, body) {
   `
   if (!gift) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already opened' }) }
 
-  // Generate gift pack cards
-  const cards = await generateGiftPack(sql)
+  let packName, newCards
 
-  // Insert cards into user's collection
-  const newCards = []
-  for (const card of cards) {
-    const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
-      VALUES (${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
-      RETURNING *
-    `
-    if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
-    newCards.push(inserted)
+  if (gift.pack_type === 'gift') {
+    // Free gift pack — use dedicated generator
+    const cards = await generateGiftPack(sql)
+    newCards = []
+    for (const card of cards) {
+      const [inserted] = await sql`
+        INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+        VALUES (${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${'gift'}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+        RETURNING *
+      `
+      if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
+      newCards.push(inserted)
+    }
+    await ensureStats(sql, user.id)
+    await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${user.id}`
+    packName = 'Gift Pack'
+  } else {
+    // Purchased pack gift — use standard pack opener (skip payment, already paid)
+    const result = await openPack(sql, user.id, gift.pack_type, { skipPayment: true })
+    packName = result.packName
+    newCards = result.cards
   }
 
   // Mark gift as opened
   await sql`UPDATE cc_gifts SET opened = true, seen = true, opened_at = NOW() WHERE id = ${giftId}`
 
-  // Update stats
-  await ensureStats(sql, user.id)
-  await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${user.id}`
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (gift open) failed:', err))
 
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
-      packName: 'Gift Pack',
-      packType: 'gift',
+      packName,
+      packType: gift.pack_type,
       cards: newCards.map(c => {
         const formatted = formatCard(c)
         if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
         return formatted
       }),
-      senderName: gift.sender_id ? undefined : undefined, // included in gift data already
     }),
   }
 }
@@ -709,13 +828,22 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Too many cards (max 200)' }) }
   }
 
-  // Fetch cards owned by user
+  // Fetch cards owned by user, excluding those locked on market or in active trades
   const cards = await sql`
-    SELECT id, rarity FROM cc_cards
-    WHERE id = ANY(${cardIds}) AND owner_id = ${user.id}
+    SELECT c.id, c.rarity FROM cc_cards c
+    WHERE c.id = ANY(${cardIds}) AND c.owner_id = ${user.id}
+      AND NOT EXISTS (
+        SELECT 1 FROM cc_market_listings ml
+        WHERE ml.card_id = c.id AND ml.status = 'active'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM cc_trade_cards tc
+        JOIN cc_trades t ON tc.trade_id = t.id
+        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
+      )
   `
   if (cards.length === 0) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found' }) }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be listed on the market or in a trade' }) }
   }
 
   // Calculate total (fractional sum, floor at the end)
@@ -729,12 +857,29 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Selected cards are worth less than 1 Ember' }) }
   }
 
+  // Count legendaries before deleting
+  const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
+
   // Delete the cards
   const validIds = cards.map(c => c.id)
   await sql`DELETE FROM cc_cards WHERE id = ANY(${validIds}) AND owner_id = ${user.id}`
 
   // Grant ember
   const { balance } = await grantEmber(sql, user.id, 'dismantle', emberGained, `Dismantled ${validIds.length} card${validIds.length > 1 ? 's' : ''}`)
+
+  // Update dismantle stats in cc_stats
+  await ensureStats(sql, user.id)
+  await sql`
+    UPDATE cc_stats SET
+      cards_dismantled = cards_dismantled + ${validIds.length},
+      legendary_cards_dismantled = legendary_cards_dismantled + ${legendaryCount}
+    WHERE user_id = ${user.id}
+  `
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (dismantle) failed:', err))
 
   return {
     statusCode: 200, headers,
@@ -782,6 +927,12 @@ async function handleSlotCard(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId and role required' }) }
   }
   const state = await slotCard(sql, user.id, cardId, role)
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (slot) failed:', err))
+
   return formatS5Response(state)
 }
 
@@ -791,15 +942,167 @@ async function handleUnslotCard(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'role required' }) }
   }
   const state = await unslotCard(sql, user.id, role)
+
+  // Push vault challenge progress (fire-and-forget) — updates starting_five counts
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (unslot) failed:', err))
+
   return formatS5Response(state)
 }
 
 async function handleCollectIncome(sql, user) {
   const result = await collectIncome(sql, user.id)
+
+  // Track income collections + push challenge progress (fire-and-forget)
+  if (result.passionGranted > 0 || result.coresGranted > 0) {
+    ensureStats(sql, user.id)
+      .then(() => sql`UPDATE cc_stats SET income_collections = income_collections + 1 WHERE user_id = ${user.id}`)
+      .then(() => getVaultStats(sql, user.id))
+      .then(stats => pushChallengeProgress(sql, user.id, stats))
+      .catch(err => console.error('Vault challenge push (income) failed:', err))
+  }
+
   return formatS5Response(result, {
     passionGranted: result.passionGranted,
     coresGranted: result.coresGranted,
   })
+}
+
+// ═══ Redeem Codes ═══
+
+async function handleRedeemCode(sql, user, body) {
+  const { code } = body
+  if (!code || typeof code !== 'string') {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Code required' }) }
+  }
+
+  const trimmed = code.trim().toUpperCase()
+  const [row] = await sql`SELECT * FROM cc_redeem_codes WHERE UPPER(code) = ${trimmed} AND active = true`
+  if (!row) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid or expired code' }) }
+
+  // Check expiration
+  if (row.expires_at && new Date(row.expires_at) < new Date()) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'This code has expired' }) }
+  }
+
+  // Check max uses
+  if (row.max_uses != null && row.times_redeemed >= row.max_uses) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'This code has reached its redemption limit' }) }
+  }
+
+  // For per_person: check if user already redeemed
+  if (row.mode === 'per_person') {
+    const [existing] = await sql`SELECT id FROM cc_redeem_history WHERE code_id = ${row.id} AND user_id = ${user.id}`
+    if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'You have already redeemed this code' }) }
+  }
+
+  // For single: check not already used (belt-and-suspenders with active flag)
+  if (row.mode === 'single' && row.times_redeemed > 0) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'This code has already been used' }) }
+  }
+
+  // Generate the pack
+  const result = await openPack(sql, user.id, row.pack_type_id, { skipPayment: true })
+
+  // Record redemption
+  await sql`INSERT INTO cc_redeem_history (code_id, user_id) VALUES (${row.id}, ${user.id})`
+  await sql`UPDATE cc_redeem_codes SET times_redeemed = times_redeemed + 1 WHERE id = ${row.id}`
+
+  // For single-use, deactivate
+  if (row.mode === 'single') {
+    await sql`UPDATE cc_redeem_codes SET active = false WHERE id = ${row.id}`
+  }
+
+  const cards = result.cards.map((c) => {
+    const formatted = formatCard(c)
+    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+    return formatted
+  })
+
+  // Push vault challenge progress (fire-and-forget)
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (redeem) failed:', err))
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    packName: result.packName,
+    packType: row.pack_type_id,
+    cards,
+  }) }
+}
+
+async function handleAdminRedeemCodes(sql, event) {
+  await requirePermission(event, 'permission_manage')
+
+  const codes = await sql`
+    SELECT c.*, u.discord_username AS creator_name,
+           pt.name AS pack_name
+    FROM cc_redeem_codes c
+    LEFT JOIN users u ON u.id = c.created_by
+    LEFT JOIN cc_pack_types pt ON pt.id = c.pack_type_id
+    ORDER BY c.created_at DESC
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      codes: codes.map(c => ({
+        id: c.id,
+        code: c.code,
+        packTypeId: c.pack_type_id,
+        packName: c.pack_name,
+        mode: c.mode,
+        maxUses: c.max_uses,
+        expiresAt: c.expires_at,
+        timesRedeemed: c.times_redeemed,
+        active: c.active,
+        creatorName: c.creator_name,
+        createdAt: c.created_at,
+      })),
+    }),
+  }
+}
+
+async function handleCreateRedeemCode(sql, event, body) {
+  await requirePermission(event, 'permission_manage')
+  const user = await requireAuth(event)
+
+  const { code, packTypeId, mode, maxUses, expiresAt } = body
+  if (!code || !packTypeId || !mode) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'code, packTypeId, and mode are required' }) }
+  }
+  if (!['single', 'per_person'].includes(mode)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'mode must be single or per_person' }) }
+  }
+
+  // Verify pack type exists
+  const [pack] = await sql`SELECT id FROM cc_pack_types WHERE id = ${packTypeId}`
+  if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack type not found' }) }
+
+  // Check for duplicate code
+  const trimmed = code.trim().toUpperCase()
+  const [existing] = await sql`SELECT id FROM cc_redeem_codes WHERE UPPER(code) = ${trimmed}`
+  if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'A code with this name already exists' }) }
+
+  await sql`
+    INSERT INTO cc_redeem_codes (code, pack_type_id, mode, max_uses, expires_at, created_by)
+    VALUES (${code.trim()}, ${packTypeId}, ${mode}, ${maxUses || null}, ${expiresAt || null}, ${user.id})
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handleToggleRedeemCode(sql, event, body) {
+  await requirePermission(event, 'permission_manage')
+
+  const { codeId, active } = body
+  if (!codeId || typeof active !== 'boolean') {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'codeId and active required' }) }
+  }
+
+  await sql`UPDATE cc_redeem_codes SET active = ${active} WHERE id = ${codeId}`
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
 
 // ═══ Formatters ═══
@@ -825,6 +1128,7 @@ function formatCard(row) {
     cardType: row.card_type || 'god',
     cardData: row.card_data || null,
     defId: row.def_id || null,
+    isFirstEdition: row.is_first_edition || false,
   }
 }
 

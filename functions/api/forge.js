@@ -440,7 +440,8 @@ async function getPortfolio(sql, user, params) {
     `
 
     const totalPL = Math.round(totalValue - totalInvested)
-    const plPct = totalInvested > 0 ? Math.round(totalPL / totalInvested * 10000) / 100 : 0
+    const totalProfit = totalPL + realized.realized_profit
+    const plPct = totalInvested > 0 ? Math.round(totalProfit / totalInvested * 10000) / 100 : 0
 
     return {
         statusCode: 200,
@@ -450,7 +451,8 @@ async function getPortfolio(sql, user, params) {
             stats: {
                 totalValue: Math.round(totalValue),
                 totalInvested: Math.round(totalInvested),
-                unrealizedPL: totalPL,
+                realizedProfit: realized.realized_profit,
+                totalProfit: totalProfit,
                 plPercent: plPct,
                 holdingCount: holdings.length,
             },

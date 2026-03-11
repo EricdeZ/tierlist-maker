@@ -4,7 +4,7 @@ import { Settings, Shield, Loader2 } from 'lucide-react'
 
 const apiCall = async (endpoint, params = {}) => {
     const qs = new URLSearchParams(params).toString()
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('auth_token')
     const res = await fetch(`/api/${endpoint}${qs ? `?${qs}` : ''}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
@@ -12,7 +12,7 @@ const apiCall = async (endpoint, params = {}) => {
 }
 
 const apiPost = async (endpoint, body) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('auth_token')
     const res = await fetch(`/api/${endpoint}`, {
         method: 'POST',
         headers: {

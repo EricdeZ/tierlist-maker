@@ -16,6 +16,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
 
     const change = getActiveChange(player, changeView)
     const tier = getHeatTier(change)
+    const blazingDesktopOnly = tier === 'blazing' && change <= 35
     const showHeatEffects = listIndex == null || listIndex < 10
     const isOpen = isLeagueWide
         ? (openMarketIds || []).includes(player.marketId)
@@ -73,7 +74,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
         <div
             className={`forge-${tier} forge-player-row-wrapper group bg-[var(--forge-panel)] border border-transparent cursor-pointer ${
                 selected ? 'forge-row-selected' : ''
-            }${!showHeatEffects ? ' forge-heat-muted' : ''}`}
+            }${!showHeatEffects ? ' forge-heat-muted' : ''}${blazingDesktopOnly ? ' forge-blazing-mobile-only' : ''}`}
             data-spark-id={player.sparkId}
         >
             {/* Fire/Frost overlays */}
@@ -120,7 +121,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
             <div
                 className="forge-player-row grid items-center py-1 sm:py-2.5 relative z-[2]"
                 style={{
-                    gridTemplateColumns: '4px 50px 1.3fr 70px 60px 0.7fr 100px 0.5fr 140px',
+                    gridTemplateColumns: '4px 50px 1.3fr 70px 60px 0.7fr 55px 100px 0.5fr 140px',
                 }}
                 onClick={handleRowClick}
             >
@@ -205,7 +206,7 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                                 </span>
                             )}
                         </div>
-                        {(player.role || perfValue != null) && (
+                        {(player.role || perfValue != null || change != null) && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 {player.role && (
                                     <span className="forge-head text-[0.6rem] font-semibold tracking-wider opacity-70">{player.role}</span>
@@ -213,6 +214,13 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                                 {perfValue != null && (
                                     <span className={`forge-num text-[0.7rem] ${perfColor}`}>
                                         {perfValue.toFixed(2)}x
+                                    </span>
+                                )}
+                                {change != null && (
+                                    <span className={`forge-num text-[0.65rem] ${
+                                        isUp ? 'text-[var(--forge-gain)]' : isDown ? 'text-[var(--forge-loss)]' : 'text-[var(--forge-text-dim)]'
+                                    }`}>
+                                        {isUp ? '+' : ''}{change.toFixed(1)}%
                                     </span>
                                 )}
                             </div>
@@ -263,6 +271,14 @@ export default memo(function ForgePlayerRow({ player, selected, marketStatus, us
                         {Math.round(player.currentPrice).toLocaleString()}
                     </div>
                     <div className="text-[0.7rem] text-[var(--forge-text-dim)] uppercase tracking-wider">Heat</div>
+                </div>
+
+                {/* Total Sparks */}
+                <div className="hidden sm:flex flex-col items-center justify-center">
+                    <span className="forge-num text-[1rem] text-[var(--forge-text)]">
+                        {player.totalSparks ?? 0}
+                    </span>
+                    <span className="text-[0.55rem] text-[var(--forge-text-dim)] uppercase tracking-wider leading-none mt-0.5">Sparks</span>
                 </div>
 
                 {/* Mini sparkline */}

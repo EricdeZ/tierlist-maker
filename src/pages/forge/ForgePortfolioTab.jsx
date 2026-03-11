@@ -366,12 +366,17 @@ export default function ForgePortfolioTab({ portfolio, portfolioHistories, portf
             {stats && (
                 <div className="forge-stat-strip flex gap-[2px] mb-4 bg-[var(--forge-border)]">
                     <StatBlock label="Portfolio" value={stats.totalValue} icon={Wallet} />
-                    <StatBlock label="Invested" value={stats.totalInvested} />
                     <StatBlock
-                        label="Unrealized"
-                        value={stats.unrealizedPL}
-                        color={stats.unrealizedPL >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}
-                        prefix={stats.unrealizedPL >= 0 ? '+' : ''}
+                        label="Total"
+                        value={stats.totalProfit}
+                        color={stats.totalProfit >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}
+                        prefix={stats.totalProfit >= 0 ? '+' : ''}
+                    />
+                    <StatBlock
+                        label="Realized"
+                        value={stats.realizedProfit}
+                        color={stats.realizedProfit >= 0 ? 'text-[var(--forge-gain)]' : 'text-[var(--forge-loss)]'}
+                        prefix={stats.realizedProfit >= 0 ? '+' : ''}
                     />
                     <StatBlock
                         label="Return"

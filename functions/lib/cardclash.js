@@ -26,6 +26,21 @@ function rollRarity(minRarity = 'common') {
   return eligible[eligible.length - 1]
 }
 
+function rollRarityBounded(minRarity = 'common', maxRarity = null) {
+  if (!maxRarity) return rollRarity(minRarity)
+  const minIdx = RARITY_ORDER.indexOf(minRarity)
+  const maxIdx = RARITY_ORDER.indexOf(maxRarity)
+  if (maxIdx < 0 || maxIdx < minIdx) return rollRarity(minRarity)
+  const eligible = RARITY_ORDER.slice(minIdx, maxIdx + 1)
+  const totalWeight = eligible.reduce((sum, r) => sum + RARITIES[r].dropRate, 0)
+  let roll = Math.random() * totalWeight
+  for (const r of eligible) {
+    roll -= RARITIES[r].dropRate
+    if (roll <= 0) return r
+  }
+  return eligible[eligible.length - 1]
+}
+
 // Fixed holo effect per rarity — matches catalog
 const RARITY_HOLO_MAP = {
   common: 'common', uncommon: 'holo', rare: 'galaxy',
@@ -131,8 +146,18 @@ async function generatePlayerCard(sql, rarity, leagueId) {
   const stats = def.frozen_stats || await computePlayerStats(sql, def.player_id, def.team_id, def.season_id)
   const role = (def.role || 'adc').toUpperCase()
 
-  // Avatar: use def's avatar, or fall back to best god icon
-  let avatarUrl = def.avatar_url
+  // Avatar: check current preference (def.avatar_url may be stale)
+  let avatarUrl = null
+  const [prefRow] = await sql`
+    SELECT u.discord_id, u.discord_avatar,
+           COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    WHERE u.linked_player_id = ${def.player_id}
+  `
+  if (prefRow?.allow_avatar && prefRow.discord_id && prefRow.discord_avatar) {
+    avatarUrl = `https://cdn.discordapp.com/avatars/${prefRow.discord_id}/${prefRow.discord_avatar}.webp?size=256`
+  }
   if (!avatarUrl && stats.bestGod) {
     const slug = stats.bestGod.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
@@ -225,8 +250,17 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
 
   let avatarUrl = null
   if (player.discord_id && player.discord_avatar) {
-    avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
-  } else if (bestGods[0]) {
+    const [pref] = await sql`
+      SELECT COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+      FROM users u
+      LEFT JOIN user_preferences up ON up.user_id = u.id
+      WHERE u.linked_player_id = ${player.id}
+    `
+    if (pref?.allow_avatar !== false) {
+      avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
+    }
+  }
+  if (!avatarUrl && bestGods[0]) {
     const slug = bestGods[0].god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
   }
@@ -279,6 +313,65 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
   }
 }
 
+async function generatePlayerCardByDivisions(sql, rarity, divisionIds) {
+  if (!divisionIds?.length) {
+    return generatePlayerCard(sql, rarity, null)
+  }
+  const defs = await sql`
+    SELECT * FROM cc_player_defs WHERE division_id = ANY(${divisionIds}) ORDER BY RANDOM() LIMIT 1
+  `
+  if (!defs[0]) {
+    return generatePlayerCard(sql, rarity, null)
+  }
+
+  const def = defs[0]
+  const stats = def.frozen_stats || await computePlayerStats(sql, def.player_id, def.team_id, def.season_id)
+  const role = (def.role || 'adc').toUpperCase()
+
+  let avatarUrl = null
+  const [prefRow] = await sql`
+    SELECT u.discord_id, u.discord_avatar,
+           COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    WHERE u.linked_player_id = ${def.player_id}
+  `
+  if (prefRow?.allow_avatar && prefRow.discord_id && prefRow.discord_avatar) {
+    avatarUrl = `https://cdn.discordapp.com/avatars/${prefRow.discord_id}/${prefRow.discord_avatar}.webp?size=256`
+  }
+  if (!avatarUrl && stats.bestGod) {
+    const slug = stats.bestGod.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+    avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
+  }
+
+  return {
+    card_type: 'player',
+    god_id: `player-${def.player_id}-t${def.team_id}`,
+    god_name: def.player_name,
+    god_class: role,
+    role: role.toLowerCase(),
+    rarity,
+    serial_number: Math.floor(Math.random() * 9999) + 1,
+    holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloType(rarity),
+    image_url: avatarUrl || '',
+    acquired_via: 'pack',
+    def_id: def.id,
+    card_data: {
+      defId: def.id,
+      playerId: def.player_id,
+      teamName: def.team_name,
+      teamColor: def.team_color || '#6366f1',
+      seasonName: def.season_slug,
+      leagueName: def.league_slug,
+      divisionName: def.division_slug,
+      role,
+      stats,
+      bestGod: stats.bestGod,
+    },
+  }
+}
+
 function generateCardByType(type, rarity) {
   switch (type) {
     case 'item': return generateItemCard(rarity)
@@ -295,6 +388,23 @@ export async function ensureStats(sql, userId) {
 }
 
 // ════════════════════════════════════════════
+// Grant starter packs (2 OSL + 2 BSL) on first visit
+// ════════════════════════════════════════════
+export async function grantStarterPacks(sql, userId) {
+  const [existing] = await sql`
+    SELECT 1 FROM cc_pack_inventory WHERE user_id = ${userId} AND source = 'starter' LIMIT 1
+  `
+  if (existing) return
+  const packs = ['osl-mixed', 'osl-mixed', 'bsl-mixed', 'bsl-mixed']
+  for (const packType of packs) {
+    await sql`
+      INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+      VALUES (${userId}, ${packType}, 'starter')
+    `
+  }
+}
+
+// ════════════════════════════════════════════
 // Open a pack
 // ════════════════════════════════════════════
 export async function openPack(sql, userId, packType, { skipPayment = false } = {}) {
@@ -308,7 +418,9 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
   }
 
   let cards
-  if (pack.category === 'mixed') {
+  if (pack.slots && pack.slots.length > 0) {
+    cards = await generateConfiguredPack(sql, pack)
+  } else if (pack.category === 'mixed') {
     cards = await generateMixedPack(sql, pack.league_id)
   } else {
     cards = generateRarityPack({ cards: pack.cards_per_pack, guarantees: pack.guarantees || [] })
@@ -316,9 +428,19 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
 
   const newCards = []
   for (const card of cards) {
+    // Check if this is the first-ever pull of this player card at this rarity
+    // Only track first editions when the Vault is publicly open
+    let isFirstEdition = false
+    if (card.card_type === 'player' && card.def_id && process.env.VAULT_OPEN === 'true') {
+      const [existing] = await sql`
+        SELECT 1 FROM cc_cards WHERE def_id = ${card.def_id} AND rarity = ${card.rarity} LIMIT 1
+      `
+      isFirstEdition = !existing
+    }
+
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
-      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, is_first_edition)
+      VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null}, ${isFirstEdition})
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -367,6 +489,176 @@ async function generateMixedPack(sql, leagueId) {
     const card = type === 'player'
       ? await generatePlayerCard(sql, rarity, leagueId)
       : generateCardByType(type, rarity)
+    card._revealOrder = i
+    cards.push(card)
+  }
+
+  return cards
+}
+
+const STATIC_POOL_SIZES = { god: GODS.length, item: ITEMS.length, consumable: CONSUMABLES.length }
+
+function pickTypeForSlot(slot) {
+  const types = slot.types || ['god']
+  if (slot.typeWeights && Object.keys(slot.typeWeights).length > 0) {
+    const totalWeight = types.reduce((sum, t) => sum + (slot.typeWeights[t] || 0), 0)
+    let roll = Math.random() * totalWeight
+    for (const t of types) {
+      roll -= (slot.typeWeights[t] || 0)
+      if (roll <= 0) return t
+    }
+    return types[types.length - 1]
+  }
+  return types[Math.floor(Math.random() * types.length)]
+}
+
+// Proportionally distribute types across N slots based on pool sizes.
+// Guarantees at least 1 of each type when slots >= types, with remainder
+// allocated randomly weighted by fractional share.
+function distributeTypesByPool(types, count, poolSizes) {
+  if (count === 0) return []
+  const weights = types.map(t => poolSizes[t] || 1)
+  const totalWeight = weights.reduce((a, b) => a + b, 0)
+
+  // Floor allocation — each type gets at least its proportional floor
+  const exact = weights.map(w => (w / totalWeight) * count)
+  const allocation = exact.map(e => Math.floor(e))
+  let remaining = count - allocation.reduce((a, b) => a + b, 0)
+
+  // Distribute remaining slots randomly, weighted by fractional remainder
+  const remainders = exact.map((e, i) => ({ i, frac: e - allocation[i] }))
+  while (remaining > 0) {
+    const totalFrac = remainders.reduce((sum, x) => sum + x.frac, 0)
+    if (totalFrac <= 0) {
+      // All equal — pick uniformly
+      allocation[Math.floor(Math.random() * types.length)]++
+    } else {
+      let roll = Math.random() * totalFrac
+      for (const x of remainders) {
+        if (x.frac <= 0) continue
+        roll -= x.frac
+        if (roll <= 0) { allocation[x.i]++; x.frac = 0; break }
+      }
+    }
+    remaining--
+  }
+
+  // Build and shuffle assignments
+  const assignments = []
+  for (let i = 0; i < types.length; i++) {
+    for (let j = 0; j < allocation[i]; j++) assignments.push(types[i])
+  }
+  for (let i = assignments.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[assignments[i], assignments[j]] = [assignments[j], assignments[i]]
+  }
+  return assignments
+}
+
+async function generateConfiguredPack(sql, pack) {
+  const slots = pack.slots || []
+  const divisionIds = pack.division_ids || []
+  const groupConstraints = pack.group_constraints || {}
+
+  // Pre-assign forced types per slot based on group constraints
+  const forcedTypes = new Array(slots.length).fill(null)
+
+  for (const [groupName, constraints] of Object.entries(groupConstraints)) {
+    // Find slot indices in this group
+    const groupIndices = slots
+      .map((s, i) => s.group === groupName ? i : -1)
+      .filter(i => i >= 0)
+    if (groupIndices.length === 0) continue
+
+    // Track how many of each type we've assigned in this group
+    const assigned = {}
+
+    for (const constraint of constraints) {
+      const { type, min } = constraint
+      if (!min || min <= 0) continue
+
+      // Find eligible slots (type is in their allowed types, not already forced)
+      const eligible = groupIndices.filter(i =>
+        !forcedTypes[i] && (slots[i].types || []).includes(type)
+      )
+
+      // Randomly pick `min` slots to force this type
+      const shuffled = [...eligible].sort(() => Math.random() - 0.5)
+      const toAssign = Math.min(min, shuffled.length)
+      for (let j = 0; j < toAssign; j++) {
+        forcedTypes[shuffled[j]] = type
+        assigned[type] = (assigned[type] || 0) + 1
+      }
+    }
+
+    // For remaining unforced slots in this group, respect max constraints
+    for (const idx of groupIndices) {
+      if (forcedTypes[idx]) continue
+      const slot = slots[idx]
+      // Filter out types that have hit their max
+      let allowedTypes = (slot.types || ['god']).filter(t => {
+        const constraint = constraints.find(c => c.type === t)
+        if (!constraint?.max) return true
+        return (assigned[t] || 0) < constraint.max
+      })
+      if (allowedTypes.length === 0) allowedTypes = (slot.types || ['god']).filter(t => t !== 'player')
+      if (allowedTypes.length === 0) allowedTypes = ['god']
+      const picked = allowedTypes[Math.floor(Math.random() * allowedTypes.length)]
+      forcedTypes[idx] = picked
+      assigned[picked] = (assigned[picked] || 0) + 1
+    }
+  }
+
+  // Pre-distribute types for weightByCardCount slots (proportional to pool sizes)
+  const wcIndices = []
+  for (let i = 0; i < slots.length; i++) {
+    if (!forcedTypes[i] && slots[i].weightByCardCount) wcIndices.push(i)
+  }
+  if (wcIndices.length > 0) {
+    // Query player pool size if any slot includes player type
+    let playerCount = 0
+    if (wcIndices.some(i => (slots[i].types || []).includes('player'))) {
+      const q = divisionIds.length > 0
+        ? await sql`SELECT COUNT(DISTINCT lp.id)::int AS cnt FROM league_players lp JOIN seasons s ON s.id = lp.season_id WHERE s.division_id = ANY(${divisionIds})`
+        : pack.league_id
+          ? await sql`SELECT COUNT(DISTINCT lp.id)::int AS cnt FROM league_players lp JOIN seasons s ON s.id = lp.season_id JOIN divisions d ON d.id = s.division_id WHERE d.league_id = ${pack.league_id}`
+          : await sql`SELECT COUNT(DISTINCT id)::int AS cnt FROM league_players`
+      playerCount = q[0]?.cnt || 1
+    }
+    const poolSizes = { ...STATIC_POOL_SIZES, player: playerCount || 1 }
+
+    // Group slots by their type set for batch distribution
+    const typeGroups = {}
+    for (const idx of wcIndices) {
+      const types = slots[idx].types || ['god']
+      const key = [...types].sort().join(',')
+      if (!typeGroups[key]) typeGroups[key] = { types, indices: [] }
+      typeGroups[key].indices.push(idx)
+    }
+
+    for (const { types, indices } of Object.values(typeGroups)) {
+      const assignments = distributeTypesByPool(types, indices.length, poolSizes)
+      for (let k = 0; k < indices.length; k++) {
+        forcedTypes[indices[k]] = assignments[k]
+      }
+    }
+  }
+
+  // Generate cards
+  const cards = []
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i]
+    const rarity = rollRarityBounded(slot.minRarity || 'common', slot.maxRarity || null)
+    const type = forcedTypes[i] || pickTypeForSlot(slot)
+
+    let card
+    if (type === 'player') {
+      card = divisionIds.length > 0
+        ? await generatePlayerCardByDivisions(sql, rarity, divisionIds)
+        : await generatePlayerCard(sql, rarity, pack.league_id)
+    } else {
+      card = generateCardByType(type, rarity)
+    }
     card._revealOrder = i
     cards.push(card)
   }

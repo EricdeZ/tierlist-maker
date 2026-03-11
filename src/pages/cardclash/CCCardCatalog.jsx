@@ -79,10 +79,10 @@ export default function CCCardCatalog() {
   const rarities = selectedRarity === 'all' ? RARITY_ORDER : [selectedRarity]
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       <div className="mb-6 cd-section-accent pb-3">
-        <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Card Catalog</h1>
-        <p className="text-sm text-[var(--cd-text-mid)] mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--cd-text)] cd-head">Card Catalog</h1>
+        <p className="text-xs sm:text-sm text-[var(--cd-text-mid)] mt-1">
           <span className="cd-num text-[var(--cd-cyan)]">{GODS.length}</span> gods, <span className="cd-num text-[var(--cd-cyan)]">{ITEMS.length}</span> items, <span className="cd-num text-[var(--cd-cyan)]">{CONSUMABLES.length}</span> consumables &mdash; {RARITY_ORDER.length} rarities each
         </p>
       </div>
@@ -115,7 +115,7 @@ export default function CCCardCatalog() {
         />
 
         {/* Rarity filter */}
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           <button
             onClick={() => setSelectedRarity('all')}
             className={`px-2.5 py-1 text-xs rounded font-bold transition-all cd-head ${
@@ -140,7 +140,7 @@ export default function CCCardCatalog() {
 
         {/* Class filter (gods only) */}
         {activeType === 'gods' && (
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {GOD_CLASSES.map(cls => (
               <button
                 key={cls}
@@ -156,7 +156,7 @@ export default function CCCardCatalog() {
         )}
 
         {/* Card size slider */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="hidden sm:flex items-center gap-2 ml-auto">
           <span className="text-xs text-[var(--cd-text-dim)] cd-mono">{cardSize}px</span>
           <input type="range" min={100} max={400} value={cardSize} onChange={e => setCardSize(parseInt(e.target.value))} className="w-24" />
         </div>

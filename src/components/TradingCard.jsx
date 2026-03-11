@@ -53,6 +53,7 @@ export default function TradingCard({
     divisionName,
     rarity,
     isConnected,
+    isFirstEdition,
     size,
 }) {
     const normalizedRole = normalizeRole(role)
@@ -71,7 +72,7 @@ export default function TradingCard({
                         <div className="card-top-banner">
                             <div className="card-top-left">
                                 <span className="card-name">{playerName}</span>
-                                <span className="card-edition-badge">1st Edition</span>
+                                {isFirstEdition && <span className="card-edition-badge">1st Edition</span>}
                             </div>
                             <div className="card-top-right">
                                 <span className="card-stage-label">{normalizedRole}</span>

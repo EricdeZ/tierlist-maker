@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { usePassion } from '../../context/PassionContext'
 import { useAuth } from '../../context/AuthContext'
-import { challengeService, predictionsService, passionService } from '../../services/database'
+import { challengeService, predictionsService, passionService, emberService } from '../../services/database'
 import { RANK_THRESHOLDS, formatRank } from '../../config/ranks'
 import RankBadge from '../../components/RankBadge'
 import PageTitle from '../../components/PageTitle'
@@ -27,6 +27,14 @@ export default function DebugTools() {
     const [grantReason, setGrantReason] = useState('')
     const [granting, setGranting] = useState(false)
     const [grantResult, setGrantResult] = useState(null)
+
+    const [coresQuery, setCoresQuery] = useState('')
+    const [coresUsers, setCoresUsers] = useState([])
+    const [coresTarget, setCoresTarget] = useState(null)
+    const [coresAmount, setCoresAmount] = useState('')
+    const [coresReason, setCoresReason] = useState('')
+    const [coresGranting, setCoresGranting] = useState(false)
+    const [coresResult, setCoresResult] = useState(null)
 
     const selectedRank = RANK_THRESHOLDS[selectedRankIdx]
 
@@ -60,6 +68,38 @@ export default function DebugTools() {
         }, 300)
         return () => clearTimeout(debounceRef.current)
     }, [grantQuery, grantTarget])
+
+    const coresDebounceRef = useRef(null)
+    useEffect(() => {
+        if (!coresQuery.trim() || coresTarget) {
+            setCoresUsers([])
+            return
+        }
+        clearTimeout(coresDebounceRef.current)
+        coresDebounceRef.current = setTimeout(async () => {
+            try {
+                const res = await challengeService.searchUsers(coresQuery.trim())
+                setCoresUsers(res.users || [])
+            } catch { /* ignore */ }
+        }, 300)
+        return () => clearTimeout(coresDebounceRef.current)
+    }, [coresQuery, coresTarget])
+
+    const handleGrantCores = async () => {
+        if (!coresTarget || !coresAmount) return
+        setCoresGranting(true)
+        setCoresResult(null)
+        try {
+            const res = await emberService.adminGrant(coresTarget.id, Number(coresAmount), coresReason || undefined)
+            setCoresResult(res)
+            setCoresAmount('')
+            setCoresReason('')
+        } catch (err) {
+            setCoresResult({ error: err.message })
+        } finally {
+            setCoresGranting(false)
+        }
+    }
 
     const handleGrantPassion = async () => {
         if (!grantTarget || !grantAmount) return
@@ -252,6 +292,82 @@ export default function DebugTools() {
                         {grantResult.error
                             ? `Error: ${grantResult.error}`
                             : `Granted ${grantResult.amount} Passion to ${grantResult.targetUsername}. New balance: ${grantResult.newBalance}`}
+                    </div>
+                )}
+            </section>
+
+            {/* Grant Cores */}
+            <section className="bg-(--color-secondary) rounded-xl border border-cyan-500/20 p-6 mb-6">
+                <h2 className="font-heading text-lg font-bold text-cyan-400 mb-4">
+                    Grant Cores
+                </h2>
+
+                <div className="mb-3">
+                    <input
+                        type="text"
+                        value={coresQuery}
+                        onChange={e => { setCoresQuery(e.target.value); setCoresTarget(null) }}
+                        placeholder="Search username..."
+                        className="w-full px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-cyan-500/50"
+                    />
+                </div>
+
+                {coresUsers.length > 0 && !coresTarget && (
+                    <div className="mb-3 max-h-40 overflow-y-auto rounded-lg border border-white/10">
+                        {coresUsers.map(u => (
+                            <button
+                                key={u.id}
+                                onClick={() => { setCoresTarget(u); setCoresUsers([]) }}
+                                className="w-full text-left px-3 py-2 text-sm text-(--color-text) hover:bg-white/10 transition-colors border-b border-white/5 last:border-0"
+                            >
+                                {u.discord_username} <span className="text-(--color-text-secondary)">#{u.id}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {coresTarget && (
+                    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-white/5">
+                        <span className="text-sm font-medium text-(--color-text)">{coresTarget.discord_username}</span>
+                        <span className="text-xs text-(--color-text-secondary)">#{coresTarget.id}</span>
+                        <button
+                            onClick={() => { setCoresTarget(null); setCoresResult(null) }}
+                            className="ml-auto text-xs text-(--color-text-secondary) hover:text-red-400 transition-colors"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                )}
+
+                <div className="flex gap-2 mb-3">
+                    <input
+                        type="number"
+                        value={coresAmount}
+                        onChange={e => setCoresAmount(e.target.value)}
+                        placeholder="Amount"
+                        className="w-28 px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-cyan-500/50"
+                    />
+                    <input
+                        type="text"
+                        value={coresReason}
+                        onChange={e => setCoresReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        className="flex-1 px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none focus:border-cyan-500/50"
+                    />
+                    <button
+                        onClick={handleGrantCores}
+                        disabled={!coresTarget || !coresAmount || coresGranting}
+                        className="px-5 py-2 rounded-lg font-bold text-sm transition-colors shrink-0 disabled:opacity-50 bg-cyan-600 hover:bg-cyan-500 text-white"
+                    >
+                        {coresGranting ? 'Granting...' : 'Grant'}
+                    </button>
+                </div>
+
+                {coresResult && (
+                    <div className={`text-xs p-2 rounded-lg ${coresResult.error ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {coresResult.error
+                            ? `Error: ${coresResult.error}`
+                            : `Granted ${coresResult.amount} Cores to ${coresResult.targetUsername}. New balance: ${coresResult.newBalance}`}
                     </div>
                 )}
             </section>

@@ -288,7 +288,7 @@ export default function useForgeData({ urlLeagueSlug, urlDivisionSlug, user }) {
             setReferralSparksAvailable(refAvail)
             const results = portfolioResults
             const allHoldings = []
-            let totalValue = 0, totalInvested = 0
+            let totalValue = 0, totalInvested = 0, totalRealized = 0
             const allTransactions = []
             for (let i = 0; i < results.length; i++) {
                 const data = results[i]
@@ -300,16 +300,18 @@ export default function useForgeData({ urlLeagueSlug, urlDivisionSlug, user }) {
                 if (data.stats) {
                     totalValue += data.stats.totalValue || 0
                     totalInvested += data.stats.totalInvested || 0
+                    totalRealized += data.stats.realizedProfit || 0
                 }
                 for (const t of (data.transactions || [])) allTransactions.push(t)
             }
             allHoldings.sort((a, b) => b.currentValue - a.currentValue)
             allTransactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            const totalPL = totalValue - totalInvested
-            const plPct = totalInvested > 0 ? Math.round(totalPL / totalInvested * 10000) / 100 : 0
+            const unrealizedPL = totalValue - totalInvested
+            const totalProfit = unrealizedPL + totalRealized
+            const plPct = totalInvested > 0 ? Math.round(totalProfit / totalInvested * 10000) / 100 : 0
             setPortfolio({
                 holdings: allHoldings,
-                stats: { totalValue, totalInvested, unrealizedPL: totalPL, plPercent: plPct, holdingCount: allHoldings.length },
+                stats: { totalValue, totalInvested, realizedProfit: totalRealized, totalProfit, plPercent: plPct, holdingCount: allHoldings.length },
                 transactions: allTransactions.slice(0, 20),
             })
             setPortfolioTimeline(null)

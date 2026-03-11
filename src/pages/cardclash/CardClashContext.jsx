@@ -14,9 +14,10 @@ export function CardClashProvider({ children }) {
   const [packTypes, setPackTypes] = useState([])
   const [salePacks, setSalePacks] = useState([])
   const [pendingTradeCount, setPendingTradeCount] = useState(0)
+  const [inventory, setInventory] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, unseenCount: 0 })
+  const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, giftInventory: [], unseenCount: 0 })
   const [startingFive, setStartingFive] = useState(null)
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export function CardClashProvider({ children }) {
       setPackTypes(ccData.packTypes || [])
       setSalePacks(ccData.salePacks || [])
       setPendingTradeCount(ccData.pendingTradeCount || 0)
+      setInventory(ccData.inventory || [])
       setLoaded(true)
       setLoading(false)
     }).catch(err => {
@@ -65,8 +67,8 @@ export function CardClashProvider({ children }) {
     if (loaded) refreshGifts()
   }, [loaded, refreshGifts])
 
-  const sendGift = useCallback(async (recipientId, message) => {
-    const result = await cardclashService.sendGift(recipientId, message)
+  const sendGift = useCallback(async (recipientId, message, packType = 'gift') => {
+    const result = await cardclashService.sendGift(recipientId, message, packType)
     await refreshGifts()
     return result
   }, [refreshGifts])
@@ -83,6 +85,13 @@ export function CardClashProvider({ children }) {
     await cardclashService.markGiftsSeen()
     setGiftData(prev => ({ ...prev, unseenCount: 0, received: prev.received.map(g => ({ ...g, seen: true })) }))
   }, [])
+
+  const buyGiftPack = useCallback(async (packType) => {
+    const result = await cardclashService.buyGiftPack(packType)
+    setGiftData(prev => ({ ...prev, giftInventory: result.giftInventory }))
+    passionCtx?.refreshBalance?.()
+    return result
+  }, [passionCtx])
 
   const loadStartingFive = useCallback(async () => {
     try {
@@ -147,6 +156,20 @@ export function CardClashProvider({ children }) {
     }
   }, [passionCtx])
 
+  const openInventoryPack = useCallback(async (inventoryId) => {
+    try {
+      const result = await cardclashService.openInventoryPack(inventoryId)
+      setCollection(prev => [...prev, ...result.cards])
+      setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
+      setInventory(prev => prev.filter(i => i.id !== inventoryId))
+      passionCtx?.refreshBalance?.()
+      return result
+    } catch (err) {
+      console.error('Failed to open inventory pack:', err)
+      throw err
+    }
+  }, [passionCtx])
+
   const buySalePack = useCallback(async (saleId) => {
     try {
       const sale = salePacks.find(s => s.id === saleId)
@@ -171,9 +194,10 @@ export function CardClashProvider({ children }) {
       loaded, loading,
       buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
-      giftData, sendGift, openGift, markGiftsSeen, refreshGifts,
+      giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, collectS5Income,
       pendingTradeCount, setPendingTradeCount,
+      inventory, openInventoryPack,
     }}>
       {children}
     </CardClashContext.Provider>
