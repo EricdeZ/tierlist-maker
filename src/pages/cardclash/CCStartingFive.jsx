@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useCardClash } from './CardClashContext'
 import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, getHoloEffect } from '../../data/cardclash/economy'
 import GameCard from './components/GameCard'
@@ -631,7 +631,6 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         <AttachmentSlot
           attachment={card.godCard}
           slotType="god"
-          role={role.key}
           onAttach={() => onAttachPicker(role.key, 'god')}
           onRemove={() => onAttachRemove(role.key, 'god')}
           size={size}
@@ -640,7 +639,6 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         <AttachmentSlot
           attachment={card.itemCard}
           slotType="item"
-          role={role.key}
           onAttach={() => onAttachPicker(role.key, 'item')}
           onRemove={() => onAttachRemove(role.key, 'item')}
           size={size}
@@ -676,7 +674,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
 }
 
 
-function AttachmentSlot({ attachment, slotType, role, onAttach, onRemove, size = 170, getDefOverride }) {
+function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride }) {
   const attachSize = Math.round(size * 0.4)
 
   if (!attachment) {
