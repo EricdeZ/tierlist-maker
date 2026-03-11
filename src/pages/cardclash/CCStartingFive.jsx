@@ -7,7 +7,7 @@ import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
-import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn } from 'lucide-react'
+import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle } from 'lucide-react'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: Shield },
@@ -177,6 +177,7 @@ export default function CCStartingFive() {
   const [collectNotif, setCollectNotif] = useState(null)
   const [slotting, setSlotting] = useState(false)
   const [zoomedCard, setZoomedCard] = useState(null)
+  const [showTutorial, setShowTutorial] = useState(false)
   const slotSize = useSlotSize()
 
   // Live-ticking income counter
@@ -317,9 +318,18 @@ export default function CCStartingFive() {
   return (
     <div className="max-w-[1100px] mx-auto pb-12">
       {/* Header */}
-      <div className="mb-6 cd-section-accent pb-3">
-        <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Starting 5</h1>
-        <p className="text-xs text-white/40 mt-1">Slot your best holo cards to earn passive income</p>
+      <div className="mb-6 cd-section-accent pb-3 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Starting 5</h1>
+          <p className="text-xs text-white/40 mt-1">Slot your best holo cards to earn passive income</p>
+        </div>
+        <button
+          onClick={() => setShowTutorial(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white/40 hover:text-[var(--cd-cyan)] hover:bg-[var(--cd-cyan)]/[0.06] rounded-lg transition-colors cursor-pointer cd-head tracking-wider"
+        >
+          <HelpCircle size={14} />
+          How It Works
+        </button>
       </div>
 
       {/* Income Dashboard */}
@@ -483,12 +493,15 @@ export default function CCStartingFive() {
           collection={collection}
           allSlottedIds={allSlottedIds}
           playerRarity={slottedCards[attachPickerState.role]?.rarity}
+          playerHoloType={slottedCards[attachPickerState.role]?.holoType}
           onSelect={handleAttachSlot}
           onClose={() => setAttachPickerState(null)}
           slotting={slotting}
           getDefOverride={getDefOverride}
         />
       )}
+
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
 
       {/* Card Zoom Modal */}
       {zoomedCard && (
@@ -547,6 +560,66 @@ export default function CCStartingFive() {
           100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+    </div>
+  )
+}
+
+
+function TutorialModal({ onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">How Starting 5 Works</h3>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 text-sm text-white/60" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">PASSIVE INCOME</h4>
+            <p>Slot holo player cards into 5 role-based slots to earn passive Passion and Cores over time. Higher rarity cards generate more income.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">HOLO TYPES</h4>
+            <p>
+              <span style={{ color: '#f8c56a' }}>Holo</span> cards earn Passion.{' '}
+              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards earn Cores.{' '}
+              <span className="text-purple-400">Full holo</span> cards earn a portion of both.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ATTACHMENTS</h4>
+            <p>Each player slot has two attachment slots: one for a god card and one for an item card. Attachments boost the player's income with a percentage multiplier based on their rarity.</p>
+            <p className="mt-1 text-white/40">God cards give larger bonuses than items. Attachments must be at least the same rarity as the player card and must match holo type (full holo attachments always fit).</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">GOD SYNERGY</h4>
+            <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">INCOME CAP</h4>
+            <p>Income accumulates up to a 2-day cap. Collect regularly to avoid wasting earnings.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ROLE MATCHING</h4>
+            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Item cards can be attached to any slot.</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -902,7 +975,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
 }
 
 
-function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, onSelect, onClose, slotting, getDefOverride }) {
+function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, playerHoloType, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const Icon = roleInfo?.icon || Shield
   const playerTier = RARITY_TIER[playerRarity] || 0
@@ -914,6 +987,8 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if (type !== slotType) return false
         if (!card.holoType) return false
         if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
+        // Holo type filter: match player's holo type, full always shown, full player sees all
+        if (playerHoloType !== 'full' && card.holoType !== 'full' && card.holoType !== playerHoloType) return false
         if (slotType === 'god') {
           const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
           if (cardRole !== role) return false
@@ -926,7 +1001,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if (rDiff !== 0) return rDiff
         return (a.godName || '').localeCompare(b.godName || '')
       })
-  }, [collection, allSlottedIds, role, slotType, playerTier])
+  }, [collection, allSlottedIds, role, slotType, playerTier, playerHoloType])
 
   return (
     <div

@@ -136,8 +136,6 @@
 /* --- Card front (wraps the TradingCard + effect layers) --- */
 .holo-card__front {
     display: grid;
-    border-radius: var(--card-radius);
-    overflow: hidden;
     transform: translate3d(0px, 0px, 0.01px);
     backface-visibility: hidden;
 }
