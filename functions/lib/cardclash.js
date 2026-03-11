@@ -506,16 +506,18 @@ const STATIC_POOL_SIZES = { god: GODS.length, item: ITEMS.length, consumable: CO
 
 function pickTypeForSlot(slot) {
   const types = slot.types || ['god']
-  if (slot.typeWeights && Object.keys(slot.typeWeights).length > 0) {
-    const totalWeight = types.reduce((sum, t) => sum + (slot.typeWeights[t] || 0), 0)
-    let roll = Math.random() * totalWeight
-    for (const t of types) {
-      roll -= (slot.typeWeights[t] || 0)
-      if (roll <= 0) return t
-    }
-    return types[types.length - 1]
+  if (types.length === 1) return types[0]
+  // Use explicit typeWeights if provided, otherwise weight by pool size
+  const weights = (slot.typeWeights && Object.keys(slot.typeWeights).length > 0)
+    ? types.map(t => slot.typeWeights[t] || 0)
+    : types.map(t => STATIC_POOL_SIZES[t] || 10)
+  const totalWeight = weights.reduce((a, b) => a + b, 0)
+  let roll = Math.random() * totalWeight
+  for (let i = 0; i < types.length; i++) {
+    roll -= weights[i]
+    if (roll <= 0) return types[i]
   }
-  return types[Math.floor(Math.random() * types.length)]
+  return types[types.length - 1]
 }
 
 // Proportionally distribute types across N slots based on pool sizes.
@@ -609,7 +611,7 @@ async function generateConfiguredPack(sql, pack) {
       })
       if (allowedTypes.length === 0) allowedTypes = (slot.types || ['god']).filter(t => t !== 'player')
       if (allowedTypes.length === 0) allowedTypes = ['god']
-      const picked = allowedTypes[Math.floor(Math.random() * allowedTypes.length)]
+      const picked = pickWeightedType(allowedTypes)
       forcedTypes[idx] = picked
       assigned[picked] = (assigned[picked] || 0) + 1
     }
@@ -672,21 +674,25 @@ async function generateConfiguredPack(sql, pack) {
   return cards
 }
 
-// Gift pack: 5 cards, both leagues, no wildcard slot
+// Gift pack: 6 cards, both leagues
 // Slot 0-3: god/item/consumable (common), one guaranteed player card
 // Slot 4: guaranteed uncommon+ rarity upgrade
+// Slot 5: wildcard (any type, weighted by pool size)
 export async function generateGiftPack(sql) {
   const nonPlayerTypes = ['god', 'item', 'consumable']
+  const wildcardTypes = ['god', 'item', 'consumable', 'player']
   const playerSlot = Math.floor(Math.random() * 4) // 0-3
 
   const cards = []
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const minRarity = i === 4 ? 'uncommon' : 'common'
     const rarity = rollRarity(minRarity)
 
     let type
     if (i === playerSlot) {
       type = 'player'
+    } else if (i === 5) {
+      type = pickWeightedType(wildcardTypes)
     } else {
       type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]
     }

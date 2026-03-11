@@ -336,11 +336,15 @@ export default function PackShopRouter() {
   const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length;
   const myPacksCount = (inventory?.length || 0) + unopenedGifts;
 
-  const defaultMode = myPacksCount > 0 ? 'my-packs' : 'shop';
-  const mode = searchParams.get('packMode') || defaultMode;
+  // Stabilize default so opening the last pack doesn't auto-switch to 'shop'
+  // and unmount MyPacks (killing the pack-opening animation mid-flight)
+  const stableDefaultRef = useRef('shop');
+  if (myPacksCount > 0) stableDefaultRef.current = 'my-packs';
+
+  const mode = searchParams.get('packMode') || stableDefaultRef.current;
   const setMode = (m) => {
     const next = new URLSearchParams(searchParams);
-    if (m === defaultMode) next.delete('packMode'); else next.set('packMode', m);
+    if (m === stableDefaultRef.current) next.delete('packMode'); else next.set('packMode', m);
     setSearchParams(next);
   };
 
@@ -631,7 +635,7 @@ function PackShop() {
                 <div className="relative transition-all duration-500 ease-out"
                   style={{
                     transform: isSelected ? `translate(${packOffset.x}px, ${packOffset.y}px) scale(2.2)` : 'scale(1.15)',
-                    zIndex: isSelected ? 20 : 1,
+                    zIndex: isSelected ? 50 : 1,
                     filter: isOther ? 'blur(4px)' : 'none',
                     opacity: isOther ? 0.25 : 1,
                     pointerEvents: isOther ? 'none' : undefined,
@@ -682,7 +686,7 @@ function PackShop() {
             transform: `translateY(-50%) translateX(${focusedPack ? '0' : '40px'})`,
             opacity: focusedPack ? 1 : 0,
             pointerEvents: focusedPack ? undefined : 'none',
-            zIndex: 30,
+            zIndex: 50,
           }}
           onClick={(e) => e.stopPropagation()}
         >
