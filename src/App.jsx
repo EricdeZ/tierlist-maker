@@ -192,7 +192,7 @@ function App() {
                             <Route path="forge/:leagueSlug/:divisionSlug/challenges" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
-                            <Route path="vault" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><VaultPage /></ProtectedRoute>} />
+                            <Route path="vault" element={<VaultPage />} />
                             <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="team" element={<MyTeams />} />
                             <Route path="bring-your-own-team" element={<MyTeams />} />

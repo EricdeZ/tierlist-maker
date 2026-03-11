@@ -7,8 +7,8 @@
 export const FEATURE_FLAGS = {
     FORGE_RELEASED: true,         // Fantasy Forge publicly visible
     BYOT_RELEASED: true,                  // Bring Your Own Team self-service team creation
-    CARD_CLASH_RELEASED: false,            // Card Clash mini-game (admin-only while in dev)
-    VAULT_OPEN: false,                     // The Vault open to all authenticated users
+    CARD_CLASH_RELEASED: true,             // Card Clash mini-game
+    VAULT_OPEN: true,                      // The Vault open to all authenticated users
 }
 
 /**
