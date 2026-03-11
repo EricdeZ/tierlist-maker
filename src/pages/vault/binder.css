@@ -396,46 +396,34 @@
   filter: grayscale(0.5);
 }
 
-/* ═══ Responsive ═══ */
+/* ═══ Responsive — single page on mobile ═══ */
 @media (max-width: 768px) {
   .binder-flip-container {
     perspective: none;
   }
 
+  /* Desktop spread hidden on mobile; mobile uses .binder-mobile-page instead */
   .binder-spread {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .binder-spine {
     display: none;
   }
 
-  .binder-page {
-    min-height: auto;
+  .binder-mobile-page {
+    display: block;
   }
 
-  .binder-page--left,
-  .binder-page--right {
-    border-radius: 4px;
+  .binder-mobile-page .binder-page {
+    min-height: auto;
+    border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.06);
   }
 
   .binder-grid {
     gap: 6px;
-    padding: 4px;
+    padding: 6px;
   }
 
   .binder-slot {
     border-radius: 6px;
-  }
-
-  /* Force cards to behave inside small slots */
-  .binder-slot .game-card,
-  .binder-slot .trading-card {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    flex-shrink: 1 !important;
   }
 
   .binder-cover {
@@ -454,6 +442,11 @@
   .binder-picker__grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
+}
+
+/* Hide mobile page on desktop */
+.binder-mobile-page {
+  display: none;
 }
 
 /* ═══ Settings panel ═══ */

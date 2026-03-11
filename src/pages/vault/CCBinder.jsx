@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useVault } from './VaultContext'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
@@ -63,6 +63,18 @@ export default function CCBinder() {
   const [binderColor, setBinderColor] = useState('#8b5e3c')
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [mobilePage, setMobilePage] = useState(1)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  )
+  const touchStartX = useRef(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     if (binder) {
@@ -132,6 +144,22 @@ export default function CCBinder() {
     }
   }, [saveBinder, binderName, binderColor])
 
+  const handleTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX
+  }, [])
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(dx) < 50) return
+    if (dx < 0 && mobilePage < PAGES) setMobilePage(p => p + 1)
+    if (dx > 0) {
+      if (mobilePage > 1) setMobilePage(p => p - 1)
+      else setShowCover(true)
+    }
+  }, [mobilePage])
+
   const handleShare = useCallback(async () => {
     const token = binder?.shareToken || await binderGenerateShare()
     const url = `${window.location.origin}/vault/binder/${token}`
@@ -196,7 +224,7 @@ export default function CCBinder() {
           </button>
           <span className="text-white/15">|</span>
           <span className="text-sm text-white/30 cd-head tracking-wider">
-            Pages {leftPage}-{rightPage} of {PAGES}
+            {isMobile ? `Page ${mobilePage} of ${PAGES}` : `Pages ${leftPage}-${rightPage} of ${PAGES}`}
           </span>
         </div>
         <div className="flex items-center gap-2">
