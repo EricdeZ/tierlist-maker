@@ -1,16 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useCardClash } from './CardClashContext'
 import { cardclashService } from '../../services/database'
 import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck } from 'lucide-react'
-import { PACKS } from '../../data/cardclash/economy'
 import PackOpening from './components/PackOpening'
 import PackArt from './components/PackArt'
 import emberIcon from '../../assets/ember.png'
 
-const GIFTABLE_PACKS = ['osl-mixed', 'bsl-mixed']
-
 export default function CCGifts() {
-  const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack, ember } = useCardClash()
+  const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack, ember, packTypes, packTypesMap } = useCardClash()
   const [tab, setTab] = useState('received')
   const [openResult, setOpenResult] = useState(null)
 
@@ -62,7 +59,7 @@ export default function CCGifts() {
         ))}
       </div>
 
-      {tab === 'received' && <ReceivedGifts received={received} onOpen={openGift} setOpenResult={setOpenResult} />}
+      {tab === 'received' && <ReceivedGifts received={received} onOpen={openGift} setOpenResult={setOpenResult} packTypesMap={packTypesMap} />}
       {tab === 'send' && (
         <SendGiftSection
           giftsRemaining={giftsRemaining}
@@ -72,9 +69,11 @@ export default function CCGifts() {
           onSend={sendGift}
           onRefresh={refreshGifts}
           onBuyGiftPack={buyGiftPack}
+          packTypes={packTypes}
+          packTypesMap={packTypesMap}
         />
       )}
-      {tab === 'sent' && <SentGifts sent={sent} />}
+      {tab === 'sent' && <SentGifts sent={sent} packTypesMap={packTypesMap} />}
       {tab === 'redeem' && <RedeemSection setOpenResult={setOpenResult} />}
 
       {openResult && (
@@ -89,7 +88,7 @@ export default function CCGifts() {
   )
 }
 
-function ReceivedGifts({ received, onOpen, setOpenResult }) {
+function ReceivedGifts({ received, onOpen, setOpenResult, packTypesMap }) {
   const [opening, setOpening] = useState(null)
 
   const handleOpen = async (gift) => {
@@ -119,7 +118,7 @@ function ReceivedGifts({ received, onOpen, setOpenResult }) {
 
   const getPackLabel = (packType) => {
     if (packType === 'gift') return '5 cards from both leagues'
-    const pack = PACKS[packType]
+    const pack = packTypesMap[packType]
     return pack ? `${pack.name} — ${pack.cards} cards` : 'Gift pack'
   }
 
@@ -205,7 +204,7 @@ function ReceivedGifts({ received, onOpen, setOpenResult }) {
   )
 }
 
-function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, onSend, onRefresh, onBuyGiftPack }) {
+function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, onSend, onRefresh, onBuyGiftPack, packTypes, packTypesMap }) {
   const [sendingPack, setSendingPack] = useState(null) // { packType, index? } for the send modal
   const [sentSuccess, setSentSuccess] = useState(false)
   const [buying, setBuying] = useState(null)
@@ -302,7 +301,7 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
           <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">Purchased Packs</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {giftInventory.map((item) => {
-              const pack = PACKS[item.packType]
+              const pack = packTypesMap[item.packType]
               if (!pack) return null
               return (
                 <div
@@ -344,9 +343,8 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {GIFTABLE_PACKS.map((key) => {
-            const pack = PACKS[key]
-            if (!pack) return null
+          {packTypes.filter(p => p.category === 'mixed' && p.leagueId).map((pack) => {
+            const key = pack.id
             const canAfford = emberBalance >= pack.cost
             const isBuying = buying === key
             const justBought = buyResult === key
@@ -354,7 +352,7 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
             return (
               <div key={key} className="cd-panel cd-corners rounded-xl p-4" style={{ animation: 'vault-card-enter 0.4s ease-out 0.1s both' }}>
                 <div className="flex items-center gap-3 mb-3">
-                  <PackArt tier={key} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={8} compact />
+                  <PackArt tier={key} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={pack.sortOrder ?? 8} compact />
                   <div className="min-w-0">
                     <div className="text-sm font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-text)' }}>{pack.name}</div>
                     <div className="text-[11px] text-white/40">{pack.cards} cards per pack</div>
@@ -415,13 +413,14 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
           onSend={onSend}
           onClose={() => setSendingPack(null)}
           onSuccess={handleSent}
+          packTypesMap={packTypesMap}
         />
       )}
     </div>
   )
 }
 
-function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess }) {
+function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess, packTypesMap }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -430,7 +429,7 @@ function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess }) 
   const [sending, setSending] = useState(false)
   const searchTimeout = useRef(null)
 
-  const pack = PACKS[packType]
+  const pack = packTypesMap[packType]
   const packLabel = pack ? pack.name : 'Gift Pack'
 
   const doSearch = useCallback(async (q) => {
@@ -596,7 +595,7 @@ function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess }) 
   )
 }
 
-function SentGifts({ sent }) {
+function SentGifts({ sent, packTypesMap }) {
   if (sent.length === 0) {
     return (
       <div className="text-center py-16">
@@ -610,7 +609,7 @@ function SentGifts({ sent }) {
   return (
     <div className="space-y-3">
       {sent.map((gift, i) => {
-        const pack = gift.packType !== 'gift' ? PACKS[gift.packType] : null
+        const pack = gift.packType !== 'gift' ? packTypesMap[gift.packType] : null
         return (
           <div
             key={gift.id}

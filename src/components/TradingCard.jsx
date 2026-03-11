@@ -62,7 +62,7 @@ export default function TradingCard({
     const isPlayer = variant === 'player'
 
     return (
-        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined} style={size ? { width: size } : undefined}>
+        <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined} style={size ? { width: size, '--card-scale': size / 340 } : undefined}>
             {/* Gold outer border */}
             <div className="card-border">
                 {/* Dark inner body */}

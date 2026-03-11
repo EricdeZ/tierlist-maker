@@ -1006,6 +1006,9 @@ export const cardclashService = {
     async getCardDetail(defId) {
         return apiCall('cardclash', { action: 'card-detail', defId })
     },
+    async searchCollection(q) {
+        return apiCall('cardclash', { action: 'collection-search', q })
+    },
     async loadGifts() {
         return apiCall('cardclash', { action: 'gifts' })
     },

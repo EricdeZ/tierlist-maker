@@ -71,9 +71,9 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     }).finally(() => setLoadingStats(false))
   }, [playerCard?.defId])
 
-  // Find owned instances of this card
-  const sellableInstances = useMemo(() => {
-    if (!canSell || !collection) return []
+  // Find owned instances of this card (used for sell + holoType lookup)
+  const ownedInstances = useMemo(() => {
+    if (!collection) return []
     let matches
     if (gameCard) {
       matches = collection.filter(c => c.cardType === gameCard.type && c.godId === gameCard.identifier)
@@ -82,15 +82,21 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     } else {
       return []
     }
-    // Group by rarity, pick one instance per rarity
+    // Group by rarity, pick best holoType per rarity (full > reverse > holo)
     const byRarity = new Map()
+    const HOLO_PRIORITY = { full: 0, reverse: 1, holo: 2 }
     for (const card of matches) {
-      if (!byRarity.has(card.rarity)) byRarity.set(card.rarity, card)
+      const existing = byRarity.get(card.rarity)
+      if (!existing || (HOLO_PRIORITY[card.holoType] ?? 3) < (HOLO_PRIORITY[existing.holoType] ?? 3)) {
+        byRarity.set(card.rarity, card)
+      }
     }
     return RARITY_ORDER
       .filter(r => byRarity.has(r))
       .map(r => byRarity.get(r))
-  }, [canSell, collection, gameCard, playerCard])
+  }, [collection, gameCard, playerCard])
+
+  const sellableInstances = canSell ? ownedInstances : []
 
   // Default sell rarity to the displayed rarity
   useEffect(() => {
@@ -121,7 +127,10 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
   const rarity = displayRarity
   const rarityInfo = RARITIES[rarity]
   const holoEffect = getHoloEffect(rarity)
-  const holoType = holoTypeProp || 'reverse'
+
+  // Use explicit prop (Starting Five), or look up from owned instances (collection), or fall back
+  const matchedInstance = ownedInstances.find(i => i.rarity === rarity)
+  const holoType = holoTypeProp || matchedInstance?.holoType || 'reverse'
 
   // Determine role for holo effect
   const role = playerCard
@@ -233,8 +242,9 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
               <input
                 type="number"
                 min="1"
+                max="10000"
                 value={sellPrice}
-                onChange={e => { setSellPrice(e.target.value); setSellError(null) }}
+                onChange={e => { setSellPrice(Math.min(10000, e.target.value)); setSellError(null) }}
                 placeholder="Price in Core"
                 className="flex-1 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg px-3 py-2 text-sm text-[var(--cd-text)] cd-num focus:outline-none focus:border-[var(--cd-cyan)]/40 placeholder:text-[var(--cd-text-dim)]"
               />

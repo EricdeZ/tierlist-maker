@@ -5,6 +5,7 @@ import GameCard from './GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { RARITIES, getHoloEffect } from '../../../data/cardclash/economy'
+import { useCardClash } from '../CardClashContext'
 import cardBackImg from '../../../assets/card_backsite.png'
 import './PackOpening.css'
 
@@ -23,15 +24,16 @@ function getCardType(card) {
   return card.cardType || card.card_type || 'god'
 }
 
-function toGameCardData(card) {
+function toGameCardData(card, override) {
   const type = getCardType(card)
   const cd = card.cardData || card.card_data || {}
   const base = {
     name: card.godName || card.god_name || card.name,
     class: card.godClass || card.god_class || card.class,
-    imageUrl: card.imageUrl || card.image_url,
+    imageUrl: override?.custom_image_url || card.imageUrl || card.image_url,
     id: card.godId || card.god_id || card.id,
     serialNumber: card.serialNumber || card.serial_number,
+    metadata: override || undefined,
   }
   if (type === 'god') {
     return { ...base, ability: card.ability || cd.ability, imageKey: cd.imageKey }
@@ -69,7 +71,7 @@ function toPlayerCardProps(card) {
  * Reusable card renderer — both card types use container queries for native scaling.
  * Pass holo=false to skip the TradingCardHolo wrapper (e.g. inside flip animation).
  */
-function PackCard({ card, size, holo = true }) {
+function PackCard({ card, size, holo = true, override }) {
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const holoEffect = getHoloEffect(card.rarity)
@@ -90,7 +92,7 @@ function PackCard({ card, size, holo = true }) {
     return <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={size} />
   }
 
-  const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} />
+  const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} />
   if (holo) {
     return (
       <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size={size}>
@@ -102,6 +104,7 @@ function PackCard({ card, size, holo = true }) {
 }
 
 function SummaryView({ cards, result, onOpenMore, onClose }) {
+  const { getDefOverride } = useCardClash()
   const gridRef = useRef(null)
   const [activeIdx, setActiveIdx] = useState(0)
   const [zoomedIdx, setZoomedIdx] = useState(null)
@@ -181,7 +184,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
             style={{ '--si': i, cursor: 'pointer' }}
             onClickCapture={(e) => { e.stopPropagation(); isMobile ? scrollTo(i) : setZoomedIdx(i) }}
           >
-            <PackCard card={card} size={cardSize} holo />
+            <PackCard card={card} size={cardSize} holo override={getDefOverride(card)} />
             {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
           </div>
         ))}
@@ -200,7 +203,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
       {zoomedIdx !== null && (
         <div className="pack-opening__zoom-overlay" onClick={() => setZoomedIdx(null)}>
           <div className="pack-opening__zoom-card" onClick={e => e.stopPropagation()}>
-            <PackCard card={cards[zoomedIdx]} size={340} holo />
+            <PackCard card={cards[zoomedIdx]} size={340} holo override={getDefOverride(cards[zoomedIdx])} />
             {cards[zoomedIdx].isNew && <div className="pack-opening__zoom-new">NEW</div>}
           </div>
           <div className="pack-opening__zoom-nav">
@@ -233,6 +236,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
 }
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
+  const { getDefOverride } = useCardClash()
   const [phase, setPhase] = useState(skipToStack ? 'stack' : skipTear ? 'ripping' : 'enter')
   const [tearProgress, setTearProgress] = useState(0)
   const [tearSide, setTearSide] = useState(null)
@@ -651,7 +655,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                 <div className="pack-opening__ec-flip">
                   <div className="pack-opening__ec-back"><CardBack /></div>
                   <div className="pack-opening__ec-front">
-                    <PackCard card={card} holo={false} />
+                    <PackCard card={card} holo={false} override={getDefOverride(card)} />
                     {isTop && topFlipPhase === 'revealed' && (
                       <div className={`pack-opening__holo-shimmer${tier <= 1 ? ' holo-intense' : tier <= 2 ? ' holo-medium' : ''}`}
                         style={{ '--holo-color': cardColor }} />

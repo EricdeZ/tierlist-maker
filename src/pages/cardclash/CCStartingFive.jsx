@@ -24,12 +24,12 @@ function getCardType(card) {
   return card.cardType || 'god'
 }
 
-function toGameCardData(card) {
+function toGameCardData(card, override) {
   const type = getCardType(card)
   const cd = card.cardData || {}
   const base = {
-    name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
-    id: card.godId, serialNumber: card.serialNumber,
+    name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
+    id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
   }
   if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -136,7 +136,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, collectS5Income } = useCardClash()
+  const { collection, startingFive, slotS5Card, unslotS5Card, collectS5Income, getDefOverride } = useCardClash()
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
   const [slotAnimation, setSlotAnimation] = useState(null)
@@ -377,6 +377,7 @@ export default function CCStartingFive() {
                     optionsOpen={optionsRole === role.key}
                     onToggleOptions={() => setOptionsRole(optionsRole === role.key ? null : role.key)}
                     size={slotSize}
+                    override={getDefOverride(card)}
                   />
                 ) : (
                   <EmptySlot role={role} onClick={() => setPickerRole(role.key)} size={slotSize} />
@@ -396,6 +397,7 @@ export default function CCStartingFive() {
           onSelect={handleSlot}
           onClose={() => setPickerRole(null)}
           slotting={slotting}
+          getDefOverride={getDefOverride}
         />
       )}
 
@@ -404,7 +406,7 @@ export default function CCStartingFive() {
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
           playerCard={getCardType(zoomedCard) === 'player' ? toPlayerCardProps(zoomedCard) : undefined}
-          gameCard={getCardType(zoomedCard) !== 'player' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard) } : undefined}
+          gameCard={getCardType(zoomedCard) !== 'player' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
           holoType={zoomedCard.holoType}
         />
       )}
@@ -479,7 +481,7 @@ function EmptySlot({ role, onClick, size = 170 }) {
 }
 
 
-function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170 }) {
+function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getIncomeRate(card)
   const type = getCardType(card)
@@ -510,7 +512,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
               size={size}
             />
           ) : (
-            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={size} />
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
           )}
         </TradingCardHolo>
       </div>
@@ -664,7 +666,7 @@ function SlotAnimationOverlay({ config, rarity }) {
 }
 
 
-function CardPicker({ role, collection, slottedCards, onSelect, onClose, slotting }) {
+function CardPicker({ role, collection, slottedCards, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const Icon = roleInfo?.icon || Shield
 
@@ -738,6 +740,7 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
                   card={card}
                   onSelect={() => onSelect(card.id, role)}
                   disabled={slotting}
+                  override={getDefOverride(card)}
                 />
               ))}
             </div>
@@ -749,7 +752,7 @@ function CardPicker({ role, collection, slottedCards, onSelect, onClose, slottin
 }
 
 
-function PickerCard({ card, onSelect, disabled }) {
+function PickerCard({ card, onSelect, disabled, override }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getIncomeRate(card)
   const type = getCardType(card)
@@ -771,7 +774,7 @@ function PickerCard({ card, onSelect, disabled }) {
               size={120}
             />
           ) : (
-            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={120} />
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
           )}
         </TradingCardHolo>
       </div>

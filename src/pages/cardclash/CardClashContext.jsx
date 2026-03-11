@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { cardclashService, emberService } from '../../services/database'
@@ -19,12 +19,16 @@ export function CardClashProvider({ children }) {
   const [loading, setLoading] = useState(false)
   const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, giftInventory: [], unseenCount: 0 })
   const [startingFive, setStartingFive] = useState(null)
+  const [defOverrides, setDefOverrides] = useState({})
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
     setLoading(true)
-    cardclashService.load().then(ccData => {
+    Promise.all([
+      cardclashService.load(),
+      cardclashService.getDefinitionOverrides().catch(() => ({ overrides: {} })),
+    ]).then(([ccData, overridesData]) => {
       if (cancelled) return
       setCollection(ccData.collection || [])
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
@@ -32,6 +36,7 @@ export function CardClashProvider({ children }) {
       setSalePacks(ccData.salePacks || [])
       setPendingTradeCount(ccData.pendingTradeCount || 0)
       setInventory(ccData.inventory || [])
+      setDefOverrides(overridesData.overrides || {})
       setLoaded(true)
       setLoading(false)
     }).catch(err => {
@@ -44,6 +49,19 @@ export function CardClashProvider({ children }) {
 
   const passion = passionCtx?.balance ?? 0
   const ember = passionCtx?.ember ?? { balance: 0 }
+
+  const packTypesMap = useMemo(() => {
+    const map = {}
+    for (const p of packTypes) map[p.id] = p
+    return map
+  }, [packTypes])
+
+  const getDefOverride = useCallback((card) => {
+    const type = card.cardType || 'god'
+    if (type === 'player') return null
+    const id = type === 'god' ? card.godId : (card.godId || '').replace(/^(item|consumable|minion|buff)-/, '')
+    return defOverrides[`${type}:${id}`] || null
+  }, [defOverrides])
 
   const refreshCollection = useCallback(async () => {
     try {
@@ -190,8 +208,8 @@ export function CardClashProvider({ children }) {
 
   return (
     <CardClashContext.Provider value={{
-      collection, passion, ember, stats, packTypes, salePacks,
-      loaded, loading,
+      collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
+      loaded, loading, getDefOverride,
       buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,

@@ -38,6 +38,7 @@ const handler = async (event) => {
         case 'collection-catalog': return await handleCollectionCatalog(sql)
         case 'collection-owned': return await handleCollectionOwned(sql, user)
         case 'collection-set': return await handleCollectionSet(sql, event.queryStringParameters)
+        case 'collection-search': return await handleCollectionSearch(sql, event.queryStringParameters)
         case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
         case 'gifts': return await handleLoadGifts(sql, user)
         case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
@@ -91,12 +92,21 @@ async function handleLoad(sql, user) {
     sql`SELECT * FROM cc_cards WHERE owner_id = ${user.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
-    sql`SELECT * FROM cc_pack_types WHERE enabled = true ORDER BY sort_order`,
+    sql`
+      SELECT pt.*, l.slug AS league_slug, l.name AS league_name,
+             COALESCE(pt.color, l.color) AS resolved_color
+      FROM cc_pack_types pt
+      LEFT JOIN leagues l ON pt.league_id = l.id
+      WHERE pt.enabled = true
+      ORDER BY pt.sort_order
+    `,
     sql`
       SELECT s.*, pt.name AS base_name, pt.description AS base_description,
-             pt.cards_per_pack, pt.category, pt.league_id
+             pt.cards_per_pack, pt.category, pt.league_id,
+             COALESCE(pt.color, l.color) AS resolved_color
       FROM cc_pack_sales s
       JOIN cc_pack_types pt ON s.pack_type_id = pt.id
+      LEFT JOIN leagues l ON pt.league_id = l.id
       WHERE s.active = true
         AND (s.starts_at IS NULL OR s.starts_at <= NOW())
         AND (s.ends_at IS NULL OR s.ends_at > NOW())
@@ -131,6 +141,9 @@ async function handleLoad(sql, user) {
         guarantees: p.guarantees || [],
         category: p.category,
         leagueId: p.league_id,
+        leagueSlug: p.league_slug,
+        leagueName: p.league_name,
+        color: p.resolved_color,
         sortOrder: p.sort_order,
       })),
       salePacks: salePacks.map(s => ({
@@ -144,6 +157,7 @@ async function handleLoad(sql, user) {
         cards: s.cards_per_pack,
         category: s.category,
         leagueId: s.league_id,
+        color: s.resolved_color,
         sortOrder: s.sort_order,
         startsAt: s.starts_at,
         endsAt: s.ends_at,
@@ -492,6 +506,53 @@ async function handleCollectionSet(sql, params) {
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
+}
+
+// ═══ GET: Collection search — find player cards by name/discord ═══
+async function handleCollectionSearch(sql, params) {
+  const { q } = params || {}
+  if (!q || q.trim().length < 2) {
+    return { statusCode: 200, headers, body: JSON.stringify({ results: [] }) }
+  }
+
+  const query = q.trim()
+  const defs = await sql`
+    SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
+           d.role,
+           CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
+           d.league_slug, d.division_tier, d.division_slug, d.season_slug,
+           div.name AS division_name,
+           CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
+    FROM cc_player_defs d
+    LEFT JOIN players p ON p.slug = d.player_slug
+    LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    JOIN divisions div ON d.division_id = div.id
+    JOIN seasons s ON d.season_id = s.id
+    WHERE s.is_active = true
+      AND (d.player_name ILIKE ${'%' + query + '%'} OR u.discord_username ILIKE ${'%' + query + '%'})
+    ORDER BY d.player_name, d.league_slug, d.division_tier
+    LIMIT 30
+  `
+
+  const results = defs.map(d => ({
+    defId: d.id,
+    cardIndex: d.card_index,
+    playerName: d.player_name,
+    playerSlug: d.player_slug,
+    teamName: d.team_name,
+    teamColor: d.team_color,
+    role: d.role,
+    avatarUrl: d.avatar_url,
+    isConnected: d.is_claimed,
+    leagueSlug: d.league_slug,
+    divisionTier: d.division_tier,
+    divisionSlug: d.division_slug,
+    divisionName: d.division_name,
+    seasonSlug: d.season_slug,
+  }))
+
+  return { statusCode: 200, headers, body: JSON.stringify({ results }) }
 }
 
 // ═══ GET: Card detail — player stats for a card definition ═══
@@ -865,8 +926,14 @@ async function handleDismantle(sql, user, body) {
   // Count legendaries before deleting
   const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
 
-  // Delete the cards
+  // Delete the cards (clean up completed trade references first to avoid FK violation)
   const validIds = cards.map(c => c.id)
+  await sql`
+    DELETE FROM cc_trade_cards tc
+    USING cc_trades t
+    WHERE tc.trade_id = t.id AND tc.card_id = ANY(${validIds})
+      AND t.status NOT IN ('waiting', 'active')
+  `
   await sql`DELETE FROM cc_cards WHERE id = ANY(${validIds}) AND owner_id = ${user.id}`
 
   // Grant ember

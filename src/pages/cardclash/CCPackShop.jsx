@@ -1,8 +1,7 @@
-import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCardClash } from './CardClashContext';
 import { usePassion } from '../../context/PassionContext';
-import { PACKS } from '../../data/cardclash/economy';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import CDChargeButton from './components/CDChargeButton';
@@ -10,13 +9,6 @@ import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
 
 const CCPackSale = lazy(() => import('./CCPackSale'));
-
-const LEAGUE_PACKS = ['osl-mixed', 'bsl-mixed']
-
-const PACK_META = {
-  'osl-mixed': { subtitle: 'Olympus League', seed: 5 },
-  'bsl-mixed': { subtitle: 'Babylon League', seed: 6 },
-};
 
 // ═══════════════════════════════════════════════
 // Convert Link
@@ -176,7 +168,7 @@ function GetCoresHint({ claimableCount }) {
 // My Packs — inventory + unopened gifts
 // ═══════════════════════════════════════════════
 function MyPacks() {
-  const { inventory, openInventoryPack, giftData, openGift } = useCardClash();
+  const { inventory, openInventoryPack, giftData, openGift, packTypesMap } = useCardClash();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(null);
 
@@ -209,7 +201,7 @@ function MyPacks() {
     }
   }, [openGift]);
 
-  if (!hasAny) {
+  if (!hasAny && !openResult) {
     return (
       <div className="text-center py-16">
         <Package className="w-10 h-10 text-white/15 mx-auto mb-3" />
@@ -229,9 +221,8 @@ function MyPacks() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {inventory.map((item, i) => {
-              const pack = PACKS[item.packTypeId];
+              const pack = packTypesMap[item.packTypeId];
               if (!pack) return null;
-              const meta = PACK_META[item.packTypeId];
               const isOpening = loading === `inv-${item.id}`;
               return (
                 <button
@@ -245,9 +236,9 @@ function MyPacks() {
                     <PackArt
                       tier={item.packTypeId}
                       name={pack.name}
-                      subtitle={meta?.subtitle || ''}
+                      subtitle={pack.leagueName || ''}
                       cardCount={pack.cards}
-                      seed={meta?.seed || 5}
+                      seed={pack.sortOrder ?? 5}
                       compact
                     />
                   </div>
@@ -280,7 +271,7 @@ function MyPacks() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {unopenedGifts.map((gift, i) => {
               const packType = gift.packType || 'gift';
-              const pack = PACKS[packType];
+              const pack = packTypesMap[packType];
               const isOpening = loading === `gift-${gift.id}`;
               return (
                 <button
@@ -403,7 +394,7 @@ export default function PackShopRouter() {
 // ═══════════════════════════════════════════════
 // Mobile Pack Showcase — fullscreen with tilt
 // ═══════════════════════════════════════════════
-function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableCount }) {
+function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResult, claimableCount }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const scrollRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -438,8 +429,8 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {packs.map((key) => {
-          const pack = PACKS[key];
-          const meta = PACK_META[key];
+          const pack = packTypesMap[key];
+          if (!pack) return null;
           const canAfford = emberBalance >= pack.cost;
 
           return (
@@ -469,7 +460,7 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
                     background: `radial-gradient(ellipse at ${50 + tilt.x * 3}% ${40 + tilt.y * 3}%, rgba(255,255,255,0.15) 0%, transparent 55%)`,
                   }}
                 />
-                <PackArt tier={key} name={pack.name} subtitle={meta.subtitle} cardCount={pack.cards} seed={meta.seed} />
+                <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} />
               </div>
 
               {/* Pack info */}
@@ -477,10 +468,10 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
                 <h3 className="cd-head text-xl font-bold mb-0.5" style={{ color: pack.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
                   {pack.name}
                 </h3>
-                <p className="text-xs text-white/40 cd-head tracking-widest mb-3">{meta.subtitle}</p>
+                <p className="text-xs text-white/40 cd-head tracking-widest mb-3">{pack.leagueName || ''}</p>
 
                 <div className="flex gap-4 mb-4 text-[12px] text-white/50">
-                  <span><span className="text-white font-bold">6</span> cards</span>
+                  <span><span className="text-white font-bold">{pack.cards}</span> cards</span>
                   <span>1 <span className="font-bold" style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player</span>
                   <span>1 <span className="text-green-400 font-bold">Rare+</span></span>
                 </div>
@@ -506,7 +497,7 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
       {/* Scroll indicator dots */}
       <div className="flex justify-center gap-3 mt-1 mb-1">
         {packs.map((k, i) => {
-          const pack = PACKS[k];
+          const pack = packTypesMap[k];
           return (
             <button
               key={k}
@@ -517,8 +508,8 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
                 i === activeIndex ? 'scale-125' : 'bg-white/20'
               }`}
               style={i === activeIndex ? {
-                background: pack.color || 'var(--cd-cyan)',
-                boxShadow: `0 0 8px ${pack.color || 'var(--cd-cyan)'}`,
+                background: pack?.color || 'var(--cd-cyan)',
+                boxShadow: `0 0 8px ${pack?.color || 'var(--cd-cyan)'}`,
               } : undefined}
             />
           );
@@ -540,8 +531,12 @@ function MobilePackShowcase({ packs, emberBalance, onBuy, openResult, claimableC
 // Main Pack Shop (original)
 // ═══════════════════════════════════════════════
 function PackShop() {
-  const { ember, buyPack } = useCardClash();
+  const { ember, buyPack, packTypes, packTypesMap } = useCardClash();
   const { claimEmberDaily, claimableCount } = usePassion();
+  const leaguePacks = useMemo(() =>
+    packTypes.filter(p => p.category === 'mixed' && p.leagueId).map(p => p.id),
+    [packTypes]
+  );
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -562,8 +557,7 @@ function PackShop() {
 
   const emberBalance = ember?.balance ?? 0;
   const [focusedPack, setFocusedPack] = useState(null);
-  const focused = focusedPack ? PACKS[focusedPack] : null;
-  const focusedMeta = focusedPack ? PACK_META[focusedPack] : null;
+  const focused = focusedPack ? packTypesMap[focusedPack] : null;
   const focusedAfford = focused ? emberBalance >= focused.cost : false;
   const rowRef = useRef(null);
   const packRefs = useRef({});
@@ -597,9 +591,9 @@ function PackShop() {
       >
         {/* Packs row — always in place */}
         <div ref={rowRef} className="flex items-center justify-center gap-16">
-          {LEAGUE_PACKS.map((key) => {
-            const pack = PACKS[key];
-            const meta = PACK_META[key];
+          {leaguePacks.map((key) => {
+            const pack = packTypesMap[key];
+            if (!pack) return null;
             const isSelected = focusedPack === key;
             const isOther = focusedPack && !isSelected;
             const canAfford = emberBalance >= pack.cost;
@@ -643,7 +637,7 @@ function PackShop() {
                   />
                   <div className={`transition-all duration-500 ease-out ${!canAfford && !isSelected ? 'opacity-40' : ''} ${!focusedPack ? 'group-hover:scale-110' : ''}`}
                   >
-                    <PackArt tier={key} name={pack.name} subtitle={meta.subtitle} cardCount={pack.cards} seed={meta.seed} />
+                    <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} />
                   </div>
                 </div>
                 {/* Label */}
@@ -651,7 +645,7 @@ function PackShop() {
                   style={{ maxHeight: focusedPack ? 0 : 30, opacity: focusedPack ? 0 : 1, marginTop: focusedPack ? 0 : 20 }}
                 >
                   <span className="text-xs text-white/30 cd-head tracking-widest group-hover:text-white/50 transition-colors">
-                    {meta.subtitle}
+                    {pack.leagueName || ''}
                   </span>
                 </div>
               </div>
@@ -673,9 +667,9 @@ function PackShop() {
           onClick={(e) => e.stopPropagation()}
         >
           {(focused || focusedPack) && (() => {
-            const pack = focused || PACKS[LEAGUE_PACKS[0]];
-            const meta = focusedMeta || PACK_META[LEAGUE_PACKS[0]];
+            const pack = focused || packTypesMap[leaguePacks[0]];
             const afford = focusedAfford;
+            if (!pack) return null;
             return (
               <div className="cd-panel cd-corners rounded-xl p-6 lg:p-8 w-80 lg:w-96 relative overflow-hidden">
                 <div className="cd-data-overlay" />
@@ -683,12 +677,12 @@ function PackShop() {
                   <h3 className="cd-head text-2xl font-bold mb-1" style={{ color: pack.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
                     {pack.name}
                   </h3>
-                  <p className="text-xs text-white/40 cd-head tracking-widest mb-6">{meta?.subtitle}</p>
+                  <p className="text-xs text-white/40 cd-head tracking-widest mb-6">{pack.leagueName || ''}</p>
 
                   <div className="space-y-2.5 mb-8 text-[13px] text-white/60">
                     <div className="flex items-center gap-2.5">
                       <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12l4 6-10 13L2 9z" /></svg>
-                      <span><span className="text-white font-bold">6</span> cards per pack</span>
+                      <span><span className="text-white font-bold">{pack.cards}</span> cards per pack</span>
                     </div>
                     <div className="flex items-center gap-2.5">
                       <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" /></svg>
@@ -732,7 +726,8 @@ function PackShop() {
 
       {/* ═══ Pack Showcase — Mobile (<640px) ═══ */}
       <MobilePackShowcase
-        packs={LEAGUE_PACKS}
+        packs={leaguePacks}
+        packTypesMap={packTypesMap}
         emberBalance={emberBalance}
         onBuy={handleBuyPack}
         openResult={openResult}

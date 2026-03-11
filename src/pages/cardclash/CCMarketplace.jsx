@@ -36,20 +36,23 @@ function calcFee(price) {
   return Math.max(Math.floor(price * FEE_RATE), MIN_FEE)
 }
 
-function buildCardData(card) {
+function buildCardData(card, override) {
   const d = card.cardData || {}
   return {
     name: card.godName,
     class: card.godClass,
-    imageUrl: card.imageUrl,
+    imageUrl: override?.custom_image_url || card.imageUrl,
     serialNumber: card.serialNumber,
     role: card.role || d.role,
     id: d.itemId || d.consumableId || card.serialNumber,
     ...d,
+    metadata: override || undefined,
   }
 }
 
 function MarketCard({ card, size }) {
+  const { getDefOverride } = useCardClash()
+  const override = getDefOverride(card)
   if (card.cardType === 'player') {
     const d = card.cardData || {}
     return (
@@ -69,13 +72,13 @@ function MarketCard({ card, size }) {
       />
     )
   }
-  return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={buildCardData(card)} size={size} />
+  return <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={buildCardData(card, override)} size={size} />
 }
 
 export default function CCMarketplace() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, refreshCollection, startingFive } = useCardClash()
+  const { collection, refreshCollection, startingFive, getDefOverride } = useCardClash()
 
   const s5CardIds = useMemo(() =>
     new Set((startingFive?.cards || []).map(c => c.id)),
@@ -236,7 +239,7 @@ export default function CCMarketplace() {
         divisionName: card.cardData?.divisionName,
       }})
     } else {
-      setZoomedCard({ gameCard: { type, rarity: card.rarity, data: buildCardData(card) } })
+      setZoomedCard({ gameCard: { type, rarity: card.rarity, data: buildCardData(card, getDefOverride(card)) } })
     }
   }
 
@@ -762,8 +765,9 @@ function CreateModal({ card, onClose, onCreate, loading }) {
           <input
             type="number"
             min="1"
+            max="10000"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => setPrice(Math.min(10000, e.target.value))}
             placeholder="Amount..."
             className="w-full bg-[var(--cd-edge)] border border-[var(--cd-border)] text-orange-400 text-sm px-3 py-2 rounded placeholder-white/15 focus:outline-none focus:border-orange-500/50 cd-num"
           />
@@ -771,7 +775,7 @@ function CreateModal({ card, onClose, onCreate, loading }) {
 
         {fee > 0 && (
           <div className="text-[11px] text-white/30 mb-4">
-            Buyer fee: {fee} Core &middot; Seller fee (you): {fee} Core
+            Buyer fee: {fee} Core{priceNum > 1 && <> &middot; Seller fee (you): {fee} Core</>}
           </div>
         )}
 

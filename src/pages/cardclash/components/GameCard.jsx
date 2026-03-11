@@ -28,7 +28,7 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
   const rarityInfo = RARITIES[rarity] || RARITIES.common
   const role = (type === 'god' || type === 'player') ? (CLASS_ROLE[data.class] || data.role?.toLowerCase() || 'mid') : null
   const style = {}
-  if (size) style.width = size
+  if (size) { style.width = size; style['--card-scale'] = size / 240 }
   if (onClick) style.cursor = 'pointer'
 
   return (

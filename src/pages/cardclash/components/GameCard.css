@@ -64,9 +64,9 @@
   width: 240px;
   aspect-ratio: 63 / 88;
   container-type: inline-size;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--card-scale, 1));
   background: linear-gradient(145deg, var(--border-light), var(--border-color), var(--border-dark));
-  padding: 4px;
+  padding: calc(4px * var(--card-scale, 1));
   font-family: 'Segoe UI', system-ui, sans-serif;
   user-select: none;
   flex-shrink: 0;
@@ -92,7 +92,7 @@
 .game-card__border {
   width: 100%;
   height: 100%;
-  border-radius: 3.88cqi;
+  border-radius: 3.45cqi;
   background: linear-gradient(180deg, var(--border-light) 0%, var(--border-color) 3%, var(--border-dark) 97%, rgba(0,0,0,0.3) 100%);
   padding: 0.86cqi;
 }
@@ -103,7 +103,7 @@
 .game-card__body {
   width: 100%;
   height: 100%;
-  border-radius: 3.02cqi;
+  border-radius: 2.59cqi;
   background: var(--body-bg);
   display: flex;
   flex-direction: column;

@@ -10,9 +10,10 @@ import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy, Eye, EyeOff } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff, ChevronDown, Search, X } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const BATCH_SIZE = 50
 
 // Only types acquirable in packs
 const COLLECTION_TYPES = ['god', 'item', 'consumable']
@@ -80,7 +81,19 @@ export default function CCCollection() {
   const [defOverrides, setDefOverrides] = useState({})
   const [zoomedCard, setZoomedCard] = useState(null)
   const [viewMode, setViewMode] = useState('all') // 'all' | 'owned'
+  const [rarityFilter, setRarityFilter] = useState(null)
+  const [displayLimit, setDisplayLimit] = useState(BATCH_SIZE)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimerRef = useRef(null)
   const loadedSetsRef = useRef(new Set())
+
+  const switchSection = useCallback((section) => {
+    setActiveSection(section)
+    setSearchQuery('')
+    setSearchResults(null)
+  }, [])
 
   useEffect(() => {
     const loadData = async () => {
@@ -130,10 +143,36 @@ export default function CCCollection() {
   }, [])
 
   useEffect(() => {
-    if (activeSection.startsWith('player:')) {
+    if (activeSection.startsWith('player:') && activeSection !== 'player:all') {
       loadPlayerSet(activeSection.replace('player:', ''))
     }
   }, [activeSection, loadPlayerSet])
+
+  // Reset display limit when switching sections or filters
+  useEffect(() => {
+    setDisplayLimit(BATCH_SIZE)
+  }, [activeSection, viewMode, rarityFilter])
+
+  // Debounced player card search
+  useEffect(() => {
+    clearTimeout(searchTimerRef.current)
+    if (searchQuery.trim().length < 2) {
+      setSearchResults(null)
+      setSearchLoading(false)
+      return
+    }
+    setSearchLoading(true)
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const data = await cardclashService.searchCollection(searchQuery.trim())
+        setSearchResults(data.results)
+      } catch {
+        setSearchResults([])
+      }
+      setSearchLoading(false)
+    }, 300)
+    return () => clearTimeout(searchTimerRef.current)
+  }, [searchQuery])
 
   // Build game entries with ownership merged (only collectible types)
   const gameEntries = useMemo(() => {
@@ -179,6 +218,13 @@ export default function CCCollection() {
     return [...groups.values()]
   }, [playerSets])
 
+  // Load all player sets when "All Players" is selected
+  useEffect(() => {
+    if (activeSection === 'player:all') {
+      for (const set of playerSets) loadPlayerSet(set.key)
+    }
+  }, [activeSection, playerSets, loadPlayerSet])
+
   const { gameTotals, totalGameCollected, totalGameCards } = useMemo(() => {
     const totals = {}
     let collected = 0
@@ -210,6 +256,47 @@ export default function CCCollection() {
       ownedRarities: owned.playerCards?.[d.defId] || [],
     }))
   }, [activePlayerSetKey, setDefs, owned])
+
+  // All player cards across all sets (for "All Players" view)
+  const allPlayerCards = useMemo(() => {
+    if (activeSection !== 'player:all' || !owned) return []
+    const cards = []
+    for (const set of playerSets) {
+      const defs = setDefs[set.key]
+      if (!defs) continue
+      for (const d of defs) {
+        cards.push({
+          ...d,
+          collected: !!owned.playerCards?.[d.defId],
+          ownedRarities: owned.playerCards?.[d.defId] || [],
+          _setMeta: set,
+        })
+      }
+    }
+    return cards
+  }, [activeSection, playerSets, setDefs, owned])
+
+  const allSetsLoaded = activeSection === 'player:all' ? playerSets.every(s => setDefs[s.key]) : true
+
+  // Unified filtered entries for active section
+  const filteredEntries = useMemo(() => {
+    let entries
+    if (COLLECTION_TYPES.includes(activeSection)) {
+      entries = gameEntries[activeSection] || []
+    } else if (activeSection === 'player:all') {
+      entries = allPlayerCards
+    } else if (activeSection.startsWith('player:')) {
+      entries = activePlayerCards
+    } else {
+      return []
+    }
+    if (viewMode === 'owned') entries = entries.filter(e => e.collected)
+    if (rarityFilter) entries = entries.filter(e => e.ownedRarities?.includes(rarityFilter))
+    return entries
+  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter])
+
+  const hasMore = displayLimit < filteredEntries.length
+  const remaining = filteredEntries.length - displayLimit
 
   if (loading) {
     return (
@@ -245,6 +332,24 @@ export default function CCCollection() {
             {viewMode === 'owned' ? 'Owned' : 'All'}
           </button>
         </div>
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--cd-text-dim)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search player cards..."
+            className="w-full pl-9 pr-8 py-2 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] text-sm text-[var(--cd-text)] placeholder-[var(--cd-text-dim)] focus:outline-none focus:border-[var(--cd-cyan)]/40 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--cd-text-dim)] hover:text-[var(--cd-text)] cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         <div className="flex gap-6 mt-2 text-sm">
           <div className="text-[var(--cd-text-mid)]">
             Game Cards: <span className="text-[var(--cd-cyan)] cd-num font-bold">{totalGameCollected}</span>
@@ -270,7 +375,7 @@ export default function CCCollection() {
               return (
                 <button
                   key={s.type}
-                  onClick={() => setActiveSection(s.type)}
+                  onClick={() => switchSection(s.type)}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
                     active
                       ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
@@ -282,6 +387,18 @@ export default function CCCollection() {
                 </button>
               )
             })}
+            {playerSets.length > 0 && (
+              <button
+                onClick={() => switchSection('player:all')}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
+                  activeSection === 'player:all'
+                    ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
+                    : 'bg-white/[0.04] text-[var(--cd-text-mid)] hover:bg-white/[0.06]'
+                }`}
+              >
+                <span>All Players</span>
+              </button>
+            )}
             {leagueSeasonGroups.flatMap(group =>
               group.divisions.map(set => {
                 const active = activeSection === `player:${set.key}`
@@ -289,7 +406,7 @@ export default function CCCollection() {
                 return (
                   <button
                     key={set.key}
-                    onClick={() => setActiveSection(`player:${set.key}`)}
+                    onClick={() => switchSection(`player:${set.key}`)}
                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
                       active
                         ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
@@ -320,7 +437,7 @@ export default function CCCollection() {
               return (
                 <button
                   key={s.type}
-                  onClick={() => setActiveSection(s.type)}
+                  onClick={() => switchSection(s.type)}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
                     active
                       ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
@@ -337,6 +454,17 @@ export default function CCCollection() {
             {leagueSeasonGroups.length > 0 && (
               <>
                 <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mt-4 mb-2 cd-head">Player Sets</div>
+                <button
+                  onClick={() => switchSection('player:all')}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
+                    activeSection === 'player:all'
+                      ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
+                      : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
+                  }`}
+                >
+                  <span className="flex-1">All Players</span>
+                  <span className="text-xs cd-num text-[var(--cd-text)]">{totalPlayerCollected}/{totalPlayerCards}</span>
+                </button>
                 {leagueSeasonGroups.map(group => {
                   const leagueLogo = getLeagueLogo(group.leagueSlug)
                   return (
@@ -351,7 +479,7 @@ export default function CCCollection() {
                         return (
                           <button
                             key={set.key}
-                            onClick={() => setActiveSection(`player:${set.key}`)}
+                            onClick={() => switchSection(`player:${set.key}`)}
                             className={`w-full flex items-center gap-2 px-3 pl-6 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
                               active
                                 ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
@@ -374,34 +502,90 @@ export default function CCCollection() {
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          {activeSection === 'god' && (
+          {/* Search results mode */}
+          {searchQuery.trim().length >= 2 ? (
+            <div>
+              <h2 className="text-lg font-bold cd-head text-[var(--cd-text)] mb-3">
+                Search: "{searchQuery.trim()}"
+              </h2>
+              {searchLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="cd-spinner w-6 h-6" />
+                </div>
+              ) : !searchResults || searchResults.length === 0 ? (
+                <div className="text-center py-16 text-[var(--cd-text-dim)]">
+                  <Search className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-bold cd-head">No player cards found</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+                  {searchResults.map(card => {
+                    const collected = !!owned.playerCards?.[card.defId]
+                    const ownedRarities = owned.playerCards?.[card.defId] || []
+                    const meta = {
+                      leagueSlug: card.leagueSlug,
+                      divisionTier: card.divisionTier,
+                      divisionSlug: card.divisionSlug,
+                      divisionName: card.divisionName,
+                      seasonSlug: card.seasonSlug,
+                    }
+                    return (
+                      <PlayerSlot
+                        key={card.defId}
+                        card={{ ...card, collected, ownedRarities }}
+                        meta={meta}
+                        onZoom={setZoomedCard}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
+          <RarityFilterBar rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
+
+          {COLLECTION_TYPES.includes(activeSection) && (
             <GameCardGrid
-              type="god"
-              entries={viewMode === 'owned' ? (gameEntries.god || []).filter(e => e.collected) : (gameEntries.god || [])}
-              totals={gameTotals.god}
+              type={activeSection}
+              entries={filteredEntries.slice(0, displayLimit)}
+              totals={gameTotals[activeSection]}
               applyOverride={applyOverride}
               onZoom={setZoomedCard}
             />
           )}
-          {activeSection === 'item' && (
-            <GameCardGrid
-              type="item"
-              entries={viewMode === 'owned' ? (gameEntries.item || []).filter(e => e.collected) : (gameEntries.item || [])}
-              totals={gameTotals.item}
-              applyOverride={applyOverride}
-              onZoom={setZoomedCard}
-            />
+
+          {activeSection === 'player:all' && (
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">All Player Cards</h2>
+                {totalPlayerCollected === totalPlayerCards && totalPlayerCards > 0 && (
+                  <Trophy className="w-4 h-4 text-[var(--cd-gold)]" />
+                )}
+              </div>
+              <ProgressBar collected={totalPlayerCollected} total={totalPlayerCards} />
+              {filteredEntries.length === 0 ? (
+                <div className="text-center py-12 text-[var(--cd-text-dim)]">
+                  <Library className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-bold cd-head">No cards {rarityFilter || viewMode === 'owned' ? 'found' : 'available'}</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+                  {filteredEntries.slice(0, displayLimit).map(card => (
+                    <PlayerSlot key={card.defId} card={card} meta={card._setMeta} onZoom={setZoomedCard} />
+                  ))}
+                </div>
+              )}
+              {!allSetsLoaded && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="cd-spinner w-5 h-5 mr-2" />
+                  <span className="text-xs text-[var(--cd-text-dim)]">Loading more sets...</span>
+                </div>
+              )}
+            </div>
           )}
-          {activeSection === 'consumable' && (
-            <GameCardGrid
-              type="consumable"
-              entries={viewMode === 'owned' ? (gameEntries.consumable || []).filter(e => e.collected) : (gameEntries.consumable || [])}
-              totals={gameTotals.consumable}
-              applyOverride={applyOverride}
-              onZoom={setZoomedCard}
-            />
-          )}
-          {isPlayerSection && activePlayerSetMeta && (
+
+          {isPlayerSection && activeSection !== 'player:all' && activePlayerSetMeta && (
             loadingSet === activePlayerSetKey ? (
               <div className="flex items-center justify-center py-20">
                 <div className="cd-spinner w-8 h-8" />
@@ -409,10 +593,24 @@ export default function CCCollection() {
             ) : (
               <PlayerCardGrid
                 meta={activePlayerSetMeta}
-                cards={viewMode === 'owned' ? activePlayerCards.filter(c => c.collected) : activePlayerCards}
+                cards={filteredEntries.slice(0, displayLimit)}
                 onZoom={setZoomedCard}
               />
             )
+          )}
+
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => setDisplayLimit(l => l + BATCH_SIZE)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] text-sm font-bold text-[var(--cd-text-mid)] hover:bg-white/[0.06] hover:text-[var(--cd-text)] transition-all cursor-pointer cd-head"
+              >
+                <ChevronDown className="w-4 h-4" />
+                Load More ({remaining} remaining)
+              </button>
+            </div>
+          )}
+          </>
           )}
         </div>
       </div>
@@ -462,6 +660,45 @@ function RarityPips({ ownedRarities }) {
             }}
             title={`${info?.name || r}${owned ? ' ✓' : ''}`}
           />
+        )
+      })}
+    </div>
+  )
+}
+
+function RarityFilterBar({ rarityFilter, setRarityFilter }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-4">
+      <button
+        onClick={() => setRarityFilter(null)}
+        className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer cd-head ${
+          !rarityFilter
+            ? 'bg-white/10 text-[var(--cd-text)] border border-white/20'
+            : 'bg-white/[0.03] text-[var(--cd-text-dim)] hover:bg-white/[0.06] border border-transparent'
+        }`}
+      >
+        All Rarities
+      </button>
+      {RARITY_ORDER.map(r => {
+        const info = RARITIES[r]
+        const active = rarityFilter === r
+        return (
+          <button
+            key={r}
+            onClick={() => setRarityFilter(active ? null : r)}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer cd-head border ${
+              active
+                ? ''
+                : 'bg-white/[0.03] text-[var(--cd-text-dim)] hover:bg-white/[0.06] border-transparent'
+            }`}
+            style={active ? {
+              backgroundColor: `${info.color}20`,
+              color: info.color,
+              borderColor: `${info.color}40`,
+            } : undefined}
+          >
+            {info.name}
+          </button>
         )
       })}
     </div>

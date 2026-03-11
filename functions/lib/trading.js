@@ -162,6 +162,7 @@ export async function removeCard(sql, userId, tradeId, cardId) {
 
 export async function setCore(sql, userId, tradeId, amount) {
   if (amount < 0) throw new Error('Core amount cannot be negative')
+  if (amount > 10000) throw new Error('Core amount cannot exceed 10,000')
 
   const [trade] = await sql`SELECT player_a_id, player_b_id FROM cc_trades WHERE id = ${tradeId} AND status = 'active'`
   if (!trade) throw new Error('Trade not found or not active')

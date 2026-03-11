@@ -1,14 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useCardClash } from './CardClashContext';
-import { PACKS } from '../../data/cardclash/economy';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import emberIcon from '../../assets/ember.png';
 import './vendingmachine.css';
-
-const PACK_SEEDS = {
-  'osl-mixed': 5, 'bsl-mixed': 6, standard: 0, premium: 1, elite: 2, legendary: 3,
-};
 
 const MIN_SLOTS = 6;
 
@@ -144,9 +139,11 @@ function AlleyScene({ children }) {
 
 // ═══ Pack Zoom Modal — shows pack details on click ═══
 
-function PackZoomModal({ slot, onClose }) {
+function PackZoomModal({ slot, onClose, packTypesMap }) {
   const pack = slot.pack;
   const packTypeId = pack.packTypeId || pack.id;
+  const basePack = packTypesMap[packTypeId];
+  const packColor = pack.color || basePack?.color || 'var(--cd-cyan)';
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -162,19 +159,19 @@ function PackZoomModal({ slot, onClose }) {
           <div
             className="absolute -inset-20 rounded-3xl"
             style={{
-              background: `radial-gradient(ellipse, ${PACKS[packTypeId]?.color || 'var(--cd-cyan)'}40 0%, transparent 70%)`,
+              background: `radial-gradient(ellipse, ${packColor}40 0%, transparent 70%)`,
               filter: 'blur(60px)',
               opacity: 0.7,
             }}
           />
           <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-4 rounded-full"
-            style={{ background: PACKS[packTypeId]?.color || 'var(--cd-cyan)', filter: 'blur(16px)', opacity: 0.5 }}
+            style={{ background: packColor, filter: 'blur(16px)', opacity: 0.5 }}
           />
           <PackArt
             tier={packTypeId}
             name={pack.name}
             cardCount={pack.cards}
-            seed={PACK_SEEDS[packTypeId] ?? 0}
+            seed={basePack?.sortOrder ?? 0}
           />
         </div>
 
@@ -182,7 +179,7 @@ function PackZoomModal({ slot, onClose }) {
         <div className="cd-panel cd-corners rounded-xl p-6 w-80 relative overflow-hidden">
           <div className="cd-data-overlay" />
           <div className="relative z-1">
-            <h3 className="cd-head text-2xl font-bold mb-1" style={{ color: PACKS[packTypeId]?.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
+            <h3 className="cd-head text-2xl font-bold mb-1" style={{ color: packColor, letterSpacing: '0.12em' }}>
               {pack.name}
             </h3>
             {pack.description && (
@@ -198,7 +195,7 @@ function PackZoomModal({ slot, onClose }) {
                 <>
                   <div className="flex items-center gap-2.5">
                     <svg className="w-4 h-4 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" /></svg>
-                    <span>1 guaranteed <span className="font-bold" style={{ color: PACKS[packTypeId]?.color }}>Player</span> card</span>
+                    <span>1 guaranteed <span className="font-bold" style={{ color: packColor }}>Player</span> card</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <svg className="w-4 h-4 text-green-400/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
@@ -239,7 +236,7 @@ function PackZoomModal({ slot, onClose }) {
 // ═══ Sale vending machine — always renders with min 6 slots ═══
 
 export default function SaleVendingMachine() {
-  const { salePacks, ember, buySalePack } = useCardClash();
+  const { salePacks, ember, buySalePack, packTypesMap } = useCardClash();
 
   const emberBalance = ember?.balance ?? 0;
   const hasPacks = salePacks?.length > 0;
@@ -393,7 +390,7 @@ export default function SaleVendingMachine() {
                               tier={packTypeId}
                               name={pack.name}
                               cardCount={pack.cards}
-                              seed={PACK_SEEDS[packTypeId] ?? idx}
+                              seed={packTypesMap[packTypeId]?.sortOrder ?? idx}
                               compact
                             />
                           </div>
@@ -481,7 +478,7 @@ export default function SaleVendingMachine() {
                       tier={dispensedSlot.pack.packTypeId || dispensedSlot.pack.id}
                       name={dispensedSlot.pack.name}
                       cardCount={dispensedSlot.pack.cards}
-                      seed={PACK_SEEDS[dispensedSlot.pack.packTypeId] ?? 0}
+                      seed={packTypesMap[dispensedSlot.pack.packTypeId]?.sortOrder ?? 0}
                       compact
                     />
                   </div>
@@ -509,7 +506,7 @@ export default function SaleVendingMachine() {
 
       {/* Pack zoom modal */}
       {zoomedSlot && zoomedSlot.pack && (
-        <PackZoomModal slot={zoomedSlot} onClose={() => setZoomedSlot(null)} />
+        <PackZoomModal slot={zoomedSlot} onClose={() => setZoomedSlot(null)} packTypesMap={packTypesMap} />
       )}
     </AlleyScene>
   );

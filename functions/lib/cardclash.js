@@ -469,10 +469,16 @@ function generateRarityPack(pack) {
 }
 
 async function generateMixedPack(sql, leagueId) {
-  const allTypes = ['god', 'item', 'consumable', 'player']
   const nonPlayerTypes = ['god', 'item', 'consumable']
   const playerSlot = Math.floor(Math.random() * 5)
 
+  // Distribute non-player slot types proportionally by card pool size
+  const nonPlayerSlotCount = 4 // slots 0-4 minus playerSlot
+  const typeAssignments = distributeTypesByPool(nonPlayerTypes, nonPlayerSlotCount, STATIC_POOL_SIZES)
+  // Wildcard slot (5) also weighted by pool size (including player)
+  const wildcardTypes = ['god', 'item', 'consumable', 'player']
+
+  let typeIdx = 0
   const cards = []
   for (let i = 0; i < 6; i++) {
     const minRarity = i === 4 ? 'uncommon' : 'common'
@@ -482,9 +488,9 @@ async function generateMixedPack(sql, leagueId) {
     if (i === playerSlot) {
       type = 'player'
     } else if (i === 5) {
-      type = allTypes[Math.floor(Math.random() * allTypes.length)]
+      type = pickWeightedType(wildcardTypes)
     } else {
-      type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]
+      type = typeAssignments[typeIdx++]
     }
 
     const card = type === 'player'
@@ -495,6 +501,17 @@ async function generateMixedPack(sql, leagueId) {
   }
 
   return cards
+}
+
+function pickWeightedType(types) {
+  const weights = types.map(t => STATIC_POOL_SIZES[t] || 10)
+  const total = weights.reduce((a, b) => a + b, 0)
+  let roll = Math.random() * total
+  for (let i = 0; i < types.length; i++) {
+    roll -= weights[i]
+    if (roll <= 0) return types[i]
+  }
+  return types[types.length - 1]
 }
 
 const STATIC_POOL_SIZES = { god: GODS.length, item: ITEMS.length, consumable: CONSUMABLES.length }

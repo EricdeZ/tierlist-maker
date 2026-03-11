@@ -13,6 +13,12 @@
   overflow: hidden;
 }
 
+.pack-opening img {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
 /* Dark background with subtle grid */
 .pack-opening__bg {
   position: absolute;

@@ -912,6 +912,46 @@
 
 
 /* ═══════════════════════════════════════════════════
+   TRADING — Bottom sheet & animations
+   ═══════════════════════════════════════════════════ */
+
+@keyframes cd-sheet-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+@keyframes cd-sheet-down {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
+}
+@keyframes cd-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes cd-overlay-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.cd-sheet-enter {
+    animation: cd-sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+.cd-sheet-exit {
+    animation: cd-sheet-down 0.2s ease-in forwards;
+}
+.cd-overlay-enter {
+    animation: cd-overlay-in 0.25s ease-out forwards;
+}
+.cd-overlay-exit {
+    animation: cd-overlay-out 0.2s ease-in forwards;
+}
+
+/* Safe area bottom padding for fixed bottom bars */
+.cd-safe-area-pb {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+}
+
+
+/* ═══════════════════════════════════════════════════
    CONVERTER — Back Alley Exchange
    ═══════════════════════════════════════════════════ */
 

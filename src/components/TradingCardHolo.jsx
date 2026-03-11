@@ -92,6 +92,7 @@ function useSpring(initial, { stiffness = 0.066, damping = 0.25 } = {}) {
 
 export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC', holoType = 'full', size }) {
     const cardRef = useRef(null)
+    const endTimerRef = useRef(null)
     const [interacting, setInteracting] = useState(false)
     const [active, setActive] = useState(false)
 
@@ -99,7 +100,12 @@ export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC
     const [glare, setGlare] = useSpring({ x: 50, y: 50, o: 0 }, { stiffness: 0.066, damping: 0.25 })
     const [bg, setBg] = useSpring({ x: 50, y: 50 }, { stiffness: 0.066, damping: 0.25 })
 
+    useEffect(() => {
+        return () => clearTimeout(endTimerRef.current)
+    }, [])
+
     const interact = useCallback((e) => {
+        clearTimeout(endTimerRef.current)
         setInteracting(true)
 
         let clientX, clientY
@@ -143,7 +149,8 @@ export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC
     }, [setBg, setRotate, setGlare])
 
     const interactEnd = useCallback(() => {
-        setTimeout(() => {
+        clearTimeout(endTimerRef.current)
+        endTimerRef.current = setTimeout(() => {
             setInteracting(false)
             setRotate({ x: 0, y: 0 }, { stiffness: 0.01, damping: 0.06 })
             setGlare({ x: 50, y: 50, o: 0 }, { stiffness: 0.01, damping: 0.06 })
@@ -177,7 +184,7 @@ export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC
             className={`holo-card ${roleClass} ${interacting ? 'interacting' : ''} ${active ? 'active' : ''}`}
             data-rarity={rarity}
             data-holo-type={holoType}
-            style={{ ...dynamicStyles, ...(size ? { width: size } : {}) }}
+            style={{ ...dynamicStyles, ...(size ? { width: size, '--card-scale': size / 340 } : {}) }}
             ref={cardRef}
         >
             <div className="holo-card__translater">

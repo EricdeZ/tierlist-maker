@@ -149,8 +149,12 @@ async function handleCreate(sql, user, body) {
   if (!cardId || !price) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId and price required' }) }
   }
+  const parsedPrice = parseInt(price)
+  if (parsedPrice < 1 || parsedPrice > 10000) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Price must be between 1 and 10,000' }) }
+  }
 
-  const listing = await createListing(sql, user.id, { cardId, price: parseInt(price) })
+  const listing = await createListing(sql, user.id, { cardId, price: parsedPrice })
 
   return {
     statusCode: 200, headers,

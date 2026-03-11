@@ -13,12 +13,12 @@ function getCardType(card) {
   return card.cardType || 'god'
 }
 
-function toGameCardData(card) {
+function toGameCardData(card, override) {
   const type = getCardType(card)
   const cd = card.cardData || {}
   const base = {
-    name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
-    id: card.godId, serialNumber: card.serialNumber,
+    name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
+    id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
   }
   if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -52,13 +52,14 @@ function CoresLabel({ value, className = '', iconSize = 'h-4' }) {
 }
 
 export default function CCDismantle() {
-  const { collection, dismantleCards, startingFive } = useCardClash()
+  const { collection, dismantleCards, startingFive, getDefOverride } = useCardClash()
   const [selected, setSelected] = useState(new Set())
   const [dismantling, setDismantling] = useState(false)
   const [result, setResult] = useState(null)
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [showRates, setShowRates] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(50)
 
   const s5CardIds = useMemo(() =>
     new Set((startingFive?.cards || []).map(c => c.id)),
@@ -70,6 +71,9 @@ export default function CCDismantle() {
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
     return list
   }, [collection, filterRarity, filterType, s5CardIds])
+
+  const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount])
+  const hasMore = visibleCount < cards.length
 
   const toggle = useCallback((id) => {
     setSelected(prev => {
@@ -182,7 +186,7 @@ export default function CCDismantle() {
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <select
           value={filterType}
-          onChange={e => setFilterType(e.target.value)}
+          onChange={e => { setFilterType(e.target.value); setVisibleCount(50) }}
           className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
         >
           <option value="all">All Types</option>
@@ -194,7 +198,7 @@ export default function CCDismantle() {
 
         <select
           value={filterRarity}
-          onChange={e => setFilterRarity(e.target.value)}
+          onChange={e => { setFilterRarity(e.target.value); setVisibleCount(50) }}
           className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
         >
           <option value="all">All Rarities</option>
@@ -223,15 +227,27 @@ export default function CCDismantle() {
 
       {/* Card grid */}
       <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
-        {cards.map(card => (
+        {visibleCards.map(card => (
           <DismantleSlot
             key={card.id}
             card={card}
             isSelected={selected.has(card.id)}
             onToggle={toggle}
+            override={getDefOverride(card)}
           />
         ))}
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => setVisibleCount(prev => prev + 50)}
+            className="px-5 py-2 rounded-lg text-xs font-bold cd-head border border-[var(--cd-border)] text-[var(--cd-text-mid)] hover:bg-white/[0.03] transition-all cursor-pointer"
+          >
+            Load More ({cards.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       {cards.length === 0 && (
         <div className="text-center py-12 text-[var(--cd-text-dim)] text-sm">
@@ -319,7 +335,7 @@ export default function CCDismantle() {
   )
 }
 
-function DismantleSlot({ card, isSelected, onToggle }) {
+function DismantleSlot({ card, isSelected, onToggle, override }) {
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
@@ -336,7 +352,7 @@ function DismantleSlot({ card, isSelected, onToggle }) {
       {isPlayer ? (
         <TradingCard {...toPlayerCardProps(card)} variant="player" rarity={card.rarity} size={CARD_SIZE} />
       ) : (
-        <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={CARD_SIZE} />
+        <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={CARD_SIZE} />
       )}
 
       {/* Selection checkmark */}
