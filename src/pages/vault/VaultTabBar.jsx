@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { Package, Users, Library, Store, MoreHorizontal, X } from 'lucide-react'
+import { Package, Users, Library, Star, MoreHorizontal, X } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { key: 'packs', label: 'Packs', icon: Package },
   { key: 'lineup', label: 'Starting 5', icon: Users },
   { key: 'collection', label: 'Collection', icon: Library },
-  { key: 'market', label: 'Market', icon: Store },
+  { key: 'challenges', label: 'Challenges', icon: Star },
 ]
 
 const PRIMARY_KEYS = new Set(PRIMARY_TABS.map(t => t.key))
 
-export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, packMode, onPackModeChange, myPacksCount }) {
+export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, claimableCount, packMode, onPackModeChange, myPacksCount }) {
   const [moreOpen, setMoreOpen] = useState(false)
 
   const secondaryTabs = tabs.filter(t => !PRIMARY_KEYS.has(t.key))
@@ -65,6 +65,11 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
                   {tab.key === 'trade' && pendingTradeCount > 0 && (
                     <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
                   )}
+                  {tab.key === 'challenges' && claimableCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-500 text-[8px] font-bold text-black flex items-center justify-center animate-pulse">
+                      {claimableCount}
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -107,12 +112,17 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
               <button
                 key={tab.key}
                 onClick={() => { onTabChange(tab.key); setMoreOpen(false) }}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all cursor-pointer ${
+                className={`relative flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all cursor-pointer ${
                   active ? 'text-[var(--cd-cyan)]' : 'text-white/30'
                 }`}
               >
                 <Icon size={20} className={active ? 'cd-icon-glow' : ''} />
                 <span className="text-[9px] font-bold cd-head tracking-wider whitespace-nowrap">{tab.label}</span>
+                {tab.key === 'challenges' && claimableCount > 0 && (
+                  <span className="absolute top-1 right-1/4 min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-500 text-[8px] font-bold text-black flex items-center justify-center animate-pulse">
+                    {claimableCount}
+                  </span>
+                )}
                 {active && (
                   <span className="w-4 h-0.5 rounded-full bg-[var(--cd-cyan)] mt-0.5" style={{ boxShadow: '0 0 8px rgba(0,229,255,0.4)' }} />
                 )}

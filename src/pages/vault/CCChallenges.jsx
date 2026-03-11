@@ -44,6 +44,14 @@ export default function CCChallenges() {
 
   useEffect(() => { loadChallenges() }, [loadChallenges])
 
+  // Poll every 60s while visible
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadChallenges()
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [loadChallenges])
+
   const handleRefresh = () => {
     setRefreshing(true)
     loadChallenges().finally(() => setRefreshing(false))

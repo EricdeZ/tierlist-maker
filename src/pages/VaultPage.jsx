@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { VaultProvider, useVault } from './vault/VaultContext'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked } from 'lucide-react'
@@ -28,13 +29,13 @@ const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
     { key: 'lineup', label: 'Starting 5', icon: Users },
     { key: 'collection', label: 'Collection', icon: Library },
-    { key: 'binder', label: 'Binder', icon: BookMarked },
+    { key: 'challenges', label: 'Challenges', icon: Star },
     { key: 'gifts', label: 'Gifts', icon: Gift },
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
     { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
-    { key: 'challenges', label: 'Challenges', icon: Star },
+    { key: 'binder', label: 'Binder', icon: BookMarked },
     // { key: 'players', label: 'Players', icon: UserSearch },
     { key: 'catalog', label: 'Catalog', icon: BookOpen },
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
@@ -86,9 +87,18 @@ export default function VaultPage() {
 
 function VaultInner() {
     const { user } = useAuth()
+    const { claimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
     const { loading, loaded, giftData, pendingTradeCount, inventory } = useVault()
     const unseenGifts = giftData?.unseenCount || 0
+
+    // Poll claimableCount every 60s while vault is visible
+    useEffect(() => {
+        const id = setInterval(() => {
+            if (document.visibilityState === 'visible') refreshBalance()
+        }, 60_000)
+        return () => clearInterval(id)
+    }, [refreshBalance])
     const activeTab = searchParams.get('tab') || 'packs'
     const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
 
@@ -152,6 +162,11 @@ function VaultInner() {
                                 {tab.key === 'trade' && pendingTradeCount > 0 && (
                                     <span className="w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
                                 )}
+                                {tab.key === 'challenges' && claimableCount > 0 && (
+                                    <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black flex items-center justify-center animate-pulse">
+                                        {claimableCount}
+                                    </span>
+                                )}
                                 {active && (
                                     <span className="absolute bottom-0 left-0 right-0 cd-tab-active cd-neon-shine" />
                                 )}
@@ -205,6 +220,7 @@ function VaultInner() {
                     onTabChange={setTab}
                     unseenGifts={unseenGifts}
                     pendingTradeCount={pendingTradeCount}
+                    claimableCount={claimableCount}
                     packMode={packMode}
                     onPackModeChange={setPackMode}
                     myPacksCount={myPacksCount}
