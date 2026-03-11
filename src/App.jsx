@@ -82,16 +82,16 @@ import StageManager from "./pages/admin/StageManager.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import SingleMatchReport from "./pages/admin/SingleMatchReport.jsx";
 import CardPreview from "./pages/admin/CardPreview.jsx";
-import CardClashAdmin from "./pages/admin/CardClashAdmin.jsx";
+import VaultAdmin from "./pages/admin/VaultAdmin.jsx";
 import VendingRestock from "./pages/admin/VendingRestock.jsx";
 import PackCreator from "./pages/admin/PackCreator.jsx";
 import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
 import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
-import CardClashPage from "./pages/CardClashPage.jsx";
-import CardSharePage from "./pages/cardclash/CardSharePage.jsx";
-const BinderSharePage = lazy(() => import("./pages/cardclash/BinderSharePage.jsx"));
+import VaultPage from "./pages/VaultPage.jsx";
+import CardSharePage from "./pages/vault/CardSharePage.jsx";
+const BinderSharePage = lazy(() => import("./pages/vault/BinderSharePage.jsx"));
 import BgRemover from "./pages/BgRemover.jsx";
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -156,7 +156,7 @@ function App() {
                                 <Route path="community-teams" element={<ProtectedRoute requiredPermission="league_manage"><CommunityTeamAdmin /></ProtectedRoute>} />
                                 <Route path="scrim-admin" element={<ProtectedRoute requiredPermission="league_manage"><ScrimAdmin /></ProtectedRoute>} />
                                 <Route path="card-preview" element={<ProtectedRoute requiredPermission="permission_manage"><CardPreview /></ProtectedRoute>} />
-                                <Route path="cardclash" element={<ProtectedRoute requiredPermission="cardclash_manage"><CardClashAdmin /></ProtectedRoute>} />
+                                <Route path="vault" element={<ProtectedRoute requiredPermission="vault_manage"><VaultAdmin /></ProtectedRoute>} />
                                 <Route path="vending-restock" element={<ProtectedRoute requiredPermission="permission_manage"><VendingRestock /></ProtectedRoute>} />
                                 <Route path="pack-creator" element={<ProtectedRoute requiredPermission="permission_manage"><PackCreator /></ProtectedRoute>} />
                                 <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />
@@ -192,7 +192,7 @@ function App() {
                             <Route path="forge/:leagueSlug/:divisionSlug/challenges" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/wiki" element={<FantasyForge />} />
                             <Route path="forge/:leagueSlug/:divisionSlug/player/:playerSlug" element={<ForgePlayerPage />} />
-                            <Route path="cardclash" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><CardClashPage /></ProtectedRoute>} />
+                            <Route path="vault" element={<ProtectedRoute requiredPermission="codex_edit" redirectTo="/"><VaultPage /></ProtectedRoute>} />
                             <Route path="scrims" element={<ScrimPlanner />} />
                             <Route path="team" element={<MyTeams />} />
                             <Route path="bring-your-own-team" element={<MyTeams />} />

@@ -366,7 +366,7 @@ export default function GlobalSidebar() {
                                     </span>
                                 </SidebarLink>
                                 {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
-                                    <SidebarLink to="/cardclash" active={isActive('/cardclash')}>
+                                    <SidebarLink to="/vault" active={isActive('/vault')}>
                                         <span className="flex items-center gap-3">
                                             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                                 <path d="M15.935,6.06H8.065a2,2,0,0,0-2,2v6a1.993,1.993,0,0,0,2,2h7.87a2,2,0,0,0,2-2v-6A2.006,2.006,0,0,0,15.935,6.06Zm1,8a1,1,0,0,1-1,1H8.065a.99.99,0,0,1-1-1v-6a1,1,0,0,1,1-1h7.87a1,1,0,0,1,1,1Z"/>

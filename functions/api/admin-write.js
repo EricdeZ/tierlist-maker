@@ -8,7 +8,7 @@ import { resolvePredictions } from '../lib/predictions.js'
 import { updateForgeAfterMatch } from '../lib/forge.js'
 import { sendChannelMessage } from '../lib/discord.js'
 import { advanceFromMatch } from '../lib/advancement.js'
-import { refreshBestGods } from '../lib/cardclash-defs.js'
+import { refreshBestGods } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {

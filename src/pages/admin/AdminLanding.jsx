@@ -396,8 +396,8 @@ const tools = [
     {
         title: 'The Vault Admin',
         description: 'Manage The Vault card game. Browse and edit all player cards, view god and item definitions, tune economy parameters, and adjust image positioning and holo effects.',
-        path: '/admin/cardclash',
-        permission: 'cardclash_manage',
+        path: '/admin/vault',
+        permission: 'vault_manage',
         globalOnly: true,
         icon: (
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

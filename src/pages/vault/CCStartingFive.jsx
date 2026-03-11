@@ -1,0 +1,1252 @@
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useVault } from './VaultContext'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, CONSUMABLE_BOOST, getHoloEffect } from '../../data/vault/economy'
+import GameCard from './components/GameCard'
+import TradingCard from '../../components/TradingCard'
+import TradingCardHolo from '../../components/TradingCardHolo'
+import CardZoomModal from './components/CardZoomModal'
+import passionCoin from '../../assets/passion/passion.png'
+import emberIcon from '../../assets/ember.png'
+import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap } from 'lucide-react'
+
+const ROLES = [
+  { key: 'solo', label: 'SOLO', icon: Shield },
+  { key: 'jungle', label: 'JUNGLE', icon: TreePine },
+  { key: 'mid', label: 'MID', icon: Sparkles },
+  { key: 'support', label: 'SUPPORT', icon: Heart },
+  { key: 'adc', label: 'ADC', icon: Crosshair },
+]
+
+const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
+const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 }
+
+function getCardType(card) {
+  return card.cardType || 'god'
+}
+
+function toGameCardData(card, override) {
+  const type = getCardType(card)
+  const cd = card.cardData || {}
+  const base = {
+    name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
+    id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
+  }
+  if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
+  if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
+  if (type === 'consumable') return { ...base, color: cd.color || '#10b981', description: cd.description || '', manaCost: cd.manaCost || 1 }
+  return base
+}
+
+const EMPTY_STATS = {
+  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
+  avgDamage: 0, avgMitigated: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0,
+}
+
+function toPlayerCardProps(card) {
+  const cd = card.cardData || {}
+  return {
+    playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
+    role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
+    leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
+    rarity: card.rarity,
+    stats: EMPTY_STATS,
+    bestGod: cd.bestGod
+      ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
+      : (card.bestGodName ? { name: card.bestGodName } : null),
+    isFirstEdition: card.isFirstEdition || false,
+  }
+}
+
+function getIncomeRate(card) {
+  if (!card) return { passion: 0, cores: 0 }
+  const ht = card.holoType
+  const r = card.rarity
+  if (ht === 'full') {
+    return {
+      passion: STARTING_FIVE_RATES.full?.passion?.[r] || 0,
+      cores: STARTING_FIVE_RATES.full?.cores?.[r] || 0,
+    }
+  }
+  if (ht === 'holo') return { passion: STARTING_FIVE_RATES.holo?.[r] || 0, cores: 0 }
+  if (ht === 'reverse') return { passion: 0, cores: STARTING_FIVE_RATES.reverse?.[r] || 0 }
+  return { passion: 0, cores: 0 }
+}
+
+function getAttachmentBonus(attachment, type, synergy = false) {
+  if (!attachment) return { passionMult: 1, coresMult: 1 }
+  const bonuses = ATTACHMENT_BONUSES[type]
+  if (!bonuses) return { passionMult: 1, coresMult: 1 }
+  let pBonus = bonuses.passion[attachment.rarity] || 0
+  let cBonus = bonuses.cores[attachment.rarity] || 0
+  if (synergy && type === 'god') {
+    pBonus *= (1 + GOD_SYNERGY_BONUS)
+    cBonus *= (1 + GOD_SYNERGY_BONUS)
+  }
+  let passionMult = 1, coresMult = 1
+  if (attachment.holoType === 'holo') passionMult = 1 + pBonus
+  else if (attachment.holoType === 'reverse') coresMult = 1 + cBonus
+  else if (attachment.holoType === 'full') {
+    passionMult = 1 + pBonus * FULL_HOLO_ATTACHMENT_RATIO
+    coresMult = 1 + cBonus * FULL_HOLO_ATTACHMENT_RATIO
+  }
+  return { passionMult, coresMult }
+}
+
+function getEffectiveIncomeRate(card) {
+  const base = getIncomeRate(card)
+  const synergy = card.godCard?.synergy || false
+  const god = getAttachmentBonus(card.godCard, 'god', synergy)
+  const item = getAttachmentBonus(card.itemCard, 'item')
+  return {
+    passion: base.passion * god.passionMult * item.passionMult,
+    cores: base.cores * god.coresMult * item.coresMult,
+  }
+}
+
+function HoloTypeIcon({ holoType, size = 14 }) {
+  const px = `${size}px`
+  if (holoType === 'full') return (
+    <span className="inline-flex items-center gap-0.5">
+      <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
+      <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
+    </span>
+  )
+  if (holoType === 'holo') return <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
+  if (holoType === 'reverse') return <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
+  return null
+}
+
+function generateParticles(count, color) {
+  const particles = []
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5
+    const dist = 60 + Math.random() * 80
+    particles.push({
+      id: i,
+      tx: `${Math.cos(angle) * dist}px`,
+      ty: `${Math.sin(angle) * dist}px`,
+      dur: `${0.6 + Math.random() * 0.4}s`,
+      size: `${3 + Math.random() * 4}px`,
+      delay: `${Math.random() * 0.15}s`,
+      color,
+    })
+  }
+  return particles
+}
+
+function getAnimationConfig(rarity) {
+  const color = RARITIES[rarity]?.color || '#9ca3af'
+  switch (rarity) {
+    case 'mythic':
+      return { flash: true, ring: true, doubleRing: true, particles: generateParticles(40, color), rays: true, banner: true, duration: 3000, color }
+    case 'legendary':
+      return { flash: true, ring: true, doubleRing: false, particles: generateParticles(25, color), rays: true, banner: true, duration: 2500, color }
+    case 'epic':
+      return { flash: true, ring: true, doubleRing: false, particles: generateParticles(15, color), rays: false, banner: false, duration: 1800, color }
+    case 'rare':
+      return { flash: false, ring: true, doubleRing: false, particles: [], rays: false, banner: false, duration: 1200, color }
+    default:
+      return { flash: false, ring: false, doubleRing: false, particles: [], rays: false, banner: false, duration: 800, color }
+  }
+}
+
+
+function useSlotSize() {
+  const [size, setSize] = useState(() => {
+    if (typeof window === 'undefined') return 170
+    if (window.innerWidth < 640) return 130
+    if (window.innerWidth < 1024) return 150
+    return 170
+  })
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 640) setSize(130)
+      else if (window.innerWidth < 1024) setSize(150)
+      else setSize(170)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return size
+}
+
+export default function CCStartingFive() {
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable, getDefOverride } = useVault()
+  const [pickerRole, setPickerRole] = useState(null)
+  const [optionsRole, setOptionsRole] = useState(null)
+  const [slotAnimation, setSlotAnimation] = useState(null)
+  const [collecting, setCollecting] = useState(false)
+  const [collectNotif, setCollectNotif] = useState(null)
+  const [slotting, setSlotting] = useState(false)
+  const [zoomedCard, setZoomedCard] = useState(null)
+  const [showTutorial, setShowTutorial] = useState(false)
+  const [showConsumablePicker, setShowConsumablePicker] = useState(false)
+  const [usingConsumable, setUsingConsumable] = useState(false)
+  const [boostNotif, setBoostNotif] = useState(null)
+  const slotSize = useSlotSize()
+
+  // Live-ticking income counter
+  const [displayPassion, setDisplayPassion] = useState(0)
+  const [displayCores, setDisplayCores] = useState(0)
+
+  useEffect(() => {
+    if (!startingFive) return
+    setDisplayPassion(startingFive.passionPending || 0)
+    setDisplayCores(startingFive.coresPending || 0)
+  }, [startingFive?.passionPending, startingFive?.coresPending])
+
+  useEffect(() => {
+    if (!startingFive) return
+    const pph = startingFive.totalPassionPerHour || 0
+    const cph = startingFive.totalCoresPerHour || 0
+    if (pph === 0 && cph === 0) return
+
+    const interval = setInterval(() => {
+      setDisplayPassion(prev => {
+        const cap = startingFive.passionCap || Infinity
+        return Math.min(prev + pph / 3600, cap)
+      })
+      setDisplayCores(prev => {
+        const cap = startingFive.coresCap || Infinity
+        return Math.min(prev + cph / 3600, cap)
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [startingFive?.totalPassionPerHour, startingFive?.totalCoresPerHour, startingFive?.passionCap, startingFive?.coresCap])
+
+  const slottedCards = useMemo(() => {
+    if (!startingFive?.cards) return {}
+    const map = {}
+    for (const card of startingFive.cards) {
+      map[card.slotRole] = card
+    }
+    return map
+  }, [startingFive?.cards])
+
+  const allSlottedIds = useMemo(() => {
+    if (!startingFive?.cards) return new Set()
+    const ids = new Set()
+    for (const card of startingFive.cards) {
+      ids.add(card.id)
+      if (card.godCard) ids.add(card.godCard.id)
+      if (card.itemCard) ids.add(card.itemCard.id)
+    }
+    return ids
+  }, [startingFive?.cards])
+
+  const handleSlot = useCallback(async (cardId, role) => {
+    setSlotting(true)
+    try {
+      await slotS5Card(cardId, role)
+      // Find the card to determine rarity for animation
+      const card = collection.find(c => c.id === cardId)
+      if (card) {
+        setSlotAnimation({ role, rarity: card.rarity, color: RARITIES[card.rarity]?.color || '#9ca3af' })
+        const config = getAnimationConfig(card.rarity)
+        setTimeout(() => setSlotAnimation(null), config.duration)
+      }
+      setPickerRole(null)
+    } catch (err) {
+      console.error('Failed to slot card:', err)
+    } finally {
+      setSlotting(false)
+    }
+  }, [slotS5Card, collection])
+
+  const handleUnslot = useCallback(async (role) => {
+    try {
+      await unslotS5Card(role)
+      setOptionsRole(null)
+    } catch (err) {
+      console.error('Failed to unslot card:', err)
+    }
+  }, [unslotS5Card])
+
+  const [attachPickerState, setAttachPickerState] = useState(null)
+
+  const handleAttachSlot = useCallback(async (cardId, role, slotType) => {
+    setSlotting(true)
+    try {
+      await slotS5Card(cardId, role, slotType)
+      const card = collection.find(c => c.id === cardId)
+      if (card) {
+        setSlotAnimation({ role, rarity: card.rarity, color: RARITIES[card.rarity]?.color || '#9ca3af' })
+        setTimeout(() => setSlotAnimation(null), 800)
+      }
+      setAttachPickerState(null)
+    } catch (err) {
+      console.error('Failed to attach card:', err)
+    } finally {
+      setSlotting(false)
+    }
+  }, [slotS5Card, collection])
+
+  const handleAttachUnslot = useCallback(async (role, slotType) => {
+    try {
+      await unslotS5Attachment(role, slotType)
+    } catch (err) {
+      console.error('Failed to unslot attachment:', err)
+    }
+  }, [unslotS5Attachment])
+
+  const handleCollect = useCallback(async () => {
+    if (collecting) return
+    setCollecting(true)
+    try {
+      const prev = { passion: displayPassion, cores: displayCores }
+      await collectS5Income()
+      setCollectNotif({ passion: Math.floor(prev.passion), cores: Math.floor(prev.cores) })
+      setTimeout(() => setCollectNotif(null), 3000)
+    } catch (err) {
+      console.error('Failed to collect income:', err)
+    } finally {
+      setCollecting(false)
+    }
+  }, [collecting, collectS5Income, displayPassion, displayCores])
+
+  const handleUseConsumable = useCallback(async (cardId) => {
+    if (usingConsumable) return
+    setUsingConsumable(true)
+    try {
+      const result = await boostS5WithConsumable(cardId)
+      setShowConsumablePicker(false)
+      setBoostNotif({ pct: Math.round(result.boostPct * 100) })
+      setTimeout(() => setBoostNotif(null), 3000)
+    } catch (err) {
+      console.error('Failed to use consumable:', err)
+    } finally {
+      setUsingConsumable(false)
+    }
+  }, [usingConsumable, boostS5WithConsumable])
+
+  const passionCap = startingFive?.passionCap || 0
+  const coresCap = startingFive?.coresCap || 0
+  const passionPct = passionCap > 0 ? Math.min((displayPassion / passionCap) * 100, 100) : 0
+  const coresPct = coresCap > 0 ? Math.min((displayCores / coresCap) * 100, 100) : 0
+  const canCollect = displayPassion >= 1 || displayCores >= 1
+  const totalPph = startingFive?.totalPassionPerHour || 0
+  const totalCph = startingFive?.totalCoresPerHour || 0
+
+  if (!startingFive) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="cd-spinner w-8 h-8" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-[1100px] mx-auto pb-12">
+      {/* Header */}
+      <div className="mb-6 cd-section-accent pb-3 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Starting 5</h1>
+          <p className="text-xs text-white/40 mt-1">Slot your best holo cards to earn passive income</p>
+        </div>
+        <button
+          onClick={() => setShowTutorial(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white/40 hover:text-[var(--cd-cyan)] hover:bg-[var(--cd-cyan)]/[0.06] rounded-lg transition-colors cursor-pointer cd-head tracking-wider"
+        >
+          <HelpCircle size={14} />
+          How It Works
+        </button>
+      </div>
+
+      {/* Income Dashboard */}
+      <div className="cd-panel cd-corners rounded-xl p-4 sm:p-5 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+          <div className="flex items-center gap-4 sm:gap-6">
+            {/* Passion income */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <img src={passionCoin} alt="" className="w-4 h-4" />
+                <span className="text-xs text-white/40 cd-head tracking-wider">PASSION</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg sm:text-xl font-bold cd-num" style={{ color: '#f8c56a' }}>
+                  {displayPassion.toFixed(1)}
+                </span>
+                {passionCap > 0 && (
+                  <span className="text-xs text-white/20 cd-num">/ {passionCap % 1 === 0 ? passionCap : passionCap.toFixed(1)}</span>
+                )}
+              </div>
+              {passionCap > 0 && (
+                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${passionPct}%`,
+                      background: 'linear-gradient(90deg, #f8c56a88, #f8c56a)',
+                      boxShadow: '0 0 6px #f8c56a66',
+                    }}
+                  />
+                </div>
+              )}
+              {totalPph > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalPph.toFixed(1)}/hr</span>
+              )}
+            </div>
+
+            {/* Cores income */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <img src={emberIcon} alt="" className="w-4 h-4 cd-icon-glow" />
+                <span className="text-xs text-white/40 cd-head tracking-wider">CORES</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg sm:text-xl font-bold cd-num text-[var(--cd-cyan)]">
+                  {displayCores.toFixed(1)}
+                </span>
+                {coresCap > 0 && (
+                  <span className="text-xs text-white/20 cd-num">/ {coresCap % 1 === 0 ? coresCap : coresCap.toFixed(1)}</span>
+                )}
+              </div>
+              {coresCap > 0 && (
+                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${coresPct}%`,
+                      background: 'linear-gradient(90deg, var(--cd-cyan-dim), var(--cd-cyan))',
+                      boxShadow: '0 0 6px rgba(0,229,255,0.4)',
+                    }}
+                  />
+                </div>
+              )}
+              {totalCph > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalCph.toFixed(1)}/hr</span>
+              )}
+            </div>
+          </div>
+
+          {/* Collect + Boost buttons */}
+          <div className="relative flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowConsumablePicker(true)}
+              disabled={!startingFive?.cards?.length}
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
+              title="Use a consumable to boost income progress"
+            >
+              <Zap size={14} />
+              Boost
+            </button>
+            <button
+              onClick={handleCollect}
+              disabled={!canCollect || collecting}
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
+            >
+              {collecting ? 'Collecting...' : 'Collect'}
+            </button>
+            {collectNotif && (
+              <div
+                className="absolute -top-10 right-0 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-cyan)]/30 text-xs font-bold cd-num flex items-center gap-2"
+                style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
+              >
+                {collectNotif.passion > 0 && (
+                  <span style={{ color: '#f8c56a' }}>+{collectNotif.passion} <img src={passionCoin} alt="" className="w-3 h-3 inline" /></span>
+                )}
+                {collectNotif.cores > 0 && (
+                  <span className="text-[var(--cd-cyan)]">+{collectNotif.cores} <img src={emberIcon} alt="" className="w-3 h-3 inline" /></span>
+                )}
+              </div>
+            )}
+            {boostNotif && (
+              <div
+                className="absolute -top-10 left-0 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-amber-500/30 text-xs font-bold cd-num text-amber-400"
+                style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
+              >
+                +{boostNotif.pct}% boosted!
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-white/20">
+          {STARTING_FIVE_CAP_DAYS}-day cap — collect before your income maxes out
+        </div>
+      </div>
+
+      {/* 5 Role Slots */}
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+        {ROLES.map(role => {
+          const card = slottedCards[role.key]
+          const Icon = role.icon
+          const isAnimating = slotAnimation?.role === role.key
+
+          return (
+            <div key={role.key} className="flex flex-col items-center gap-2">
+              {/* Role label */}
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon size={14} className="text-white/40" />
+                <span className="text-xs font-bold text-white/40 cd-head tracking-wider">{role.label}</span>
+              </div>
+
+              {/* Slot container */}
+              <div className="relative">
+                {card ? (
+                  <FilledSlot
+                    card={card}
+                    role={role}
+                    isAnimating={isAnimating}
+                    animConfig={isAnimating ? getAnimationConfig(slotAnimation.rarity) : null}
+                    onSwap={() => setPickerRole(role.key)}
+                    onRemove={() => handleUnslot(role.key)}
+                    onZoom={() => { setOptionsRole(null); setZoomedCard(card) }}
+                    optionsOpen={optionsRole === role.key}
+                    onToggleOptions={() => setOptionsRole(optionsRole === role.key ? null : role.key)}
+                    size={slotSize}
+                    override={getDefOverride(card)}
+                    onAttachPicker={(r, st) => setAttachPickerState({ role: r, slotType: st })}
+                    onAttachRemove={(r, st) => handleAttachUnslot(r, st)}
+                    getDefOverride={getDefOverride}
+                  />
+                ) : (
+                  <EmptySlot role={role} onClick={() => setPickerRole(role.key)} size={slotSize} />
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Card Picker Modal */}
+      {pickerRole && (
+        <CardPicker
+          role={pickerRole}
+          collection={collection}
+          slottedCards={slottedCards}
+          allSlottedIds={allSlottedIds}
+          onSelect={handleSlot}
+          onClose={() => setPickerRole(null)}
+          slotting={slotting}
+          getDefOverride={getDefOverride}
+        />
+      )}
+
+      {attachPickerState && (
+        <AttachmentPicker
+          role={attachPickerState.role}
+          slotType={attachPickerState.slotType}
+          collection={collection}
+          allSlottedIds={allSlottedIds}
+          playerRarity={slottedCards[attachPickerState.role]?.rarity}
+          playerHoloType={slottedCards[attachPickerState.role]?.holoType}
+          onSelect={handleAttachSlot}
+          onClose={() => setAttachPickerState(null)}
+          slotting={slotting}
+          getDefOverride={getDefOverride}
+        />
+      )}
+
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+
+      {showConsumablePicker && (
+        <ConsumablePicker
+          collection={collection}
+          allSlottedIds={allSlottedIds}
+          onSelect={handleUseConsumable}
+          onClose={() => setShowConsumablePicker(false)}
+          using={usingConsumable}
+          getDefOverride={getDefOverride}
+        />
+      )}
+
+      {/* Card Zoom Modal */}
+      {zoomedCard && (
+        <CardZoomModal
+          onClose={() => setZoomedCard(null)}
+          playerCard={getCardType(zoomedCard) === 'player' ? toPlayerCardProps(zoomedCard) : undefined}
+          gameCard={getCardType(zoomedCard) !== 'player' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
+          holoType={zoomedCard.holoType}
+        />
+      )}
+
+      <style>{`
+        @keyframes s5-ring-expand {
+          0% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.3); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(3); }
+        }
+        @keyframes s5-ring-expand-2 {
+          0% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.5); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(3.5); }
+        }
+        @keyframes s5-particle {
+          0% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+          70% { opacity: 0.6; }
+          100% { transform: translate(calc(-50% + var(--p-tx)), calc(-50% + var(--p-ty))) scale(0); opacity: 0; }
+        }
+        @keyframes s5-flash {
+          0% { opacity: 0.6; }
+          100% { opacity: 0; }
+        }
+        @keyframes s5-banner-slam {
+          0% { opacity: 0; transform: scale(1.8) translateY(10px); filter: blur(8px); }
+          40% { opacity: 1; transform: scale(0.95) translateY(0); filter: blur(0); }
+          60% { transform: scale(1.03); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes s5-glow-pulse {
+          0%, 100% { box-shadow: 0 0 20px 5px var(--glow-color); }
+          50% { box-shadow: 0 0 40px 12px var(--glow-color); }
+        }
+        @keyframes s5-fade-in {
+          0% { opacity: 0; transform: scale(0.9); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes s5-rays {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+          30% { opacity: 0.4; }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(2) rotate(45deg); }
+        }
+        @keyframes s5-notif-float {
+          0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+        @keyframes s5-card-enter {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+
+function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride }) {
+  const eligibleCards = useMemo(() => {
+    return collection
+      .filter(card => {
+        const type = getCardType(card)
+        if (type !== 'consumable') return false
+        if (allSlottedIds.has(card.id)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        if (rDiff !== 0) return rDiff
+        return (a.godName || '').localeCompare(b.godName || '')
+      })
+  }, [collection, allSlottedIds])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <div className="flex items-center gap-2">
+            <Zap size={18} className="text-amber-400" />
+            <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
+              Use Consumable
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-5 pt-3 pb-1 text-xs text-white/40">
+          Consume a card to instantly boost your pending income. Higher rarity = bigger boost. The card is destroyed.
+        </div>
+
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 110px)' }}>
+          {eligibleCards.length === 0 ? (
+            <div className="text-center py-12 text-white/30">
+              <Zap size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">No consumable cards</p>
+              <p className="text-xs text-white/20 mt-1">Open packs to find consumables</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {eligibleCards.map(card => {
+                const color = RARITIES[card.rarity]?.color || '#9ca3af'
+                const boostPct = Math.round((CONSUMABLE_BOOST[card.rarity] || 0) * 100)
+                const override = getDefOverride?.(card)
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => onSelect(card.id)}
+                    disabled={using}
+                    className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="transition-all group-hover:scale-[1.03]">
+                      <TradingCardHolo rarity={getHoloEffect(card.rarity)} role="ADC" holoType={card.holoType || 'reverse'} size={120}>
+                        <GameCard type="consumable" rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
+                      </TradingCardHolo>
+                    </div>
+                    <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>
+                      <div className="text-[10px] font-bold text-white/60 truncate cd-head">{card.godName}</div>
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-1 mt-0.5 text-[10px] font-bold cd-num">
+                        <span className="text-amber-400">+{boostPct}%</span>
+                        <HoloTypeIcon holoType={card.holoType} size={10} />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+function TutorialModal({ onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">How Starting 5 Works</h3>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 text-sm text-white/60" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">PASSIVE INCOME</h4>
+            <p>Slot holo player cards into 5 role-based slots to earn passive Passion and Cores over time. Higher rarity cards generate more income.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">HOLO TYPES</h4>
+            <p>
+              <span style={{ color: '#f8c56a' }}>Holo</span> cards earn Passion.{' '}
+              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards earn Cores.{' '}
+              <span className="text-purple-400">Full holo</span> cards earn a portion of both.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ATTACHMENTS</h4>
+            <p>Each player slot has two attachment slots: one for a god card and one for an item card. Attachments boost the player's income with a percentage multiplier based on their rarity.</p>
+            <p className="mt-1 text-white/40">God cards give larger bonuses than items. Attachments must be at least the same rarity as the player card and must match holo type (full holo attachments always fit).</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">GOD SYNERGY</h4>
+            <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLE BOOST</h4>
+            <p>Use consumable cards to instantly boost your pending income. Higher rarity consumables give a bigger percentage boost. The consumable is destroyed on use.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">INCOME CAP</h4>
+            <p>Income accumulates up to a 2-day cap. Collect regularly to avoid wasting earnings.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ROLE MATCHING</h4>
+            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Item cards can be attached to any slot.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+function EmptySlot({ role, onClick, size = 170 }) {
+  const Icon = role.icon
+  return (
+    <button
+      onClick={onClick}
+      className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
+      style={{ width: size, aspectRatio: '63/88' }}
+    >
+      <Icon size={size < 150 ? 22 : 28} className="text-white/[0.08] group-hover:text-[var(--cd-cyan)]/30 transition-colors mb-2" />
+      <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
+        <Plus size={12} />
+        Slot Card
+      </div>
+    </button>
+  )
+}
+
+
+function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override, onAttachPicker, onAttachRemove, getDefOverride }) {
+  const color = RARITIES[card.rarity]?.color || '#9ca3af'
+  const income = getEffectiveIncomeRate(card)
+  const type = getCardType(card)
+  const isPlayer = type === 'player'
+
+  return (
+    <div className="relative">
+      {/* Animation overlays */}
+      {isAnimating && animConfig && (
+        <SlotAnimationOverlay config={animConfig} rarity={card.rarity} />
+      )}
+
+      {/* Card display */}
+      <div
+        className="relative cursor-pointer transition-all"
+        style={{
+          ...(isAnimating ? { '--glow-color': `${color}66`, animation: 's5-glow-pulse 0.8s ease-in-out 2' } : {}),
+          ...(!isAnimating ? { animation: 's5-card-enter 0.3s ease-out' } : {}),
+        }}
+        onClick={onToggleOptions}
+      >
+        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
+          {isPlayer ? (
+            <TradingCard
+              {...toPlayerCardProps(card)}
+              variant="player"
+              rarity={card.rarity}
+              size={size}
+            />
+          ) : (
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
+          )}
+        </TradingCardHolo>
+      </div>
+
+      {/* Card info below */}
+      <div className="mt-2 text-center">
+        <div className="text-[11px] font-bold text-white/70 truncate cd-head" style={{ maxWidth: size }}>
+          {card.godName}
+        </div>
+        <div className="flex items-center justify-center gap-1.5 mt-0.5">
+          <span className="text-[10px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+          <HoloTypeIcon holoType={card.holoType} size={11} />
+        </div>
+        <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
+          {income.passion > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+              <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+              {income.passion % 1 === 0 ? income.passion : income.passion.toFixed(1)}/d
+            </span>
+          )}
+          {income.cores > 0 && (
+            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+              <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+              {income.cores % 1 === 0 ? income.cores : income.cores.toFixed(1)}/d
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Attachment slots */}
+      <div className="flex items-start justify-center gap-2 mt-2">
+        <AttachmentSlot
+          attachment={card.godCard}
+          slotType="god"
+          onAttach={() => onAttachPicker(role.key, 'god')}
+          onRemove={() => onAttachRemove(role.key, 'god')}
+          size={size}
+          getDefOverride={getDefOverride}
+          synergy={card.godCard?.synergy}
+        />
+        <AttachmentSlot
+          attachment={card.itemCard}
+          slotType="item"
+          onAttach={() => onAttachPicker(role.key, 'item')}
+          onRemove={() => onAttachRemove(role.key, 'item')}
+          size={size}
+          getDefOverride={getDefOverride}
+        />
+      </div>
+
+      {/* Options dropdown */}
+      {optionsOpen && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg overflow-hidden shadow-xl" style={{ minWidth: 130 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onZoom() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+          >
+            <ZoomIn size={12} /> Zoom
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onSwap() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+          >
+            <ArrowRightLeft size={12} /> Swap
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer cd-head tracking-wider"
+          >
+            <Trash2 size={12} /> Remove
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride, synergy }) {
+  const attachSize = Math.round(size * 0.4)
+
+  if (!attachment) {
+    return (
+      <button
+        onClick={onAttach}
+        className="group flex flex-col items-center justify-center rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] hover:border-[var(--cd-cyan)]/20 hover:bg-[var(--cd-cyan)]/[0.02] transition-all cursor-pointer"
+        style={{ width: attachSize, height: Math.round(attachSize * 88 / 63) }}
+        title={`Attach ${slotType}`}
+      >
+        <Plus size={10} className="text-white/15 group-hover:text-[var(--cd-cyan)]/40 transition-colors" />
+        <span className="text-[7px] text-white/15 group-hover:text-[var(--cd-cyan)]/40 font-bold cd-head tracking-wider mt-0.5 transition-colors">
+          {slotType === 'god' ? 'GOD' : 'ITEM'}
+        </span>
+      </button>
+    )
+  }
+
+  const color = RARITIES[attachment.rarity]?.color || '#9ca3af'
+  const type = getCardType(attachment)
+  const cardOverride = getDefOverride?.(attachment)
+
+  return (
+    <div className="relative group">
+      <div style={{ width: attachSize }}>
+        <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={attachSize}>
+          <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} />
+        </TradingCardHolo>
+      </div>
+      <div className="text-center mt-0.5">
+        <div className="text-[7px] font-bold text-white/50 truncate cd-head" style={{ maxWidth: attachSize }}>{attachment.godName}</div>
+        <div className="text-[7px] font-bold cd-head" style={{ color }}>{RARITIES[attachment.rarity]?.name}</div>
+        {synergy && (
+          <div className="text-[6px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +30%</div>
+        )}
+      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove() }}
+        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+        title="Remove"
+      >
+        <X size={8} className="text-white" />
+      </button>
+    </div>
+  )
+}
+
+
+function SlotAnimationOverlay({ config, rarity }) {
+  const { flash, ring, doubleRing, particles, rays, banner, color, duration } = config
+
+  return (
+    <>
+      {/* Screen flash */}
+      {flash && (
+        <div
+          className="fixed inset-0 pointer-events-none z-30"
+          style={{
+            background: `radial-gradient(circle, ${color}30 0%, transparent 70%)`,
+            animation: `s5-flash ${duration * 0.3}ms ease-out forwards`,
+          }}
+        />
+      )}
+
+      {/* Ring burst(s) */}
+      {ring && (
+        <div
+          className="absolute top-1/2 left-1/2 pointer-events-none z-20"
+          style={{
+            width: 170,
+            height: 170,
+            borderRadius: '50%',
+            border: `2px solid ${color}`,
+            boxShadow: `0 0 20px ${color}88`,
+            animation: `s5-ring-expand 0.8s ease-out forwards`,
+          }}
+        />
+      )}
+      {doubleRing && (
+        <div
+          className="absolute top-1/2 left-1/2 pointer-events-none z-20"
+          style={{
+            width: 170,
+            height: 170,
+            borderRadius: '50%',
+            border: `2px solid ${color}88`,
+            boxShadow: `0 0 15px ${color}66`,
+            animation: `s5-ring-expand-2 1s ease-out 0.15s forwards`,
+            opacity: 0,
+          }}
+        />
+      )}
+
+      {/* Radial glow rays */}
+      {rays && (
+        <div
+          className="absolute top-1/2 left-1/2 pointer-events-none z-10"
+          style={{
+            width: 300,
+            height: 300,
+            background: `conic-gradient(from 0deg, transparent, ${color}15, transparent, ${color}15, transparent, ${color}15, transparent, ${color}15, transparent)`,
+            animation: `s5-rays ${duration * 0.6}ms ease-out forwards`,
+          }}
+        />
+      )}
+
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute top-1/2 left-1/2 pointer-events-none z-20 rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            boxShadow: `0 0 6px ${p.color}`,
+            '--p-tx': p.tx,
+            '--p-ty': p.ty,
+            animation: `s5-particle ${p.dur} ease-out ${p.delay} forwards`,
+          }}
+        />
+      ))}
+
+      {/* Rarity banner text slam */}
+      {banner && (
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 whitespace-nowrap"
+          style={{
+            animation: `s5-banner-slam 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both`,
+          }}
+        >
+          <span
+            className="cd-rarity-neon text-lg"
+            style={{ '--cd-rarity-color': color }}
+          >
+            {RARITIES[rarity]?.name}
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
+
+
+function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride }) {
+  const roleInfo = ROLES.find(r => r.key === role)
+  const Icon = roleInfo?.icon || Shield
+
+  // Filter eligible cards
+  const eligibleCards = useMemo(() => {
+    const currentPlayerInSlot = slottedCards[role]?.id
+    return collection
+      .filter(card => {
+        const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
+        if (cardRole !== role) return false
+        if (!card.holoType && card.rarity !== 'common') return false
+        const type = getCardType(card)
+        if (type !== 'player') return false
+        if (card.id !== currentPlayerInSlot && allSlottedIds.has(card.id)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        if (rDiff !== 0) return rDiff
+        const aIncome = getIncomeRate(a)
+        const bIncome = getIncomeRate(b)
+        return (bIncome.passion + bIncome.cores) - (aIncome.passion + aIncome.cores)
+      })
+  }, [collection, slottedCards, allSlottedIds, role])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <div className="flex items-center gap-2">
+            <Icon size={18} className="text-[var(--cd-cyan)]" />
+            <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
+              Select {roleInfo?.label} Card
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Card grid */}
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          {eligibleCards.length === 0 ? (
+            <div className="text-center py-12 text-white/30">
+              <Icon size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">No eligible cards</p>
+              <p className="text-xs text-white/20 mt-1">Need a player card with the {roleInfo?.label} role</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {eligibleCards.map(card => (
+                <PickerCard
+                  key={card.id}
+                  card={card}
+                  onSelect={() => onSelect(card.id, role)}
+                  disabled={slotting}
+                  override={getDefOverride(card)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, playerHoloType, onSelect, onClose, slotting, getDefOverride }) {
+  const roleInfo = ROLES.find(r => r.key === role)
+  const Icon = roleInfo?.icon || Shield
+  const playerTier = RARITY_TIER[playerRarity] || 0
+
+  const eligibleCards = useMemo(() => {
+    return collection
+      .filter(card => {
+        const type = getCardType(card)
+        if (type !== slotType) return false
+        if (!card.holoType) return false
+        if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
+        // Holo type filter: match player's holo type, full always shown, full player sees all
+        if (playerHoloType !== 'full' && card.holoType !== 'full' && card.holoType !== playerHoloType) return false
+        if (slotType === 'god') {
+          const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
+          if (cardRole !== role) return false
+        }
+        if (allSlottedIds.has(card.id)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        if (rDiff !== 0) return rDiff
+        return (a.godName || '').localeCompare(b.godName || '')
+      })
+  }, [collection, allSlottedIds, role, slotType, playerTier, playerHoloType])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <div className="flex items-center gap-2">
+            <Icon size={18} className="text-[var(--cd-cyan)]" />
+            <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
+              Attach {slotType === 'god' ? 'God' : 'Item'}{slotType === 'god' ? ` \u2014 ${roleInfo?.label}` : ''}
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          {eligibleCards.length === 0 ? (
+            <div className="text-center py-12 text-white/30">
+              <Icon size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">No eligible {slotType} cards</p>
+              <p className="text-xs text-white/20 mt-1">
+                {slotType === 'god'
+                  ? `Need a holo god card with ${roleInfo?.label} role, ${playerRarity}+ rarity`
+                  : `Need a holo item card, ${playerRarity}+ rarity`
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {eligibleCards.map(card => (
+                <PickerCard
+                  key={card.id}
+                  card={card}
+                  onSelect={() => onSelect(card.id, role, slotType)}
+                  disabled={slotting}
+                  override={getDefOverride(card)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+function PickerCard({ card, onSelect, disabled, override }) {
+  const color = RARITIES[card.rarity]?.color || '#9ca3af'
+  const income = getIncomeRate(card)
+  const type = getCardType(card)
+  const isPlayer = type === 'player'
+
+  return (
+    <button
+      onClick={onSelect}
+      disabled={disabled}
+      className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <div className="transition-all group-hover:scale-[1.03]">
+        <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={120}>
+          {isPlayer ? (
+            <TradingCard
+              {...toPlayerCardProps(card)}
+              variant="player"
+              rarity={card.rarity}
+              size={120}
+            />
+          ) : (
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
+          )}
+        </TradingCardHolo>
+      </div>
+
+      <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>
+        <div className="text-[10px] font-bold text-white/60 truncate cd-head">{card.godName}</div>
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+          <HoloTypeIcon holoType={card.holoType} size={10} />
+        </div>
+        <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
+          {income.passion > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+              <img src={passionCoin} alt="" className="w-2 h-2" />
+              {income.passion}/d
+            </span>
+          )}
+          {income.cores > 0 && (
+            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+              <img src={emberIcon} alt="" className="w-2 h-2" />
+              {income.cores}/d
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}

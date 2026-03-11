@@ -25,7 +25,7 @@ export default function PassionDisplay() {
         challengeNotifications, dismissChallengeNotification, ember,
     } = usePassion()
 
-    const isCardClash = location.pathname.startsWith('/cardclash')
+    const isCardClash = location.pathname.startsWith('/vault')
 
     // Auto-dismiss challenge notifications after 5 seconds
     useEffect(() => {
@@ -578,7 +578,7 @@ export default function PassionDisplay() {
                                             Coin Flip
                                         </Link>
                                         {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
-                                            <Link to="/cardclash" onClick={() => setOpen(false)}
+                                            <Link to="/vault" onClick={() => setOpen(false)}
                                                 className="flex items-center justify-between px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                                 <span className="flex items-center gap-2">
                                                     <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />

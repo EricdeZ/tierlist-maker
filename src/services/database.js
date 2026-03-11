@@ -980,106 +980,106 @@ export const emberService = {
 
 export const cardclashService = {
     async load() {
-        return apiCall('cardclash', { action: 'load' })
+        return apiCall('vault', { action: 'load' })
     },
     async openPack(packType) {
-        return apiPost('cardclash', { action: 'open-pack' }, { packType })
+        return apiPost('vault', { action: 'open-pack' }, { packType })
     },
     async openSalePack(saleId, packType) {
-        return apiPost('cardclash', { action: 'open-pack' }, { saleId, packType })
+        return apiPost('vault', { action: 'open-pack' }, { saleId, packType })
     },
     async getDefinitionOverrides() {
-        return apiCall('cardclash', { action: 'definition-overrides' })
+        return apiCall('vault', { action: 'definition-overrides' })
     },
     async getSharedCard(token) {
-        return apiCall('cardclash', { action: 'shared-card', token })
+        return apiCall('vault', { action: 'shared-card', token })
     },
     async getCollectionCatalog() {
-        return apiCall('cardclash', { action: 'collection-catalog' })
+        return apiCall('vault', { action: 'collection-catalog' })
     },
     async getCollectionOwned() {
-        return apiCall('cardclash', { action: 'collection-owned' })
+        return apiCall('vault', { action: 'collection-owned' })
     },
     async getCollectionSet(setKey) {
-        return apiCall('cardclash', { action: 'collection-set', setKey })
+        return apiCall('vault', { action: 'collection-set', setKey })
     },
     async getCardDetail(defId) {
-        return apiCall('cardclash', { action: 'card-detail', defId })
+        return apiCall('vault', { action: 'card-detail', defId })
     },
     async searchCollection(q) {
-        return apiCall('cardclash', { action: 'collection-search', q })
+        return apiCall('vault', { action: 'collection-search', q })
     },
     async loadGifts() {
-        return apiCall('cardclash', { action: 'gifts' })
+        return apiCall('vault', { action: 'gifts' })
     },
     async searchUsers(q) {
-        return apiCall('cardclash', { action: 'search-users', q })
+        return apiCall('vault', { action: 'search-users', q })
     },
     async sendGift(recipientId, message, packType = 'gift') {
-        return apiPost('cardclash', { action: 'send-gift' }, { recipientId, message, packType })
+        return apiPost('vault', { action: 'send-gift' }, { recipientId, message, packType })
     },
     async openGift(giftId) {
-        return apiPost('cardclash', { action: 'open-gift' }, { giftId })
+        return apiPost('vault', { action: 'open-gift' }, { giftId })
     },
     async markGiftsSeen() {
-        return apiPost('cardclash', { action: 'mark-gifts-seen' }, {})
+        return apiPost('vault', { action: 'mark-gifts-seen' }, {})
     },
     async buyGiftPack(packType) {
-        return apiPost('cardclash', { action: 'buy-gift-pack' }, { packType })
+        return apiPost('vault', { action: 'buy-gift-pack' }, { packType })
     },
     async dismantleCards(cardIds) {
-        return apiPost('cardclash', { action: 'dismantle' }, { cardIds })
+        return apiPost('vault', { action: 'dismantle' }, { cardIds })
     },
     loadStartingFive() {
-        return apiCall('cardclash', { action: 'starting-five' })
+        return apiCall('vault', { action: 'starting-five' })
     },
     slotCard(cardId, role, slotType = 'player') {
-        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role, slotType })
+        return apiPost('vault', { action: 'slot-card' }, { cardId, role, slotType })
     },
     unslotCard(role) {
-        return apiPost('cardclash', { action: 'unslot-card' }, { role })
+        return apiPost('vault', { action: 'unslot-card' }, { role })
     },
     unslotAttachment(role, slotType) {
-        return apiPost('cardclash', { action: 'unslot-attachment' }, { role, slotType })
+        return apiPost('vault', { action: 'unslot-attachment' }, { role, slotType })
     },
     collectIncome() {
-        return apiPost('cardclash', { action: 'collect-income' }, {})
+        return apiPost('vault', { action: 'collect-income' }, {})
     },
     useConsumable(cardId) {
-        return apiPost('cardclash', { action: 'use-consumable' }, { cardId })
+        return apiPost('vault', { action: 'use-consumable' }, { cardId })
     },
     openInventoryPack(inventoryId) {
-        return apiPost('cardclash', { action: 'open-inventory-pack' }, { inventoryId })
+        return apiPost('vault', { action: 'open-inventory-pack' }, { inventoryId })
     },
     redeemCode(code) {
-        return apiPost('cardclash', { action: 'redeem-code' }, { code })
+        return apiPost('vault', { action: 'redeem-code' }, { code })
     },
     adminListRedeemCodes() {
-        return apiCall('cardclash', { action: 'admin-redeem-codes' })
+        return apiCall('vault', { action: 'admin-redeem-codes' })
     },
     adminCreateRedeemCode(data) {
-        return apiPost('cardclash', { action: 'create-redeem-code' }, data)
+        return apiPost('vault', { action: 'create-redeem-code' }, data)
     },
     adminToggleRedeemCode(codeId, active) {
-        return apiPost('cardclash', { action: 'toggle-redeem-code' }, { codeId, active })
+        return apiPost('vault', { action: 'toggle-redeem-code' }, { codeId, active })
     },
     async loadBinder() {
-        return apiCall('cardclash', { action: 'binder' })
+        return apiCall('vault', { action: 'binder' })
     },
     async getBinderView(token) {
-        return apiCall('cardclash', { action: 'binder-view', token })
+        return apiCall('vault', { action: 'binder-view', token })
     },
     async saveBinder(name, color) {
-        return apiPost('cardclash', { action: 'binder-save' }, { name, color })
+        return apiPost('vault', { action: 'binder-save' }, { name, color })
     },
     async binderSlot(cardId, page, slot) {
-        return apiPost('cardclash', { action: 'binder-slot' }, { cardId, page, slot })
+        return apiPost('vault', { action: 'binder-slot' }, { cardId, page, slot })
     },
     async binderUnslot(page, slot) {
-        return apiPost('cardclash', { action: 'binder-unslot' }, { page, slot })
+        return apiPost('vault', { action: 'binder-unslot' }, { page, slot })
     },
     async binderGenerateShare() {
-        return apiPost('cardclash', { action: 'binder-generate-share' }, {})
+        return apiPost('vault', { action: 'binder-generate-share' }, {})
     },
 }
 
@@ -1181,52 +1181,52 @@ export const vendingRestockService = {
 
 export const cardclashAdminService = {
     async getStats() {
-        return apiCall('cardclash-admin', { action: 'stats' })
+        return apiCall('vault-admin', { action: 'stats' })
     },
     async listCards(params = {}) {
-        return apiCall('cardclash-admin', { action: 'cards', ...params })
+        return apiCall('vault-admin', { action: 'cards', ...params })
     },
     async getCard(id) {
-        return apiCall('cardclash-admin', { action: 'card', id })
+        return apiCall('vault-admin', { action: 'card', id })
     },
     async listUsers(params = {}) {
-        return apiCall('cardclash-admin', { action: 'users', ...params })
+        return apiCall('vault-admin', { action: 'users', ...params })
     },
     async getHoloTypes() {
-        return apiCall('cardclash-admin', { action: 'holo-types' })
+        return apiCall('vault-admin', { action: 'holo-types' })
     },
     async updateCard(id, updates) {
-        return apiPost('cardclash-admin', { action: 'update-card' }, { id, updates })
+        return apiPost('vault-admin', { action: 'update-card' }, { id, updates })
     },
     async bulkUpdateCards(cardIds, updates) {
-        return apiPost('cardclash-admin', { action: 'bulk-update-cards' }, { cardIds, updates })
+        return apiPost('vault-admin', { action: 'bulk-update-cards' }, { cardIds, updates })
     },
     async grantCard(data) {
-        return apiPost('cardclash-admin', { action: 'grant-card' }, data)
+        return apiPost('vault-admin', { action: 'grant-card' }, data)
     },
     async deleteCard(id) {
-        return apiPost('cardclash-admin', { action: 'delete-card' }, { id })
+        return apiPost('vault-admin', { action: 'delete-card' }, { id })
     },
     async updateUserStats(userId, updates) {
-        return apiPost('cardclash-admin', { action: 'update-user-stats' }, { userId, updates })
+        return apiPost('vault-admin', { action: 'update-user-stats' }, { userId, updates })
     },
     async getDefinitionOverrides(type) {
-        return apiCall('cardclash-admin', { action: 'definition-overrides', type })
+        return apiCall('vault-admin', { action: 'definition-overrides', type })
     },
     async saveDefinitionOverride(type, definitionId, metadata) {
-        return apiPost('cardclash-admin', { action: 'save-definition-override' }, { type, definitionId, metadata })
+        return apiPost('vault-admin', { action: 'save-definition-override' }, { type, definitionId, metadata })
     },
     async generateShareLink(playerSlug, holoEffect, rarity) {
-        return apiPost('cardclash-admin', { action: 'generate-share-link' }, { playerSlug, holoEffect, rarity })
+        return apiPost('vault-admin', { action: 'generate-share-link' }, { playerSlug, holoEffect, rarity })
     },
     async generatePlayerDefs(params) {
-        return apiPost('cardclash-admin', { action: 'generate-player-defs' }, params)
+        return apiPost('vault-admin', { action: 'generate-player-defs' }, params)
     },
     async freezeSeasonStats(seasonId) {
-        return apiPost('cardclash-admin', { action: 'freeze-season-stats' }, { seasonId })
+        return apiPost('vault-admin', { action: 'freeze-season-stats' }, { seasonId })
     },
     async backfillCardDefs() {
-        return apiPost('cardclash-admin', { action: 'backfill-card-defs' }, {})
+        return apiPost('vault-admin', { action: 'backfill-card-defs' }, {})
     },
 }
 
