@@ -2,8 +2,9 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
-import { recalcMatchChallenges, catchupAllUsers } from '../lib/challenges.js'
+import { recalcMatchChallenges, catchupAllUsers, getVaultStats } from '../lib/challenges.js'
 import { grantPassion, revokePassion } from '../lib/passion.js'
+import { grantEmber } from '../lib/ember.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -52,6 +53,8 @@ const handler = async (event) => {
                     return await recalcAllChallenges(sql, admin, event)
                 case 'catchup-all':
                     return await catchupAllChallengesHandler(sql, admin, event)
+                case 'reset-stat-challenges':
+                    return await resetStatChallenges(sql, body, admin, event)
                 case 'search-users':
                     return await searchUsers(sql, body)
                 case 'user-challenges':
@@ -288,6 +291,101 @@ async function catchupAllChallengesHandler(sql, admin) {
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, ...result }) }
 }
+
+// ═══════════════════════════════════════════════════
+// Reset + recalculate all challenges for a given stat_key
+// Revokes passion/ember for anyone who completed, then recalculates progress
+// ═══════════════════════════════════════════════════
+async function resetStatChallenges(sql, body, admin, event) {
+    const owner = await requirePermission(event, 'permission_manage')
+    if (!owner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Owner only' }) }
+    }
+
+    const { statKey } = body
+    if (!statKey) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'statKey required' }) }
+    }
+
+    // Get all challenges with this stat_key
+    const challenges = await sql`
+        SELECT id, title, reward, ember_reward, target_value
+        FROM challenges WHERE stat_key = ${statKey} AND is_active = true
+    `
+    if (challenges.length === 0) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'No challenges found for stat_key' }) }
+    }
+
+    const challengeIds = challenges.map(c => c.id)
+
+    // Find all users who completed any of these challenges
+    const completions = await sql`
+        SELECT uc.user_id, uc.challenge_id
+        FROM user_challenges uc
+        WHERE uc.challenge_id = ANY(${challengeIds}) AND uc.completed = true
+    `
+
+    // Revoke rewards for each completion
+    const challengeMap = Object.fromEntries(challenges.map(c => [c.id, c]))
+    let revokedCount = 0
+
+    for (const comp of completions) {
+        const ch = challengeMap[comp.challenge_id]
+        if (!ch) continue
+
+        // Revoke passion
+        await revokePassion(sql, comp.user_id, ch.reward,
+            `Challenge reset (stat fix): ${ch.title}`, String(ch.id))
+
+        // Revoke ember
+        if (ch.ember_reward && ch.ember_reward > 0) {
+            await grantEmber(sql, comp.user_id, 'challenge_revoke', -ch.ember_reward,
+                `Challenge reset (stat fix): ${ch.title}`, String(ch.id))
+        }
+
+        revokedCount++
+    }
+
+    // Reset all user_challenges for these challenge IDs
+    await sql`
+        UPDATE user_challenges SET
+            completed = false,
+            completed_at = NULL,
+            last_completed_at = NULL,
+            current_value = 0
+        WHERE challenge_id = ANY(${challengeIds})
+    `
+
+    // Recalculate current_value for all users who have cards
+    const allUsers = await sql`
+        SELECT DISTINCT owner_id AS user_id FROM cc_cards
+    `
+
+    let recalcCount = 0
+    for (const { user_id } of allUsers) {
+        const stats = await getVaultStats(sql, user_id)
+        const newValue = Number(stats[statKey] || 0)
+
+        await sql`
+            INSERT INTO user_challenges (user_id, challenge_id, current_value)
+            SELECT ${user_id}, unnest(${challengeIds}::int[]), ${newValue}
+            ON CONFLICT (user_id, challenge_id)
+            DO UPDATE SET current_value = ${newValue}
+        `
+        recalcCount++
+    }
+
+    await logAudit(sql, admin, {
+        action: 'reset-stat-challenges', endpoint: 'challenge-manage',
+        details: { statKey, challengeCount: challenges.length, revokedCount, recalcCount },
+    })
+
+    return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ success: true, revokedCount, recalcCount, challenges: challenges.map(c => c.title) })
+    }
+}
+
 
 // ═══════════════════════════════════════════════════
 // Search users by discord username
