@@ -24,8 +24,8 @@ export const PACKS = {
   'bsl-mixed': { name: 'BSL Pack', cost: 20, cards: 6, guarantees: [], category: 'mixed',
     leagueId: 3, leagueSlug: 'bsl', leagueName: 'Babylon Smite League', color: '#2795cf',
     description: 'BSL players only — gods, items, consumables & a Babylon player card' },
-  gift: { name: 'Gift Pack', cost: 0, cards: 5, guarantees: [], category: 'mixed',
-    description: 'A gift from a friend! Contains 5 cards from both leagues.' },
+  gift: { name: 'Gift Pack', cost: 0, cards: 7, guarantees: [], category: 'mixed',
+    description: 'A gift from a friend! Contains 7 cards from both leagues.' },
 };
 
 // Canonical holo effect per rarity — one fixed effect per tier

@@ -674,24 +674,25 @@ async function generateConfiguredPack(sql, pack) {
   return cards
 }
 
-// Gift pack: 6 cards, both leagues
+// Gift pack: 7 cards, both leagues
 // Slot 0-3: god/item/consumable (common), one guaranteed player card
 // Slot 4: guaranteed uncommon+ rarity upgrade
 // Slot 5: wildcard (any type, weighted by pool size)
+// Slot 6: wildcard (any type, weighted by pool size)
 export async function generateGiftPack(sql) {
   const nonPlayerTypes = ['god', 'item', 'consumable']
   const wildcardTypes = ['god', 'item', 'consumable', 'player']
   const playerSlot = Math.floor(Math.random() * 4) // 0-3
 
   const cards = []
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const minRarity = i === 4 ? 'uncommon' : 'common'
     const rarity = rollRarity(minRarity)
 
     let type
     if (i === playerSlot) {
       type = 'player'
-    } else if (i === 5) {
+    } else if (i >= 5) {
       type = pickWeightedType(wildcardTypes)
     } else {
       type = nonPlayerTypes[Math.floor(Math.random() * nonPlayerTypes.length)]

@@ -117,7 +117,7 @@ function ReceivedGifts({ received, onOpen, setOpenResult, packTypesMap }) {
   const opened = received.filter(g => g.opened)
 
   const getPackLabel = (packType) => {
-    if (packType === 'gift') return '5 cards from both leagues'
+    if (packType === 'gift') return '7 cards from both leagues'
     const pack = packTypesMap[packType]
     return pack ? `${pack.name} — ${pack.cards} cards` : 'Gift pack'
   }
@@ -588,7 +588,7 @@ function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess, pa
         </button>
 
         <p className="text-[10px] text-white/20 mt-3 text-center">
-          {pack ? `${pack.cards} cards${pack.leagueName ? ` — ${pack.leagueName}` : ''}` : 'Contains 5 cards from both leagues'}
+          {pack ? `${pack.cards} cards${pack.leagueName ? ` — ${pack.leagueName}` : ''}` : 'Contains 7 cards from both leagues'}
         </p>
       </div>
     </div>

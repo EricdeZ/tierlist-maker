@@ -893,7 +893,7 @@ export async function getVaultStats(sql, userId) {
         [tradeRow], [soldRow], [boughtRow], [bestSaleRow],
         [giftsSentRow], [giftsOpenedRow],
         [lineupRow], [lineupRareRow], [lineupEpicRow],
-        [maxConvRow],
+        [maxConvRow], [rarityRow],
     ] = await Promise.all([
         // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
         sql`
@@ -971,6 +971,14 @@ export async function getVaultStats(sql, userId) {
                 GROUP BY DATE(created_at)
             ) sub
         `,
+        // Max distinct rarities of any single card (god_id)
+        sql`
+            SELECT COALESCE(MAX(rarity_count), 0)::integer as max_rarities FROM (
+                SELECT COUNT(DISTINCT rarity)::integer as rarity_count
+                FROM cc_cards WHERE owner_id = ${userId}
+                GROUP BY god_id
+            ) sub
+        `,
     ])
 
     return {
@@ -990,6 +998,7 @@ export async function getVaultStats(sql, userId) {
         starting_five_epic_count: lineupEpicRow?.count ?? 0,
         income_collected: statsRow?.income_collections ?? 0,
         max_conversions_day: maxConvRow?.max_conv ?? 0,
+        max_card_rarities: rarityRow?.max_rarities ?? 0,
     }
 }
 
