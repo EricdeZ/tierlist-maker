@@ -534,7 +534,7 @@ function PackShop() {
   const { ember, buyPack, packTypes, packTypesMap } = useCardClash();
   const { claimEmberDaily, claimableCount } = usePassion();
   const leaguePacks = useMemo(() =>
-    packTypes.filter(p => p.category === 'mixed' && p.leagueId).map(p => p.id),
+    packTypes.filter(p => p.leagueId).map(p => p.id),
     [packTypes]
   );
   const [openResult, setOpenResult] = useState(null);

@@ -11,7 +11,7 @@ import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import emberIcon from '../../assets/ember.png'
-import { Search, X, Handshake, Loader2, Check, Plus, History, ChevronLeft, ChevronRight, Filter, Wifi, WifiOff, Timer, ArrowLeftRight, Package } from 'lucide-react'
+import { Search, X, Handshake, Loader2, Check, Plus, History, ChevronLeft, ChevronRight, Filter, Wifi, WifiOff, Timer, ArrowLeftRight, Package, RefreshCw } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const TYPE_FILTERS = [
@@ -26,6 +26,11 @@ const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
 const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
 const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
+
+const EMPTY_STATS = {
+  gamesPlayed: 0, wins: 0, winRate: 0, kda: 0,
+  avgDamage: 0, avgMitigated: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0,
+}
 
 function CoreLabel({ value, size = 'sm', className = '' }) {
   const sizes = { xs: 'h-3', sm: 'h-3.5', md: 'h-4', lg: 'h-5' }
@@ -51,7 +56,7 @@ function useIsMobile() {
 export default function CCTrading() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, pendingTradeCount, setPendingTradeCount, startingFive } = useCardClash()
+  const { collection, pendingTradeCount, setPendingTradeCount, startingFive, refreshCollection } = useCardClash()
 
   const s5CardIds = useMemo(() =>
     new Set((startingFive?.cards || []).map(c => c.id)),
@@ -119,6 +124,8 @@ export default function CCTrading() {
       if (elapsed >= 45000) {
         clearInterval(invitePollRef.current)
         setInvitePolling(null)
+        try { await tradingService.cancel(invitePolling.tradeId) } catch {}
+        fetchPending()
         return
       }
       await fetchPending()
@@ -157,6 +164,7 @@ export default function CCTrading() {
     setActiveTrade(null)
     setView('inbox')
     fetchPending()
+    refreshCollection()
     passionCtx?.refreshBalance?.()
     setPendingTradeCount?.(0)
   }
@@ -211,6 +219,13 @@ export default function CCTrading() {
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Start </span>Trade
+          </button>
+          <button
+            onClick={fetchPending}
+            className="cd-head p-2 text-white/30 hover:text-white/60 border border-white/10 hover:border-white/20 transition-all cursor-pointer rounded"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -536,7 +551,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   const [searchQuery, setSearchQuery] = useState('')
   const [rarityFilter, setRarityFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
 
   const poll = useCallback(async () => {
     try {
@@ -602,7 +617,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
     }
 
     if (typeFilter !== 'all') {
-      cards = cards.filter(c => c.cardType === typeFilter)
+      cards = cards.filter(c => (c.cardType || 'god') === typeFilter)
     }
 
     return cards
@@ -1160,7 +1175,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
             />
           )}
 
-          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[400px] overflow-y-auto pr-1">
+          <div className="flex flex-wrap gap-2 max-h-[550px] overflow-y-auto pr-1">
             {availableCards.map(card => (
               <CollectionPickerCard
                 key={card.id}
@@ -1298,21 +1313,21 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
       >
         <div className="rounded overflow-hidden border-2 transition-colors" style={{ borderColor: `${rarityInfo.color}33` }}>
           {isPlayer ? (
-            <div style={{ width: 105, aspectRatio: '63/88' }}>
               <TradingCard
                 playerName={cardData?.playerName || card.godName}
-                teamName={cardData?.teamName}
-                teamColor={cardData?.teamColor}
-                role={card.role || cardData?.role}
-                avatarUrl={cardData?.avatarUrl}
+                teamName={cardData?.teamName || ''}
+                teamColor={cardData?.teamColor || '#6366f1'}
+                role={cardData?.role || card.role || 'ADC'}
+                avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
+                variant="player"
                 rarity={card.rarity}
-                leagueName={cardData?.leagueName}
-                divisionName={cardData?.divisionName}
-                seasonName={cardData?.seasonName}
+                leagueName={cardData?.leagueName || ''}
+                divisionName={cardData?.divisionName || ''}
+                stats={EMPTY_STATS}
                 isFirstEdition={cardData?.isFirstEdition}
+                isConnected={cardData?.isConnected}
                 size={105}
               />
-            </div>
           ) : (
             <div style={{ width: 105 }}>
               <GameCard
@@ -1402,7 +1417,7 @@ function MobileCollectionSheet({ cards, onAdd, onClose, disabled, searchQuery, s
 
         {/* Card grid */}
         <div className="flex-1 overflow-y-auto px-3 pb-4">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             {cards.map(card => (
               <CollectionPickerCard
                 key={card.id}
@@ -1505,29 +1520,6 @@ function CollectionFilters({ searchQuery, setSearchQuery, rarityFilter, setRarit
 // Desktop Trade Offer Panel
 // ═══════════════════════════════════════
 function TradeOfferPanel({ title, titleColor, cards, coreAmount, isReady, cardCount, onRemoveCard, onZoomCard, canRemove }) {
-  const scrollRef = useRef(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
-
-  const checkScroll = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 4)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
-  }, [])
-
-  useEffect(() => {
-    checkScroll()
-    const el = scrollRef.current
-    if (el) el.addEventListener('scroll', checkScroll, { passive: true })
-    return () => el?.removeEventListener('scroll', checkScroll)
-  }, [checkScroll, cards])
-
-  const scroll = (dir) => {
-    const el = scrollRef.current
-    if (el) el.scrollBy({ left: dir * 200, behavior: 'smooth' })
-  }
-
   return (
     <div className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-4 flex flex-col" style={{ minHeight: 220 }}>
       <div className="flex items-center justify-between mb-2">
@@ -1538,38 +1530,23 @@ function TradeOfferPanel({ title, titleColor, cards, coreAmount, isReady, cardCo
         <span className="cd-num text-[10px] text-white/30">{cardCount}/10</span>
       </div>
 
-      <div className="relative flex-1 min-h-0">
+      <div className="flex-1 min-h-0">
         {cards.length === 0 ? (
           <div className="flex items-center justify-center h-full min-h-[120px] text-white/10 text-xs cd-head">
             No cards added
           </div>
         ) : (
-          <>
-            {canScrollLeft && (
-              <button onClick={() => scroll(-1)} className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-black/60 text-white/60 flex items-center justify-center hover:text-white cursor-pointer">
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <div
-              ref={scrollRef}
-              className="flex gap-2 overflow-x-auto pb-1 scroll-smooth snap-x snap-mandatory cd-scrollbar-hide"
-            >
-              {cards.map(tc => (
-                <DesktopTradeCardSlot
-                  key={tc.cardId}
-                  tradeCard={tc}
-                  onRemove={onRemoveCard ? () => onRemoveCard(tc.cardId) : undefined}
-                  onZoom={() => onZoomCard?.(tc.card)}
-                  canRemove={canRemove}
-                />
-              ))}
-            </div>
-            {canScrollRight && (
-              <button onClick={() => scroll(1)} className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-black/60 text-white/60 flex items-center justify-center hover:text-white cursor-pointer">
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </>
+          <div className="flex flex-wrap gap-2">
+            {cards.map(tc => (
+              <DesktopTradeCardSlot
+                key={tc.cardId}
+                tradeCard={tc}
+                onRemove={onRemoveCard ? () => onRemoveCard(tc.cardId) : undefined}
+                onZoom={() => onZoomCard?.(tc.card)}
+                canRemove={canRemove}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -1606,40 +1583,38 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
     : rawData
 
   return (
-    <div className="relative group shrink-0 snap-center" style={{ width: 100 }}>
+    <div className="relative group" style={{ width: 100 }}>
       <button
         onClick={onZoom}
         className="w-full cursor-pointer transition-transform hover:scale-105 active:scale-95"
       >
         <div className="rounded overflow-hidden border-2 transition-colors" style={{ borderColor: `${rarityInfo.color}33` }}>
           {isPlayer ? (
-            <div style={{ width: 100, aspectRatio: '63/88' }}>
-              <TradingCard
-                playerName={cardData?.playerName || card.godName}
-                teamName={cardData?.teamName}
-                teamColor={cardData?.teamColor}
-                role={card.role || cardData?.role}
-                avatarUrl={cardData?.avatarUrl}
-                rarity={card.rarity}
-                leagueName={cardData?.leagueName}
-                divisionName={cardData?.divisionName}
-                seasonName={cardData?.seasonName}
-                isFirstEdition={cardData?.isFirstEdition}
-                size={100}
-              />
-            </div>
+            <TradingCard
+              playerName={cardData?.playerName || card.godName}
+              teamName={cardData?.teamName || ''}
+              teamColor={cardData?.teamColor || '#6366f1'}
+              role={cardData?.role || card.role || 'ADC'}
+              avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
+              variant="player"
+              rarity={card.rarity}
+              leagueName={cardData?.leagueName || ''}
+              divisionName={cardData?.divisionName || ''}
+              stats={EMPTY_STATS}
+              isFirstEdition={cardData?.isFirstEdition}
+              isConnected={cardData?.isConnected}
+              size={100}
+            />
           ) : (
-            <div style={{ width: 100 }}>
-              <GameCard
-                type={card.cardType}
-                rarity={card.rarity}
-                data={resolvedData || { name: card.godName, slug: card.godId }}
-                size={100}
-              />
-            </div>
+            <GameCard
+              type={card.cardType}
+              rarity={card.rarity}
+              data={resolvedData || { name: card.godName, slug: card.godId }}
+              size={100}
+            />
           )}
         </div>
-        <div className="mt-1 text-[8px] font-bold text-white truncate text-center">{card.godName}</div>
+        <div className="mt-1 text-[8px] font-bold text-white truncate text-center" style={{ maxWidth: 100 }}>{card.godName}</div>
         <div className="text-[7px] uppercase cd-head text-center" style={{ color: rarityInfo.color }}>{card.rarity}</div>
       </button>
 
@@ -1662,7 +1637,8 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
 function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
   const { getDefOverride } = useCardClash()
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
-  const isPlayer = card.cardType === 'player'
+  const isPlayer = (card.cardType || 'god') === 'player'
+  const cardSize = mobile ? 100 : 130
 
   let cardData = null
   if (isPlayer && card.cardData) {
@@ -1681,33 +1657,38 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
     <button
       onClick={onAdd}
       disabled={disabled}
+      style={{ width: cardSize + 10 }}
       className={`bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded p-1 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default group ${
         mobile ? 'active:border-[var(--cd-cyan)]/30 active:bg-[var(--cd-cyan)]/5' : 'hover:border-[var(--cd-cyan)]/30'
       }`}
     >
       <div className="rounded overflow-hidden">
         {isPlayer ? (
-          <div style={{ aspectRatio: '63/88' }}>
-            <TradingCard
-              playerName={cardData?.playerName || card.godName}
-              teamName={cardData?.teamName}
-              teamColor={cardData?.teamColor}
-              role={card.role || cardData?.role}
-              avatarUrl={cardData?.avatarUrl}
-              rarity={card.rarity}
-              size="100%"
-            />
-          </div>
+          <TradingCard
+            playerName={cardData?.playerName || card.godName}
+            teamName={cardData?.teamName || ''}
+            teamColor={cardData?.teamColor || '#6366f1'}
+            role={cardData?.role || card.role || 'ADC'}
+            avatarUrl={cardData?.avatarUrl || card.imageUrl || ''}
+            variant="player"
+            rarity={card.rarity}
+            leagueName={cardData?.leagueName || ''}
+            divisionName={cardData?.divisionName || ''}
+            stats={EMPTY_STATS}
+            isFirstEdition={card.isFirstEdition || false}
+            isConnected={cardData?.isConnected}
+            size={cardSize}
+          />
         ) : (
           <GameCard
             type={card.cardType}
             rarity={card.rarity}
             data={resolvedData || { name: card.godName, slug: card.godId }}
-            compact
+            size={cardSize}
           />
         )}
       </div>
-      <div className={`text-[8px] font-bold text-white truncate mt-0.5 px-0.5 ${mobile ? '' : 'group-hover:text-[var(--cd-cyan)]'} transition-colors`}>{card.godName}</div>
+      <div className={`text-[8px] font-bold text-white truncate mt-0.5 px-0.5 ${mobile ? '' : 'group-hover:text-[var(--cd-cyan)]'} transition-colors`} style={{ maxWidth: cardSize }}>{card.godName}</div>
       <div className="text-[7px] uppercase cd-head px-0.5" style={{ color: rarityInfo.color }}>{card.rarity}</div>
     </button>
   )

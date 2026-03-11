@@ -137,8 +137,6 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     ? (playerCard.role || 'ADC')
     : (gameCard ? (CLASS_ROLE[gameCard.data?.class] || 'mid') : 'mid')
 
-  const showSpinner = playerCard && loadingStats
-
   return createPortal(
     <div
       className={`card-zoom-backdrop ${closing ? 'card-zoom-out' : 'card-zoom-in'}`}
@@ -152,23 +150,19 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
           <X className="w-6 h-6" />
         </button>
 
-        {showSpinner ? (
-          <div className="flex items-center justify-center" style={{ width: 'min(340px, 85vw)', aspectRatio: '63/88' }}>
-            <div className="cd-spinner w-8 h-8" />
-          </div>
-        ) : (
-          <>
-            {gameCard && (
-              <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size="min(340px, 85vw)">
-                <GameCard
-                  type={gameCard.type}
-                  rarity={rarity}
-                  data={gameCard.data}
-                />
-              </TradingCardHolo>
-            )}
+        {gameCard && (
+          <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size="min(340px, 85vw)">
+            <GameCard
+              type={gameCard.type}
+              rarity={rarity}
+              data={gameCard.data}
+            />
+          </TradingCardHolo>
+        )}
 
-            {playerCard && (
+        {playerCard && (
+          <div className="relative">
+            <div style={{ opacity: loadingStats ? 0 : 1, transition: 'opacity 0.2s ease' }}>
               <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType}>
                 <TradingCard
                   playerName={playerCard.playerName}
@@ -187,8 +181,13 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
                   isFirstEdition={playerCard.isFirstEdition}
                 />
               </TradingCardHolo>
+            </div>
+            {loadingStats && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="cd-spinner w-8 h-8" />
+              </div>
             )}
-          </>
+          </div>
         )}
 
         <div className="mt-3 text-center">

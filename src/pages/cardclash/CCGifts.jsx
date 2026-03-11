@@ -343,7 +343,7 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {packTypes.filter(p => p.category === 'mixed' && p.leagueId).map((pack) => {
+          {packTypes.filter(p => p.leagueId).map((pack) => {
             const key = pack.id
             const canAfford = emberBalance >= pack.cost
             const isBuying = buying === key

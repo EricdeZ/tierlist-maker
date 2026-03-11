@@ -7,7 +7,7 @@ import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
-import { Shield, TreePine, Sparkles, Heart, Crosshair, Flame, Hexagon, Plus, X, ArrowRightLeft, Trash2, ZoomIn } from 'lucide-react'
+import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn } from 'lucide-react'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: Shield },
@@ -70,14 +70,15 @@ function getIncomeRate(card) {
 }
 
 function HoloTypeIcon({ holoType, size = 14 }) {
+  const px = `${size}px`
   if (holoType === 'full') return (
     <span className="inline-flex items-center gap-0.5">
-      <Flame size={size} className="text-amber-400" />
-      <Hexagon size={size} className="text-[var(--cd-cyan)]" />
+      <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
+      <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
     </span>
   )
-  if (holoType === 'holo') return <Flame size={size} className="text-amber-400" />
-  if (holoType === 'reverse') return <Hexagon size={size} className="text-[var(--cd-cyan)]" />
+  if (holoType === 'holo') return <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
+  if (holoType === 'reverse') return <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
   return null
 }
 
@@ -528,14 +529,14 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         </div>
         <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
           {income.passion > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Flame size={10} className="text-amber-400" />
+            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+              <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
               {income.passion}/d
             </span>
           )}
           {income.cores > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Hexagon size={10} className="text-[var(--cd-cyan)]" />
+            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+              <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
               {income.cores}/d
             </span>
           )}
@@ -787,14 +788,14 @@ function PickerCard({ card, onSelect, disabled, override }) {
         </div>
         <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
           {income.passion > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Flame size={9} className="text-amber-400" />
+            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+              <img src={passionCoin} alt="" className="w-2 h-2" />
               {income.passion}/d
             </span>
           )}
           {income.cores > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Hexagon size={9} className="text-[var(--cd-cyan)]" />
+            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+              <img src={emberIcon} alt="" className="w-2 h-2" />
               {income.cores}/d
             </span>
           )}
