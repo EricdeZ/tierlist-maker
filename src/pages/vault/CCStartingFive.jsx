@@ -338,7 +338,7 @@ export default function CCStartingFive() {
   return (
     <div className="max-w-[1100px] mx-auto pb-12">
       {/* Header */}
-      <div className="mb-6 cd-section-accent pb-3 flex items-start justify-between">
+      <div className="mb-6 cd-section-accent pb-3 flex items-start justify-between flex-nowrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[var(--cd-text)] cd-head">Starting 5</h1>
           <p className="text-xs text-white/40 mt-1">Slot your best holo cards to earn passive income</p>
@@ -420,11 +420,11 @@ export default function CCStartingFive() {
           </div>
 
           {/* Collect + Boost buttons */}
-          <div className="relative flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center gap-2 shrink-0 flex-nowrap">
             <button
               onClick={() => setShowConsumablePicker(true)}
               disabled={!startingFive?.cards?.length}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
               title="Use a consumable to boost income progress"
             >
               <Zap size={14} />
@@ -433,7 +433,7 @@ export default function CCStartingFive() {
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
             >
               {collecting ? 'Collecting...' : 'Collect'}
             </button>

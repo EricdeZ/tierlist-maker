@@ -460,7 +460,7 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
         </div>
 
         <div className="flex flex-col gap-2 px-4 pt-3">
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {[
               { key: 'player', label: 'Players' },
               { key: 'god', label: 'Gods' },

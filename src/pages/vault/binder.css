@@ -123,14 +123,30 @@
   width: 100% !important;
   height: 100% !important;
   aspect-ratio: auto;
-  border-radius: 6px;
-  flex-shrink: 1;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Scale border/padding with cqi so they shrink proportionally in small slots.
+   GameCard base: 240px → 12px radius = 5%, 4px padding = 1.67%
+   TradingCard base: 340px → 14px radius = 4.12%, 6px padding = 1.76%  */
+.binder-slot .game-card {
+  border-radius: 5cqi !important;
+  padding: 1.67cqi !important;
+}
+.binder-slot .trading-card {
+  border-radius: 4.12cqi !important;
+  padding: 1.76cqi !important;
+  box-shadow: inset 0 0.29cqi 0 var(--gold-edge), inset 0 -0.29cqi 0 var(--gold-dark) !important;
 }
 
 .binder-slot .game-card:hover,
 .binder-slot .trading-card:hover {
   transform: none;
   box-shadow: none;
+}
+.binder-slot .trading-card:hover {
+  box-shadow: inset 0 0.29cqi 0 var(--gold-edge), inset 0 -0.29cqi 0 var(--gold-dark) !important;
 }
 
 /* ── Page number ── */
@@ -382,41 +398,48 @@
 
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
-  .binder-book-inner {
-    flex-direction: column;
-    min-height: auto;
+  .binder-flip-container {
+    perspective: none;
   }
 
-  .binder-page {
-    min-height: auto;
+  .binder-spread {
+    flex-direction: column;
+    gap: 8px;
   }
 
   .binder-spine {
     display: none;
   }
 
-  .binder-page--left {
-    border-radius: 4px 4px 0 0;
-    border-right: 1px solid rgba(255,255,255,0.06);
-    border-bottom: none;
+  .binder-page {
+    min-height: auto;
   }
 
+  .binder-page--left,
   .binder-page--right {
-    border-radius: 0 0 4px 4px;
-    border-left: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
   }
 
   .binder-grid {
-    gap: 4px;
-    padding: 2px;
+    gap: 6px;
+    padding: 4px;
   }
 
   .binder-slot {
-    border-radius: 4px;
+    border-radius: 6px;
+  }
+
+  /* Force cards to behave inside small slots */
+  .binder-slot .game-card,
+  .binder-slot .trading-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex-shrink: 1 !important;
   }
 
   .binder-cover {
-    max-width: 300px;
+    max-width: 280px;
     aspect-ratio: 2/3;
   }
 
@@ -424,12 +447,12 @@
     font-size: 24px;
   }
 
-  .binder-flip-container {
-    perspective: none;
-  }
-
   .binder-flip-page {
     display: none;
+  }
+
+  .binder-picker__grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 }
 
