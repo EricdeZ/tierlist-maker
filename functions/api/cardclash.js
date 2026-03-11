@@ -971,6 +971,7 @@ function formatS5Response(state, extra = {}) {
     const itemCard = c._itemCard || null
     const baseRates = getCardRates(c.holo_type, c.rarity)
     const effectiveRates = getSlotRates(c, godCard, itemCard)
+    const synergy = !!(godCard && c.best_god_name && godCard.god_name && godCard.god_name.toLowerCase() === c.best_god_name.toLowerCase())
 
     return {
       ...formatCard(c),
@@ -979,7 +980,7 @@ function formatS5Response(state, extra = {}) {
       coresPerHour: baseRates.coresPerHour,
       effectivePassionPerHour: effectiveRates.passionPerHour,
       effectiveCoresPerHour: effectiveRates.coresPerHour,
-      godCard: godCard ? { ...formatCard(godCard), ...getAttachmentBonusInfo(godCard, 'god') } : null,
+      godCard: godCard ? { ...formatCard(godCard), ...getAttachmentBonusInfo(godCard, 'god', synergy), synergy } : null,
       itemCard: itemCard ? { ...formatCard(itemCard), ...getAttachmentBonusInfo(itemCard, 'item') } : null,
     }
   })

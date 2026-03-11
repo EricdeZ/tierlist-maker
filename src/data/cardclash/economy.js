@@ -80,3 +80,4 @@ export const ATTACHMENT_BONUSES = {
 };
 
 export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
+export const GOD_SYNERGY_BONUS = 0.30;

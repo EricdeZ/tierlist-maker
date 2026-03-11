@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useCardClash } from './CardClashContext'
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, getHoloEffect } from '../../data/cardclash/economy'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, getHoloEffect } from '../../data/cardclash/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
@@ -70,12 +70,16 @@ function getIncomeRate(card) {
   return { passion: 0, cores: 0 }
 }
 
-function getAttachmentBonus(attachment, type) {
+function getAttachmentBonus(attachment, type, synergy = false) {
   if (!attachment) return { passionMult: 1, coresMult: 1 }
   const bonuses = ATTACHMENT_BONUSES[type]
   if (!bonuses) return { passionMult: 1, coresMult: 1 }
-  const pBonus = bonuses.passion[attachment.rarity] || 0
-  const cBonus = bonuses.cores[attachment.rarity] || 0
+  let pBonus = bonuses.passion[attachment.rarity] || 0
+  let cBonus = bonuses.cores[attachment.rarity] || 0
+  if (synergy && type === 'god') {
+    pBonus *= (1 + GOD_SYNERGY_BONUS)
+    cBonus *= (1 + GOD_SYNERGY_BONUS)
+  }
   let passionMult = 1, coresMult = 1
   if (attachment.holoType === 'holo') passionMult = 1 + pBonus
   else if (attachment.holoType === 'reverse') coresMult = 1 + cBonus
@@ -88,7 +92,8 @@ function getAttachmentBonus(attachment, type) {
 
 function getEffectiveIncomeRate(card) {
   const base = getIncomeRate(card)
-  const god = getAttachmentBonus(card.godCard, 'god')
+  const synergy = card.godCard?.synergy || false
+  const god = getAttachmentBonus(card.godCard, 'god', synergy)
   const item = getAttachmentBonus(card.itemCard, 'item')
   return {
     passion: base.passion * god.passionMult * item.passionMult,
@@ -635,6 +640,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           onRemove={() => onAttachRemove(role.key, 'god')}
           size={size}
           getDefOverride={getDefOverride}
+          synergy={card.godCard?.synergy}
         />
         <AttachmentSlot
           attachment={card.itemCard}
@@ -674,7 +680,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
 }
 
 
-function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride }) {
+function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride, synergy }) {
   const attachSize = Math.round(size * 0.4)
 
   if (!attachment) {
@@ -707,6 +713,9 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, 
       <div className="text-center mt-0.5">
         <div className="text-[7px] font-bold text-white/50 truncate cd-head" style={{ maxWidth: attachSize }}>{attachment.godName}</div>
         <div className="text-[7px] font-bold cd-head" style={{ color }}>{RARITIES[attachment.rarity]?.name}</div>
+        {synergy && (
+          <div className="text-[6px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +30%</div>
+        )}
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onRemove() }}

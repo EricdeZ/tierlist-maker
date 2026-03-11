@@ -22,6 +22,7 @@ const ATTACHMENT_BONUSES = {
   },
 }
 const FULL_HOLO_RATIO = 0.6
+const GOD_SYNERGY_BONUS = 0.30
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
@@ -46,13 +47,18 @@ export function getCardRates(holoType, rarity) {
   }
 }
 
-function getAttachmentMultiplier(attachment, type) {
+function getAttachmentMultiplier(attachment, type, synergy = false) {
   if (!attachment || !attachment.holo_type || !attachment.rarity) return { passionMult: 1, coresMult: 1 }
   const bonuses = ATTACHMENT_BONUSES[type]
   if (!bonuses) return { passionMult: 1, coresMult: 1 }
 
-  const passionBonus = bonuses.passion[attachment.rarity] || 0
-  const coresBonus = bonuses.cores[attachment.rarity] || 0
+  let passionBonus = bonuses.passion[attachment.rarity] || 0
+  let coresBonus = bonuses.cores[attachment.rarity] || 0
+
+  if (synergy && type === 'god') {
+    passionBonus *= (1 + GOD_SYNERGY_BONUS)
+    coresBonus *= (1 + GOD_SYNERGY_BONUS)
+  }
 
   let passionMult = 1, coresMult = 1
   if (attachment.holo_type === 'holo') {
@@ -66,9 +72,15 @@ function getAttachmentMultiplier(attachment, type) {
   return { passionMult, coresMult }
 }
 
+function checkSynergy(playerCard, godCard) {
+  if (!playerCard?.best_god_name || !godCard?.god_name) return false
+  return godCard.god_name.toLowerCase() === playerCard.best_god_name.toLowerCase()
+}
+
 export function getSlotRates(playerCard, godCard, itemCard) {
   const base = getCardRates(playerCard.holo_type, playerCard.rarity)
-  const god = getAttachmentMultiplier(godCard, 'god')
+  const synergy = checkSynergy(playerCard, godCard)
+  const god = getAttachmentMultiplier(godCard, 'god', synergy)
   const item = getAttachmentMultiplier(itemCard, 'item')
   return {
     passionPerHour: base.passionPerHour * god.passionMult * item.passionMult,
@@ -76,14 +88,18 @@ export function getSlotRates(playerCard, godCard, itemCard) {
   }
 }
 
-export function getAttachmentBonusInfo(attachment, type) {
+export function getAttachmentBonusInfo(attachment, type, synergy = false) {
   if (!attachment || !attachment.holo_type) return { passionBonus: 0, coresBonus: 0 }
   const bonuses = ATTACHMENT_BONUSES[type]
   if (!bonuses) return { passionBonus: 0, coresBonus: 0 }
-  const pB = bonuses.passion[attachment.rarity] || 0
-  const cB = bonuses.cores[attachment.rarity] || 0
-  if (attachment.holo_type === 'holo') return { passionBonus: pB, coresBonus: 0 }
-  if (attachment.holo_type === 'reverse') return { passionBonus: 0, coresBonus: cB }
+  let pB = bonuses.passion[attachment.rarity] || 0
+  let cB = bonuses.cores[attachment.rarity] || 0
+  if (synergy && type === 'god') {
+    pB *= (1 + GOD_SYNERGY_BONUS)
+    cB *= (1 + GOD_SYNERGY_BONUS)
+  }
+  if (attachment.holo_type === 'holo') return { passionBonus: +pB.toFixed(4), coresBonus: 0 }
+  if (attachment.holo_type === 'reverse') return { passionBonus: 0, coresBonus: +cB.toFixed(4) }
   if (attachment.holo_type === 'full') return { passionBonus: +(pB * FULL_HOLO_RATIO).toFixed(4), coresBonus: +(cB * FULL_HOLO_RATIO).toFixed(4) }
   return { passionBonus: 0, coresBonus: 0 }
 }
@@ -129,7 +145,7 @@ export async function tick(sql, userId) {
   await ensureState(sql, userId)
 
   const cards = await sql`
-    SELECT l.role AS slot_role, c.*,
+    SELECT l.role AS slot_role, c.*, pd.best_god_name,
       g.id AS god_id, g.rarity AS god_rarity, g.holo_type AS god_holo_type,
       g.card_type AS god_card_type, g.role AS god_role, g.card_data AS god_card_data,
       g.god_name AS god_god_name, g.god_class AS god_god_class, g.image_url AS god_image_url,
@@ -142,6 +158,7 @@ export async function tick(sql, userId) {
       i.def_id AS item_def_id, i.is_first_edition AS item_is_first_edition
     FROM cc_lineups l
     JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_player_defs pd ON c.def_id = pd.id AND c.card_type = 'player'
     LEFT JOIN cc_cards g ON l.god_card_id = g.id
     LEFT JOIN cc_cards i ON l.item_card_id = i.id
     WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
