@@ -143,7 +143,7 @@ export default function CCChallenges() {
       </div>
 
       {/* Category filter pills */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-4 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {VAULT_CATEGORIES.map(cat => {
           const isActive = activeCategory === cat.key
           const count = categoryCounts[cat.key] || 0
@@ -152,7 +152,7 @@ export default function CCChallenges() {
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
               className={`
-                shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer
+                px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer
                 ${isActive
                   ? 'bg-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/40'
                   : 'bg-white/[0.04] text-white/40 border border-white/[0.06] hover:text-white/60 hover:bg-white/[0.06]'

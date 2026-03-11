@@ -282,8 +282,8 @@ export default function CCBinder() {
 
       {/* Book */}
       <div className="binder-flip-container" style={{ perspective: '2400px' }}>
+        {/* Desktop: two-page spread */}
         <div className="binder-spread">
-          {/* Left page */}
           <BinderPage
             page={leftPage}
             side="left"
@@ -292,11 +292,7 @@ export default function CCBinder() {
             onSlotClick={handleSlotClick}
             onRemoveCard={handleRemoveCard}
           />
-
-          {/* Spine */}
           <div className="binder-spine" />
-
-          {/* Right page */}
           <BinderPage
             page={rightPage}
             side="right"
@@ -306,7 +302,6 @@ export default function CCBinder() {
             onRemoveCard={handleRemoveCard}
           />
 
-          {/* Page flip animation overlay */}
           {flipping === 'forward' && (
             <div className="binder-flip-page binder-flip-page--forward">
               <div className="binder-flip-front">
@@ -329,40 +324,81 @@ export default function CCBinder() {
             </div>
           )}
         </div>
+
+        {/* Mobile: single page with swipe */}
+        <div
+          className="binder-mobile-page"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <BinderPage
+            page={mobilePage}
+            side="left"
+            color={color}
+            cardsBySlot={cardsBySlot}
+            onSlotClick={handleSlotClick}
+            onRemoveCard={handleRemoveCard}
+          />
+        </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-center gap-6 mt-4">
-        <button
-          onClick={flipBackward}
-          disabled={flipping}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
-        >
-          <ChevronLeft size={18} />
-          <span className="text-xs cd-head tracking-wider">{spread === 0 ? 'Cover' : 'Prev'}</span>
-        </button>
+      {isMobile ? (
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <button
+            onClick={() => { if (mobilePage > 1) setMobilePage(p => p - 1); else setShowCover(true) }}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer"
+          >
+            <ChevronLeft size={18} />
+            <span className="text-xs cd-head tracking-wider">{mobilePage === 1 ? 'Cover' : 'Prev'}</span>
+          </button>
 
-        <div className="flex items-center gap-1.5">
-          {Array.from({ length: 5 }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => { if (!flipping) setSpread(i) }}
-              className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                i === spread ? 'bg-[var(--cd-cyan)] scale-125' : 'bg-white/15 hover:bg-white/30'
-              }`}
-            />
-          ))}
+          <span className="text-xs text-white/30 cd-head tracking-wider tabular-nums">
+            {mobilePage} / {PAGES}
+          </span>
+
+          <button
+            onClick={() => mobilePage < PAGES && setMobilePage(p => p + 1)}
+            disabled={mobilePage >= PAGES}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
+          >
+            <span className="text-xs cd-head tracking-wider">Next</span>
+            <ChevronRight size={18} />
+          </button>
         </div>
+      ) : (
+        <div className="flex items-center justify-center gap-6 mt-4">
+          <button
+            onClick={flipBackward}
+            disabled={flipping}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
+          >
+            <ChevronLeft size={18} />
+            <span className="text-xs cd-head tracking-wider">{spread === 0 ? 'Cover' : 'Prev'}</span>
+          </button>
 
-        <button
-          onClick={flipForward}
-          disabled={spread >= 4 || flipping}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
-        >
-          <span className="text-xs cd-head tracking-wider">Next</span>
-          <ChevronRight size={18} />
-        </button>
-      </div>
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => { if (!flipping) setSpread(i) }}
+                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                  i === spread ? 'bg-[var(--cd-cyan)] scale-125' : 'bg-white/15 hover:bg-white/30'
+                }`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={flipForward}
+            disabled={spread >= 4 || flipping}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
+          >
+            <span className="text-xs cd-head tracking-wider">Next</span>
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Card picker modal */}
       {pickerSlot && (

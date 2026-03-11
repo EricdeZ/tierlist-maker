@@ -1081,13 +1081,22 @@ async function handleUseConsumable(sql, user, body) {
 async function handleCollectIncome(sql, user) {
   const result = await collectIncome(sql, user.id)
 
-  // Track income collections + push challenge progress (fire-and-forget)
+  // Only count toward challenge if income was >= 50% of daily cap
   if (result.passionGranted > 0 || result.coresGranted > 0) {
-    ensureStats(sql, user.id)
-      .then(() => sql`UPDATE cc_stats SET income_collections = income_collections + 1 WHERE user_id = ${user.id}`)
-      .then(() => getVaultStats(sql, user.id))
-      .then(stats => pushChallengeProgress(sql, user.id, stats))
-      .catch(err => console.error('Vault challenge push (income) failed:', err))
+    const originalPassion = result.passionGranted + result.passionPending
+    const originalCores = result.coresGranted + result.coresPending
+    const halfFull = (result.passionCap > 0 && originalPassion >= result.passionCap * 0.5) ||
+                     (result.coresCap > 0 && originalCores >= result.coresCap * 0.5)
+
+    if (halfFull) {
+      await ensureStats(sql, user.id)
+      await sql`UPDATE cc_stats SET income_collections = income_collections + 1 WHERE user_id = ${user.id}`
+
+      // Push vault challenge progress (fire-and-forget)
+      getVaultStats(sql, user.id)
+        .then(stats => pushChallengeProgress(sql, user.id, stats))
+        .catch(err => console.error('Vault challenge push (income) failed:', err))
+    }
   }
 
   return formatS5Response(result, {
