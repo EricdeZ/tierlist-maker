@@ -403,7 +403,7 @@ async function bulkRecalcNonPerfChallenges(sql) {
         `,
         sql`
             SELECT owner_id AS user_id, COUNT(DISTINCT god_id)::integer as unique_gods_owned
-            FROM cc_cards GROUP BY owner_id
+            FROM cc_cards WHERE card_type = 'god' GROUP BY owner_id
         `,
         sql`
             SELECT user_id, COALESCE(SUM(amount), 0)::integer as total_cores_earned
@@ -1006,7 +1006,7 @@ export async function getVaultStats(sql, userId) {
         // Unique gods owned
         sql`
             SELECT COUNT(DISTINCT god_id)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId}
+            WHERE owner_id = ${userId} AND card_type = 'god'
         `,
         // Total lifetime Cores earned (all positive ember transactions)
         sql`
