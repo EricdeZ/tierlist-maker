@@ -352,7 +352,7 @@ export default function PassionDisplay() {
                                 </span>
                             </>
                         )}
-                        {(canClaimDaily && !claimResult || claimableCount > 0) && (
+                        {(isCardClash ? (ember.canClaimDaily && !emberClaimResult) : (canClaimDaily && !claimResult || claimableCount > 0)) && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
