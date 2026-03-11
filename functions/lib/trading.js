@@ -17,7 +17,7 @@ export async function isCardInTrade(sql, cardId) {
   return !!row
 }
 
-// Expire stale trades (called on poll and on CardClash load)
+// Expire stale trades (called on poll and on Vault load)
 export async function expireStale(sql) {
   const mins = TRADE_RULES.expiry_minutes
   await sql`

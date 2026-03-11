@@ -54,10 +54,10 @@ git commit -m "feat: add Starting 5 migration — holo_type column, income state
 ### Task 2: Add holo_type to Card Generation
 
 **Files:**
-- Modify: `functions/lib/cardclash.js:35-37` (rollHoloEffect) and lines 50, 71, 95, 140, 248 (each generate function)
-- Modify: `src/data/cardclash/economy.js` (add rate constants)
+- Modify: `functions/lib/vault.js:35-37` (rollHoloEffect) and lines 50, 71, 95, 140, 248 (each generate function)
+- Modify: `src/data/vault/economy.js` (add rate constants)
 
-- [ ] **Step 1: Add `rollHoloType` function to `functions/lib/cardclash.js`**
+- [ ] **Step 1: Add `rollHoloType` function to `functions/lib/vault.js`**
 
 After the existing `rollHoloEffect` function (line 37), add:
 
@@ -88,9 +88,9 @@ INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, seria
 VALUES (${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
 ```
 
-Also update the INSERT in `functions/api/cardclash.js` (the `handleOpenGift` function, around line 624) which has its own INSERT INTO cc_cards — add `holo_type` there too. Search both files for all `INSERT INTO cc_cards` to be thorough.
+Also update the INSERT in `functions/api/vault.js` (the `handleOpenGift` function, around line 624) which has its own INSERT INTO cc_cards — add `holo_type` there too. Search both files for all `INSERT INTO cc_cards` to be thorough.
 
-- [ ] **Step 4: Add `holoType` to `formatCard` in `functions/api/cardclash.js`**
+- [ ] **Step 4: Add `holoType` to `formatCard` in `functions/api/vault.js`**
 
 In `formatCard` (around line 704), add after the `holoEffect` line:
 
@@ -98,7 +98,7 @@ In `formatCard` (around line 704), add after the `holoEffect` line:
 holoType: row.holo_type,
 ```
 
-- [ ] **Step 5: Add Starting 5 rate constants to `src/data/cardclash/economy.js`**
+- [ ] **Step 5: Add Starting 5 rate constants to `src/data/vault/economy.js`**
 
 After the `MARKETPLACE` export (line 53), add:
 
@@ -125,7 +125,7 @@ export const STARTING_FIVE_CAP_DAYS = 2;
 - [ ] **Step 6: Commit**
 
 ```bash
-git add functions/lib/cardclash.js functions/api/cardclash.js src/data/cardclash/economy.js
+git add functions/lib/vault.js functions/api/vault.js src/data/vault/economy.js
 git commit -m "feat: add holo_type to card generation and Starting 5 rate constants"
 ```
 
@@ -408,11 +408,11 @@ git commit -m "feat: Starting 5 backend logic — tick, collect, slot/unslot"
 ### Task 4: Starting 5 API Endpoints
 
 **Files:**
-- Modify: `functions/api/cardclash.js:8` (imports), lines 34-44 (GET switch), lines 49-54 (POST switch)
+- Modify: `functions/api/vault.js:8` (imports), lines 34-44 (GET switch), lines 49-54 (POST switch)
 
 - [ ] **Step 1: Add import**
 
-At line 8 in `functions/api/cardclash.js`, after the existing imports, add:
+At line 8 in `functions/api/vault.js`, after the existing imports, add:
 
 ```javascript
 import { tick, collectIncome, slotCard, unslotCard, getCardRates } from '../lib/starting-five.js'
@@ -505,7 +505,7 @@ async function handleCollectIncome(sql, user) {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add functions/api/cardclash.js
+git add functions/api/vault.js
 git commit -m "feat: Starting 5 API endpoints — load, slot, unslot, collect"
 ```
 
@@ -514,24 +514,24 @@ git commit -m "feat: Starting 5 API endpoints — load, slot, unslot, collect"
 ### Task 5: Service Layer
 
 **Files:**
-- Modify: `src/services/database.js:978` (cardclashService object)
+- Modify: `src/services/database.js:978` (vaultService object)
 
-- [ ] **Step 1: Add Starting 5 methods to `cardclashService`**
+- [ ] **Step 1: Add Starting 5 methods to `vaultService`**
 
-In the `cardclashService` object (after the existing methods around line 1019), add:
+In the `vaultService` object (after the existing methods around line 1019), add:
 
 ```javascript
     loadStartingFive() {
-        return apiCall('cardclash', { action: 'starting-five' })
+        return apiCall('vault', { action: 'starting-five' })
     },
     slotCard(cardId, role) {
-        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role })
+        return apiPost('vault', { action: 'slot-card' }, { cardId, role })
     },
     unslotCard(role) {
-        return apiPost('cardclash', { action: 'unslot-card' }, { role })
+        return apiPost('vault', { action: 'unslot-card' }, { role })
     },
     collectIncome() {
-        return apiPost('cardclash', { action: 'collect-income' }, {})
+        return apiPost('vault', { action: 'collect-income' }, {})
     },
 ```
 
@@ -546,10 +546,10 @@ git commit -m "feat: add Starting 5 service methods"
 
 ## Chunk 2: Frontend
 
-### Task 6: CardClashContext Integration
+### Task 6: VaultContext Integration
 
 **Files:**
-- Modify: `src/pages/cardclash/CardClashContext.jsx`
+- Modify: `src/pages/vault/VaultContext.jsx`
 
 - [ ] **Step 1: Add Starting 5 state and methods**
 
@@ -564,7 +564,7 @@ Add a `loadStartingFive` callback after the `refreshGifts` callback:
 ```javascript
 const loadStartingFive = useCallback(async () => {
   try {
-    const data = await cardclashService.loadStartingFive()
+    const data = await vaultService.loadStartingFive()
     setStartingFive(data)
   } catch (err) {
     console.error('Failed to load Starting 5:', err)
@@ -572,19 +572,19 @@ const loadStartingFive = useCallback(async () => {
 }, [])
 
 const slotCard = useCallback(async (cardId, role) => {
-  const data = await cardclashService.slotCard(cardId, role)
+  const data = await vaultService.slotCard(cardId, role)
   setStartingFive(data)
   return data
 }, [])
 
 const unslotCard = useCallback(async (role) => {
-  const data = await cardclashService.unslotCard(role)
+  const data = await vaultService.unslotCard(role)
   setStartingFive(data)
   return data
 }, [])
 
 const collectS5Income = useCallback(async () => {
-  const data = await cardclashService.collectIncome()
+  const data = await vaultService.collectIncome()
   setStartingFive(data)
   await passionCtx?.refreshBalance?.()
   return data
@@ -608,8 +608,8 @@ startingFive, loadStartingFive, slotCard, unslotCard, collectS5Income,
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CardClashContext.jsx
-git commit -m "feat: add Starting 5 state and methods to CardClashContext"
+git add src/pages/vault/VaultContext.jsx
+git commit -m "feat: add Starting 5 state and methods to VaultContext"
 ```
 
 ---
@@ -617,12 +617,12 @@ git commit -m "feat: add Starting 5 state and methods to CardClashContext"
 ### Task 7: Starting 5 UI Component
 
 **Files:**
-- Create: `src/pages/cardclash/CCStartingFive.jsx`
-- Modify: `src/pages/CardClashPage.jsx` (add tab)
+- Create: `src/pages/vault/CCStartingFive.jsx`
+- Modify: `src/pages/VaultPage.jsx` (add tab)
 
 - [ ] **Step 1: Create the Starting 5 component**
 
-Create `src/pages/cardclash/CCStartingFive.jsx`. This component should:
+Create `src/pages/vault/CCStartingFive.jsx`. This component should:
 
 1. Display 5 role slots in a row: solo, jungle, mid, support, adc
 2. Each slot shows the slotted card (using `TradingCardHolo`) or an empty placeholder with the role name
@@ -632,7 +632,7 @@ Create `src/pages/cardclash/CCStartingFive.jsx`. This component should:
 6. Clicking a filled slot shows swap/remove options
 7. Progress bars showing how close pending income is to the 2-day cap
 
-The component uses `useCardClash()` to access:
+The component uses `useVault()` to access:
 - `startingFive` — server state (cards, pending, rates, cap)
 - `collection` — all owned cards (for the picker)
 - `slotCard(cardId, role)`, `unslotCard(role)`, `collectS5Income()`
@@ -669,12 +669,12 @@ useEffect(() => {
 
 The full component is a UI task — build it to match the existing vault aesthetic (dark theme, cyan accents, `cd-head` font classes, `cd-clip-tag` styled buttons). Use Lucide icons (`Flame` for Passion, `Hexagon` for Cores).
 
-- [ ] **Step 2: Add the tab to `CardClashPage.jsx`**
+- [ ] **Step 2: Add the tab to `VaultPage.jsx`**
 
 Add the lazy import after the existing imports (line 19):
 
 ```javascript
-const CCStartingFive = lazy(() => import('./cardclash/CCStartingFive'))
+const CCStartingFive = lazy(() => import('./vault/CCStartingFive'))
 ```
 
 Add to the `TABS` array (line 21-31), insert after 'packs':
@@ -694,7 +694,7 @@ lineup: CCStartingFive,
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/cardclash/CCStartingFive.jsx src/pages/CardClashPage.jsx
+git add src/pages/vault/CCStartingFive.jsx src/pages/VaultPage.jsx
 git commit -m "feat: Starting 5 UI component and vault tab"
 ```
 

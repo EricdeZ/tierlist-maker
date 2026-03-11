@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 
 const CARD_W = 340
@@ -27,7 +27,7 @@ export default function CardSharePage() {
 
   useEffect(() => {
     if (!token) return
-    cardclashService.getSharedCard(token)
+    vaultService.getSharedCard(token)
       .then(setData)
       .catch(() => setError('This share link is invalid or has expired.'))
       .finally(() => setLoading(false))

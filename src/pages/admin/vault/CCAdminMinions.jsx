@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MINIONS, MINION_TYPES } from '../../../data/vault/minions'
 import { RARITIES } from '../../../data/vault/economy'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import GameCard from '../../vault/components/GameCard'
 
 const INPUT = 'w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm'
@@ -13,7 +13,7 @@ export default function CCAdminMinions() {
   const [overrides, setOverrides] = useState({})
 
   useEffect(() => {
-    cardclashAdminService.getDefinitionOverrides('minion').then(data => {
+    vaultAdminService.getDefinitionOverrides('minion').then(data => {
       const map = {}
       for (const o of (data.overrides || [])) {
         map[o.definitionId] = o.metadata
@@ -39,7 +39,7 @@ export default function CCAdminMinions() {
   }, [overrides])
 
   const handleSaveOverride = async (minion, metadata) => {
-    await cardclashAdminService.saveDefinitionOverride('minion', minion.type, metadata)
+    await vaultAdminService.saveDefinitionOverride('minion', minion.type, metadata)
     setOverrides(prev => ({ ...prev, [minion.type]: metadata }))
   }
 

@@ -1,5 +1,5 @@
 // Card Clash Admin API — manage cards, view stats, edit metadata
-// Permission: vault_manage (global only)
+// Permission: cardclash_manage (global only)
 
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders } from '../lib/db.js'
@@ -14,7 +14,7 @@ const handler = async (event) => {
     return { statusCode: 204, headers: adminHeaders, body: '' }
   }
 
-  const user = await requirePermission(event, 'vault_manage')
+  const user = await requirePermission(event, 'cardclash_manage')
   if (!user) {
     return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'Permission denied' }) }
   }

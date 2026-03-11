@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useVault } from './VaultContext'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck } from 'lucide-react'
 import PackOpening from './components/PackOpening'
 import PackArt from './components/PackArt'
@@ -439,7 +439,7 @@ function SendGiftModal({ packType, alreadySentTo, onSend, onClose, onSuccess, pa
     }
     setSearching(true)
     try {
-      const data = await cardclashService.searchUsers(q.trim())
+      const data = await vaultService.searchUsers(q.trim())
       setSearchResults(data.users || [])
     } catch (err) {
       console.error('Search failed:', err)
@@ -662,7 +662,7 @@ function RedeemSection({ setOpenResult }) {
     setError(null)
     setSuccess(false)
     try {
-      const result = await cardclashService.redeemCode(code.trim())
+      const result = await vaultService.redeemCode(code.trim())
       setSuccess(true)
       setCode('')
       setOpenResult(result)

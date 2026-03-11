@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react'
@@ -93,7 +93,7 @@ export default function BinderSharePage() {
   const [flipping, setFlipping] = useState(null)
 
   useEffect(() => {
-    cardclashService.getBinderView(token)
+    vaultService.getBinderView(token)
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message || 'Failed to load binder'); setLoading(false) })
   }, [token])

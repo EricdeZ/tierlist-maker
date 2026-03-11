@@ -45,13 +45,13 @@ Unique constraint on `(trade_id, card_id)`.
 ## Trade Flow
 
 1. **Initiate**: Player A searches for Player B by username, creates trade → status `waiting`
-2. **Join**: Player B sees pending invite (via `pendingTradeCount` in CardClash load response), navigates to trade tab, joins → status `active`
+2. **Join**: Player B sees pending invite (via `pendingTradeCount` in Vault load response), navigates to trade tab, joins → status `active`
 3. **Build offers**: Both players on trade room page, polling every 3 seconds. Each adds/removes their own cards and sets Core amount. Any modification resets both `ready` flags to false.
 4. **Ready up**: Player clicks Ready. If either player modifies anything after readying, both ready flags reset.
 5. **Confirm**: Once both ready, Confirm button appears. Both must confirm. Second confirm triggers atomic swap.
 6. **Complete**: Cards swap `owner_id`, Core transfers via `grantEmber()`, status → `completed`.
 7. **Cancel**: Either player can cancel at any time → status `cancelled`, all locks released.
-8. **Expire**: If `last_polled_at` older than 2 minutes, trade auto-expires. Checked on next poll AND during CardClash `load` action (cleans up abandoned trades even if neither player returns to the trade room).
+8. **Expire**: If `last_polled_at` older than 2 minutes, trade auto-expires. Checked on next poll AND during Vault `load` action (cleans up abandoned trades even if neither player returns to the trade room).
 
 ## Card Locking
 
@@ -182,10 +182,10 @@ export const tradingService = {
 - When both ready: Confirm button appears with final summary
 - Poll every 3 seconds updates the right side + ready/confirm state
 
-### CardClash Integration
+### Vault Integration
 
-- Add `pendingTradeCount` to the `load` response in `cardclash.js`
-- Show badge on Trade tab in `CardClashPage.jsx` when count > 0
+- Add `pendingTradeCount` to the `load` response in `vault.js`
+- Show badge on Trade tab in `VaultPage.jsx` when count > 0
 - Add `'trade'` to `TABS` array with `Handshake` icon (distinct from Convert's `ArrowRightLeft`)
 - Cards in active trades shown with lock icon in collection views
 
@@ -194,12 +194,12 @@ export const tradingService = {
 - Max 1 active/waiting trade per user at a time (simplifies locking + UI)
 - Max 10 cards per side per trade
 - Core amount must be >= 0, validated against balance at confirm time (not at set time)
-- Trade auto-expires after 2 minutes of no polls (via `last_polled_at`); cleanup also runs on CardClash `load`
+- Trade auto-expires after 2 minutes of no polls (via `last_polled_at`); cleanup also runs on Vault `load`
 - Cannot trade with yourself
 - At least one card or non-zero Core must be exchanged total (no empty trades)
 
 ## Cross-Cutting Changes
 
 - `functions/lib/marketplace.js` `createListing`: add check that card is not in active/waiting trade
-- `functions/api/cardclash.js` `handleLoad`: add `pendingTradeCount` to response + expire stale trades
-- `src/pages/cardclash/CardClashContext.jsx`: store `pendingTradeCount` in context state
+- `functions/api/vault.js` `handleLoad`: add `pendingTradeCount` to response + expire stale trades
+- `src/pages/vault/VaultContext.jsx`: store `pendingTradeCount` in context state

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 import { getGameCardEntries, getPlayerCardNumber, TOTAL_GAME_CARDS } from '../../data/vault/cardIndex'
 import { RARITIES } from '../../data/vault/economy'
 import { GODS } from '../../data/vault/gods'
@@ -99,11 +99,11 @@ export default function CCCollection() {
     const loadData = async () => {
       try {
         let cat = cacheGet('cd-catalog', CATALOG_TTL)
-        const ownedPromise = cardclashService.getCollectionOwned()
-        const overridesPromise = cardclashService.getDefinitionOverrides().catch(() => ({ overrides: {} }))
+        const ownedPromise = vaultService.getCollectionOwned()
+        const overridesPromise = vaultService.getDefinitionOverrides().catch(() => ({ overrides: {} }))
 
         if (!cat) {
-          cat = await cardclashService.getCollectionCatalog()
+          cat = await vaultService.getCollectionCatalog()
           cacheSet('cd-catalog', cat)
         }
 
@@ -135,7 +135,7 @@ export default function CCCollection() {
 
     setLoadingSet(setKey)
     try {
-      const data = await cardclashService.getCollectionSet(setKey)
+      const data = await vaultService.getCollectionSet(setKey)
       cacheSet(`cd-set3-${setKey}`, data.cards)
       setSetDefs(prev => ({ ...prev, [setKey]: data.cards }))
     } catch {}
@@ -164,7 +164,7 @@ export default function CCCollection() {
     setSearchLoading(true)
     searchTimerRef.current = setTimeout(async () => {
       try {
-        const data = await cardclashService.searchCollection(searchQuery.trim())
+        const data = await vaultService.searchCollection(searchQuery.trim())
         setSearchResults(data.results)
       } catch {
         setSearchResults([])

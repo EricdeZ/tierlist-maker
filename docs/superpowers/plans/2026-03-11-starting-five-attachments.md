@@ -48,7 +48,7 @@ git commit -m "feat: add god/item attachment columns to cc_lineups"
 ### Task 2: Economy Constants
 
 **Files:**
-- Modify: `src/data/cardclash/economy.js:57-67`
+- Modify: `src/data/vault/economy.js:57-67`
 
 - [ ] **Step 1: Add attachment bonus constants**
 
@@ -74,7 +74,7 @@ export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/data/cardclash/economy.js
+git add src/data/vault/economy.js
 git commit -m "feat: add Starting 5 attachment bonus constants"
 ```
 
@@ -391,7 +391,7 @@ git commit -m "feat: attachment rate calculation, slot/unslot logic, rarity vali
 ### Task 4: API Layer Changes
 
 **Files:**
-- Modify: `functions/api/cardclash.js:11,61-62,967-1027`
+- Modify: `functions/api/vault.js:11,61-62,967-1027`
 
 - [ ] **Step 1: Update imports**
 
@@ -447,7 +447,7 @@ export function getAttachmentBonusInfo(attachment, type) {
 }
 ```
 
-Then import it in `cardclash.js` alongside the other imports. The `formatS5Response` simply calls it:
+Then import it in `vault.js` alongside the other imports. The `formatS5Response` simply calls it:
 
 ```javascript
 function formatS5Response(state, extra = {}) {
@@ -531,7 +531,7 @@ async function handleUnslotAttachment(sql, user, body) {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add functions/api/cardclash.js
+git add functions/api/vault.js
 git commit -m "feat: API handlers for attachment slot/unslot, updated response format"
 ```
 
@@ -540,13 +540,13 @@ git commit -m "feat: API handlers for attachment slot/unslot, updated response f
 ### Task 5: Cross-Cutting Lineup Checks
 
 **Files:**
-- Modify: `functions/api/cardclash.js:909-912` (dismantle)
+- Modify: `functions/api/vault.js:909-912` (dismantle)
 - Modify: `functions/lib/marketplace.js:31-33,112`
 - Modify: `functions/lib/trading.js:115-117,277,283`
 
 - [ ] **Step 1: Update dismantle handler lineup check**
 
-Replace lines 909-912 in `cardclash.js`:
+Replace lines 909-912 in `vault.js`:
 
 ```sql
       AND NOT EXISTS (
@@ -609,7 +609,7 @@ Line 283 area:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add functions/api/cardclash.js functions/lib/marketplace.js functions/lib/trading.js
+git add functions/api/vault.js functions/lib/marketplace.js functions/lib/trading.js
 git commit -m "feat: update lineup checks for god/item attachments across marketplace, trading, dismantle"
 ```
 
@@ -628,7 +628,7 @@ Replace line 1036-1038:
 
 ```javascript
     slotCard(cardId, role, slotType = 'player') {
-        return apiPost('cardclash', { action: 'slot-card' }, { cardId, role, slotType })
+        return apiPost('vault', { action: 'slot-card' }, { cardId, role, slotType })
     },
 ```
 
@@ -638,7 +638,7 @@ After `unslotCard` (line 1041), add:
 
 ```javascript
     unslotAttachment(role, slotType) {
-        return apiPost('cardclash', { action: 'unslot-attachment' }, { role, slotType })
+        return apiPost('vault', { action: 'unslot-attachment' }, { role, slotType })
     },
 ```
 
@@ -651,10 +651,10 @@ git commit -m "feat: service layer methods for attachment slot/unslot"
 
 ---
 
-### Task 7: CardClashContext Updates
+### Task 7: VaultContext Updates
 
 **Files:**
-- Modify: `src/pages/cardclash/CardClashContext.jsx:123-133`
+- Modify: `src/pages/vault/VaultContext.jsx:123-133`
 
 - [ ] **Step 1: Update `slotS5Card` to accept slotType**
 
@@ -662,7 +662,7 @@ Replace lines 123-127:
 
 ```javascript
   const slotS5Card = useCallback(async (cardId, role, slotType = 'player') => {
-    const data = await cardclashService.slotCard(cardId, role, slotType)
+    const data = await vaultService.slotCard(cardId, role, slotType)
     setStartingFive(data)
     return data
   }, [])
@@ -674,7 +674,7 @@ After `unslotS5Card` (line 133), add:
 
 ```javascript
   const unslotS5Attachment = useCallback(async (role, slotType) => {
-    const data = await cardclashService.unslotAttachment(role, slotType)
+    const data = await vaultService.unslotAttachment(role, slotType)
     setStartingFive(data)
     return data
   }, [])
@@ -687,7 +687,7 @@ Find the context value object (around line 221) and add `unslotS5Attachment` to 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/pages/cardclash/CardClashContext.jsx
+git add src/pages/vault/VaultContext.jsx
 git commit -m "feat: context methods for attachment slot/unslot"
 ```
 
@@ -696,7 +696,7 @@ git commit -m "feat: context methods for attachment slot/unslot"
 ### Task 8: Frontend UI — Attachment Slots
 
 **Files:**
-- Modify: `src/pages/cardclash/CCStartingFive.jsx`
+- Modify: `src/pages/vault/CCStartingFive.jsx`
 
 This is the largest frontend task. The changes are:
 
@@ -712,7 +712,7 @@ This is the largest frontend task. The changes are:
 Update line 3:
 
 ```javascript
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, getHoloEffect } from '../../data/cardclash/economy'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, getHoloEffect } from '../../data/vault/economy'
 ```
 
 - [ ] **Step 2: Add `getEffectiveIncomeRate` function**
@@ -800,7 +800,7 @@ After `handleUnslot` (line 215), add:
 Update the destructuring at line 141 to include `unslotS5Attachment`:
 
 ```javascript
-  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, getDefOverride } = useCardClash()
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, getDefOverride } = useVault()
 ```
 
 - [ ] **Step 5: Add `AttachmentSlot` component**
@@ -1072,7 +1072,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
 - [ ] **Step 10: Commit**
 
 ```bash
-git add src/pages/cardclash/CCStartingFive.jsx
+git add src/pages/vault/CCStartingFive.jsx
 git commit -m "feat: attachment UI — slots, picker modal, effective rate display"
 ```
 

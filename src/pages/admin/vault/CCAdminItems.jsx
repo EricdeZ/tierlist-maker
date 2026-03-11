@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { ITEMS } from '../../../data/vault/items'
 import { RARITIES } from '../../../data/vault/economy'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import GameCard from '../../vault/components/GameCard'
 
 const CATEGORIES = ['All', ...new Set(ITEMS.map(i => i.category))]
@@ -16,7 +16,7 @@ export default function CCAdminItems() {
   const [overrides, setOverrides] = useState({})
 
   useEffect(() => {
-    cardclashAdminService.getDefinitionOverrides('item').then(data => {
+    vaultAdminService.getDefinitionOverrides('item').then(data => {
       const map = {}
       for (const o of (data.overrides || [])) {
         map[o.definitionId] = o.metadata
@@ -53,7 +53,7 @@ export default function CCAdminItems() {
   }, [])
 
   const handleSaveOverride = async (item, metadata) => {
-    await cardclashAdminService.saveDefinitionOverride('item', String(item.id), metadata)
+    await vaultAdminService.saveDefinitionOverride('item', String(item.id), metadata)
     setOverrides(prev => ({ ...prev, [String(item.id)]: metadata }))
   }
 

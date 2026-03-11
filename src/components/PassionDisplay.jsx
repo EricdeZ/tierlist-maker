@@ -25,7 +25,7 @@ export default function PassionDisplay() {
         challengeNotifications, dismissChallengeNotification, ember,
     } = usePassion()
 
-    const isCardClash = location.pathname.startsWith('/vault')
+    const isVault = location.pathname.startsWith('/vault')
 
     // Auto-dismiss challenge notifications after 5 seconds
     useEffect(() => {
@@ -335,8 +335,8 @@ export default function PassionDisplay() {
                         onClick={() => { setOpen(!open); setClaimResult(null) }}
                         className="relative flex items-center gap-1.5 rounded-lg hover:bg-white/10 transition-colors px-2 py-1"
                     >
-                        {!isCardClash && <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>}
-                        {isCardClash ? (
+                        {!isVault && <span className="hidden sm:inline-flex"><RankBadge rank={rank} size="sm" /></span>}
+                        {isVault ? (
                             <>
                                 <img id="ember-balance-icon" src={emberIcon} alt="Cores" className="h-5 w-auto object-contain" />
                                 <span className="text-sm font-semibold text-[#00e5ff] tabular-nums min-w-[2ch]">
@@ -352,17 +352,17 @@ export default function PassionDisplay() {
                                 </span>
                             </>
                         )}
-                        {(isCardClash ? (ember.canClaimDaily && !emberClaimResult) : (canClaimDaily && !claimResult || claimableCount > 0)) && (
+                        {(isVault ? (ember.canClaimDaily && !emberClaimResult) : (canClaimDaily && !claimResult || claimableCount > 0)) && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isCardClash ? '#00e5ff' : '#f8c56a' }} />
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isVault ? '#00e5ff' : '#f8c56a' }} />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: isVault ? '#00e5ff' : '#f8c56a' }} />
                             </span>
                         )}
                     </button>
 
                     {open && (
                         <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-14 sm:top-full mt-0 sm:mt-2 w-auto sm:w-72 bg-(--color-secondary) border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
-                            {isCardClash ? (
+                            {isVault ? (
                                 <>
                                     {/* ═══ Compdeck Dropdown ═══ */}
                                     {/* Core Balance header */}
@@ -462,15 +462,15 @@ export default function PassionDisplay() {
 
                                     {/* Compdeck Links */}
                                     <div className="py-1">
-                                        <Link to="/cardclash?tab=packs" onClick={() => setOpen(false)}
+                                        <Link to="/vault?tab=packs" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Packs
                                         </Link>
-                                        <Link to="/cardclash?tab=catalog" onClick={() => setOpen(false)}
+                                        <Link to="/vault?tab=catalog" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Collection
                                         </Link>
-                                        <Link to="/cardclash?tab=starting5" onClick={() => setOpen(false)}
+                                        <Link to="/vault?tab=starting5" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Starting 5
                                         </Link>

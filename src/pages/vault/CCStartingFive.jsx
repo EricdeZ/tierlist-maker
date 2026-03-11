@@ -917,13 +917,17 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, 
   const color = RARITIES[attachment.rarity]?.color || '#9ca3af'
   const type = getCardType(attachment)
   const cardOverride = getDefOverride?.(attachment)
+  const renderSize = 150
+  const scale = attachSize / renderSize
 
   return (
     <div className="relative group">
-      <div style={{ width: attachSize }}>
-        <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={attachSize}>
-          <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} />
-        </TradingCardHolo>
+      <div style={{ width: attachSize, height: Math.round(attachSize * 88 / 63), overflow: 'hidden' }}>
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: renderSize }}>
+          <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={renderSize}>
+            <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} />
+          </TradingCardHolo>
+        </div>
       </div>
       <div className="text-center mt-0.5">
         <div className="text-[7px] font-bold text-white/50 truncate cd-head" style={{ maxWidth: attachSize }}>{attachment.godName}</div>

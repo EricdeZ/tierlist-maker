@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import { RARITIES } from '../../../data/vault/economy'
 import CCCardEditor from './CCCardEditor'
 
@@ -30,7 +30,7 @@ export default function CCAdminCards() {
       if (search) params.search = search
       if (rarity !== 'all') params.rarity = rarity
       if (holo !== 'all') params.holo = holo
-      const data = await cardclashAdminService.listCards(params)
+      const data = await vaultAdminService.listCards(params)
       setCards(data.cards || [])
       setTotal(data.total || 0)
     } catch (e) {
@@ -42,7 +42,7 @@ export default function CCAdminCards() {
   useEffect(() => { loadCards() }, [loadCards])
 
   const handleUpdateCard = async (id, updates) => {
-    const data = await cardclashAdminService.updateCard(id, updates)
+    const data = await vaultAdminService.updateCard(id, updates)
     if (data.card) {
       setCards(prev => prev.map(c => c.id === id ? data.card : c))
       setSelectedCard(data.card)
@@ -51,14 +51,14 @@ export default function CCAdminCards() {
 
   const handleDeleteCard = async (id) => {
     if (!confirm('Delete this card? This cannot be undone.')) return
-    await cardclashAdminService.deleteCard(id)
+    await vaultAdminService.deleteCard(id)
     setCards(prev => prev.filter(c => c.id !== id))
     setSelectedCard(null)
   }
 
   const handleBulkUpdate = async (updates) => {
     if (!selected.size) return
-    await cardclashAdminService.bulkUpdateCards([...selected], updates)
+    await vaultAdminService.bulkUpdateCards([...selected], updates)
     setSelected(new Set())
     loadCards()
   }

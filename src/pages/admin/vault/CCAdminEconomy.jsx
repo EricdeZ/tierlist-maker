@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { RARITIES } from '../../../data/vault/economy'
-import { cardclashService } from '../../../services/database'
+import { vaultService } from '../../../services/database'
 
 export default function CCAdminEconomy() {
   const [packTypes, setPackTypes] = useState([])
 
   useEffect(() => {
-    cardclashService.load().then(data => setPackTypes(data.packTypes || []))
+    vaultService.load().then(data => setPackTypes(data.packTypes || []))
   }, [])
 
   return (

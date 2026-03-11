@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BUFFS } from '../../../data/vault/buffs'
 import { RARITIES } from '../../../data/vault/economy'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import GameCard from '../../vault/components/GameCard'
 
 const INPUT = 'w-full bg-[var(--color-secondary)] border border-white/10 rounded-lg px-3 py-2 text-sm'
@@ -13,7 +13,7 @@ export default function CCAdminBuffs() {
   const [overrides, setOverrides] = useState({})
 
   useEffect(() => {
-    cardclashAdminService.getDefinitionOverrides('buff').then(data => {
+    vaultAdminService.getDefinitionOverrides('buff').then(data => {
       const map = {}
       for (const o of (data.overrides || [])) {
         map[o.definitionId] = o.metadata
@@ -38,7 +38,7 @@ export default function CCAdminBuffs() {
   }, [overrides])
 
   const handleSaveOverride = async (buff, metadata) => {
-    await cardclashAdminService.saveDefinitionOverride('buff', buff.id, metadata)
+    await vaultAdminService.saveDefinitionOverride('buff', buff.id, metadata)
     setOverrides(prev => ({ ...prev, [buff.id]: metadata }))
   }
 

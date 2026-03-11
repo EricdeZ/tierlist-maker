@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 import PageTitle from '../../components/PageTitle'
 
 export default function RedeemCodes() {
@@ -17,8 +17,8 @@ export default function RedeemCodes() {
   const load = async () => {
     try {
       const [codesData, clashData] = await Promise.all([
-        cardclashService.adminListRedeemCodes(),
-        cardclashService.load(),
+        vaultService.adminListRedeemCodes(),
+        vaultService.load(),
       ])
       setCodes(codesData.codes || [])
       setPackTypes(clashData.packTypes || [])
@@ -35,7 +35,7 @@ export default function RedeemCodes() {
     setCreating(true)
     setError(null)
     try {
-      await cardclashService.adminCreateRedeemCode({
+      await vaultService.adminCreateRedeemCode({
         code: form.code.trim(),
         packTypeId: form.packTypeId,
         mode: form.mode,
@@ -53,7 +53,7 @@ export default function RedeemCodes() {
 
   const handleToggle = async (codeId, active) => {
     try {
-      await cardclashService.adminToggleRedeemCode(codeId, active)
+      await vaultService.adminToggleRedeemCode(codeId, active)
       setCodes(prev => prev.map(c => c.id === codeId ? { ...c, active } : c))
     } catch (err) {
       setError(err.message)

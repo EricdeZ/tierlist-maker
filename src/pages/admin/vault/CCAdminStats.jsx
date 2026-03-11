@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import { RARITIES } from '../../../data/vault/economy'
 
 export default function CCAdminStats() {
@@ -7,7 +7,7 @@ export default function CCAdminStats() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    cardclashAdminService.getStats().then(data => {
+    vaultAdminService.getStats().then(data => {
       setStats(data)
       setLoading(false)
     }).catch(() => setLoading(false))

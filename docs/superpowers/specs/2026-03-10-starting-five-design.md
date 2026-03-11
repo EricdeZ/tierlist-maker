@@ -70,7 +70,7 @@ ALTER TABLE cc_lineups ADD COLUMN IF NOT EXISTS slotted_at TIMESTAMPTZ DEFAULT N
 
 All card generation functions (`generateCard`, `generatePlayerCard`, `generateItemCard`, `generateConsumableCard`) must roll `holo_type` for uncommon+ cards. Items and consumables get the holo_type but still can't be slotted (no role).
 
-## API Endpoints (on `/api/cardclash`)
+## API Endpoints (on `/api/vault`)
 
 - `GET ?action=starting-five` — returns slotted cards, pending income, per-hour rates, cap
 - `POST ?action=slot-card` — body: `{ cardId, role }` — auto-collects pending, then slots card

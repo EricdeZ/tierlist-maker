@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import GameCard from './GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
-import { cardclashService, marketplaceService } from '../../../services/database'
+import { vaultService, marketplaceService } from '../../../services/database'
 import { RARITIES, getHoloEffect, MARKETPLACE } from '../../../data/vault/economy'
 import { CLASS_ROLE } from '../../../data/vault/gods'
 import { useVault } from '../VaultContext'
@@ -62,7 +62,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
   useEffect(() => {
     if (!playerCard?.defId) return
     setLoadingStats(true)
-    cardclashService.getCardDetail(playerCard.defId).then(data => {
+    vaultService.getCardDetail(playerCard.defId).then(data => {
       if (data.stats) setStats(data.stats)
       if (data.bestGod) setBestGod(data.bestGod)
       if (data.bestGodName) setBestGodName(data.bestGodName)

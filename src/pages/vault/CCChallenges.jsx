@@ -6,6 +6,25 @@ import { getTierColor } from '../../config/challengeTiers'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
 
+const VAULT_CATEGORIES = [
+  { key: 'all', label: 'All' },
+  { key: 'packs', label: 'Packs', statKeys: ['packs_opened'] },
+  { key: 'collection', label: 'Collection', statKeys: ['total_cards_owned', 'unique_gods_owned', 'unique_cards_owned', 'legendary_cards_owned', 'epic_cards_owned'] },
+  { key: 'marketplace', label: 'Marketplace', statKeys: ['marketplace_sold', 'marketplace_bought', 'best_marketplace_sale', 'marketplace_volume'] },
+  { key: 'trading', label: 'Trading', statKeys: ['trades_completed'] },
+  { key: 'starting_five', label: 'Starting Five', statKeys: ['starting_five_filled', 'starting_five_rare_count', 'starting_five_epic_count', 'income_collected'] },
+  { key: 'currency', label: 'Currency', statKeys: ['cores_converted', 'daily_cores_claimed', 'max_conversions_day', 'total_cores_earned', 'total_cores_spent'] },
+  { key: 'social', label: 'Social', statKeys: ['gifts_sent', 'gifts_opened'] },
+  { key: 'dismantling', label: 'Dismantling', statKeys: ['cards_dismantled', 'legendary_cards_dismantled'] },
+]
+
+function getCategoryForStatKey(statKey) {
+  for (const cat of VAULT_CATEGORIES) {
+    if (cat.statKeys?.includes(statKey)) return cat.key
+  }
+  return 'all'
+}
+
 export default function CCChallenges() {
   const { user } = useAuth()
   const { updateFromClaim, challengeNotifications } = usePassion()
@@ -14,6 +33,7 @@ export default function CCChallenges() {
   const [refreshing, setRefreshing] = useState(false)
   const [claimingId, setClaimingId] = useState(null)
   const [justClaimed, setJustClaimed] = useState({})
+  const [activeCategory, setActiveCategory] = useState('all')
 
   const loadChallenges = useCallback(() => {
     return challengeService.getAll()
@@ -38,6 +58,7 @@ export default function CCChallenges() {
     const all = Object.values(challengeData).flat()
     return all
       .filter(ch => ch.category === 'vault')
+      .filter(ch => activeCategory === 'all' || getCategoryForStatKey(ch.statKey) === activeCategory)
       .sort((a, b) => {
         if (a.claimable && !b.claimable) return -1
         if (!a.claimable && b.claimable) return 1
@@ -46,6 +67,20 @@ export default function CCChallenges() {
         if (a.progress !== b.progress) return b.progress - a.progress
         return a.targetValue - b.targetValue
       })
+  }, [challengeData, activeCategory])
+
+  // Count challenges per category for badges
+  const categoryCounts = useMemo(() => {
+    const all = Object.values(challengeData).flat().filter(ch => ch.category === 'vault')
+    const counts = {}
+    for (const cat of VAULT_CATEGORIES) {
+      if (cat.key === 'all') {
+        counts.all = all.filter(ch => ch.claimable).length
+      } else {
+        counts[cat.key] = all.filter(ch => cat.statKeys.includes(ch.statKey) && ch.claimable).length
+      }
+    }
+    return counts
   }, [challengeData])
 
   const handleClaim = async (challengeId, buttonEl) => {
@@ -78,7 +113,9 @@ export default function CCChallenges() {
     )
   }
 
-  if (vaultChallenges.length === 0) {
+  const allVaultEmpty = Object.values(challengeData).flat().filter(ch => ch.category === 'vault').length === 0
+
+  if (allVaultEmpty) {
     return (
       <div className="text-center py-16 text-white/30 cd-head tracking-wider text-sm">
         No vault challenges available yet.
@@ -104,6 +141,40 @@ export default function CCChallenges() {
           </svg>
         </button>
       </div>
+
+      {/* Category filter pills */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-4 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+        {VAULT_CATEGORIES.map(cat => {
+          const isActive = activeCategory === cat.key
+          const count = categoryCounts[cat.key] || 0
+          return (
+            <button
+              key={cat.key}
+              onClick={() => setActiveCategory(cat.key)}
+              className={`
+                shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer
+                ${isActive
+                  ? 'bg-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/40'
+                  : 'bg-white/[0.04] text-white/40 border border-white/[0.06] hover:text-white/60 hover:bg-white/[0.06]'
+                }
+              `}
+            >
+              {cat.label}
+              {count > 0 && (
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${isActive ? 'bg-[var(--cd-cyan)]/30' : 'bg-white/10'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {vaultChallenges.length === 0 && (
+        <div className="text-center py-12 text-white/30 cd-head tracking-wider text-sm">
+          No challenges in this category.
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {vaultChallenges.map((ch, i) => (

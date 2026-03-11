@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { globalPlayerService, profileService, cardclashAdminService } from '../../../services/database'
+import { globalPlayerService, profileService, vaultAdminService } from '../../../services/database'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { Search, Loader2, User, Link2, Copy, Check } from 'lucide-react'
@@ -93,7 +93,7 @@ export default function CCAdminShare() {
     if (!selectedPlayer) return
     setGenerating(true)
     try {
-      const data = await cardclashAdminService.generateShareLink(selectedPlayer.slug, holoEffect, rarity)
+      const data = await vaultAdminService.generateShareLink(selectedPlayer.slug, holoEffect, rarity)
       const url = `${window.location.origin}/vault/share/${data.token}`
       setShareLink(url)
     } catch (e) {

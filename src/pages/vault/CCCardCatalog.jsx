@@ -7,7 +7,7 @@ import { GODS } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import { RARITIES, getHoloEffect } from '../../data/vault/economy'
-import { cardclashService } from '../../services/database'
+import { vaultService } from '../../services/database'
 
 const SAMPLE_PLAYER = {
   playerName: 'Azulisc',
@@ -53,7 +53,7 @@ export default function CCCardCatalog() {
 
   // Load definition overrides (image positioning per god/item)
   useEffect(() => {
-    cardclashService.getDefinitionOverrides().then(data => {
+    vaultService.getDefinitionOverrides().then(data => {
       setDefOverrides(data.overrides || {})
     }).catch(() => {})
   }, [])

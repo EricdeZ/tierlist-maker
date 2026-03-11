@@ -6,7 +6,7 @@
 
 **Architecture:** New `cc_pack_inventory` table stores unopened packs. The `handleLoad` API returns inventory alongside existing data. Starter packs (2 OSL + 2 BSL) are granted on first visit via `ensureStats`. A new `open-inventory-pack` POST action deletes the row and generates cards via `openPack(skipPayment)`. The pack page toggle adds "MY PACKS" as the first option, showing inventory packs + unopened gifts.
 
-**Tech Stack:** PostgreSQL migration, Cloudflare Pages Function (existing `functions/api/cardclash.js`), React frontend (existing `CCPackShop.jsx`).
+**Tech Stack:** PostgreSQL migration, Cloudflare Pages Function (existing `functions/api/vault.js`), React frontend (existing `CCPackShop.jsx`).
 
 ---
 
@@ -15,11 +15,11 @@
 | File | Action | Responsibility |
 |------|--------|---------------|
 | `database/migrations/088-pack-inventory.sql` | Create | New table + seed starter packs for existing users |
-| `functions/lib/cardclash.js` | Modify | Add `grantStarterPacks()` helper, call from `ensureStats` |
-| `functions/api/cardclash.js` | Modify | Return inventory in `handleLoad`, add `open-inventory-pack` action |
-| `src/services/database.js` | Modify | Add `openInventoryPack()` to `cardclashService` |
-| `src/pages/cardclash/CardClashContext.jsx` | Modify | Add `inventory` state, `openInventoryPack` action |
-| `src/pages/cardclash/CCPackShop.jsx` | Modify | Add "MY PACKS" toggle + inventory view |
+| `functions/lib/vault.js` | Modify | Add `grantStarterPacks()` helper, call from `ensureStats` |
+| `functions/api/vault.js` | Modify | Return inventory in `handleLoad`, add `open-inventory-pack` action |
+| `src/services/database.js` | Modify | Add `openInventoryPack()` to `vaultService` |
+| `src/pages/vault/VaultContext.jsx` | Modify | Add `inventory` state, `openInventoryPack` action |
+| `src/pages/vault/CCPackShop.jsx` | Modify | Add "MY PACKS" toggle + inventory view |
 
 ---
 
@@ -70,10 +70,10 @@ git commit -m "feat: add cc_pack_inventory table with starter packs migration"
 ### Task 2: Backend — Starter Pack Grant + Inventory Query
 
 **Files:**
-- Modify: `functions/lib/cardclash.js` (add `grantStarterPacks`, export it)
-- Modify: `functions/api/cardclash.js` (return inventory in `handleLoad`, add `open-inventory-pack` action)
+- Modify: `functions/lib/vault.js` (add `grantStarterPacks`, export it)
+- Modify: `functions/api/vault.js` (return inventory in `handleLoad`, add `open-inventory-pack` action)
 
-- [ ] **Step 1: Add `grantStarterPacks` to `functions/lib/cardclash.js`**
+- [ ] **Step 1: Add `grantStarterPacks` to `functions/lib/vault.js`**
 
 After the existing `ensureStats` function (~line 314), add:
 
@@ -93,7 +93,7 @@ export async function grantStarterPacks(sql, userId) {
 }
 ```
 
-- [ ] **Step 2: Add inventory query + starter grant to `handleLoad` in `functions/api/cardclash.js`**
+- [ ] **Step 2: Add inventory query + starter grant to `handleLoad` in `functions/api/vault.js`**
 
 In `handleLoad` (~line 73), after `ensureStats(sql, user.id)` and `ensureEmberBalance(sql, user.id)`, add:
 
@@ -103,7 +103,7 @@ await grantStarterPacks(sql, user.id)
 
 Update the import at the top (~line 8) to include `grantStarterPacks`:
 ```js
-import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/cardclash.js'
+import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 ```
 
 Add `inventory` to the `Promise.all` array (~line 84):
@@ -131,7 +131,7 @@ inventory: inventory.map(i => ({
 })),
 ```
 
-- [ ] **Step 3: Add `open-inventory-pack` POST action in `functions/api/cardclash.js`**
+- [ ] **Step 3: Add `open-inventory-pack` POST action in `functions/api/vault.js`**
 
 Add to the POST switch (~line 61):
 ```js
@@ -176,7 +176,7 @@ async function handleOpenInventoryPack(sql, user, body) {
 - [ ] **Step 4: Commit**
 
 ```bash
-git add functions/lib/cardclash.js functions/api/cardclash.js
+git add functions/lib/vault.js functions/api/vault.js
 git commit -m "feat: pack inventory backend — starter packs, load inventory, open from inventory"
 ```
 
@@ -186,19 +186,19 @@ git commit -m "feat: pack inventory backend — starter packs, load inventory, o
 
 **Files:**
 - Modify: `src/services/database.js` (~line 1039, add method)
-- Modify: `src/pages/cardclash/CardClashContext.jsx`
+- Modify: `src/pages/vault/VaultContext.jsx`
 
-- [ ] **Step 1: Add `openInventoryPack` to `cardclashService` in `src/services/database.js`**
+- [ ] **Step 1: Add `openInventoryPack` to `vaultService` in `src/services/database.js`**
 
 After the `collectIncome` method (~line 1038), add:
 
 ```js
     openInventoryPack(inventoryId) {
-        return apiPost('cardclash', { action: 'open-inventory-pack' }, { inventoryId })
+        return apiPost('vault', { action: 'open-inventory-pack' }, { inventoryId })
     },
 ```
 
-- [ ] **Step 2: Add inventory state and action to `CardClashContext.jsx`**
+- [ ] **Step 2: Add inventory state and action to `VaultContext.jsx`**
 
 Add `inventory` state (~line 17, after `pendingTradeCount`):
 ```js
@@ -214,7 +214,7 @@ Add `openInventoryPack` callback (after `buyPack`, ~line 155):
 ```js
 const openInventoryPack = useCallback(async (inventoryId) => {
   try {
-    const result = await cardclashService.openInventoryPack(inventoryId)
+    const result = await vaultService.openInventoryPack(inventoryId)
     setCollection(prev => [...prev, ...result.cards])
     setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
     setInventory(prev => prev.filter(i => i.id !== inventoryId))
@@ -235,7 +235,7 @@ inventory, openInventoryPack,
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/services/database.js src/pages/cardclash/CardClashContext.jsx
+git add src/services/database.js src/pages/vault/VaultContext.jsx
 git commit -m "feat: pack inventory frontend service + context state"
 ```
 
@@ -244,7 +244,7 @@ git commit -m "feat: pack inventory frontend service + context state"
 ### Task 4: Pack Page UI — "My Packs" Toggle + Inventory View
 
 **Files:**
-- Modify: `src/pages/cardclash/CCPackShop.jsx`
+- Modify: `src/pages/vault/CCPackShop.jsx`
 
 - [ ] **Step 1: Update `PackShopRouter` to add "MY PACKS" toggle**
 
@@ -252,7 +252,7 @@ Replace the `PackShopRouter` component (~line 177-214) with a 3-way toggle:
 
 ```jsx
 export default function PackShopRouter() {
-  const { inventory, giftData } = useCardClash();
+  const { inventory, giftData } = useVault();
   const [mode, setMode] = useState('shop');
 
   // Count of openable packs: inventory items + unopened gifts
@@ -321,7 +321,7 @@ Add the `MyPacks` component in `CCPackShop.jsx` (before the `PackShop` function)
 
 ```jsx
 function MyPacks() {
-  const { inventory, openInventoryPack, giftData, openGift } = useCardClash();
+  const { inventory, openInventoryPack, giftData, openGift } = useVault();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(null); // inventoryId or giftId being opened
 
@@ -491,7 +491,7 @@ import { Package } from 'lucide-react'
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/cardclash/CCPackShop.jsx
+git add src/pages/vault/CCPackShop.jsx
 git commit -m "feat: My Packs tab with inventory + gift packs display"
 ```
 

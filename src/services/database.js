@@ -978,7 +978,7 @@ export const emberService = {
     },
 }
 
-export const cardclashService = {
+export const vaultService = {
     async load() {
         return apiCall('vault', { action: 'load' })
     },
@@ -1179,7 +1179,7 @@ export const vendingRestockService = {
     },
 }
 
-export const cardclashAdminService = {
+export const vaultAdminService = {
     async getStats() {
         return apiCall('vault-admin', { action: 'stats' })
     },

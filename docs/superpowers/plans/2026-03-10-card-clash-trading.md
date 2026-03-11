@@ -8,7 +8,7 @@
 
 **Tech Stack:** PostgreSQL (Neon), Cloudflare Pages Functions, React, Tailwind CSS 4, lucide-react icons.
 
-**Spec:** `docs/superpowers/specs/2026-03-10-card-clash-trading-design.md`
+**Spec:** `docs/superpowers/specs/2026-03-10-vault-trading-design.md`
 
 ---
 
@@ -73,7 +73,7 @@ Run against your local/dev database:
 
 ```bash
 git add database/migrations/084-trading.sql
-git commit -m "feat(cardclash): add trading tables migration"
+git commit -m "feat(vault): add trading tables migration"
 ```
 
 ---
@@ -109,7 +109,7 @@ export async function isCardInTrade(sql, cardId) {
   return !!row
 }
 
-// Expire stale trades (called on poll and on CardClash load)
+// Expire stale trades (called on poll and on Vault load)
 export async function expireStale(sql) {
   await sql`
     UPDATE cc_trades
@@ -492,7 +492,7 @@ export async function pollTrade(sql, userId, tradeId) {
 
 ```bash
 git add functions/lib/trading.js
-git commit -m "feat(cardclash): add trading library with core logic"
+git commit -m "feat(vault): add trading library with core logic"
 ```
 
 ---
@@ -769,7 +769,7 @@ export const onRequest = adapt(handler)
 
 ```bash
 git add functions/api/trading.js
-git commit -m "feat(cardclash): add trading API endpoint"
+git commit -m "feat(vault): add trading API endpoint"
 ```
 
 ---
@@ -777,12 +777,12 @@ git commit -m "feat(cardclash): add trading API endpoint"
 ### Task 4: Cross-Cutting Backend Changes
 
 **Files:**
-- Modify: `functions/api/cardclash.js` (handleLoad — add pendingTradeCount + expire stale trades)
+- Modify: `functions/api/vault.js` (handleLoad — add pendingTradeCount + expire stale trades)
 - Modify: `functions/lib/marketplace.js` (createListing — add trade lock check)
 
-- [ ] **Step 1: Add pendingTradeCount to cardclash handleLoad**
+- [ ] **Step 1: Add pendingTradeCount to vault handleLoad**
 
-In `functions/api/cardclash.js`, inside `handleLoad`, add to the `Promise.all`:
+In `functions/api/vault.js`, inside `handleLoad`, add to the `Promise.all`:
 
 ```js
 // Add after the existing 5 queries in the Promise.all:
@@ -828,8 +828,8 @@ if (tradeLock) throw new Error('Card is locked in an active trade')
 - [ ] **Step 3: Commit**
 
 ```bash
-git add functions/api/cardclash.js functions/lib/marketplace.js
-git commit -m "feat(cardclash): add trade count to load, trade lock to marketplace"
+git add functions/api/vault.js functions/lib/marketplace.js
+git commit -m "feat(vault): add trade count to load, trade lock to marketplace"
 ```
 
 ---
@@ -890,26 +890,26 @@ export const tradingService = {
 
 ```bash
 git add src/services/database.js
-git commit -m "feat(cardclash): add tradingService to API client"
+git commit -m "feat(vault): add tradingService to API client"
 ```
 
 ---
 
-### Task 6: CardClash Context + Page Integration
+### Task 6: Vault Context + Page Integration
 
 **Files:**
-- Modify: `src/pages/cardclash/CardClashContext.jsx` (add `pendingTradeCount`)
-- Modify: `src/pages/CardClashPage.jsx` (add Trade tab with badge)
+- Modify: `src/pages/vault/VaultContext.jsx` (add `pendingTradeCount`)
+- Modify: `src/pages/VaultPage.jsx` (add Trade tab with badge)
 
-- [ ] **Step 1: Add pendingTradeCount to CardClashContext**
+- [ ] **Step 1: Add pendingTradeCount to VaultContext**
 
-In `CardClashContext.jsx`, add state:
+In `VaultContext.jsx`, add state:
 
 ```js
 const [pendingTradeCount, setPendingTradeCount] = useState(0)
 ```
 
-In the `useEffect` that calls `cardclashService.load()`, set it:
+In the `useEffect` that calls `vaultService.load()`, set it:
 
 ```js
 setPendingTradeCount(ccData.pendingTradeCount || 0)
@@ -921,9 +921,9 @@ Add to the Provider value:
 pendingTradeCount, setPendingTradeCount,
 ```
 
-- [ ] **Step 2: Add Trade tab to CardClashPage**
+- [ ] **Step 2: Add Trade tab to VaultPage**
 
-In `CardClashPage.jsx`:
+In `VaultPage.jsx`:
 
 Add import:
 ```js
@@ -932,7 +932,7 @@ import { Handshake } from 'lucide-react'
 
 Add lazy component:
 ```js
-const CCTrading = lazy(() => import('./cardclash/CCTrading'))
+const CCTrading = lazy(() => import('./vault/CCTrading'))
 ```
 
 Add to `TABS` array (after `market`):
@@ -945,10 +945,10 @@ Add to `TAB_COMPONENTS`:
 trade: CCTrading,
 ```
 
-For the badge, update the tab button rendering to show a notification dot when `pendingTradeCount > 0`. In the `CardClashInner` component, get `pendingTradeCount` from context:
+For the badge, update the tab button rendering to show a notification dot when `pendingTradeCount > 0`. In the `VaultInner` component, get `pendingTradeCount` from context:
 
 ```js
-const { testMode, setTestMode, loading, loaded, pendingTradeCount } = useCardClash()
+const { testMode, setTestMode, loading, loaded, pendingTradeCount } = useVault()
 ```
 
 In the tab button, after the icon + label, add:
@@ -962,8 +962,8 @@ In the tab button, after the icon + label, add:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/cardclash/CardClashContext.jsx src/pages/CardClashPage.jsx
-git commit -m "feat(cardclash): add Trade tab with pending badge"
+git add src/pages/vault/VaultContext.jsx src/pages/VaultPage.jsx
+git commit -m "feat(vault): add Trade tab with pending badge"
 ```
 
 ---
@@ -971,11 +971,11 @@ git commit -m "feat(cardclash): add Trade tab with pending badge"
 ### Task 7: CCTrading.jsx — Main Trading Page
 
 **Files:**
-- Create: `src/pages/cardclash/CCTrading.jsx`
+- Create: `src/pages/vault/CCTrading.jsx`
 
 This is the largest frontend file. It has three sub-views: inbox (default), trade room (when in a trade), and history. The trade room polls every 3 seconds.
 
-Reference: `src/pages/cardclash/CCMarketplace.jsx` for view-switching pattern, button styles, error/success display, and card rendering.
+Reference: `src/pages/vault/CCMarketplace.jsx` for view-switching pattern, button styles, error/success display, and card rendering.
 
 - [ ] **Step 1: Create CCTrading with inbox view and user search modal**
 
@@ -985,15 +985,15 @@ The inbox shows pending invites and a "Start Trade" button that opens a user sea
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
-import { useCardClash } from './CardClashContext'
+import { useVault } from './VaultContext'
 import { tradingService } from '../../services/database'
-import { RARITIES } from '../../data/cardclash/economy'
+import { RARITIES } from '../../data/vault/economy'
 import { Search, X, Handshake, Clock, Loader2, Check, ArrowRightLeft, Plus, History } from 'lucide-react'
 
 export default function CCTrading() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, pendingTradeCount, setPendingTradeCount } = useCardClash()
+  const { collection, pendingTradeCount, setPendingTradeCount } = useVault()
 
   const [view, setView] = useState('inbox') // 'inbox' | 'room' | 'history'
   const [pending, setPending] = useState([])
@@ -1701,8 +1701,8 @@ function TradeCardSlot({ card, onRemove, disabled }) {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/pages/cardclash/CCTrading.jsx
-git commit -m "feat(cardclash): add trading page with inbox, trade room, and history"
+git add src/pages/vault/CCTrading.jsx
+git commit -m "feat(vault): add trading page with inbox, trade room, and history"
 ```
 
 ---
@@ -1792,5 +1792,5 @@ Delete the `getPlayerCoreCol` and `getPlayerReadyCol` helpers.
 
 ```bash
 git add functions/lib/trading.js
-git commit -m "fix(cardclash): use conditional queries for dynamic trade columns"
+git commit -m "fix(vault): use conditional queries for dynamic trade columns"
 ```

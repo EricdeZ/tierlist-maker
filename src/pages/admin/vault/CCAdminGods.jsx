@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { GODS, CLASS_ROLE, CLASS_DAMAGE, ABILITY_TYPES } from '../../../data/vault/gods'
 import { RARITIES } from '../../../data/vault/economy'
-import { cardclashAdminService } from '../../../services/database'
+import { vaultAdminService } from '../../../services/database'
 import GameCard from '../../vault/components/GameCard'
 
 const CLASSES = ['All', 'Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter']
@@ -17,7 +17,7 @@ export default function CCAdminGods() {
   const [overrides, setOverrides] = useState({})
 
   useEffect(() => {
-    cardclashAdminService.getDefinitionOverrides('god').then(data => {
+    vaultAdminService.getDefinitionOverrides('god').then(data => {
       const map = {}
       for (const o of (data.overrides || [])) {
         map[o.definitionId] = o.metadata
@@ -56,7 +56,7 @@ export default function CCAdminGods() {
   }, [])
 
   const handleSaveOverride = async (god, metadata) => {
-    await cardclashAdminService.saveDefinitionOverride('god', god.slug, metadata)
+    await vaultAdminService.saveDefinitionOverride('god', god.slug, metadata)
     setOverrides(prev => ({ ...prev, [god.slug]: metadata }))
   }
 

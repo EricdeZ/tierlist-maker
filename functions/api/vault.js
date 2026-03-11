@@ -80,7 +80,7 @@ const handler = async (event) => {
 
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
   } catch (error) {
-    console.error('cardclash error:', error)
+    console.error('vault error:', error)
     return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
   }
 }

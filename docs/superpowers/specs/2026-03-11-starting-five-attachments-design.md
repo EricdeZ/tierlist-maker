@@ -105,7 +105,7 @@ New export: `getSlotRates(playerCard, godCard, itemCard)` that returns `{ passio
 
 ## API Changes
 
-All on existing `/api/cardclash` endpoint:
+All on existing `/api/vault` endpoint:
 
 ### Modified Actions
 
@@ -201,7 +201,7 @@ for (const row of rows) {
 - **Unslotting a player** also clears its `god_card_id` and `item_card_id` in the same UPDATE
 - **Swapping a player** for a different one: after replacing the player card, check each attachment's rarity against the new player's rarity. Clear any attachment that no longer meets the floor. This check happens inside `slotCard()` after the UPSERT.
 - **Selling/dismantling** a card that's an attachment auto-removes it via `ON DELETE SET NULL`
-- **Dismantling** validation: the existing check in `cardclash.js` that prevents dismantling slotted cards must expand its query to also check `god_card_id` and `item_card_id`
+- **Dismantling** validation: the existing check in `vault.js` that prevents dismantling slotted cards must expand its query to also check `god_card_id` and `item_card_id`
 
 ### Cross-cutting cc_lineups queries
 
@@ -211,11 +211,11 @@ All existing queries that check if a card is in `cc_lineups` must be updated to 
 - **Marketplace purchase** (`marketplace.js`): clearing lineup on ownership transfer must also `SET god_card_id = NULL WHERE god_card_id = ANY(...)` and same for `item_card_id`
 - **Trading validation** (`trading.js`): check all three columns when verifying cards aren't slotted
 - **Trade execution** (`trading.js`): clear all three column references on ownership transfer
-- **Dismantle** (`cardclash.js`): expand the NOT EXISTS check to cover all three columns
+- **Dismantle** (`vault.js`): expand the NOT EXISTS check to cover all three columns
 
 ## Frontend Changes
 
-### Context Updates (CardClashContext)
+### Context Updates (VaultContext)
 
 - `slotS5Card(cardId, role)` → `slotS5Card(cardId, role, slotType = 'player')` — add slotType param
 - Add `unslotS5Attachment(role, slotType)` for removing god/item attachments

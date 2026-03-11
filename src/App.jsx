@@ -113,8 +113,8 @@ function App() {
                         <Route path="snooz/:week" element={<SnoozOverlay />} />
 
                         {/* Card Clash share — standalone, no app chrome */}
-                        <Route path="cardclash/share/:token" element={<CardSharePage />} />
-                        <Route path="cardclash/binder/:token" element={<Suspense fallback={null}><BinderSharePage /></Suspense>} />
+                        <Route path="vault/share/:token" element={<CardSharePage />} />
+                        <Route path="vault/binder/:token" element={<Suspense fallback={null}><BinderSharePage /></Suspense>} />
 
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector */}
@@ -156,7 +156,7 @@ function App() {
                                 <Route path="community-teams" element={<ProtectedRoute requiredPermission="league_manage"><CommunityTeamAdmin /></ProtectedRoute>} />
                                 <Route path="scrim-admin" element={<ProtectedRoute requiredPermission="league_manage"><ScrimAdmin /></ProtectedRoute>} />
                                 <Route path="card-preview" element={<ProtectedRoute requiredPermission="permission_manage"><CardPreview /></ProtectedRoute>} />
-                                <Route path="vault" element={<ProtectedRoute requiredPermission="vault_manage"><VaultAdmin /></ProtectedRoute>} />
+                                <Route path="vault" element={<ProtectedRoute requiredPermission="cardclash_manage"><VaultAdmin /></ProtectedRoute>} />
                                 <Route path="vending-restock" element={<ProtectedRoute requiredPermission="permission_manage"><VendingRestock /></ProtectedRoute>} />
                                 <Route path="pack-creator" element={<ProtectedRoute requiredPermission="permission_manage"><PackCreator /></ProtectedRoute>} />
                                 <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />

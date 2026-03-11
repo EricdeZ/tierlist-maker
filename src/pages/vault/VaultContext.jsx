@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
-import { cardclashService, emberService } from '../../services/database'
+import { vaultService, emberService } from '../../services/database'
 
 const VaultContext = createContext(null)
 
@@ -28,8 +28,8 @@ export function VaultProvider({ children }) {
     let cancelled = false
     setLoading(true)
     Promise.all([
-      cardclashService.load(),
-      cardclashService.getDefinitionOverrides().catch(() => ({ overrides: {} })),
+      vaultService.load(),
+      vaultService.getDefinitionOverrides().catch(() => ({ overrides: {} })),
     ]).then(([ccData, overridesData]) => {
       if (cancelled) return
       setCollection(ccData.collection || [])
@@ -67,7 +67,7 @@ export function VaultProvider({ children }) {
 
   const refreshCollection = useCallback(async () => {
     try {
-      const ccData = await cardclashService.load()
+      const ccData = await vaultService.load()
       setCollection(ccData.collection || [])
     } catch (err) {
       console.error('Failed to refresh collection:', err)
@@ -76,7 +76,7 @@ export function VaultProvider({ children }) {
 
   const refreshGifts = useCallback(async () => {
     try {
-      const data = await cardclashService.loadGifts()
+      const data = await vaultService.loadGifts()
       setGiftData(data)
     } catch (err) {
       console.error('Failed to load gifts:', err)
@@ -88,13 +88,13 @@ export function VaultProvider({ children }) {
   }, [loaded, refreshGifts])
 
   const sendGift = useCallback(async (recipientId, message, packType = 'gift') => {
-    const result = await cardclashService.sendGift(recipientId, message, packType)
+    const result = await vaultService.sendGift(recipientId, message, packType)
     await refreshGifts()
     return result
   }, [refreshGifts])
 
   const openGift = useCallback(async (giftId) => {
-    const result = await cardclashService.openGift(giftId)
+    const result = await vaultService.openGift(giftId)
     setCollection(prev => [...prev, ...result.cards])
     setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
     await refreshGifts()
@@ -102,12 +102,12 @@ export function VaultProvider({ children }) {
   }, [refreshGifts])
 
   const markGiftsSeen = useCallback(async () => {
-    await cardclashService.markGiftsSeen()
+    await vaultService.markGiftsSeen()
     setGiftData(prev => ({ ...prev, unseenCount: 0, received: prev.received.map(g => ({ ...g, seen: true })) }))
   }, [])
 
   const buyGiftPack = useCallback(async (packType) => {
-    const result = await cardclashService.buyGiftPack(packType)
+    const result = await vaultService.buyGiftPack(packType)
     setGiftData(prev => ({ ...prev, giftInventory: result.giftInventory }))
     passionCtx?.refreshBalance?.()
     return result
@@ -115,7 +115,7 @@ export function VaultProvider({ children }) {
 
   const loadBinder = useCallback(async () => {
     try {
-      const data = await cardclashService.loadBinder()
+      const data = await vaultService.loadBinder()
       setBinder(data.binder)
       setBinderCards(data.cards || [])
     } catch (err) {
@@ -124,29 +124,29 @@ export function VaultProvider({ children }) {
   }, [])
 
   const saveBinder = useCallback(async (name, color) => {
-    await cardclashService.saveBinder(name, color)
+    await vaultService.saveBinder(name, color)
     setBinder(prev => ({ ...prev, name, color }))
   }, [])
 
   const binderSlotCard = useCallback(async (cardId, page, slot) => {
-    await cardclashService.binderSlot(cardId, page, slot)
+    await vaultService.binderSlot(cardId, page, slot)
     await loadBinder()
   }, [loadBinder])
 
   const binderUnslotCard = useCallback(async (page, slot) => {
-    await cardclashService.binderUnslot(page, slot)
+    await vaultService.binderUnslot(page, slot)
     setBinderCards(prev => prev.filter(c => !(c.page === page && c.slot === slot)))
   }, [])
 
   const binderGenerateShare = useCallback(async () => {
-    const data = await cardclashService.binderGenerateShare()
+    const data = await vaultService.binderGenerateShare()
     setBinder(prev => ({ ...prev, shareToken: data.shareToken }))
     return data.shareToken
   }, [])
 
   const loadStartingFive = useCallback(async () => {
     try {
-      const data = await cardclashService.loadStartingFive()
+      const data = await vaultService.loadStartingFive()
       setStartingFive(data)
     } catch (err) {
       console.error('Failed to load Starting 5:', err)
@@ -154,32 +154,32 @@ export function VaultProvider({ children }) {
   }, [])
 
   const slotS5Card = useCallback(async (cardId, role, slotType = 'player') => {
-    const data = await cardclashService.slotCard(cardId, role, slotType)
+    const data = await vaultService.slotCard(cardId, role, slotType)
     setStartingFive(data)
     return data
   }, [])
 
   const unslotS5Card = useCallback(async (role) => {
-    const data = await cardclashService.unslotCard(role)
+    const data = await vaultService.unslotCard(role)
     setStartingFive(data)
     return data
   }, [])
 
   const unslotS5Attachment = useCallback(async (role, slotType) => {
-    const data = await cardclashService.unslotAttachment(role, slotType)
+    const data = await vaultService.unslotAttachment(role, slotType)
     setStartingFive(data)
     return data
   }, [])
 
   const collectS5Income = useCallback(async () => {
-    const data = await cardclashService.collectIncome()
+    const data = await vaultService.collectIncome()
     setStartingFive(data)
     await passionCtx?.refreshBalance?.()
     return data
   }, [passionCtx])
 
   const boostS5WithConsumable = useCallback(async (cardId) => {
-    const data = await cardclashService.useConsumable(cardId)
+    const data = await vaultService.useConsumable(cardId)
     setStartingFive(data)
     setCollection(prev => prev.filter(c => c.id !== data.consumedCardId))
     return data
@@ -193,7 +193,7 @@ export function VaultProvider({ children }) {
   }, [loaded, loadStartingFive, loadBinder])
 
   const dismantleCards = useCallback(async (cardIds) => {
-    const result = await cardclashService.dismantleCards(cardIds)
+    const result = await vaultService.dismantleCards(cardIds)
     setCollection(prev => prev.filter(c => !cardIds.includes(c.id)))
     passionCtx?.refreshBalance?.()
     return result
@@ -217,7 +217,7 @@ export function VaultProvider({ children }) {
 
   const buyPack = useCallback(async (packType) => {
     try {
-      const result = await cardclashService.openPack(packType)
+      const result = await vaultService.openPack(packType)
       setCollection(prev => [...prev, ...result.cards])
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
       passionCtx?.refreshBalance?.()
@@ -230,7 +230,7 @@ export function VaultProvider({ children }) {
 
   const openInventoryPack = useCallback(async (inventoryId) => {
     try {
-      const result = await cardclashService.openInventoryPack(inventoryId)
+      const result = await vaultService.openInventoryPack(inventoryId)
       setCollection(prev => [...prev, ...result.cards])
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
       setInventory(prev => prev.filter(i => i.id !== inventoryId))
@@ -246,7 +246,7 @@ export function VaultProvider({ children }) {
     try {
       const sale = salePacks.find(s => s.id === saleId)
       if (!sale) throw new Error('Sale not found')
-      const result = await cardclashService.openSalePack(saleId, sale.packTypeId)
+      const result = await vaultService.openSalePack(saleId, sale.packTypeId)
       setCollection(prev => [...prev, ...result.cards])
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
       setSalePacks(prev => prev.map(s =>

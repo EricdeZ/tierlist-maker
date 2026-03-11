@@ -16,7 +16,7 @@
 |------|--------|---------------|
 | `database/migrations/087-pack-types-slots.sql` | Create | Add `slots`, `division_ids`, `color` columns to `cc_pack_types` |
 | `functions/api/pack-creator.js` | Create | Admin CRUD endpoint for pack types (permission_manage) |
-| `functions/lib/cardclash.js` | Modify | Add `generateConfiguredPack()`, update `openPack()` routing, add `generatePlayerCardByDivisions()` |
+| `functions/lib/vault.js` | Modify | Add `generateConfiguredPack()`, update `openPack()` routing, add `generatePlayerCardByDivisions()` |
 | `src/pages/admin/PackCreator.jsx` | Create | Admin page: list pack types, create/edit form with slot builder |
 | `src/services/database.js` | Modify | Add `packCreatorService` |
 | `src/App.jsx` | Modify | Import + route |
@@ -54,7 +54,7 @@ Expected: ALTER TABLE x3, COMMENT x3
 ### Task 2: Backend Pack Generator
 
 **Files:**
-- Modify: `functions/lib/cardclash.js`
+- Modify: `functions/lib/vault.js`
 
 The key change: add `generateConfiguredPack(sql, pack)` that reads `pack.slots` JSONB and generates cards per-slot. Also add `generatePlayerCardByDivisions(sql, rarity, divisionIds)` for division-filtered player cards.
 

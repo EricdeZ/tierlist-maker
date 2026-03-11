@@ -15,15 +15,15 @@
 ### Task 1: Create VaultTabBar component
 
 **Files:**
-- Create: `src/pages/cardclash/VaultTabBar.jsx`
-- Modify: `src/pages/CardClashPage.jsx:97-138`
+- Create: `src/pages/vault/VaultTabBar.jsx`
+- Modify: `src/pages/VaultPage.jsx:97-138`
 
 This is the most impactful change. At <1400px, hide the existing horizontal top tabs and show a fixed bottom tab bar with 4 primary tabs + a "More" menu.
 
 - [ ] **Step 1: Create VaultTabBar.jsx**
 
 ```jsx
-// src/pages/cardclash/VaultTabBar.jsx
+// src/pages/vault/VaultTabBar.jsx
 import { useState } from 'react'
 import { Package, Users, Library, Store, MoreHorizontal, X } from 'lucide-react'
 
@@ -146,23 +146,23 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
 }
 ```
 
-- [ ] **Step 2: Wire VaultTabBar into CardClashPage.jsx**
+- [ ] **Step 2: Wire VaultTabBar into VaultPage.jsx**
 
-In `CardClashPage.jsx`, replace the existing tab bar section (lines 107-138) with a conditional render:
+In `VaultPage.jsx`, replace the existing tab bar section (lines 107-138) with a conditional render:
 - At >=1400px (`hidden 2xl:flex` — we'll use a custom `vault` breakpoint at 1400px): show existing horizontal tabs
 - At <1400px (`2xl:hidden`): show VaultTabBar at bottom
 
 Since Tailwind 4 doesn't have a 1400px breakpoint by default, use the existing `--breakpoint-sidebar: 87.5rem` (1400px) from `index.css`, which maps to `sidebar:` prefix.
 
-Modify `CardClashInner` in `CardClashPage.jsx`:
+Modify `VaultInner` in `VaultPage.jsx`:
 
 ```jsx
 // After the VaultHeroBanner div, replace the <main> content:
 
 // Add import at top:
-import VaultTabBar from './cardclash/VaultTabBar'
+import VaultTabBar from './vault/VaultTabBar'
 
-// In CardClashInner, replace the tab switcher div (lines 107-138) with:
+// In VaultInner, replace the tab switcher div (lines 107-138) with:
 
 {/* Desktop tab switcher — hidden below 1400px */}
 <div className="relative z-10 hidden sidebar:flex items-center gap-6 border-b border-[var(--cd-border)] pb-0">
@@ -202,7 +202,7 @@ The `--breakpoint-sidebar: 87.5rem` is already in `src/index.css`. Tailwind 4 au
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/pages/cardclash/VaultTabBar.jsx src/pages/CardClashPage.jsx
+git add src/pages/vault/VaultTabBar.jsx src/pages/VaultPage.jsx
 git commit -m "feat: add responsive bottom tab bar for vault at <1400px"
 ```
 
@@ -213,7 +213,7 @@ git commit -m "feat: add responsive bottom tab bar for vault at <1400px"
 ### Task 2: Make CCPackShop responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCPackShop.jsx:314-511`
+- Modify: `src/pages/vault/CCPackShop.jsx:314-511`
 
 The pack shop currently uses a centered row with animated focus/zoom to viewport center + fixed info panel to the right. On mobile (<640px), this doesn't work. Replace with horizontal snap scroll where each pack fills the viewport, info + buy button below.
 
@@ -320,7 +320,7 @@ Run dev server, test at mobile width:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/pages/cardclash/CCPackShop.jsx
+git add src/pages/vault/CCPackShop.jsx
 git commit -m "feat: fullscreen scrollable pack cards on mobile"
 ```
 
@@ -331,7 +331,7 @@ git commit -m "feat: fullscreen scrollable pack cards on mobile"
 ### Task 3: Make CCPackSale responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/vendingmachine.css`
+- Modify: `src/pages/vault/vendingmachine.css`
 
 The vending machine is 520px wide in the alley scene. On mobile, scale it down and hide the alley SVG buildings.
 
@@ -452,7 +452,7 @@ Append to `vendingmachine.css` before the reduced-motion section (before line 80
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/cardclash/vendingmachine.css
+git add src/pages/vault/vendingmachine.css
 git commit -m "feat: responsive vending machine scaling for mobile/tablet"
 ```
 
@@ -463,7 +463,7 @@ git commit -m "feat: responsive vending machine scaling for mobile/tablet"
 ### Task 4: Make CCStartingFive responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCStartingFive.jsx:224-436`
+- Modify: `src/pages/vault/CCStartingFive.jsx:224-436`
 
 The Starting 5 has two problem areas: the income dashboard and the 5-column role grid.
 
@@ -576,7 +576,7 @@ className="relative w-full max-w-2xl sm:max-h-[80vh] max-h-[100dvh] bg-[var(--cd
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/pages/cardclash/CCStartingFive.jsx
+git add src/pages/vault/CCStartingFive.jsx
 git commit -m "feat: responsive Starting 5 with grid breakpoints and scaled cards"
 ```
 
@@ -587,7 +587,7 @@ git commit -m "feat: responsive Starting 5 with grid breakpoints and scaled card
 ### Task 5: Make CCCollection responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCCollection.jsx:248-300`
+- Modify: `src/pages/vault/CCCollection.jsx:248-300`
 
 The main issue is the fixed `w-52` sidebar. On mobile, convert it to a horizontal scrollable filter strip or a dropdown.
 
@@ -661,14 +661,14 @@ Replace the `flex gap-6` wrapper (line 248) with responsive layout:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/pages/cardclash/CCCollection.jsx
+git add src/pages/vault/CCCollection.jsx
 git commit -m "feat: responsive collection sidebar as horizontal pills on mobile"
 ```
 
 ### Task 6: Make CCMarketplace responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCMarketplace.jsx`
+- Modify: `src/pages/vault/CCMarketplace.jsx`
 
 The marketplace has filters + card grid. Apply same pill pattern for filters on mobile, and scale card sizes.
 
@@ -690,14 +690,14 @@ For the "Create listing" section, ensure the card selection grid wraps properly 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CCMarketplace.jsx
+git add src/pages/vault/CCMarketplace.jsx
 git commit -m "feat: responsive marketplace card grid"
 ```
 
 ### Task 7: Make CCTrading responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCTrading.jsx`
+- Modify: `src/pages/vault/CCTrading.jsx`
 
 The trading room shows both users' card collections side-by-side. On mobile, this needs to stack or use tabs.
 
@@ -714,14 +714,14 @@ This stacks the two collection panels vertically on mobile/tablet. Each panel fi
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CCTrading.jsx
+git add src/pages/vault/CCTrading.jsx
 git commit -m "feat: responsive trading room layout"
 ```
 
 ### Task 8: Make CCDismantle responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCDismantle.jsx`
+- Modify: `src/pages/vault/CCDismantle.jsx`
 
 - [ ] **Step 1: Responsive card grid**
 
@@ -737,14 +737,14 @@ className="sticky bottom-20 sm:bottom-0 ..."
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CCDismantle.jsx
+git add src/pages/vault/CCDismantle.jsx
 git commit -m "feat: responsive dismantle page with sticky action bar"
 ```
 
 ### Task 9: Make CCGifts responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCGifts.jsx`
+- Modify: `src/pages/vault/CCGifts.jsx`
 
 - [ ] **Step 1: Responsive adjustments**
 
@@ -753,14 +753,14 @@ The gifts page has internal tabs (Received/Send/Sent) and gift card grids. The i
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CCGifts.jsx
+git add src/pages/vault/CCGifts.jsx
 git commit -m "feat: responsive gifts page"
 ```
 
 ### Task 10: Make CCCardCatalog responsive
 
 **Files:**
-- Modify: `src/pages/cardclash/CCCardCatalog.jsx`
+- Modify: `src/pages/vault/CCCardCatalog.jsx`
 
 - [ ] **Step 1: Responsive card grid**
 
@@ -769,7 +769,7 @@ Same pattern as collection — ensure filters work as horizontal pills and card 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/pages/cardclash/CCCardCatalog.jsx
+git add src/pages/vault/CCCardCatalog.jsx
 git commit -m "feat: responsive catalog page"
 ```
 
@@ -780,7 +780,7 @@ git commit -m "feat: responsive catalog page"
 ### Task 11: Add safe bottom padding for tab bar
 
 **Files:**
-- Modify: `src/pages/CardClashPage.jsx`
+- Modify: `src/pages/VaultPage.jsx`
 
 - [ ] **Step 1: Bottom padding for tab bar**
 
