@@ -117,16 +117,20 @@
   cursor: default;
 }
 
-/* ── Card in slot ── */
-.binder-slot .game-card {
+/* ── Card in slot — force both GameCard and TradingCard to fill the pocket ── */
+.binder-slot .game-card,
+.binder-slot .trading-card {
   width: 100% !important;
   height: 100% !important;
   aspect-ratio: auto;
   border-radius: 6px;
+  flex-shrink: 1;
 }
 
-.binder-slot .game-card:hover {
+.binder-slot .game-card:hover,
+.binder-slot .trading-card:hover {
   transform: none;
+  box-shadow: none;
 }
 
 /* ── Page number ── */
