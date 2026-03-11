@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Flame, Snowflake, Crown } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
+import passiontailsImg from '../../assets/passion/passiontails.png'
 import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
@@ -23,7 +24,7 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const navigate = useNavigate()
-    const avatarUrl = usePlayerAvatar(player)
+    const { avatarUrl, isPassionless } = usePlayerAvatar(player)
     const forgeProfileUrl = isLeagueWide && player.divisionSlug
         ? `/forge/${leagueSlug}/${player.divisionSlug}/player/${player.playerSlug}?from=all`
         : seasonSlugs
@@ -85,15 +86,18 @@ export default function ForgePlayerCard({ player, selected, marketStatus, userTe
                 {/* Top row: avatar + name */}
                 <div className="flex items-center gap-2.5 mb-2.5">
                     <div
-                        className="w-12 h-12 flex-shrink-0 forge-clip-hex flex items-center justify-center font-extrabold text-xs text-white"
+                        className="w-12 h-12 flex-shrink-0 forge-clip-hex flex items-center justify-center font-extrabold text-xs text-white overflow-hidden"
                         style={{
                             background: avatarUrl
                                 ? `url(${avatarUrl}) center/cover`
-                                : `linear-gradient(135deg, ${teamColor}80, ${teamColor})`,
+                                : isPassionless
+                                    ? '#1a1a1a'
+                                    : `linear-gradient(135deg, ${teamColor}80, ${teamColor})`,
                             textShadow: '0 1px 4px rgba(0,0,0,0.5)',
                         }}
                     >
-                        {!avatarUrl && initials}
+                        {!avatarUrl && isPassionless && <img src={passiontailsImg} alt="" className="w-full h-full opacity-50 object-contain" />}
+                        {!avatarUrl && !isPassionless && initials}
                     </div>
                     <div>
                         <a

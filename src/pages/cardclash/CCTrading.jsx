@@ -1324,6 +1324,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
                 leagueName={cardData?.leagueName || ''}
                 divisionName={cardData?.divisionName || ''}
                 stats={EMPTY_STATS}
+                bestGod={card.bestGodName ? { name: card.bestGodName } : (cardData?.bestGod || null)}
                 isFirstEdition={cardData?.isFirstEdition}
                 isConnected={cardData?.isConnected}
                 size={105}
@@ -1601,6 +1602,7 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
               leagueName={cardData?.leagueName || ''}
               divisionName={cardData?.divisionName || ''}
               stats={EMPTY_STATS}
+              bestGod={card.bestGodName ? { name: card.bestGodName } : (cardData?.bestGod || null)}
               isFirstEdition={cardData?.isFirstEdition}
               isConnected={cardData?.isConnected}
               size={100}
@@ -1675,6 +1677,7 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
             leagueName={cardData?.leagueName || ''}
             divisionName={cardData?.divisionName || ''}
             stats={EMPTY_STATS}
+            bestGod={card.bestGodName ? { name: card.bestGodName } : (cardData?.bestGod || null)}
             isFirstEdition={card.isFirstEdition || false}
             isConnected={cardData?.isConnected}
             size={cardSize}

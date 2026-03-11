@@ -58,9 +58,11 @@ async function handleList(sql, params) {
     SELECT l.id, l.seller_id, l.card_id, l.core_price, l.created_at,
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
+           d.best_god_name,
            u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id
     FROM cc_market_listings l
     JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     JOIN users u ON l.seller_id = u.id
     WHERE l.status = 'active'
     ORDER BY l.created_at DESC
@@ -116,9 +118,11 @@ async function handleMyListings(sql, user) {
   const rows = await sql`
     SELECT l.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
+           d.best_god_name,
            bu.discord_username AS buyer_name
     FROM cc_market_listings l
     JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     LEFT JOIN users bu ON l.buyer_id = bu.id
     WHERE l.seller_id = ${user.id}
     ORDER BY
@@ -225,11 +229,13 @@ function formatListing(row) {
       role: row.role,
       rarity: row.rarity,
       holoEffect: row.holo_effect,
-      imageUrl: row.image_url,
+      imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
+        ? '' : row.image_url,
       cardType: row.card_type,
       cardData: row.card_data,
       serialNumber: row.serial_number,
       defId: row.def_id,
+      bestGodName: row.best_god_name || null,
     },
   }
 }

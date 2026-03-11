@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { globalPlayerService, profileService } from '../../services/database'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
+import PlayerAvatar from '../../components/PlayerAvatar'
 import { RARITIES, getHoloEffect } from '../../data/cardclash/economy'
 import { Search, Loader2, User } from 'lucide-react'
 
@@ -127,13 +128,17 @@ export default function CCPlayerCards() {
           {/* Player info header */}
           <div className="cd-panel cd-corners flex items-center gap-4 mb-6 p-4 rounded-xl relative overflow-hidden">
             <div className="cd-data-overlay" />
-            <div className="w-12 h-12 rounded-full bg-[var(--cd-edge)] flex items-center justify-center overflow-hidden ring-1 ring-[var(--cd-cyan-dim)] relative z-1">
-              {cardProps.avatarUrl ? (
-                <img src={cardProps.avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-6 h-6 text-[var(--cd-text-dim)]" />
-              )}
-            </div>
+            <PlayerAvatar
+              discordId={cardProps._discordId}
+              discordAvatar={cardProps._discordAvatar}
+              isConnected={cardProps.isConnected}
+              mostPlayedGod={cardProps._mostPlayedGod}
+              playerName={cardProps.playerName}
+              teamColor={cardProps.teamColor}
+              allowDiscordAvatar={cardProps._allowDiscordAvatar}
+              size={48}
+              className="ring-1 ring-[var(--cd-cyan-dim)] relative z-1"
+            />
             <div className="relative z-1">
               <h2 className="text-lg font-bold cd-head" style={{ letterSpacing: '0.08em' }}>{cardProps.playerName}</h2>
               <p className="text-sm text-[var(--cd-text-mid)]">
@@ -228,16 +233,11 @@ function buildCardProps(data) {
   // Compute most played god across all games (for avatar fallback)
   const mostPlayedGod = computeMostPlayedGod(gameHistory || [])
 
-  // Build avatar URL — respect user preference
-  let avatarUrl = null
+  // Discord avatar URL (TradingCard handles fallback chain internally)
   const allowAvatar = player.allow_discord_avatar !== false
-  if (allowAvatar && player.discord_id && player.discord_avatar) {
-    avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
-  } else if (mostPlayedGod) {
-    // Use most played god's card art
-    avatarUrl = `https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75/Gods/${mostPlayedGod}/Default/t_GodCard_${mostPlayedGod}.png`
-  }
-  // If no avatar and no games, avatarUrl stays null — TradingCard will show role fallback
+  const avatarUrl = allowAvatar && player.discord_id && player.discord_avatar
+    ? `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
+    : null
 
   // Compute stats from team-filtered games
   let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
@@ -261,6 +261,11 @@ function buildCardProps(data) {
     role: role.toUpperCase(),
     avatarUrl,
     isConnected: player.is_claimed,
+    // Raw data for PlayerAvatar in header
+    _discordId: player.discord_id,
+    _discordAvatar: player.discord_avatar,
+    _mostPlayedGod: mostPlayedGod,
+    _allowDiscordAvatar: allowAvatar,
     stats: {
       gamesPlayed,
       wins,

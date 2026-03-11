@@ -38,6 +38,7 @@ function toPlayerCardProps(card) {
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     stats: EMPTY_STATS,
+    bestGod: card.bestGodName ? { name: card.bestGodName } : (cd.bestGod || null),
     isFirstEdition: card.isFirstEdition || false,
   }
 }

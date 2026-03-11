@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { UserCheck, User, ExternalLink } from 'lucide-react'
 import TeamLogo from '../../../components/TeamLogo'
+import PlayerAvatar from '../../../components/PlayerAvatar'
 import RankBadge from '../../../components/RankBadge'
 import { getRank, formatRank } from '../../../config/ranks'
 import { getTierColor } from '../../../config/challengeTiers'
@@ -8,7 +9,8 @@ import passionCoin from '../../../assets/passion/passion.png'
 import { roleImages } from './profileUtils'
 
 export default function PlayerHeader({
-    player, team, basePath, avatarUrl, totalEarned,
+    player, team, basePath, totalEarned,
+    discordId, discordAvatar, isConnected, allowDiscordAvatar, mostPlayedGod,
     profileData, passionBalance, isOwnProfile,
     user, linkedPlayer, login, authLoading,
 }) {
@@ -19,13 +21,17 @@ export default function PlayerHeader({
             {/* Header -- avatar + name + rank (rank hidden on mobile) */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-3">
                 <div className="flex items-center gap-4">
-                    {avatarUrl && (
-                        <img
-                            src={avatarUrl}
-                            alt=""
-                            className="w-14 h-14 rounded-full border-2 border-(--color-accent)/30 flex-shrink-0"
-                        />
-                    )}
+                    <PlayerAvatar
+                        discordId={discordId}
+                        discordAvatar={discordAvatar}
+                        isConnected={isConnected}
+                        allowDiscordAvatar={allowDiscordAvatar}
+                        mostPlayedGod={mostPlayedGod}
+                        playerName={player.name}
+                        teamColor={team?.color}
+                        size={56}
+                        className="border-2 border-(--color-accent)/30"
+                    />
                     <h1 className="font-heading text-3xl font-bold text-(--color-text) flex-1 min-w-0 truncate">
                         {player.name}
                     </h1>

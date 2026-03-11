@@ -89,7 +89,7 @@ async function handleLoad(sql, user) {
   `
 
   const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory] = await Promise.all([
-    sql`SELECT * FROM cc_cards WHERE owner_id = ${user.id} ORDER BY created_at DESC`,
+    sql`SELECT c.*, d.best_god_name FROM cc_cards c LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player' WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
     sql`
@@ -481,7 +481,7 @@ async function handleCollectionSet(sql, params) {
 
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
-           d.role,
+           d.role, d.best_god_name,
            CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
            d.league_slug, d.division_tier, d.season_slug,
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
@@ -503,6 +503,7 @@ async function handleCollectionSet(sql, params) {
     role: d.role,
     avatarUrl: d.avatar_url,
     isConnected: d.is_claimed,
+    bestGodName: d.best_god_name,
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
@@ -518,7 +519,7 @@ async function handleCollectionSearch(sql, params) {
   const query = q.trim()
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
-           d.role,
+           d.role, d.best_god_name,
            CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
            d.league_slug, d.division_tier, d.division_slug, d.season_slug,
            div.name AS division_name,
@@ -545,6 +546,7 @@ async function handleCollectionSearch(sql, params) {
     role: d.role,
     avatarUrl: d.avatar_url,
     isConnected: d.is_claimed,
+    bestGodName: d.best_god_name,
     leagueSlug: d.league_slug,
     divisionTier: d.division_tier,
     divisionSlug: d.division_slug,
@@ -562,7 +564,7 @@ async function handleCardDetail(sql, params) {
 
   // Use direct FK columns (season_id, division_id) instead of slug reverse-lookup
   const [def] = await sql`
-    SELECT d.player_slug, d.season_id,
+    SELECT d.player_slug, d.season_id, d.team_id, d.best_god_name,
            s.name AS season_name, l.name AS league_name, div.name AS division_name
     FROM cc_player_defs d
     JOIN seasons s ON d.season_id = s.id
@@ -589,7 +591,7 @@ async function handleCardDetail(sql, params) {
     JOIN league_players lp ON pgs.league_player_id = lp.id
     JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
     JOIN matches m ON g.match_id = m.id
-    WHERE lp.player_id = ${player.id} AND lp.season_id = ${def.season_id}
+    WHERE lp.player_id = ${player.id} AND lp.season_id = ${def.season_id} AND lp.team_id = ${def.team_id}
   `
 
   let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
@@ -634,6 +636,7 @@ async function handleCardDetail(sql, params) {
         totalKills: kills, totalDeaths: deaths, totalAssists: assists,
       },
       bestGod,
+      bestGodName: def.best_god_name || null,
       seasonName: def.season_name,
       isConnected: player.is_claimed,
     }),
@@ -1192,7 +1195,8 @@ function formatCard(row) {
     serialNumber: row.serial_number,
     holoEffect: row.holo_effect,
     holoType: row.holo_type,
-    imageUrl: row.image_url,
+    imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
+      ? '' : row.image_url,
     ability: row.ability,
     metadata: row.metadata || {},
     acquiredVia: row.acquired_via,
@@ -1201,6 +1205,7 @@ function formatCard(row) {
     cardData: row.card_data || null,
     defId: row.def_id || null,
     isFirstEdition: row.is_first_edition || false,
+    bestGodName: row.best_god_name || null,
   }
 }
 

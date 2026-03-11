@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import './TradingCard.css'
 
 import passiontailsImg from '../assets/passion/passiontails.png'
@@ -6,6 +7,7 @@ import jungleImage from '../assets/roles/jungle.webp'
 import midImage from '../assets/roles/mid.webp'
 import suppImage from '../assets/roles/supp.webp'
 import adcImage from '../assets/roles/adc.webp'
+import { getGodCardUrl } from '../utils/playerAvatar'
 
 const ROLE_IMAGES = {
     'SOLO': soloImage,
@@ -61,6 +63,28 @@ export default function TradingCard({
     const hp = stats?.gamesPlayed ? stats.gamesPlayed * 10 : 0
     const isPlayer = variant === 'player'
 
+    // Fallback chain: Discord → Passionless (if not connected) → God card art → Initials
+    const godCardFallbackUrl = bestGod?.name && isConnected !== false ? getGodCardUrl(bestGod.name) : null
+    const [imgSrc, setImgSrc] = useState(avatarUrl || godCardFallbackUrl)
+    const [imgFailed, setImgFailed] = useState(false)
+    const [isGodImage, setIsGodImage] = useState(!avatarUrl && !!godCardFallbackUrl)
+
+    useEffect(() => {
+        setImgSrc(avatarUrl || godCardFallbackUrl)
+        setImgFailed(false)
+        setIsGodImage(!avatarUrl && !!godCardFallbackUrl)
+    }, [avatarUrl, godCardFallbackUrl])
+
+    const handleImgError = () => {
+        // If Discord avatar failed, try god card (only for connected players)
+        if (imgSrc === avatarUrl && godCardFallbackUrl && imgSrc !== godCardFallbackUrl) {
+            setImgSrc(godCardFallbackUrl)
+            setIsGodImage(true)
+        } else {
+            setImgFailed(true)
+        }
+    }
+
     return (
         <div className={`trading-card ${isPlayer ? 'trading-card--player' : ''}`} data-role={normalizedRole} data-rarity={rarity || undefined} style={size ? { width: size, '--card-scale': size / 340 } : undefined}>
             {/* Gold outer border */}
@@ -104,31 +128,33 @@ export default function TradingCard({
                         </>
                     )}
 
-                    {/* Image frame */}
+                    {/* Image frame — fallback: Discord → Passionless → God Card → Initials */}
                     <div className="card-image-wrap">
                         <div className="card-image-frame">
-                            {isConnected === false ? (
+                            {isConnected === false && !imgSrc ? (
                                 <div className="card-image-placeholder" style={{ position: 'relative' }}>
                                     <img src={passiontailsImg} alt="Passionless" style={{ width: '100%', height: '100%', opacity: 0.5, objectFit: 'contain' }} />
                                     <span style={{ position: 'absolute', bottom: '8px', left: 0, right: 0, fontSize: '10px', fontWeight: 700, color: 'var(--text-dim, #9a8a70)', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.3 }}>
                                         Passionless<br />Not Connected
                                     </span>
                                 </div>
+                            ) : imgSrc && !imgFailed ? (
+                                <img
+                                    src={imgSrc}
+                                    alt={playerName}
+                                    style={isGodImage ? { objectPosition: 'center 20%' } : undefined}
+                                    onError={handleImgError}
+                                />
                             ) : (
-                                <>
-                                    {avatarUrl ? (
-                                        <img src={avatarUrl} alt={playerName} onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
-                                    ) : null}
-                                    <div className="card-image-placeholder" style={avatarUrl ? { display: 'none' } : undefined}>
-                                        {isPlayer ? (
-                                            <span className="card-image-initials" style={{ color: teamColor || 'var(--accent)' }}>
-                                                {(playerName || '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase()}
-                                            </span>
-                                        ) : (
-                                            <img src={roleImg} alt={normalizedRole} />
-                                        )}
-                                    </div>
-                                </>
+                                <div className="card-image-placeholder">
+                                    {isPlayer ? (
+                                        <span className="card-image-initials" style={{ color: teamColor || 'var(--accent)' }}>
+                                            {(playerName || '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase()}
+                                        </span>
+                                    ) : (
+                                        <img src={roleImg} alt={normalizedRole} />
+                                    )}
+                                </div>
                             )}
                         </div>
                         {/* Corner accents */}

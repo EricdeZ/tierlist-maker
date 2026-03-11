@@ -1253,6 +1253,19 @@
     to { opacity: 0; transform: scale(0.9); }
 }
 
+/* Mobile pack shop — large pack that takes up real layout space */
+.mobile-pack-large .pack-art { width: 220px; }
+.mobile-pack-large .pack-art .pack-art__title-text { font-size: 12px; letter-spacing: 3px; }
+.mobile-pack-large .pack-art .pack-art__subtitle-text { font-size: 8px; }
+.mobile-pack-large .pack-art .pack-art__card-count { font-size: 8px; }
+
+/* Horizontal bounce for scroll-right indicator */
+@keyframes cd-bounce-right {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(4px); }
+}
+.animate-bounce-right { animation: cd-bounce-right 1.5s ease-in-out infinite; }
+
 /* ═══════════════════════════════════════════════════
    Pack Opening — hide chrome
    ═══════════════════════════════════════════════════ */

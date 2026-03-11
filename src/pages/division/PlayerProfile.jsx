@@ -109,9 +109,19 @@ const PlayerProfile = () => {
     const passionBalance = profileData?.player?.passion_balance ?? null
     const isOwnProfile = linkedPlayer && linkedPlayer.id === player.id
 
-    const avatarUrl = profileData?.player?.is_claimed && profileData.player.discord_id && profileData.player.discord_avatar
-        ? `https://cdn.discordapp.com/avatars/${profileData.player.discord_id}/${profileData.player.discord_avatar}.png?size=128`
-        : null
+    // Compute most played god for avatar fallback
+    const mostPlayedGod = (() => {
+        const games = profileData?.gameHistory
+        if (!games?.length) return null
+        const counts = {}
+        for (const g of games) {
+            if (g.god_played) counts[g.god_played] = (counts[g.god_played] || 0) + 1
+        }
+        const entries = Object.entries(counts)
+        if (!entries.length) return null
+        entries.sort((a, b) => b[1] - a[1])
+        return entries[0][0]
+    })()
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
@@ -139,7 +149,11 @@ const PlayerProfile = () => {
                 player={player}
                 team={team}
                 basePath={basePath}
-                avatarUrl={avatarUrl}
+                discordId={profileData?.player?.discord_id}
+                discordAvatar={profileData?.player?.discord_avatar}
+                isConnected={profileData?.player?.is_claimed}
+                allowDiscordAvatar={profileData?.player?.allow_discord_avatar}
+                mostPlayedGod={mostPlayedGod}
                 totalEarned={totalEarned}
                 profileData={profileData}
                 passionBalance={passionBalance}

@@ -8,6 +8,7 @@ import { resolvePredictions } from '../lib/predictions.js'
 import { updateForgeAfterMatch } from '../lib/forge.js'
 import { sendChannelMessage } from '../lib/discord.js'
 import { advanceFromMatch } from '../lib/advancement.js'
+import { refreshBestGods } from '../lib/cardclash-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -324,6 +325,12 @@ async function submitMatch(sql, body, admin, event) {
         event.waitUntil(
             updatePlayerRoles(sql, result.match_id)
                 .catch(err => console.error('Player role update failed:', err))
+        )
+
+        // Refresh best_god_name on card defs for avatar fallback (fire-and-forget)
+        event.waitUntil(
+            refreshBestGods(sql, result.match_id)
+                .catch(err => console.error('Best god refresh failed:', err))
         )
 
         // Release report lock and notify Discord (fire-and-forget)

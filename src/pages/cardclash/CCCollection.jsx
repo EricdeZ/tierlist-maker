@@ -127,7 +127,7 @@ export default function CCCollection() {
     if (loadedSetsRef.current.has(setKey)) return
     loadedSetsRef.current.add(setKey)
 
-    const cached = cacheGet(`cd-set2-${setKey}`, SET_DEF_TTL)
+    const cached = cacheGet(`cd-set3-${setKey}`, SET_DEF_TTL)
     if (cached) {
       setSetDefs(prev => ({ ...prev, [setKey]: cached }))
       return
@@ -136,7 +136,7 @@ export default function CCCollection() {
     setLoadingSet(setKey)
     try {
       const data = await cardclashService.getCollectionSet(setKey)
-      cacheSet(`cd-set2-${setKey}`, data.cards)
+      cacheSet(`cd-set3-${setKey}`, data.cards)
       setSetDefs(prev => ({ ...prev, [setKey]: data.cards }))
     } catch {}
     setLoadingSet(null)
@@ -519,7 +519,11 @@ export default function CCCollection() {
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-                  {searchResults.map(card => {
+                  {searchResults.filter(card => {
+                    if (viewMode === 'owned' && !owned.playerCards?.[card.defId]) return false
+                    if (rarityFilter && !(owned.playerCards?.[card.defId] || []).includes(rarityFilter)) return false
+                    return true
+                  }).map(card => {
                     const collected = !!owned.playerCards?.[card.defId]
                     const ownedRarities = owned.playerCards?.[card.defId] || []
                     const meta = {
@@ -852,6 +856,8 @@ function PlayerSlot({ card, meta, onZoom }) {
         teamColor: card.teamColor,
         role: card.role,
         avatarUrl: card.avatarUrl,
+        bestGodName: card.bestGodName || null,
+        isConnected: card.isConnected,
         rarity,
         leagueName: meta.leagueSlug.toUpperCase(),
         divisionName: meta.divisionName || `Division ${meta.divisionTier}`,
@@ -873,6 +879,7 @@ function PlayerSlot({ card, meta, onZoom }) {
           leagueName={meta.leagueSlug.toUpperCase()}
           divisionName={meta.divisionName || `Division ${meta.divisionTier}`}
           stats={EMPTY_STATS}
+          bestGod={card.bestGodName ? { name: card.bestGodName } : null}
           isConnected={card.isConnected}
           size={PLAYER_CARD_SIZE}
         />

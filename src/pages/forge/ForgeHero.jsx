@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Flame, Snowflake, Shuffle } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
 import sparkIcon from '../../assets/spark.png'
+import passiontailsImg from '../../assets/passion/passiontails.png'
 import { getHeatTier, getActiveChange, SPARK_COLORS, FALLBACK_HISTORY } from './forgeConstants'
 import { drawSparkline } from './forgeCanvas'
 import { usePlayerAvatar } from './usePlayerAvatar'
@@ -54,7 +55,7 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const teamColor = player.teamColor || '#666'
     const changeLabel = changeView === '7d' ? '7d Change' : '24h Change'
-    const avatarUrl = usePlayerAvatar(player)
+    const { avatarUrl, isPassionless } = usePlayerAvatar(player)
     const profileUrl = isLeagueWide && player.divisionSlug
         ? `/${leagueSlug}/${player.divisionSlug}/players/${player.playerSlug}`
         : seasonSlugs
@@ -115,15 +116,18 @@ export default function ForgeHero({ player, historyData, marketStatus, userTeamI
                     <div className="absolute -inset-[5px] forge-clip-hex forge-hex-outer" />
                     {/* Inner hex */}
                     <div
-                        className="relative w-full h-full forge-clip-hex flex items-center justify-center text-lg sm:text-2xl font-extrabold text-white z-[1]"
+                        className="relative w-full h-full forge-clip-hex flex items-center justify-center text-lg sm:text-2xl font-extrabold text-white z-[1] overflow-hidden"
                         style={{
                             background: avatarUrl
                                 ? `url(${avatarUrl}) center/cover`
-                                : `linear-gradient(135deg, ${teamColor}90, ${teamColor})`,
+                                : isPassionless
+                                    ? '#1a1a1a'
+                                    : `linear-gradient(135deg, ${teamColor}90, ${teamColor})`,
                             textShadow: '0 2px 8px rgba(0,0,0,0.6)',
                         }}
                     >
-                        {!avatarUrl && initials}
+                        {!avatarUrl && isPassionless && <img src={passiontailsImg} alt="" className="w-full h-full opacity-50 object-contain" />}
+                        {!avatarUrl && !isPassionless && initials}
                     </div>
                 </div>
 

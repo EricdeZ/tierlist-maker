@@ -26,6 +26,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
   const { collection } = useCardClash()
   const [stats, setStats] = useState(null)
   const [bestGod, setBestGod] = useState(null)
+  const [bestGodName, setBestGodName] = useState(playerCard?.bestGodName || null)
   const [seasonName, setSeasonName] = useState(playerCard?.seasonName || null)
   const [isConnected, setIsConnected] = useState(playerCard?.isConnected)
   const [loadingStats, setLoadingStats] = useState(!!playerCard?.defId)
@@ -64,6 +65,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     cardclashService.getCardDetail(playerCard.defId).then(data => {
       if (data.stats) setStats(data.stats)
       if (data.bestGod) setBestGod(data.bestGod)
+      if (data.bestGodName) setBestGodName(data.bestGodName)
       if (data.seasonName) setSeasonName(data.seasonName)
       if (data.isConnected !== undefined) setIsConnected(data.isConnected)
     }).catch(err => {
@@ -176,7 +178,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
                   divisionName={playerCard.divisionName}
                   seasonName={seasonName}
                   stats={stats || EMPTY_STATS}
-                  bestGod={bestGod}
+                  bestGod={bestGodName ? { name: bestGodName } : bestGod}
                   isConnected={isConnected}
                   isFirstEdition={playerCard.isFirstEdition}
                 />

@@ -153,7 +153,7 @@ function PackZoomModal({ slot, onClose, packTypesMap }) {
 
   return (
     <div className="vm-zoom-overlay" onClick={onClose}>
-      <div className="vm-zoom-content" onClick={(e) => e.stopPropagation()}>
+      <div className="vm-zoom-content">
         {/* Pack art with ambient glow */}
         <div className="vm-zoom-pack-wrap">
           <div
@@ -176,7 +176,7 @@ function PackZoomModal({ slot, onClose, packTypesMap }) {
         </div>
 
         {/* Info panel — matches regular shop style */}
-        <div className="cd-panel cd-corners rounded-xl p-6 w-80 relative overflow-hidden">
+        <div className="cd-panel cd-corners rounded-xl p-6 w-80 relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="cd-data-overlay" />
           <div className="relative z-1">
             <h3 className="cd-head text-2xl font-bold mb-1" style={{ color: packColor, letterSpacing: '0.12em' }}>
@@ -426,45 +426,50 @@ export default function SaleVendingMachine() {
             </div>
 
             <div className="vm-controls">
-              <div className={`vm-display ${display.isError ? 'vm-display-error' : ''}`}>
-                <div className="vm-display-line1">{display.line1}</div>
-                <div className="vm-display-line2">{display.line2}</div>
-              </div>
-
-              <div className="vm-keypad">
-                {rowLetters.map(k => (
-                  <button key={k} className="vm-key" onClick={() => handleKey(k)}>{k}</button>
-                ))}
-                {colNumbers.map(k => (
-                  <button key={k} className="vm-key" onClick={() => handleKey(k)}>{k}</button>
-                ))}
-                <button className="vm-key vm-key-clr" onClick={() => handleKey('CLR')}>CLR</button>
-              </div>
-
-              <button
-                className={`vm-coin-slot ${coinsInserted ? 'vm-coin-inserted' : ''} ${selectedPack && canAfford && !coinsInserted && phase === 'idle' ? 'vm-coin-ready' : ''}`}
-                onClick={handleInsertCoins}
-                disabled={!selectedPack || !canAfford || coinsInserted || phase !== 'idle'}
-              >
-                {coinAnimating && <img src={emberIcon} alt="" className="vm-coin-anim" />}
-                <div className="vm-coin-opening" />
-                <div className="vm-coin-label">
-                  {coinsInserted ? 'CORES INSERTED' : 'COIN SLOT'}
+              <div className="vm-controls-row">
+                <div className="vm-left-col">
+                  <div className={`vm-display ${display.isError ? 'vm-display-error' : ''}`}>
+                    <div className="vm-display-line1">{display.line1}</div>
+                    <div className="vm-display-line2">{display.line2}</div>
+                  </div>
+                  <div className="vm-keypad">
+                  {rowLetters.map(k => (
+                    <button key={k} className="vm-key" onClick={() => handleKey(k)}>{k}</button>
+                  ))}
+                  {colNumbers.map(k => (
+                    <button key={k} className="vm-key" onClick={() => handleKey(k)}>{k}</button>
+                  ))}
+                  <button className="vm-key vm-key-clr" onClick={() => handleKey('CLR')}>CLR</button>
+                  </div>
                 </div>
-              </button>
 
-              <button
-                className={`vm-vend-btn ${coinsInserted && phase === 'idle' ? 'vm-vend-ready' : ''}`}
-                onClick={handleVend}
-                disabled={!coinsInserted || phase !== 'idle'}
-              >
-                VEND
-              </button>
+                <div className="vm-actions">
+                  <button
+                    className={`vm-coin-slot ${coinsInserted ? 'vm-coin-inserted' : ''} ${selectedPack && canAfford && !coinsInserted && phase === 'idle' ? 'vm-coin-ready' : ''}`}
+                    onClick={handleInsertCoins}
+                    disabled={!selectedPack || !canAfford || coinsInserted || phase !== 'idle'}
+                  >
+                    {coinAnimating && <img src={emberIcon} alt="" className="vm-coin-anim" />}
+                    <div className="vm-coin-opening" />
+                    <div className="vm-coin-label">
+                      {coinsInserted ? 'CORES INSERTED' : 'COIN SLOT'}
+                    </div>
+                  </button>
 
-              <div className="vm-balance">
-                <img src={emberIcon} alt="" className="vm-balance-icon" />
-                <span className="vm-balance-amount">{emberBalance}</span>
-                <span className="vm-balance-label">CORES</span>
+                  <button
+                    className={`vm-vend-btn ${coinsInserted && phase === 'idle' ? 'vm-vend-ready' : ''}`}
+                    onClick={handleVend}
+                    disabled={!coinsInserted || phase !== 'idle'}
+                  >
+                    VEND
+                  </button>
+
+                  <div className="vm-balance">
+                    <img src={emberIcon} alt="" className="vm-balance-icon" />
+                    <span className="vm-balance-amount">{emberBalance}</span>
+                    <span className="vm-balance-label">CORES</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

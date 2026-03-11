@@ -258,11 +258,13 @@ function formatTradeCard(row) {
       role: row.role,
       rarity: row.rarity,
       holoEffect: row.holo_effect,
-      imageUrl: row.image_url,
+      imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
+        ? '' : row.image_url,
       cardType: row.card_type,
       cardData: row.card_data,
       serialNumber: row.serial_number,
       defId: row.def_id,
+      bestGodName: row.best_god_name || null,
     },
   }
 }

@@ -10,7 +10,7 @@ const PRIMARY_TABS = [
 
 const PRIMARY_KEYS = new Set(PRIMARY_TABS.map(t => t.key))
 
-export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount }) {
+export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, packMode, onPackModeChange, myPacksCount }) {
   const [moreOpen, setMoreOpen] = useState(false)
 
   const secondaryTabs = tabs.filter(t => !PRIMARY_KEYS.has(t.key))
@@ -73,6 +73,32 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
       )}
 
       <div className="fixed bottom-0 left-0 right-0 z-[98] bg-[var(--cd-edge)] backdrop-blur-md border-t border-[var(--cd-border)] px-2 pb-[env(safe-area-inset-bottom)]">
+        {/* Pack sub-toggles — second row when on packs tab */}
+        {activeTab === 'packs' && onPackModeChange && (
+          <div className="flex items-center justify-center gap-1.5 pt-1.5 pb-0.5 max-w-lg mx-auto">
+            {[
+              { key: 'my-packs', label: 'MY PACKS', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', badge: myPacksCount },
+              { key: 'shop', label: 'SHOP', active: 'bg-white/10 text-white border-white/30' },
+              { key: 'sale', label: 'LIMITED', active: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+            ].map(m => (
+              <button
+                key={m.key}
+                onClick={() => onPackModeChange(m.key)}
+                className={`relative px-3 py-0.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+                  packMode === m.key ? m.active : 'bg-transparent text-white/30 border-white/10'
+                }`}
+                style={{ fontFamily: "'Teko', sans-serif", fontSize: 11, letterSpacing: '0.15em' }}
+              >
+                {m.label}
+                {m.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-emerald-500 text-[8px] font-bold text-black flex items-center justify-center">
+                    {m.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-stretch justify-around max-w-lg mx-auto">
           {PRIMARY_TABS.map(tab => {
             const Icon = tab.icon

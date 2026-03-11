@@ -337,9 +337,11 @@ export async function pollTrade(sql, userId, tradeId) {
   // Get cards in trade
   const cards = await sql`
     SELECT tc.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect,
-           c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id
+           c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id,
+           d.best_god_name
     FROM cc_trade_cards tc
     JOIN cc_cards c ON tc.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     WHERE tc.trade_id = ${tradeId}
   `
 

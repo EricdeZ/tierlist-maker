@@ -84,10 +84,20 @@ export default function CardClashPage() {
 function CardClashInner() {
     const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, giftData, pendingTradeCount } = useCardClash()
+    const { loading, loaded, giftData, pendingTradeCount, inventory } = useCardClash()
     const unseenGifts = giftData?.unseenCount || 0
     const activeTab = searchParams.get('tab') || 'packs'
     const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
+
+    const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length
+    const myPacksCount = (inventory?.length || 0) + unopenedGifts
+    const defaultPackMode = myPacksCount > 0 ? 'my-packs' : 'shop'
+    const packMode = searchParams.get('packMode') || defaultPackMode
+    const setPackMode = (m) => {
+        const next = new URLSearchParams(searchParams)
+        if (m === defaultPackMode) next.delete('packMode'); else next.set('packMode', m)
+        setSearchParams(next)
+    }
 
     const setTab = (key) => {
         setSearchParams(key === 'packs' ? {} : { tab: key })
@@ -109,11 +119,11 @@ function CardClashInner() {
         <div className="compdeck">
             <Navbar branding={branding} />
 
-            <div className="relative" style={{ zIndex: 1 }}>
+            <div className={`relative ${activeTab === 'packs' ? 'hidden sm:block' : ''}`} style={{ zIndex: 1 }}>
                 <VaultHeroBanner />
             </div>
 
-            <main className="relative z-1 max-w-[1400px] mx-auto px-4 pt-6 pb-20 sidebar:pb-0">
+            <main className={`relative z-1 max-w-[1400px] mx-auto px-4 pb-20 sidebar:pb-0 ${activeTab === 'packs' ? 'pt-18 sm:pt-6' : 'pt-6'}`}>
                 {/* Tab switcher — desktop only (>=1400px) */}
                 <div className="relative z-10 hidden sidebar:flex items-center gap-6 border-b border-[var(--cd-border)] pb-0">
                     {visibleTabs.map(tab => {
@@ -151,7 +161,7 @@ function CardClashInner() {
                 <p className={`hidden sm:block text-[10px] text-white/25 mt-2 ${unseenGifts > 0 && activeTab !== 'gifts' ? 'mb-2' : 'mb-6'}`}>
                     SMITE 2 is a registered trademark of Hi-Rez Studios. Trademarks are the property of their respective owners. Game materials copyright Hi-Rez Studios. Hi-Rez Studios has not endorsed and is not responsible for this site or its content.
                 </p>
-                <div className="sm:hidden mb-4" />
+                <div className={`sm:hidden ${activeTab === 'packs' ? 'mb-1' : 'mb-4'}`} />
 
                 {unseenGifts > 0 && activeTab !== 'gifts' && (
                     <button
@@ -179,7 +189,7 @@ function CardClashInner() {
                     </Suspense>
                 )}
                 {/* Mobile footer trademark */}
-                <p className="sm:hidden text-[9px] text-white/15 mt-8 mb-4 text-center leading-relaxed px-2">
+                <p className="sm:hidden text-[9px] text-white/15 mt-2 mb-20 text-center leading-relaxed px-2">
                     SMITE 2 is a registered trademark of Hi-Rez Studios. Trademarks are the property of their respective owners. Game materials copyright Hi-Rez Studios. Hi-Rez Studios has not endorsed and is not responsible for this site or its content.
                 </p>
             </main>
@@ -192,6 +202,9 @@ function CardClashInner() {
                     onTabChange={setTab}
                     unseenGifts={unseenGifts}
                     pendingTradeCount={pendingTradeCount}
+                    packMode={packMode}
+                    onPackModeChange={setPackMode}
+                    myPacksCount={myPacksCount}
                 />
             </div>
         </div>

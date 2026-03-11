@@ -8,6 +8,7 @@ import { getRank, formatRank } from '../config/ranks'
 import { getDivisionImage } from '../utils/divisionImages'
 import { getLeagueLogo } from '../utils/leagueImages'
 import RankBadge from '../components/RankBadge'
+import PlayerAvatar from '../components/PlayerAvatar'
 import GodpoolTierListDisplay from '../components/GodpoolTierListDisplay'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
@@ -133,9 +134,18 @@ const ProfilePage = () => {
 
     const isOwnProfile = linkedPlayer && linkedPlayer.slug === player.slug
 
-    const avatarUrl = player.is_claimed && player.discord_id && player.discord_avatar
-        ? `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.png?size=128`
-        : null
+    // Most played god for avatar fallback
+    const mostPlayedGod = (() => {
+        if (!gameHistory?.length) return null
+        const counts = {}
+        for (const g of gameHistory) {
+            if (g.god_played) counts[g.god_played] = (counts[g.god_played] || 0) + 1
+        }
+        const entries = Object.entries(counts)
+        if (!entries.length) return null
+        entries.sort((a, b) => b[1] - a[1])
+        return entries[0][0]
+    })()
 
     return (
         <>
@@ -146,20 +156,16 @@ const ProfilePage = () => {
             {/* Profile Header */}
             <div className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <div className="flex items-center gap-5">
-                    {/* Avatar */}
-                    {avatarUrl ? (
-                        <img
-                            src={avatarUrl}
-                            alt=""
-                            className="w-20 h-20 rounded-full border-2 border-(--color-accent)/30"
-                        />
-                    ) : (
-                        <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/10 flex items-center justify-center flex-shrink-0">
-                            <span className="text-3xl font-bold text-(--color-text-secondary)">
-                                {player.name[0]?.toUpperCase()}
-                            </span>
-                        </div>
-                    )}
+                    <PlayerAvatar
+                        discordId={player.discord_id}
+                        discordAvatar={player.discord_avatar}
+                        isConnected={player.is_claimed}
+                        allowDiscordAvatar={player.allow_discord_avatar}
+                        mostPlayedGod={mostPlayedGod}
+                        playerName={player.name}
+                        size={80}
+                        className="border-2 border-(--color-accent)/30"
+                    />
 
                     <div className="flex-1 min-w-0">
                         <h1 className="font-heading text-3xl font-bold text-(--color-text) mb-1">

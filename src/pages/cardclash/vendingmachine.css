@@ -359,6 +359,24 @@
   gap: 10px;
 }
 
+.vm-controls-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vm-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* LCD Display — warm amber */
 .vm-display {
   background: #0a0804;
@@ -938,7 +956,23 @@
   }
 
   .vm-controls {
+    width: 100%;
     padding: 8px;
+    gap: 6px;
+  }
+
+  .vm-controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    align-items: start;
+  }
+
+  .vm-left-col {
+    gap: 6px;
+  }
+
+  .vm-actions {
     gap: 6px;
   }
 
@@ -972,6 +1006,8 @@
 
   .vm-coin-slot {
     padding: 4px;
+    height: auto;
+    min-height: 40px;
   }
 
   .vm-coin-label {

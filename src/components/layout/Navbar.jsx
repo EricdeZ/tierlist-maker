@@ -6,7 +6,7 @@ import UserMenu from '../UserMenu'
 import PassionDisplay from '../PassionDisplay'
 import smiteLogo from '../../assets/smite2.png'
 import ReporterBell from '../ReporterBell'
-import { Home, User, Wrench, ChevronDown, ChevronRight, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown, Calendar, Flame } from 'lucide-react'
+import { Home, User, Wrench, ChevronDown, Menu, ListOrdered, Swords, Trophy, Coins, ShoppingBag, Crown, Calendar, Flame } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
 
 const tools = [
@@ -32,9 +32,7 @@ export default function Navbar({ title, branding, tabs }) {
     const { toggle: toggleSidebar } = useSidebar()
     const location = useLocation()
     const [toolsOpen, setToolsOpen] = useState(false)
-    const [mobileOpen, setMobileOpen] = useState(false)
     const toolsRef = useRef(null)
-    const menuRef = useRef(null)
 
     // Breakpoint classes — must be full literal strings so Tailwind can scan them
     const bpShow = tabs ? 'nav:flex' : 'sm:flex'
@@ -51,7 +49,6 @@ export default function Navbar({ title, branding, tabs }) {
 
     // Close menus on route change
     useEffect(() => {
-        setMobileOpen(false)
         setToolsOpen(false)
     }, [location.pathname])
 
@@ -65,39 +62,10 @@ export default function Navbar({ title, branding, tabs }) {
         return () => document.removeEventListener('mousedown', handle)
     }, [toolsOpen])
 
-    // Close mobile menu on click outside
-    useEffect(() => {
-        if (!mobileOpen) return
-        const handle = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) setMobileOpen(false)
-        }
-        document.addEventListener('mousedown', handle)
-        document.addEventListener('touchstart', handle)
-        return () => {
-            document.removeEventListener('mousedown', handle)
-            document.removeEventListener('touchstart', handle)
-        }
-    }, [mobileOpen])
-
-    // Prevent body scroll when mobile menu open
-    useEffect(() => {
-        document.body.style.overflow = mobileOpen ? 'hidden' : ''
-        return () => { document.body.style.overflow = '' }
-    }, [mobileOpen])
-
     return (
-        <nav ref={menuRef} className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
-            <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-4 py-2 shadow-lg border border-white/10">
+        <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
+            <div className="bg-(--color-primary)/75 backdrop-blur-xl rounded-xl px-3 py-1.5 shadow-lg border border-white/10">
                 <div className="flex items-center gap-3 sm:gap-6">
-                    {/* Sidebar trigger — visible below 1400px */}
-                    <button
-                        onClick={() => { toggleSidebar(); setMobileOpen(false); }}
-                        className="sidebar:hidden flex items-center justify-center w-8 h-8 rounded-lg text-(--color-accent) hover:bg-white/10 transition-colors cursor-pointer border border-(--color-accent)/25"
-                        aria-label="Open menu"
-                    >
-                        <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-                    </button>
-
                     {/* Logo → home */}
                     <Link to="/" className="flex items-center gap-3 flex-shrink-0">
                         <img src={smiteLogo} alt="SMITE 2" className="h-8 sm:h-10 w-auto" />
@@ -208,114 +176,32 @@ export default function Navbar({ title, branding, tabs }) {
                             <ReporterBell />
                             {user && <PassionDisplay />}
                             <UserMenu compact />
+                            <button
+                                onClick={toggleSidebar}
+                                className="flex items-center justify-center w-10 h-10 rounded-lg text-(--color-accent) hover:bg-white/10 transition-colors cursor-pointer border border-(--color-accent)/25"
+                                aria-label="Open menu"
+                            >
+                                <Menu className="w-5 h-5" strokeWidth={2.5} />
+                            </button>
                         </div>
                     </div>
 
-                    {/* ── Mobile: passion + user + hamburger ── */}
+                    {/* ── Mobile: passion + user + burger ── */}
                     <div className={`flex ${bpHide} items-center gap-2 ml-auto`}>
-                        <div onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
-                            <ReporterBell />
-                            {user && <PassionDisplay compact />}
-                            <UserMenu compact />
-                        </div>
+                        <ReporterBell />
+                        {user && <PassionDisplay compact />}
+                        <UserMenu compact />
                         <button
-                            onClick={() => setMobileOpen(!mobileOpen)}
-                            className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
-                            aria-label="Toggle navigation menu"
+                            onClick={toggleSidebar}
+                            className="flex items-center justify-center -mr-1.5 text-white/50 hover:text-white/80 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                            aria-label="Open menu"
                         >
-                            <div className="w-5 h-4 flex flex-col justify-between">
-                                <span
-                                    className="block w-full h-0.5 bg-(--color-text) rounded-full transition-all duration-300 origin-center"
-                                    style={{ transform: mobileOpen ? 'translateY(7px) rotate(45deg)' : 'none' }}
-                                />
-                                <span
-                                    className="block w-full h-0.5 bg-(--color-text) rounded-full transition-all duration-300"
-                                    style={{ opacity: mobileOpen ? 0 : 1, transform: mobileOpen ? 'scaleX(0)' : 'scaleX(1)' }}
-                                />
-                                <span
-                                    className="block w-full h-0.5 bg-(--color-text) rounded-full transition-all duration-300 origin-center"
-                                    style={{ transform: mobileOpen ? 'translateY(-7px) rotate(-45deg)' : 'none' }}
-                                />
-                            </div>
+                            <Menu className="w-7 h-7" />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* ── Mobile dropdown menu ── */}
-            <div
-                className={`${bpHide} overflow-hidden transition-all duration-300 ease-in-out`}
-                style={{ maxHeight: mobileOpen ? '600px' : '0px', opacity: mobileOpen ? 1 : 0 }}
-            >
-                <div className="mt-2 bg-(--color-primary)/90 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl p-2">
-                    {/* Tab links (division pages) */}
-                    {tabs && tabs.map((item) => (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all duration-200 ${
-                                isActive(item)
-                                    ? 'text-(--color-accent) bg-(--color-accent)/10'
-                                    : 'text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5'
-                            }`}
-                        >
-                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                isActive(item) ? 'bg-(--color-accent)' : 'bg-white/20'
-                            }`} />
-                            {item.label}
-                        </Link>
-                    ))}
-
-                    {/* Navigation links */}
-                    <div className={tabs ? 'border-t border-white/5 mt-1 pt-1' : ''}>
-                        <Link
-                            to="/"
-                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                        >
-                            <Home className="w-4 h-4" />
-                            Home
-                        </Link>
-                        {user && linkedPlayer && (
-                            <Link
-                                to={`/profile/${linkedPlayer.slug}`}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                            >
-                                <User className="w-4 h-4" />
-                                My Profile
-                            </Link>
-                        )}
-                        <Link
-                            to="/leagues"
-                            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                        >
-                            <Trophy className="w-4 h-4" />
-                            Leagues
-                        </Link>
-                    </div>
-
-                    {/* Tools section */}
-                    <div className="border-t border-white/5 mt-1 pt-1">
-                        <div className="px-4 py-2 text-[10px] font-bold text-(--color-text-secondary) uppercase tracking-widest">
-                            Tools
-                        </div>
-                        {tools.map((tool) => (
-                            <Link
-                                key={tool.to}
-                                to={resolveToolTo(tool)}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold uppercase tracking-wider text-(--nav-text) hover:text-(--color-accent) hover:bg-white/5 transition-all duration-200"
-                            >
-                                <tool.icon className="w-4 h-4" />
-                                {tool.label}
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Backdrop overlay when menu is open */}
-            {mobileOpen && (
-                <div className={`fixed inset-0 -z-10 ${bpHide}`} />
-            )}
         </nav>
     )
 }

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import TeamLogo from '../../components/TeamLogo'
+import passiontailsImg from '../../assets/passion/passiontails.png'
 import { usePlayerAvatar } from './usePlayerAvatar'
 import { getHeatTier, getActiveChange } from './forgeConstants'
 
@@ -7,7 +8,7 @@ export default function ForgeSpotlight({
     player, pos, isDragging, dragOffset,
     onStartDrag, onClose, onViewProfile, changeView,
 }) {
-    const avatarUrl = usePlayerAvatar(player)
+    const { avatarUrl, isPassionless } = usePlayerAvatar(player)
     const teamColor = player.teamColor || '#666'
     const initials = player.playerName.slice(0, 2).toUpperCase()
     const change = getActiveChange(player, changeView)
@@ -68,15 +69,18 @@ export default function ForgeSpotlight({
                 </div>
                 {/* Avatar */}
                 <div
-                    className="w-8 h-8 forge-clip-hex flex items-center justify-center font-extrabold text-[0.75rem] text-white flex-shrink-0"
+                    className="w-8 h-8 forge-clip-hex flex items-center justify-center font-extrabold text-[0.75rem] text-white flex-shrink-0 overflow-hidden"
                     style={{
                         background: avatarUrl
                             ? `url(${avatarUrl}) center/cover`
-                            : `linear-gradient(135deg, ${teamColor}80, ${teamColor})`,
+                            : isPassionless
+                                ? '#1a1a1a'
+                                : `linear-gradient(135deg, ${teamColor}80, ${teamColor})`,
                         textShadow: '0 1px 3px rgba(0,0,0,0.5)',
                     }}
                 >
-                    {!avatarUrl && initials}
+                    {!avatarUrl && isPassionless && <img src={passiontailsImg} alt="" className="w-full h-full opacity-50 object-contain" />}
+                    {!avatarUrl && !isPassionless && initials}
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="font-bold text-sm text-white truncate" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>

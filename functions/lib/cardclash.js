@@ -158,10 +158,6 @@ async function generatePlayerCard(sql, rarity, leagueId) {
   if (prefRow?.allow_avatar && prefRow.discord_id && prefRow.discord_avatar) {
     avatarUrl = `https://cdn.discordapp.com/avatars/${prefRow.discord_id}/${prefRow.discord_avatar}.webp?size=256`
   }
-  if (!avatarUrl && stats.bestGod) {
-    const slug = stats.bestGod.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
-    avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
-  }
 
   return {
     card_type: 'player',
@@ -260,10 +256,6 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
       avatarUrl = `https://cdn.discordapp.com/avatars/${player.discord_id}/${player.discord_avatar}.webp?size=256`
     }
   }
-  if (!avatarUrl && bestGods[0]) {
-    const slug = bestGods[0].god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
-    avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
-  }
 
   const gp = stats?.games_played || 0, w = stats?.wins || 0
   const k = stats?.total_kills || 0, d = stats?.total_deaths || 0, a = stats?.total_assists || 0
@@ -338,10 +330,6 @@ async function generatePlayerCardByDivisions(sql, rarity, divisionIds) {
   `
   if (prefRow?.allow_avatar && prefRow.discord_id && prefRow.discord_avatar) {
     avatarUrl = `https://cdn.discordapp.com/avatars/${prefRow.discord_id}/${prefRow.discord_avatar}.webp?size=256`
-  }
-  if (!avatarUrl && stats.bestGod) {
-    const slug = stats.bestGod.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
-    avatarUrl = `https://smitebrain.com/cdn-cgi/image/width=256,height=256,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`
   }
 
   return {

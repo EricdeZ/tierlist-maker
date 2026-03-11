@@ -246,8 +246,8 @@ export default function GlobalSidebar() {
 
                     {/* Everything scrolls together */}
                     <div className="flex-1 overflow-y-auto panel-scrollbar">
-                    {/* Header */}
-                    <div className="px-5 pt-5 pb-4 border-b border-white/5">
+                    {/* Header — hidden on mobile, shown on sm+ */}
+                    <div className="hidden sm:block px-5 pt-5 pb-4 border-b border-white/5">
 
                         {user ? (
                             <div className="flex flex-col items-center text-center pt-2">

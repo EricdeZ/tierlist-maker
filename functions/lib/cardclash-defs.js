@@ -199,6 +199,19 @@ export async function generatePlayerDefs(sql, seasonId) {
       avatarUrl = `https://cdn.discordapp.com/avatars/${userRow.discord_id}/${userRow.discord_avatar}.webp?size=256`
     }
 
+    // Best god name for avatar fallback
+    const [bestGodRow] = await sql`
+      SELECT pgs.god_played FROM player_game_stats pgs
+      JOIN league_players lp ON pgs.league_player_id = lp.id
+      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+      JOIN matches m ON g.match_id = m.id
+      WHERE lp.player_id = ${e.playerId} AND lp.season_id = ${seasonId}
+        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${e.teamId}
+        AND pgs.god_played IS NOT NULL
+      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC LIMIT 1
+    `
+    const bestGodName = bestGodRow?.god_played || null
+
     const [existing] = await sql`
       SELECT id FROM cc_player_defs
       WHERE player_id = ${e.playerId} AND team_id = ${e.teamId} AND season_id = ${seasonId}
@@ -220,6 +233,7 @@ export async function generatePlayerDefs(sql, seasonId) {
           season_slug = ${season.slug},
           card_index = ${cardIndex},
           avatar_url = ${avatarUrl},
+          best_god_name = ${bestGodName},
           updated_at = NOW()
         WHERE id = ${existing.id}
       `
@@ -230,12 +244,12 @@ export async function generatePlayerDefs(sql, seasonId) {
           player_id, team_id, season_id, league_id, division_id,
           player_name, player_slug, team_name, team_color, role,
           league_slug, division_slug, season_slug, division_tier,
-          card_index, avatar_url
+          card_index, avatar_url, best_god_name
         ) VALUES (
           ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
           ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
           ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
-          ${cardIndex}, ${avatarUrl}
+          ${cardIndex}, ${avatarUrl}, ${bestGodName}
         )
       `
       created++
@@ -285,4 +299,42 @@ export async function backfillCardDefs(sql) {
       AND c.card_data->>'teamName' = d.team_name
   `
   return { updated: result.count || 0 }
+}
+
+/**
+ * Refresh best_god_name for all player defs affected by a match.
+ * Called fire-and-forget after match reports.
+ */
+export async function refreshBestGods(sql, matchId) {
+  // Find all player-team-season combos from this match
+  const players = await sql`
+    SELECT DISTINCT lp.player_id,
+           CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END AS team_id,
+           lp.season_id
+    FROM player_game_stats pgs
+    JOIN league_players lp ON lp.id = pgs.league_player_id
+    JOIN games g ON g.id = pgs.game_id
+    JOIN matches m ON m.id = g.match_id
+    WHERE g.match_id = ${matchId}
+  `
+
+  for (const p of players) {
+    const [row] = await sql`
+      SELECT pgs.god_played FROM player_game_stats pgs
+      JOIN league_players lp ON pgs.league_player_id = lp.id
+      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+      JOIN matches m ON g.match_id = m.id
+      WHERE lp.player_id = ${p.player_id} AND lp.season_id = ${p.season_id}
+        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${p.team_id}
+        AND pgs.god_played IS NOT NULL
+      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC LIMIT 1
+    `
+    if (row) {
+      await sql`
+        UPDATE cc_player_defs
+        SET best_god_name = ${row.god_played}, updated_at = NOW()
+        WHERE player_id = ${p.player_id} AND team_id = ${p.team_id} AND season_id = ${p.season_id}
+      `
+    }
+  }
 }

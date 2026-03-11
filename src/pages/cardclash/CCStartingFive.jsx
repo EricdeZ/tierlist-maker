@@ -50,6 +50,7 @@ function toPlayerCardProps(card) {
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     rarity: card.rarity,
     stats: EMPTY_STATS,
+    bestGod: card.bestGodName ? { name: card.bestGodName } : (cd.bestGod || null),
     isFirstEdition: card.isFirstEdition || false,
   }
 }

@@ -11,9 +11,16 @@ function testImage(url) {
     })
 }
 
+/**
+ * Hook for forge components that use CSS background-image (no onError available).
+ * Pre-tests image URLs in order: Discord → God (skips god for unconnected players).
+ * Returns { avatarUrl, isPassionless }.
+ */
 export function usePlayerAvatar(player) {
     const discord = player?.discordAvatarUrl
-    const god = player?.godImageUrl
+    // Don't try god image for unconnected players — they get passionless
+    const god = player?.isConnected !== false ? player?.godImageUrl : null
+    const isPassionless = player?.isConnected === false
 
     const [avatarUrl, setAvatarUrl] = useState(() => discord || god || null)
 
@@ -39,5 +46,5 @@ export function usePlayerAvatar(player) {
         return () => { cancelled = true }
     }, [discord, god])
 
-    return avatarUrl
+    return { avatarUrl, isPassionless }
 }

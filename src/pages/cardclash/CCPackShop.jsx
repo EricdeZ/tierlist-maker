@@ -331,17 +331,26 @@ function MyPacks() {
 // ═══════════════════════════════════════════════
 export default function PackShopRouter() {
   const { inventory, giftData } = useCardClash();
-  const [mode, setMode] = useState('shop');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length;
   const myPacksCount = (inventory?.length || 0) + unopenedGifts;
 
+  const defaultMode = myPacksCount > 0 ? 'my-packs' : 'shop';
+  const mode = searchParams.get('packMode') || defaultMode;
+  const setMode = (m) => {
+    const next = new URLSearchParams(searchParams);
+    if (m === defaultMode) next.delete('packMode'); else next.set('packMode', m);
+    setSearchParams(next);
+  };
+
   return (
     <>
-      <div className="flex justify-center gap-1.5 sm:gap-2 -mt-2 sm:mt-0 mb-2 sm:mb-4 relative z-40">
+      {/* Desktop toggles */}
+      <div className="hidden sm:flex justify-center gap-2 mb-4 relative z-40">
         <button
           onClick={() => setMode('my-packs')}
-          className={`relative px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+          className={`relative px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
             mode === 'my-packs'
               ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
               : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
@@ -357,7 +366,7 @@ export default function PackShopRouter() {
         </button>
         <button
           onClick={() => setMode('shop')}
-          className={`px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
             mode === 'shop'
               ? 'bg-white/10 text-white border-white/30'
               : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
@@ -368,7 +377,7 @@ export default function PackShopRouter() {
         </button>
         <button
           onClick={() => setMode('sale')}
-          className={`px-4 sm:px-5 py-1 sm:py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
             mode === 'sale'
               ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
               : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
@@ -419,12 +428,53 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
     setActiveIndex(Math.max(0, Math.min(idx, packs.length - 1)));
   }, [packs.length]);
 
+  const [hasScrolled, setHasScrolled] = useState(false);
+
+  const onScroll = useCallback(() => {
+    handleScroll();
+    if (!hasScrolled) setHasScrolled(true);
+  }, [handleScroll, hasScrolled]);
+
   return (
-    <div className="sm:hidden">
+    <div className="sm:hidden relative">
+      {/* Swipe hint — above dots, fixed height to prevent jump */}
+      <div className="h-5 flex items-center justify-center z-20 relative">
+        {!hasScrolled ? (
+          <div className="flex items-center gap-1 animate-bounce-right">
+            <span className="text-xs text-white/60 cd-head tracking-widest">More</span>
+            <svg className="w-3.5 h-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        ) : <div />}
+      </div>
+
+      {/* Dots */}
+      <div className="flex items-center justify-center gap-3 pb-1 mb-3 z-20 relative">
+        {packs.map((k, i) => {
+          const pack = packTypesMap[k];
+          return (
+            <button
+              key={k}
+              onClick={() => {
+                scrollRef.current?.scrollTo({ left: i * scrollRef.current.offsetWidth, behavior: 'smooth' });
+              }}
+              className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
+                i === activeIndex ? 'scale-125' : 'bg-white/20'
+              }`}
+              style={i === activeIndex ? {
+                background: pack?.color || 'var(--cd-cyan)',
+                boxShadow: `0 0 8px ${pack?.color || 'var(--cd-cyan)'}`,
+              } : undefined}
+            />
+          );
+        })}
+      </div>
+
       {/* Horizontal snap scroll for packs */}
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
+        onScroll={onScroll}
         className="flex snap-x snap-mandatory overflow-x-auto -mx-4"
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       >
@@ -434,14 +484,15 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
           const canAfford = emberBalance >= pack.cost;
 
           return (
-            <div key={key} className="snap-center shrink-0 w-full flex flex-col items-center px-4 pt-2 pb-4">
-              {/* Pack art with gyro 3D tilt */}
+            <div key={key} className="snap-center shrink-0 w-full flex flex-col items-center px-4 pb-2 relative">
+              {/* Pack art — large, overlaps behind info */}
               <div
-                className="relative"
+                className="relative z-0 mobile-pack-large"
                 style={{
                   transform: `perspective(600px) rotateY(${tilt.x}deg) rotateX(${-tilt.y}deg)`,
                   transformStyle: 'preserve-3d',
                   transition: 'transform 0.15s ease-out',
+                  marginBottom: -20,
                 }}
               >
                 {/* Ambient glow — follows tilt */}
@@ -463,23 +514,22 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
                 <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} />
               </div>
 
-              {/* Pack info */}
-              <div className="w-full mt-5">
-                <h3 className="cd-head text-xl font-bold mb-0.5" style={{ color: pack.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
-                  {pack.name}
-                </h3>
-                <p className="text-xs text-white/40 cd-head tracking-widest mb-3">{pack.leagueName || ''}</p>
+              {/* Pack info — slim frosted glass overlay */}
+              <div className="w-full relative z-10 rounded-lg px-3 py-2" style={{ background: 'rgba(10, 12, 18, 0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <h3 className="cd-head text-base font-bold" style={{ color: pack.color || 'var(--cd-cyan)', letterSpacing: '0.12em' }}>
+                    {pack.name}
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    <img src={emberIcon} alt="" className="h-3.5 w-auto object-contain cd-icon-glow" />
+                    <span className="text-base font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.cost}</span>
+                  </div>
+                </div>
 
-                <div className="flex gap-4 mb-4 text-[12px] text-white/50">
+                <div className="flex gap-3 mb-2 text-[10px] text-white/50">
                   <span><span className="text-white font-bold">{pack.cards}</span> cards</span>
                   <span>1 <span className="font-bold" style={{ color: pack.color }}>{pack.leagueName?.split(' ')[0]}</span> player</span>
                   <span>1 <span className="text-green-400 font-bold">Rare+</span></span>
-                </div>
-
-                <div className="flex items-center gap-2.5 mb-4">
-                  <img src={emberIcon} alt="" className="h-5 w-auto object-contain cd-icon-glow" />
-                  <span className="text-2xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.cost}</span>
-                  <span className="text-sm text-white/40 cd-head tracking-wider">Cores</span>
                 </div>
 
                 <CDChargeButton
@@ -492,36 +542,6 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
             </div>
           );
         })}
-      </div>
-
-      {/* Scroll indicator dots */}
-      <div className="flex justify-center gap-3 mt-1 mb-1">
-        {packs.map((k, i) => {
-          const pack = packTypesMap[k];
-          return (
-            <button
-              key={k}
-              onClick={() => {
-                scrollRef.current?.scrollTo({ left: i * scrollRef.current.offsetWidth, behavior: 'smooth' });
-              }}
-              className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-                i === activeIndex ? 'scale-125' : 'bg-white/20'
-              }`}
-              style={i === activeIndex ? {
-                background: pack?.color || 'var(--cd-cyan)',
-                boxShadow: `0 0 8px ${pack?.color || 'var(--cd-cyan)'}`,
-              } : undefined}
-            />
-          );
-        })}
-      </div>
-
-      {/* Scroll down indicator */}
-      <div className="flex flex-col items-center mt-3 mb-1 animate-bounce">
-        <span className="text-[10px] text-white/20 cd-head tracking-widest mb-1">Scroll for more</span>
-        <svg className="w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
       </div>
     </div>
   );
@@ -751,10 +771,10 @@ function PackShop() {
         )}
 
         {/* ═══ Divider ═══ */}
-        <div className="cd-divider max-w-lg mx-auto mb-8" />
+        <div className="cd-divider max-w-lg mx-auto mb-8 hidden sm:block" />
 
         {/* ═══ Core Economy Panel ═══ */}
-        <div className="max-w-3xl mx-auto mb-8">
+        <div className="max-w-3xl mx-auto mb-8 hidden sm:block">
           <div className="text-center mb-4">
             <h3 className="cd-head text-sm text-[var(--cd-text-mid)] tracking-widest">Get Cores</h3>
           </div>
