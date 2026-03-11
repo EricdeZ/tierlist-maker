@@ -424,7 +424,7 @@ export default function CCStartingFive() {
             <button
               onClick={() => setShowConsumablePicker(true)}
               disabled={!startingFive?.cards?.length}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap inline-flex items-center gap-1.5"
               title="Use a consumable to boost income progress"
             >
               <Zap size={14} />

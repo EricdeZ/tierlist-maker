@@ -112,7 +112,7 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
                 }`}
               >
                 <Icon size={20} className={active ? 'cd-icon-glow' : ''} />
-                <span className="text-[9px] font-bold cd-head tracking-wider">{tab.label}</span>
+                <span className="text-[9px] font-bold cd-head tracking-wider whitespace-nowrap">{tab.label}</span>
                 {active && (
                   <span className="w-4 h-0.5 rounded-full bg-[var(--cd-cyan)] mt-0.5" style={{ boxShadow: '0 0 8px rgba(0,229,255,0.4)' }} />
                 )}

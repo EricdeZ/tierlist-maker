@@ -72,10 +72,10 @@
 .binder-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
   gap: 8px;
   flex: 1;
   padding: 4px;
+  align-content: start;
 }
 
 /* ── Card slot (pocket) ── */
@@ -91,6 +91,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .binder-slot:hover {
@@ -396,6 +397,11 @@
   filter: grayscale(0.5);
 }
 
+/* Hide mobile page on desktop (must come before media query) */
+.binder-mobile-page {
+  display: none;
+}
+
 /* ═══ Responsive — single page on mobile ═══ */
 @media (max-width: 768px) {
   .binder-flip-container {
@@ -444,10 +450,6 @@
   }
 }
 
-/* Hide mobile page on desktop */
-.binder-mobile-page {
-  display: none;
-}
 
 /* ═══ Settings panel ═══ */
 .binder-settings {
