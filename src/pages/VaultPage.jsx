@@ -59,7 +59,11 @@ const TAB_COMPONENTS = {
 }
 
 export default function VaultPage() {
-    const { user, login, hasPermission } = useAuth()
+    const { user, login, loading, hasPermission } = useAuth()
+
+    if (loading) {
+        return null
+    }
 
     if (!user) {
         return (
