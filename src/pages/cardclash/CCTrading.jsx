@@ -710,7 +710,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           teamName: cd?.teamName,
           teamColor: cd?.teamColor,
           role: card.role || cd?.role,
-          avatarUrl: cd?.avatarUrl,
+          avatarUrl: cd?.avatarUrl || card.imageUrl || '',
           rarity: card.rarity,
           leagueName: cd?.leagueName,
           divisionName: cd?.divisionName,
@@ -1311,7 +1311,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
         onClick={onZoom}
         className="w-full cursor-pointer active:scale-95 transition-transform"
       >
-        <div className="rounded overflow-hidden border-2 transition-colors" style={{ borderColor: `${rarityInfo.color}33` }}>
+        <div>
           {isPlayer ? (
               <TradingCard
                 playerName={cardData?.playerName || card.godName}
@@ -1588,7 +1588,7 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
         onClick={onZoom}
         className="w-full cursor-pointer transition-transform hover:scale-105 active:scale-95"
       >
-        <div className="rounded overflow-hidden border-2 transition-colors" style={{ borderColor: `${rarityInfo.color}33` }}>
+        <div>
           {isPlayer ? (
             <TradingCard
               playerName={cardData?.playerName || card.godName}
