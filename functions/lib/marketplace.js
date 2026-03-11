@@ -36,6 +36,12 @@ export async function createListing(sql, userId, { cardId, price }) {
     throw new Error('Card is in your Starting 5 lineup — remove it first')
   }
 
+  // Check card not in binder
+  const [bindered] = await sql`
+    SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1
+  `
+  if (bindered) throw new Error('Card is in your binder — remove it first')
+
   // Check listing limit
   const [{ count }] = await sql`
     SELECT COUNT(*)::int AS count FROM cc_market_listings
@@ -112,6 +118,9 @@ export async function buyListing(tx, buyerId, listingId) {
   await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ${listing.card_id}`
   await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ${listing.card_id}`
   await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ${listing.card_id}`
+
+  // Remove card from binder
+  await tx`DELETE FROM cc_binder_cards WHERE card_id = ${listing.card_id}`
 
   // Mark listing sold
   const [updated] = await tx`

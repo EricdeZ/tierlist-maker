@@ -24,6 +24,9 @@ const handler = async (event) => {
   if (event.httpMethod === 'GET' && action === 'shared-card') {
     return await handleSharedCard(sql, event.queryStringParameters)
   }
+  if (event.httpMethod === 'GET' && action === 'binder-view') {
+    return await handleBinderView(sql, event.queryStringParameters)
+  }
 
   const user = await requireAuth(event)
   if (!user) {
@@ -43,6 +46,7 @@ const handler = async (event) => {
         case 'gifts': return await handleLoadGifts(sql, user)
         case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
         case 'starting-five': return await handleStartingFive(sql, user)
+        case 'binder': return await handleLoadBinder(sql, user)
         case 'admin-redeem-codes': return await handleAdminRedeemCodes(sql, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
@@ -63,6 +67,10 @@ const handler = async (event) => {
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
         case 'use-consumable': return await handleUseConsumable(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
+        case 'binder-save': return await handleBinderSave(sql, user, body)
+        case 'binder-slot': return await handleBinderSlot(sql, user, body)
+        case 'binder-unslot': return await handleBinderUnslot(sql, user, body)
+        case 'binder-generate-share': return await handleBinderGenerateShare(sql, user, event)
         case 'redeem-code': return await handleRedeemCode(sql, user, body)
         case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
         case 'toggle-redeem-code': return await handleToggleRedeemCode(sql, event, body)
@@ -912,9 +920,12 @@ async function handleDismantle(sql, user, body) {
         SELECT 1 FROM cc_lineups l
         WHERE (l.card_id = c.id OR l.god_card_id = c.id OR l.item_card_id = c.id) AND l.user_id = ${user.id}
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM cc_binder_cards bc WHERE bc.card_id = c.id
+      )
   `
   if (cards.length === 0) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be in your Starting 5, listed on the market, or in a trade' }) }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be in your Starting 5, listed on the market, in a trade, or in your binder' }) }
   }
 
   // Calculate total (fractional sum, floor at the end)
@@ -1219,6 +1230,173 @@ async function handleToggleRedeemCode(sql, event, body) {
 
   await sql`UPDATE cc_redeem_codes SET active = ${active} WHERE id = ${codeId}`
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ Binder ═══
+
+async function handleLoadBinder(sql, user) {
+  const [binder] = await sql`
+    SELECT * FROM cc_binders WHERE user_id = ${user.id}
+  `
+  const cards = await sql`
+    SELECT bc.page, bc.slot, bc.card_id,
+           c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
+           c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
+           c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
+           d.best_god_name
+    FROM cc_binder_cards bc
+    JOIN cc_cards c ON bc.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    WHERE bc.user_id = ${user.id}
+    ORDER BY bc.page, bc.slot
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      binder: binder ? { name: binder.name, color: binder.color, shareToken: binder.share_token } : null,
+      cards: cards.map(c => ({
+        page: c.page,
+        slot: c.slot,
+        card: formatCard(c),
+      })),
+    }),
+  }
+}
+
+async function handleBinderView(sql, params) {
+  const { token } = params || {}
+  if (!token) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Token required' }) }
+
+  const [binder] = await sql`
+    SELECT b.*, u.discord_username, u.discord_avatar, u.discord_id
+    FROM cc_binders b
+    JOIN users u ON b.user_id = u.id
+    WHERE b.share_token = ${token}
+  `
+  if (!binder) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Binder not found' }) }
+
+  const cards = await sql`
+    SELECT bc.page, bc.slot,
+           c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
+           c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
+           c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
+           d.best_god_name
+    FROM cc_binder_cards bc
+    JOIN cc_cards c ON bc.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    WHERE bc.user_id = ${binder.user_id}
+    ORDER BY bc.page, bc.slot
+  `
+
+  const avatarUrl = binder.discord_id && binder.discord_avatar
+    ? `https://cdn.discordapp.com/avatars/${binder.discord_id}/${binder.discord_avatar}.webp?size=128`
+    : null
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      binder: { name: binder.name, color: binder.color },
+      owner: { username: binder.discord_username, avatar: avatarUrl },
+      cards: cards.map(c => ({
+        page: c.page,
+        slot: c.slot,
+        card: formatCard(c),
+      })),
+    }),
+  }
+}
+
+async function handleBinderSave(sql, user, body) {
+  const { name, color } = body
+  if (!name || !color) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Name and color required' }) }
+
+  const trimmedName = name.trim().slice(0, 40)
+  const safeColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#8b5e3c'
+
+  await sql`
+    INSERT INTO cc_binders (user_id, name, color)
+    VALUES (${user.id}, ${trimmedName}, ${safeColor})
+    ON CONFLICT (user_id)
+    DO UPDATE SET name = ${trimmedName}, color = ${safeColor}, updated_at = NOW()
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handleBinderSlot(sql, user, body) {
+  const { cardId, page, slot } = body
+  if (!cardId || !page || !slot) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId, page, and slot required' }) }
+  if (page < 1 || page > 10 || slot < 1 || slot > 9) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid page (1-10) or slot (1-9)' }) }
+  }
+
+  // Verify ownership
+  const [card] = await sql`SELECT id FROM cc_cards WHERE id = ${cardId} AND owner_id = ${user.id}`
+  if (!card) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card not found' }) }
+
+  // Check card not locked elsewhere
+  const [tradeLock] = await sql`
+    SELECT tc.id FROM cc_trade_cards tc JOIN cc_trades t ON tc.trade_id = t.id
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') LIMIT 1
+  `
+  if (tradeLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is in an active trade' }) }
+
+  const [marketLock] = await sql`
+    SELECT id FROM cc_market_listings WHERE card_id = ${cardId} AND status = 'active' LIMIT 1
+  `
+  if (marketLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is listed on the marketplace' }) }
+
+  const [s5Lock] = await sql`
+    SELECT role FROM cc_lineups
+    WHERE (card_id = ${cardId} OR god_card_id = ${cardId} OR item_card_id = ${cardId}) AND user_id = ${user.id}
+  `
+  if (s5Lock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is in your Starting 5 lineup' }) }
+
+  // Ensure binder exists
+  await sql`
+    INSERT INTO cc_binders (user_id) VALUES (${user.id})
+    ON CONFLICT (user_id) DO NOTHING
+  `
+
+  // Remove card from any existing binder slot first
+  await sql`DELETE FROM cc_binder_cards WHERE card_id = ${cardId}`
+
+  // Slot the card (upsert — replaces whatever was in this page/slot)
+  await sql`
+    INSERT INTO cc_binder_cards (user_id, card_id, page, slot)
+    VALUES (${user.id}, ${cardId}, ${page}, ${slot})
+    ON CONFLICT (user_id, page, slot)
+    DO UPDATE SET card_id = ${cardId}, slotted_at = NOW()
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handleBinderUnslot(sql, user, body) {
+  const { page, slot } = body
+  if (!page || !slot) return { statusCode: 400, headers, body: JSON.stringify({ error: 'page and slot required' }) }
+
+  await sql`
+    DELETE FROM cc_binder_cards
+    WHERE user_id = ${user.id} AND page = ${page} AND slot = ${slot}
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handleBinderGenerateShare(sql, user, event) {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  const token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+
+  await sql`
+    INSERT INTO cc_binders (user_id, share_token) VALUES (${user.id}, ${token})
+    ON CONFLICT (user_id)
+    DO UPDATE SET share_token = ${token}, updated_at = NOW()
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ shareToken: token }) }
 }
 
 // ═══ Formatters ═══

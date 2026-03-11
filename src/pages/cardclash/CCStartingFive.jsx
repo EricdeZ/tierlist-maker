@@ -420,11 +420,11 @@ export default function CCStartingFive() {
           </div>
 
           {/* Collect + Boost buttons */}
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex items-center gap-2 shrink-0">
             <button
               onClick={() => setShowConsumablePicker(true)}
               disabled={!startingFive?.cards?.length}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold cd-head tracking-wider rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
               title="Use a consumable to boost income progress"
             >
               <Zap size={14} />
@@ -433,7 +433,7 @@ export default function CCStartingFive() {
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed w-full sm:w-auto"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed"
             >
               {collecting ? 'Collecting...' : 'Collect'}
             </button>
@@ -685,7 +685,10 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
                       <div className="flex items-center justify-center gap-1 mt-0.5">
                         <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
                       </div>
-                      <div className="text-[10px] font-bold text-amber-400 cd-num mt-0.5">+{boostPct}%</div>
+                      <div className="flex items-center justify-center gap-1 mt-0.5 text-[10px] font-bold cd-num">
+                        <span className="text-amber-400">+{boostPct}%</span>
+                        <HoloTypeIcon holoType={card.holoType} size={10} />
+                      </div>
                     </div>
                   </button>
                 )

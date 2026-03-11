@@ -1,0 +1,489 @@
+/* ═══════════════════════════════════════════════════
+   Binder — Digital TCG binder with page flip animation
+   ═══════════════════════════════════════════════════ */
+
+/* ── Book container ── */
+.binder-book {
+  perspective: 2400px;
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.binder-book-inner {
+  position: relative;
+  display: flex;
+  min-height: 540px;
+}
+
+/* ── Spine + shadow ── */
+.binder-spine {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  box-shadow: 0 0 20px rgba(0,0,0,0.6), 0 0 4px rgba(0,0,0,0.8);
+}
+
+/* ── Page base ── */
+.binder-page {
+  flex: 1;
+  min-height: 500px;
+  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.binder-page--left {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.binder-page--right {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+/* Page texture */
+.binder-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(255,255,255,0.008) 3px,
+      rgba(255,255,255,0.008) 4px
+    );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Card grid — 3×3 ── */
+.binder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 8px;
+  flex: 1;
+  padding: 4px;
+}
+
+/* ── Card slot (pocket) ── */
+.binder-slot {
+  position: relative;
+  aspect-ratio: 63 / 88;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.25);
+  border: 1px dashed rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.binder-slot:hover {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.04);
+}
+
+.binder-slot--empty::after {
+  content: '+';
+  font-size: 24px;
+  color: rgba(255,255,255,0.1);
+  font-weight: 300;
+  transition: color 0.2s;
+}
+
+.binder-slot--empty:hover::after {
+  color: rgba(255,255,255,0.3);
+}
+
+.binder-slot--filled {
+  border-style: solid;
+  border-color: rgba(255,255,255,0.06);
+  background: transparent;
+  cursor: default;
+}
+
+/* ── Card in slot ── */
+.binder-slot .game-card {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: auto;
+  border-radius: 6px;
+}
+
+.binder-slot .game-card:hover {
+  transform: none;
+}
+
+/* ── Page number ── */
+.binder-page-num {
+  text-align: center;
+  margin-top: 8px;
+  font-family: 'Teko', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.3;
+}
+
+/* ═══ Page flip animation ═══ */
+
+.binder-flip-container {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  perspective: 2400px;
+}
+
+.binder-spread {
+  display: flex;
+  width: 100%;
+  position: relative;
+}
+
+/* Flipping page overlay */
+.binder-flip-page {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.binder-flip-page--forward {
+  animation: binder-page-flip-forward 0.6s ease-in-out forwards;
+}
+
+.binder-flip-page--backward {
+  left: 0;
+  right: auto;
+  transform-origin: right center;
+  animation: binder-page-flip-backward 0.6s ease-in-out forwards;
+}
+
+.binder-flip-front,
+.binder-flip-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 0 4px 4px 0;
+  overflow: hidden;
+}
+
+.binder-flip-back {
+  transform: rotateY(180deg);
+  border-radius: 4px 0 0 4px;
+}
+
+.binder-flip-page--backward .binder-flip-front {
+  border-radius: 4px 0 0 4px;
+}
+
+.binder-flip-page--backward .binder-flip-back {
+  border-radius: 0 4px 4px 0;
+}
+
+@keyframes binder-page-flip-forward {
+  0% {
+    transform: rotateY(0deg);
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+  50% {
+    box-shadow: -20px 0 40px rgba(0,0,0,0.4);
+  }
+  100% {
+    transform: rotateY(-180deg);
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+}
+
+@keyframes binder-page-flip-backward {
+  0% {
+    transform: rotateY(0deg);
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+  50% {
+    box-shadow: 20px 0 40px rgba(0,0,0,0.4);
+  }
+  100% {
+    transform: rotateY(180deg);
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+}
+
+/* ═══ Cover ═══ */
+.binder-cover {
+  position: relative;
+  width: 100%;
+  max-width: 550px;
+  margin: 0 auto;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  box-shadow:
+    0 4px 30px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 -1px 0 rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.binder-cover:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 8px 40px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    inset 0 -1px 0 rgba(0,0,0,0.3);
+}
+
+/* Leather texture overlay */
+.binder-cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 4px,
+      rgba(0,0,0,0.03) 4px,
+      rgba(0,0,0,0.03) 8px
+    );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Embossed border */
+.binder-cover::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 2px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.binder-cover__title {
+  font-family: 'Teko', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  z-index: 1;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.binder-cover__subtitle {
+  font-family: 'Teko', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  z-index: 1;
+}
+
+/* ═══ Card picker modal ═══ */
+.binder-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: cd-fade-in 0.15s ease-out;
+}
+
+.binder-picker {
+  background: var(--cd-surface);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.binder-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cd-border);
+}
+
+.binder-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.binder-picker__card {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  opacity: 0.8;
+}
+
+.binder-picker__card:hover {
+  opacity: 1;
+  transform: scale(1.03);
+}
+
+.binder-picker__card--locked {
+  opacity: 0.3;
+  pointer-events: none;
+  filter: grayscale(0.5);
+}
+
+/* ═══ Responsive ═══ */
+@media (max-width: 768px) {
+  .binder-book-inner {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .binder-page {
+    min-height: auto;
+  }
+
+  .binder-spine {
+    display: none;
+  }
+
+  .binder-page--left {
+    border-radius: 4px 4px 0 0;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    border-bottom: none;
+  }
+
+  .binder-page--right {
+    border-radius: 0 0 4px 4px;
+    border-left: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .binder-grid {
+    gap: 4px;
+    padding: 2px;
+  }
+
+  .binder-slot {
+    border-radius: 4px;
+  }
+
+  .binder-cover {
+    max-width: 300px;
+    aspect-ratio: 2/3;
+  }
+
+  .binder-cover__title {
+    font-size: 24px;
+  }
+
+  .binder-flip-container {
+    perspective: none;
+  }
+
+  .binder-flip-page {
+    display: none;
+  }
+}
+
+/* ═══ Settings panel ═══ */
+.binder-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.binder-color-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.binder-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.binder-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.binder-color-swatch--active {
+  border-color: white;
+  box-shadow: 0 0 8px rgba(255,255,255,0.3);
+}
+
+/* ── Remove button on card ── */
+.binder-slot__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 5;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ff4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.binder-slot:hover .binder-slot__remove {
+  opacity: 1;
+}

@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './cardclash/VaultHeroBanner'
 import VaultTabBar from './cardclash/VaultTabBar'
@@ -22,11 +22,13 @@ const CCGifts = lazy(() => import('./cardclash/CCGifts'))
 const CCTrading = lazy(() => import('./cardclash/CCTrading'))
 const CCDismantle = lazy(() => import('./cardclash/CCDismantle'))
 const CCStartingFive = lazy(() => import('./cardclash/CCStartingFive'))
+const CCBinder = lazy(() => import('./cardclash/CCBinder'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
     { key: 'lineup', label: 'Starting 5', icon: Users },
     { key: 'collection', label: 'Collection', icon: Library },
+    { key: 'binder', label: 'Binder', icon: BookMarked },
     { key: 'gifts', label: 'Gifts', icon: Gift },
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
@@ -43,6 +45,7 @@ const TAB_COMPONENTS = {
     lineup: CCStartingFive,
     catalog: CCCardCatalog,
     collection: CCCollection,
+    binder: CCBinder,
     gifts: CCGifts,
     trade: CCTrading,
     market: CCMarketplace,

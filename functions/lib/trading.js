@@ -119,6 +119,12 @@ export async function addCard(tx, userId, tradeId, cardId) {
   `
   if (inLineup) throw new Error('Card is in your Starting 5 lineup — remove it first')
 
+  // Check card not in binder
+  const [inBinder] = await tx`
+    SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1
+  `
+  if (inBinder) throw new Error('Card is in your binder — remove it first')
+
   // Check max cards per side
   const [{ count }] = await tx`
     SELECT COUNT(*)::int AS count FROM cc_trade_cards
@@ -273,18 +279,18 @@ export async function confirmTrade(tx, userId, tradeId) {
   if (aCards.length > 0) {
     const aCardIds = aCards.map(c => c.card_id)
     await tx`UPDATE cc_cards SET owner_id = ${trade.player_b_id} WHERE id = ANY(${aCardIds})`
-    // Remove traded cards from Starting 5 lineups
     await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${aCardIds})`
     await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${aCardIds})`
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${aCardIds})`
+    await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${aCardIds})`
   }
   if (bCards.length > 0) {
     const bCardIds = bCards.map(c => c.card_id)
     await tx`UPDATE cc_cards SET owner_id = ${trade.player_a_id} WHERE id = ANY(${bCardIds})`
-    // Remove traded cards from Starting 5 lineups
     await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${bCardIds})`
     await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${bCardIds})`
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${bCardIds})`
+    await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${bCardIds})`
   }
 
   // Transfer Core

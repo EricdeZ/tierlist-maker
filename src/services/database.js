@@ -1063,6 +1063,24 @@ export const cardclashService = {
     adminToggleRedeemCode(codeId, active) {
         return apiPost('cardclash', { action: 'toggle-redeem-code' }, { codeId, active })
     },
+    async loadBinder() {
+        return apiCall('cardclash', { action: 'binder' })
+    },
+    async getBinderView(token) {
+        return apiCall('cardclash', { action: 'binder-view', token })
+    },
+    async saveBinder(name, color) {
+        return apiPost('cardclash', { action: 'binder-save' }, { name, color })
+    },
+    async binderSlot(cardId, page, slot) {
+        return apiPost('cardclash', { action: 'binder-slot' }, { cardId, page, slot })
+    },
+    async binderUnslot(page, slot) {
+        return apiPost('cardclash', { action: 'binder-unslot' }, { page, slot })
+    },
+    async binderGenerateShare() {
+        return apiPost('cardclash', { action: 'binder-generate-share' }, {})
+    },
 }
 
 export const marketplaceService = {

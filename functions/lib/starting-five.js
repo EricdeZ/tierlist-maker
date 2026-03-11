@@ -282,6 +282,11 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
   `
   if (listing) throw new Error('Card is listed on marketplace — unlist it first')
 
+  const [inBinder] = await sql`
+    SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1
+  `
+  if (inBinder) throw new Error('Card is in your binder — remove it first')
+
   if (slotType === 'player') {
     if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
     if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
@@ -397,7 +402,7 @@ export async function unslotAttachment(sql, userId, role, slotType) {
 
 export async function useConsumable(sql, userId, cardId) {
   const [card] = await sql`
-    SELECT id, rarity, card_type FROM cc_cards
+    SELECT id, rarity, card_type, holo_type FROM cc_cards
     WHERE id = ${cardId} AND owner_id = ${userId}
   `
   if (!card) throw new Error('Card not found')
@@ -414,8 +419,12 @@ export async function useConsumable(sql, userId, cardId) {
   const passionCap = totalPassionPerDay * CAP_DAYS
   const coresCap = totalCoresPerDay * CAP_DAYS
 
-  const passionBoost = passionCap * boost
-  const coresBoost = coresCap * boost
+  // Holo type determines what gets boosted
+  const boostsPassion = card.holo_type === 'holo' || card.holo_type === 'full' || !card.holo_type
+  const boostsCores = card.holo_type === 'reverse' || card.holo_type === 'full' || !card.holo_type
+
+  const passionBoost = boostsPassion ? passionCap * boost : 0
+  const coresBoost = boostsCores ? coresCap * boost : 0
 
   const newPassion = Math.min(state.passionPending + passionBoost, passionCap)
   const newCores = Math.min(state.coresPending + coresBoost, coresCap)

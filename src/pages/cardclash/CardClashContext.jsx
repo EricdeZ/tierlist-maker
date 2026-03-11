@@ -20,6 +20,8 @@ export function CardClashProvider({ children }) {
   const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, giftInventory: [], unseenCount: 0 })
   const [startingFive, setStartingFive] = useState(null)
   const [defOverrides, setDefOverrides] = useState({})
+  const [binder, setBinder] = useState(null)
+  const [binderCards, setBinderCards] = useState([])
 
   useEffect(() => {
     if (!user) return
@@ -111,6 +113,37 @@ export function CardClashProvider({ children }) {
     return result
   }, [passionCtx])
 
+  const loadBinder = useCallback(async () => {
+    try {
+      const data = await cardclashService.loadBinder()
+      setBinder(data.binder)
+      setBinderCards(data.cards || [])
+    } catch (err) {
+      console.error('Failed to load binder:', err)
+    }
+  }, [])
+
+  const saveBinder = useCallback(async (name, color) => {
+    await cardclashService.saveBinder(name, color)
+    setBinder(prev => ({ ...prev, name, color }))
+  }, [])
+
+  const binderSlotCard = useCallback(async (cardId, page, slot) => {
+    await cardclashService.binderSlot(cardId, page, slot)
+    await loadBinder()
+  }, [loadBinder])
+
+  const binderUnslotCard = useCallback(async (page, slot) => {
+    await cardclashService.binderUnslot(page, slot)
+    setBinderCards(prev => prev.filter(c => !(c.page === page && c.slot === slot)))
+  }, [])
+
+  const binderGenerateShare = useCallback(async () => {
+    const data = await cardclashService.binderGenerateShare()
+    setBinder(prev => ({ ...prev, shareToken: data.shareToken }))
+    return data.shareToken
+  }, [])
+
   const loadStartingFive = useCallback(async () => {
     try {
       const data = await cardclashService.loadStartingFive()
@@ -153,8 +186,11 @@ export function CardClashProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    if (loaded) loadStartingFive()
-  }, [loaded, loadStartingFive])
+    if (loaded) {
+      loadStartingFive()
+      loadBinder()
+    }
+  }, [loaded, loadStartingFive, loadBinder])
 
   const dismantleCards = useCallback(async (cardIds) => {
     const result = await cardclashService.dismantleCards(cardIds)
@@ -232,6 +268,7 @@ export function CardClashProvider({ children }) {
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,
+      binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
       pendingTradeCount, setPendingTradeCount,
       inventory, openInventoryPack,
     }}>

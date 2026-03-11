@@ -1,4 +1,5 @@
 // src/App.jsx
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { PassionProvider } from './context/PassionContext'
@@ -90,6 +91,7 @@ import Players from "./pages/Players.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import CardClashPage from "./pages/CardClashPage.jsx";
 import CardSharePage from "./pages/cardclash/CardSharePage.jsx";
+const BinderSharePage = lazy(() => import("./pages/cardclash/BinderSharePage.jsx"));
 import BgRemover from "./pages/BgRemover.jsx";
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
@@ -112,6 +114,7 @@ function App() {
 
                         {/* Card Clash share — standalone, no app chrome */}
                         <Route path="cardclash/share/:token" element={<CardSharePage />} />
+                        <Route path="cardclash/binder/:token" element={<Suspense fallback={null}><BinderSharePage /></Suspense>} />
 
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector */}
