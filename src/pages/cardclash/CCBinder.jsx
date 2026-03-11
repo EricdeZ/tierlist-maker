@@ -425,7 +425,7 @@ function BinderPageContent({ page, color, cardsBySlot }) {
 
 function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, targetSlot }) {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState('player')
 
   const available = useMemo(() => {
     let cards = collection.filter(c => !binderCardIds.has(c.id))
@@ -459,26 +459,36 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
           </button>
         </div>
 
-        <div className="flex items-center gap-2 px-4 pt-3">
+        <div className="flex flex-col gap-2 px-4 pt-3">
+          <div className="flex items-center gap-1.5">
+            {[
+              { key: 'player', label: 'Players' },
+              { key: 'god', label: 'Gods' },
+              { key: 'item', label: 'Items' },
+              { key: 'consumable', label: 'Consumables' },
+              { key: 'all', label: 'All' },
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold cd-head tracking-wider border transition-all cursor-pointer ${
+                  filter === f.key
+                    ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
+                    : 'bg-transparent text-white/30 border-white/10 hover:text-white/50 hover:border-white/20'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <input
             type="text"
             placeholder="Search cards..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 px-3 py-1.5 rounded-md bg-black/30 border border-white/10 text-white text-sm outline-none focus:border-[var(--cd-cyan)]/40"
+            className="w-full px-3 py-1.5 rounded-md bg-black/30 border border-white/10 text-white text-sm outline-none focus:border-[var(--cd-cyan)]/40"
             autoFocus
           />
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-white text-sm outline-none cursor-pointer"
-          >
-            <option value="all">All</option>
-            <option value="god">Gods</option>
-            <option value="player">Players</option>
-            <option value="item">Items</option>
-            <option value="consumable">Consumables</option>
-          </select>
         </div>
 
         <div className="binder-picker__grid">
