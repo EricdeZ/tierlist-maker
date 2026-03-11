@@ -178,7 +178,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
                   divisionName={playerCard.divisionName}
                   seasonName={seasonName}
                   stats={stats || EMPTY_STATS}
-                  bestGod={bestGodName ? { name: bestGodName } : bestGod}
+                  bestGod={bestGod || (bestGodName ? { name: bestGodName } : null)}
                   isConnected={isConnected}
                   isFirstEdition={playerCard.isFirstEdition}
                 />

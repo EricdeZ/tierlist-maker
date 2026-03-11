@@ -67,7 +67,7 @@ function MarketCard({ card, size }) {
         leagueName={d.leagueName}
         divisionName={d.divisionName}
         stats={EMPTY_STATS}
-        bestGod={card.bestGodName ? { name: card.bestGodName } : (d.bestGod || null)}
+        bestGod={d.bestGod ? { ...d.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
         isFirstEdition={card.isFirstEdition}
         size={size}
       />

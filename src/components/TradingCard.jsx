@@ -253,7 +253,9 @@ export default function TradingCard({
                         )}
                         <span className="card-flavor-text">
                             {bestGod
-                                ? `${playerName}'s most played god is ${bestGod.name} with ${bestGod.games} game${bestGod.games !== 1 ? 's' : ''} and a ${bestGod.winRate?.toFixed(0)}% win rate.`
+                                ? bestGod.games != null
+                                    ? `${playerName}'s most played god is ${bestGod.name} with ${bestGod.games} game${bestGod.games !== 1 ? 's' : ''} and a ${bestGod.winRate?.toFixed(0)}% win rate.`
+                                    : `${playerName}'s most played god is ${bestGod.name}.`
                                 : 'No games recorded this season.'
                             }
                         </span>
