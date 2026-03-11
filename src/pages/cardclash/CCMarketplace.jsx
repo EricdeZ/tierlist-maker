@@ -621,9 +621,12 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
   const [filter, setFilter] = useState('')
 
   const filtered = useMemo(() => {
-    if (!filter) return cards
-    const q = filter.toLowerCase()
-    return cards.filter(c => c.godName.toLowerCase().includes(q))
+    let list = cards
+    if (filter) {
+      const q = filter.toLowerCase()
+      list = list.filter(c => c.godName.toLowerCase().includes(q))
+    }
+    return list.slice().sort((a, b) => (a.godName || '').localeCompare(b.godName || ''))
   }, [cards, filter])
 
   if (activeCount >= MAX_LISTINGS) {
