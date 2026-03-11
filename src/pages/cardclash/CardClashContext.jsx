@@ -153,7 +153,12 @@ export function CardClashProvider({ children }) {
   const convertPassionToEmber = useCallback(async () => {
     try {
       const result = await emberService.convert()
-      await passionCtx?.refreshBalance?.()
+      passionCtx?.updateEmber?.({
+        balance: result.emberBalance,
+        conversionsToday: result.conversionsToday,
+        nextConversionCost: result.nextConversionCost,
+      })
+      passionCtx?.refreshBalance?.()
       return result
     } catch (err) {
       console.error('Failed to convert passion to ember:', err)

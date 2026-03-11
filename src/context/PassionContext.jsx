@@ -156,6 +156,7 @@ export const PassionProvider = ({ children }) => {
 
     const dismissRankUp = useCallback(() => setRankUpInfo(null), [])
     const triggerRankUp = useCallback((overrideRank = null) => setRankUpInfo({ overrideRank }), [])
+    const updateEmber = useCallback((updates) => setEmber(prev => ({ ...prev, ...updates })), [])
 
     const value = useMemo(() => ({
         balance,
@@ -177,6 +178,7 @@ export const PassionProvider = ({ children }) => {
         trackAction,
         refreshBalance,
         updateFromClaim,
+        updateEmber,
         dismissRankUp,
         triggerRankUp,
         addChallengeNotification,
@@ -185,7 +187,7 @@ export const PassionProvider = ({ children }) => {
         balance, totalEarned, currentStreak, longestStreak, canClaimDaily,
         lastDailyClaim, claimableCount, inDiscord, ember, rank, nextRank,
         loading, rankUpInfo, challengeNotifications, claimDaily, claimEmberDaily,
-        trackAction, refreshBalance, updateFromClaim, dismissRankUp, triggerRankUp,
+        trackAction, refreshBalance, updateFromClaim, updateEmber, dismissRankUp, triggerRankUp,
         addChallengeNotification, dismissChallengeNotification,
     ])
 
