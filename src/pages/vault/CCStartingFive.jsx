@@ -1060,7 +1060,7 @@ function SlotAnimationOverlay({ config, rarity }) {
 
 function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
-  const Icon = roleInfo?.icon || Shield
+  const roleIcon = roleInfo?.icon
 
   // Filter eligible cards
   const eligibleCards = useMemo(() => {
@@ -1097,7 +1097,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
           <div className="flex items-center gap-2">
-            <Icon size={18} className="text-[var(--cd-cyan)]" />
+            {roleIcon && <img src={roleIcon} alt="" className="w-[18px] h-[18px] object-contain" />}
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
               Select {roleInfo?.label} Card
             </h3>
@@ -1111,7 +1111,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
           {eligibleCards.length === 0 ? (
             <div className="text-center py-12 text-white/30">
-              <Icon size={40} className="mx-auto mb-3 opacity-20" />
+              {roleIcon && <img src={roleIcon} alt="" className="w-10 h-10 mx-auto mb-3 opacity-20 object-contain" />}
               <p className="text-sm cd-head tracking-wider">No eligible cards</p>
               <p className="text-xs text-white/20 mt-1">Need a player card with the {roleInfo?.label} role</p>
             </div>
@@ -1137,7 +1137,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
 
 function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, playerHoloType, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
-  const Icon = roleInfo?.icon || Shield
+  const roleIcon = roleInfo?.icon
   const playerTier = RARITY_TIER[playerRarity] || 0
 
   const eligibleCards = useMemo(() => {
@@ -1175,7 +1175,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
           <div className="flex items-center gap-2">
-            <Icon size={18} className="text-[var(--cd-cyan)]" />
+            {roleIcon && <img src={roleIcon} alt="" className="w-[18px] h-[18px] object-contain" />}
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
               Attach {slotType === 'god' ? 'God' : 'Item'}{slotType === 'god' ? ` \u2014 ${roleInfo?.label}` : ''}
             </h3>
@@ -1188,7 +1188,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
           {eligibleCards.length === 0 ? (
             <div className="text-center py-12 text-white/30">
-              <Icon size={40} className="mx-auto mb-3 opacity-20" />
+              {roleIcon && <img src={roleIcon} alt="" className="w-10 h-10 mx-auto mb-3 opacity-20 object-contain" />}
               <p className="text-sm cd-head tracking-wider">No eligible {slotType} cards</p>
               <p className="text-xs text-white/20 mt-1">
                 {slotType === 'god'
