@@ -27,6 +27,8 @@ const GOD_SYNERGY_BONUS = 0.30
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
 
+const CONSUMABLE_BOOST = { common: 0.05, uncommon: 0.10, rare: 0.15, epic: 0.25, legendary: 0.35, mythic: 0.50 }
+
 const CAP_DAYS = 2
 const HOURS_PER_DAY = 24
 
@@ -391,4 +393,43 @@ export async function unslotAttachment(sql, userId, role, slotType) {
   }
 
   return await tick(sql, userId)
+}
+
+export async function useConsumable(sql, userId, cardId) {
+  const [card] = await sql`
+    SELECT id, rarity, card_type FROM cc_cards
+    WHERE id = ${cardId} AND owner_id = ${userId}
+  `
+  if (!card) throw new Error('Card not found')
+  if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be used')
+
+  const boost = CONSUMABLE_BOOST[card.rarity]
+  if (!boost) throw new Error('Invalid rarity')
+
+  // Tick first to get current state and caps
+  const state = await tick(sql, userId)
+  if (state.cards.length === 0) throw new Error('No cards slotted — slot players first')
+
+  const { totalPassionPerDay, totalCoresPerDay } = getTotalDailyRates(state.cards)
+  const passionCap = totalPassionPerDay * CAP_DAYS
+  const coresCap = totalCoresPerDay * CAP_DAYS
+
+  const passionBoost = passionCap * boost
+  const coresBoost = coresCap * boost
+
+  const newPassion = Math.min(state.passionPending + passionBoost, passionCap)
+  const newCores = Math.min(state.coresPending + coresBoost, coresCap)
+
+  await sql`
+    UPDATE cc_starting_five_state
+    SET passion_pending = ${newPassion}, cores_pending = ${newCores}
+    WHERE user_id = ${userId}
+  `
+
+  // Destroy the consumable
+  await sql`DELETE FROM cc_cards WHERE id = ${cardId}`
+
+  // Return updated state
+  const updated = await tick(sql, userId)
+  return { ...updated, boostPct: boost, passionBoosted: passionBoost, coresBoosted: coresBoost, consumedCardId: cardId }
 }

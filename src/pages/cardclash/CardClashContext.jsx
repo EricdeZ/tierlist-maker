@@ -145,6 +145,13 @@ export function CardClashProvider({ children }) {
     return data
   }, [passionCtx])
 
+  const boostS5WithConsumable = useCallback(async (cardId) => {
+    const data = await cardclashService.useConsumable(cardId)
+    setStartingFive(data)
+    setCollection(prev => prev.filter(c => c.id !== data.consumedCardId))
+    return data
+  }, [])
+
   useEffect(() => {
     if (loaded) loadStartingFive()
   }, [loaded, loadStartingFive])
@@ -224,7 +231,7 @@ export function CardClashProvider({ children }) {
       buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
-      startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income,
+      startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,
       pendingTradeCount, setPendingTradeCount,
       inventory, openInventoryPack,
     }}>

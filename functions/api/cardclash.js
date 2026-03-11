@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/cardclash.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, getCardRates, getSlotRates, getAttachmentBonusInfo } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable, getCardRates, getSlotRates, getAttachmentBonusInfo } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -61,6 +61,7 @@ const handler = async (event) => {
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
+        case 'use-consumable': return await handleUseConsumable(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
         case 'redeem-code': return await handleRedeemCode(sql, user, body)
         case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
@@ -1050,6 +1051,20 @@ async function handleUnslotAttachment(sql, user, body) {
     .catch(err => console.error('Vault challenge push (unslot-attachment) failed:', err))
 
   return formatS5Response(state)
+}
+
+async function handleUseConsumable(sql, user, body) {
+  const { cardId } = body
+  if (!cardId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+  }
+  const result = await useConsumable(sql, user.id, cardId)
+  return formatS5Response(result, {
+    boostPct: result.boostPct,
+    passionBoosted: result.passionBoosted,
+    coresBoosted: result.coresBoosted,
+    consumedCardId: result.consumedCardId,
+  })
 }
 
 async function handleCollectIncome(sql, user) {

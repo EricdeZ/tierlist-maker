@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useCardClash } from './CardClashContext'
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, getHoloEffect } from '../../data/cardclash/economy'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, CONSUMABLE_BOOST, getHoloEffect } from '../../data/cardclash/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
-import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle } from 'lucide-react'
+import { Shield, TreePine, Sparkles, Heart, Crosshair, Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap } from 'lucide-react'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: Shield },
@@ -50,7 +50,9 @@ function toPlayerCardProps(card) {
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     rarity: card.rarity,
     stats: EMPTY_STATS,
-    bestGod: card.bestGodName ? { name: card.bestGodName } : (cd.bestGod || null),
+    bestGod: cd.bestGod
+      ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
+      : (card.bestGodName ? { name: card.bestGodName } : null),
     isFirstEdition: card.isFirstEdition || false,
   }
 }
@@ -169,7 +171,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, getDefOverride } = useCardClash()
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable, getDefOverride } = useCardClash()
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
   const [slotAnimation, setSlotAnimation] = useState(null)
@@ -178,6 +180,9 @@ export default function CCStartingFive() {
   const [slotting, setSlotting] = useState(false)
   const [zoomedCard, setZoomedCard] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
+  const [showConsumablePicker, setShowConsumablePicker] = useState(false)
+  const [usingConsumable, setUsingConsumable] = useState(false)
+  const [boostNotif, setBoostNotif] = useState(null)
   const slotSize = useSlotSize()
 
   // Live-ticking income counter
@@ -299,6 +304,21 @@ export default function CCStartingFive() {
     }
   }, [collecting, collectS5Income, displayPassion, displayCores])
 
+  const handleUseConsumable = useCallback(async (cardId) => {
+    if (usingConsumable) return
+    setUsingConsumable(true)
+    try {
+      const result = await boostS5WithConsumable(cardId)
+      setShowConsumablePicker(false)
+      setBoostNotif({ pct: Math.round(result.boostPct * 100) })
+      setTimeout(() => setBoostNotif(null), 3000)
+    } catch (err) {
+      console.error('Failed to use consumable:', err)
+    } finally {
+      setUsingConsumable(false)
+    }
+  }, [usingConsumable, boostS5WithConsumable])
+
   const passionCap = startingFive?.passionCap || 0
   const coresCap = startingFive?.coresCap || 0
   const passionPct = passionCap > 0 ? Math.min((displayPassion / passionCap) * 100, 100) : 0
@@ -399,8 +419,17 @@ export default function CCStartingFive() {
             </div>
           </div>
 
-          {/* Collect button */}
-          <div className="relative">
+          {/* Collect + Boost buttons */}
+          <div className="relative flex items-center gap-2">
+            <button
+              onClick={() => setShowConsumablePicker(true)}
+              disabled={!startingFive?.cards?.length}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold cd-head tracking-wider rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Use a consumable to boost income progress"
+            >
+              <Zap size={14} />
+              Boost
+            </button>
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
@@ -410,7 +439,7 @@ export default function CCStartingFive() {
             </button>
             {collectNotif && (
               <div
-                className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-cyan)]/30 text-xs font-bold cd-num flex items-center gap-2"
+                className="absolute -top-10 right-0 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-cyan)]/30 text-xs font-bold cd-num flex items-center gap-2"
                 style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
               >
                 {collectNotif.passion > 0 && (
@@ -419,6 +448,14 @@ export default function CCStartingFive() {
                 {collectNotif.cores > 0 && (
                   <span className="text-[var(--cd-cyan)]">+{collectNotif.cores} <img src={emberIcon} alt="" className="w-3 h-3 inline" /></span>
                 )}
+              </div>
+            )}
+            {boostNotif && (
+              <div
+                className="absolute -top-10 left-0 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-amber-500/30 text-xs font-bold cd-num text-amber-400"
+                style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
+              >
+                +{boostNotif.pct}% boosted!
               </div>
             )}
           </div>
@@ -503,6 +540,17 @@ export default function CCStartingFive() {
 
       {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
 
+      {showConsumablePicker && (
+        <ConsumablePicker
+          collection={collection}
+          allSlottedIds={allSlottedIds}
+          onSelect={handleUseConsumable}
+          onClose={() => setShowConsumablePicker(false)}
+          using={usingConsumable}
+          getDefOverride={getDefOverride}
+        />
+      )}
+
       {/* Card Zoom Modal */}
       {zoomedCard && (
         <CardZoomModal
@@ -565,6 +613,92 @@ export default function CCStartingFive() {
 }
 
 
+function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride }) {
+  const eligibleCards = useMemo(() => {
+    return collection
+      .filter(card => {
+        const type = getCardType(card)
+        if (type !== 'consumable') return false
+        if (allSlottedIds.has(card.id)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        if (rDiff !== 0) return rDiff
+        return (a.godName || '').localeCompare(b.godName || '')
+      })
+  }, [collection, allSlottedIds])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <div className="flex items-center gap-2">
+            <Zap size={18} className="text-amber-400" />
+            <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
+              Use Consumable
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-5 pt-3 pb-1 text-xs text-white/40">
+          Consume a card to instantly boost your pending income. Higher rarity = bigger boost. The card is destroyed.
+        </div>
+
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 110px)' }}>
+          {eligibleCards.length === 0 ? (
+            <div className="text-center py-12 text-white/30">
+              <Zap size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">No consumable cards</p>
+              <p className="text-xs text-white/20 mt-1">Open packs to find consumables</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {eligibleCards.map(card => {
+                const color = RARITIES[card.rarity]?.color || '#9ca3af'
+                const boostPct = Math.round((CONSUMABLE_BOOST[card.rarity] || 0) * 100)
+                const override = getDefOverride?.(card)
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => onSelect(card.id)}
+                    disabled={using}
+                    className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="transition-all group-hover:scale-[1.03]">
+                      <TradingCardHolo rarity={getHoloEffect(card.rarity)} role="ADC" holoType={card.holoType || 'reverse'} size={120}>
+                        <GameCard type="consumable" rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
+                      </TradingCardHolo>
+                    </div>
+                    <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>
+                      <div className="text-[10px] font-bold text-white/60 truncate cd-head">{card.godName}</div>
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+                      </div>
+                      <div className="text-[10px] font-bold text-amber-400 cd-num mt-0.5">+{boostPct}%</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function TutorialModal({ onClose }) {
   return (
     <div
@@ -607,6 +741,11 @@ function TutorialModal({ onClose }) {
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">GOD SYNERGY</h4>
             <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLE BOOST</h4>
+            <p>Use consumable cards to instantly boost your pending income. Higher rarity consumables give a bigger percentage boost. The consumable is destroyed on use.</p>
           </div>
 
           <div>

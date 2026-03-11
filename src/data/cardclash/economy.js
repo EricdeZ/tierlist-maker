@@ -81,3 +81,4 @@ export const ATTACHMENT_BONUSES = {
 
 export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
 export const GOD_SYNERGY_BONUS = 0.30;
+export const CONSUMABLE_BOOST = { common: 0.05, uncommon: 0.10, rare: 0.15, epic: 0.25, legendary: 0.35, mythic: 0.50 };

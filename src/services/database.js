@@ -1045,6 +1045,9 @@ export const cardclashService = {
     collectIncome() {
         return apiPost('cardclash', { action: 'collect-income' }, {})
     },
+    useConsumable(cardId) {
+        return apiPost('cardclash', { action: 'use-consumable' }, { cardId })
+    },
     openInventoryPack(inventoryId) {
         return apiPost('cardclash', { action: 'open-inventory-pack' }, { inventoryId })
     },
