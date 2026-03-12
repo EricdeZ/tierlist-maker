@@ -714,7 +714,8 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           isConnected: cd?.isConnected,
           isFirstEdition: cd?.isFirstEdition,
           bestGod: cd?.bestGod ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null),
-        }
+        },
+        holoType: card.holoType,
       })
     } else {
       const dataMap = DATA_MAPS[card.cardType]
@@ -730,7 +731,8 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           identifier: card.godId,
           rarity: card.rarity,
           data: data || { name: card.godName, slug: card.godId },
-        }
+        },
+        holoType: card.holoType,
       })
     }
   }
@@ -972,6 +974,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
             onClose={() => setZoomedCard(null)}
             gameCard={zoomedCard.gameCard}
             playerCard={zoomedCard.playerCard}
+            holoType={zoomedCard.holoType}
           />
         )}
       </div>

@@ -258,6 +258,7 @@ function formatTradeCard(row) {
       role: row.role,
       rarity: row.rarity,
       holoEffect: row.holo_effect,
+      holoType: row.holo_type,
       imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
         ? '' : row.image_url,
       cardType: row.card_type,

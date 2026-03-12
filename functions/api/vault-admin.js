@@ -476,6 +476,7 @@ function formatAdminCard(row) {
     xp: row.xp,
     serialNumber: row.serial_number,
     holoEffect: row.holo_effect,
+    holoType: row.holo_type,
     imageUrl: row.image_url,
     ability: row.ability,
     metadata: row.metadata || {},
