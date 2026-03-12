@@ -88,7 +88,8 @@ const handler = async (event) => {
                 return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
             }
 
-            const { action, id, name, image_url } = event.body || {}
+            const body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {})
+            const { action, id, name, image_url } = body
 
             if (action === 'create') {
                 if (!name?.trim()) {
