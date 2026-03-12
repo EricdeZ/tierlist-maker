@@ -290,7 +290,7 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
   if (slotType === 'player') {
     if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
     if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
-    if (card.role !== role) throw new Error(`Card role (${card.role}) does not match slot (${role})`)
+    if (card.role !== role && card.role !== 'fill') throw new Error(`Card role (${card.role}) does not match slot (${role})`)
 
     const [existing] = await sql`
       SELECT role FROM cc_lineups
@@ -331,7 +331,7 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
     if (!card.holo_type) throw new Error('Attachment must have a holo type')
     if (card.card_type !== slotType) throw new Error(`Card type (${card.card_type}) does not match slot type (${slotType})`)
 
-    if (slotType === 'god' && card.role !== role) {
+    if (slotType === 'god' && card.role !== role && card.role !== 'fill') {
       throw new Error(`God card role (${card.role}) does not match slot (${role})`)
     }
 

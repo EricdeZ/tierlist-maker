@@ -1099,7 +1099,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
     return collection
       .filter(card => {
         const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
-        if (cardRole !== role) return false
+        if (cardRole !== role && cardRole !== 'fill') return false
         if (!card.holoType && card.rarity !== 'common') return false
         const type = getCardType(card)
         if (type !== 'player') return false
@@ -1180,7 +1180,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
         if (slotType === 'god') {
           const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
-          if (cardRole !== role) return false
+          if (cardRole !== role && cardRole !== 'fill') return false
         }
         if (allSlottedIds.has(card.id)) return false
         return true
