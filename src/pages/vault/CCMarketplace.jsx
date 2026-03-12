@@ -11,6 +11,9 @@ import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2,
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
+const HOLO_TYPES = ['holo', 'reverse', 'full']
+const ROLES = ['solo', 'jungle', 'mid', 'support', 'adc']
+const HOLO_TYPE_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
@@ -93,6 +96,8 @@ export default function CCMarketplace() {
   const [searchInput, setSearchInput] = useState('')
   const [rarity, setRarity] = useState([])
   const [cardType, setCardType] = useState([])
+  const [holoType, setHoloType] = useState([])
+  const [role, setRole] = useState([])
   const [sort, setSort] = useState('newest')
 
   // Modals
@@ -112,6 +117,8 @@ export default function CCMarketplace() {
       const params = { page: String(page), limit: String(limit), sort }
       if (rarity.length) params.rarity = rarity.join(',')
       if (cardType.length) params.cardType = cardType.join(',')
+      if (holoType.length) params.holoType = holoType.join(',')
+      if (role.length) params.role = role.join(',')
       if (search) params.search = search
       const data = await marketplaceService.list(params)
       setListings(data.listings || [])
@@ -121,7 +128,7 @@ export default function CCMarketplace() {
     } finally {
       setLoading(false)
     }
-  }, [page, sort, rarity, cardType, search])
+  }, [page, sort, rarity, cardType, holoType, role, search])
 
   const fetchMyListings = useCallback(async () => {
     try {
@@ -153,6 +160,16 @@ export default function CCMarketplace() {
 
   const toggleCardType = (t) => {
     setCardType(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+    setPage(0)
+  }
+
+  const toggleHoloType = (h) => {
+    setHoloType(prev => prev.includes(h) ? prev.filter(x => x !== h) : [...prev, h])
+    setPage(0)
+  }
+
+  const toggleRole = (r) => {
+    setRole(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
     setPage(0)
   }
 
@@ -301,6 +318,8 @@ export default function CCMarketplace() {
           search={searchInput} setSearch={setSearchInput} onSearch={handleSearch}
           rarity={rarity} toggleRarity={toggleRarity}
           cardType={cardType} toggleCardType={toggleCardType}
+          holoType={holoType} toggleHoloType={toggleHoloType}
+          role={role} toggleRole={toggleRole}
           sort={sort} setSort={(s) => { setSort(s); setPage(0) }}
           setPage={setPage}
           onBuy={(listing) => setBuyModal(listing)}
@@ -362,6 +381,8 @@ function BrowseView({
   search, setSearch, onSearch,
   rarity, toggleRarity,
   cardType, toggleCardType,
+  holoType, toggleHoloType,
+  role, toggleRole,
   sort, setSort,
   setPage, onBuy, onZoom, userId, onRefresh,
 }) {
@@ -427,9 +448,44 @@ function BrowseView({
           </button>
         ))}
 
-        {(rarity.length > 0 || cardType.length > 0) && (
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Holo:</span>
+        {HOLO_TYPES.map(h => (
           <button
-            onClick={() => { rarity.forEach(r => toggleRarity(r)); cardType.forEach(t => toggleCardType(t)) }}
+            key={h}
+            onClick={() => toggleHoloType(h)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              holoType.includes(h)
+                ? 'border-[var(--cd-magenta)]/50 text-[var(--cd-magenta)] bg-[var(--cd-magenta)]/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {HOLO_TYPE_LABELS[h]}
+          </button>
+        ))}
+
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Role:</span>
+        {ROLES.map(r => (
+          <button
+            key={r}
+            onClick={() => toggleRole(r)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              role.includes(r)
+                ? 'border-amber-400/50 text-amber-400 bg-amber-400/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+
+        {(rarity.length > 0 || cardType.length > 0 || holoType.length > 0 || role.length > 0) && (
+          <button
+            onClick={() => {
+              rarity.forEach(r => toggleRarity(r))
+              cardType.forEach(t => toggleCardType(t))
+              holoType.forEach(h => toggleHoloType(h))
+              role.forEach(r => toggleRole(r))
+            }}
             className="text-xs text-white/30 hover:text-white/50 ml-2 cursor-pointer"
           >
             Clear all

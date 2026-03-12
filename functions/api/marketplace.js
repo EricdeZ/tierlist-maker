@@ -48,7 +48,7 @@ const handler = async (event) => {
 async function handleList(sql, params) {
   const {
     page = '0', limit = '24', sort = 'newest',
-    rarity, cardType, search, minPrice, maxPrice,
+    rarity, cardType, search, minPrice, maxPrice, holoType, role,
   } = params
 
   const offset = parseInt(page) * parseInt(limit)
@@ -77,6 +77,14 @@ async function handleList(sql, params) {
   if (cardType) {
     const types = cardType.split(',')
     filtered = filtered.filter(l => types.includes(l.card_type))
+  }
+  if (holoType) {
+    const types = holoType.split(',')
+    filtered = filtered.filter(l => l.holo_type && types.includes(l.holo_type))
+  }
+  if (role) {
+    const roles = role.split(',')
+    filtered = filtered.filter(l => l.role && roles.includes(l.role))
   }
   if (search) {
     const q = search.toLowerCase()
