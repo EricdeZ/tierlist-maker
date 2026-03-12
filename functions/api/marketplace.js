@@ -244,6 +244,7 @@ function formatListing(row) {
       cardData: row.card_data,
       serialNumber: row.serial_number,
       defId: row.def_id,
+      isConnected: row.card_data?.isConnected ?? null,
       bestGodName: row.best_god_name || null,
     },
   }

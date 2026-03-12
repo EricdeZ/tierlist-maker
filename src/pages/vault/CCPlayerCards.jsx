@@ -296,7 +296,7 @@ function computeBestGod(gameHistory) {
   const gods = Object.values(godMap)
   if (!gods.length) return null
 
-  gods.sort((a, b) => b.games - a.games)
+  gods.sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
   const best = gods[0]
   const slug = best.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
 
@@ -317,6 +317,6 @@ function computeMostPlayedGod(gameHistory) {
   }
   const entries = Object.entries(counts)
   if (!entries.length) return null
-  entries.sort((a, b) => b[1] - a[1])
+  entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
   return entries[0][0] // god name string (e.g. "Zeus")
 }

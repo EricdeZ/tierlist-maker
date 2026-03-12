@@ -1060,6 +1060,9 @@ export const vaultService = {
     openInventoryPack(inventoryId) {
         return apiPost('vault', { action: 'open-inventory-pack' }, { inventoryId })
     },
+    buyPacksToInventory(packType, quantity) {
+        return apiPost('vault', { action: 'buy-packs-to-inventory' }, { packType, quantity })
+    },
     redeemCode(code) {
         return apiPost('vault', { action: 'redeem-code' }, { code })
     },
@@ -1236,6 +1239,9 @@ export const vaultAdminService = {
     },
     async backfillCardDefs() {
         return apiPost('vault-admin', { action: 'backfill-card-defs' }, {})
+    },
+    async refreshBestGods() {
+        return apiPost('vault-admin', { action: 'refresh-best-gods' }, {})
     },
 }
 

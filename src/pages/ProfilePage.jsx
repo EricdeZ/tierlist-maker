@@ -454,7 +454,7 @@ const ProfilePage = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-3 text-center text-sm text-(--color-text)">
-                                                    {season.role || '—'}
+                                                    {season.role ? season.role.toUpperCase() : '—'}
                                                 </td>
                                                 <td className="px-3 py-3 text-center text-sm text-(--color-text)">
                                                     {sGames}
@@ -648,7 +648,7 @@ function aggregateGodStats(games, godsList) {
             avgDamage: g.games > 0 ? g.damage / g.games : 0,
             avgMitigated: g.games > 0 ? g.mitigated / g.games : 0,
         }))
-        .sort((a, b) => b.games - a.games)
+        .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
 }
 
 function GodPool({ godStats }) {

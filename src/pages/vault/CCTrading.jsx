@@ -711,9 +711,9 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           leagueName: cd?.leagueName,
           divisionName: cd?.divisionName,
           seasonName: cd?.seasonName,
-          isConnected: cd?.isConnected,
-          isFirstEdition: cd?.isFirstEdition,
-          bestGod: cd?.bestGod ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null),
+          isConnected: card.isConnected,
+          isFirstEdition: card.isFirstEdition,
+          bestGod: card.bestGodName ? { name: card.bestGodName } : null,
         },
         holoType: card.holoType,
       })
@@ -1323,9 +1323,9 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
                 leagueName={cardData?.leagueName || ''}
                 divisionName={cardData?.divisionName || ''}
                 stats={cardData?.stats || null}
-                bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
+                bestGod={card.bestGodName ? { name: card.bestGodName } : null}
                 isFirstEdition={cardData?.isFirstEdition}
-                isConnected={cardData?.isConnected}
+                isConnected={card.isConnected}
                 size={105}
               />
           ) : (
@@ -1600,9 +1600,9 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
               leagueName={cardData?.leagueName || ''}
               divisionName={cardData?.divisionName || ''}
               stats={cardData?.stats || null}
-              bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
+              bestGod={card.bestGodName ? { name: card.bestGodName } : null}
               isFirstEdition={cardData?.isFirstEdition}
-              isConnected={cardData?.isConnected}
+              isConnected={card.isConnected}
               size={100}
             />
           ) : (
@@ -1674,9 +1674,9 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
             leagueName={cardData?.leagueName || ''}
             divisionName={cardData?.divisionName || ''}
             stats={cardData?.stats || null}
-            bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
+            bestGod={card.bestGodName ? { name: card.bestGodName } : null}
             isFirstEdition={card.isFirstEdition || false}
-            isConnected={cardData?.isConnected}
+            isConnected={card.isConnected}
             size={cardSize}
           />
         ) : (

@@ -623,12 +623,10 @@ function toPlayerCardProps(card) {
     role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     seasonName: cd.seasonName || '',
-    bestGod: cd.bestGod
-      ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
-      : (card.bestGodName ? { name: card.bestGodName } : null),
+    bestGod: card.bestGodName ? { name: card.bestGodName } : null,
     stats: cd.stats || null,
     isFirstEdition: card.isFirstEdition || false,
-    isConnected: cd.isConnected,
+    isConnected: card.isConnected,
     defId: card.defId,
     rarity: card.rarity,
   }

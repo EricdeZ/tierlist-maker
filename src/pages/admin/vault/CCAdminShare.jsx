@@ -273,7 +273,7 @@ function buildCardProps(data) {
     }
   }
 
-  const gods = Object.values(godMap).sort((a, b) => b.games - a.games)
+  const gods = Object.values(godMap).sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
   const best = gods[0] || null
   let bestGod = null
   if (best) {

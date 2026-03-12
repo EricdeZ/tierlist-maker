@@ -242,7 +242,7 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
            COUNT(*) FILTER (WHERE g.winner_team_id = ${player.team_id})::int as wins
     FROM player_game_stats pgs JOIN games g ON g.id = pgs.game_id
     WHERE pgs.league_player_id = ${player.lp_id} AND pgs.god_played IS NOT NULL
-    GROUP BY god_played ORDER BY games DESC LIMIT 1
+    GROUP BY god_played ORDER BY games DESC, god_played ASC LIMIT 1
   `
 
   let avatarUrl = null

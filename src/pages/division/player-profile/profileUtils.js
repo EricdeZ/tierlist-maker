@@ -65,5 +65,5 @@ export function aggregateGodStats(games, godsList) {
             avgDamage: g.games > 0 ? g.damage / g.games : 0,
             avgMitigated: g.games > 0 ? g.mitigated / g.games : 0,
         }))
-        .sort((a, b) => b.games - a.games)
+        .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
 }

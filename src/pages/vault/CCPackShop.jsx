@@ -407,7 +407,7 @@ export default function PackShopRouter() {
 // ═══════════════════════════════════════════════
 // Mobile Pack Showcase — fullscreen with tilt
 // ═══════════════════════════════════════════════
-function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResult, claimableCount }) {
+function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResult, claimableCount, quantity, setQuantity }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const scrollRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -429,8 +429,12 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
     const el = scrollRef.current;
     if (!el) return;
     const idx = Math.round(el.scrollLeft / el.offsetWidth);
-    setActiveIndex(Math.max(0, Math.min(idx, packs.length - 1)));
-  }, [packs.length]);
+    const clamped = Math.max(0, Math.min(idx, packs.length - 1));
+    setActiveIndex(prev => {
+      if (prev !== clamped) setQuantity(1);
+      return clamped;
+    });
+  }, [packs.length, setQuantity]);
 
   const [hasScrolled, setHasScrolled] = useState(false);
 
@@ -485,7 +489,8 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
         {packs.map((key) => {
           const pack = packTypesMap[key];
           if (!pack) return null;
-          const canAfford = emberBalance >= pack.cost;
+          const totalCost = pack.cost * quantity;
+          const canAfford = emberBalance >= totalCost;
 
           return (
             <div key={key} className="snap-center shrink-0 w-full flex flex-col items-center px-4 pb-2 relative">
@@ -526,7 +531,7 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
                   </h3>
                   <div className="flex items-center gap-1">
                     <img src={emberIcon} alt="" className="h-3.5 w-auto object-contain cd-icon-glow" />
-                    <span className="text-base font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.cost}</span>
+                    <span className="text-base font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{totalCost}</span>
                   </div>
                 </div>
 
@@ -536,8 +541,27 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
                   <span>1 <span className="text-green-400 font-bold">Rare+</span></span>
                 </div>
 
+                {/* Quantity counter */}
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <button
+                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                    disabled={quantity <= 1}
+                    className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
+                  >−</button>
+                  <span className="text-lg font-bold text-white cd-num w-6 text-center">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(q => q + 1)}
+                    disabled={emberBalance < pack.cost * (quantity + 1)}
+                    className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
+                  >+</button>
+                </div>
+
                 <CDChargeButton
-                  label={canAfford ? `Open for ${pack.cost}` : `Need ${pack.cost} Cores`}
+                  label={!canAfford
+                    ? `Need ${totalCost} Cores`
+                    : quantity > 1
+                      ? `Add to Inventory for ${totalCost}`
+                      : `Open for ${pack.cost}`}
                   onFire={() => onBuy(key)}
                   disabled={!canAfford || !!openResult}
                 />
@@ -555,7 +579,7 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
 // Main Pack Shop (original)
 // ═══════════════════════════════════════════════
 function PackShop() {
-  const { ember, buyPack, packTypes, packTypesMap } = useVault();
+  const { ember, buyPack, buyPacksToInventory, packTypes, packTypesMap } = useVault();
   const { claimEmberDaily, claimableCount } = usePassion();
   const leaguePacks = useMemo(() =>
     packTypes.filter(p => p.leagueId).map(p => p.id),
@@ -563,10 +587,17 @@ function PackShop() {
   );
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   const handleBuyPack = useCallback(async (packType) => {
     try {
       setLoading(true);
+      if (quantity > 1) {
+        await buyPacksToInventory(packType, quantity);
+        setQuantity(1);
+        setLoading(false);
+        return;
+      }
       const result = await buyPack(packType);
       if (!result) { setLoading(false); return; }
       setOpenResult({ ...result, packType });
@@ -575,14 +606,18 @@ function PackShop() {
       setLoading(false);
       alert(err.message || 'Failed to open pack');
     }
-  }, [buyPack]);
+  }, [buyPack, buyPacksToInventory, quantity]);
 
   const closeResult = () => setOpenResult(null);
 
   const emberBalance = ember?.balance ?? 0;
   const [focusedPack, setFocusedPack] = useState(null);
+
+  // Reset quantity when changing focused pack
+  useEffect(() => { setQuantity(1); }, [focusedPack]);
   const focused = focusedPack ? packTypesMap[focusedPack] : null;
-  const focusedAfford = focused ? emberBalance >= focused.cost : false;
+  const focusedTotalCost = focused ? focused.cost * quantity : 0;
+  const focusedAfford = focused ? emberBalance >= focusedTotalCost : false;
   const rowRef = useRef(null);
   const packRefs = useRef({});
   const [packOffset, setPackOffset] = useState({ x: 0, y: 0 });
@@ -722,16 +757,35 @@ function PackShop() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 mb-5">
+                  <div className="flex items-center gap-2.5 mb-3">
                     <img src={emberIcon} alt="" className="h-6 w-auto object-contain cd-icon-glow" />
-                    <span className="text-3xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{pack.cost}</span>
+                    <span className="text-3xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{focusedTotalCost}</span>
                     <span className="text-sm text-white/40 cd-head tracking-wider">Cores</span>
                   </div>
 
+                  {/* Quantity counter */}
+                  <div className="flex items-center justify-center gap-3 mb-5">
+                    <button
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
+                      className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-lg flex items-center justify-center cursor-pointer"
+                    >−</button>
+                    <span className="text-xl font-bold text-white cd-num w-8 text-center">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(q => q + 1)}
+                      disabled={emberBalance < pack.cost * (quantity + 1)}
+                      className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-lg flex items-center justify-center cursor-pointer"
+                    >+</button>
+                  </div>
+
                   <CDChargeButton
-                    label={afford ? `Open for ${pack.cost}` : `Need ${pack.cost} Cores`}
+                    label={!afford
+                      ? `Need ${focusedTotalCost} Cores`
+                      : quantity > 1
+                        ? `Add to Inventory for ${focusedTotalCost}`
+                        : `Open for ${pack.cost}`}
                     onFire={() => handleBuyPack(focusedPack)}
-                    disabled={!afford || !!openResult}
+                    disabled={!afford || !!openResult || loading}
                   />
                   {!afford && <GetCoresHint claimableCount={claimableCount} />}
 
@@ -756,6 +810,8 @@ function PackShop() {
         onBuy={handleBuyPack}
         openResult={openResult}
         claimableCount={claimableCount}
+        quantity={quantity}
+        setQuantity={setQuantity}
       />
 
       {/* ═══ Bottom UI — blurs when pack is focused ═══ */}

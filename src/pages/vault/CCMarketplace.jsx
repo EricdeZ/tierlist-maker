@@ -64,9 +64,9 @@ function MarketCard({ card, size }) {
         divisionName={d.divisionName}
         seasonName={d.seasonName}
         stats={d.stats || null}
-        bestGod={d.bestGod ? { ...d.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
+        bestGod={card.bestGodName ? { name: card.bestGodName } : null}
         isFirstEdition={card.isFirstEdition}
-        isConnected={d.isConnected}
+        isConnected={card.isConnected}
         size={size}
       />
     )
@@ -251,8 +251,8 @@ export default function CCMarketplace() {
         leagueName: card.cardData?.leagueName,
         divisionName: card.cardData?.divisionName,
         seasonName: card.cardData?.seasonName,
-        bestGod: card.cardData?.bestGod || (card.bestGodName ? { name: card.bestGodName } : null),
-        isConnected: card.cardData?.isConnected,
+        bestGod: card.bestGodName ? { name: card.bestGodName } : null,
+        isConnected: card.isConnected,
         isFirstEdition: card.isFirstEdition,
       }, holoType: card.holoType })
     } else {

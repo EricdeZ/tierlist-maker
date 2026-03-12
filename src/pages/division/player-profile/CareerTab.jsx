@@ -184,7 +184,7 @@ function SeasonHistory({ filteredSeasons, player, leagueSlug, divisionSlug, seas
                                             )}
                                         </td>
                                         <td className="px-3 py-3 text-center text-sm text-(--color-text)">
-                                            {s.role || '—'}
+                                            {s.role ? s.role.toUpperCase() : '—'}
                                         </td>
                                         <td className="px-3 py-3 text-center text-sm text-(--color-text)">
                                             {sGames}

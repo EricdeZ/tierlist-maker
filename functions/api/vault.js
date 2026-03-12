@@ -59,6 +59,7 @@ const handler = async (event) => {
         case 'open-inventory-pack': return await handleOpenInventoryPack(sql, user, body)
         case 'send-gift': return await handleSendGift(sql, user, body, event)
         case 'open-gift': return await handleOpenGift(sql, user, body)
+        case 'buy-packs-to-inventory': return await handleBuyPacksToInventory(sql, user, body)
         case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
@@ -91,14 +92,7 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  // Expire stale trades
-  await sql`
-    UPDATE cc_trades SET status = 'expired', updated_at = NOW()
-    WHERE status IN ('waiting', 'active')
-      AND last_polled_at < NOW() - make_interval(mins => 2)
-  `
-
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired] = await Promise.all([
     sql`SELECT c.*, d.best_god_name FROM cc_cards c LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player' WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
@@ -133,6 +127,11 @@ async function handleLoad(sql, user) {
       JOIN cc_pack_types pt ON i.pack_type_id = pt.id
       WHERE i.user_id = ${user.id}
       ORDER BY i.created_at
+    `,
+    sql`
+      UPDATE cc_trades SET status = 'expired', updated_at = NOW()
+      WHERE status IN ('waiting', 'active')
+        AND last_polled_at < NOW() - make_interval(mins => 2)
     `,
   ])
 
@@ -212,6 +211,43 @@ async function handleOpenInventoryPack(sql, user, body) {
     packName: result.packName,
     packType: item.pack_type_id,
     cards,
+  }) }
+}
+
+// ═══ POST: Buy packs to inventory ═══
+async function handleBuyPacksToInventory(sql, user, body) {
+  const { packType, quantity } = body
+  const qty = Math.floor(Number(quantity))
+  if (!packType || !qty || qty < 1) return { statusCode: 400, headers, body: JSON.stringify({ error: 'packType and quantity (>= 1) required' }) }
+  if (qty > 100) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 100 packs per purchase' }) }
+
+  const [pack] = await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
+  if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found' }) }
+
+  const totalCost = pack.cost * qty
+  if (totalCost > 0) {
+    await ensureEmberBalance(sql, user.id)
+    const [bal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
+    if (!bal || bal.balance < totalCost) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Not enough Cores' }) }
+    await grantEmber(sql, user.id, 'cc_pack', -totalCost, `Card Clash: ${qty}x ${pack.name} (inventory)`)
+  }
+
+  // Insert qty rows into inventory
+  const inserted = []
+  for (let i = 0; i < qty; i++) {
+    const [row] = await sql`
+      INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+      VALUES (${user.id}, ${pack.id}, 'shop')
+      RETURNING id, pack_type_id, source, created_at
+    `
+    inserted.push(row)
+  }
+
+  const [updatedBal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    ember: updatedBal?.balance ?? 0,
+    inventory: inserted.map(i => ({ id: i.id, packTypeId: i.pack_type_id, source: i.source, createdAt: i.created_at })),
   }) }
 }
 
@@ -373,7 +409,7 @@ async function handleSharedCard(sql, params) {
       }
     }
 
-    const gods = Object.values(godMap).sort((a, b) => b.games - a.games)
+    const gods = Object.values(godMap).sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
     const best = gods[0] || null
     let bestGod = null
     if (best) {
@@ -600,17 +636,17 @@ async function handleCardDetail(sql, params) {
 
   const games = await sql`
     SELECT pgs.kills, pgs.deaths, pgs.assists, pgs.damage, pgs.mitigated,
-           pgs.god_played, pgs.team_side, g.winner_team_id,
+           pgs.team_side, g.winner_team_id,
            CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END AS player_team_id
     FROM player_game_stats pgs
     JOIN league_players lp ON pgs.league_player_id = lp.id
     JOIN games g ON pgs.game_id = g.id AND g.is_completed = true
     JOIN matches m ON g.match_id = m.id
-    WHERE lp.player_id = ${player.id} AND lp.season_id = ${def.season_id} AND lp.team_id = ${def.team_id}
+    WHERE lp.player_id = ${player.id} AND lp.season_id = ${def.season_id}
+      AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${def.team_id}
   `
 
   let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
-  const godMap = {}
   for (const g of games) {
     gamesPlayed++
     if (g.winner_team_id === g.player_team_id) wins++
@@ -619,23 +655,15 @@ async function handleCardDetail(sql, params) {
     assists += parseInt(g.assists) || 0
     totalDamage += parseInt(g.damage) || 0
     totalMitigated += parseInt(g.mitigated) || 0
-    if (g.god_played) {
-      if (!godMap[g.god_played]) godMap[g.god_played] = { name: g.god_played, games: 0, wins: 0 }
-      godMap[g.god_played].games++
-      if (g.winner_team_id === g.player_team_id) godMap[g.god_played].wins++
-    }
   }
 
-  const gods = Object.values(godMap).sort((a, b) => b.games - a.games)
-  const best = gods[0] || null
+  // Use def.best_god_name as authoritative card identity (not live-computed)
   let bestGod = null
-  if (best) {
-    const slug = best.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+  if (def.best_god_name) {
+    const slug = def.best_god_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     bestGod = {
-      name: best.name,
+      name: def.best_god_name,
       imageUrl: `https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`,
-      games: best.games,
-      winRate: best.games > 0 ? (best.wins / best.games) * 100 : 0,
     }
   }
 
@@ -644,8 +672,8 @@ async function handleCardDetail(sql, params) {
     body: JSON.stringify({
       stats: {
         gamesPlayed, wins,
-        winRate: gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0,
-        kda: deaths > 0 ? (kills + assists / 2) / deaths : kills + assists / 2,
+        winRate: gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 1000) / 10 : 0,
+        kda: deaths > 0 ? Math.round(((kills + assists / 2) / deaths) * 10) / 10 : kills + assists / 2,
         avgDamage: gamesPlayed > 0 ? Math.round(totalDamage / gamesPlayed) : 0,
         avgMitigated: gamesPlayed > 0 ? Math.round(totalMitigated / gamesPlayed) : 0,
         totalKills: kills, totalDeaths: deaths, totalAssists: assists,
@@ -653,7 +681,6 @@ async function handleCardDetail(sql, params) {
       bestGod,
       bestGodName: def.best_god_name || null,
       seasonName: def.season_name,
-      isConnected: player.is_claimed,
     }),
   }
 }
@@ -1438,6 +1465,7 @@ function formatCard(row) {
     cardData: row.card_data || null,
     defId: row.def_id || null,
     isFirstEdition: row.is_first_edition || false,
+    isConnected: row.card_data?.isConnected ?? null,
     bestGodName: row.best_god_name || null,
   }
 }

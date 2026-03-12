@@ -1,5 +1,10 @@
+import { GODS } from '../data/vault/gods'
+
 const DISCORD_CDN = 'https://cdn.discordapp.com/avatars'
 const GOD_CDN = 'https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75'
+
+// Lookup: lowercase god name → imageKey from god data
+const GOD_IMAGE_KEY_MAP = new Map(GODS.map(g => [g.name.toLowerCase(), g.imageKey]))
 
 /** Build Discord avatar URL */
 export function getDiscordAvatarUrl(discordId, discordAvatar, size = 256) {
@@ -7,10 +12,10 @@ export function getDiscordAvatarUrl(discordId, discordAvatar, size = 256) {
     return `${DISCORD_CDN}/${discordId}/${discordAvatar}.webp?size=${size}`
 }
 
-/** Convert god display name to CDN image key (strip non-alphanumeric) */
+/** Convert god display name to CDN image key */
 export function godNameToImageKey(godName) {
     if (!godName) return null
-    return godName.replace(/[^a-zA-Z0-9]/g, '')
+    return GOD_IMAGE_KEY_MAP.get(godName.toLowerCase()) || godName.replace(/[^a-zA-Z0-9]/g, '')
 }
 
 /** Build god card art URL from god name or imageKey */

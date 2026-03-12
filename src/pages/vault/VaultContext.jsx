@@ -215,6 +215,18 @@ export function VaultProvider({ children }) {
     }
   }, [passionCtx])
 
+  const buyPacksToInventory = useCallback(async (packType, quantity) => {
+    try {
+      const result = await vaultService.buyPacksToInventory(packType, quantity)
+      setInventory(prev => [...prev, ...result.inventory])
+      passionCtx?.refreshBalance?.()
+      return result
+    } catch (err) {
+      console.error('Failed to buy packs to inventory:', err)
+      throw err
+    }
+  }, [passionCtx])
+
   const buyPack = useCallback(async (packType) => {
     try {
       const result = await vaultService.openPack(packType)
@@ -264,7 +276,7 @@ export function VaultProvider({ children }) {
     <VaultContext.Provider value={{
       collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
       loaded, loading, getDefOverride,
-      buyPack, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
+      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,

@@ -48,6 +48,7 @@ const handler = async (event) => {
         case 'generate-player-defs':   return await handleGeneratePlayerDefs(sql, body)
         case 'freeze-season-stats':    return await handleFreezeSeasonStats(sql, body)
         case 'backfill-card-defs':     return await handleBackfillCardDefs(sql)
+        case 'refresh-best-gods':     return await handleRefreshBestGods(sql)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -318,8 +319,9 @@ async function handleDeleteCard(sql, body) {
   const { id } = body
   if (!id) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'id required' }) }
 
-  // Clear from lineups first
+  // Clear from lineups and trade references first
   await sql`UPDATE cc_lineups SET card_id = NULL WHERE card_id = ${id}`
+  await sql`DELETE FROM cc_trade_cards WHERE card_id = ${id}`
   await sql`DELETE FROM cc_cards WHERE id = ${id}`
 
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ deleted: true }) }
@@ -457,6 +459,38 @@ async function handleFreezeSeasonStats(sql, body) {
 async function handleBackfillCardDefs(sql) {
   const result = await backfillCardDefs(sql)
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
+}
+
+// ═══ POST: Refresh best_god_name for all player defs missing it ═══
+async function handleRefreshBestGods(sql) {
+  const defs = await sql`
+    SELECT d.id, d.player_id, d.team_id, d.season_id
+    FROM cc_player_defs d
+    WHERE d.best_god_name IS NULL
+  `
+
+  let updated = 0
+  for (const def of defs) {
+    const [row] = await sql`
+      SELECT pgs.god_played FROM player_game_stats pgs
+      JOIN league_players lp ON pgs.league_player_id = lp.id
+      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+      JOIN matches m ON g.match_id = m.id
+      WHERE lp.player_id = ${def.player_id} AND lp.season_id = ${def.season_id}
+        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${def.team_id}
+        AND pgs.god_played IS NOT NULL
+      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+    `
+    if (row) {
+      await sql`
+        UPDATE cc_player_defs SET best_god_name = ${row.god_played}, updated_at = NOW()
+        WHERE id = ${def.id}
+      `
+      updated++
+    }
+  }
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ checked: defs.length, updated }) }
 }
 
 // ═══ Formatter ═══

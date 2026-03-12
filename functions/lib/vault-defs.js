@@ -42,7 +42,7 @@ export async function computePlayerStats(sql, playerId, teamId, seasonId) {
       AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${teamId}
       AND pgs.god_played IS NOT NULL
     GROUP BY pgs.god_played
-    ORDER BY games DESC
+    ORDER BY games DESC, pgs.god_played ASC
     LIMIT 1
   `
 
@@ -208,7 +208,7 @@ export async function generatePlayerDefs(sql, seasonId) {
       WHERE lp.player_id = ${e.playerId} AND lp.season_id = ${seasonId}
         AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${e.teamId}
         AND pgs.god_played IS NOT NULL
-      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC LIMIT 1
+      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
     `
     const bestGodName = bestGodRow?.god_played || null
 
@@ -327,7 +327,7 @@ export async function refreshBestGods(sql, matchId) {
       WHERE lp.player_id = ${p.player_id} AND lp.season_id = ${p.season_id}
         AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${p.team_id}
         AND pgs.god_played IS NOT NULL
-      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC LIMIT 1
+      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
     `
     if (row) {
       await sql`
