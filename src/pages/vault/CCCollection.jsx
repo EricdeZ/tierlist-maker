@@ -650,11 +650,22 @@ function ProgressBar({ collected, total, color }) {
   )
 }
 
+function DuplicateCount({ ownedRarities }) {
+  const count = ownedRarities.length
+  if (count < 2) return null
+  return (
+    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[10px] font-bold text-[var(--cd-text-mid)] cd-num px-1 z-10">
+      x{count}
+    </span>
+  )
+}
+
 function RarityPips({ ownedRarities }) {
+  const distinct = [...new Set(ownedRarities)]
   return (
     <div className="flex gap-0.5 justify-center mt-1">
       {RARITY_ORDER.map(r => {
-        const owned = ownedRarities.includes(r)
+        const owned = distinct.includes(r)
         const info = RARITIES[r]
         return (
           <div
@@ -753,7 +764,10 @@ function CollectionSlot({ entry, type, applyOverride, onZoom }) {
 
     return (
       <div className="flex flex-col items-center card-zoomable" onClick={() => onZoom({ gameCard: { type, rarity, data, identifier: entryGodId(entry, type), ownedRarities: entry.ownedRarities }, canSell: true })}>
-        <GameCard type={type} rarity={rarity} data={data} size={CARD_SIZE} />
+        <div className="relative">
+          <GameCard type={type} rarity={rarity} data={data} size={CARD_SIZE} />
+          <DuplicateCount ownedRarities={entry.ownedRarities} />
+        </div>
         <RarityPips ownedRarities={entry.ownedRarities} />
       </div>
     )
@@ -867,20 +881,23 @@ function PlayerSlot({ card, meta, onZoom }) {
 
     return (
       <div className="flex flex-col items-center card-zoomable" onClick={handleZoom}>
-        <TradingCard
-          playerName={card.playerName}
-          teamName={card.teamName}
-          teamColor={card.teamColor}
-          role={card.role}
-          avatarUrl={card.avatarUrl}
-          rarity={rarity}
-          leagueName={meta.leagueSlug.toUpperCase()}
-          divisionName={meta.divisionName || `Division ${meta.divisionTier}`}
-          bestGod={card.bestGodName ? { name: card.bestGodName } : null}
-          isConnected={card.isConnected}
-          isFirstEdition={isFirstEdition}
-          size={PLAYER_CARD_SIZE}
-        />
+        <div className="relative">
+          <TradingCard
+            playerName={card.playerName}
+            teamName={card.teamName}
+            teamColor={card.teamColor}
+            role={card.role}
+            avatarUrl={card.avatarUrl}
+            rarity={rarity}
+            leagueName={meta.leagueSlug.toUpperCase()}
+            divisionName={meta.divisionName || `Division ${meta.divisionTier}`}
+            bestGod={card.bestGodName ? { name: card.bestGodName } : null}
+            isConnected={card.isConnected}
+            isFirstEdition={isFirstEdition}
+            size={PLAYER_CARD_SIZE}
+          />
+          <DuplicateCount ownedRarities={card.ownedRarities} />
+        </div>
         <RarityPips ownedRarities={card.ownedRarities} />
       </div>
     )

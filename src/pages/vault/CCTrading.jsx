@@ -750,7 +750,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   // ─── Mobile Trade Room ───
   if (isMobile) {
     return (
-      <div className="pb-24">
+      <div className="pb-24 trade-room-active">
         {/* Mobile header */}
         <div className="flex items-center justify-between mb-3 gap-2">
           <div className="flex items-center gap-2 min-w-0">

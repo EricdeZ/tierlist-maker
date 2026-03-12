@@ -808,7 +808,8 @@ function PlayerNameInput({ player, onChange, rosterPlayers }) {
             ? 'bg-amber-500' // sub
             : 'bg-red-500' // unknown
 
-    const showMatchedName = player.matched_name && player.matched_name !== player.player_name
+    // Show original OCR name when it differs from the resolved player_name
+    const wasResolved = player.original_name && player.original_name !== player.player_name
 
     return (
         <div className="relative" ref={containerRef}>
@@ -822,11 +823,14 @@ function PlayerNameInput({ player, onChange, rosterPlayers }) {
                         onFocus={() => { setQuery(player.player_name || ''); setOpen(true) }}
                         className="bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-accent)] outline-none w-full text-sm text-[var(--color-text)] transition-colors py-1"
                     />
-                    {showMatchedName && (
+                    {wasResolved && (
                         <div className="text-[10px] text-[var(--color-text-secondary)] mt-0.5 flex items-center gap-1">
-                            <span>&rarr; {player.matched_name}</span>
+                            <span>extracted: {player.original_name}</span>
                             {player.match_source === 'alias' && (
                                 <span className="text-blue-400/70">(alias)</span>
+                            )}
+                            {player.match_source === 'fuzzy' && (
+                                <span className="text-amber-400/70">(fuzzy)</span>
                             )}
                         </div>
                     )}
@@ -894,7 +898,7 @@ function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
                     <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Unmatched — click to search roster</span>
                 </div>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                    When a name shows <span className="text-[var(--color-text)]">&rarr; Roster Name</span> below it, the player was matched via an alias. <span className="text-blue-400/70">(alias)</span> confirms the alias used.
+                    When <span className="text-[var(--color-text)]">extracted: OCR Name</span> appears below, the name was auto-corrected from the screenshot. <span className="text-blue-400/70">(alias)</span> = matched via alias, <span className="text-amber-400/70">(fuzzy)</span> = matched via similar spelling.
                 </p>
             </div>
         </div>

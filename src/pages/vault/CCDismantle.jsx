@@ -278,7 +278,7 @@ export default function CCDismantle() {
 
       {/* Bottom bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--cd-border)] bg-[#0a0e14]/95 backdrop-blur-md">
+        <div className="fixed bottom-[68px] sidebar:bottom-0 left-0 right-0 z-40 border-t border-[var(--cd-border)] bg-[#0a0e14]/95 backdrop-blur-md">
           <div className="max-w-[1400px] mx-auto px-4 py-3 sm:py-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
             {/* Breakdown */}
             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">

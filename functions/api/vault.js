@@ -462,13 +462,13 @@ async function handleCollectionCatalog(sql) {
 async function handleCollectionOwned(sql, user) {
   const [gameCards, playerCards] = await Promise.all([
     sql`
-      SELECT card_type, god_id, array_agg(DISTINCT rarity) AS rarities
+      SELECT card_type, god_id, array_agg(rarity) AS rarities
       FROM cc_cards
       WHERE owner_id = ${user.id} AND card_type != 'player'
       GROUP BY card_type, god_id
     `,
     sql`
-      SELECT def_id, array_agg(DISTINCT rarity) AS rarities,
+      SELECT def_id, array_agg(rarity) AS rarities,
              array_agg(DISTINCT rarity) FILTER (WHERE is_first_edition) AS fe_rarities
       FROM cc_cards
       WHERE owner_id = ${user.id} AND card_type = 'player' AND def_id IS NOT NULL

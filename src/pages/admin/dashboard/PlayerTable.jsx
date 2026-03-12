@@ -231,8 +231,8 @@ function PlayerRow({ player, playerIdx, seasonId, adminData, usedLpIds, usedName
                             <span className="text-green-400 text-[10px] shrink-0">{'\u2713'}</span>
                         )}
                     </div>
-                    {isMatched && player.matched_name && player.matched_name !== player.player_name && !showSearch && (
-                        <div className="text-[10px] text-[var(--color-text-secondary)] pl-3 truncate">{'\u2192'} {player.matched_name}</div>
+                    {isMatched && player.original_name && player.original_name !== player.player_name && !showSearch && (
+                        <div className="text-[10px] text-[var(--color-text-secondary)] pl-3 truncate">extracted: {player.original_name}</div>
                     )}
                     {player.is_sub && !isMatched && !showSearch && (
                         <>
@@ -249,10 +249,15 @@ function PlayerRow({ player, playerIdx, seasonId, adminData, usedLpIds, usedName
                         </>
                     )}
 
-                    {/* Alias match indicator — shown when auto-matched via alias */}
+                    {/* Match source indicator — shown when auto-matched via alias or fuzzy */}
                     {player.match_source === 'alias' && isMatched && !showSearch && (
                         <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold">
                             via alias{player.matched_alias ? `: "${player.matched_alias}"` : ''}
+                        </span>
+                    )}
+                    {player.match_source === 'fuzzy' && isMatched && !showSearch && (
+                        <span className="text-[9px] ml-3 px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
+                            fuzzy match
                         </span>
                     )}
 

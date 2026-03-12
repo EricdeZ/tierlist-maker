@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, CONSUMABLE_BOOST, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
@@ -27,6 +27,12 @@ const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, my
 
 function getCardType(card) {
   return card.cardType || 'god'
+}
+
+function isHoloMatch(playerHoloType, attachmentHoloType) {
+  if (playerHoloType === 'full') return true
+  if (attachmentHoloType === 'full') return true
+  return playerHoloType === attachmentHoloType
 }
 
 function toGameCardData(card, override) {
@@ -804,9 +810,21 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
   const income = getEffectiveIncomeRate(card)
   const type = getCardType(card)
   const isPlayer = type === 'player'
+  const slotRef = useRef(null)
+
+  useEffect(() => {
+    if (!optionsOpen) return
+    const handler = (e) => {
+      if (slotRef.current && !slotRef.current.contains(e.target)) {
+        onToggleOptions()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [optionsOpen, onToggleOptions])
 
   return (
-    <div className="relative">
+    <div className="relative" ref={slotRef}>
       {/* Animation overlays */}
       {isAnimating && animConfig && (
         <SlotAnimationOverlay config={animConfig} rarity={card.rarity} />
@@ -894,6 +912,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           size={size}
           getDefOverride={getDefOverride}
           synergy={card.godCard?.synergy}
+          playerHoloType={card.holoType}
         />
         <AttachmentSlot
           attachment={card.itemCard}
@@ -902,6 +921,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           onRemove={() => onAttachRemove(role.key, 'item')}
           size={size}
           getDefOverride={getDefOverride}
+          playerHoloType={card.holoType}
         />
       </div>
 
@@ -910,7 +930,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
 }
 
 
-function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride, synergy }) {
+function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride, synergy, playerHoloType }) {
   const attachSize = Math.round(size * 0.4)
 
   if (!attachment) {
@@ -934,21 +954,31 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, 
   const cardOverride = getDefOverride?.(attachment)
   const renderSize = 150
   const scale = attachSize / renderSize
+  const holoMismatch = playerHoloType && !isHoloMatch(playerHoloType, attachment.holoType)
 
   return (
     <div className="relative group">
-      <div style={{ width: attachSize, height: Math.round(attachSize * 88 / 63), overflow: 'hidden' }}>
-        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: renderSize }}>
+      <div style={{ width: attachSize, height: Math.round(attachSize * 88 / 63), overflow: 'hidden' }} className="relative">
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: renderSize, filter: holoMismatch ? 'grayscale(0.7) brightness(0.5)' : undefined }}>
           <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={renderSize}>
             <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} />
           </TradingCardHolo>
         </div>
+        {holoMismatch && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <X size={14} className="text-red-500/80" strokeWidth={3} />
+            <span className="text-[5px] font-bold text-red-400/80 cd-head tracking-wider leading-none">WRONG HOLO</span>
+          </div>
+        )}
       </div>
       <div className="text-center mt-0.5">
-        <div className="text-[7px] font-bold text-white/50 truncate cd-head" style={{ maxWidth: attachSize }}>{attachment.godName}</div>
-        <div className="text-[7px] font-bold cd-head" style={{ color }}>{RARITIES[attachment.rarity]?.name}</div>
-        {synergy && (
+        <div className={`text-[7px] font-bold truncate cd-head ${holoMismatch ? 'text-white/25' : 'text-white/50'}`} style={{ maxWidth: attachSize }}>{attachment.godName}</div>
+        <div className="text-[7px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[attachment.rarity]?.name}</div>
+        {synergy && !holoMismatch && (
           <div className="text-[6px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +30%</div>
+        )}
+        {holoMismatch && (
+          <div className="text-[5px] font-bold cd-head text-red-400/60 tracking-wider">NO BONUS</div>
         )}
       </div>
       <button
@@ -1148,8 +1178,6 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if (type !== slotType) return false
         if (!card.holoType) return false
         if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
-        // Holo type filter: match player's holo type, full always shown, full player sees all
-        if (playerHoloType !== 'full' && card.holoType !== 'full' && card.holoType !== playerHoloType) return false
         if (slotType === 'god') {
           const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
           if (cardRole !== role) return false
@@ -1157,7 +1185,13 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if (allSlottedIds.has(card.id)) return false
         return true
       })
+      .map(card => ({
+        ...card,
+        _holoMismatch: !isHoloMatch(playerHoloType, card.holoType),
+      }))
       .sort((a, b) => {
+        // Sort mismatched cards to the bottom
+        if (a._holoMismatch !== b._holoMismatch) return a._holoMismatch ? 1 : -1
         const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
         if (rDiff !== 0) return rDiff
         return (a.godName || '').localeCompare(b.godName || '')
@@ -1207,6 +1241,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
                   onSelect={() => onSelect(card.id, role, slotType)}
                   disabled={slotting}
                   override={getDefOverride(card)}
+                  holoMismatch={card._holoMismatch}
                 />
               ))}
             </div>
@@ -1218,7 +1253,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
 }
 
 
-function PickerCard({ card, onSelect, disabled, override }) {
+function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getIncomeRate(card)
   const type = getCardType(card)
@@ -1230,7 +1265,7 @@ function PickerCard({ card, onSelect, disabled, override }) {
       disabled={disabled}
       className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      <div className="transition-all group-hover:scale-[1.03]">
+      <div className="relative transition-all group-hover:scale-[1.03]">
         {isPlayer ? (
           <TradingCard
             {...toPlayerCardProps(card)}
@@ -1243,12 +1278,18 @@ function PickerCard({ card, onSelect, disabled, override }) {
             <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
           </TradingCardHolo>
         )}
+        {holoMismatch && (
+          <div className="absolute inset-0 rounded-lg bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+            <X size={28} className="text-red-500/80" strokeWidth={3} />
+            <span className="text-[7px] font-bold text-red-400/90 cd-head tracking-wider mt-0.5">WRONG HOLO</span>
+          </div>
+        )}
       </div>
 
       <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>
-        <div className="text-[10px] font-bold text-white/60 truncate cd-head">{card.godName}</div>
+        <div className={`text-[10px] font-bold truncate cd-head ${holoMismatch ? 'text-white/30' : 'text-white/60'}`}>{card.godName}</div>
         <div className="flex items-center justify-center gap-1 mt-0.5">
-          <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+          <span className="text-[9px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[card.rarity]?.name}</span>
           <HoloTypeIcon holoType={card.holoType} size={10} />
         </div>
         <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">

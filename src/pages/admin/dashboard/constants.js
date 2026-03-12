@@ -106,12 +106,15 @@ export function buildEditData(result, adminData) {
             const normalizedRole = prefillRole && validRoles.some(r => r.toLowerCase() === prefillRole.toLowerCase())
                 ? validRoles.find(r => r.toLowerCase() === prefillRole.toLowerCase())
                 : null
+            // Resolve display name: matched DB name > known sub name > OCR name
+            const resolvedName = m?.db_player?.name || sub?.player_name || null
             return {
                 ...p,
+                player_name: resolvedName || p.player_name,
                 original_name: p.player_name,
-                matched_name: m?.db_player?.name || null,
+                matched_name: resolvedName,
                 matched_lp_id: m?.db_player?.league_player_id || null,
-                match_source: m?.match_source || null,
+                match_source: m?.match_source || (m?.confidence === 'fuzzy' ? 'fuzzy' : null),
                 matched_alias: m?.matched_alias || null,
                 is_sub: !!sub,
                 sub_type: sub?.sub_type || null,

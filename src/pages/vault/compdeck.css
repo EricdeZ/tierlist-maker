@@ -1270,6 +1270,7 @@
    Pack Opening — hide chrome
    ═══════════════════════════════════════════════════ */
 body:has(.pack-opening) nav,
-body:has(.pack-opening) .vault-tab-bar-wrap {
+body:has(.pack-opening) .vault-tab-bar-wrap,
+body:has(.trade-room-active) .vault-tab-bar-wrap {
     display: none !important;
 }

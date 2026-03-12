@@ -582,19 +582,27 @@ async function autoMatchPlayers(extractedGames) {
                 })
             } else {
                 const fuzzy = fuzzyMatch(ep.player_name, nameLookup)
-                if (fuzzy) {
+                // Also try fuzzy matching against roster aliases
+                const fuzzyAlias = !fuzzy ? fuzzyMatch(ep.player_name, aliasLookup) : null
+                const rosterFuzzy = fuzzy || fuzzyAlias
+                if (rosterFuzzy) {
                     matched.push({
                         extracted_name: ep.player_name,
                         side: ep.side,
-                        db_player: fuzzy.matches[0],
-                        all_matches: fuzzy.matches,
+                        db_player: rosterFuzzy.matches[0],
+                        all_matches: rosterFuzzy.matches,
                         confidence: 'fuzzy',
-                        fuzzy_matched_to: fuzzy.matchedName,
+                        match_source: fuzzyAlias ? 'alias' : undefined,
+                        matched_alias: fuzzyAlias ? ep.player_name : null,
+                        fuzzy_matched_to: rosterFuzzy.matchedName,
                         is_sub: false,
                     })
                 } else {
                     const globalMatch = globalNameLookup[key] || globalAliasLookup[key]
-                    const globalFuzzy = !globalMatch ? fuzzyMatch(ep.player_name, globalNameLookup) : null
+                    // Try fuzzy against global names, then global aliases
+                    const globalFuzzyName = !globalMatch ? fuzzyMatch(ep.player_name, globalNameLookup) : null
+                    const globalFuzzyAlias = !globalMatch && !globalFuzzyName ? fuzzyMatch(ep.player_name, globalAliasLookup) : null
+                    const globalFuzzy = globalFuzzyName || globalFuzzyAlias
 
                     if (globalMatch?.length > 0) {
                         unmatched.push({
