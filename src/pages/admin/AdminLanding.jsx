@@ -157,6 +157,22 @@ const tools = [
         btnClass: 'bg-amber-600 hover:bg-amber-700',
     },
     {
+        title: 'God Manager',
+        description: 'View, add, edit, and delete gods in the database. Manage the master god list used across match reports, tier lists, and statistics.',
+        path: '/admin/gods',
+        permission: 'league_manage',
+        globalOnly: true,
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+            </svg>
+        ),
+        accent: 'from-yellow-500/20 to-yellow-600/5',
+        border: 'border-yellow-500/20 hover:border-yellow-500/40',
+        iconColor: 'text-yellow-400',
+        btnClass: 'bg-yellow-600 hover:bg-yellow-700',
+    },
+    {
         title: 'Banned Content',
         description: 'Configure Discord channels for league ban lists. Sync gods, items, relics, and other banned content from Discord messages. Auto-syncs hourly.',
         path: '/admin/banned-content',

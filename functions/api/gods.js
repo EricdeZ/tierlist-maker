@@ -1,5 +1,11 @@
 import { adapt } from '../lib/adapter.js'
-import { getDB, handleCors, getHeaders, headers } from '../lib/db.js'
+import { getDB, handleCors, getHeaders, headers, adminHeaders } from '../lib/db.js'
+import { requirePermission } from '../lib/auth.js'
+import { logAudit } from '../lib/audit.js'
+
+function slugify(str) {
+    return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'god'
+}
 
 const handler = async (event) => {
     const cors = handleCors(event)
@@ -74,6 +80,64 @@ const handler = async (event) => {
                 headers: getHeaders(event),
                 body: JSON.stringify(gods),
             }
+        }
+
+        if (event.httpMethod === 'POST') {
+            const admin = await requirePermission(event, 'league_manage')
+            if (!admin) {
+                return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
+            }
+
+            const { action, id, name, image_url } = event.body || {}
+
+            if (action === 'create') {
+                if (!name?.trim()) {
+                    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Name is required' }) }
+                }
+                const slug = slugify(name.trim())
+                const [god] = await sql`
+                    INSERT INTO gods (name, slug, image_url)
+                    VALUES (${name.trim()}, ${slug}, ${image_url || null})
+                    RETURNING *
+                `
+                await logAudit(sql, admin, { action: 'create-god', endpoint: 'gods', targetType: 'god', targetId: god.id, details: { name: god.name } })
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true, god }) }
+            }
+
+            if (action === 'update') {
+                if (!id) {
+                    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'ID is required' }) }
+                }
+                if (!name?.trim()) {
+                    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Name is required' }) }
+                }
+                const slug = slugify(name.trim())
+                const [god] = await sql`
+                    UPDATE gods
+                    SET name = ${name.trim()}, slug = ${slug}, image_url = ${image_url || null}
+                    WHERE id = ${id}
+                    RETURNING *
+                `
+                if (!god) {
+                    return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'God not found' }) }
+                }
+                await logAudit(sql, admin, { action: 'update-god', endpoint: 'gods', targetType: 'god', targetId: god.id, details: { name: god.name } })
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true, god }) }
+            }
+
+            if (action === 'delete') {
+                if (!id) {
+                    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'ID is required' }) }
+                }
+                const [god] = await sql`DELETE FROM gods WHERE id = ${id} RETURNING *`
+                if (!god) {
+                    return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'God not found' }) }
+                }
+                await logAudit(sql, admin, { action: 'delete-god', endpoint: 'gods', targetType: 'god', targetId: god.id, details: { name: god.name } })
+                return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+            }
+
+            return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Unknown action' }) }
         }
 
         return {

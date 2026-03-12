@@ -52,6 +52,7 @@ function toPlayerCardProps(card) {
     bestGod: cd.bestGod
       ? { ...cd.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) }
       : (card.bestGodName ? { name: card.bestGodName } : null),
+    stats: cd.stats || null,
     isFirstEdition: card.isFirstEdition || false,
     isConnected: cd.isConnected,
     defId: card.defId,

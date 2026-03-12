@@ -211,7 +211,16 @@ export const godService = {
     },
     async getTopPlayers() {
         return apiCall('gods', { action: 'top-players' })
-    }
+    },
+    async create(name, image_url) {
+        return apiPost('gods', {}, { action: 'create', name, image_url })
+    },
+    async update(id, name, image_url) {
+        return apiPost('gods', {}, { action: 'update', id, name, image_url })
+    },
+    async delete(id) {
+        return apiPost('gods', {}, { action: 'delete', id })
+    },
 }
 
 export const godpoolService = {

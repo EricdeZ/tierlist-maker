@@ -187,8 +187,8 @@ export default function TradingCard({
                         </span>
                     </div>
 
-                    {/* Stats section — always rendered, dashes when no data */}
-                    <div className="card-stats-section">
+                    {/* Stats section — only rendered when stats are available or being loaded */}
+                    {(stats || loadStats) && <div className="card-stats-section">
                         <div className="card-stats-grid">
                             <div className="card-stat-row">
                                 <div className="card-stat-energy">
@@ -255,7 +255,7 @@ export default function TradingCard({
                                 <span className="card-record-label">Games</span>
                             </div>
                         </div>
-                    </div>
+                    </div>}
 
                     {/* Flavor text */}
                     <div className="card-flavor">

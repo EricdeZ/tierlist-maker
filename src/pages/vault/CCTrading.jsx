@@ -1319,6 +1319,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
                 rarity={card.rarity}
                 leagueName={cardData?.leagueName || ''}
                 divisionName={cardData?.divisionName || ''}
+                stats={cardData?.stats || null}
                 bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
                 isFirstEdition={cardData?.isFirstEdition}
                 isConnected={cardData?.isConnected}
@@ -1595,6 +1596,7 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
               rarity={card.rarity}
               leagueName={cardData?.leagueName || ''}
               divisionName={cardData?.divisionName || ''}
+              stats={cardData?.stats || null}
               bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
               isFirstEdition={cardData?.isFirstEdition}
               isConnected={cardData?.isConnected}
@@ -1668,6 +1670,7 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
             rarity={card.rarity}
             leagueName={cardData?.leagueName || ''}
             divisionName={cardData?.divisionName || ''}
+            stats={cardData?.stats || null}
             bestGod={cardData?.bestGod ? { ...cardData.bestGod, ...(card.bestGodName ? { name: card.bestGodName } : {}) } : (card.bestGodName ? { name: card.bestGodName } : null)}
             isFirstEdition={card.isFirstEdition || false}
             isConnected={cardData?.isConnected}

@@ -79,6 +79,7 @@ import ReferralManager from "./pages/admin/ReferralManager.jsx";
 import CommunityTeamAdmin from "./pages/admin/CommunityTeamAdmin.jsx";
 import ScrimAdmin from "./pages/admin/ScrimAdmin.jsx";
 import StageManager from "./pages/admin/StageManager.jsx";
+import GodManager from "./pages/admin/GodManager.jsx";
 import StaffSettings from "./pages/admin/StaffSettings.jsx";
 import SingleMatchReport from "./pages/admin/SingleMatchReport.jsx";
 import CardPreview from "./pages/admin/CardPreview.jsx";
@@ -160,6 +161,7 @@ function App() {
                                 <Route path="vending-restock" element={<ProtectedRoute requiredPermission="permission_manage"><VendingRestock /></ProtectedRoute>} />
                                 <Route path="pack-creator" element={<ProtectedRoute requiredPermission="permission_manage"><PackCreator /></ProtectedRoute>} />
                                 <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />
+                                <Route path="gods" element={<ProtectedRoute requiredPermission="league_manage"><GodManager /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
                             </Route>
 
