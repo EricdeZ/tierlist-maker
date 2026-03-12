@@ -19,7 +19,7 @@ import CareerTab from './player-profile/CareerTab'
 const PlayerProfile = () => {
     const { leagueSlug, divisionSlug, playerSlug } = useParams()
     const { players, teams, season, division, loading: divisionLoading } = useDivision()
-    const { user, linkedPlayer, login, loading: authLoading } = useAuth()
+    const { user, linkedPlayer, loading: authLoading } = useAuth()
 
     const [gameHistory, setGameHistory] = useState([])
     const [playerStats, setPlayerStats] = useState(null)
@@ -160,7 +160,6 @@ const PlayerProfile = () => {
                 isOwnProfile={isOwnProfile}
                 user={user}
                 linkedPlayer={linkedPlayer}
-                login={login}
                 authLoading={authLoading}
             />
 
