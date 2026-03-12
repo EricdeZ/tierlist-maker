@@ -56,7 +56,7 @@ async function handleList(sql, params) {
 
   const rows = await sql`
     SELECT l.id, l.seller_id, l.card_id, l.core_price, l.created_at,
-           c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.image_url,
+           c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
            d.best_god_name,
            u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id
@@ -116,7 +116,7 @@ async function handleList(sql, params) {
 // ═══ GET: My listings ═══
 async function handleMyListings(sql, user) {
   const rows = await sql`
-    SELECT l.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.image_url,
+    SELECT l.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
            d.best_god_name,
            bu.discord_username AS buyer_name
@@ -229,6 +229,7 @@ function formatListing(row) {
       role: row.role,
       rarity: row.rarity,
       holoEffect: row.holo_effect,
+      holoType: row.holo_type,
       imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
         ? '' : row.image_url,
       cardType: row.card_type,

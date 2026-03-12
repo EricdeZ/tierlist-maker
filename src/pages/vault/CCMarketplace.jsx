@@ -237,9 +237,9 @@ export default function CCMarketplace() {
         bestGod: card.cardData?.bestGod || (card.bestGodName ? { name: card.bestGodName } : null),
         isConnected: card.cardData?.isConnected,
         isFirstEdition: card.isFirstEdition,
-      }})
+      }, holoType: card.holoType })
     } else {
-      setZoomedCard({ gameCard: { type, rarity: card.rarity, data: buildCardData(card, getDefOverride(card)) } })
+      setZoomedCard({ gameCard: { type, rarity: card.rarity, data: buildCardData(card, getDefOverride(card)) }, holoType: card.holoType })
     }
   }
 
@@ -347,6 +347,7 @@ export default function CCMarketplace() {
           onClose={() => setZoomedCard(null)}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
+          holoType={zoomedCard.holoType}
         />
       )}
     </div>
