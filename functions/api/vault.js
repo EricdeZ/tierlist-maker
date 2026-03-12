@@ -225,30 +225,37 @@ async function handleBuyPacksToInventory(sql, user, body) {
   if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found' }) }
 
   const totalCost = pack.cost * qty
-  if (totalCost > 0) {
-    await ensureEmberBalance(sql, user.id)
-    const [bal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
-    if (!bal || bal.balance < totalCost) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Not enough Cores' }) }
-    await grantEmber(sql, user.id, 'cc_pack', -totalCost, `Card Clash: ${qty}x ${pack.name} (inventory)`)
+
+  try {
+    const result = await transaction(async (tx) => {
+      if (totalCost > 0) {
+        await ensureEmberBalance(tx, user.id)
+        const [bal] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${user.id} FOR UPDATE`
+        if (!bal || bal.balance < totalCost) throw new Error('Not enough Cores')
+        await grantEmber(tx, user.id, 'cc_pack', -totalCost, `Card Clash: ${qty}x ${pack.name} (inventory)`)
+      }
+
+      const inserted = await tx`
+        INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+        SELECT ${user.id}, ${pack.id}, 'shop'
+        FROM generate_series(1, ${qty})
+        RETURNING id, pack_type_id, source, created_at
+      `
+
+      const [updatedBal] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
+
+      return {
+        ember: updatedBal?.balance ?? 0,
+        inventory: inserted.map(i => ({ id: i.id, packTypeId: i.pack_type_id, source: i.source, createdAt: i.created_at })),
+      }
+    })
+
+    return { statusCode: 200, headers, body: JSON.stringify(result) }
+  } catch (err) {
+    const msg = err.message
+    if (msg === 'Not enough Cores') return { statusCode: 400, headers, body: JSON.stringify({ error: msg }) }
+    throw err
   }
-
-  // Insert qty rows into inventory
-  const inserted = []
-  for (let i = 0; i < qty; i++) {
-    const [row] = await sql`
-      INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
-      VALUES (${user.id}, ${pack.id}, 'shop')
-      RETURNING id, pack_type_id, source, created_at
-    `
-    inserted.push(row)
-  }
-
-  const [updatedBal] = await sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
-
-  return { statusCode: 200, headers, body: JSON.stringify({
-    ember: updatedBal?.balance ?? 0,
-    inventory: inserted.map(i => ({ id: i.id, packTypeId: i.pack_type_id, source: i.source, createdAt: i.created_at })),
-  }) }
 }
 
 // ═══ POST: Open pack ═══
