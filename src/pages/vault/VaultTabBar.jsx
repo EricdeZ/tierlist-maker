@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
 import { Package, Users, Library, Star, MoreHorizontal, X } from 'lucide-react'
 
 const PRIMARY_TABS = [
@@ -12,8 +11,6 @@ const PRIMARY_TABS = [
 const PRIMARY_KEYS = new Set(PRIMARY_TABS.map(t => t.key))
 
 export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, claimableCount, packMode, onPackModeChange, myPacksCount }) {
-  const { hasPermission } = useAuth()
-  const isOwner = hasPermission('permission_manage')
   const [moreOpen, setMoreOpen] = useState(false)
 
   const secondaryTabs = tabs.filter(t => !PRIMARY_KEYS.has(t.key))
@@ -88,7 +85,7 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
               { key: 'my-packs', label: 'MY PACKS', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', badge: myPacksCount },
               { key: 'shop', label: 'SHOP', active: 'bg-white/10 text-white border-white/30' },
               { key: 'sale', label: 'LIMITED', active: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-              ...(isOwner ? [{ key: 'black-market', label: 'BLACK MARKET', active: 'bg-red-500/15 text-red-400 border-red-500/30' }] : []),
+              { key: 'black-market', label: 'BLACK MARKET', shortLabel: 'BM', active: 'bg-red-500/15 text-red-400 border-red-500/30' },
             ].map(m => (
               <button
                 key={m.key}
@@ -98,7 +95,7 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
                 }`}
                 style={{ fontFamily: "'Teko', sans-serif", fontSize: 11, letterSpacing: '0.15em' }}
               >
-                {m.label}
+                {m.shortLabel ? (<><span className="hidden min-[360px]:inline">{m.label}</span><span className="min-[360px]:hidden">{m.shortLabel}</span></>) : m.label}
                 {m.badge > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-emerald-500 text-[8px] font-bold text-black flex items-center justify-center">
                     {m.badge}

@@ -1099,6 +1099,9 @@ export const vaultService = {
     blackMarketClaimMythic(data) {
         return apiPost('vault', { action: 'black-market-claim-mythic' }, data)
     },
+    blackMarketDebugPending() {
+        return apiPost('vault', { action: 'black-market-debug-pending' }, {})
+    },
 }
 
 export const bountyService = {

@@ -658,19 +658,21 @@ function RedeemSection({ setOpenResult }) {
   const [code, setCode] = useState('')
   const [redeeming, setRedeeming] = useState(false)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState(null)
 
   const handleRedeem = async () => {
     if (!code.trim()) return
     setRedeeming(true)
     setError(null)
-    setSuccess(false)
+    setSuccess(null)
     try {
       const result = await vaultService.redeemCode(code.trim())
-      setSuccess(true)
       setCode('')
-      setOpenResult(result)
-      setTimeout(() => setSuccess(false), 3000)
+      if (result.toInventory) {
+        setSuccess(`${result.quantity}x ${result.packName} added to your inventory!`)
+      } else {
+        setOpenResult(result)
+      }
     } catch (err) {
       setError(err.message || 'Failed to redeem code')
     } finally {
@@ -710,7 +712,7 @@ function RedeemSection({ setOpenResult }) {
         )}
         {success && (
           <div className="mt-4 py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs cd-head tracking-wider">
-            Code redeemed successfully!
+            {success}
           </div>
         )}
       </div>

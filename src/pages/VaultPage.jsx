@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { VaultProvider, useVault } from './vault/VaultContext'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -6,7 +6,7 @@ import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
@@ -43,6 +43,8 @@ const TABS = [
     { key: 'catalog', label: 'Catalog', icon: BookOpen },
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
 ]
+
+const DESKTOP_MORE_KEYS = new Set(['settings', 'binder', 'catalog'])
 
 const TAB_COMPONENTS = {
     packs: CCPackShop,
@@ -118,6 +120,8 @@ function VaultInner() {
     const { claimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
     const { loading, loaded, giftData, pendingTradeCount, inventory } = useVault()
+    const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
+    const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
 
     // Poll claimableCount every 60s while vault is visible
@@ -133,6 +137,21 @@ function VaultInner() {
         ? `${activeTabLabel} - The Vault`
         : 'The Vault'
     const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
+    const desktopPrimaryTabs = visibleTabs.filter(t => !DESKTOP_MORE_KEYS.has(t.key))
+    const desktopSecondaryTabs = visibleTabs.filter(t => DESKTOP_MORE_KEYS.has(t.key))
+    const activeIsDesktopSecondary = DESKTOP_MORE_KEYS.has(activeTab)
+
+    // Close desktop "More" dropdown on outside click
+    useEffect(() => {
+        if (!desktopMoreOpen) return
+        const handler = (e) => {
+            if (desktopMoreRef.current && !desktopMoreRef.current.contains(e.target)) {
+                setDesktopMoreOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [desktopMoreOpen])
 
     const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length
     const myPacksCount = (inventory?.length || 0) + unopenedGifts
@@ -172,7 +191,7 @@ function VaultInner() {
             <main className={`relative z-1 max-w-[1400px] mx-auto px-4 pb-20 sidebar:pb-0 ${activeTab === 'packs' ? 'pt-18 sm:pt-6' : 'pt-6'}`}>
                 {/* Tab switcher — desktop only (>=1400px) */}
                 <div className="relative z-10 hidden sidebar:flex items-center gap-6 border-b border-[var(--cd-border)] pb-0">
-                    {visibleTabs.map(tab => {
+                    {desktopPrimaryTabs.map(tab => {
                         const Icon = tab.icon
                         const active = activeTab === tab.key
                         return (
@@ -207,6 +226,45 @@ function VaultInner() {
                         )
                     })}
 
+                    {/* More dropdown for secondary tabs */}
+                    <div className="relative" ref={desktopMoreRef}>
+                        <button
+                            onClick={() => setDesktopMoreOpen(!desktopMoreOpen)}
+                            className={`relative flex items-center gap-2 px-1 pb-3 text-sm font-bold uppercase tracking-widest transition-all cursor-pointer cd-head ${
+                                desktopMoreOpen || activeIsDesktopSecondary
+                                    ? 'text-[var(--cd-cyan)] cd-tab-glow'
+                                    : 'text-white/30 hover:text-white/60'
+                            }`}
+                        >
+                            <MoreHorizontal className={`w-4 h-4 ${desktopMoreOpen || activeIsDesktopSecondary ? 'cd-icon-glow' : ''}`} />
+                            More
+                            {(desktopMoreOpen || activeIsDesktopSecondary) && (
+                                <span className="absolute bottom-0 left-0 right-0 cd-tab-active cd-neon-shine" />
+                            )}
+                        </button>
+                        {desktopMoreOpen && (
+                            <div className="absolute top-full right-0 mt-2 min-w-[180px] bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg py-1 shadow-2xl z-50">
+                                {desktopSecondaryTabs.map(tab => {
+                                    const Icon = tab.icon
+                                    const active = activeTab === tab.key
+                                    return (
+                                        <button
+                                            key={tab.key}
+                                            onClick={() => { setTab(tab.key); setDesktopMoreOpen(false) }}
+                                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold uppercase tracking-widest transition-all cursor-pointer cd-head ${
+                                                active
+                                                    ? 'text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
+                                                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                                            }`}
+                                        >
+                                            <Icon className={`w-4 h-4 ${active ? 'cd-icon-glow' : ''}`} />
+                                            {tab.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <p className={`hidden sm:block text-[10px] text-white/25 mt-2 ${unseenGifts > 0 && activeTab !== 'gifts' ? 'mb-2' : 'mb-6'}`}>

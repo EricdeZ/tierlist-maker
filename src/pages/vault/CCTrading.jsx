@@ -52,11 +52,20 @@ function useIsMobile() {
 export default function CCTrading() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, pendingTradeCount, setPendingTradeCount, startingFive, refreshCollection } = useVault()
+  const { collection, pendingTradeCount, setPendingTradeCount, startingFive, binderCards, refreshCollection } = useVault()
 
-  const s5CardIds = useMemo(() =>
-    new Set((startingFive?.cards || []).map(c => c.id)),
-  [startingFive])
+  const lockedCardIds = useMemo(() => {
+    const ids = new Set()
+    for (const card of (startingFive?.cards || [])) {
+      ids.add(card.id)
+      if (card.godCard) ids.add(card.godCard.id)
+      if (card.itemCard) ids.add(card.itemCard.id)
+    }
+    for (const bc of (binderCards || [])) {
+      if (bc.card?.id) ids.add(bc.card.id)
+    }
+    return ids
+  }, [startingFive, binderCards])
 
   const [view, setView] = useState('inbox')
   const [pending, setPending] = useState([])
@@ -257,7 +266,7 @@ export default function CCTrading() {
           onEnd={handleTradeEnd}
           setError={setError}
           setSuccess={setSuccess}
-          s5CardIds={s5CardIds}
+          lockedCardIds={lockedCardIds}
         />
       )}
 
@@ -525,7 +534,7 @@ function UserSearchModal({ onClose, onSelect, currentUserId }) {
 // ═══════════════════════════════════════
 // Trade Room
 // ═══════════════════════════════════════
-function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess, s5CardIds }) {
+function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess, lockedCardIds }) {
   const { getDefOverride } = useVault()
   const isMobile = useIsMobile()
   const [trade, setTrade] = useState(null)
@@ -597,7 +606,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   [myCards])
 
   const availableCards = useMemo(() => {
-    let cards = collection.filter(c => !myCardIds.has(c.id) && !s5CardIds.has(c.id))
+    let cards = collection.filter(c => !myCardIds.has(c.id) && !lockedCardIds.has(c.id))
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -617,7 +626,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
     }
 
     return cards
-  }, [collection, myCardIds, s5CardIds, searchQuery, rarityFilter, typeFilter])
+  }, [collection, myCardIds, lockedCardIds, searchQuery, rarityFilter, typeFilter])
 
   const handleAddCard = async (cardId) => {
     setActionLoading(true)

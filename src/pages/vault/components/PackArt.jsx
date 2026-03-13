@@ -11,7 +11,7 @@ const PACK_FEATURED_GODS = {
   legendary: ['Zeus', 'Odin', 'Ra', 'Poseidon', 'Agni'],
   mixed: ['Discordia', 'Freya', 'NuWa', 'Pele', 'Sol'],
   'osl-mixed': ['Zeus', 'Athena', 'Ares', 'Poseidon', 'Hercules'],
-  'bsl-mixed': ['Anubis', 'Ra', 'Hades', 'Agni', 'Bakasura'],
+  'bsl-mixed': ['Anubis', 'Ra', 'Hades', 'Agni', 'Bellona'],
   gift: ['Cupid', 'Cupid', 'Cupid', 'Cupid', 'Cupid'],
 }
 

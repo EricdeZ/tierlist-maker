@@ -63,8 +63,9 @@ const handler = async (event) => {
         case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
-        case 'black-market-turn-in': { await requirePermission(event, 'permission_manage'); return await handleBlackMarketTurnIn(sql, user, body) }
-        case 'black-market-claim-mythic': { await requirePermission(event, 'permission_manage'); return await handleBlackMarketClaimMythic(sql, user, body) }
+        case 'black-market-turn-in': return await handleBlackMarketTurnIn(sql, user, body)
+        case 'black-market-claim-mythic': return await handleBlackMarketClaimMythic(sql, user, body)
+        case 'black-market-debug-pending': { await requirePermission(event, 'permission_manage'); return await handleBlackMarketDebugPending(sql, user) }
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
@@ -983,8 +984,10 @@ async function handleDismantle(sql, user, body) {
   await ensureStats(sql, user.id)
   const [currentStats] = await sql`SELECT dismantled_today, dismantle_reset_date FROM cc_stats WHERE user_id = ${user.id}`
   const today = new Date().toISOString().slice(0, 10)
-  const resetDate = currentStats.dismantle_reset_date ? new Date(currentStats.dismantle_reset_date).toISOString().slice(0, 10) : null
-  const dismantledToday = resetDate === today ? (currentStats.dismantled_today || 0) : 0
+  const dismantledToday = currentStats.dismantle_reset_date === today ? (currentStats.dismantled_today || 0) : 0
+
+  // Sort by rarity value descending so highest-value cards get the best rate
+  cards.sort((a, b) => (DISMANTLE_VALUES[b.rarity] || 0) - (DISMANTLE_VALUES[a.rarity] || 0))
 
   // Calculate total with diminishing returns applied server-side
   let total = 0
@@ -1022,7 +1025,7 @@ async function handleDismantle(sql, user, body) {
       cards_dismantled = cards_dismantled + ${validIds.length},
       legendary_cards_dismantled = legendary_cards_dismantled + ${legendaryCount},
       dismantled_today = ${newDismantledToday},
-      dismantle_reset_date = CURRENT_DATE
+      dismantle_reset_date = ${today}
     WHERE user_id = ${user.id}
   `
 
@@ -1162,10 +1165,12 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
     }
 
     // Validate card definition exists
+    let defId = null
     if (cardType === 'player') {
-      if (!body.defId) throw new Error('defId required for player cards')
-      const [def] = await tx`SELECT id FROM cc_player_defs WHERE id = ${body.defId}`
+      if (!body.godName) throw new Error('godName required for player cards')
+      const [def] = await tx`SELECT id FROM cc_player_defs WHERE player_name = ${body.godName} LIMIT 1`
       if (!def) throw new Error('Player definition not found')
+      defId = def.id
     } else {
       if (!godId || typeof godId !== 'string') throw new Error('Invalid godId')
     }
@@ -1181,7 +1186,7 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
         ${user.id}, ${godId}, ${body.godName || ''}, ${body.godClass || ''},
         ${body.role || ''}, 'mythic',
         ${serialNumber}, 'rainbow', 'holo', 'black-market', ${cardType},
-        ${cardType === 'player' ? (body.defId || null) : null}
+        ${defId}
       )
       RETURNING *
     `
@@ -1198,6 +1203,12 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
     statusCode: 200, headers,
     body: JSON.stringify({ success: true, card: formatCard(result) }),
   }
+}
+
+async function handleBlackMarketDebugPending(sql, user) {
+  await ensureStats(sql, user.id)
+  await sql`UPDATE cc_stats SET pending_mythic_claim = pending_mythic_claim + 1 WHERE user_id = ${user.id}`
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
 
 // ═══ Starting 5 ═══
@@ -1363,8 +1374,14 @@ async function handleRedeemCode(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'This code has already been used' }) }
   }
 
-  // Generate the pack
-  const result = await openPack(sql, user.id, row.pack_type_id, { skipPayment: true })
+  const qty = row.quantity || 1
+
+  // Add packs to inventory
+  await sql`
+    INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+    SELECT ${user.id}, ${row.pack_type_id}, 'redeem'
+    FROM generate_series(1, ${qty})
+  `
 
   // Record redemption
   await sql`INSERT INTO cc_redeem_history (code_id, user_id) VALUES (${row.id}, ${user.id})`
@@ -1375,21 +1392,14 @@ async function handleRedeemCode(sql, user, body) {
     await sql`UPDATE cc_redeem_codes SET active = false WHERE id = ${row.id}`
   }
 
-  const cards = result.cards.map((c) => {
-    const formatted = formatCard(c)
-    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
-    return formatted
-  })
-
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (redeem) failed:', err))
+  // Fetch pack name for response
+  const [packType] = await sql`SELECT name FROM cc_pack_types WHERE id = ${row.pack_type_id}`
 
   return { statusCode: 200, headers, body: JSON.stringify({
-    packName: result.packName,
+    packName: packType?.name || row.pack_type_id,
     packType: row.pack_type_id,
-    cards,
+    quantity: qty,
+    toInventory: true,
   }) }
 }
 
@@ -1414,6 +1424,7 @@ async function handleAdminRedeemCodes(sql, event) {
         packTypeId: c.pack_type_id,
         packName: c.pack_name,
         mode: c.mode,
+        quantity: c.quantity || 1,
         maxUses: c.max_uses,
         expiresAt: c.expires_at,
         timesRedeemed: c.times_redeemed,
@@ -1429,13 +1440,15 @@ async function handleCreateRedeemCode(sql, event, body) {
   await requirePermission(event, 'permission_manage')
   const user = await requireAuth(event)
 
-  const { code, packTypeId, mode, maxUses, expiresAt } = body
+  const { code, packTypeId, mode, maxUses, expiresAt, quantity } = body
   if (!code || !packTypeId || !mode) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'code, packTypeId, and mode are required' }) }
   }
   if (!['single', 'per_person'].includes(mode)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'mode must be single or per_person' }) }
   }
+
+  const qty = Math.max(1, Math.min(50, parseInt(quantity) || 1))
 
   // Verify pack type exists
   const [pack] = await sql`SELECT id FROM cc_pack_types WHERE id = ${packTypeId}`
@@ -1447,8 +1460,8 @@ async function handleCreateRedeemCode(sql, event, body) {
   if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'A code with this name already exists' }) }
 
   await sql`
-    INSERT INTO cc_redeem_codes (code, pack_type_id, mode, max_uses, expires_at, created_by)
-    VALUES (${code.trim()}, ${packTypeId}, ${mode}, ${maxUses || null}, ${expiresAt || null}, ${user.id})
+    INSERT INTO cc_redeem_codes (code, pack_type_id, mode, max_uses, expires_at, quantity, created_by)
+    VALUES (${code.trim()}, ${packTypeId}, ${mode}, ${maxUses || null}, ${expiresAt || null}, ${qty}, ${user.id})
   `
 
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
@@ -1665,10 +1678,8 @@ function formatCard(row) {
 
 function formatStats(row) {
   if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0, dismantledToday: 0 }
-  // Reset daily dismantle counter if the stored date is not today
   const today = new Date().toISOString().slice(0, 10)
-  const resetDate = row.dismantle_reset_date ? new Date(row.dismantle_reset_date).toISOString().slice(0, 10) : null
-  const dismantledToday = resetDate === today ? (row.dismantled_today || 0) : 0
+  const dismantledToday = row.dismantle_reset_date === today ? (row.dismantled_today || 0) : 0
   return {
     packsOpened: row.packs_opened,
     embers: row.embers,

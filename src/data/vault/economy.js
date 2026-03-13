@@ -63,11 +63,12 @@ export function getDismantleMultiplier(cardIndex) {
 }
 
 export function calcDismantleTotal(cards, dismantledToday) {
+  const sorted = [...cards].sort((a, b) => (RARITIES[b.rarity]?.dismantleValue || 0) - (RARITIES[a.rarity]?.dismantleValue || 0));
   let total = 0;
-  for (let i = 0; i < cards.length; i++) {
+  for (let i = 0; i < sorted.length; i++) {
     const dayIndex = dismantledToday + i;
     const mult = getDismantleMultiplier(dayIndex);
-    const base = RARITIES[cards[i].rarity]?.dismantleValue || 0;
+    const base = RARITIES[sorted[i].rarity]?.dismantleValue || 0;
     total += base * mult;
   }
   return Math.floor(Math.round(total * 10) / 10);

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, DISMANTLE_TIERS, getDismantleMultiplier, calcDismantleTotal } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
@@ -51,9 +51,30 @@ function CoresLabel({ value, className = '', iconSize = 'h-4' }) {
   )
 }
 
+function useResetCountdown() {
+  const [timeLeft, setTimeLeft] = useState('')
+  useEffect(() => {
+    const calc = () => {
+      const now = new Date()
+      const tomorrow = new Date(now)
+      tomorrow.setUTCHours(24, 0, 0, 0)
+      const diff = tomorrow - now
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setTimeLeft(`${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`)
+    }
+    calc()
+    const id = setInterval(calc, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return timeLeft
+}
+
 function SalvageGauge({ dismantledToday, currentRate }) {
   const pressure = Math.min(((1 - currentRate) / 0.9) * 100, 100)
   const needleAngle = -90 + (pressure / 100) * 180
+  const resetIn = useResetCountdown()
   const getColor = (pct) => {
     if (pct < 5) return '#00e5ff'
     if (pct < 25) return '#22c55e'
@@ -100,15 +121,16 @@ function SalvageGauge({ dismantledToday, currentRate }) {
         <div className="text-lg font-bold tabular-nums cd-num cd-text-glow" style={{ color }}>{Math.round(currentRate * 100)}%</div>
         <div className="text-[11px] font-bold uppercase tracking-wider cd-head" style={{ color: color + 'bb' }}>{statusLabel}</div>
       </div>
+      <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{dismantledToday} dismantled today</div>
       {dismantledToday > 0 && (
-        <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{dismantledToday} dismantled today</div>
+        <div className="text-[10px] text-white/20 mt-0.5 cd-mono">Resets in {resetIn}</div>
       )}
     </div>
   )
 }
 
 export default function CCDismantle() {
-  const { collection, dismantleCards, startingFive, getDefOverride, stats } = useVault()
+  const { collection, dismantleCards, startingFive, binderCards, getDefOverride, stats } = useVault()
   const dismantledToday = stats?.dismantledToday || 0
   const [selected, setSelected] = useState(new Set())
   const [dismantling, setDismantling] = useState(false)
@@ -118,17 +140,26 @@ export default function CCDismantle() {
   const [showRates, setShowRates] = useState(true)
   const [visibleCount, setVisibleCount] = useState(50)
 
-  const s5CardIds = useMemo(() =>
-    new Set((startingFive?.cards || []).map(c => c.id)),
-  [startingFive])
+  const lockedCardIds = useMemo(() => {
+    const ids = new Set()
+    for (const card of (startingFive?.cards || [])) {
+      ids.add(card.id)
+      if (card.godCard) ids.add(card.godCard.id)
+      if (card.itemCard) ids.add(card.itemCard.id)
+    }
+    for (const bc of (binderCards || [])) {
+      if (bc.card?.id) ids.add(bc.card.id)
+    }
+    return ids
+  }, [startingFive, binderCards])
 
   const cards = useMemo(() => {
-    let list = collection.filter(c => !s5CardIds.has(c.id))
+    let list = collection.filter(c => !lockedCardIds.has(c.id))
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
     list.sort((a, b) => (a.godName || '').localeCompare(b.godName || ''))
     return list
-  }, [collection, filterRarity, filterType, s5CardIds])
+  }, [collection, filterRarity, filterType, lockedCardIds])
 
   const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount])
   const hasMore = visibleCount < cards.length

@@ -8,7 +8,7 @@ export default function RedeemCodes() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState(null)
-  const [form, setForm] = useState({ code: '', packTypeId: '', mode: 'per_person', maxUses: '', expiresAt: '' })
+  const [form, setForm] = useState({ code: '', packTypeId: '', mode: 'per_person', quantity: '1', maxUses: '', expiresAt: '' })
 
   useEffect(() => {
     load()
@@ -39,10 +39,11 @@ export default function RedeemCodes() {
         code: form.code.trim(),
         packTypeId: form.packTypeId,
         mode: form.mode,
+        quantity: parseInt(form.quantity) || 1,
         maxUses: form.maxUses ? parseInt(form.maxUses) : null,
         expiresAt: form.expiresAt || null,
       })
-      setForm({ code: '', packTypeId: '', mode: 'per_person', maxUses: '', expiresAt: '' })
+      setForm({ code: '', packTypeId: '', mode: 'per_person', quantity: '1', maxUses: '', expiresAt: '' })
       await load()
     } catch (err) {
       setError(err.message || 'Failed to create code')
@@ -78,7 +79,7 @@ export default function RedeemCodes() {
       <div className="bg-[var(--color-card,var(--color-secondary))] rounded-xl border border-[var(--color-border)] p-5 mb-8">
         <h2 className="text-lg font-semibold mb-4">Create New Code</h2>
         <form onSubmit={handleCreate} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Code</label>
               <input
@@ -103,6 +104,17 @@ export default function RedeemCodes() {
                   <option key={p.id} value={p.id}>{p.name} ({p.cards} cards)</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Quantity</label>
+              <input
+                type="number"
+                value={form.quantity}
+                onChange={(e) => setForm(f => ({ ...f, quantity: e.target.value }))}
+                min="1"
+                max="50"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-border)] text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
             </div>
           </div>
 
@@ -169,6 +181,7 @@ export default function RedeemCodes() {
                 <tr className="border-b border-[var(--color-border)] text-left text-xs text-[var(--color-text-secondary)] uppercase tracking-wider">
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3">Pack</th>
+                  <th className="px-4 py-3">Qty</th>
                   <th className="px-4 py-3">Mode</th>
                   <th className="px-4 py-3">Uses</th>
                   <th className="px-4 py-3">Expires</th>
@@ -189,6 +202,7 @@ export default function RedeemCodes() {
                     <tr key={c.id} className="border-b border-[var(--color-border)] last:border-b-0">
                       <td className="px-4 py-3 font-mono font-bold tracking-wider">{c.code}</td>
                       <td className="px-4 py-3">{c.packName || c.packTypeId}</td>
+                      <td className="px-4 py-3">{c.quantity > 1 ? `${c.quantity}x` : '1'}</td>
                       <td className="px-4 py-3 capitalize">{c.mode === 'per_person' ? 'Per Person' : 'Single'}</td>
                       <td className="px-4 py-3">
                         {c.timesRedeemed}{c.maxUses != null ? ` / ${c.maxUses}` : ''}

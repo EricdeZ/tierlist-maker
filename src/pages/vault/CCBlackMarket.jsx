@@ -1,12 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef, Fragment } from 'react'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
+import { bountyService, vaultService } from '../../services/database'
 import { GODS, CLASS_ROLE } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import { MINIONS } from '../../data/vault/minions'
 import TradingCard from '../../components/TradingCard'
 import PackArt from './components/PackArt'
+import { Loader2 } from 'lucide-react'
 import './CCBlackMarket.css'
 
 const RARITY_COLORS = {
@@ -34,6 +36,24 @@ const REWARD_TIERS = {
   epic: 10,
   legendary: 15,
   mythic: 'choose',
+}
+
+const RARITY_GLOW = {
+  common: '20px',
+  uncommon: '30px',
+  rare: '45px',
+  epic: '60px',
+  legendary: '80px',
+  mythic: '110px',
+}
+
+const RARITY_GLOW_ALPHA = {
+  common: '0.25',
+  uncommon: '0.35',
+  rare: '0.45',
+  epic: '0.55',
+  legendary: '0.65',
+  mythic: '0.8',
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
@@ -98,6 +118,9 @@ function MythicSelectionModal({ onSelect, onClose }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [claiming, setClaiming] = useState(false)
+  const [playerResults, setPlayerResults] = useState([])
+  const [playerSearching, setPlayerSearching] = useState(false)
+  const debounceRef = useRef(null)
 
   const catalog = useMemo(() => {
     const gods = GODS.map(g => ({
@@ -133,15 +156,46 @@ function MythicSelectionModal({ onSelect, onClose }) {
     return { gods, items, consumables, minions }
   }, [])
 
+  // Debounced API search for players (same as bounty board)
+  const searchPlayerDefs = useCallback((term) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!term || term.length < 2) {
+      setPlayerResults([])
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setPlayerSearching(true)
+      try {
+        const res = await bountyService.searchPlayers(term)
+        setPlayerResults((res.players || [])
+          .filter(p => p.player_name !== 'Brudih')
+          .map(p => ({
+            cardType: 'player',
+            godId: 'player-' + p.player_name,
+            godName: p.player_name,
+            label: p.player_name,
+            sublabel: [p.role, p.team_name].filter(Boolean).join(' · ') || 'Player',
+            avatarUrl: p.avatar_url || null,
+            teamColor: p.team_color,
+          })))
+      } catch {
+        setPlayerResults([])
+      }
+      setPlayerSearching(false)
+    }, 250)
+  }, [])
+
   const filtered = useMemo(() => {
+    if (tab === 'players') return playerResults
     const list = catalog[tab] || []
     if (!search.trim()) return list
     const q = search.toLowerCase()
-    return list.filter(item => item.label.toLowerCase().includes(q))
-  }, [catalog, tab, search])
+    return list.filter(item => item.label.toLowerCase().includes(q) || item.sublabel?.toLowerCase().includes(q))
+  }, [catalog, tab, search, playerResults])
 
   const tabs = [
     { key: 'gods', label: 'Gods' },
+    { key: 'players', label: 'Players' },
     { key: 'items', label: 'Items' },
     { key: 'consumables', label: 'Consumables' },
     { key: 'minions', label: 'Minions' },
@@ -158,80 +212,137 @@ function MythicSelectionModal({ onSelect, onClose }) {
   }
 
   return (
-    <div className="bm-mythic-modal">
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <div>
-          <h2 className="text-lg font-bold cd-head text-red-400 tracking-wider">Choose Your Mythic</h2>
-          <p className="text-[11px] text-white/30 mt-0.5">Select any card to receive as a Mythic</p>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-white/30 hover:text-white/60 text-2xl leading-none transition-colors cursor-pointer px-2"
-        >
-          &times;
-        </button>
-      </div>
-
-      <div className="flex gap-1 px-4 mb-3">
-        {tabs.map(t => (
+    <div className="bm-mythic-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bm-mythic-modal">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div>
+            <h2 className="text-lg font-bold cd-head text-red-400 tracking-wider">Choose Your Mythic</h2>
+            <p className="text-[11px] text-white/30 mt-0.5">Select any card to receive as a Mythic</p>
+          </div>
           <button
-            key={t.key}
-            onClick={() => { setTab(t.key); setSelected(null) }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer ${
-              tab === t.key
-                ? 'bg-red-500/15 border border-red-500/30 text-red-400'
-                : 'border border-transparent text-white/30 hover:text-white/50'
-            }`}
+            onClick={onClose}
+            className="text-white/30 hover:text-white/60 text-2xl leading-none transition-colors cursor-pointer px-2"
           >
-            {t.label}
+            &times;
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="px-4 mb-3">
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search..."
-          className="w-full px-3 py-2 rounded-lg text-sm bg-[rgba(10,0,8,0.8)] border border-[rgba(139,0,0,0.2)] text-white/80 placeholder-white/20 focus:border-[rgba(200,0,0,0.4)] focus:outline-none transition-colors"
-        />
-      </div>
+        {/* Tabs */}
+        <div className="flex gap-1 px-5 mb-3 flex-wrap">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => { setTab(t.key); setSelected(null); setSearch(''); setPlayerResults([]) }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer ${
+                tab === t.key
+                  ? 'bg-red-500/15 border border-red-500/30 text-red-400'
+                  : 'border border-transparent text-white/30 hover:text-white/50'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {filtered.length === 0 ? (
-          <div className="text-center py-8 text-white/20 text-sm">No results</div>
-        ) : (
-          <div className="bm-mythic-grid">
-            {filtered.map(item => (
-              <button
-                key={item.godId}
-                onClick={() => setSelected(item)}
-                className={`bm-mythic-item ${selected?.godId === item.godId ? 'bm-mythic-item-selected' : ''}`}
-              >
-                <div className="text-sm font-bold text-white/80 truncate">{item.label}</div>
-                <div className="text-[11px] text-white/30 mt-0.5">{item.sublabel}</div>
-              </button>
-            ))}
+        {/* Search */}
+        <div className="px-5 mb-3 relative">
+          <input
+            type="text"
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value)
+              if (tab === 'players') searchPlayerDefs(e.target.value)
+            }}
+            placeholder={tab === 'players' ? 'Type a player name...' : 'Search...'}
+            className="w-full px-3 py-2 rounded-lg text-sm bg-black/40 border border-[rgba(139,0,0,0.25)] text-white/80 placeholder-white/20 focus:border-[rgba(200,0,0,0.4)] focus:outline-none transition-colors"
+          />
+          {tab === 'players' && playerSearching && (
+            <Loader2 size={14} className="absolute right-8 top-1/2 -translate-y-1/2 text-white/30 animate-spin" />
+          )}
+        </div>
+
+        {/* Grid / Player list */}
+        <div className="flex-1 overflow-y-auto px-5 pb-4 min-h-0">
+          {tab === 'players' ? (
+            /* Autocomplete list for players */
+            filtered.length === 0 ? (
+              <div className="text-center py-8 text-white/20 text-sm">
+                {playerSearching ? 'Searching...' : !search.trim() || search.length < 2 ? 'Type a player name to search' : 'No players found'}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {filtered.map(item => (
+                  <button
+                    key={item.godId}
+                    onClick={() => setSelected(item)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
+                      selected?.godId === item.godId
+                        ? 'bg-red-500/15 border border-red-500/30'
+                        : 'border border-transparent hover:bg-white/5'
+                    }`}
+                  >
+                    {item.avatarUrl ? (
+                      <img src={item.avatarUrl} alt="" className="w-9 h-9 rounded-full shrink-0 object-cover border border-white/10" />
+                    ) : (
+                      <div
+                        className="w-9 h-9 rounded-full shrink-0 border border-white/10 flex items-center justify-center text-xs font-bold"
+                        style={{ background: item.teamColor || 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }}
+                      >
+                        {item.label.charAt(0)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-white/80 truncate">{item.label}</div>
+                      <div className="text-[11px] text-white/30 truncate">{item.sublabel}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            /* Standard grid for other tabs */
+            filtered.length === 0 ? (
+              <div className="text-center py-8 text-white/20 text-sm">No results</div>
+            ) : (
+              <div className="bm-mythic-grid">
+                {filtered.map(item => (
+                  <button
+                    key={item.godId}
+                    onClick={() => setSelected(item)}
+                    className={`bm-mythic-item ${selected?.godId === item.godId ? 'bm-mythic-item-selected' : ''}`}
+                  >
+                    <div className="text-sm font-bold text-white/80 truncate">{item.label}</div>
+                    <div className="text-[11px] text-white/30 mt-0.5 truncate">{item.sublabel}</div>
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Confirm bar */}
+        {selected && (
+          <div className="px-5 py-3 border-t border-[rgba(139,0,0,0.2)] bg-black/30 flex items-center justify-between gap-3 rounded-b-xl">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {selected.avatarUrl && (
+                <img src={selected.avatarUrl} alt="" className="w-8 h-8 rounded-full shrink-0 object-cover border border-white/10" />
+              )}
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white/80 truncate">{selected.label}</div>
+                <div className="text-[11px] text-white/30">{selected.sublabel} — Mythic</div>
+              </div>
+            </div>
+            <button
+              onClick={handleConfirm}
+              disabled={claiming}
+              className="px-5 py-2 rounded-lg text-sm font-bold cd-head uppercase tracking-wider bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {claiming ? <div className="cd-spinner w-4 h-4" /> : 'Confirm'}
+            </button>
           </div>
         )}
       </div>
-
-      {selected && (
-        <div className="px-4 py-3 border-t border-[rgba(139,0,0,0.2)] bg-[rgba(10,0,8,0.95)] flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-white/80 truncate">{selected.label}</div>
-            <div className="text-[11px] text-white/30">{selected.sublabel} — Mythic</div>
-          </div>
-          <button
-            onClick={handleConfirm}
-            disabled={claiming}
-            className="px-5 py-2 rounded-lg text-sm font-bold cd-head uppercase tracking-wider bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {claiming ? <div className="cd-spinner w-4 h-4" /> : 'Confirm'}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -240,7 +351,7 @@ function MythicSelectionModal({ onSelect, onClose }) {
 // ─── Main Component ──────────────────────────────────────
 
 export default function CCBlackMarket() {
-  const { collection, blackMarketTurnIn, blackMarketClaimMythic, stats } = useVault()
+  const { collection, blackMarketTurnIn, blackMarketClaimMythic, stats, refreshCollection } = useVault()
   const { user, hasPermission } = useAuth()
   const isOwner = hasPermission('permission_manage')
 
@@ -310,8 +421,9 @@ export default function CCBlackMarket() {
       setPhase('idle')
       setSelectedCard(null)
       setReward(null)
+      refreshCollection()
     }
-  }, [reward])
+  }, [reward, refreshCollection])
 
   // ── Mythic claim ──
 
@@ -420,8 +532,8 @@ export default function CCBlackMarket() {
   const total = filteredCards.length
   const maxAngle = total <= 1 ? 0 : Math.min(35, Math.max(10, total * 4.5))
   const cardSize = isMobile
-    ? (total > 8 ? 60 : 70)
-    : (total > 10 ? 75 : total > 6 ? 85 : 100)
+    ? (total > 8 ? 80 : 95)
+    : (total > 10 ? 100 : total > 6 ? 115 : 130)
 
   // ── Reset helper ──
 
@@ -455,7 +567,7 @@ export default function CCBlackMarket() {
             Black Market
           </h2>
           <p className="text-[11px] sm:text-xs text-white/25 mt-1">
-            Turn in Brudih player cards for league packs. The shadier the card, the better the payout.
+            Turn in Brudih player cards for league packs.
           </p>
         </div>
 
@@ -542,6 +654,8 @@ export default function CCBlackMarket() {
                   setSelectedCard(fakeCard)
                   setError(null)
                   setPhase('turning-in')
+                  await vaultService.blackMarketDebugPending()
+                  await refreshCollection()
                   await sleep(600)
                   setReward({ type: 'mythic_choice' })
                   setPhase('reward')
@@ -553,7 +667,11 @@ export default function CCBlackMarket() {
               </button>
               <span className="w-px h-5 bg-yellow-500/10 self-center mx-1" />
               <button
-                onClick={() => setShowMythicModal(true)}
+                onClick={async () => {
+                  await vaultService.blackMarketDebugPending()
+                  await refreshCollection()
+                  setShowMythicModal(true)
+                }}
                 className="px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border border-yellow-500/10 text-yellow-500/40 hover:text-yellow-500/60 cursor-pointer transition-all"
               >
                 modal
@@ -571,24 +689,28 @@ export default function CCBlackMarket() {
 
         {/* ═══ INSERT SLOT ═══ */}
         <div className="bm-slot-section mb-8">
-          <div className="text-[10px] text-white/20 cd-head tracking-[0.25em] uppercase text-center mb-2">Insert</div>
+          <div className="text-[10px] text-white cd-head tracking-[0.25em] uppercase text-center mb-2">Insert</div>
           <div
             ref={slotRef}
             className={`bm-slot ${slotHover ? 'bm-slot-hover' : ''} ${phase === 'turning-in' ? 'bm-slot-processing' : ''}`}
+            style={slotHover && selectedCard ? {
+              '--glow-size': RARITY_GLOW[selectedCard.rarity] || '30px',
+              '--glow-alpha': RARITY_GLOW_ALPHA[selectedCard.rarity] || '0.4',
+            } : undefined}
           >
             {phase === 'turning-in' && <div className="bm-slot-shimmer" />}
           </div>
 
-          {/* Reward preview under slot */}
-          {selectedCard && (phase === 'idle' || dragState) && (
-            <div className="text-center mt-2">
+          {/* Reward preview under slot — fixed height to prevent layout jump */}
+          <div className="text-center mt-2 h-4">
+            {selectedCard && (phase === 'idle' || dragState) && (
               <div className="text-[10px] text-white/20 cd-head tracking-wider">
                 {selectedCard.rarity === 'mythic'
                   ? 'Mythic card of your choice'
                   : `${REWARD_TIERS[selectedCard.rarity]} ${(selectedCard.cardData?.leagueName || '').toUpperCase()} Packs`}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Mobile turn-in button */}
           {isMobile && selectedCard && phase === 'idle' && (
@@ -629,7 +751,7 @@ export default function CCBlackMarket() {
                 <p className="text-xs text-white/15 mt-1">Find Brudih player cards in packs to trade here.</p>
               </div>
             ) : (
-              <div className="bm-fan" style={{ height: isMobile ? 200 : 280 }}>
+              <div className="bm-fan" style={{ height: isMobile ? 260 : 380 }}>
                 {filteredCards.map((card, i) => {
                   const t = total <= 1 ? 0 : (i - (total - 1) / 2) / Math.max(1, (total - 1) / 2)
                   const angle = t * maxAngle
@@ -661,9 +783,9 @@ export default function CCBlackMarket() {
           <div className="bm-output bm-panel rounded-xl p-6 text-center max-w-md mx-auto">
             {reward.type === 'packs' && (
               <div className="flex flex-col items-center gap-3">
-                <div className="bm-reward-packs">
-                  {[...Array(Math.min(reward.count, 5))].map((_, i) => (
-                    <div key={i} className="bm-reward-pack-card" style={{ transform: `rotate(${(i - 2) * 6}deg) translateY(${Math.abs(i - 2) * 3}px)` }}>
+                <div className="flex justify-center" style={{ transform: 'translateX(-24px)' }}>
+                  {[...Array(Math.min(reward.count, 7))].map((_, i) => (
+                    <div key={i} className="bm-reward-pack-card" style={{ marginLeft: i === 0 ? 0 : -20 }}>
                       <PackArt
                         tier={reward.packType || 'mixed'}
                         name=""

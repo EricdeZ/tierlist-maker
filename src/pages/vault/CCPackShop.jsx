@@ -365,7 +365,7 @@ export default function PackShopRouter() {
   return (
     <>
       {/* Desktop toggles */}
-      <div className="hidden sm:flex justify-center gap-2 mb-4 relative z-40">
+      <div className="hidden sm:flex justify-center gap-2 mb-4 relative">
         <button
           onClick={() => setMode('my-packs')}
           className={`relative px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
@@ -377,7 +377,7 @@ export default function PackShopRouter() {
         >
           MY PACKS
           {myPacksCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-[10px] font-bold text-black flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-[10px] leading-none font-bold text-black flex items-center justify-center">
               {myPacksCount}
             </span>
           )}
@@ -693,13 +693,13 @@ function PackShop() {
               <div
                 key={key}
                 ref={(el) => { packRefs.current[key] = el; }}
-                className="flex flex-col items-center cursor-pointer group"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFocusedPack(isSelected ? null : key);
-                }}
+                className="flex flex-col items-center"
               >
-                <div className="relative transition-all duration-500 ease-out"
+                <div className="relative transition-all duration-500 ease-out cursor-pointer group"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFocusedPack(isSelected ? null : key);
+                  }}
                   style={{
                     transform: isSelected ? `translate(${packOffset.x}px, ${packOffset.y}px) scale(2.2)` : 'scale(1.15)',
                     zIndex: isSelected ? 50 : 1,
@@ -710,7 +710,7 @@ function PackShop() {
                 >
                   {/* Ambient glow */}
                   <div
-                    className="absolute -inset-20 rounded-3xl transition-all duration-500"
+                    className="absolute -inset-20 rounded-3xl transition-all duration-500 pointer-events-none"
                     style={{
                       background: `radial-gradient(ellipse, ${pack.color || 'var(--cd-cyan)'}40 0%, transparent 70%)`,
                       filter: `blur(${isSelected ? 80 : 0}px)`,
@@ -719,7 +719,7 @@ function PackShop() {
                   />
                   {/* Pedestal glow */}
                   <div
-                    className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-4 rounded-full transition-all duration-500"
+                    className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-4 rounded-full transition-all duration-500 pointer-events-none"
                     style={{
                       background: pack.color || 'var(--cd-cyan)',
                       filter: 'blur(16px)',
