@@ -1051,7 +1051,9 @@ async function handleBlackMarketTurnIn(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
 
-  const result = await transaction(async (tx) => {
+  let result
+  try {
+  result = await transaction(async (tx) => {
     // Fetch card + player def in one query, with lock guards
     const [card] = await tx`
       SELECT c.id, c.rarity, c.owner_id, d.player_name, d.league_id, l.slug AS league_slug
@@ -1150,6 +1152,9 @@ async function handleBlackMarketTurnIn(sql, user, body) {
       return { type: 'packs', packType: packTypeId, count: rewardCount }
     }
   })
+  } catch (err) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: err.message }) }
+  }
 
   return {
     statusCode: 200, headers,
