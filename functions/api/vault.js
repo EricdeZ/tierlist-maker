@@ -1113,8 +1113,19 @@ async function handleBlackMarketTurnIn(sql, user, body) {
         AND t.status NOT IN ('waiting', 'active')
     `
 
-    // Delete the card
-    await tx`DELETE FROM cc_cards WHERE id = ${cardId} AND owner_id = ${user.id}`
+    // Transfer card to Brudih's user account (via players → users link)
+    const [brudihUser] = await tx`
+      SELECT u.id FROM users u
+      JOIN players p ON u.linked_player_id = p.id
+      JOIN cc_player_defs d ON d.player_id = p.id
+      WHERE d.player_name = 'Brudih'
+      LIMIT 1
+    `
+    if (brudihUser) {
+      await tx`UPDATE cc_cards SET owner_id = ${brudihUser.id} WHERE id = ${cardId}`
+    } else {
+      await tx`DELETE FROM cc_cards WHERE id = ${cardId} AND owner_id = ${user.id}`
+    }
 
     // Grant reward
     if (isMythic) {
