@@ -9,6 +9,7 @@ import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
 
 const CCPackSale = lazy(() => import('./CCPackSale'));
+const CCBlackMarket = lazy(() => import('./CCBlackMarket'));
 
 // ═══════════════════════════════════════════════
 // Convert Link
@@ -390,11 +391,27 @@ export default function PackShopRouter() {
         >
           LIMITED SALE
         </button>
+        <button
+          onClick={() => setMode('black-market')}
+          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer relative ${
+            mode === 'black-market'
+              ? 'bg-red-900/20 text-red-500 border-red-500/30'
+              : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
+          }`}
+          style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
+        >
+          BLACK MARKET
+          <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500" style={{ boxShadow: '0 0 6px #ef4444' }} />
+        </button>
       </div>
       {mode === 'my-packs' ? (
         <MyPacks />
       ) : mode === 'shop' ? (
         <PackShop />
+      ) : mode === 'black-market' ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
+          <CCBlackMarket />
+        </Suspense>
       ) : (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
           <CCPackSale />
