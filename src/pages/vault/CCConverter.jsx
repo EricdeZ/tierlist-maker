@@ -7,7 +7,7 @@ import coinSide from '../../assets/passion/flipping3.png'
 import emberIcon from '../../assets/ember.png'
 
 const CORES_PER_PACK = 10
-const FALLBACK_BASE_COST = 50
+const FALLBACK_BASE_COST = 30
 const FALLBACK_MULTIPLIER = 1.3
 const getCost = (n, base, mult) => Math.round(base * Math.pow(mult, n))
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))

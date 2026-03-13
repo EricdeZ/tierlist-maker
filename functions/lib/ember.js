@@ -5,7 +5,7 @@ export const EMBER_RULES = {
     daily_base: 25,
     streak_bonus_per_day: 1,
     streak_bonus_cap: 10,
-    conversion_base_passion: 50,  // 50 passion per 10 ember at base rate
+    conversion_base_passion: 30,  // 30 passion per 10 ember at base rate
     conversion_ember_amount: 10,  // each conversion gives 10 ember
     conversion_multiplier: 1.3,   // exponential increase per conversion per day
 }
