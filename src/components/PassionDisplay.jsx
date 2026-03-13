@@ -466,11 +466,11 @@ export default function PassionDisplay() {
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Packs
                                         </Link>
-                                        <Link to="/vault?tab=catalog" onClick={() => setOpen(false)}
+                                        <Link to="/vault?tab=collection" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Collection
                                         </Link>
-                                        <Link to="/vault?tab=starting5" onClick={() => setOpen(false)}
+                                        <Link to="/vault?tab=lineup" onClick={() => setOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2 text-sm text-(--color-text) hover:bg-white/5 transition-colors">
                                             Starting 5
                                         </Link>
