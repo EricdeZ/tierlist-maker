@@ -35,6 +35,7 @@ export const VAULT_KEYS = [
     'income_collected', 'max_conversions_day',
     'total_cards_owned', 'unique_gods_owned', 'unique_cards_owned', 'total_cores_earned',
     'legendary_cards_owned', 'epic_cards_owned', 'marketplace_volume', 'total_cores_spent',
+    'bounty_cores_earned', 'best_bounty_reward',
 ]
 
 /**
@@ -945,6 +946,7 @@ export async function getVaultStats(sql, userId) {
         [maxConvRow], [rarityRow],
         [totalCardsRow], [uniqueGodsRow], [uniqueCardsRow], [totalCoresRow],
         [legendaryOwnedRow], [epicOwnedRow], [marketVolumeRow], [coresSpentRow],
+        [bEarnedRow], [bBestRow],
     ] = await Promise.all([
         // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
         sql`
@@ -1070,6 +1072,16 @@ export async function getVaultStats(sql, userId) {
             SELECT COALESCE(SUM(ABS(amount)), 0)::integer as total FROM ember_transactions
             WHERE user_id = ${userId} AND amount < 0
         `,
+        // Total Cores earned from fulfilling bounties
+        sql`
+            SELECT COALESCE(SUM(amount), 0)::integer as total FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'bounty_reward'
+        `,
+        // Best single bounty reward earned
+        sql`
+            SELECT COALESCE(MAX(core_reward), 0)::integer as best FROM cc_bounties
+            WHERE fulfilled_by = ${userId} AND status = 'completed'
+        `,
     ])
 
     return {
@@ -1098,6 +1110,8 @@ export async function getVaultStats(sql, userId) {
         epic_cards_owned: epicOwnedRow?.count ?? 0,
         marketplace_volume: marketVolumeRow?.total ?? 0,
         total_cores_spent: coresSpentRow?.total ?? 0,
+        bounty_cores_earned: bEarnedRow?.total ?? 0,
+        best_bounty_reward: bBestRow?.best ?? 0,
     }
 }
 

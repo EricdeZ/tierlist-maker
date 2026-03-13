@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useVault } from './VaultContext'
 import { bountyService } from '../../services/database'
@@ -6,15 +6,17 @@ import { Plus, Loader2 } from 'lucide-react'
 import HeroPinboard from './bounty/HeroPinboard'
 import BountyGrid from './bounty/BountyGrid'
 import CreateBountyForm from './bounty/CreateBountyForm'
+import BountyConfirmModal from './bounty/BountyConfirmModal'
 
 export default function CCBountyBoard() {
   const { user } = useAuth()
-  const { collection, ember, refreshCollection } = useVault()
+  const { collection, ember, refreshCollection, refreshBalance } = useVault()
 
   const [heroBounties, setHeroBounties] = useState([])
   const [bounties, setBounties] = useState([])
   const [total, setTotal] = useState(0)
   const [myBountyIds, setMyBountyIds] = useState([])
+  const [myBountyHistory, setMyBountyHistory] = useState([])
   const [fulfillableIds, setFulfillableIds] = useState([])
   const [activeBountyCount, setActiveBountyCount] = useState(0)
 
@@ -25,6 +27,10 @@ export default function CCBountyBoard() {
   const [showMine, setShowMine] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState(null)
+  const lastClickRef = useRef(null)
 
   const loadHero = useCallback(async () => {
     try {
@@ -57,6 +63,20 @@ export default function CCBountyBoard() {
       const mine = res.bounties || []
       setMyBountyIds(mine.filter(b => b.status === 'active').map(b => b.id))
       setActiveBountyCount(mine.filter(b => b.status === 'active').length)
+      setMyBountyHistory(mine.filter(b => b.status !== 'active').map(b => ({
+        id: b.id,
+        card_type: b.cardType,
+        card_name: b.cardName,
+        rarity: b.rarity,
+        holo_type: b.holoType,
+        core_reward: b.coreReward,
+        status: b.status,
+        created_at: b.createdAt,
+        expires_at: b.expiresAt,
+        completed_at: b.completedAt,
+        cancelled_at: b.cancelledAt,
+        fulfiller_name: b.fulfillerName,
+      })))
     } catch (e) { console.error('my bounties error:', e) }
   }, [user])
 
@@ -74,9 +94,10 @@ export default function CCBountyBoard() {
     if (res.error) throw new Error(res.error)
     await loadAll()
     refreshCollection?.()
+    refreshBalance?.()
   }
 
-  const handleFulfill = async (bountyId) => {
+  const handleFulfill = async (bountyId, sourceEl) => {
     const bounty = [...heroBounties, ...bounties].find(b => b.id === bountyId)
     if (!bounty) return
 
@@ -87,32 +108,66 @@ export default function CCBountyBoard() {
       (!bounty.holo_type || c.holoType === bounty.holo_type)
     )
     if (!match) {
-      alert('No matching unlocked card found in your collection')
+      setConfirmModal({
+        type: 'error',
+        title: 'No Match Found',
+        message: 'No matching unlocked card found in your collection.',
+      })
       return
     }
 
-    if (!window.confirm(`Turn in your ${bounty.rarity} ${bounty.card_name} card for ${bounty.core_reward} Cores?`)) return
-
-    try {
-      const res = await bountyService.fulfill({ bountyId, cardId: match.id })
-      if (res.error) throw new Error(res.error)
-      await loadAll()
-      refreshCollection?.()
-    } catch (e) {
-      alert(e.message || 'Failed to fulfill bounty — card may be locked in a trade, lineup, binder, or listing')
-    }
+    lastClickRef.current = sourceEl || null
+    setConfirmModal({
+      type: 'fulfill',
+      title: 'Turn In Card',
+      message: `Turn in your ${bounty.rarity} ${bounty.card_name} card?`,
+      reward: bounty.core_reward,
+      onConfirm: async () => {
+        try {
+          const res = await bountyService.fulfill({ bountyId, cardId: match.id })
+          if (res.error) throw new Error(res.error)
+          spawnFlyingCores(lastClickRef.current, res.reward || bounty.core_reward)
+          setConfirmModal(null)
+          await loadAll()
+          refreshCollection?.()
+          refreshBalance?.()
+        } catch (e) {
+          setConfirmModal({
+            type: 'error',
+            title: 'Turn In Failed',
+            message: e.message || 'Card may be locked in a trade, lineup, binder, or listing.',
+          })
+        }
+      },
+    })
   }
 
   const handleCancel = async (bountyId) => {
-    if (!window.confirm('Cancel this bounty? You will lose 25% of the escrowed Cores.')) return
-    try {
-      const res = await bountyService.cancel(bountyId)
-      if (res.error) throw new Error(res.error)
-      await loadAll()
-      refreshCollection?.()
-    } catch (e) {
-      alert(e.message || 'Failed to cancel bounty')
-    }
+    const bounty = [...heroBounties, ...bounties].find(b => b.id === bountyId)
+    const fee = bounty ? Math.max(Math.floor(bounty.core_reward * 0.25), 1) : '25%'
+    const refund = bounty ? bounty.core_reward - fee : null
+
+    setConfirmModal({
+      type: 'cancel',
+      title: 'Cancel Bounty',
+      message: `You will lose ${fee} Core (25% fee)${refund ? ` and get ${refund} Core refunded.` : '.'}`,
+      onConfirm: async () => {
+        try {
+          const res = await bountyService.cancel(bountyId)
+          if (res.error) throw new Error(res.error)
+          setConfirmModal(null)
+          await loadAll()
+          refreshCollection?.()
+          refreshBalance?.()
+        } catch (e) {
+          setConfirmModal({
+            type: 'error',
+            title: 'Cancel Failed',
+            message: e.message || 'Failed to cancel bounty.',
+          })
+        }
+      },
+    })
   }
 
   let displayBounties = bounties
@@ -168,6 +223,7 @@ export default function CCBountyBoard() {
         setSort={setSort}
         fulfillableIds={fulfillableIds}
         myBountyIds={myBountyIds}
+        myBountyHistory={myBountyHistory}
         onFulfill={handleFulfill}
         onCancel={handleCancel}
         showFulfillable={showFulfillable}
@@ -184,6 +240,51 @@ export default function CCBountyBoard() {
           activeBountyCount={activeBountyCount}
         />
       )}
+
+      {confirmModal && (
+        <BountyConfirmModal
+          {...confirmModal}
+          onClose={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   )
+}
+
+function spawnFlyingCores(sourceEl, amount) {
+  const target = document.getElementById('ember-balance-icon')
+  if (!target) return
+
+  const sr = sourceEl
+    ? sourceEl.getBoundingClientRect()
+    : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 }
+  const tr = target.getBoundingClientRect()
+  const sx = sr.left + sr.width / 2
+  const sy = sr.top + sr.height / 2
+  const tx = tr.left + tr.width / 2
+  const ty = tr.top + tr.height / 2
+
+  const count = Math.min(Math.max(Math.ceil(amount / 20), 4), 12)
+
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement('div')
+    const size = 5 + Math.random() * 5
+    dot.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px;border-radius:50%;background:#ff8c00;box-shadow:0 0 8px #ff8c00,0 0 16px rgba(255,140,0,0.4);z-index:9999;pointer-events:none;will-change:transform;`
+    document.body.appendChild(dot)
+
+    const spreadX = (Math.random() - 0.5) * 100
+    const spreadY = (Math.random() - 0.5) * 40
+    const startX = sx + spreadX
+    const startY = sy + spreadY
+    const duration = 600 + Math.random() * 400
+    const delay = i * 50
+    const hs = size / 2
+
+    const anim = dot.animate([
+      { transform: `translate(${startX - hs}px, ${startY - hs}px) scale(1)`, opacity: 1 },
+      { transform: `translate(${tx - hs}px, ${ty - hs}px) scale(0.2)`, opacity: 0.3 },
+    ], { duration, delay, easing: 'ease-in', fill: 'forwards' })
+
+    anim.onfinish = () => dot.remove()
+  }
 }

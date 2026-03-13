@@ -195,6 +195,9 @@ export function VaultProvider({ children }) {
   const dismantleCards = useCallback(async (cardIds) => {
     const result = await vaultService.dismantleCards(cardIds)
     setCollection(prev => prev.filter(c => !cardIds.includes(c.id)))
+    if (result.dismantledToday != null) {
+      setStats(prev => ({ ...prev, dismantledToday: result.dismantledToday }))
+    }
     passionCtx?.refreshBalance?.()
     return result
   }, [passionCtx])
@@ -305,7 +308,7 @@ export function VaultProvider({ children }) {
     <VaultContext.Provider value={{
       collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
       loaded, loading, getDefOverride,
-      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection,
+      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshBalance: passionCtx?.refreshBalance,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,

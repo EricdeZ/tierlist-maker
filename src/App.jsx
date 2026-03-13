@@ -94,6 +94,7 @@ import VaultPage from "./pages/VaultPage.jsx";
 import CardSharePage from "./pages/vault/CardSharePage.jsx";
 const BinderSharePage = lazy(() => import("./pages/vault/BinderSharePage.jsx"));
 import BgRemover from "./pages/BgRemover.jsx";
+import SketchPad from "./pages/SketchPad.jsx";
 // Codex
 import CodexLayout from './components/layout/CodexLayout'
 import CodexDashboard from "./pages/codex/CodexDashboard.jsx";
@@ -112,6 +113,9 @@ function App() {
                     <Routes>
                         {/* Stream overlay — standalone, no app chrome */}
                         <Route path="snooz/:week" element={<SnoozOverlay />} />
+
+                        {/* Sketch pad — standalone */}
+                        <Route path="sketch" element={<SketchPad />} />
 
                         {/* Card Clash share — standalone, no app chrome */}
                         <Route path="vault/share/:token" element={<CardSharePage />} />

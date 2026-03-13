@@ -18,7 +18,7 @@ export default function BountyGrid({
   bounties, total, page, setPage,
   filters, setFilters,
   sort, setSort,
-  fulfillableIds, myBountyIds,
+  fulfillableIds, myBountyIds, myBountyHistory,
   onFulfill, onCancel,
   showFulfillable, setShowFulfillable,
   showMine, setShowMine,
@@ -198,6 +198,25 @@ export default function BountyGrid({
           >
             <ChevronRight className="w-5 h-5" />
           </button>
+        </div>
+      )}
+
+      {/* My bounty history */}
+      {showMine && myBountyHistory?.length > 0 && (
+        <div className="mt-8">
+          <div className="border-t mb-5" style={{ borderColor: 'rgba(255,140,0,0.1)' }} />
+          <div className="text-xs text-white/30 uppercase tracking-wider cd-head mb-3">
+            History ({myBountyHistory.length})
+          </div>
+          <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
+            {myBountyHistory.map(b => (
+              <WantedPoster
+                key={b.id}
+                bounty={b}
+                size="sm"
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

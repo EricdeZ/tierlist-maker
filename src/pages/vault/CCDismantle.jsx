@@ -314,6 +314,7 @@ export default function CCDismantle() {
             isSelected={selected.has(card.id)}
             onToggle={toggle}
             override={getDefOverride(card)}
+            multiplier={currentMultiplier}
           />
         ))}
       </div>
@@ -418,10 +419,11 @@ export default function CCDismantle() {
   )
 }
 
-function DismantleSlot({ card, isSelected, onToggle, override }) {
+function DismantleSlot({ card, isSelected, onToggle, override, multiplier = 1 }) {
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
+  const adjustedValue = Math.round(rarityInfo.dismantleValue * multiplier * 10) / 10
 
   return (
     <div
@@ -448,9 +450,9 @@ function DismantleSlot({ card, isSelected, onToggle, override }) {
       {/* Value badge */}
       <div
         className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold cd-num flex items-center gap-0.5"
-        style={{ backgroundColor: rarityInfo.color + '20', color: rarityInfo.color }}
+        style={{ backgroundColor: rarityInfo.color + '20', color: multiplier < 1 ? '#f59e0b' : rarityInfo.color }}
       >
-        {rarityInfo.dismantleValue}
+        {adjustedValue}
         <img src={emberIcon} alt="" className="h-3 w-auto object-contain" />
       </div>
     </div>

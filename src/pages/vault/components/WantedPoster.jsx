@@ -28,9 +28,17 @@ function formatCardType(cardType) {
   return map[cardType] || cardType.charAt(0).toUpperCase() + cardType.slice(1)
 }
 
+const STATUS_STAMPS = {
+  completed: { label: 'CLAIMED', color: '#22c55e', angle: -8 },
+  expired: { label: 'EXPIRED', color: '#ef4444', angle: 6 },
+  cancelled: { label: 'CANCELLED', color: '#f97316', angle: -5 },
+}
+
 export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfill, isMine, onCancel }) {
   const isLg = size === 'lg'
   const w = isLg ? 200 : 160
+  const isDone = bounty.status && bounty.status !== 'active'
+  const stamp = STATUS_STAMPS[bounty.status]
 
   const rotation = useMemo(() => {
     // Deterministic rotation from bounty id
@@ -72,12 +80,40 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
         className="relative flex flex-col items-center w-full"
         style={{
           background: 'rgba(20, 15, 8, 0.92)',
-          border: '1px solid rgba(255, 140, 0, 0.27)',
-          boxShadow: '0 0 24px rgba(255,140,0,0.1), inset 0 0 40px rgba(255,140,0,0.04)',
+          border: `1px solid ${isDone ? 'rgba(255,255,255,0.08)' : 'rgba(255, 140, 0, 0.27)'}`,
+          boxShadow: isDone ? 'none' : '0 0 24px rgba(255,140,0,0.1), inset 0 0 40px rgba(255,140,0,0.04)',
           borderRadius: 4,
           padding: isLg ? '20px 14px 16px' : '16px 10px 12px',
+          filter: isDone ? 'saturate(0.3) brightness(0.7)' : 'none',
         }}
       >
+        {/* Status stamp */}
+        {stamp && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: 10 }}
+          >
+            <div
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: isLg ? 22 : 18,
+                fontWeight: 'bold',
+                color: stamp.color,
+                border: `2px solid ${stamp.color}`,
+                borderRadius: 4,
+                padding: '2px 10px',
+                transform: `rotate(${stamp.angle}deg)`,
+                letterSpacing: '0.15em',
+                textShadow: `0 0 12px ${stamp.color}80`,
+                boxShadow: `0 0 12px ${stamp.color}30`,
+                background: 'rgba(10, 8, 6, 0.85)',
+                filter: 'saturate(2) brightness(1.5)',
+              }}
+            >
+              {stamp.label}
+            </div>
+          </div>
+        )}
         {/* Orange neon pin */}
         <div
           className="absolute"
@@ -261,8 +297,8 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
           </div>
         </div>
 
-        {/* Days remaining */}
-        {daysLeft !== null && (
+        {/* Days remaining — only for active bounties */}
+        {!isDone && daysLeft !== null && (
           <div
             className="text-center"
             style={{
@@ -279,7 +315,7 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
         {/* Action buttons */}
         {canFulfill && onFulfill && (
           <button
-            onClick={() => onFulfill(bounty.id)}
+            onClick={(e) => onFulfill(bounty.id, e.currentTarget)}
             className="w-full cursor-pointer"
             style={{
               background: 'rgba(0, 210, 255, 0.12)',

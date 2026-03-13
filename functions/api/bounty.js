@@ -3,6 +3,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { createBounty, fulfillBounty, cancelBounty, expireStale, BOUNTY_RULES } from '../lib/bounty.js'
+import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { GODS, ITEMS, CONSUMABLES } from '../lib/vault-data.js'
 
 const VALID_CARD_NAMES = new Set([
@@ -43,9 +44,9 @@ const handler = async (event) => {
     if (event.httpMethod === 'POST') {
       const body = event.body ? JSON.parse(event.body) : {}
       switch (action) {
-        case 'create': return await handleCreate(user, body)
-        case 'fulfill': return await handleFulfill(user, body)
-        case 'cancel': return await handleCancel(user, body)
+        case 'create': return await handleCreate(sql, user, body)
+        case 'fulfill': return await handleFulfill(sql, user, body)
+        case 'cancel': return await handleCancel(sql, user, body)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -250,8 +251,14 @@ async function handleSearchPlayers(sql, params) {
   }
 }
 
+function pushBountyProgress(sql, userId) {
+  getVaultStats(sql, userId)
+    .then(stats => pushChallengeProgress(sql, userId, stats))
+    .catch(err => console.error('Bounty challenge push failed:', err))
+}
+
 // ═══ POST: Create bounty ═══
-async function handleCreate(user, body) {
+async function handleCreate(sql, user, body) {
   const { cardType, cardName, rarity, holoType, coreReward } = body
   if (!cardType || !cardName || !rarity || !coreReward) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType, cardName, rarity, and coreReward required' }) }
@@ -278,6 +285,8 @@ async function handleCreate(user, body) {
     })
   })
 
+  pushBountyProgress(sql, user.id)
+
   return {
     statusCode: 200, headers,
     body: JSON.stringify({ bounty: { id: bounty.id, status: bounty.status } }),
@@ -285,7 +294,7 @@ async function handleCreate(user, body) {
 }
 
 // ═══ POST: Fulfill bounty ═══
-async function handleFulfill(user, body) {
+async function handleFulfill(sql, user, body) {
   const { bountyId, cardId } = body
   if (!bountyId || !cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'bountyId and cardId required' }) }
@@ -294,6 +303,8 @@ async function handleFulfill(user, body) {
   const result = await transaction(async (tx) => {
     return await fulfillBounty(tx, user.id, { bountyId: parseInt(bountyId), cardId: parseInt(cardId) })
   })
+
+  pushBountyProgress(sql, user.id)
 
   return {
     statusCode: 200, headers,
@@ -305,7 +316,7 @@ async function handleFulfill(user, body) {
 }
 
 // ═══ POST: Cancel bounty ═══
-async function handleCancel(user, body) {
+async function handleCancel(sql, user, body) {
   const { bountyId } = body
   if (!bountyId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'bountyId required' }) }

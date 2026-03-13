@@ -934,6 +934,12 @@ async function handleDefinitionOverrides(sql) {
 const DISMANTLE_VALUES = {
   common: 0.2, uncommon: 1, rare: 3, epic: 8, legendary: 25, mythic: 75,
 }
+const DISMANTLE_TIERS = [
+  { upTo: 30,  rate: 1.0 },
+  { upTo: 80,  rate: 0.5 },
+  { upTo: 150, rate: 0.25 },
+  { upTo: Infinity, rate: 0.1 },
+]
 
 async function handleDismantle(sql, user, body) {
   const { cardIds } = body
@@ -969,22 +975,35 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid cards found — some may be in your Starting 5, listed on the market, in a trade, or in your binder' }) }
   }
 
-  // Calculate total (fractional sum, floor at the end)
-  let rawTotal = 0
-  for (const card of cards) {
-    rawTotal += DISMANTLE_VALUES[card.rarity] || 0
+  // Count legendaries before deleting
+  const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
+  const validIds = cards.map(c => c.id)
+
+  // Fetch current daily dismantle count (reset if new day)
+  await ensureStats(sql, user.id)
+  const [currentStats] = await sql`SELECT dismantled_today, dismantle_reset_date FROM cc_stats WHERE user_id = ${user.id}`
+  const today = new Date().toISOString().slice(0, 10)
+  const resetDate = currentStats.dismantle_reset_date ? new Date(currentStats.dismantle_reset_date).toISOString().slice(0, 10) : null
+  const dismantledToday = resetDate === today ? (currentStats.dismantled_today || 0) : 0
+
+  // Calculate total with diminishing returns applied server-side
+  let total = 0
+  for (let i = 0; i < cards.length; i++) {
+    const dayIndex = dismantledToday + i
+    const base = DISMANTLE_VALUES[cards[i].rarity] || 0
+    let mult = 0.1
+    for (const tier of DISMANTLE_TIERS) {
+      if (dayIndex < tier.upTo) { mult = tier.rate; break }
+    }
+    total += base * mult
   }
-  const emberGained = Math.floor(Math.round(rawTotal * 10) / 10)
+  const emberGained = Math.floor(Math.round(total * 10) / 10)
 
   if (emberGained < 1) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Selected cards are worth less than 1 Ember' }) }
   }
 
-  // Count legendaries before deleting
-  const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
-
   // Delete the cards (clean up completed trade references first to avoid FK violation)
-  const validIds = cards.map(c => c.id)
   await sql`
     DELETE FROM cc_trade_cards tc
     USING cc_trades t
@@ -996,12 +1015,14 @@ async function handleDismantle(sql, user, body) {
   // Grant ember
   const { balance } = await grantEmber(sql, user.id, 'dismantle', emberGained, `Dismantled ${validIds.length} card${validIds.length > 1 ? 's' : ''}`)
 
-  // Update dismantle stats in cc_stats
-  await ensureStats(sql, user.id)
+  // Update dismantle stats + daily counter
+  const newDismantledToday = dismantledToday + validIds.length
   await sql`
     UPDATE cc_stats SET
       cards_dismantled = cards_dismantled + ${validIds.length},
-      legendary_cards_dismantled = legendary_cards_dismantled + ${legendaryCount}
+      legendary_cards_dismantled = legendary_cards_dismantled + ${legendaryCount},
+      dismantled_today = ${newDismantledToday},
+      dismantle_reset_date = CURRENT_DATE
     WHERE user_id = ${user.id}
   `
 
@@ -1012,7 +1033,7 @@ async function handleDismantle(sql, user, body) {
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ dismantled: validIds.length, emberGained, balance }),
+    body: JSON.stringify({ dismantled: validIds.length, emberGained, balance, dismantledToday: newDismantledToday }),
   }
 }
 
@@ -1643,12 +1664,17 @@ function formatCard(row) {
 }
 
 function formatStats(row) {
-  if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0 }
+  if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0, dismantledToday: 0 }
+  // Reset daily dismantle counter if the stored date is not today
+  const today = new Date().toISOString().slice(0, 10)
+  const resetDate = row.dismantle_reset_date ? new Date(row.dismantle_reset_date).toISOString().slice(0, 10) : null
+  const dismantledToday = resetDate === today ? (row.dismantled_today || 0) : 0
   return {
     packsOpened: row.packs_opened,
     embers: row.embers,
     brudihsTurnedIn: row.brudihs_turned_in || 0,
     pendingMythicClaim: row.pending_mythic_claim || 0,
+    dismantledToday,
   }
 }
 
