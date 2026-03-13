@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useVault } from './VaultContext'
-import { RARITIES } from '../../data/vault/economy'
+import { RARITIES, DISMANTLE_TIERS, getDismantleMultiplier, calcDismantleTotal } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import { Hammer, Check, Trash2, Info } from 'lucide-react'
@@ -51,14 +51,71 @@ function CoresLabel({ value, className = '', iconSize = 'h-4' }) {
   )
 }
 
+function SalvageGauge({ dismantledToday, currentRate }) {
+  const pressure = Math.min(((1 - currentRate) / 0.9) * 100, 100)
+  const needleAngle = -90 + (pressure / 100) * 180
+  const getColor = (pct) => {
+    if (pct < 5) return '#00e5ff'
+    if (pct < 25) return '#22c55e'
+    if (pct < 60) return '#ff8c00'
+    if (pct < 85) return '#ff2d78'
+    return '#ef4444'
+  }
+  const color = getColor(pressure)
+  const statusLabel = currentRate >= 1 ? 'OPTIMAL' : currentRate >= 0.5 ? 'REDUCED' : currentRate >= 0.25 ? 'LOW' : 'MINIMAL'
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="text-[11px] text-white/35 uppercase tracking-[0.2em] font-bold mb-1 cd-head">Salvage Rate</div>
+      <div className="relative w-36 h-20">
+        <div className="absolute inset-0 rounded-full"
+          style={{ background: `radial-gradient(ellipse at 50% 90%, ${color}12, transparent 70%)`, filter: 'blur(12px)' }} />
+        <svg viewBox="0 0 200 110" className="w-full h-full relative z-1">
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#111a2a" strokeWidth="16" strokeLinecap="round" />
+          <path d="M 20 100 A 80 80 0 0 1 43 43" fill="none" stroke="#00e5ff" strokeWidth="13" strokeLinecap="round" opacity="0.5" />
+          <path d="M 46 40 A 80 80 0 0 1 100 20" fill="none" stroke="#22c55e" strokeWidth="13" opacity="0.5" />
+          <path d="M 100 20 A 80 80 0 0 1 154 40" fill="none" stroke="#ff8c00" strokeWidth="13" opacity="0.5" />
+          <path d="M 157 43 A 80 80 0 0 1 180 100" fill="none" stroke="#ef4444" strokeWidth="13" strokeLinecap="round" opacity="0.5" />
+          {pressure > 0 && (
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+              strokeDasharray={`${pressure * 2.51} 251`} opacity="0.8"
+              style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
+          )}
+          {[...Array(11)].map((_, i) => {
+            const angle = (180 - i * 18) * Math.PI / 180
+            return <line key={i} x1={100 + 68 * Math.cos(angle)} y1={100 - 68 * Math.sin(angle)}
+              x2={100 + 63 * Math.cos(angle)} y2={100 - 63 * Math.sin(angle)} stroke="white" strokeWidth="1" opacity="0.15" />
+          })}
+          <g transform={`rotate(${needleAngle}, 100, 100)`} style={{ transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            <line x1="100" y1="100" x2="100" y2="28" stroke={color} strokeWidth="3" strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
+          </g>
+          <circle cx="100" cy="100" r="8" fill="#0a0f1a" stroke={color} strokeWidth="2" opacity="0.8" />
+          <circle cx="100" cy="100" r="3" fill={color} opacity="0.9" />
+          <text x="15" y="108" fill="white" opacity="0.15" fontSize="7" fontFamily="'Share Tech Mono', monospace" textAnchor="start">100%</text>
+          <text x="185" y="108" fill="white" opacity="0.15" fontSize="7" fontFamily="'Share Tech Mono', monospace" textAnchor="end">10%</text>
+        </svg>
+      </div>
+      <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="text-lg font-bold tabular-nums cd-num cd-text-glow" style={{ color }}>{Math.round(currentRate * 100)}%</div>
+        <div className="text-[11px] font-bold uppercase tracking-wider cd-head" style={{ color: color + 'bb' }}>{statusLabel}</div>
+      </div>
+      {dismantledToday > 0 && (
+        <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{dismantledToday} dismantled today</div>
+      )}
+    </div>
+  )
+}
+
 export default function CCDismantle() {
-  const { collection, dismantleCards, startingFive, getDefOverride } = useVault()
+  const { collection, dismantleCards, startingFive, getDefOverride, stats } = useVault()
+  const dismantledToday = stats?.dismantledToday || 0
   const [selected, setSelected] = useState(new Set())
   const [dismantling, setDismantling] = useState(false)
   const [result, setResult] = useState(null)
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
-  const [showRates, setShowRates] = useState(false)
+  const [showRates, setShowRates] = useState(true)
   const [visibleCount, setVisibleCount] = useState(50)
 
   const s5CardIds = useMemo(() =>
@@ -99,20 +156,21 @@ export default function CCDismantle() {
     setResult(null)
   }, [])
 
-  const { rawTotal, coresTotal, selectedCount, breakdown } = useMemo(() => {
-    let raw = 0
+  const currentMultiplier = getDismantleMultiplier(dismantledToday)
+
+  const { fullValue, coresTotal, selectedCount, breakdown } = useMemo(() => {
+    const selectedCards = []
     const counts = {}
-    let count = 0
+    let fullVal = 0
     for (const card of collection) {
       if (!selected.has(card.id)) continue
-      count++
-      const val = RARITIES[card.rarity]?.dismantleValue || 0
-      raw += val
+      selectedCards.push(card)
+      fullVal += RARITIES[card.rarity]?.dismantleValue || 0
       counts[card.rarity] = (counts[card.rarity] || 0) + 1
     }
-    const rounded = Math.round(raw * 10) / 10
-    return { rawTotal: rounded, coresTotal: Math.floor(rounded), selectedCount: count, breakdown: counts }
-  }, [collection, selected])
+    const adjusted = calcDismantleTotal(selectedCards, dismantledToday)
+    return { fullValue: Math.floor(Math.round(fullVal * 10) / 10), coresTotal: adjusted, selectedCount: selectedCards.length, breakdown: counts }
+  }, [collection, selected, dismantledToday])
 
   const handleDismantle = async () => {
     if (coresTotal < 1 || dismantling) return
@@ -163,24 +221,44 @@ export default function CCDismantle() {
       {/* Rates panel */}
       {showRates && (
         <div className="mb-4 p-4 rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/60">
-          <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Dismantle Rates</div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {RARITY_ORDER.map(r => {
-              const info = RARITIES[r]
-              return (
-                <div key={r} className="text-center p-2 rounded-lg bg-black/20">
-                  <div className="text-xs font-bold cd-head" style={{ color: info.color }}>{info.name}</div>
-                  <div className="text-lg font-bold cd-num text-[var(--cd-text)] flex items-center justify-center gap-1">
-                    {info.dismantleValue}
-                    <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
-                  </div>
+          <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+            <SalvageGauge dismantledToday={dismantledToday} currentRate={currentMultiplier} />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Base Rates</div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {RARITY_ORDER.map(r => {
+                  const info = RARITIES[r]
+                  return (
+                    <div key={r} className="text-center p-2 rounded-lg bg-black/20">
+                      <div className="text-xs font-bold cd-head" style={{ color: info.color }}>{info.name}</div>
+                      <div className="text-lg font-bold cd-num text-[var(--cd-text)] flex items-center justify-center gap-1">
+                        {info.dismantleValue}
+                        <img src={emberIcon} alt="" className="h-4 w-auto object-contain" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-3 pt-3 border-t border-[var(--cd-border)]">
+                <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Daily Diminishing Returns</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {DISMANTLE_TIERS.map((tier, i) => {
+                    const prevUpTo = i === 0 ? 0 : DISMANTLE_TIERS[i - 1].upTo
+                    const label = tier.upTo === Infinity ? `${prevUpTo}+` : `${prevUpTo + 1}–${tier.upTo}`
+                    const isActive = dismantledToday >= prevUpTo && dismantledToday < tier.upTo
+                    return (
+                      <div key={i} className={`p-2 rounded-lg ${isActive ? 'bg-[var(--cd-cyan)]/10 border border-[var(--cd-cyan)]/30' : 'bg-black/20'}`}>
+                        <div className="text-[var(--cd-text-dim)] cd-head">Cards {label}</div>
+                        <div className={`font-bold cd-num ${isActive ? 'text-[var(--cd-cyan)]' : 'text-[var(--cd-text)]'}`}>
+                          {Math.round(tier.rate * 100)}% value
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
+              </div>
+            </div>
           </div>
-          <p className="text-[10px] text-[var(--cd-text-dim)] mt-2 flex items-center gap-1">
-            1 Standard Pack = <CoresLabel value="10" iconSize="h-3.5" />. Values are summed and rounded down.
-          </p>
         </div>
       )}
 
@@ -303,13 +381,16 @@ export default function CCDismantle() {
                 <span className={`text-2xl font-bold cd-num ${coresTotal >= 1 ? 'text-white' : 'text-red-400'}`}>
                   {coresTotal}
                 </span>
-                {rawTotal !== coresTotal && (
-                  <span className="text-sm text-white/40 cd-num">({rawTotal.toFixed(1)})</span>
+                {fullValue > coresTotal && (
+                  <span className="text-sm text-white/40 cd-num line-through">({fullValue})</span>
                 )}
                 <img src={emberIcon} alt="Cores" className="h-6 w-auto object-contain" />
               </div>
               {coresTotal < 1 && (
                 <div className="text-[11px] text-red-400 font-bold">Min. 1 Core required</div>
+              )}
+              {currentMultiplier < 1 && (
+                <div className="text-[10px] text-amber-400 font-bold">{Math.round(currentMultiplier * 100)}% rate ({dismantledToday} today)</div>
               )}
             </div>
 

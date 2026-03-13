@@ -47,6 +47,32 @@ export function getRandomHoloEffect(rarity) {
   return info.holoEffects[Math.floor(Math.random() * info.holoEffects.length)];
 }
 
+// Dismantle diminishing returns — tiers of daily cards dismantled
+export const DISMANTLE_TIERS = [
+  { upTo: 30,  rate: 1.0 },
+  { upTo: 80,  rate: 0.5 },
+  { upTo: 150, rate: 0.25 },
+  { upTo: Infinity, rate: 0.1 },
+];
+
+export function getDismantleMultiplier(cardIndex) {
+  for (const tier of DISMANTLE_TIERS) {
+    if (cardIndex < tier.upTo) return tier.rate;
+  }
+  return 0.1;
+}
+
+export function calcDismantleTotal(cards, dismantledToday) {
+  let total = 0;
+  for (let i = 0; i < cards.length; i++) {
+    const dayIndex = dismantledToday + i;
+    const mult = getDismantleMultiplier(dayIndex);
+    const base = RARITIES[cards[i].rarity]?.dismantleValue || 0;
+    total += base * mult;
+  }
+  return Math.floor(Math.round(total * 10) / 10);
+}
+
 // Marketplace fee constants (Core-only)
 export const MARKETPLACE = {
   feePercent: 0.02,
