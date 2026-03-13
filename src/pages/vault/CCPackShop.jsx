@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useVault } from './VaultContext';
+import { useAuth } from '../../context/AuthContext';
 import { usePassion } from '../../context/PassionContext';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
@@ -332,6 +333,8 @@ function MyPacks() {
 // ═══════════════════════════════════════════════
 export default function PackShopRouter() {
   const { inventory, giftData } = useVault();
+  const { hasPermission } = useAuth();
+  const isOwner = hasPermission('permission_manage');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length;
@@ -342,7 +345,17 @@ export default function PackShopRouter() {
   const stableDefaultRef = useRef('shop');
   if (myPacksCount > 0) stableDefaultRef.current = 'my-packs';
 
-  const mode = searchParams.get('packMode') || stableDefaultRef.current;
+  const rawMode = searchParams.get('packMode') || stableDefaultRef.current;
+  const mode = (rawMode === 'black-market' && !isOwner) ? 'shop' : rawMode;
+
+  useEffect(() => {
+    if (searchParams.get('packMode') === 'black-market' && !isOwner) {
+      const next = new URLSearchParams(searchParams);
+      next.set('packMode', 'shop');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, isOwner, setSearchParams]);
+
   const setMode = (m) => {
     const next = new URLSearchParams(searchParams);
     if (m === stableDefaultRef.current) next.delete('packMode'); else next.set('packMode', m);
@@ -391,24 +404,26 @@ export default function PackShopRouter() {
         >
           LIMITED SALE
         </button>
-        <button
-          onClick={() => setMode('black-market')}
-          className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer relative ${
-            mode === 'black-market'
-              ? 'bg-red-900/20 text-red-500 border-red-500/30'
-              : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
-          }`}
-          style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
-        >
-          BLACK MARKET
-          <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500" style={{ boxShadow: '0 0 6px #ef4444' }} />
-        </button>
+        {isOwner && (
+          <button
+            onClick={() => setMode('black-market')}
+            className={`px-5 py-1.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer relative ${
+              mode === 'black-market'
+                ? 'bg-red-900/20 text-red-500 border-red-500/30'
+                : 'bg-transparent text-white/30 border-white/10 hover:text-white/50'
+            }`}
+            style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, letterSpacing: '0.2em' }}
+          >
+            BLACK MARKET
+            <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500" style={{ boxShadow: '0 0 6px #ef4444' }} />
+          </button>
+        )}
       </div>
       {mode === 'my-packs' ? (
         <MyPacks />
       ) : mode === 'shop' ? (
         <PackShop />
-      ) : mode === 'black-market' ? (
+      ) : mode === 'black-market' && isOwner ? (
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
           <CCBlackMarket />
         </Suspense>

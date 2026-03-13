@@ -63,8 +63,8 @@ const handler = async (event) => {
         case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
-        case 'black-market-turn-in': return await handleBlackMarketTurnIn(sql, user, body)
-        case 'black-market-claim-mythic': return await handleBlackMarketClaimMythic(sql, user, body)
+        case 'black-market-turn-in': { await requirePermission(event, 'permission_manage'); return await handleBlackMarketTurnIn(sql, user, body) }
+        case 'black-market-claim-mythic': { await requirePermission(event, 'permission_manage'); return await handleBlackMarketClaimMythic(sql, user, body) }
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)

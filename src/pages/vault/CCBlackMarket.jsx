@@ -5,6 +5,8 @@ import { GODS, CLASS_ROLE } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import { MINIONS } from '../../data/vault/minions'
+import TradingCard from '../../components/TradingCard'
+import PackArt from './components/PackArt'
 import './CCBlackMarket.css'
 
 const RARITY_COLORS = {
@@ -43,77 +45,192 @@ function ShadowyHand({ phase }) {
   const isOpen = phase === 'idle' || phase === 'dragging' || phase === 'return'
 
   return (
-    <svg viewBox="0 0 200 280" fill="none" xmlns="http://www.w3.org/2000/svg" className="bm-hand-svg">
+    <svg viewBox="0 0 240 360" fill="none" xmlns="http://www.w3.org/2000/svg" className="bm-hand-svg">
       <defs>
-        <radialGradient id="bm-hand-glow" cx="50%" cy="40%" r="60%">
-          <stop offset="0%" stopColor="rgba(139,0,0,0.3)" />
+        {/* Multi-layered ambient glow */}
+        <radialGradient id="bm-glow-outer" cx="50%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="rgba(180,0,0,0.25)" />
+          <stop offset="50%" stopColor="rgba(100,0,0,0.1)" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
-        <linearGradient id="bm-hand-fill" x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="#0a0008" />
-          <stop offset="60%" stopColor="#120010" />
-          <stop offset="100%" stopColor="#0a0008" />
+        <radialGradient id="bm-glow-inner" cx="50%" cy="40%" r="35%">
+          <stop offset="0%" stopColor="rgba(255,30,30,0.12)" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+
+        {/* Skin fill — dark with subtle warm undertone */}
+        <linearGradient id="bm-skin" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="#1a0a12" />
+          <stop offset="40%" stopColor="#140810" />
+          <stop offset="100%" stopColor="#0c0408" />
         </linearGradient>
-        <filter id="bm-hand-shadow">
-          <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="rgba(139,0,0,0.4)" />
+        <linearGradient id="bm-skin-hi" x1="30%" y1="0%" x2="70%" y2="100%">
+          <stop offset="0%" stopColor="#2a1018" />
+          <stop offset="100%" stopColor="#140810" />
+        </linearGradient>
+
+        {/* Edge highlight for depth */}
+        <linearGradient id="bm-edge" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(200,40,40,0.15)" />
+          <stop offset="50%" stopColor="rgba(200,40,40,0.04)" />
+          <stop offset="100%" stopColor="rgba(200,40,40,0.12)" />
+        </linearGradient>
+
+        {/* Nail gradient */}
+        <linearGradient id="bm-nail" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="#2a1520" />
+          <stop offset="100%" stopColor="#0c0408" />
+        </linearGradient>
+
+        {/* Bottom fog */}
+        <linearGradient id="bm-fog" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="transparent" />
+          <stop offset="40%" stopColor="rgba(10,2,6,0.7)" />
+          <stop offset="100%" stopColor="rgba(10,2,6,0.98)" />
+        </linearGradient>
+
+        <filter id="bm-glow-filter">
+          <feGaussianBlur stdDeviation="4" />
+          <feComposite in="SourceGraphic" />
+        </filter>
+        <filter id="bm-shadow">
+          <feDropShadow dx="0" dy="2" stdDeviation="8" floodColor="rgba(120,0,0,0.5)" />
+        </filter>
+
+        {/* Vein pattern */}
+        <filter id="bm-vein-blur">
+          <feGaussianBlur stdDeviation="1.2" />
         </filter>
       </defs>
 
-      {/* Glow behind hand */}
-      <ellipse cx="100" cy="120" rx="90" ry="100" fill="url(#bm-hand-glow)" />
+      {/* Background glow layers */}
+      <ellipse cx="120" cy="130" rx="110" ry="120" fill="url(#bm-glow-outer)" />
+      <ellipse cx="120" cy="120" rx="60" ry="70" fill="url(#bm-glow-inner)" />
 
       {isOpen ? (
-        /* Open palm — fingers spread, reaching up */
-        <g filter="url(#bm-hand-shadow)">
-          {/* Palm base */}
-          <path d="M60 180 C60 150, 65 140, 70 130 L70 125 C72 118, 78 115, 82 115 L118 115 C122 115, 128 118, 130 125 L130 130 C135 140, 140 150, 140 180 L140 240 C140 260, 130 270, 100 270 C70 270, 60 260, 60 240 Z"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.25)" strokeWidth="1" />
-          {/* Thumb — left, angled out */}
-          <path d="M62 160 C55 150, 42 135, 38 118 C35 105, 40 95, 48 98 C54 100, 58 110, 60 125 L62 140"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Index finger */}
-          <path d="M78 115 C76 95, 74 70, 72 45 C71 32, 76 25, 82 26 C88 27, 90 35, 89 48 L86 80 L85 115"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Middle finger — tallest */}
-          <path d="M93 115 C92 90, 91 60, 90 30 C89 15, 95 8, 101 9 C107 10, 110 18, 109 33 L106 75 L104 115"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Ring finger */}
-          <path d="M110 115 C112 92, 114 68, 115 48 C116 35, 121 28, 126 30 C131 32, 132 40, 131 52 L128 82 L122 115"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Pinky */}
-          <path d="M128 125 C132 108, 136 90, 138 72 C139 60, 144 55, 149 58 C153 61, 153 70, 151 80 L146 105 L140 130"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Knuckle highlights */}
-          <ellipse cx="82" cy="115" rx="5" ry="3" fill="rgba(139,0,0,0.08)" />
-          <ellipse cx="100" cy="112" rx="5" ry="3" fill="rgba(139,0,0,0.08)" />
-          <ellipse cx="118" cy="115" rx="5" ry="3" fill="rgba(139,0,0,0.08)" />
+        <g filter="url(#bm-shadow)">
+          {/* === OPEN HAND — sinister, clawed, beckoning === */}
+
+          {/* Wrist + forearm emerging from below */}
+          <path d="M78 280 C76 260, 74 240, 76 220 L76 195 C78 180, 82 170, 88 165 L152 165 C158 170, 162 180, 164 195 L164 220 C166 240, 164 260, 162 280 L162 360 L78 360 Z"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+
+          {/* Forearm veins */}
+          <g filter="url(#bm-vein-blur)" opacity="0.35">
+            <path d="M98 260 C96 240, 100 220, 95 200" stroke="rgba(120,20,30,0.4)" strokeWidth="1.5" fill="none" />
+            <path d="M130 255 C132 235, 128 218, 133 195" stroke="rgba(120,20,30,0.3)" strokeWidth="1" fill="none" />
+            <path d="M142 270 C144 248, 140 230, 145 208" stroke="rgba(120,20,30,0.25)" strokeWidth="1" fill="none" />
+          </g>
+
+          {/* Palm */}
+          <path d="M80 195 C80 178, 84 168, 90 162 L92 158 C95 152, 102 148, 110 147 L130 147 C138 148, 145 152, 148 158 L150 162 C156 168, 160 178, 160 195 L160 210 C160 218, 156 222, 150 222 L90 222 C84 222, 80 218, 80 210 Z"
+            fill="url(#bm-skin-hi)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+
+          {/* Palm crease lines */}
+          <path d="M92 180 C100 175, 115 172, 148 178" stroke="rgba(180,30,30,0.12)" strokeWidth="0.7" fill="none" />
+          <path d="M88 192 C100 186, 120 184, 155 190" stroke="rgba(180,30,30,0.1)" strokeWidth="0.6" fill="none" />
+          <path d="M95 200 C110 195, 130 194, 150 198" stroke="rgba(180,30,30,0.08)" strokeWidth="0.5" fill="none" />
+
+          {/* Thumb — thick, angled outward, slightly curled */}
+          <path d="M82 190 C76 182, 62 168, 52 148 C47 138, 44 126, 48 118 C52 110, 60 108, 66 114 C72 120, 74 132, 74 142 L76 160 L80 178"
+            fill="url(#bm-skin-hi)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          {/* Thumb nail */}
+          <ellipse cx="50" cy="124" rx="5" ry="7" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.15)" strokeWidth="0.5" transform="rotate(-20 50 124)" />
+          {/* Thumb joint */}
+          <path d="M66 142 C62 142, 58 140, 56 136" stroke="rgba(150,20,20,0.15)" strokeWidth="0.6" fill="none" />
+
+          {/* Index finger — long, slightly curled inward like beckoning */}
+          <path d="M96 148 C94 128, 90 100, 86 72 C84 56, 80 40, 78 28 C76 16, 82 6, 90 8 C98 10, 100 22, 100 36 L98 60 L96 90 L95 120 L95 148"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          <ellipse cx="80" cy="18" rx="4.5" ry="8" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.2)" strokeWidth="0.5" transform="rotate(-8 80 18)" />
+          <path d="M90 72 C87 72, 85 70, 84 66" stroke="rgba(150,20,20,0.12)" strokeWidth="0.5" fill="none" />
+          <path d="M92 100 C89 100, 87 98, 86 94" stroke="rgba(150,20,20,0.1)" strokeWidth="0.5" fill="none" />
+
+          {/* Middle finger — tallest, straight, menacing */}
+          <path d="M113 147 C112 120, 110 85, 108 52 C107 35, 106 18, 106 6 C106 -8, 114 -14, 121 -12 C128 -10, 130 0, 129 14 L127 50 L125 90 L122 130 L120 147"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          <ellipse cx="107" cy="-4" rx="5" ry="9" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.2)" strokeWidth="0.5" transform="rotate(-2 107 -4)" />
+          <path d="M117 52 C114 52, 112 50, 111 46" stroke="rgba(150,20,20,0.12)" strokeWidth="0.5" fill="none" />
+          <path d="M119 85 C116 85, 114 83, 113 80" stroke="rgba(150,20,20,0.1)" strokeWidth="0.5" fill="none" />
+
+          {/* Ring finger — slightly shorter, slight curl */}
+          <path d="M133 148 C134 124, 136 95, 138 65 C139 48, 140 32, 141 22 C142 10, 148 4, 155 7 C162 10, 162 22, 160 35 L157 65 L153 100 L148 135 L145 148"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          <ellipse cx="141" cy="12" rx="4.5" ry="8" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.2)" strokeWidth="0.5" transform="rotate(6 141 12)" />
+          <path d="M152 65 C149 65, 147 63, 146 60" stroke="rgba(150,20,20,0.12)" strokeWidth="0.5" fill="none" />
+
+          {/* Pinky — short, curled slightly */}
+          <path d="M152 158 C156 140, 160 118, 164 94 C165 80, 168 68, 170 58 C172 46, 178 42, 184 46 C189 50, 188 62, 185 74 L180 98 L174 126 L168 155 L160 170"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          <ellipse cx="171" cy="50" rx="4" ry="7" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.2)" strokeWidth="0.5" transform="rotate(12 171 50)" />
+
+          {/* Knuckle highlights — bone pushing through */}
+          <ellipse cx="96" cy="148" rx="7" ry="4" fill="rgba(200,30,30,0.06)" />
+          <ellipse cx="116" cy="145" rx="7" ry="4" fill="rgba(200,30,30,0.06)" />
+          <ellipse cx="138" cy="148" rx="7" ry="4" fill="rgba(200,30,30,0.06)" />
+
+          {/* Tendons on back of hand */}
+          <g opacity="0.2">
+            <path d="M96 148 L92 170" stroke="rgba(140,20,20,0.3)" strokeWidth="0.8" fill="none" />
+            <path d="M116 145 L114 170" stroke="rgba(140,20,20,0.3)" strokeWidth="0.8" fill="none" />
+            <path d="M138 148 L140 170" stroke="rgba(140,20,20,0.3)" strokeWidth="0.8" fill="none" />
+          </g>
         </g>
       ) : (
-        /* Closed fist — fingers clenched */
-        <g filter="url(#bm-hand-shadow)">
-          {/* Fist body */}
-          <path d="M58 130 C58 110, 65 90, 75 85 L80 82 C85 78, 95 76, 105 76 L120 78 C130 80, 138 88, 142 100 L144 115 C146 130, 144 150, 140 170 L138 200 C136 230, 128 260, 100 270 C72 260, 64 230, 62 200 L60 170 C58 155, 57 140, 58 130 Z"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.25)" strokeWidth="1" />
-          {/* Thumb wrapped over */}
-          <path d="M60 130 C52 125, 44 115, 44 105 C44 95, 50 90, 56 92 C62 94, 66 102, 66 112 L64 125"
-            fill="url(#bm-hand-fill)" stroke="rgba(139,0,0,0.2)" strokeWidth="1" />
-          {/* Finger ridges across fist */}
-          <path d="M70 95 C80 88, 100 84, 120 88 C130 90, 136 96, 138 105"
-            fill="none" stroke="rgba(139,0,0,0.12)" strokeWidth="1.5" />
-          <path d="M68 108 C78 102, 100 98, 125 102 C132 104, 138 108, 140 115"
-            fill="none" stroke="rgba(139,0,0,0.1)" strokeWidth="1" />
-          <path d="M66 120 C76 115, 100 112, 128 116 C134 118, 140 122, 142 128"
-            fill="none" stroke="rgba(139,0,0,0.08)" strokeWidth="1" />
-          {/* Knuckle bumps */}
-          <ellipse cx="82" cy="86" rx="6" ry="4" fill="rgba(139,0,0,0.1)" />
-          <ellipse cx="100" cy="83" rx="6" ry="4" fill="rgba(139,0,0,0.1)" />
-          <ellipse cx="118" cy="86" rx="6" ry="4" fill="rgba(139,0,0,0.1)" />
+        <g filter="url(#bm-shadow)">
+          {/* === CLOSED FIST — crushing, powerful === */}
+
+          {/* Wrist + forearm */}
+          <path d="M78 260 C76 240, 74 220, 76 200 L78 180 C80 168, 86 160, 92 156 L148 156 C154 160, 160 168, 162 180 L164 200 C166 220, 164 240, 162 260 L162 360 L78 360 Z"
+            fill="url(#bm-skin)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+
+          {/* Forearm veins */}
+          <g filter="url(#bm-vein-blur)" opacity="0.4">
+            <path d="M98 250 C94 228, 100 210, 94 188" stroke="rgba(120,20,30,0.5)" strokeWidth="1.8" fill="none" />
+            <path d="M130 245 C134 225, 128 208, 134 185" stroke="rgba(120,20,30,0.35)" strokeWidth="1.2" fill="none" />
+            <path d="M145 258 C148 238, 142 222, 148 200" stroke="rgba(120,20,30,0.3)" strokeWidth="1" fill="none" />
+          </g>
+
+          {/* Main fist mass */}
+          <path d="M68 148 C66 130, 72 108, 82 98 L88 92 C95 86, 108 82, 120 82 L138 84 C150 87, 160 96, 166 110 L170 125 C174 142, 172 162, 168 178 L164 200 C162 210, 156 218, 148 222 L92 222 C84 218, 78 210, 76 200 L72 178 C68 162, 66 152, 68 148 Z"
+            fill="url(#bm-skin-hi)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+
+          {/* Thumb wrapped across front — the "lock" */}
+          <path d="M70 155 C60 148, 48 136, 44 122 C40 108, 44 96, 54 94 C64 92, 72 100, 76 112 L78 128 C80 138, 78 148, 74 155"
+            fill="url(#bm-skin-hi)" stroke="url(#bm-edge)" strokeWidth="0.8" />
+          <ellipse cx="46" cy="106" rx="5" ry="6" fill="url(#bm-nail)" stroke="rgba(200,40,40,0.15)" strokeWidth="0.5" transform="rotate(-25 46 106)" />
+
+          {/* Curled finger segments across top — 3 rows of knuckle ridges */}
+          <path d="M78 105 C90 94, 115 88, 142 94 C154 98, 162 106, 166 118"
+            fill="none" stroke="rgba(200,30,30,0.18)" strokeWidth="1.2" />
+          <path d="M74 122 C86 114, 115 108, 145 114 C155 118, 164 124, 168 134"
+            fill="none" stroke="rgba(200,30,30,0.14)" strokeWidth="1" />
+          <path d="M72 140 C84 133, 115 128, 148 134 C158 137, 166 142, 170 150"
+            fill="none" stroke="rgba(200,30,30,0.1)" strokeWidth="0.8" />
+
+          {/* Knuckle bumps — prominent on a clenched fist */}
+          <ellipse cx="92" cy="96" rx="8" ry="5" fill="rgba(200,30,30,0.08)" />
+          <ellipse cx="116" cy="92" rx="8" ry="5" fill="rgba(200,30,30,0.08)" />
+          <ellipse cx="140" cy="96" rx="8" ry="5" fill="rgba(200,30,30,0.08)" />
+          {/* Knuckle bone highlights */}
+          <ellipse cx="92" cy="94" rx="3" ry="2" fill="rgba(255,60,60,0.06)" />
+          <ellipse cx="116" cy="90" rx="3" ry="2" fill="rgba(255,60,60,0.06)" />
+          <ellipse cx="140" cy="94" rx="3" ry="2" fill="rgba(255,60,60,0.06)" />
+
+          {/* Tendons strained on back of hand */}
+          <g opacity="0.3">
+            <path d="M92 98 L90 160" stroke="rgba(140,20,20,0.4)" strokeWidth="1" fill="none" />
+            <path d="M116 94 L114 160" stroke="rgba(140,20,20,0.4)" strokeWidth="1" fill="none" />
+            <path d="M140 98 L142 160" stroke="rgba(140,20,20,0.4)" strokeWidth="1" fill="none" />
+          </g>
         </g>
       )}
 
-      {/* Bottom fog/shadow */}
-      <rect x="0" y="240" width="200" height="40" fill="url(#bm-hand-fill)" opacity="0.6" />
-      <ellipse cx="100" cy="260" rx="80" ry="20" fill="rgba(10,0,8,0.9)" />
+      {/* Bottom fog — hand emerges from darkness */}
+      <rect x="0" y="260" width="240" height="100" fill="url(#bm-fog)" />
+      <ellipse cx="120" cy="300" rx="100" ry="30" fill="rgba(10,2,6,0.95)" />
+      {/* Subtle red glow at fog line */}
+      <ellipse cx="120" cy="280" rx="60" ry="15" fill="rgba(139,0,0,0.08)" />
     </svg>
   )
 }
@@ -205,15 +322,23 @@ function HandDropZone({
           </div>
           {rewardPacks > 0 && (
             <div className="bm-reward-packs">
-              {[...Array(Math.min(rewardPacks, 15))].map((_, i) => (
-                <div key={i} className="bm-reward-pack">
-                  <svg viewBox="0 0 20 26" width="16" height="20" fill="none">
-                    <rect x="1" y="1" width="18" height="24" rx="2" fill="rgba(139,0,0,0.3)" stroke="rgba(200,0,0,0.4)" strokeWidth="1" />
-                    <line x1="4" y1="8" x2="16" y2="8" stroke="rgba(200,0,0,0.3)" strokeWidth="0.5" />
-                    <line x1="4" y1="12" x2="16" y2="12" stroke="rgba(200,0,0,0.2)" strokeWidth="0.5" />
-                  </svg>
+              {[...Array(Math.min(rewardPacks, 5))].map((_, i) => (
+                <div key={i} className="bm-reward-pack-card" style={{ transform: `rotate(${(i - 2) * 6}deg) translateY(${Math.abs(i - 2) * 4}px)` }}>
+                  <PackArt
+                    tier={reward.packType || 'mixed'}
+                    name=""
+                    subtitle=""
+                    cardCount={6}
+                    seed={i}
+                    compact
+                  />
                 </div>
               ))}
+            </div>
+          )}
+          {isMythicReward && (
+            <div className="bm-mythic-reward-glow">
+              <div className="text-4xl">&#9733;</div>
             </div>
           )}
         </div>
@@ -222,12 +347,22 @@ function HandDropZone({
       {/* Phase: collect */}
       {phase === 'collect' && (
         <div className="flex flex-col items-center gap-4 z-10 relative bm-reward-fade-in">
-          <div className="bm-hand-svg bm-hand-collect">
-            <ShadowyHand phase="idle" />
-          </div>
-
           {rewardPacks > 0 && (
             <div className="text-center">
+              <div className="bm-reward-packs mb-3">
+                {[...Array(Math.min(rewardPacks, 5))].map((_, i) => (
+                  <div key={i} className="bm-reward-pack-card" style={{ transform: `rotate(${(i - 2) * 8}deg) translateY(${Math.abs(i - 2) * 3}px)` }}>
+                    <PackArt
+                      tier={reward.packType || 'mixed'}
+                      name=""
+                      subtitle=""
+                      cardCount={6}
+                      seed={i}
+                      compact
+                    />
+                  </div>
+                ))}
+              </div>
               <div className="text-2xl font-bold cd-num text-red-400 mb-1">+{rewardPacks}</div>
               <div className="text-xs text-white/40 cd-head tracking-wider">
                 {reward.packType?.replace('-mixed', '').toUpperCase()} Packs
@@ -237,6 +372,9 @@ function HandDropZone({
 
           {isMythicReward && (
             <div className="text-center">
+              <div className="bm-mythic-reward-glow mb-2">
+                <div className="text-5xl">&#9733;</div>
+              </div>
               <div className="text-lg font-bold cd-head text-red-400 tracking-wider">Mythic Choice</div>
               <div className="text-xs text-white/30 mt-1">Choose any mythic card from the catalog</div>
             </div>
@@ -248,7 +386,7 @@ function HandDropZone({
           >
             {isMythicReward
               ? 'Choose Your Mythic'
-              : `${reward.count}× ${reward.packType?.replace('-mixed', '').toUpperCase()} Packs`}
+              : 'Collect'}
           </button>
         </div>
       )}
@@ -259,33 +397,39 @@ function HandDropZone({
 
 // ─── Brudih Card Item ────────────────────────────────────
 
-function BrudihCardItem({ card, isSelected, onSelect, onDragStart, onDragEnd, dragging }) {
-  const color = RARITY_COLORS[card.rarity] || RARITY_COLORS.common
-  const league = card.cardData?.leagueName || ''
+function BrudihCardItem({ card, isSelected, onSelect, onDragStart, onDragEnd, dragging, compact }) {
+  const cardData = card.cardData || {}
   const reward = REWARD_TIERS[card.rarity]
+  const sz = compact ? 80 : 105
 
   return (
     <div
-      className={`bm-card-item rounded-lg p-3 border shrink-0 ${
-        isSelected
-          ? 'bm-card-item-selected border-red-500/40'
-          : 'border-[rgba(139,0,0,0.15)] hover:border-[rgba(139,0,0,0.35)]'
+      className={`bm-card-item shrink-0 ${
+        isSelected ? 'bm-card-item-selected' : ''
       } ${dragging ? 'bm-card-dragging' : ''}`}
-      style={{ background: `linear-gradient(135deg, ${color}08, rgba(10,0,8,0.9))`, width: 110 }}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onSelect}
     >
-      <div className="text-[10px] font-bold cd-head tracking-wider mb-1 truncate" style={{ color }}>
-        {RARITY_LABELS[card.rarity] || card.rarity}
-      </div>
-      <div className="text-sm font-bold text-white/90 cd-head tracking-wide truncate">Brudih</div>
-      {league && (
-        <div className="text-[10px] text-white/30 cd-mono mt-0.5 uppercase">{league}</div>
-      )}
-      <div className="mt-2 text-[10px] text-white/20 cd-head tracking-wider">
-        {reward === 'choose' ? 'Mythic pick' : `${reward} packs`}
+      <TradingCard
+        playerName={cardData.playerName || card.godName}
+        teamName={cardData.teamName || ''}
+        teamColor={cardData.teamColor || '#6366f1'}
+        role={cardData.role || card.role || 'ADC'}
+        avatarUrl={cardData.avatarUrl || card.imageUrl || ''}
+        rarity={card.rarity}
+        leagueName={cardData.leagueName || ''}
+        divisionName={cardData.divisionName || ''}
+        bestGod={card.bestGodName ? { name: card.bestGodName } : null}
+        isConnected={card.isConnected}
+        isFirstEdition={cardData.isFirstEdition}
+        size={sz}
+      />
+      <div className="text-center mt-1">
+        <div className="text-[9px] text-white/25 cd-head tracking-wider">
+          {reward === 'choose' ? 'Mythic pick' : `${reward} packs`}
+        </div>
       </div>
     </div>
   )
@@ -337,6 +481,7 @@ function BrudihCardGrid({ cards, selectedCard, onSelect, onDragStart, onDragEnd,
               onDragStart={() => {}}
               onDragEnd={() => {}}
               dragging={false}
+              compact
             />
           ))}
         </div>
@@ -347,7 +492,7 @@ function BrudihCardGrid({ cards, selectedCard, onSelect, onDragStart, onDragEnd,
   return (
     <>
       {filterButtons}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 justify-items-center">
         {cards.map(card => (
           <BrudihCardItem
             key={card.id}
