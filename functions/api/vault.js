@@ -1478,10 +1478,12 @@ function formatCard(row) {
 }
 
 function formatStats(row) {
-  if (!row) return { packsOpened: 0, embers: 0 }
+  if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0 }
   return {
     packsOpened: row.packs_opened,
     embers: row.embers,
+    brudihsTurnedIn: row.brudihs_turned_in || 0,
+    pendingMythicClaim: row.pending_mythic_claim || 0,
   }
 }
 
