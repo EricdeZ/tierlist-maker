@@ -192,6 +192,15 @@
     animation: bm-screen-shake 0.2s ease-in-out;
 }
 
+.bm-flash {
+    animation: bm-flash 0.3s ease-out forwards;
+}
+
+@keyframes bm-flash {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
 /* Shadow particles container */
 .bm-particles {
     position: absolute;
@@ -244,6 +253,8 @@
 /* Dragging ghost */
 .bm-card-dragging {
     opacity: 0.5;
+    transform: rotate(-3deg) scale(1.05);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(139, 0, 0, 0.3);
 }
 
 

@@ -162,6 +162,18 @@ const HandDropZone = forwardRef(function HandDropZone({
         </div>
       )}
 
+      {/* Reward preview during drag-over or mobile selection */}
+      {(phase === 'dragging' || (phase === 'idle' && selectedCard)) && selectedCard && (
+        <div className="absolute bottom-3 left-3 right-3 p-2 rounded-md bg-red-900/10 border border-red-900/20 z-10">
+          <div className="text-[8px] text-white/25 tracking-widest uppercase">Reward</div>
+          <div className="text-[10px] text-red-400 mt-0.5">
+            {selectedCard.rarity === 'mythic'
+              ? 'Mythic card of your choice'
+              : `${REWARD_TIERS[selectedCard.rarity]} ${(selectedCard.cardData?.leagueName || '').toUpperCase()} Packs`}
+          </div>
+        </div>
+      )}
+
       {/* Phase: grab */}
       {phase === 'grab' && (
         <div className="flex flex-col items-center z-10 relative">
@@ -169,6 +181,11 @@ const HandDropZone = forwardRef(function HandDropZone({
             <ShadowyHand phase={phase} />
           </div>
         </div>
+      )}
+
+      {/* Red flash on grab */}
+      {phase === 'grab' && (
+        <div className="absolute inset-0 bg-red-500/10 rounded-xl pointer-events-none bm-flash" />
       )}
 
       {/* Phase: devour */}
@@ -212,7 +229,9 @@ const HandDropZone = forwardRef(function HandDropZone({
           {rewardPacks > 0 && (
             <div className="text-center">
               <div className="text-2xl font-bold cd-num text-red-400 mb-1">+{rewardPacks}</div>
-              <div className="text-xs text-white/40 cd-head tracking-wider">League Packs</div>
+              <div className="text-xs text-white/40 cd-head tracking-wider">
+                {reward.packType?.replace('-mixed', '').toUpperCase()} Packs
+              </div>
             </div>
           )}
 
@@ -227,7 +246,9 @@ const HandDropZone = forwardRef(function HandDropZone({
             onClick={onCollect}
             className="px-6 py-2.5 rounded-lg text-sm font-bold cd-head uppercase tracking-wider bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:shadow-[0_0_20px_rgba(200,0,0,0.2)] transition-all cursor-pointer"
           >
-            {isMythicReward ? 'Choose Your Mythic' : 'Collect'}
+            {isMythicReward
+              ? 'Choose Your Mythic'
+              : `${reward.count}× ${reward.packType?.replace('-mixed', '').toUpperCase()} Packs`}
           </button>
         </div>
       )}
@@ -273,7 +294,7 @@ function BrudihCardItem({ card, isSelected, onSelect, onDragStart, onDragEnd, dr
 
 // ─── Brudih Card Grid ────────────────────────────────────
 
-function BrudihCardGrid({ cards, selectedCard, onSelect, onDragStart, onDragEnd, draggingId, isMobile }) {
+function BrudihCardGrid({ cards, selectedCard, onSelect, onDragStart, onDragEnd, draggingId, isMobile, leagues, leagueFilter, setLeagueFilter }) {
   if (cards.length === 0) {
     return (
       <div className="text-center py-12">
@@ -284,38 +305,62 @@ function BrudihCardGrid({ cards, selectedCard, onSelect, onDragStart, onDragEnd,
     )
   }
 
+  const filterButtons = leagues && leagues.length > 2 && (
+    <div className="flex gap-1.5 mb-3 flex-wrap">
+      {leagues.map(league => (
+        <button
+          key={league}
+          onClick={() => setLeagueFilter(league)}
+          className={`px-2.5 py-1 rounded text-[10px] font-bold cd-head tracking-wider uppercase transition-all cursor-pointer ${
+            leagueFilter === league
+              ? 'bg-red-500/15 border border-red-500/30 text-red-400'
+              : 'border border-transparent text-white/25 hover:text-white/40'
+          }`}
+        >
+          {league === 'all' ? 'All' : league}
+        </button>
+      ))}
+    </div>
+  )
+
   if (isMobile) {
     return (
-      <div className="bm-mobile-scroll">
+      <>
+        {filterButtons}
+        <div className="bm-mobile-scroll">
+          {cards.map(card => (
+            <BrudihCardItem
+              key={card.id}
+              card={card}
+              isSelected={selectedCard?.id === card.id}
+              onSelect={() => onSelect(card)}
+              onDragStart={() => {}}
+              onDragEnd={() => {}}
+              dragging={false}
+            />
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {filterButtons}
+      <div className="grid grid-cols-3 gap-3">
         {cards.map(card => (
           <BrudihCardItem
             key={card.id}
             card={card}
             isSelected={selectedCard?.id === card.id}
             onSelect={() => onSelect(card)}
-            onDragStart={() => {}}
-            onDragEnd={() => {}}
-            dragging={false}
+            onDragStart={(e) => onDragStart(e, card)}
+            onDragEnd={onDragEnd}
+            dragging={draggingId === card.id}
           />
         ))}
       </div>
-    )
-  }
-
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {cards.map(card => (
-        <BrudihCardItem
-          key={card.id}
-          card={card}
-          isSelected={selectedCard?.id === card.id}
-          onSelect={() => onSelect(card)}
-          onDragStart={(e) => onDragStart(e, card)}
-          onDragEnd={onDragEnd}
-          dragging={draggingId === card.id}
-        />
-      ))}
-    </div>
+    </>
   )
 }
 
@@ -505,6 +550,7 @@ export default function CCBlackMarket() {
   const [showMythicModal, setShowMythicModal] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
+  const [leagueFilter, setLeagueFilter] = useState('all')
 
   const dropRef = useRef(null)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
@@ -513,7 +559,17 @@ export default function CCBlackMarket() {
     collection.filter(c => c.cardType === 'player' && c.godName === 'Brudih'),
   [collection])
 
+  const leagues = useMemo(() => {
+    const set = new Set(brudihCards.map(c => c.cardData?.leagueName).filter(Boolean))
+    return ['all', ...set]
+  }, [brudihCards])
+
+  const filteredCards = leagueFilter === 'all'
+    ? brudihCards
+    : brudihCards.filter(c => c.cardData?.leagueName === leagueFilter)
+
   const brudihsTurnedIn = stats?.brudihsTurnedIn || 0
+  const pendingMythicClaim = stats?.pendingMythicClaim || 0
 
   // ── Animation handler ──
 
@@ -664,6 +720,18 @@ export default function CCBlackMarket() {
           </div>
         </div>
 
+        {/* Pending mythic claim banner */}
+        {pendingMythicClaim > 0 && phase === 'idle' && (
+          <div className="mb-4 mx-auto max-w-md text-center">
+            <button
+              onClick={() => setShowMythicModal(true)}
+              className="px-6 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 cd-head tracking-wider text-sm font-bold hover:bg-red-900/40 transition-colors cursor-pointer animate-pulse"
+            >
+              Claim Your Mythic Card
+            </button>
+          </div>
+        )}
+
         {/* Error toast */}
         {error && (
           <div className="mb-4 px-4 py-3 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-bold cd-head">
@@ -678,13 +746,16 @@ export default function CCBlackMarket() {
           <div className="bm-panel rounded-xl p-4">
             <div className="text-xs font-bold cd-head text-white/30 tracking-widest mb-3 uppercase">Your Brudih Cards</div>
             <BrudihCardGrid
-              cards={brudihCards}
+              cards={filteredCards}
               selectedCard={selectedCard}
               onSelect={handleCardSelect}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               draggingId={draggingId}
               isMobile={false}
+              leagues={leagues}
+              leagueFilter={leagueFilter}
+              setLeagueFilter={setLeagueFilter}
             />
           </div>
 
@@ -724,13 +795,16 @@ export default function CCBlackMarket() {
           <div className="bm-panel rounded-xl p-4">
             <div className="text-xs font-bold cd-head text-white/30 tracking-widest mb-3 uppercase">Your Brudih Cards</div>
             <BrudihCardGrid
-              cards={brudihCards}
+              cards={filteredCards}
               selectedCard={selectedCard}
               onSelect={handleCardSelect}
               onDragStart={() => {}}
               onDragEnd={() => {}}
               draggingId={null}
               isMobile={true}
+              leagues={leagues}
+              leagueFilter={leagueFilter}
+              setLeagueFilter={setLeagueFilter}
             />
           </div>
 
