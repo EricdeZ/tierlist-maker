@@ -74,6 +74,15 @@ export function VaultProvider({ children }) {
     }
   }, [])
 
+  const refreshSalePacks = useCallback(async () => {
+    try {
+      const ccData = await vaultService.load()
+      setSalePacks(ccData.salePacks || [])
+    } catch (err) {
+      console.error('Failed to refresh sale packs:', err)
+    }
+  }, [])
+
   const refreshGifts = useCallback(async () => {
     try {
       const data = await vaultService.loadGifts()
@@ -308,7 +317,7 @@ export function VaultProvider({ children }) {
     <VaultContext.Provider value={{
       collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
       loaded, loading, getDefOverride,
-      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshBalance: passionCtx?.refreshBalance,
+      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshSalePacks, refreshBalance: passionCtx?.refreshBalance,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,

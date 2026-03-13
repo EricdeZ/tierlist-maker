@@ -236,7 +236,11 @@ function PackZoomModal({ slot, onClose, packTypesMap }) {
 // ═══ Sale vending machine — always renders with min 6 slots ═══
 
 export default function SaleVendingMachine() {
-  const { salePacks, ember, buySalePack, packTypesMap } = useVault();
+  const { salePacks, ember, buySalePack, packTypesMap, refreshSalePacks } = useVault();
+
+  useEffect(() => {
+    refreshSalePacks();
+  }, [refreshSalePacks]);
 
   const emberBalance = ember?.balance ?? 0;
   const hasPacks = salePacks?.length > 0;
