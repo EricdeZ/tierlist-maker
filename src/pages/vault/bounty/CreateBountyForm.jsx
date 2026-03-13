@@ -1,10 +1,19 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { RARITIES } from '../../../data/vault/economy'
 import { GODS } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
+import { CONSUMABLES } from '../../../data/vault/buffs'
+import { bountyService } from '../../../services/database'
 import WantedPoster from '../components/WantedPoster'
 import { X, Loader2 } from 'lucide-react'
 
 const CARD_TYPES = ['god', 'player', 'item', 'consumable']
+
+const STATIC_CARD_DATA = {
+  god: GODS.map(g => ({ name: g.name, detail: g.class, avatar: null })),
+  item: ITEMS.map(i => ({ name: i.name, detail: i.category, avatar: null })),
+  consumable: CONSUMABLES.map(c => ({ name: c.name, detail: null, avatar: null })),
+}
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const HOLO_OPTIONS = [
   { value: '', label: 'Any' },
@@ -17,21 +26,52 @@ const MAX_BOUNTIES = 3
 export default function CreateBountyForm({ onSubmit, onClose, emberBalance, activeBountyCount }) {
   const [cardType, setCardType] = useState('god')
   const [cardName, setCardName] = useState('')
-  const [godSearch, setGodSearch] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [rarity, setRarity] = useState('common')
   const [holoType, setHoloType] = useState('')
   const [coreReward, setCoreReward] = useState(10)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [showGodDropdown, setShowGodDropdown] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [playerResults, setPlayerResults] = useState([])
+  const [playerSearching, setPlayerSearching] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState(null)
+  const debounceRef = useRef(null)
 
   const atMax = activeBountyCount >= MAX_BOUNTIES
+  const isPlayer = cardType === 'player'
+  const isStatic = cardType in STATIC_CARD_DATA
 
-  const godMatches = useMemo(() => {
-    if (cardType !== 'god' || !godSearch) return []
-    const q = godSearch.toLowerCase()
-    return GODS.filter(g => g.name.toLowerCase().includes(q)).slice(0, 20)
-  }, [cardType, godSearch])
+  const staticMatches = useMemo(() => {
+    if (!isStatic || !searchText) return []
+    const q = searchText.toLowerCase()
+    return STATIC_CARD_DATA[cardType].filter(c => c.name.toLowerCase().includes(q)).slice(0, 20)
+  }, [cardType, searchText, isStatic])
+
+  const searchPlayerDefs = useCallback((term) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!term || term.length < 2) {
+      setPlayerResults([])
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setPlayerSearching(true)
+      try {
+        const res = await bountyService.searchPlayers(term)
+        setPlayerResults((res.players || []).map(p => ({
+          name: p.player_name,
+          detail: [p.role, p.team_name].filter(Boolean).join(' · '),
+          avatar: p.avatar_url,
+          teamColor: p.team_color,
+        })))
+      } catch {
+        setPlayerResults([])
+      }
+      setPlayerSearching(false)
+    }, 250)
+  }, [])
+
+  const searchMatches = isPlayer ? playerResults : staticMatches
 
   const previewBounty = useMemo(() => {
     if (!cardName) return null
@@ -43,8 +83,9 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
       holo_type: holoType || null,
       core_reward: coreReward,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      avatar_url: selectedAvatar,
     }
-  }, [cardType, cardName, rarity, holoType, coreReward])
+  }, [cardType, cardName, rarity, holoType, coreReward, selectedAvatar])
 
   const handleSubmit = async () => {
     if (!cardName.trim()) {
@@ -76,10 +117,11 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
     }
   }
 
-  const selectGod = (god) => {
-    setCardName(god.name)
-    setGodSearch(god.name)
-    setShowGodDropdown(false)
+  const selectCard = (card) => {
+    setCardName(card.name)
+    setSearchText(card.name)
+    setShowDropdown(false)
+    setSelectedAvatar(card.avatar || null)
   }
 
   return (
@@ -129,7 +171,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                 {CARD_TYPES.map(t => (
                   <button
                     key={t}
-                    onClick={() => { setCardType(t); setCardName(''); setGodSearch('') }}
+                    onClick={() => { setCardType(t); setCardName(''); setSearchText(''); setPlayerResults([]); setSelectedAvatar(null) }}
                     className={`text-[10px] sm:text-xs px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
                       cardType === t
                         ? 'border-[#ff8c00]/50 text-[#ff8c00] bg-[#ff8c00]/10'
@@ -145,47 +187,56 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
             {/* Card Name */}
             <div>
               <label className="block text-[10px] text-white/40 uppercase tracking-wider mb-1.5 cd-head">Name</label>
-              {cardType === 'god' ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={godSearch}
-                    onChange={(e) => {
-                      setGodSearch(e.target.value)
-                      setCardName('')
-                      setShowGodDropdown(true)
-                    }}
-                    onFocus={() => godSearch && setShowGodDropdown(true)}
-                    placeholder="Search gods..."
-                    className="w-full bg-black/30 border border-[var(--cd-border)] text-white text-sm px-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[#ff8c00]/40"
-                  />
-                  {showGodDropdown && godMatches.length > 0 && (
-                    <div
-                      className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto rounded border"
-                      style={{ background: 'var(--cd-surface)', borderColor: 'var(--cd-border)' }}
-                    >
-                      {godMatches.map(g => (
-                        <button
-                          key={g.id}
-                          onClick={() => selectGod(g)}
-                          className="w-full text-left px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white cursor-pointer"
-                        >
-                          {g.name}
-                          <span className="ml-2 text-[10px] text-white/30">{g.class}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
+              <div className="relative">
                 <input
                   type="text"
-                  value={cardName}
-                  onChange={(e) => setCardName(e.target.value)}
-                  placeholder={`Enter ${cardType} name...`}
+                  value={searchText}
+                  onChange={(e) => {
+                    setSearchText(e.target.value)
+                    setCardName('')
+                    setShowDropdown(true)
+                    if (isPlayer) searchPlayerDefs(e.target.value)
+                  }}
+                  onFocus={() => searchText && setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  placeholder={`Search ${cardType}s...`}
                   className="w-full bg-black/30 border border-[var(--cd-border)] text-white text-sm px-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[#ff8c00]/40"
                 />
-              )}
+                {isPlayer && playerSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-white/30" />
+                )}
+                {showDropdown && searchMatches.length > 0 && (
+                  <div
+                    className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto rounded border"
+                    style={{ background: 'var(--cd-surface)', borderColor: 'var(--cd-border)' }}
+                  >
+                    {searchMatches.map(c => (
+                      <button
+                        key={c.name}
+                        onClick={() => selectCard(c)}
+                        className="w-full text-left px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white cursor-pointer flex items-center gap-2"
+                      >
+                        {c.avatar ? (
+                          <img
+                            src={c.avatar}
+                            alt=""
+                            className="w-5 h-5 rounded-full shrink-0 object-cover"
+                          />
+                        ) : isPlayer ? (
+                          <div
+                            className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[8px] font-bold"
+                            style={{ background: c.teamColor ? `${c.teamColor}33` : 'rgba(255,255,255,0.1)', color: c.teamColor || 'rgba(255,255,255,0.4)' }}
+                          >
+                            {c.name.charAt(0)}
+                          </div>
+                        ) : null}
+                        <span>{c.name}</span>
+                        {c.detail && <span className="ml-auto text-[10px] text-white/30 truncate">{c.detail}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Rarity */}

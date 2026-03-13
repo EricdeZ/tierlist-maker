@@ -44,14 +44,17 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
   const subtitleParts = [holoLabel, typeLabel].filter(Boolean).join(' \u00b7 ')
   const daysLeft = getDaysRemaining(bounty.expires_at)
 
-  // Resolve god image for god cards
+  // Resolve mugshot image
   const mugshot = useMemo(() => {
     if (bounty.card_type === 'god') {
       const god = GODS.find(g => g.name === bounty.card_name)
-      if (god) return getGodCardUrl(god.imageKey)
+      if (god) return { url: getGodCardUrl(god.imageKey), isPlayer: false }
+    }
+    if (bounty.card_type === 'player' && bounty.avatar_url) {
+      return { url: bounty.avatar_url, isPlayer: true }
     }
     return null
-  }, [bounty.card_type, bounty.card_name])
+  }, [bounty.card_type, bounty.card_name, bounty.avatar_url])
 
   const pinSize = isLg ? 10 : 8
   const mugshotH = isLg ? 120 : 96
@@ -120,16 +123,28 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
         >
           {mugshot ? (
             <img
-              src={mugshot}
+              src={mugshot.url}
               alt={bounty.card_name}
-              className="absolute inset-0 w-full h-full object-cover object-top"
-              style={{ filter: 'contrast(1.1) saturate(0.8)' }}
+              className={`absolute inset-0 w-full h-full object-cover ${mugshot.isPlayer ? 'object-center' : 'object-top'}`}
+              style={{
+                filter: mugshot.isPlayer
+                  ? 'sepia(0.5) contrast(1.3) saturate(0.6) brightness(0.85)'
+                  : 'contrast(1.1) saturate(0.8)',
+              }}
               draggable={false}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
               <span style={{ color: 'rgba(255,140,0,0.3)', fontSize: isLg ? 32 : 24 }}>?</span>
             </div>
+          )}
+
+          {/* Warm orange tint overlay for player mugshots */}
+          {mugshot?.isPlayer && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: 'rgba(255, 140, 0, 0.08)', mixBlendMode: 'overlay' }}
+            />
           )}
 
           {/* Dark vignette */}

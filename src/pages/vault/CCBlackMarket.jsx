@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { GODS, CLASS_ROLE } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
+import { MINIONS } from '../../data/vault/minions'
 import './CCBlackMarket.css'
 
 const RARITY_COLORS = {
@@ -253,7 +254,7 @@ function HandDropZone({
       )}
     </div>
   )
-})
+}
 
 
 // ─── Brudih Card Item ────────────────────────────────────
@@ -425,7 +426,14 @@ function MythicSelectionModal({ onSelect, onClose }) {
       label: c.name,
       sublabel: 'Consumable',
     }))
-    return { gods, items, consumables }
+    const minions = MINIONS.map(m => ({
+      cardType: 'minion',
+      godId: 'minion-' + m.type,
+      godName: m.name,
+      label: m.name,
+      sublabel: m.type.charAt(0).toUpperCase() + m.type.slice(1) + ' Minion',
+    }))
+    return { gods, items, consumables, minions }
   }, [])
 
   const filtered = useMemo(() => {
@@ -439,6 +447,7 @@ function MythicSelectionModal({ onSelect, onClose }) {
     { key: 'gods', label: 'Gods' },
     { key: 'items', label: 'Items' },
     { key: 'consumables', label: 'Consumables' },
+    { key: 'minions', label: 'Minions' },
   ]
 
   const handleConfirm = async () => {
@@ -540,7 +549,8 @@ function MythicSelectionModal({ onSelect, onClose }) {
 
 export default function CCBlackMarket() {
   const { collection, blackMarketTurnIn, blackMarketClaimMythic, stats } = useVault()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const isOwner = hasPermission('permission_manage')
 
   const [phase, setPhase] = useState('idle')
   const [selectedCard, setSelectedCard] = useState(null)
@@ -634,12 +644,13 @@ export default function CCBlackMarket() {
   // ── Drag and drop ──
 
   const handleDragStart = useCallback((e, card) => {
+    if (phase !== 'idle') return
     setDraggingId(card.id)
     setSelectedCard(card)
     setPhase('dragging')
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', card.id)
-  }, [])
+  }, [phase])
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null)
@@ -744,6 +755,92 @@ export default function CCBlackMarket() {
           </div>
         )}
 
+        {/* Owner debug panel */}
+        {isOwner && (
+          <div className="mb-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+            <div className="text-[10px] text-yellow-500/60 cd-head tracking-widest uppercase mb-2">Debug Controls</div>
+            <div className="flex flex-wrap gap-1.5">
+              {['idle', 'dragging', 'grab', 'devour', 'return', 'collect'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    if (p === 'dragging' || p === 'grab' || p === 'devour' || p === 'return' || p === 'collect') {
+                      setSelectedCard({ id: 'debug', rarity: 'rare', godName: 'Brudih', cardData: { leagueName: 'bsl' } })
+                    }
+                    if (p === 'return' || p === 'collect') {
+                      setReward({ type: 'packs', packType: 'bsl-mixed', count: 7 })
+                    }
+                    setPhase(p)
+                  }}
+                  className={`px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border cursor-pointer transition-all ${
+                    phase === p
+                      ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400'
+                      : 'border-yellow-500/10 text-yellow-500/40 hover:text-yellow-500/60'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <span className="w-px h-5 bg-yellow-500/10 self-center mx-1" />
+              {['common', 'uncommon', 'rare', 'epic', 'legendary'].map(r => (
+                <button
+                  key={r}
+                  onClick={async () => {
+                    const fakeCard = { id: 'debug', rarity: r, godName: 'Brudih', cardData: { leagueName: 'bsl' } }
+                    setSelectedCard(fakeCard)
+                    setError(null)
+                    setPhase('grab')
+                    await sleep(400)
+                    setPhase('devour')
+                    await sleep(600)
+                    setReward({ type: 'packs', packType: 'bsl-mixed', count: REWARD_TIERS[r] })
+                    setPhase('return')
+                    await sleep(800)
+                    setPhase('collect')
+                  }}
+                  className="px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border border-yellow-500/10 text-yellow-500/40 hover:text-yellow-500/60 cursor-pointer transition-all"
+                  style={{ color: RARITY_COLORS[r] }}
+                >
+                  {r}
+                </button>
+              ))}
+              <button
+                onClick={async () => {
+                  const fakeCard = { id: 'debug', rarity: 'mythic', godName: 'Brudih', cardData: { leagueName: 'bsl' } }
+                  setSelectedCard(fakeCard)
+                  setError(null)
+                  setPhase('grab')
+                  await sleep(400)
+                  setPhase('devour')
+                  await sleep(600)
+                  setReward({ type: 'mythic_choice' })
+                  setPhase('return')
+                  await sleep(800)
+                  setPhase('collect')
+                }}
+                className="px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border border-yellow-500/10 cursor-pointer transition-all"
+                style={{ color: RARITY_COLORS.mythic }}
+              >
+                mythic
+              </button>
+              <span className="w-px h-5 bg-yellow-500/10 self-center mx-1" />
+              <button
+                onClick={() => setShowMythicModal(true)}
+                className="px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border border-yellow-500/10 text-yellow-500/40 hover:text-yellow-500/60 cursor-pointer transition-all"
+              >
+                modal
+              </button>
+              <button
+                onClick={() => { setPhase('idle'); setSelectedCard(null); setReward(null); setError(null); setShowMythicModal(false) }}
+                className="px-2 py-1 rounded text-[10px] font-bold cd-head tracking-wider border border-yellow-500/10 text-yellow-500/40 hover:text-yellow-500/60 cursor-pointer transition-all"
+              >
+                reset
+              </button>
+            </div>
+            <div className="text-[10px] text-yellow-500/30 mt-1.5">Phase: <span className="text-yellow-500/50">{phase}</span></div>
+          </div>
+        )}
+
         {/* Desktop: side-by-side */}
         <div className="hidden sm:grid sm:grid-cols-[1fr_1.2fr] gap-4">
           {/* Left: cards */}
@@ -824,7 +921,12 @@ export default function CCBlackMarket() {
       {showMythicModal && (
         <MythicSelectionModal
           onSelect={handleMythicSelect}
-          onClose={() => setShowMythicModal(false)}
+          onClose={() => {
+            setShowMythicModal(false)
+            setPhase('idle')
+            setSelectedCard(null)
+            setReward(null)
+          }}
         />
       )}
     </div>

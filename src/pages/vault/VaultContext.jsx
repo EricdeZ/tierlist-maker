@@ -199,6 +199,35 @@ export function VaultProvider({ children }) {
     return result
   }, [passionCtx])
 
+  const blackMarketTurnIn = useCallback(async (cardId) => {
+    const result = await vaultService.blackMarketTurnIn(cardId)
+    setCollection(prev => prev.filter(c => c.id !== cardId))
+    setStats(prev => ({
+      ...prev,
+      brudihsTurnedIn: (prev.brudihsTurnedIn || 0) + 1,
+      pendingMythicClaim: result.reward?.type === 'mythic_choice'
+        ? (prev.pendingMythicClaim || 0) + 1
+        : prev.pendingMythicClaim,
+    }))
+    if (result.reward?.type === 'packs') {
+      const loadResult = await vaultService.load()
+      setInventory(loadResult.inventory || [])
+    }
+    return result
+  }, [])
+
+  const blackMarketClaimMythic = useCallback(async (data) => {
+    const result = await vaultService.blackMarketClaimMythic(data)
+    if (result.card) {
+      setCollection(prev => [result.card, ...prev])
+    }
+    setStats(prev => ({
+      ...prev,
+      pendingMythicClaim: Math.max(0, (prev.pendingMythicClaim || 0) - 1),
+    }))
+    return result
+  }, [])
+
   const convertPassionToEmber = useCallback(async () => {
     try {
       const result = await emberService.convert()
@@ -276,7 +305,7 @@ export function VaultProvider({ children }) {
     <VaultContext.Provider value={{
       collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
       loaded, loading, getDefOverride,
-      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, refreshCollection,
+      buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
       startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,

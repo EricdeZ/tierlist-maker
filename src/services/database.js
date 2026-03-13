@@ -1093,6 +1093,12 @@ export const vaultService = {
     async binderGenerateShare() {
         return apiPost('vault', { action: 'binder-generate-share' }, {})
     },
+    blackMarketTurnIn(cardId) {
+        return apiPost('vault', { action: 'black-market-turn-in' }, { cardId })
+    },
+    blackMarketClaimMythic(data) {
+        return apiPost('vault', { action: 'black-market-claim-mythic' }, data)
+    },
 }
 
 export const bountyService = {
@@ -1116,6 +1122,9 @@ export const bountyService = {
     },
     async cancel(bountyId) {
         return apiPost('bounty', { action: 'cancel' }, { bountyId })
+    },
+    async searchPlayers(q) {
+        return apiCall('bounty', { action: 'search-players', q })
     },
 }
 

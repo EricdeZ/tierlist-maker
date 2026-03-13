@@ -35,6 +35,7 @@ const handler = async (event) => {
         case 'my-bounties': return await handleMyBounties(sql, user)
         case 'hero': return await handleHero(sql)
         case 'fulfillable': return await handleFulfillable(sql, user)
+        case 'search-players': return await handleSearchPlayers(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -83,10 +84,11 @@ async function handleList(sql, params) {
   const lim = Math.min(parseInt(limit), 50)
 
   const rows = await sql`
-    SELECT id, card_type, card_name, rarity, holo_type, core_reward, created_at, expires_at
-    FROM cc_bounties
-    WHERE status = 'active'
-    ORDER BY created_at DESC
+    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.created_at, b.expires_at,
+      (SELECT pd.avatar_url FROM cc_player_defs pd WHERE pd.player_name = b.card_name AND b.card_type = 'player' LIMIT 1) AS avatar_url
+    FROM cc_bounties b
+    WHERE b.status = 'active'
+    ORDER BY b.created_at DESC
   `
 
   let filtered = Array.from(rows)
@@ -179,10 +181,11 @@ async function handleHero(sql) {
   await maybeExpireStale(sql)
 
   const rows = await sql`
-    SELECT id, card_type, card_name, rarity, holo_type, core_reward, created_at, expires_at
-    FROM cc_bounties
-    WHERE status = 'active'
-    ORDER BY core_reward DESC
+    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.created_at, b.expires_at,
+      (SELECT pd.avatar_url FROM cc_player_defs pd WHERE pd.player_name = b.card_name AND b.card_type = 'player' LIMIT 1) AS avatar_url
+    FROM cc_bounties b
+    WHERE b.status = 'active'
+    ORDER BY b.core_reward DESC
     LIMIT 5
   `
 
@@ -223,6 +226,27 @@ async function handleFulfillable(sql, user) {
   return {
     statusCode: 200, headers,
     body: JSON.stringify({ fulfillableIds: rows.map(r => r.bounty_id) }),
+  }
+}
+
+// ═══ GET: Search player defs for autocomplete ═══
+async function handleSearchPlayers(sql, params) {
+  const { q } = params
+  if (!q || q.trim().length < 2) {
+    return { statusCode: 200, headers, body: JSON.stringify({ players: [] }) }
+  }
+  const term = `%${q.trim()}%`
+  const rows = await sql`
+    SELECT DISTINCT ON (pd.player_name)
+      pd.player_name, pd.team_name, pd.team_color, pd.role, pd.avatar_url
+    FROM cc_player_defs pd
+    WHERE pd.player_name ILIKE ${term}
+    ORDER BY pd.player_name
+    LIMIT 15
+  `
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ players: Array.from(rows) }),
   }
 }
 

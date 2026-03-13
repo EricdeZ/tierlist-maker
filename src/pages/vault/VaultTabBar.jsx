@@ -85,6 +85,7 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
               { key: 'my-packs', label: 'MY PACKS', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', badge: myPacksCount },
               { key: 'shop', label: 'SHOP', active: 'bg-white/10 text-white border-white/30' },
               { key: 'sale', label: 'LIMITED', active: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+              { key: 'black-market', label: 'BLACK MARKET', active: 'bg-red-500/15 text-red-400 border-red-500/30' },
             ].map(m => (
               <button
                 key={m.key}
