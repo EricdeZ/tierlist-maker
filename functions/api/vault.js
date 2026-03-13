@@ -63,6 +63,8 @@ const handler = async (event) => {
         case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
+        case 'black-market-turn-in': return await handleBlackMarketTurnIn(sql, user, body)
+        case 'black-market-claim-mythic': return await handleBlackMarketClaimMythic(sql, user, body)
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
@@ -1011,6 +1013,170 @@ async function handleDismantle(sql, user, body) {
   return {
     statusCode: 200, headers,
     body: JSON.stringify({ dismantled: validIds.length, emberGained, balance }),
+  }
+}
+
+// ═══ POST: Black Market — turn in Brudih cards ═══
+const BLACK_MARKET_REWARDS = {
+  common: 3, uncommon: 5, rare: 7, epic: 10, legendary: 15,
+}
+
+async function handleBlackMarketTurnIn(sql, user, body) {
+  const { cardId } = body
+  if (!cardId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+  }
+
+  const result = await transaction(async (tx) => {
+    // Fetch card + player def in one query, with lock guards
+    const [card] = await tx`
+      SELECT c.id, c.rarity, c.owner_id, d.player_name, d.league_id, l.slug AS league_slug
+      FROM cc_cards c
+      JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+      JOIN leagues l ON d.league_id = l.id
+      WHERE c.id = ${cardId} AND c.owner_id = ${user.id}
+        AND NOT EXISTS (
+          SELECT 1 FROM cc_market_listings ml
+          WHERE ml.card_id = c.id AND ml.status = 'active'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM cc_trade_cards tc
+          JOIN cc_trades t ON tc.trade_id = t.id
+          WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM cc_lineups ln
+          WHERE (ln.card_id = c.id OR ln.god_card_id = c.id OR ln.item_card_id = c.id) AND ln.user_id = ${user.id}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM cc_binder_cards bc WHERE bc.card_id = c.id
+        )
+    `
+    if (!card) {
+      throw new Error('Card not found, not a Brudih, or is locked (market/trade/lineup/binder)')
+    }
+    if (card.player_name !== 'Brudih') {
+      throw new Error('Card is not a Brudih card')
+    }
+
+    // Check pending mythic claim
+    await ensureStats(tx, user.id)
+    const [userStats] = await tx`SELECT pending_mythic_claim FROM cc_stats WHERE user_id = ${user.id}`
+    if (userStats.pending_mythic_claim > 0) {
+      throw new Error('You must claim your pending mythic card first')
+    }
+
+    const isMythic = card.rarity === 'mythic'
+    const rewardCount = BLACK_MARKET_REWARDS[card.rarity]
+    if (!isMythic && !rewardCount) {
+      throw new Error(`No reward defined for rarity: ${card.rarity}`)
+    }
+
+    // Determine league pack type
+    const packTypeId = `${card.league_slug}-mixed`
+    if (!isMythic) {
+      const [packType] = await tx`SELECT id FROM cc_pack_types WHERE id = ${packTypeId} AND enabled = true`
+      if (!packType) {
+        throw new Error(`No pack type found for league: ${card.league_slug}`)
+      }
+    }
+
+    // Clean up completed trade references (same as dismantle)
+    await tx`
+      DELETE FROM cc_trade_cards tc
+      USING cc_trades t
+      WHERE tc.trade_id = t.id AND tc.card_id = ${cardId}
+        AND t.status NOT IN ('waiting', 'active')
+    `
+
+    // Delete the card
+    await tx`DELETE FROM cc_cards WHERE id = ${cardId} AND owner_id = ${user.id}`
+
+    // Grant reward
+    if (isMythic) {
+      await tx`
+        UPDATE cc_stats SET
+          brudihs_turned_in = brudihs_turned_in + 1,
+          pending_mythic_claim = pending_mythic_claim + 1
+        WHERE user_id = ${user.id}
+      `
+      return { type: 'mythic_choice' }
+    } else {
+      // Insert packs into inventory
+      for (let i = 0; i < rewardCount; i++) {
+        await tx`
+          INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+          VALUES (${user.id}, ${packTypeId}, 'black-market')
+        `
+      }
+      await tx`
+        UPDATE cc_stats SET brudihs_turned_in = brudihs_turned_in + 1
+        WHERE user_id = ${user.id}
+      `
+      return { type: 'packs', packType: packTypeId, count: rewardCount }
+    }
+  })
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ success: true, reward: result }),
+  }
+}
+
+async function handleBlackMarketClaimMythic(sql, user, body) {
+  const { cardType, godId } = body
+  if (!cardType || !godId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType and godId required' }) }
+  }
+
+  const validTypes = ['god', 'item', 'consumable', 'player', 'minion']
+  if (!validTypes.includes(cardType)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid cardType: ${cardType}` }) }
+  }
+
+  const result = await transaction(async (tx) => {
+    await ensureStats(tx, user.id)
+    const [stats] = await tx`SELECT pending_mythic_claim FROM cc_stats WHERE user_id = ${user.id}`
+    if (!stats || stats.pending_mythic_claim <= 0) {
+      throw new Error('No pending mythic claim')
+    }
+
+    // Validate card definition exists
+    if (cardType === 'player') {
+      if (!body.defId) throw new Error('defId required for player cards')
+      const [def] = await tx`SELECT id FROM cc_player_defs WHERE id = ${body.defId}`
+      if (!def) throw new Error('Player definition not found')
+    } else {
+      if (!godId || typeof godId !== 'string') throw new Error('Invalid godId')
+    }
+
+    const serialNumber = Math.floor(Math.random() * 9999) + 1
+    const [card] = await tx`
+      INSERT INTO cc_cards (
+        owner_id, god_id, god_name, god_class, role, rarity,
+        serial_number, holo_effect, holo_type, acquired_via, card_type,
+        def_id
+      )
+      VALUES (
+        ${user.id}, ${godId}, ${body.godName || ''}, ${body.godClass || ''},
+        ${body.role || ''}, 'mythic',
+        ${serialNumber}, 'rainbow', 'holo', 'black-market', ${cardType},
+        ${cardType === 'player' ? (body.defId || null) : null}
+      )
+      RETURNING *
+    `
+
+    await tx`
+      UPDATE cc_stats SET pending_mythic_claim = pending_mythic_claim - 1
+      WHERE user_id = ${user.id}
+    `
+
+    return card
+  })
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ success: true, card: formatCard(result) }),
   }
 }
 
