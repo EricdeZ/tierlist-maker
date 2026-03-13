@@ -1103,12 +1103,11 @@ async function handleBlackMarketTurnIn(sql, user, body) {
       return { type: 'mythic_choice' }
     } else {
       // Insert packs into inventory
-      for (let i = 0; i < rewardCount; i++) {
-        await tx`
-          INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
-          VALUES (${user.id}, ${packTypeId}, 'black-market')
-        `
-      }
+      await tx`
+        INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+        SELECT ${user.id}, ${packTypeId}, 'black-market'
+        FROM generate_series(1, ${rewardCount})
+      `
       await tx`
         UPDATE cc_stats SET brudihs_turned_in = brudihs_turned_in + 1
         WHERE user_id = ${user.id}

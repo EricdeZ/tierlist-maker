@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, forwardRef, Fragment } from 'react'
+import { useState, useMemo, useCallback, useEffect, Fragment } from 'react'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
 import { GODS, CLASS_ROLE } from '../../data/vault/gods'
@@ -120,16 +120,15 @@ function ShadowyHand({ phase }) {
 
 // ─── Hand Drop Zone ──────────────────────────────────────
 
-const HandDropZone = forwardRef(function HandDropZone({
+function HandDropZone({
   phase, selectedCard, reward, onDrop, onDragOver, onDragLeave, onCollect, isDragOver, isMobile, onMobileTurnIn,
-}, ref) {
+}) {
   const isActive = isDragOver || (isMobile && selectedCard && phase === 'idle')
   const rewardPacks = reward?.type === 'packs' ? reward.count : 0
   const isMythicReward = reward?.type === 'mythic_choice'
 
   return (
     <div
-      ref={ref}
       className={`bm-drop-zone rounded-xl relative ${isActive ? 'bm-drop-zone-active' : ''} ${phase === 'grab' ? 'bm-phase-grab' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -552,8 +551,13 @@ export default function CCBlackMarket() {
   const [draggingId, setDraggingId] = useState(null)
   const [leagueFilter, setLeagueFilter] = useState('all')
 
-  const dropRef = useRef(null)
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const handler = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const brudihCards = useMemo(() =>
     collection.filter(c => c.cardType === 'player' && c.godName === 'Brudih'),
@@ -761,7 +765,6 @@ export default function CCBlackMarket() {
 
           {/* Right: drop zone */}
           <HandDropZone
-            ref={dropRef}
             phase={phase}
             selectedCard={selectedCard}
             reward={reward}
@@ -778,7 +781,6 @@ export default function CCBlackMarket() {
         <div className="sm:hidden flex flex-col gap-4">
           {/* Hand on top */}
           <HandDropZone
-            ref={dropRef}
             phase={phase}
             selectedCard={selectedCard}
             reward={reward}
