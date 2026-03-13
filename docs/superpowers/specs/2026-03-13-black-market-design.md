@@ -39,8 +39,7 @@ Top banner displays two stats:
 ### Mobile (<640px)
 - Stacked vertically: hand zone on top, cards below
 - Cards displayed in a horizontal scroll row
-- Drag direction: vertical (bottom → up)
-- Long-press/hold shows reward preview
+- **Tap-to-confirm flow**: Tap a card to select it (shows reward preview + confirm button), tap "Turn In" to trigger the animation. Native drag-and-drop is unreliable on mobile touch, so tap-to-confirm is the primary mobile interaction. The animation sequence (phases 2-5) plays identically after confirmation.
 - Exchange rates table below the cards section
 
 ## Visual Theme
@@ -48,7 +47,7 @@ Top banner displays two stats:
 The entire Black Market section overrides the vault's cyan theme:
 - Deep reds and blacks (`#ff3333`, `rgba(139,0,0,...)`)
 - Heavy vignette (radial gradient darkening edges)
-- The hand is a CSS-illustrated dark silhouette emerging from fog/shadow — not an emoji. Slightly curled fingers, red ambient glow, shadow particles at the edges.
+- The hand is a dark silhouette emerging from fog/shadow — not an emoji. Slightly curled fingers, red ambient glow, shadow particles at the edges. Implementation can use CSS art or inline SVG, whichever achieves the best result.
 
 ## Animation Sequence (5 Phases)
 
@@ -75,39 +74,51 @@ Reward fans out in the center of the zone. Reward text fades in below (e.g., "5x
 
 **Total automated animation**: ~2.4 seconds. Fast enough to feel snappy, slow enough to feel theatrical.
 
+## Auth
+
+Requires `requireAuth` (logged-in user). No special permission needed — any vault user can access the Black Market.
+
 ## API
 
 ### `POST /api/vault?action=black-market-turn-in`
 
 **Input**: `{ cardId }`
 
-**Server-side flow**:
+**Server-side flow** (entire flow wrapped in a single transaction):
 1. Validate card exists and is owned by the requesting user
 2. Validate card's `cc_player_defs` entry has `player_name = 'Brudih'`
 3. Validate card is not in Starting Five, marketplace listing, active trade, or binder (same guards as dismantle)
-4. Look up rarity → reward count mapping
-5. Look up league from `cc_player_defs` → determines league-specific pack type
-6. Transaction:
+4. Block if `pending_mythic_claim > 0` — user must claim their pending mythic first
+5. Look up rarity → reward count mapping
+6. Look up league from `cc_player_defs.league_id` → pack type via `{league_slug}-mixed` convention (e.g., league_slug `bsl` → `bsl-mixed`). If no matching pack type exists for the league, reject with error.
+7. Mutations (inside same transaction):
    - Delete card from `cc_cards`
-   - Insert reward packs into `cc_pack_inventory` (skip for mythic)
+   - For non-mythic: insert N reward packs into `cc_pack_inventory` with the league-specific pack type
+   - For mythic: increment `pending_mythic_claim` in `cc_stats` (no packs inserted)
    - Increment `brudihs_turned_in` in `cc_stats`
-7. Return `{ success: true, reward: { type: 'packs', packType, count } }` or `{ success: true, reward: { type: 'mythic_choice' } }`
+8. Return `{ success: true, reward: { type: 'packs', packType, count } }` or `{ success: true, reward: { type: 'mythic_choice' } }`
 
 ### `POST /api/vault?action=black-market-claim-mythic`
 
-**Input**: `{ cardType, godId }` — identifies which card from the catalog
+**Input**: `{ cardType, godId }` — identifies which card from the catalog. `cardType` is one of `god`, `item`, `consumable`, `player`, `minion`. `godId` is the card's identifier (god slug, `item-{id}`, `player-{id}-t{teamId}`, etc.).
 
 **Server-side flow**:
-1. Validate user has a pending mythic claim (track via a flag, e.g., `cc_stats.pending_mythic_claim`)
-2. Create a new mythic card in `cc_cards` with the selected definition, `acquired_via = 'black-market'`
-3. Clear the pending claim flag
+1. Validate user has `pending_mythic_claim > 0` in `cc_stats`
+2. Validate the requested card definition exists in the catalog
+3. Transaction:
+   - Create a new mythic card in `cc_cards` with the selected definition, `rarity = 'mythic'`, `holo_effect = 'rainbow'`, `acquired_via = 'black-market'`
+   - Decrement `pending_mythic_claim` in `cc_stats`
 4. Return the created card
+
+### Mythic Selection Modal
+
+Full-screen modal with tabs for each card type (Gods / Items / Players / Consumables / Minions). Each tab shows a searchable grid. Search is frontend-only — the full card catalog is already loaded in `VaultContext` from the card catalog data files. User selects a card, sees a confirmation prompt ("Create Mythic [card name]?"), then confirms to fire the claim-mythic API call.
 
 ## Database Changes
 
 ### `cc_stats` — add columns:
 - `brudihs_turned_in INTEGER DEFAULT 0` — lifetime counter
-- `pending_mythic_claim BOOLEAN DEFAULT false` — tracks unclaimed mythic reward
+- `pending_mythic_claim INTEGER DEFAULT 0` — tracks unclaimed mythic rewards (integer to handle edge cases; blocked from turning in another mythic while > 0)
 
 No new tables needed. Uses existing `cc_cards`, `cc_pack_inventory`, `cc_player_defs`, `cc_stats`.
 
