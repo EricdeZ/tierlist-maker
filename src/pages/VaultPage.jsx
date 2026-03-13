@@ -6,7 +6,7 @@ import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
@@ -25,6 +25,7 @@ const CCTrading = lazy(() => import('./vault/CCTrading'))
 const CCDismantle = lazy(() => import('./vault/CCDismantle'))
 const CCStartingFive = lazy(() => import('./vault/CCStartingFive'))
 const CCBinder = lazy(() => import('./vault/CCBinder'))
+const CCBountyBoard = lazy(() => import('./vault/CCBountyBoard'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
@@ -34,6 +35,7 @@ const TABS = [
     { key: 'gifts', label: 'Gifts', icon: Gift },
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
+    { key: 'bounty', label: 'Bounties', icon: Crosshair, authOnly: true },
     { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
     { key: 'binder', label: 'Binder', icon: BookMarked },
@@ -51,6 +53,7 @@ const TAB_COMPONENTS = {
     gifts: CCGifts,
     trade: CCTrading,
     market: CCMarketplace,
+    bounty: CCBountyBoard,
     dismantle: CCDismantle,
     convert: CCConverter,
     challenges: CCChallenges,

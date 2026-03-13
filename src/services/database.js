@@ -1095,6 +1095,30 @@ export const vaultService = {
     },
 }
 
+export const bountyService = {
+    async list(params = {}) {
+        return apiCall('bounty', { action: 'list', ...params })
+    },
+    async myBounties() {
+        return apiCall('bounty', { action: 'my-bounties' })
+    },
+    async fulfillable() {
+        return apiCall('bounty', { action: 'fulfillable' })
+    },
+    async hero() {
+        return apiCall('bounty', { action: 'hero' })
+    },
+    async create(data) {
+        return apiPost('bounty', { action: 'create' }, data)
+    },
+    async fulfill(data) {
+        return apiPost('bounty', { action: 'fulfill' }, data)
+    },
+    async cancel(bountyId) {
+        return apiPost('bounty', { action: 'cancel' }, { bountyId })
+    },
+}
+
 export const marketplaceService = {
     async list(params = {}) {
         return apiCall('marketplace', { action: 'list', ...params })
