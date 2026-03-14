@@ -86,7 +86,7 @@ function PackCard({ card, size, holo = true, override }) {
     )
   }
 
-  const role = ((card.godClass || card.god_class || '').toLowerCase() || 'mid')
+  const role = card.role || 'mid'
   const gameCard = <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} />
   if (holo) {
     return (

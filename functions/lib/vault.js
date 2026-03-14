@@ -425,8 +425,8 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
     const checkFE = card.card_type === 'player' && !!card.def_id && process.env.VAULT_OPEN === 'true'
 
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, is_first_edition)
-      SELECT ${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity},
+      INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, is_first_edition)
+      SELECT ${userId}, ${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity},
              ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url},
              ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}::jsonb,
              ${card.def_id || null},

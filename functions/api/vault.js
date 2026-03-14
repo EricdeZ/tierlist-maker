@@ -844,8 +844,8 @@ async function handleOpenGift(sql, user, body) {
     newCards = []
     for (const card of cards) {
       const [inserted] = await sql`
-        INSERT INTO cc_cards (owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
-        VALUES (${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${'gift'}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+        INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+        VALUES (${user.id}, ${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${'gift'}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
         RETURNING *
       `
       if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -1194,12 +1194,12 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
     const serialNumber = Math.floor(Math.random() * 9999) + 1
     const [card] = await tx`
       INSERT INTO cc_cards (
-        owner_id, god_id, god_name, god_class, role, rarity,
+        owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
         serial_number, holo_effect, holo_type, acquired_via, card_type,
         def_id
       )
       VALUES (
-        ${user.id}, ${godId}, ${body.godName || ''}, ${body.godClass || ''},
+        ${user.id}, ${user.id}, ${godId}, ${body.godName || ''}, ${body.godClass || ''},
         ${body.role || ''}, 'mythic',
         ${serialNumber}, 'rainbow', 'holo', 'black-market', ${cardType},
         ${defId}

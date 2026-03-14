@@ -9,6 +9,7 @@ import AppLayout from './components/layout/AppLayout'
 import DivisionLayout from './components/layout/DivisionLayout'
 import Homepage from './pages/Homepage'
 import NotFound from './pages/NotFound'
+import Bill from './pages/Bill'
 
 // Division pages
 import DivisionOverview from './pages/division/DivisionOverview'
@@ -116,6 +117,9 @@ function App() {
 
                         {/* Sketch pad — standalone */}
                         <Route path="sketch" element={<SketchPad />} />
+
+                        {/* Bill the duck */}
+                        <Route path="bill" element={<Bill />} />
 
                         {/* Card Clash share — standalone, no app chrome */}
                         <Route path="vault/share/:token" element={<CardSharePage />} />

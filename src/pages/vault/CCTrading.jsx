@@ -1211,6 +1211,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           onClose={() => setZoomedCard(null)}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
+          holoType={zoomedCard.holoType}
         />
       )}
     </div>
