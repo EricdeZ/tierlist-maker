@@ -1,6 +1,6 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, handleCors, adminHeaders } from '../lib/db.js'
-import { requireAdmin } from '../lib/auth.js'
+import { requireAuth } from '../lib/auth.js'
 
 const handler = async (event) => {
     const cors = handleCors(event)
@@ -10,7 +10,7 @@ const handler = async (event) => {
         return { statusCode: 405, headers: adminHeaders, body: JSON.stringify({ error: 'Method not allowed' }) }
     }
 
-    const user = await requireAdmin(event)
+    const user = await requireAuth(event)
     if (!user) {
         return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
