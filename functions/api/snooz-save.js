@@ -15,6 +15,11 @@ const handler = async (event) => {
         return { statusCode: 401, headers: adminHeaders, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
 
+    const SNOOZ_ALLOWED = ['171059031291461633', process.env.ADMIN_DISCORD_ID]
+    if (!SNOOZ_ALLOWED.includes(user.discord_id)) {
+        return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'Not authorized to save snooz picks' }) }
+    }
+
     const { seasonId, week, panelists, picks } = typeof event.body === 'string' ? JSON.parse(event.body) : event.body
     if (!seasonId || !week || !Array.isArray(panelists)) {
         return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Missing required fields' }) }
