@@ -3,11 +3,11 @@ import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
 
 const RATES = {
-  holo: { uncommon: 1, rare: 2, epic: 3, legendary: 5, mythic: 8 },
-  reverse: { uncommon: 1, rare: 1.5, epic: 2.5, legendary: 4, mythic: 6 },
+  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16 },
+  reverse: { uncommon: 2, rare: 3, epic: 5, legendary: 8, mythic: 12 },
   full: {
-    passion: { uncommon: 0.6, rare: 1.2, epic: 1.8, legendary: 3, mythic: 4.8 },
-    cores: { uncommon: 0.6, rare: 0.9, epic: 1.5, legendary: 2.4, mythic: 3.6 },
+    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6 },
+    cores: { uncommon: 1.2, rare: 1.8, epic: 3, legendary: 4.8, mythic: 7.2 },
   },
 }
 
