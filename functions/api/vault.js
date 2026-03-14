@@ -38,8 +38,10 @@ const handler = async (event) => {
     const [ban] = await sql`SELECT 1 FROM cc_vault_bans WHERE user_id = ${user.id}`
     if (ban) return { statusCode: 200, headers, body: JSON.stringify({ vault_banned: true }) }
 
-    // Account age check — 1 month minimum to prevent alt farming
-    const accountAgeMs = Date.now() - new Date(user.created_at).getTime()
+    // Account age check — Discord account must be 30+ days old to prevent alt farming
+    const discordEpoch = 1420070400000n
+    const discordCreatedAt = Number((BigInt(user.discord_id) >> 22n) + discordEpoch)
+    const accountAgeMs = Date.now() - discordCreatedAt
     if (accountAgeMs < 30 * 24 * 60 * 60 * 1000) {
       const daysLeft = Math.ceil((30 * 24 * 60 * 60 * 1000 - accountAgeMs) / (1000 * 60 * 60 * 24))
       return { statusCode: 200, headers, body: JSON.stringify({ account_too_new: true, days_left: daysLeft }) }
