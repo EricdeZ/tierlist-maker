@@ -100,10 +100,10 @@ export const MARKETPLACE = {
 // Starting 5 passive income rates (per day, per card)
 export const STARTING_FIVE_RATES = {
   holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16 },
-  reverse: { uncommon: 2, rare: 3, epic: 5, legendary: 8, mythic: 12 },
+  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24 },
   full: {
     passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6 },
-    cores: { uncommon: 1.2, rare: 1.8, epic: 3, legendary: 4.8, mythic: 7.2 },
+    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4 },
   },
 };
 
@@ -124,6 +124,7 @@ export const ATTACHMENT_BONUSES = {
 
 export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
 export const GOD_SYNERGY_BONUS = 0.30;
+export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
 // Consumable slot — rarity-based total boost (non-linear scaling)
 export const CONSUMABLE_SLOT_SCALING = {
   common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, CONSUMABLE_BOOST, getHoloEffect } from '../../data/vault/economy'
+import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, TEAM_SYNERGY_BONUS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
@@ -104,9 +104,10 @@ function getEffectiveIncomeRate(card) {
   const synergy = card.godCard?.synergy || false
   const god = getAttachmentBonus(card.godCard, 'god', synergy)
   const item = getAttachmentBonus(card.itemCard, 'item')
+  const teamMult = 1 + (card.teamSynergyBonus || 0)
   return {
-    passion: base.passion * god.passionMult * item.passionMult,
-    cores: base.cores * god.coresMult * item.coresMult,
+    passion: base.passion * god.passionMult * item.passionMult * teamMult,
+    cores: base.cores * god.coresMult * item.coresMult * teamMult,
   }
 }
 
@@ -178,7 +179,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable, getDefOverride } = useVault()
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable, getDefOverride } = useVault()
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
   const [slotAnimation, setSlotAnimation] = useState(null)
@@ -188,8 +189,7 @@ export default function CCStartingFive() {
   const [zoomedCard, setZoomedCard] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
   const [showConsumablePicker, setShowConsumablePicker] = useState(false)
-  const [usingConsumable, setUsingConsumable] = useState(false)
-  const [boostNotif, setBoostNotif] = useState(null)
+  const [slottingConsumable, setSlottingConsumable] = useState(false)
   const [error, setError] = useState(null)
   const slotSize = useSlotSize()
 
@@ -317,20 +317,18 @@ export default function CCStartingFive() {
     }
   }, [collecting, collectS5Income, displayPassion, displayCores, showError])
 
-  const handleUseConsumable = useCallback(async (cardId) => {
-    if (usingConsumable) return
-    setUsingConsumable(true)
+  const handleSlotConsumable = useCallback(async (cardId) => {
+    if (slottingConsumable) return
+    setSlottingConsumable(true)
     try {
-      const result = await boostS5WithConsumable(cardId)
+      await slotS5Consumable(cardId)
       setShowConsumablePicker(false)
-      setBoostNotif({ pct: Math.round(result.boostPct * 100) })
-      setTimeout(() => setBoostNotif(null), 3000)
     } catch (err) {
-      showError(err.message || 'Failed to use consumable')
+      showError(err.message || 'Failed to slot consumable')
     } finally {
-      setUsingConsumable(false)
+      setSlottingConsumable(false)
     }
-  }, [usingConsumable, boostS5WithConsumable, showError])
+  }, [slottingConsumable, slotS5Consumable, showError])
 
   const passionCap = startingFive?.passionCap || 0
   const coresCap = startingFive?.coresCap || 0
@@ -368,6 +366,7 @@ export default function CCStartingFive() {
       {/* Income Dashboard */}
       <div className="cd-panel cd-corners rounded-xl p-4 sm:p-5 mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+          <div className="flex flex-col gap-1">
           <div className="flex items-center gap-4 sm:gap-6">
             {/* Passion income */}
             <div className="flex flex-col gap-1">
@@ -431,22 +430,63 @@ export default function CCStartingFive() {
               )}
             </div>
           </div>
+          <div className="text-[10px] text-white/20">
+            {STARTING_FIVE_CAP_DAYS}-day cap — collect before your income maxes out
+          </div>
+          </div>
 
-          {/* Collect + Boost buttons */}
-          <div className="relative flex items-center gap-2 shrink-0 flex-nowrap">
-            <button
-              onClick={() => setShowConsumablePicker(true)}
-              disabled={!startingFive?.cards?.length}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap inline-flex items-center gap-1.5"
-              title="Use a consumable to boost income progress"
-            >
-              <Zap size={14} />
-              Boost
-            </button>
+          {/* Consumable slot + Collect */}
+          <div className="relative flex items-center gap-3 shrink-0 flex-nowrap">
+            {startingFive?.consumableCard ? (
+              <div
+                className="flex flex-col items-center cursor-pointer group"
+                onClick={() => setShowConsumablePicker(true)}
+                title="Replace consumable (current one will be destroyed)"
+              >
+                <div className="relative transition-all group-hover:scale-[1.03]">
+                  <TradingCardHolo rarity={getHoloEffect(startingFive.consumableCard.rarity)} role="ADC" holoType={startingFive.consumableCard.holoType || 'reverse'} size={80}>
+                    <GameCard type="consumable" rarity={startingFive.consumableCard.rarity} data={toGameCardData(startingFive.consumableCard, getDefOverride?.(startingFive.consumableCard))} size={80} />
+                  </TradingCardHolo>
+                </div>
+                <div className="mt-1.5 text-center" style={{ maxWidth: 80 }}>
+                  <div className="text-[10px] font-bold text-white/70 truncate cd-head">
+                    {startingFive.consumableCard.godName}
+                  </div>
+                  <div className="flex items-center justify-center gap-1 mt-0.5">
+                    <span className="text-[9px] font-bold cd-head" style={{ color: RARITIES[startingFive.consumableCard.rarity]?.color }}>{RARITIES[startingFive.consumableCard.rarity]?.name}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[10px] font-bold cd-num">
+                    {startingFive.consumableCard.passionBoostPct > 0 && (
+                      <span className="flex items-center gap-0.5 text-amber-400">
+                        <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+                        +{startingFive.consumableCard.passionBoostPct}%
+                      </span>
+                    )}
+                    {startingFive.consumableCard.coresBoostPct > 0 && (
+                      <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+                        <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+                        +{startingFive.consumableCard.coresBoostPct}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowConsumablePicker(true)}
+                disabled={!startingFive?.cards?.length}
+                className="group flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                style={{ width: 58, aspectRatio: '63/88' }}
+                title="Slot a consumable to boost income rate"
+              >
+                <Plus size={14} className="text-white/20 group-hover:text-amber-400 transition-colors" />
+                <span className="text-[7px] text-white/20 group-hover:text-amber-400/60 font-bold cd-head tracking-wider mt-0.5 transition-colors">SLOT</span>
+              </button>
+            )}
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
-              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+              className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 ml-2 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
             >
               {collecting ? 'Collecting...' : 'Collect'}
             </button>
@@ -463,20 +503,9 @@ export default function CCStartingFive() {
                 )}
               </div>
             )}
-            {boostNotif && (
-              <div
-                className="absolute -top-10 left-0 whitespace-nowrap px-3 py-1 rounded-lg bg-[var(--cd-surface)] border border-amber-500/30 text-xs font-bold cd-num text-amber-400"
-                style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
-              >
-                +{boostNotif.pct}% boosted!
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="text-[10px] text-white/20">
-          {STARTING_FIVE_CAP_DAYS}-day cap — collect before your income maxes out
-        </div>
       </div>
 
       {/* 5 Role Slots */}
@@ -556,10 +585,11 @@ export default function CCStartingFive() {
         <ConsumablePicker
           collection={collection}
           allSlottedIds={allSlottedIds}
-          onSelect={handleUseConsumable}
+          onSelect={handleSlotConsumable}
           onClose={() => setShowConsumablePicker(false)}
-          using={usingConsumable}
+          using={slottingConsumable}
           getDefOverride={getDefOverride}
+          currentConsumable={startingFive?.consumableCard}
         />
       )}
 
@@ -631,13 +661,16 @@ export default function CCStartingFive() {
 }
 
 
-function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride }) {
+function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride, currentConsumable }) {
+  const [confirmCardId, setConfirmCardId] = useState(null)
+
   const eligibleCards = useMemo(() => {
     return collection
       .filter(card => {
         const type = getCardType(card)
         if (type !== 'consumable') return false
         if (allSlottedIds.has(card.id)) return false
+        if (currentConsumable && card.id === currentConsumable.id) return false
         return true
       })
       .sort((a, b) => {
@@ -645,7 +678,15 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         if (rDiff !== 0) return rDiff
         return (a.godName || '').localeCompare(b.godName || '')
       })
-  }, [collection, allSlottedIds])
+  }, [collection, allSlottedIds, currentConsumable])
+
+  const handleSelect = useCallback((cardId) => {
+    if (currentConsumable) {
+      setConfirmCardId(cardId)
+    } else {
+      onSelect(cardId)
+    }
+  }, [currentConsumable, onSelect])
 
   return (
     <div
@@ -661,7 +702,7 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
           <div className="flex items-center gap-2">
             <Zap size={18} className="text-amber-400" />
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
-              Use Consumable
+              {currentConsumable ? 'Replace Consumable' : 'Slot Consumable'}
             </h3>
           </div>
           <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
@@ -670,8 +711,28 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         </div>
 
         <div className="px-5 pt-3 pb-1 text-xs text-white/40">
-          Consume a card to instantly boost your pending income. Higher rarity = bigger boost. The card is destroyed.
+          {currentConsumable
+            ? 'Select a consumable to replace the current one. The current consumable will be destroyed.'
+            : 'Slot a consumable to boost your Starting 5 income rate. Once slotted, it can only be removed by replacing it.'}
         </div>
+
+        {confirmCardId && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-xl">
+            <div className="bg-[var(--cd-surface)] border border-red-500/30 rounded-xl p-6 mx-4 max-w-sm text-center">
+              <Trash2 size={24} className="mx-auto mb-3 text-red-400" />
+              <p className="text-sm text-white/80 mb-1 cd-head">Replace consumable?</p>
+              <p className="text-xs text-white/40 mb-4">
+                Your <span className="font-bold" style={{ color: RARITIES[currentConsumable?.rarity]?.color }}>{RARITIES[currentConsumable?.rarity]?.name}</span> {currentConsumable?.godName} will be <span className="text-red-400 font-bold">destroyed</span>.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setConfirmCardId(null)} className="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white/70 border border-white/10 cursor-pointer">Cancel</button>
+                <button onClick={() => { onSelect(confirmCardId); setConfirmCardId(null) }} disabled={using} className="px-4 py-2 rounded-lg text-sm font-bold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 cursor-pointer disabled:opacity-50">
+                  {using ? 'Replacing...' : 'Destroy & Replace'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 110px)' }}>
           {eligibleCards.length === 0 ? (
@@ -684,12 +745,13 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
               {eligibleCards.map(card => {
                 const color = RARITIES[card.rarity]?.color || '#9ca3af'
-                const boostPct = Math.round((CONSUMABLE_BOOST[card.rarity] || 0) * 100)
+                const consumableId = card.cardData?.consumableId
+                const boost = consumableId ? getConsumableBoost(consumableId, card.rarity) : { passionBoost: 0, coresBoost: 0 }
                 const override = getDefOverride?.(card)
                 return (
                   <button
                     key={card.id}
-                    onClick={() => onSelect(card.id)}
+                    onClick={() => handleSelect(card.id)}
                     disabled={using}
                     className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -703,9 +765,13 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
                       <div className="flex items-center justify-center gap-1 mt-0.5">
                         <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
                       </div>
-                      <div className="flex items-center justify-center gap-1 mt-0.5 text-[10px] font-bold cd-num">
-                        <span className="text-amber-400">+{boostPct}%</span>
-                        <HoloTypeIcon holoType={card.holoType} size={10} />
+                      <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[10px] font-bold cd-num">
+                        {boost.passionBoost > 0 && (
+                          <span className="text-amber-400">+{Math.round(boost.passionBoost * 100)}%</span>
+                        )}
+                        {boost.coresBoost > 0 && (
+                          <span className="text-[var(--cd-cyan)]">+{Math.round(boost.coresBoost * 100)}%</span>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -898,6 +964,13 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
             </span>
           )}
         </div>
+        {card.teamSynergyBonus > 0 && (
+          <div className="flex items-center justify-center gap-1 mt-0.5">
+            <span className="text-[9px] font-bold cd-head text-emerald-400">
+              +{Math.round(card.teamSynergyBonus * 100)}% Team
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Attachment slots */}
@@ -972,6 +1045,22 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, 
       <div className="text-center mt-0.5">
         <div className={`text-[7px] font-bold truncate cd-head ${holoMismatch ? 'text-white/25' : 'text-white/50'}`} style={{ maxWidth: attachSize }}>{attachment.godName}</div>
         <div className="text-[7px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[attachment.rarity]?.name}</div>
+        {!holoMismatch && (Number(attachment.passionBonus) > 0 || Number(attachment.coresBonus) > 0) && (
+          <div className="flex items-center justify-center gap-1 mt-0.5 text-[7px] font-bold cd-num">
+            {Number(attachment.passionBonus) > 0 && (
+              <span className="flex items-center gap-0.5 text-amber-400">
+                <img src={passionCoin} alt="" className="w-2 h-2" />
+                +{Math.round(Number(attachment.passionBonus) * 100)}%
+              </span>
+            )}
+            {Number(attachment.coresBonus) > 0 && (
+              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+                <img src={emberIcon} alt="" className="w-2 h-2" />
+                +{Math.round(Number(attachment.coresBonus) * 100)}%
+              </span>
+            )}
+          </div>
+        )}
         {synergy && !holoMismatch && (
           <div className="text-[6px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +30%</div>
         )}
@@ -1256,6 +1345,24 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
   const income = getIncomeRate(card)
   const type = getCardType(card)
   const isPlayer = type === 'player'
+  const isAttachment = type === 'god' || type === 'item'
+
+  // Compute attachment bonus percentages for god/item cards
+  const attachBonus = useMemo(() => {
+    if (!isAttachment || holoMismatch) return null
+    const bonuses = ATTACHMENT_BONUSES[type]
+    if (!bonuses) return null
+    let pB = bonuses.passion[card.rarity] || 0
+    let cB = bonuses.cores[card.rarity] || 0
+    let passionPct = 0, coresPct = 0
+    if (card.holoType === 'holo') passionPct = Math.round(pB * 100)
+    else if (card.holoType === 'reverse') coresPct = Math.round(cB * 100)
+    else if (card.holoType === 'full') {
+      passionPct = Math.round(pB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+      coresPct = Math.round(cB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+    }
+    return { passionPct, coresPct }
+  }, [isAttachment, holoMismatch, type, card.rarity, card.holoType])
 
   return (
     <button
@@ -1290,20 +1397,37 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           <span className="text-[9px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[card.rarity]?.name}</span>
           <HoloTypeIcon holoType={card.holoType} size={10} />
         </div>
-        <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
-          {income.passion > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
-              <img src={passionCoin} alt="" className="w-2 h-2" />
-              {income.passion}/d
-            </span>
-          )}
-          {income.cores > 0 && (
-            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-              <img src={emberIcon} alt="" className="w-2 h-2" />
-              {income.cores}/d
-            </span>
-          )}
-        </div>
+        {isAttachment && attachBonus && (attachBonus.passionPct > 0 || attachBonus.coresPct > 0) ? (
+          <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-bold cd-num">
+            {attachBonus.passionPct > 0 && (
+              <span className="flex items-center gap-0.5 text-amber-400">
+                <img src={passionCoin} alt="" className="w-2 h-2" />
+                +{attachBonus.passionPct}%
+              </span>
+            )}
+            {attachBonus.coresPct > 0 && (
+              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+                <img src={emberIcon} alt="" className="w-2 h-2" />
+                +{attachBonus.coresPct}%
+              </span>
+            )}
+          </div>
+        ) : !isAttachment ? (
+          <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
+            {income.passion > 0 && (
+              <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+                <img src={passionCoin} alt="" className="w-2 h-2" />
+                {income.passion}/d
+              </span>
+            )}
+            {income.cores > 0 && (
+              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+                <img src={emberIcon} alt="" className="w-2 h-2" />
+                {income.cores}/d
+              </span>
+            )}
+          </div>
+        ) : null}
       </div>
     </button>
   )

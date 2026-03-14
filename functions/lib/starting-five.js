@@ -4,10 +4,10 @@ import { grantPassion } from './passion.js'
 
 const RATES = {
   holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16 },
-  reverse: { uncommon: 2, rare: 3, epic: 5, legendary: 8, mythic: 12 },
+  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24 },
   full: {
     passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6 },
-    cores: { uncommon: 1.2, rare: 1.8, epic: 3, legendary: 4.8, mythic: 7.2 },
+    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4 },
   },
 }
 
@@ -23,11 +23,29 @@ const ATTACHMENT_BONUSES = {
 }
 const FULL_HOLO_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.30
+const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
 
-const CONSUMABLE_BOOST = { common: 0.05, uncommon: 0.10, rare: 0.15, epic: 0.25, legendary: 0.35, mythic: 0.50 }
+const CONSUMABLE_SLOT_SCALING = {
+  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00,
+}
+const CONSUMABLE_SPREADS = {
+  'health-pot':  { passion: 0.75, cores: 0.25 },
+  'mana-pot':    { passion: 0.25, cores: 0.75 },
+  'multi-pot':   { passion: 0.50, cores: 0.50 },
+  'elixir-str':  { passion: 1.00, cores: 0.00 },
+  'elixir-int':  { passion: 0.00, cores: 1.00 },
+  'ward':        { passion: 0.60, cores: 0.40 },
+  'sentry':      { passion: 0.40, cores: 0.60 },
+}
+
+export function getConsumableBoost(consumableId, rarity) {
+  const total = CONSUMABLE_SLOT_SCALING[rarity] || 0
+  const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 }
+  return { passionBoost: total * spread.passion, coresBoost: total * spread.cores }
+}
 
 const CAP_DAYS = 2
 const HOURS_PER_DAY = 24
@@ -124,13 +142,14 @@ function reshapeAttachments(row) {
   return { godCard, itemCard }
 }
 
-function getTotalDailyRates(cards) {
+function getTotalDailyRates(cards, teamCounts = {}) {
   let totalPassion = 0, totalCores = 0
   for (const card of cards) {
     const { godCard, itemCard } = reshapeAttachments(card)
     const { passionPerHour, coresPerHour } = getSlotRates(card, godCard, itemCard)
-    totalPassion += passionPerHour * HOURS_PER_DAY
-    totalCores += coresPerHour * HOURS_PER_DAY
+    const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
+    totalPassion += passionPerHour * teamBonus * HOURS_PER_DAY
+    totalCores += coresPerHour * teamBonus * HOURS_PER_DAY
   }
   return { totalPassionPerDay: totalPassion, totalCoresPerDay: totalCores }
 }
@@ -147,7 +166,7 @@ export async function tick(sql, userId) {
   await ensureState(sql, userId)
 
   const cards = await sql`
-    SELECT l.role AS slot_role, c.*, pd.best_god_name,
+    SELECT l.role AS slot_role, c.*, pd.best_god_name, pd.team_id AS team_id,
       g.id AS god_id, g.rarity AS god_rarity, g.holo_type AS god_holo_type,
       g.card_type AS god_card_type, g.role AS god_role, g.card_data AS god_card_data,
       g.god_name AS god_god_name, g.god_class AS god_god_class, g.image_url AS god_image_url,
@@ -176,6 +195,11 @@ export async function tick(sql, userId) {
     SELECT * FROM cc_starting_five_state WHERE user_id = ${userId}
   `
 
+  // Fetch slotted consumable (if any)
+  const [consumableCard] = state?.consumable_card_id ? await sql`
+    SELECT * FROM cc_cards WHERE id = ${state.consumable_card_id}
+  ` : [null]
+
   if (!state || !state.last_tick || cards.length === 0) {
     await sql`
       UPDATE cc_starting_five_state
@@ -187,6 +211,7 @@ export async function tick(sql, userId) {
       passionPending: Number(state?.passion_pending) || 0,
       coresPending: Number(state?.cores_pending) || 0,
       lastTick: new Date().toISOString(),
+      consumableCard: consumableCard || null,
     }
   }
 
@@ -200,19 +225,34 @@ export async function tick(sql, userId) {
       passionPending: Number(state.passion_pending) || 0,
       coresPending: Number(state.cores_pending) || 0,
       lastTick: state.last_tick,
+      consumableCard: consumableCard || null,
     }
+  }
+
+  const teamCounts = {}
+  for (const card of cards) {
+    if (card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
   }
 
   let passionAccrued = 0, coresAccrued = 0
   for (const card of cards) {
     const { passionPerHour, coresPerHour } = getSlotRates(card, card._godCard, card._itemCard)
-    passionAccrued += passionPerHour * elapsedHours
-    coresAccrued += coresPerHour * elapsedHours
+    const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
+    passionAccrued += passionPerHour * teamBonus * elapsedHours
+    coresAccrued += coresPerHour * teamBonus * elapsedHours
   }
 
-  const { totalPassionPerDay, totalCoresPerDay } = getTotalDailyRates(cards)
+  // Cap always uses unboosted rates (before consumable, but including team synergy)
+  const { totalPassionPerDay, totalCoresPerDay } = getTotalDailyRates(cards, teamCounts)
   const passionCap = totalPassionPerDay * CAP_DAYS
   const coresCap = totalCoresPerDay * CAP_DAYS
+
+  // Apply consumable boost to accrued amounts (not cap)
+  if (consumableCard?.card_data?.consumableId) {
+    const boost = getConsumableBoost(consumableCard.card_data.consumableId, consumableCard.rarity)
+    passionAccrued *= (1 + boost.passionBoost)
+    coresAccrued *= (1 + boost.coresBoost)
+  }
 
   let newPassion = Math.min((Number(state.passion_pending) || 0) + passionAccrued, passionCap)
   let newCores = Math.min((Number(state.cores_pending) || 0) + coresAccrued, coresCap)
@@ -232,6 +272,7 @@ export async function tick(sql, userId) {
     lastTick: now.toISOString(),
     passionCap,
     coresCap,
+    consumableCard: consumableCard || null,
   }
 }
 
@@ -400,45 +441,47 @@ export async function unslotAttachment(sql, userId, role, slotType) {
   return await tick(sql, userId)
 }
 
-export async function useConsumable(sql, userId, cardId) {
+export async function slotConsumable(sql, userId, cardId) {
   const [card] = await sql`
-    SELECT id, rarity, card_type, holo_type FROM cc_cards
+    SELECT id, rarity, card_type, card_data FROM cc_cards
     WHERE id = ${cardId} AND owner_id = ${userId}
   `
   if (!card) throw new Error('Card not found')
-  if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be used')
+  if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be slotted')
 
-  const boost = CONSUMABLE_BOOST[card.rarity]
-  if (!boost) throw new Error('Invalid rarity')
+  const [listing] = await sql`
+    SELECT id FROM cc_market_listings WHERE card_id = ${cardId} AND status = 'active'
+  `
+  if (listing) throw new Error('Card is listed on marketplace — unlist it first')
 
-  // Tick first to get current state and caps
-  const state = await tick(sql, userId)
-  if (state.cards.length === 0) throw new Error('No cards slotted — slot players first')
+  const [inTrade] = await sql`
+    SELECT id FROM cc_trade_cards WHERE card_id = ${cardId}
+  `
+  if (inTrade) throw new Error('Card is in an active trade — cancel the trade first')
 
-  const { totalPassionPerDay, totalCoresPerDay } = getTotalDailyRates(state.cards)
-  const passionCap = totalPassionPerDay * CAP_DAYS
-  const coresCap = totalCoresPerDay * CAP_DAYS
+  const [inBinder] = await sql`
+    SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1
+  `
+  if (inBinder) throw new Error('Card is in your binder — remove it first')
 
-  // Holo type determines what gets boosted
-  const boostsPassion = card.holo_type === 'holo' || card.holo_type === 'full' || !card.holo_type
-  const boostsCores = card.holo_type === 'reverse' || card.holo_type === 'full' || !card.holo_type
+  // Collect pending income before changing rates
+  await collectIncome(sql, userId)
+  await ensureState(sql, userId)
 
-  const passionBoost = boostsPassion ? passionCap * boost : 0
-  const coresBoost = boostsCores ? coresCap * boost : 0
+  // Destroy current consumable (if any)
+  const [state] = await sql`
+    SELECT consumable_card_id FROM cc_starting_five_state WHERE user_id = ${userId}
+  `
+  if (state?.consumable_card_id) {
+    await sql`DELETE FROM cc_cards WHERE id = ${state.consumable_card_id}`
+  }
 
-  const newPassion = Math.min(state.passionPending + passionBoost, passionCap)
-  const newCores = Math.min(state.coresPending + coresBoost, coresCap)
-
+  // Slot new consumable
   await sql`
     UPDATE cc_starting_five_state
-    SET passion_pending = ${newPassion}, cores_pending = ${newCores}
+    SET consumable_card_id = ${cardId}
     WHERE user_id = ${userId}
   `
 
-  // Destroy the consumable
-  await sql`DELETE FROM cc_cards WHERE id = ${cardId}`
-
-  // Return updated state
-  const updated = await tick(sql, userId)
-  return { ...updated, boostPct: boost, passionBoosted: passionBoost, coresBoosted: coresBoost, consumedCardId: cardId }
+  return await tick(sql, userId)
 }

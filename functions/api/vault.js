@@ -1258,20 +1258,31 @@ async function handleBlackMarketDebugPending(sql, user) {
 // ═══ Starting 5 ═══
 
 function formatS5Response(state, extra = {}) {
+  // Count teammates for team synergy
+  const teamCounts = {}
+  for (const c of state.cards) {
+    if (c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+  }
+  const TEAM_SYNERGY = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
+
   const cardsWithRates = state.cards.map(c => {
     const godCard = c._godCard || null
     const itemCard = c._itemCard || null
     const baseRates = getCardRates(c.holo_type, c.rarity)
     const effectiveRates = getSlotRates(c, godCard, itemCard)
     const synergy = !!(godCard && c.best_god_name && godCard.god_name && godCard.god_name.toLowerCase() === c.best_god_name.toLowerCase())
+    const teamSynergyBonus = TEAM_SYNERGY[teamCounts[c.team_id]] || 0
+    const teamMult = 1 + teamSynergyBonus
 
     return {
       ...formatCard(c),
       slotRole: c.slot_role,
+      teamId: c.team_id || null,
+      teamSynergyBonus,
       passionPerHour: baseRates.passionPerHour,
       coresPerHour: baseRates.coresPerHour,
-      effectivePassionPerHour: effectiveRates.passionPerHour,
-      effectiveCoresPerHour: effectiveRates.coresPerHour,
+      effectivePassionPerHour: effectiveRates.passionPerHour * teamMult,
+      effectiveCoresPerHour: effectiveRates.coresPerHour * teamMult,
       godCard: godCard ? { ...formatCard(godCard), ...getAttachmentBonusInfo(godCard, 'god', synergy), synergy } : null,
       itemCard: itemCard ? { ...formatCard(itemCard), ...getAttachmentBonusInfo(itemCard, 'item') } : null,
     }
