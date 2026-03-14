@@ -49,7 +49,7 @@ export function getRandomHoloEffect(rarity) {
 
 // Dismantle diminishing returns — tiers based on cumulative base value (Cores) dismantled today
 export const DISMANTLE_TIERS = [
-  { upTo: 100, rate: 1.0 },
+  { upTo: 120, rate: 1.0 },
   { upTo: 160, rate: 0.75 },
   { upTo: 200, rate: 0.5 },
   { upTo: Infinity, rate: 0.25 },
@@ -126,7 +126,7 @@ export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
 export const GOD_SYNERGY_BONUS = 0.30;
 // Consumable slot — rarity-based total boost (non-linear scaling)
 export const CONSUMABLE_SLOT_SCALING = {
-  common: 0.50, uncommon: 0.65, rare: 0.80, epic: 1.00, legendary: 1.35, mythic: 2.00,
+  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00,
 };
 
 // Per-consumable passion/cores spread (ratios sum to 1.0)

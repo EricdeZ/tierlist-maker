@@ -952,7 +952,7 @@ const DISMANTLE_VALUES = {
   common: 0.2, uncommon: 1, rare: 3, epic: 8, legendary: 25, mythic: 75,
 }
 const DISMANTLE_TIERS = [
-  { upTo: 100, rate: 1.0 },
+  { upTo: 120, rate: 1.0 },
   { upTo: 160, rate: 0.75 },
   { upTo: 200, rate: 0.5 },
   { upTo: Infinity, rate: 0.25 },
