@@ -71,7 +71,7 @@ function useResetCountdown() {
   return timeLeft
 }
 
-function SalvageGauge({ dismantledToday, currentRate }) {
+function SalvageGauge({ dismantledToday, dismantledValueToday = 0, currentRate }) {
   const pressure = Math.min(((1 - currentRate) / 0.9) * 100, 100)
   const needleAngle = -90 + (pressure / 100) * 180
   const resetIn = useResetCountdown()
@@ -121,7 +121,7 @@ function SalvageGauge({ dismantledToday, currentRate }) {
         <div className="text-lg font-bold tabular-nums cd-num cd-text-glow" style={{ color }}>{Math.round(currentRate * 100)}%</div>
         <div className="text-[11px] font-bold uppercase tracking-wider cd-head" style={{ color: color + 'bb' }}>{statusLabel}</div>
       </div>
-      <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{dismantledToday} dismantled today</div>
+      <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{Math.round(dismantledValueToday * 10) / 10} Cores today ({dismantledToday} cards)</div>
       {dismantledToday > 0 && (
         <div className="text-[10px] text-white/20 mt-0.5 cd-mono">Resets in {resetIn}</div>
       )}
@@ -132,6 +132,7 @@ function SalvageGauge({ dismantledToday, currentRate }) {
 export default function CCDismantle() {
   const { collection, dismantleCards, startingFive, binderCards, getDefOverride, stats } = useVault()
   const dismantledToday = stats?.dismantledToday || 0
+  const dismantledValueToday = stats?.dismantledValueToday || 0
   const [selected, setSelected] = useState(new Set())
   const [dismantling, setDismantling] = useState(false)
   const [result, setResult] = useState(null)
@@ -187,7 +188,7 @@ export default function CCDismantle() {
     setResult(null)
   }, [])
 
-  const currentMultiplier = getDismantleMultiplier(dismantledToday)
+  const currentMultiplier = getDismantleMultiplier(dismantledValueToday)
 
   const { fullValue, coresTotal, selectedCount, breakdown } = useMemo(() => {
     const selectedCards = []
@@ -199,9 +200,9 @@ export default function CCDismantle() {
       fullVal += RARITIES[card.rarity]?.dismantleValue || 0
       counts[card.rarity] = (counts[card.rarity] || 0) + 1
     }
-    const adjusted = calcDismantleTotal(selectedCards, dismantledToday)
+    const adjusted = calcDismantleTotal(selectedCards, dismantledValueToday)
     return { fullValue: Math.floor(Math.round(fullVal * 10) / 10), coresTotal: adjusted, selectedCount: selectedCards.length, breakdown: counts }
-  }, [collection, selected, dismantledToday])
+  }, [collection, selected, dismantledValueToday])
 
   const handleDismantle = async () => {
     if (coresTotal < 1 || dismantling) return
@@ -253,7 +254,7 @@ export default function CCDismantle() {
       {showRates && (
         <div className="mb-4 p-4 rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/60">
           <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-            <SalvageGauge dismantledToday={dismantledToday} currentRate={currentMultiplier} />
+            <SalvageGauge dismantledToday={dismantledToday} dismantledValueToday={dismantledValueToday} currentRate={currentMultiplier} />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Base Rates</div>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -275,11 +276,11 @@ export default function CCDismantle() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {DISMANTLE_TIERS.map((tier, i) => {
                     const prevUpTo = i === 0 ? 0 : DISMANTLE_TIERS[i - 1].upTo
-                    const label = tier.upTo === Infinity ? `${prevUpTo}+` : `${prevUpTo + 1}–${tier.upTo}`
-                    const isActive = dismantledToday >= prevUpTo && dismantledToday < tier.upTo
+                    const label = tier.upTo === Infinity ? `${prevUpTo}+` : `${prevUpTo}–${tier.upTo}`
+                    const isActive = dismantledValueToday >= prevUpTo && dismantledValueToday < tier.upTo
                     return (
                       <div key={i} className={`p-2 rounded-lg ${isActive ? 'bg-[var(--cd-cyan)]/10 border border-[var(--cd-cyan)]/30' : 'bg-black/20'}`}>
-                        <div className="text-[var(--cd-text-dim)] cd-head">Cards {label}</div>
+                        <div className="text-[var(--cd-text-dim)] cd-head">Cores {label}</div>
                         <div className={`font-bold cd-num ${isActive ? 'text-[var(--cd-cyan)]' : 'text-[var(--cd-text)]'}`}>
                           {Math.round(tier.rate * 100)}% value
                         </div>
@@ -345,7 +346,6 @@ export default function CCDismantle() {
             isSelected={selected.has(card.id)}
             onToggle={toggle}
             override={getDefOverride(card)}
-            multiplier={currentMultiplier}
           />
         ))}
       </div>
@@ -422,7 +422,7 @@ export default function CCDismantle() {
                 <div className="text-[11px] text-red-400 font-bold">Min. 1 Core required</div>
               )}
               {currentMultiplier < 1 && (
-                <div className="text-[10px] text-amber-400 font-bold">{Math.round(currentMultiplier * 100)}% rate ({dismantledToday} today)</div>
+                <div className="text-[10px] text-amber-400 font-bold">{Math.round(currentMultiplier * 100)}% rate ({Math.round(dismantledValueToday)} Cores today)</div>
               )}
             </div>
 
@@ -450,11 +450,10 @@ export default function CCDismantle() {
   )
 }
 
-function DismantleSlot({ card, isSelected, onToggle, override, multiplier = 1 }) {
+function DismantleSlot({ card, isSelected, onToggle, override }) {
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
-  const adjustedValue = Math.round(rarityInfo.dismantleValue * multiplier * 10) / 10
 
   return (
     <div
@@ -481,9 +480,9 @@ function DismantleSlot({ card, isSelected, onToggle, override, multiplier = 1 })
       {/* Value badge */}
       <div
         className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold cd-num flex items-center gap-0.5"
-        style={{ backgroundColor: rarityInfo.color + '20', color: multiplier < 1 ? '#f59e0b' : rarityInfo.color }}
+        style={{ backgroundColor: rarityInfo.color + '20', color: rarityInfo.color }}
       >
-        {adjustedValue}
+        {rarityInfo.dismantleValue}
         <img src={emberIcon} alt="" className="h-3 w-auto object-contain" />
       </div>
     </div>

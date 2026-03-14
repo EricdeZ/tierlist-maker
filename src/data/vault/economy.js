@@ -47,29 +47,45 @@ export function getRandomHoloEffect(rarity) {
   return info.holoEffects[Math.floor(Math.random() * info.holoEffects.length)];
 }
 
-// Dismantle diminishing returns — tiers of daily cards dismantled
+// Dismantle diminishing returns — tiers based on cumulative base value (Cores) dismantled today
 export const DISMANTLE_TIERS = [
-  { upTo: 30,  rate: 1.0 },
-  { upTo: 80,  rate: 0.5 },
-  { upTo: 150, rate: 0.25 },
-  { upTo: Infinity, rate: 0.1 },
+  { upTo: 100, rate: 1.0 },
+  { upTo: 160, rate: 0.75 },
+  { upTo: 200, rate: 0.5 },
+  { upTo: Infinity, rate: 0.25 },
 ];
 
-export function getDismantleMultiplier(cardIndex) {
+export function getDismantleMultiplier(valueAccumulated) {
   for (const tier of DISMANTLE_TIERS) {
-    if (cardIndex < tier.upTo) return tier.rate;
+    if (valueAccumulated < tier.upTo) return tier.rate;
   }
   return 0.1;
 }
 
-export function calcDismantleTotal(cards, dismantledToday) {
+// Split a single card's base value across tier boundaries
+function applyTieredValue(base, cumulativeBase) {
+  let remaining = base;
+  let value = 0;
+  let pos = cumulativeBase;
+  for (const tier of DISMANTLE_TIERS) {
+    if (remaining <= 0) break;
+    if (pos >= tier.upTo) continue;
+    const chunk = tier.upTo === Infinity ? remaining : Math.min(tier.upTo - pos, remaining);
+    value += chunk * tier.rate;
+    remaining -= chunk;
+    pos += chunk;
+  }
+  return value;
+}
+
+export function calcDismantleTotal(cards, dismantledValueToday) {
   const sorted = [...cards].sort((a, b) => (RARITIES[b.rarity]?.dismantleValue || 0) - (RARITIES[a.rarity]?.dismantleValue || 0));
   let total = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    const dayIndex = dismantledToday + i;
-    const mult = getDismantleMultiplier(dayIndex);
-    const base = RARITIES[sorted[i].rarity]?.dismantleValue || 0;
-    total += base * mult;
+  let cumulativeBase = dismantledValueToday;
+  for (const card of sorted) {
+    const base = RARITIES[card.rarity]?.dismantleValue || 0;
+    total += applyTieredValue(base, cumulativeBase);
+    cumulativeBase += base;
   }
   return Math.floor(Math.round(total * 10) / 10);
 }
@@ -108,4 +124,27 @@ export const ATTACHMENT_BONUSES = {
 
 export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
 export const GOD_SYNERGY_BONUS = 0.30;
-export const CONSUMABLE_BOOST = { common: 0.05, uncommon: 0.10, rare: 0.15, epic: 0.25, legendary: 0.35, mythic: 0.50 };
+// Consumable slot — rarity-based total boost (non-linear scaling)
+export const CONSUMABLE_SLOT_SCALING = {
+  common: 0.50, uncommon: 0.65, rare: 0.80, epic: 1.00, legendary: 1.35, mythic: 2.00,
+};
+
+// Per-consumable passion/cores spread (ratios sum to 1.0)
+export const CONSUMABLE_SPREADS = {
+  'health-pot':  { passion: 0.75, cores: 0.25 },
+  'mana-pot':    { passion: 0.25, cores: 0.75 },
+  'multi-pot':   { passion: 0.50, cores: 0.50 },
+  'elixir-str':  { passion: 1.00, cores: 0.00 },
+  'elixir-int':  { passion: 0.00, cores: 1.00 },
+  'ward':        { passion: 0.60, cores: 0.40 },
+  'sentry':      { passion: 0.40, cores: 0.60 },
+};
+
+export function getConsumableBoost(consumableId, rarity) {
+  const total = CONSUMABLE_SLOT_SCALING[rarity] || 0;
+  const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 };
+  return {
+    passionBoost: total * spread.passion,
+    coresBoost: total * spread.cores,
+  };
+}

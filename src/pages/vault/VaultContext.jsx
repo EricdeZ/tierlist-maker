@@ -187,12 +187,14 @@ export function VaultProvider({ children }) {
     return data
   }, [passionCtx])
 
-  const boostS5WithConsumable = useCallback(async (cardId) => {
-    const data = await vaultService.useConsumable(cardId)
+  const slotS5Consumable = useCallback(async (cardId) => {
+    const prevConsumableId = startingFive?.consumableCard?.id
+    const data = await vaultService.slotConsumable(cardId)
     setStartingFive(data)
-    setCollection(prev => prev.filter(c => c.id !== data.consumedCardId))
+    // Remove slotted card from collection; also remove destroyed previous consumable
+    setCollection(prev => prev.filter(c => c.id !== cardId && c.id !== prevConsumableId))
     return data
-  }, [])
+  }, [startingFive?.consumableCard?.id])
 
   useEffect(() => {
     if (loaded) {
@@ -205,7 +207,7 @@ export function VaultProvider({ children }) {
     const result = await vaultService.dismantleCards(cardIds)
     setCollection(prev => prev.filter(c => !cardIds.includes(c.id)))
     if (result.dismantledToday != null) {
-      setStats(prev => ({ ...prev, dismantledToday: result.dismantledToday }))
+      setStats(prev => ({ ...prev, dismantledToday: result.dismantledToday, dismantledValueToday: result.dismantledValueToday ?? prev.dismantledValueToday }))
     }
     passionCtx?.refreshBalance?.()
     return result
@@ -320,7 +322,7 @@ export function VaultProvider({ children }) {
       buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshSalePacks, refreshBalance: passionCtx?.refreshBalance,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
-      startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, boostS5WithConsumable,
+      startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
       binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
       pendingTradeCount, setPendingTradeCount,
       inventory, openInventoryPack,

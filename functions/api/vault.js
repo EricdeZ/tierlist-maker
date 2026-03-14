@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable, getCardRates, getSlotRates, getAttachmentBonusInfo } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, getCardRates, getSlotRates, getAttachmentBonusInfo, getConsumableBoost } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -69,7 +69,7 @@ const handler = async (event) => {
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
-        case 'use-consumable': return await handleUseConsumable(sql, user, body)
+        case 'slot-consumable': return await handleSlotConsumable(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
         case 'binder-save': return await handleBinderSave(sql, user, body)
         case 'binder-slot': return await handleBinderSlot(sql, user, body)
@@ -952,10 +952,10 @@ const DISMANTLE_VALUES = {
   common: 0.2, uncommon: 1, rare: 3, epic: 8, legendary: 25, mythic: 75,
 }
 const DISMANTLE_TIERS = [
-  { upTo: 30,  rate: 1.0 },
-  { upTo: 80,  rate: 0.5 },
-  { upTo: 150, rate: 0.25 },
-  { upTo: Infinity, rate: 0.1 },
+  { upTo: 100, rate: 1.0 },
+  { upTo: 160, rate: 0.75 },
+  { upTo: 200, rate: 0.5 },
+  { upTo: Infinity, rate: 0.25 },
 ]
 
 async function handleDismantle(sql, user, body) {
@@ -996,25 +996,35 @@ async function handleDismantle(sql, user, body) {
   const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
   const validIds = cards.map(c => c.id)
 
-  // Fetch current daily dismantle count (reset if new day)
+  // Fetch current daily dismantle stats (reset if new day)
   await ensureStats(sql, user.id)
-  const [currentStats] = await sql`SELECT dismantled_today, dismantle_reset_date FROM cc_stats WHERE user_id = ${user.id}`
+  const [currentStats] = await sql`SELECT dismantled_today, dismantled_value_today, dismantle_reset_date FROM cc_stats WHERE user_id = ${user.id}`
   const today = new Date().toISOString().slice(0, 10)
-  const dismantledToday = currentStats.dismantle_reset_date === today ? (currentStats.dismantled_today || 0) : 0
+  const isToday = currentStats.dismantle_reset_date === today
+  const dismantledToday = isToday ? (currentStats.dismantled_today || 0) : 0
+  const dismantledValueToday = isToday ? (parseFloat(currentStats.dismantled_value_today) || 0) : 0
 
   // Sort by rarity value descending so highest-value cards get the best rate
   cards.sort((a, b) => (DISMANTLE_VALUES[b.rarity] || 0) - (DISMANTLE_VALUES[a.rarity] || 0))
 
-  // Calculate total with diminishing returns applied server-side
+  // Calculate total with value-based diminishing returns (split across tier boundaries)
   let total = 0
-  for (let i = 0; i < cards.length; i++) {
-    const dayIndex = dismantledToday + i
-    const base = DISMANTLE_VALUES[cards[i].rarity] || 0
-    let mult = 0.1
+  let cumulativeBase = dismantledValueToday
+  let batchBaseValue = 0
+  for (const card of cards) {
+    const base = DISMANTLE_VALUES[card.rarity] || 0
+    let remaining = base
+    let pos = cumulativeBase
     for (const tier of DISMANTLE_TIERS) {
-      if (dayIndex < tier.upTo) { mult = tier.rate; break }
+      if (remaining <= 0) break
+      if (pos >= tier.upTo) continue
+      const chunk = tier.upTo === Infinity ? remaining : Math.min(tier.upTo - pos, remaining)
+      total += chunk * tier.rate
+      remaining -= chunk
+      pos += chunk
     }
-    total += base * mult
+    cumulativeBase += base
+    batchBaseValue += base
   }
   const emberGained = Math.floor(Math.round(total * 10) / 10)
 
@@ -1034,13 +1044,15 @@ async function handleDismantle(sql, user, body) {
   // Grant ember
   const { balance } = await grantEmber(sql, user.id, 'dismantle', emberGained, `Dismantled ${validIds.length} card${validIds.length > 1 ? 's' : ''}`)
 
-  // Update dismantle stats + daily counter
+  // Update dismantle stats + daily counters
   const newDismantledToday = dismantledToday + validIds.length
+  const newDismantledValueToday = dismantledValueToday + batchBaseValue
   await sql`
     UPDATE cc_stats SET
       cards_dismantled = cards_dismantled + ${validIds.length},
       legendary_cards_dismantled = legendary_cards_dismantled + ${legendaryCount},
       dismantled_today = ${newDismantledToday},
+      dismantled_value_today = ${newDismantledValueToday},
       dismantle_reset_date = ${today}
     WHERE user_id = ${user.id}
   `
@@ -1052,7 +1064,7 @@ async function handleDismantle(sql, user, body) {
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ dismantled: validIds.length, emberGained, balance, dismantledToday: newDismantledToday }),
+    body: JSON.stringify({ dismantled: validIds.length, emberGained, balance, dismantledToday: newDismantledToday, dismantledValueToday: newDismantledValueToday }),
   }
 }
 
@@ -1268,6 +1280,23 @@ function formatS5Response(state, extra = {}) {
   const totalPassionPerHour = cardsWithRates.reduce((s, c) => s + c.effectivePassionPerHour, 0)
   const totalCoresPerHour = cardsWithRates.reduce((s, c) => s + c.effectiveCoresPerHour, 0)
 
+  // Apply consumable boost to display rates (cap uses unboosted)
+  const consumable = state.consumableCard
+  let boostedPassionPerHour = totalPassionPerHour
+  let boostedCoresPerHour = totalCoresPerHour
+  let consumableResponse = null
+
+  if (consumable?.card_data?.consumableId) {
+    const boost = getConsumableBoost(consumable.card_data.consumableId, consumable.rarity)
+    boostedPassionPerHour = totalPassionPerHour * (1 + boost.passionBoost)
+    boostedCoresPerHour = totalCoresPerHour * (1 + boost.coresBoost)
+    consumableResponse = {
+      ...formatCard(consumable),
+      passionBoostPct: Math.round(boost.passionBoost * 100),
+      coresBoostPct: Math.round(boost.coresBoost * 100),
+    }
+  }
+
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
@@ -1276,10 +1305,11 @@ function formatS5Response(state, extra = {}) {
       passionPending: state.passionPending,
       coresPending: state.coresPending,
       lastTick: state.lastTick,
-      totalPassionPerHour,
-      totalCoresPerHour,
+      totalPassionPerHour: boostedPassionPerHour,
+      totalCoresPerHour: boostedCoresPerHour,
       passionCap: state.passionCap || totalPassionPerHour * 48,
       coresCap: state.coresCap || totalCoresPerHour * 48,
+      consumableCard: consumableResponse,
     }),
   }
 }
@@ -1332,18 +1362,18 @@ async function handleUnslotAttachment(sql, user, body) {
   return formatS5Response(state)
 }
 
-async function handleUseConsumable(sql, user, body) {
+async function handleSlotConsumable(sql, user, body) {
   const { cardId } = body
   if (!cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
-  const result = await useConsumable(sql, user.id, cardId)
-  return formatS5Response(result, {
-    boostPct: result.boostPct,
-    passionBoosted: result.passionBoosted,
-    coresBoosted: result.coresBoosted,
-    consumedCardId: result.consumedCardId,
-  })
+  const state = await slotConsumable(sql, user.id, cardId)
+
+  getVaultStats(sql, user.id)
+    .then(stats => pushChallengeProgress(sql, user.id, stats))
+    .catch(err => console.error('Vault challenge push (slot-consumable) failed:', err))
+
+  return formatS5Response(state)
 }
 
 async function handleCollectIncome(sql, user) {
@@ -1709,15 +1739,18 @@ function formatCard(row) {
 }
 
 function formatStats(row) {
-  if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0, dismantledToday: 0 }
+  if (!row) return { packsOpened: 0, embers: 0, brudihsTurnedIn: 0, pendingMythicClaim: 0, dismantledToday: 0, dismantledValueToday: 0 }
   const today = new Date().toISOString().slice(0, 10)
-  const dismantledToday = row.dismantle_reset_date === today ? (row.dismantled_today || 0) : 0
+  const isToday = row.dismantle_reset_date === today
+  const dismantledToday = isToday ? (row.dismantled_today || 0) : 0
+  const dismantledValueToday = isToday ? (parseFloat(row.dismantled_value_today) || 0) : 0
   return {
     packsOpened: row.packs_opened,
     embers: row.embers,
     brudihsTurnedIn: row.brudihs_turned_in || 0,
     pendingMythicClaim: row.pending_mythic_claim || 0,
     dismantledToday,
+    dismantledValueToday,
   }
 }
 
