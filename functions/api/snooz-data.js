@@ -1,5 +1,8 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, handleCors, getHeaders } from '../lib/db.js'
+import { requireAuth } from '../lib/auth.js'
+
+const SNOOZ_ALLOWED = ['171059031291461633']
 
 const handler = async (event) => {
     const cors = handleCors(event)
@@ -10,6 +13,14 @@ const handler = async (event) => {
     try {
         if (event.httpMethod !== 'GET') {
             return { statusCode: 405, headers: getHeaders(event), body: JSON.stringify({ error: 'Method not allowed' }) }
+        }
+
+        // Resolve user if token present (non-blocking — page still loads without auth)
+        let canSave = false
+        const user = await requireAuth(event)
+        if (user) {
+            const adminId = process.env.ADMIN_DISCORD_ID
+            canSave = SNOOZ_ALLOWED.includes(user.discord_id) || user.discord_id === adminId
         }
 
         const [league] = await sql`SELECT id, name, slug, color FROM leagues WHERE slug = 'osl'`
@@ -247,6 +258,7 @@ const handler = async (event) => {
                 allDivCompleteMisses,
                 allDivSavedWeeks,
                 maxWeek: maxWeekRow?.max_week || null,
+                canSave,
             }),
         }
     } catch (error) {

@@ -443,7 +443,7 @@ const SnoozOverlay = () => {
     const [saveStatus, setSaveStatus] = useState(null)
     const [scoresOpen, setScoresOpen] = useState(false)
     const [allSnoozPanelists, setAllSnoozPanelists] = useState([])
-    const hasAuth = !!localStorage.getItem('auth_token')
+    const [canSave, setCanSave] = useState(false)
     const [customBg, setCustomBg] = useState(() => {
         try { return localStorage.getItem('snooz_custom_bg') || null } catch { return null }
     })
@@ -488,9 +488,12 @@ const SnoozOverlay = () => {
             try {
                 const params = new URLSearchParams({ week })
                 if (selectedDivision) params.append('divisionSlug', selectedDivision)
-                const res = await fetch(`${API_BASE}/snooz-data?${params}`)
+                const token = localStorage.getItem('auth_token')
+                const headers = token ? { Authorization: `Bearer ${token}` } : {}
+                const res = await fetch(`${API_BASE}/snooz-data?${params}`, { headers })
                 const json = await res.json()
                 setData(json)
+                setCanSave(!!json.canSave)
                 if (!selectedDivision && json.activeDivision) setSelectedDivision(json.activeDivision.slug)
 
                 // Check for a local draft first (unsaved edits survive refresh)
@@ -795,7 +798,7 @@ const SnoozOverlay = () => {
                         Scores
                     </button>
 
-                    {hasAuth && (
+                    {canSave && (
                         <>
                             <button onClick={handleSync} disabled={syncing}
                                 className="p-2.5 rounded-lg bg-black/30 hover:bg-black/50 text-white/30 hover:text-white/60 transition-all cursor-pointer border border-white/[0.08] backdrop-blur-sm"
@@ -919,12 +922,12 @@ const SnoozOverlay = () => {
                                                 const displayColor = wasWrong ? (picked1 ? match.team1_color : match.team2_color) : winnerColor
                                                 const otherTeamId = picked1 ? match.team2_id : match.team1_id
 
-                                                const Tag = hasAuth ? 'button' : 'div'
+                                                const Tag = canSave ? 'button' : 'div'
                                                 return (
                                                     <div key={person.id} className="flex-1 px-1.5 flex items-center justify-center">
                                                         <Tag
-                                                            {...(hasAuth ? { onClick: () => handlePick(match.id, person.id, otherTeamId) } : {})}
-                                                            className={`w-full py-2 rounded text-sm font-bold text-center truncate px-1.5 ${hasAuth ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                                                            {...(canSave ? { onClick: () => handlePick(match.id, person.id, otherTeamId) } : {})}
+                                                            className={`w-full py-2 rounded text-sm font-bold text-center truncate px-1.5 ${canSave ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                                                             style={{
                                                                 background: wasCorrect ? displayColor : wasWrong ? 'rgba(239,68,68,0.15)' : `${displayColor}30`,
                                                                 color: wasCorrect ? '#fff' : wasWrong ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.25)',
