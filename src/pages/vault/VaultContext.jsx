@@ -22,6 +22,8 @@ export function VaultProvider({ children }) {
   const [defOverrides, setDefOverrides] = useState({})
   const [binder, setBinder] = useState(null)
   const [binderCards, setBinderCards] = useState([])
+  const [vaultBanned, setVaultBanned] = useState(false)
+  const [accountTooNew, setAccountTooNew] = useState(null)
 
   useEffect(() => {
     if (!user) return
@@ -32,6 +34,8 @@ export function VaultProvider({ children }) {
       vaultService.getDefinitionOverrides().catch(() => ({ overrides: {} })),
     ]).then(([ccData, overridesData]) => {
       if (cancelled) return
+      if (ccData.vault_banned) { setVaultBanned(true); setLoading(false); return }
+      if (ccData.account_too_new) { setAccountTooNew(ccData.days_left); setLoading(false); return }
       setCollection(ccData.collection || [])
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
       setPackTypes(ccData.packTypes || [])
@@ -318,7 +322,7 @@ export function VaultProvider({ children }) {
   return (
     <VaultContext.Provider value={{
       collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
-      loaded, loading, getDefOverride,
+      loaded, loading, vaultBanned, accountTooNew, getDefOverride,
       buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshSalePacks, refreshBalance: passionCtx?.refreshBalance,
       claimEmberDaily: passionCtx?.claimEmberDaily,
       giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,

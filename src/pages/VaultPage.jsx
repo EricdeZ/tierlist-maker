@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { VaultProvider, useVault } from './vault/VaultContext'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
@@ -64,9 +64,18 @@ const TAB_COMPONENTS = {
 }
 
 export default function VaultPage() {
-    const { user, login, loading, hasPermission } = useAuth()
+    const { user, login, loading, hasPermission, vaultBanned } = useAuth()
+    const navigate = useNavigate()
+
+    useEffect(() => {
+        if (vaultBanned) navigate('/', { replace: true })
+    }, [vaultBanned, navigate])
 
     if (loading) {
+        return null
+    }
+
+    if (vaultBanned) {
         return null
     }
 
@@ -119,7 +128,7 @@ function VaultInner() {
     const { user } = useAuth()
     const { claimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, giftData, pendingTradeCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, inventory } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
@@ -178,6 +187,32 @@ function VaultInner() {
             </span>
         </div>
     )
+
+    if (vaultBanned) {
+        return (
+            <div className="compdeck">
+                <Navbar branding={branding} />
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <h1 className="text-2xl font-bold text-red-400 mb-2">Account Banned</h1>
+                    <p className="text-white/50">Your account has been banned from The Vault.</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (accountTooNew != null) {
+        return (
+            <div className="compdeck">
+                <Navbar branding={branding} />
+                <VaultHeroBanner />
+                <div className="relative z-1 flex flex-col items-center justify-center py-20 text-center">
+                    <h1 className="text-2xl font-bold text-white mb-2">Account Too New</h1>
+                    <p className="text-white/50">Your account must be at least 30 days old to access The Vault.</p>
+                    <p className="text-white/30 text-sm mt-2">Come back in {accountTooNew} day{accountTooNew !== 1 ? 's' : ''}.</p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="compdeck">

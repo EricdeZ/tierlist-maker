@@ -1,12 +1,6 @@
 -- 110-vault-dashboard.sql
 -- Vault Dashboard: card templates, drafts, asset library, permissions
 
--- New permissions
-INSERT INTO permissions (key, description) VALUES
-  ('vault_member', 'Access Vault Dashboard and card creator'),
-  ('vault_approve', 'Approve/reject card designs and delete assets')
-ON CONFLICT (key) DO NOTHING;
-
 -- Grant vault_member and vault_approve to Owner role
 INSERT INTO role_permissions (role_id, permission_key)
 SELECT r.id, p.key

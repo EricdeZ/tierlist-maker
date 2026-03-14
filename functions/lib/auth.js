@@ -33,7 +33,7 @@ export async function resolveUser(event) {
 
     const sql = getDB()
     const [realUser] = await sql`
-        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id, referral_code
+        SELECT id, discord_id, discord_username, discord_avatar, role, linked_player_id, referral_code, created_at
         FROM users WHERE id = ${payload.userId}
     `
     if (!realUser) return null

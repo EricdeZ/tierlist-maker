@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
     const [realUser, setRealUser] = useState(null)
     const [impersonateId, setImpersonateId] = useState(() => localStorage.getItem('impersonate_user_id'))
     const [notification, setNotification] = useState(null)
+    const [vaultBanned, setVaultBanned] = useState(false)
 
     // On mount: check URL for auth_token (from OAuth redirect)
     useEffect(() => {
@@ -73,6 +74,7 @@ export const AuthProvider = ({ children }) => {
             setPermissions({ global: [], byLeague: {} })
             setImpersonating(false)
             setRealUser(null)
+            setVaultBanned(false)
             setLoading(false)
             return
         }
@@ -94,6 +96,7 @@ export const AuthProvider = ({ children }) => {
                     setPermissions(data.permissions || { global: [], byLeague: {} })
                     setImpersonating(!!data.impersonating)
                     setRealUser(data.realUser || null)
+                    setVaultBanned(!!data.vaultBanned)
                 }
             } catch {
                 if (!cancelled) {
@@ -104,6 +107,7 @@ export const AuthProvider = ({ children }) => {
                     setPermissions({ global: [], byLeague: {} })
                     setImpersonating(false)
                     setRealUser(null)
+                    setVaultBanned(false)
                 }
             } finally {
                 if (!cancelled) setLoading(false)
@@ -169,6 +173,7 @@ export const AuthProvider = ({ children }) => {
         setPermissions({ global: [], byLeague: {} })
         setImpersonating(false)
         setRealUser(null)
+        setVaultBanned(false)
         setImpersonateId(null)
     }, [])
 
@@ -222,6 +227,7 @@ export const AuthProvider = ({ children }) => {
             realUser,
             startImpersonation,
             stopImpersonation,
+            vaultBanned,
             notification,
             clearNotification: () => setNotification(null),
         }}>

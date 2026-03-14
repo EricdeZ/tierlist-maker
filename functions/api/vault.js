@@ -34,6 +34,17 @@ const handler = async (event) => {
   }
 
   try {
+    // Ban check — guards all authenticated actions
+    const [ban] = await sql`SELECT 1 FROM cc_vault_bans WHERE user_id = ${user.id}`
+    if (ban) return { statusCode: 200, headers, body: JSON.stringify({ vault_banned: true }) }
+
+    // Account age check — 1 month minimum to prevent alt farming
+    const accountAgeMs = Date.now() - new Date(user.created_at).getTime()
+    if (accountAgeMs < 30 * 24 * 60 * 60 * 1000) {
+      const daysLeft = Math.ceil((30 * 24 * 60 * 60 * 1000 - accountAgeMs) / (1000 * 60 * 60 * 24))
+      return { statusCode: 200, headers, body: JSON.stringify({ account_too_new: true, days_left: daysLeft }) }
+    }
+
     if (event.httpMethod === 'GET') {
       switch (action) {
         case 'load': return await handleLoad(sql, user)

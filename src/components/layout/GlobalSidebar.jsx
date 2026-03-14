@@ -67,7 +67,7 @@ function SidebarLink({ to, icon: Icon, children, onClick, badge, active }) {
 
 export default function GlobalSidebar() {
     const { isOpen, open, close } = useSidebar()
-    const { user, linkedPlayer, login, logout, isAdmin, hasPermission, hasAnyPermission, avatarUrl } = useAuth()
+    const { user, linkedPlayer, login, logout, isAdmin, hasPermission, hasAnyPermission, avatarUrl, vaultBanned } = useAuth()
     const passion = usePassion()
     const location = useLocation()
     const sidebarRef = useRef(null)
@@ -365,7 +365,7 @@ export default function GlobalSidebar() {
                                         Fantasy Forge
                                     </span>
                                 </SidebarLink>
-                                {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && (
+                                {(FEATURE_FLAGS.CARD_CLASH_RELEASED || isAdmin || hasPermission('codex_edit')) && !vaultBanned && (
                                     <SidebarLink to="/vault" active={isActive('/vault')}>
                                         <span className="flex items-center gap-3">
                                             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">

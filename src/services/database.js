@@ -1283,6 +1283,12 @@ export const vaultAdminService = {
     async refreshBestGods() {
         return apiPost('vault-admin', { action: 'refresh-best-gods' }, {})
     },
+    async banUser(userId) {
+        return apiPost('vault-admin', { action: 'ban-user' }, { userId })
+    },
+    async unbanUser(userId) {
+        return apiPost('vault-admin', { action: 'unban-user' }, { userId })
+    },
 }
 
 // ─── Vault Dashboard (card creator) ───

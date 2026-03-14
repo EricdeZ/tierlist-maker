@@ -36,6 +36,9 @@ export const VAULT_KEYS = [
     'total_cards_owned', 'unique_gods_owned', 'unique_cards_owned', 'total_cores_earned',
     'legendary_cards_owned', 'epic_cards_owned', 'marketplace_volume', 'total_cores_spent',
     'bounty_cores_earned', 'best_bounty_reward',
+    'self_common_owned', 'self_uncommon_owned', 'self_rare_owned',
+    'self_epic_owned', 'self_legendary_owned', 'self_mythic_owned',
+    'self_rarities_owned',
 ]
 
 /**
@@ -947,6 +950,7 @@ export async function getVaultStats(sql, userId) {
         [totalCardsRow], [uniqueGodsRow], [uniqueCardsRow], [totalCoresRow],
         [legendaryOwnedRow], [epicOwnedRow], [marketVolumeRow], [coresSpentRow],
         [bEarnedRow], [bBestRow],
+        selfCardRows,
     ] = await Promise.all([
         // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
         sql`
@@ -1082,6 +1086,15 @@ export async function getVaultStats(sql, userId) {
             SELECT COALESCE(MAX(core_reward), 0)::integer as best FROM cc_bounties
             WHERE fulfilled_by = ${userId} AND status = 'completed'
         `,
+        // Self-cards owned by rarity (player cards of yourself)
+        sql`
+            SELECT c.rarity, COUNT(*)::integer as count
+            FROM cc_cards c
+            JOIN cc_player_defs pd ON c.def_id = pd.id
+            JOIN users u ON u.linked_player_id = pd.player_id AND u.id = ${userId}
+            WHERE c.owner_id = ${userId} AND c.card_type = 'player'
+            GROUP BY c.rarity
+        `,
     ])
 
     return {
@@ -1112,6 +1125,21 @@ export async function getVaultStats(sql, userId) {
         total_cores_spent: coresSpentRow?.total ?? 0,
         bounty_cores_earned: bEarnedRow?.total ?? 0,
         best_bounty_reward: bBestRow?.best ?? 0,
+        ...selfCardStatsByRarity(selfCardRows),
+    }
+}
+
+function selfCardStatsByRarity(rows) {
+    const byRarity = {}
+    for (const r of rows) byRarity[r.rarity] = r.count
+    return {
+        self_common_owned: byRarity.common ?? 0,
+        self_uncommon_owned: byRarity.uncommon ?? 0,
+        self_rare_owned: byRarity.rare ?? 0,
+        self_epic_owned: byRarity.epic ?? 0,
+        self_legendary_owned: byRarity.legendary ?? 0,
+        self_mythic_owned: byRarity.mythic ?? 0,
+        self_rarities_owned: Object.keys(byRarity).length,
     }
 }
 

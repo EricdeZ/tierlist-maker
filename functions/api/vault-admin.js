@@ -49,6 +49,8 @@ const handler = async (event) => {
         case 'freeze-season-stats':    return await handleFreezeSeasonStats(sql, body)
         case 'backfill-card-defs':     return await handleBackfillCardDefs(sql)
         case 'refresh-best-gods':     return await handleRefreshBestGods(sql)
+        case 'ban-user':           return await handleBanUser(sql, body, user)
+        case 'unban-user':         return await handleUnbanUser(sql, body)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -183,20 +185,24 @@ async function handleListUsers(sql, params) {
   let users
   if (search) {
     users = await sql`
-      SELECT s.*, u.discord_name,
-             (SELECT COUNT(*)::int FROM cc_cards WHERE owner_id = s.user_id) AS card_count
+      SELECT s.*, u.discord_username,
+             (SELECT COUNT(*)::int FROM cc_cards WHERE owner_id = s.user_id) AS card_count,
+             vb.banned_at
       FROM cc_stats s
       JOIN users u ON u.id = s.user_id
-      WHERE u.discord_name ILIKE ${'%' + search + '%'}
+      LEFT JOIN cc_vault_bans vb ON vb.user_id = s.user_id
+      WHERE u.discord_username ILIKE ${'%' + search + '%'}
       ORDER BY s.elo DESC
       LIMIT ${lim} OFFSET ${off}
     `
   } else {
     users = await sql`
-      SELECT s.*, u.discord_name,
-             (SELECT COUNT(*)::int FROM cc_cards WHERE owner_id = s.user_id) AS card_count
+      SELECT s.*, u.discord_username,
+             (SELECT COUNT(*)::int FROM cc_cards WHERE owner_id = s.user_id) AS card_count,
+             vb.banned_at
       FROM cc_stats s
       JOIN users u ON u.id = s.user_id
+      LEFT JOIN cc_vault_bans vb ON vb.user_id = s.user_id
       ORDER BY s.elo DESC
       LIMIT ${lim} OFFSET ${off}
     `
@@ -491,6 +497,30 @@ async function handleRefreshBestGods(sql) {
   }
 
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ checked: defs.length, updated }) }
+}
+
+// ═══ POST: Ban a user from the vault ═══
+async function handleBanUser(sql, body, admin) {
+  const { userId } = body
+  if (!userId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'userId required' }) }
+
+  await sql`
+    INSERT INTO cc_vault_bans (user_id, banned_by)
+    VALUES (${userId}, ${admin.id})
+    ON CONFLICT (user_id) DO NOTHING
+  `
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ POST: Unban a user from the vault ═══
+async function handleUnbanUser(sql, body) {
+  const { userId } = body
+  if (!userId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'userId required' }) }
+
+  await sql`DELETE FROM cc_vault_bans WHERE user_id = ${userId}`
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
 }
 
 // ═══ Formatter ═══

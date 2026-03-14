@@ -14,6 +14,8 @@ const primaryTabs = [
     { path: '/admin/matchreport', label: 'Report',      exact: false, permission: 'match_report' },
     { path: '/admin/schedule',    label: 'Schedule',    exact: false, permission: 'match_schedule' },
     { path: '/admin/discord',     label: 'Discord',     exact: false, permission: 'match_report' },
+    { path: '/vault-dashboard',  label: 'Vault Studio', exact: false, permission: 'vault_member' },
+    { path: '/codex',            label: 'Codex',        exact: false, permission: 'codex_edit' },
 ]
 
 const morePages = [

@@ -21,9 +21,9 @@ const handler = async (event) => {
     const impersonating = user.id !== realUser.id
 
     // If user has a linked player, fetch player details + their most recent division
+    const sql = getDB()
     let linkedPlayer = null
     if (user.linked_player_id) {
-        const sql = getDB()
         const [player] = await sql`
             SELECT p.id, p.name, p.slug, p.discord_name,
                    l.slug AS league_slug, d.slug AS division_slug
@@ -42,6 +42,9 @@ const handler = async (event) => {
     // Fetch RBAC permissions for the effective user (impersonated if applicable)
     const permissions = await getUserPermissions(user.id)
 
+    // Check vault ban status
+    const [banRow] = await sql`SELECT 1 FROM cc_vault_bans WHERE user_id = ${user.id}`
+
     const response = {
         user: {
             id: user.id,
@@ -53,6 +56,7 @@ const handler = async (event) => {
         },
         linkedPlayer,
         permissions,
+        vaultBanned: !!banRow,
     }
 
     if (impersonating) {

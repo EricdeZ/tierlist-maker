@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, Shield, BookOpen, User, UserCheck } from 'lucide-react'
+import { LogOut, Shield, BookOpen, Palette, User, UserCheck } from 'lucide-react'
 
 export default function UserMenu({ compact = false }) {
     const { user, linkedPlayer, login, logout, isAdmin, hasAnyPermission, hasPermission, avatarUrl } = useAuth()
@@ -113,6 +113,17 @@ export default function UserMenu({ compact = false }) {
                             >
                                 <BookOpen className="w-4 h-4 text-amber-400" />
                                 Codex Dashboard
+                            </Link>
+                        )}
+
+                        {hasPermission('vault_member') && (
+                            <Link
+                                to="/vault-dashboard"
+                                onClick={() => setOpen(false)}
+                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-(--color-text) hover:bg-white/5 transition-colors"
+                            >
+                                <Palette className="w-4 h-4 text-amber-400" />
+                                Vault Studio
                             </Link>
                         )}
                     </div>
