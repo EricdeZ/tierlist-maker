@@ -256,6 +256,25 @@ export default function SaleVendingMachine() {
   const [openResult, setOpenResult] = useState(null);
   const [error, setError] = useState('');
   const [zoomedSlot, setZoomedSlot] = useState(null);
+  const [cooldownEnd, setCooldownEnd] = useState(null);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+
+  // Countdown timer for vending cooldown
+  useEffect(() => {
+    if (!cooldownEnd) { setCooldownLeft(0); return; }
+    const tick = () => {
+      const remaining = Math.ceil((cooldownEnd - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setCooldownEnd(null);
+        setCooldownLeft(0);
+      } else {
+        setCooldownLeft(remaining);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [cooldownEnd]);
 
   const slotMap = useMemo(() => Object.fromEntries(slots.map(s => [s.code, s])), [slots]);
   const rowLetters = useMemo(() => [...new Set(slots.map(s => s.code[0]))], [slots]);
@@ -269,7 +288,7 @@ export default function SaleVendingMachine() {
   const canAfford = selectedPack ? emberBalance >= selectedCost && !selectedSoldOut : false;
 
   const handleKey = useCallback((key) => {
-    if (phase !== 'idle') return;
+    if (phase !== 'idle' || cooldownLeft > 0) return;
     setError('');
     if (key === 'CLR') {
       setInputCode('');
@@ -285,7 +304,7 @@ export default function SaleVendingMachine() {
   }, [phase, inputCode, rowLetters, colNumbers]);
 
   const handleInsertCoins = useCallback(() => {
-    if (!selectedPack || !canAfford || coinsInserted || phase !== 'idle') return;
+    if (!selectedPack || !canAfford || coinsInserted || phase !== 'idle' || cooldownLeft > 0) return;
     setCoinAnimating(true);
     setTimeout(() => {
       setCoinsInserted(true);
@@ -294,7 +313,7 @@ export default function SaleVendingMachine() {
   }, [selectedPack, canAfford, coinsInserted, phase]);
 
   const handleVend = useCallback(async () => {
-    if (!selectedSlot || !coinsInserted || phase !== 'idle') return;
+    if (!selectedSlot || !coinsInserted || phase !== 'idle' || cooldownLeft > 0) return;
     setPhase('dispensing');
     setDispensedSlot(selectedSlot);
 
@@ -306,17 +325,23 @@ export default function SaleVendingMachine() {
         setDispensedSlot(null);
         return;
       }
+      // Start 15s cooldown after successful purchase
+      setCooldownEnd(Date.now() + 15000);
       setTimeout(() => {
         setPhase('dropped');
         setPendingResult({ ...result, packType: selectedSlot.pack.packTypeId || selectedSlot.pack.id });
       }, 2000);
     } catch (err) {
+      // Handle server-side cooldown (429)
+      if (err.retryAfter) {
+        setCooldownEnd(Date.now() + err.retryAfter * 1000);
+      }
       setError(err.message || 'MACHINE ERROR');
       setPhase('idle');
       setCoinsInserted(false);
       setDispensedSlot(null);
     }
-  }, [selectedSlot, coinsInserted, phase, buySalePack]);
+  }, [selectedSlot, coinsInserted, phase, buySalePack, cooldownLeft]);
 
   const handleGrabPack = useCallback(() => {
     if (phase !== 'dropped' || !pendingResult) return;
@@ -335,6 +360,7 @@ export default function SaleVendingMachine() {
     if (error) return { line1: 'ERROR', line2: error, isError: true };
     if (phase === 'dispensing') return { line1: 'VENDING...', line2: 'PLEASE WAIT' };
     if (phase === 'dropped') return { line1: 'COMPLETE', line2: 'TAKE YOUR PACK' };
+    if (cooldownLeft > 0) return { line1: `COOLDOWN ${cooldownLeft}s`, line2: 'PLEASE WAIT' };
     if (!inputCode) return { line1: 'READY', line2: 'ENTER CODE' };
     if (inputCode.length === 1) return { line1: inputCode + '_', line2: 'ENTER NUMBER' };
     if (selectedSlot && !selectedPack) return { line1: inputCode, line2: 'EMPTY SLOT' };
@@ -449,9 +475,9 @@ export default function SaleVendingMachine() {
 
                 <div className="vm-actions">
                   <button
-                    className={`vm-coin-slot ${coinsInserted ? 'vm-coin-inserted' : ''} ${selectedPack && canAfford && !coinsInserted && phase === 'idle' ? 'vm-coin-ready' : ''}`}
+                    className={`vm-coin-slot ${coinsInserted ? 'vm-coin-inserted' : ''} ${selectedPack && canAfford && !coinsInserted && phase === 'idle' && !cooldownLeft ? 'vm-coin-ready' : ''}`}
                     onClick={handleInsertCoins}
-                    disabled={!selectedPack || !canAfford || coinsInserted || phase !== 'idle'}
+                    disabled={!selectedPack || !canAfford || coinsInserted || phase !== 'idle' || cooldownLeft > 0}
                   >
                     {coinAnimating && <img src={emberIcon} alt="" className="vm-coin-anim" />}
                     <div className="vm-coin-opening" />
@@ -461,9 +487,9 @@ export default function SaleVendingMachine() {
                   </button>
 
                   <button
-                    className={`vm-vend-btn ${coinsInserted && phase === 'idle' ? 'vm-vend-ready' : ''}`}
+                    className={`vm-vend-btn ${coinsInserted && phase === 'idle' && !cooldownLeft ? 'vm-vend-ready' : ''}`}
                     onClick={handleVend}
-                    disabled={!coinsInserted || phase !== 'idle'}
+                    disabled={!coinsInserted || phase !== 'idle' || cooldownLeft > 0}
                   >
                     VEND
                   </button>

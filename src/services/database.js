@@ -67,11 +67,15 @@ const apiPost = async (endpoint, params = {}, body = {}) => {
 
     if (!response.ok) {
         let message = `API call failed: ${response.statusText}`
+        let extra = {}
         try {
             const data = await response.json()
             if (data.error) message = data.error
+            extra = data
         } catch {}
-        throw new Error(message)
+        const err = new Error(message)
+        Object.assign(err, extra)
+        throw err
     }
 
     return response.json()

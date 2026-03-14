@@ -290,7 +290,23 @@ async function handleOpenPack(sql, user, body) {
 }
 
 // ═══ POST: Sale purchase — transactional stock + payment ═══
+const VENDING_COOLDOWN_SECONDS = 15
+
 async function handleSalePurchase(sql, user, saleId) {
+  // Enforce per-user cooldown between vending machine purchases
+  const [lastPurchase] = await sql`
+    SELECT created_at FROM ember_transactions
+    WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount < 0
+    ORDER BY created_at DESC LIMIT 1
+  `
+  if (lastPurchase) {
+    const elapsed = (Date.now() - new Date(lastPurchase.created_at).getTime()) / 1000
+    if (elapsed < VENDING_COOLDOWN_SECONDS) {
+      const retryAfter = Math.ceil(VENDING_COOLDOWN_SECONDS - elapsed)
+      return { statusCode: 429, headers, body: JSON.stringify({ error: `Vending machine cooling down — ${retryAfter}s`, retryAfter }) }
+    }
+  }
+
   const result = await transaction(async (tx) => {
     // Lock the sale row and verify availability
     const [sale] = await tx`
