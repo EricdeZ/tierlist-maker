@@ -35,6 +35,7 @@ const morePages = [
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },
     { path: '/admin/feedback',       label: 'Feedback',        permission: 'feedback_manage', globalOnly: true },
     { path: '/admin/card-preview',   label: 'Card Preview',    permission: 'permission_manage' },
+    { path: '/vault-dashboard',       label: 'Vault Studio',    permission: 'vault_member' },
     { path: '/admin/settings',       label: 'My Settings',     permission: null },
 ]
 

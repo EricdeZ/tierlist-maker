@@ -1058,8 +1058,8 @@ export const vaultService = {
     collectIncome() {
         return apiPost('vault', { action: 'collect-income' }, {})
     },
-    useConsumable(cardId) {
-        return apiPost('vault', { action: 'use-consumable' }, { cardId })
+    slotConsumable(cardId) {
+        return apiPost('vault', { action: 'slot-consumable' }, { cardId })
     },
     openInventoryPack(inventoryId) {
         return apiPost('vault', { action: 'open-inventory-pack' }, { inventoryId })
@@ -1282,6 +1282,59 @@ export const vaultAdminService = {
     },
     async refreshBestGods() {
         return apiPost('vault-admin', { action: 'refresh-best-gods' }, {})
+    },
+}
+
+// ─── Vault Dashboard (card creator) ───
+
+export const vaultDashboardService = {
+    // Templates
+    async getTemplates(params = {}) { return apiCall('vault-dashboard', { action: 'templates', ...params }) },
+    async getTemplate(id) { return apiCall('vault-dashboard', { action: 'template', id }) },
+    async saveTemplate(data) { return apiPost('vault-dashboard', { action: 'save-template' }, data) },
+
+    // Drafts
+    async getDrafts(params = {}) { return apiCall('vault-dashboard', { action: 'drafts', ...params }) },
+    async getDraft(id) { return apiCall('vault-dashboard', { action: 'draft', id }) },
+    async saveDraft(data) { return apiPost('vault-dashboard', { action: 'save-draft' }, data) },
+
+    // Review workflow
+    async submitForReview(type, id) { return apiPost('vault-dashboard', { action: 'submit-for-review' }, { type, id }) },
+    async approve(type, id) { return apiPost('vault-dashboard', { action: 'approve' }, { type, id }) },
+    async reject(type, id, reason) { return apiPost('vault-dashboard', { action: 'reject' }, { type, id, reason }) },
+    async archiveTemplate(id) { return apiPost('vault-dashboard', { action: 'archive-template' }, { id }) },
+
+    // Assets
+    async getAssets(params = {}) { return apiCall('vault-dashboard', { action: 'assets', ...params }) },
+    async getAsset(id) { return apiCall('vault-dashboard', { action: 'asset', id }) },
+    async deleteAsset(id) { return apiPost('vault-dashboard', { action: 'delete-asset' }, { id }) },
+
+    // Uploads (multipart — use fetch directly)
+    async uploadAsset(file, { name, category, tags }) {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('name', name || file.name)
+        form.append('category', category || 'background')
+        if (tags) form.append('tags', tags.join(','))
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch('/api/vault-dashboard-upload?action=upload-asset', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: form,
+        })
+        return res.json()
+    },
+
+    async exportThumbnail(file, type, id) {
+        const form = new FormData()
+        form.append('file', file)
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch(`/api/vault-dashboard-upload?action=export-thumbnail&type=${type}&id=${id}`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: form,
+        })
+        return res.json()
     },
 }
 

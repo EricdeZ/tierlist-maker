@@ -10,6 +10,7 @@ const RARITIES = {
   epic:      { name: 'Epic',      dropRate: 0.025, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
   legendary: { name: 'Legendary', dropRate: 0.003, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
   mythic:    { name: 'Mythic',    dropRate: 0.0005, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  full_art:  { name: 'Full Art',  dropRate: 0, color: '#d4af37', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'] },
 }
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']

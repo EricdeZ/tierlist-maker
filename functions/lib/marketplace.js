@@ -36,6 +36,15 @@ export async function createListing(sql, userId, { cardId, price }) {
     throw new Error('Card is in your Starting 5 lineup — remove it first')
   }
 
+  // Check card not slotted as Starting 5 consumable
+  const [inS5Consumable] = await sql`
+    SELECT user_id FROM cc_starting_five_state
+    WHERE consumable_card_id = ${cardId}
+  `
+  if (inS5Consumable) {
+    throw new Error('Card is slotted in Starting 5 — replace it first')
+  }
+
   // Check card not in binder
   const [bindered] = await sql`
     SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1
@@ -118,6 +127,7 @@ export async function buyListing(tx, buyerId, listingId) {
   await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ${listing.card_id}`
   await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ${listing.card_id}`
   await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ${listing.card_id}`
+  await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ${listing.card_id}`
 
   // Remove card from binder
   await tx`DELETE FROM cc_binder_cards WHERE card_id = ${listing.card_id}`

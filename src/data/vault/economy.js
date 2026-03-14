@@ -8,6 +8,7 @@ export const RARITIES = {
   epic:      { tier: 2, name: 'Epic',      holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'], dropRate: 0.025, color: '#a855f7', emberValue: 100, craftCost: 500, targetedCraftCost: 1000, dismantleValue: 8 },
   legendary: { tier: 1, name: 'Legendary', holoEffects: ['rainbow', 'secret', 'gold'],     dropRate: 0.003, color: '#ff8c00', emberValue: 300, craftCost: 1500, targetedCraftCost: 3000, dismantleValue: 25 },
   mythic:    { tier: 0, name: 'Mythic',    holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'], dropRate: 0.0005, color: '#ef4444', emberValue: 750, craftCost: 5000, targetedCraftCost: 10000, dismantleValue: 75 },
+  full_art:  { tier: 0, holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'], dropRate: 0, color: '#d4af37', emberValue: 0, dismantleValue: 0, craftCost: 0 },
 };
 
 // Pack types — costs are in Ember

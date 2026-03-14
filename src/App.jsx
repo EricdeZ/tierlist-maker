@@ -104,6 +104,13 @@ import CodexGods from "./pages/codex/CodexGods.jsx";
 import CodexImages from "./pages/codex/CodexImages.jsx";
 import CodexWordle from "./pages/codex/CodexWordle.jsx";
 
+// Vault Dashboard (card creator)
+const VaultDashboardLayout = lazy(() => import('./components/layout/VaultDashboardLayout'))
+const CardCreator = lazy(() => import('./pages/vault-dashboard/CardCreator'))
+const TemplatesPage = lazy(() => import('./pages/vault-dashboard/TemplatesPage'))
+const DraftsPage = lazy(() => import('./pages/vault-dashboard/DraftsPage'))
+const AssetsPage = lazy(() => import('./pages/vault-dashboard/AssetsPage'))
+
 function App() {
     return (
         <AuthProvider>
@@ -180,6 +187,18 @@ function App() {
                                 <Route path="gods" element={<CodexGods />} />
                                 <Route path="wordle" element={<CodexWordle />} />
                                 <Route path="images" element={<CodexImages />} />
+                            </Route>
+
+                            {/* Vault Dashboard (card creator studio) */}
+                            <Route path="vault-dashboard" element={
+                                <ProtectedRoute requiredPermission="vault_member" redirectTo="/">
+                                    <Suspense fallback={null}><VaultDashboardLayout /></Suspense>
+                                </ProtectedRoute>
+                            }>
+                                <Route index element={<Suspense fallback={null}><CardCreator /></Suspense>} />
+                                <Route path="templates" element={<Suspense fallback={null}><TemplatesPage /></Suspense>} />
+                                <Route path="drafts" element={<Suspense fallback={null}><DraftsPage /></Suspense>} />
+                                <Route path="assets" element={<Suspense fallback={null}><AssetsPage /></Suspense>} />
                             </Route>
 
                             {/* Passion pages */}
