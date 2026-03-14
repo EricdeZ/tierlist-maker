@@ -455,7 +455,8 @@ export async function slotConsumable(sql, userId, cardId) {
   if (listing) throw new Error('Card is listed on marketplace — unlist it first')
 
   const [inTrade] = await sql`
-    SELECT id FROM cc_trade_cards WHERE card_id = ${cardId}
+    SELECT tc.id FROM cc_trade_cards tc JOIN cc_trades t ON tc.trade_id = t.id
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') LIMIT 1
   `
   if (inTrade) throw new Error('Card is in an active trade — cancel the trade first')
 
