@@ -155,7 +155,11 @@ export const matchService = {
 
     async getById(matchId) {
         return apiCall('match-detail', { matchId })
-    }
+    },
+
+    async getMyUpcoming() {
+        return apiCall('matches', { action: 'my-upcoming' })
+    },
 }
 
 export const statsService = {
