@@ -237,6 +237,27 @@ export default function DebugTools() {
                 </div>
             </section>
 
+            {/* SAL Invite */}
+            <section className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
+                <h2 className="font-heading text-lg font-bold text-green-400 mb-4">
+                    SAL Invite
+                </h2>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-sm font-medium text-(--color-text)">Show SAL Invite Modal</div>
+                        <div className="text-xs text-(--color-text-secondary) mt-0.5">
+                            The promotional popup shown to Tier 5 players inviting them to join the Serpent Ascension League.
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-sal-invite'))}
+                        className="px-5 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold text-sm transition-colors shrink-0"
+                    >
+                        Trigger
+                    </button>
+                </div>
+            </section>
+
             {/* Current Passion State */}
             <section className="bg-(--color-secondary) rounded-xl border border-white/10 p-6 mb-6">
                 <h2 className="font-heading text-lg font-bold text-(--color-text) mb-4">

@@ -26,7 +26,7 @@ const handler = async (event) => {
     if (user.linked_player_id) {
         const [player] = await sql`
             SELECT p.id, p.name, p.slug, p.discord_name,
-                   l.slug AS league_slug, d.slug AS division_slug
+                   l.slug AS league_slug, d.slug AS division_slug, d.tier AS division_tier
             FROM players p
             LEFT JOIN league_players lp ON lp.player_id = p.id
             LEFT JOIN seasons s ON s.id = lp.season_id

@@ -12,6 +12,7 @@ import GlobalSidebar from './GlobalSidebar'
 import StreamWidget from '../StreamWidget'
 import WhatsNewModal from '../WhatsNewModal'
 import ChallengeNudge from '../ChallengeNudge'
+import SALInviteModal from '../SALInviteModal'
 import GlobalToast from '../GlobalToast'
 
 const AppLayout = () => {
@@ -58,6 +59,7 @@ const AppLayout = () => {
                 <ReportDataIssueModal />
                 <WhatsNewModal />
                 <ChallengeNudge />
+                <SALInviteModal />
                 <GlobalToast message={notification} onDone={clearNotification} />
             </div>
         </SidebarProvider>
