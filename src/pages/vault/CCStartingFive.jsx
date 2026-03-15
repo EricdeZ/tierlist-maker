@@ -1001,7 +1001,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
 }
 
 
-function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, getDefOverride, synergy, playerHoloType }) {
+function AttachmentSlot({ attachment, slotType, onAttach, onRemove, onSwap, size = 170, getDefOverride, synergy, playerHoloType }) {
   const attachSize = Math.round(size * 0.4)
 
   if (!attachment) {
@@ -1029,7 +1029,12 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, size = 170, 
 
   return (
     <div className="relative group">
-      <div style={{ width: attachSize, height: Math.round(attachSize * 88 / 63), overflow: 'hidden' }} className="relative">
+      <div
+        style={{ width: attachSize, height: Math.round(attachSize * 88 / 63), overflow: 'hidden' }}
+        className="relative cursor-pointer"
+        onClick={onSwap || onAttach}
+        title={`Swap ${slotType}`}
+      >
         <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: renderSize, filter: holoMismatch ? 'grayscale(0.7) brightness(0.5)' : undefined }}>
           <TradingCardHolo rarity={getHoloEffect(attachment.rarity)} role={(attachment.role || attachment.cardData?.role || 'adc').toUpperCase()} holoType={attachment.holoType || 'reverse'} size={renderSize}>
             <GameCard type={type} rarity={attachment.rarity} data={toGameCardData(attachment, cardOverride)} />

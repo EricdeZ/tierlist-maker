@@ -78,6 +78,10 @@ export default function CCTrading() {
   // Invite polling state
   const [invitePolling, setInvitePolling] = useState(null)
   const invitePollRef = useRef(null)
+  const invitePollingRef = useRef(invitePolling)
+  invitePollingRef.current = invitePolling
+  const passionCtxRef = useRef(passionCtx)
+  passionCtxRef.current = passionCtx
 
   const fetchPending = useCallback(async () => {
     try {
@@ -87,7 +91,7 @@ export default function CCTrading() {
       if (active) {
         setActiveTrade(active.id)
         setView('room')
-        if (invitePolling) {
+        if (invitePollingRef.current) {
           clearInterval(invitePollRef.current)
           setInvitePolling(null)
         }
@@ -95,7 +99,7 @@ export default function CCTrading() {
     } catch (err) {
       console.error('Failed to fetch pending trades:', err)
     }
-  }, [invitePolling])
+  }, [])
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -122,14 +126,14 @@ export default function CCTrading() {
   // Invite polling
   useEffect(() => {
     if (!invitePolling) return
-    const { startTime } = invitePolling
+    const { startTime, tradeId } = invitePolling
 
     invitePollRef.current = setInterval(async () => {
       const elapsed = Date.now() - startTime
       if (elapsed >= 45000) {
         clearInterval(invitePollRef.current)
         setInvitePolling(null)
-        try { await tradingService.cancel(invitePolling.tradeId) } catch {}
+        try { await tradingService.cancel(tradeId) } catch {}
         fetchPending()
         return
       }
@@ -165,14 +169,14 @@ export default function CCTrading() {
     }
   }
 
-  const handleTradeEnd = () => {
+  const handleTradeEnd = useCallback(() => {
     setActiveTrade(null)
     setView('inbox')
     fetchPending()
     refreshCollection()
-    passionCtx?.refreshBalance?.()
+    passionCtxRef.current?.refreshBalance?.()
     setPendingTradeCount?.(0)
-  }
+  }, [fetchPending, refreshCollection, setPendingTradeCount])
 
   const inviteTimeLeft = invitePolling
     ? Math.max(0, 45 - Math.floor((Date.now() - invitePolling.startTime) / 1000))

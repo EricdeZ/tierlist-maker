@@ -158,7 +158,13 @@ export default function CCDismantle() {
     let list = collection.filter(c => !lockedCardIds.has(c.id))
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
-    list.sort((a, b) => (a.godName || '').localeCompare(b.godName || ''))
+    list.sort((a, b) => {
+      const nameComp = (a.godName || '').localeCompare(b.godName || '')
+      if (nameComp !== 0) return nameComp
+      const teamComp = (a.cardData?.teamName || '').localeCompare(b.cardData?.teamName || '')
+      if (teamComp !== 0) return teamComp
+      return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+    })
     return list
   }, [collection, filterRarity, filterType, lockedCardIds])
 

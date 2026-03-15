@@ -10,7 +10,7 @@ import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy, Eye, EyeOff, ChevronDown, Search, X } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const BATCH_SIZE = 50
@@ -86,6 +86,8 @@ export default function CCCollection() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
+  const [recentPulls, setRecentPulls] = useState([])
+  const [recentOpen, setRecentOpen] = useState(false)
   const searchTimerRef = useRef(null)
   const loadedSetsRef = useRef(new Set())
 
@@ -110,6 +112,7 @@ export default function CCCollection() {
         const [ownedData, overridesData] = await Promise.all([ownedPromise, overridesPromise])
         setCatalog(cat)
         setOwned(ownedData)
+        setRecentPulls(ownedData.recentPulls || [])
         setDefOverrides(overridesData.overrides || {})
       } catch {}
       setLoading(false)
@@ -365,6 +368,18 @@ export default function CCCollection() {
           )}
         </div>
       </div>
+
+      {recentPulls.length > 0 && (
+        <RecentPulls
+          pulls={recentPulls}
+          open={recentOpen}
+          onToggle={() => setRecentOpen(o => !o)}
+          defOverrides={defOverrides}
+          applyOverride={applyOverride}
+          onZoom={setZoomedCard}
+          owned={owned}
+        />
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Sidebar — horizontal pills on mobile, vertical on desktop */}
@@ -718,6 +733,97 @@ function RarityFilterBar({ rarityFilter, setRarityFilter }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ═══ Recent Pulls ═══
+
+function RecentPulls({ pulls, open, onToggle, applyOverride, onZoom, owned }) {
+  return (
+    <div className="mb-4">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 w-full text-left px-1 py-1.5 group cursor-pointer"
+      >
+        {open
+          ? <ChevronDown className="w-4 h-4 text-[var(--cd-text-dim)] group-hover:text-[var(--cd-text-mid)] transition-colors" />
+          : <ChevronRight className="w-4 h-4 text-[var(--cd-text-dim)] group-hover:text-[var(--cd-text-mid)] transition-colors" />
+        }
+        <Clock className="w-3.5 h-3.5 text-[var(--cd-text-dim)]" />
+        <span className="text-sm font-bold text-[var(--cd-text-mid)] cd-head">Recent Pulls</span>
+        <span className="text-xs text-[var(--cd-text-dim)] cd-num">{pulls.length}</span>
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-3 justify-center lg:justify-start mt-2 px-1">
+          {pulls.map(card => (
+            <RecentPullCard key={card.id} card={card} applyOverride={applyOverride} onZoom={onZoom} owned={owned} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecentPullCard({ card, applyOverride, onZoom, owned }) {
+  if (card.cardType === 'player') {
+    const isFirstEdition = card.isFirstEdition || false
+    const ownedRarities = owned?.playerCards?.[card.defId] || []
+    const handleZoom = () => onZoom({
+      playerCard: {
+        defId: card.defId,
+        playerName: card.playerName,
+        teamName: card.teamName,
+        teamColor: card.teamColor,
+        role: card.role,
+        avatarUrl: card.avatarUrl,
+        bestGodName: card.bestGodName || null,
+        bestGod: card.bestGodName ? { name: card.bestGodName } : null,
+        isConnected: card.isConnected,
+        isFirstEdition,
+        rarity: card.rarity,
+        leagueName: card.leagueSlug?.toUpperCase() || '',
+        divisionName: `Division ${card.divisionTier}`,
+        ownedRarities,
+      },
+      canSell: true,
+    })
+    return (
+      <div className="flex flex-col items-center card-zoomable" onClick={handleZoom}>
+        <TradingCard
+          playerName={card.playerName}
+          teamName={card.teamName}
+          teamColor={card.teamColor}
+          role={card.role}
+          avatarUrl={card.avatarUrl}
+          rarity={card.rarity}
+          leagueName={card.leagueSlug?.toUpperCase() || ''}
+          divisionName={`Division ${card.divisionTier}`}
+          bestGod={card.bestGodName ? { name: card.bestGodName } : null}
+          isConnected={card.isConnected}
+          isFirstEdition={isFirstEdition}
+          size={CARD_SIZE}
+        />
+      </div>
+    )
+  }
+
+  // Game card
+  const dataMap = DATA_MAPS[card.cardType]
+  const identifier = card.godId?.replace(/^(item|consumable)-/, '') || card.godId
+  const fullData = dataMap?.get(card.cardType === 'god' ? card.godId : identifier)
+  if (!fullData) return null
+  const data = applyOverride(card.cardType, card.cardType === 'god' ? card.godId : identifier, fullData)
+
+  return (
+    <div
+      className="flex flex-col items-center card-zoomable"
+      onClick={() => onZoom({
+        gameCard: { type: card.cardType, rarity: card.rarity, data, identifier: card.godId, ownedRarities: owned?.gameCards?.[`${card.cardType}:${card.godId}`] || [] },
+        canSell: true,
+      })}
+    >
+      <GameCard type={card.cardType} rarity={card.rarity} data={data} size={CARD_SIZE} />
     </div>
   )
 }

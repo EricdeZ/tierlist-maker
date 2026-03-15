@@ -3,11 +3,13 @@ import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { marketplaceService } from '../../services/database'
-import { RARITIES } from '../../data/vault/economy'
+import { RARITIES, STARTING_FIVE_RATES, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../data/vault/economy'
+import passionCoin from '../../assets/passion/passion.png'
+import emberIcon from '../../assets/ember.png'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
-import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
@@ -45,6 +47,82 @@ function buildCardData(card, override) {
     ...d,
     metadata: override || undefined,
   }
+}
+
+function getCardEffect(card) {
+  const type = card.cardType || 'god'
+  const r = card.rarity
+  const ht = card.holoType
+
+  if (type === 'player') {
+    let passion = 0, cores = 0
+    if (ht === 'full') {
+      passion = STARTING_FIVE_RATES.full?.passion?.[r] || 0
+      cores = STARTING_FIVE_RATES.full?.cores?.[r] || 0
+    } else if (ht === 'holo') {
+      passion = STARTING_FIVE_RATES.holo?.[r] || 0
+    } else if (ht === 'reverse') {
+      cores = STARTING_FIVE_RATES.reverse?.[r] || 0
+    }
+    if (!passion && !cores) return null
+    return { passion, cores, isFlat: true }
+  }
+
+  if (type === 'god' || type === 'item') {
+    const bonuses = ATTACHMENT_BONUSES[type]
+    if (!bonuses) return null
+    const pB = bonuses.passion[r] || 0
+    const cB = bonuses.cores[r] || 0
+    let passionPct = 0, coresPct = 0
+    if (ht === 'holo') passionPct = Math.round(pB * 100)
+    else if (ht === 'reverse') coresPct = Math.round(cB * 100)
+    else if (ht === 'full') {
+      passionPct = Math.round(pB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+      coresPct = Math.round(cB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+    }
+    if (!passionPct && !coresPct) return null
+    return { passion: passionPct, cores: coresPct, isFlat: false }
+  }
+
+  if (type === 'consumable') {
+    const consumableId = card.cardData?.consumableId
+    const total = CONSUMABLE_SLOT_SCALING[r] || 0
+    const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 }
+    const passionPct = Math.round(total * spread.passion * 100)
+    const coresPct = Math.round(total * spread.cores * 100)
+    if (!passionPct && !coresPct) return null
+    return { passion: passionPct, cores: coresPct, isFlat: false }
+  }
+
+  return null
+}
+
+function CardEffectDisplay({ card }) {
+  const effect = getCardEffect(card)
+  if (!effect) return null
+
+  return (
+    <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold cd-num">
+      {effect.passion > 0 && (
+        <span className="flex items-center gap-0.5 text-amber-400">
+          <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+          +{effect.isFlat
+            ? `${effect.passion % 1 === 0 ? effect.passion : effect.passion.toFixed(1)}/d`
+            : `${effect.passion}%`
+          }
+        </span>
+      )}
+      {effect.cores > 0 && (
+        <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+          <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+          +{effect.isFlat
+            ? `${effect.cores % 1 === 0 ? effect.cores : effect.cores.toFixed(1)}/d`
+            : `${effect.cores}%`
+          }
+        </span>
+      )}
+    </div>
+  )
 }
 
 function MarketCard({ card, size }) {
@@ -108,6 +186,8 @@ export default function CCMarketplace() {
   const [holoType, setHoloType] = useState([])
   const [role, setRole] = useState([])
   const [sort, setSort] = useState('newest')
+
+  const [showStats, setShowStats] = useState(() => localStorage.getItem('cc-market-stats') === '1')
 
   // Modals
   const [buyModal, setBuyModal] = useState(null)
@@ -335,6 +415,8 @@ export default function CCMarketplace() {
           onZoom={handleCardZoom}
           userId={user?.id}
           onRefresh={fetchListings}
+          showStats={showStats}
+          setShowStats={setShowStats}
         />
       )}
 
@@ -394,6 +476,7 @@ function BrowseView({
   role, toggleRole,
   sort, setSort,
   setPage, onBuy, onZoom, userId, onRefresh,
+  showStats, setShowStats,
 }) {
   return (
     <>
@@ -512,6 +595,17 @@ function BrowseView({
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
+        <button
+          onClick={() => setShowStats(s => { const next = !s; localStorage.setItem('cc-market-stats', next ? '1' : '0'); return next })}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all cursor-pointer text-[10px] font-bold uppercase tracking-wider ${
+            showStats
+              ? 'border-amber-400/40 text-amber-400 bg-amber-400/10'
+              : 'border-white/10 text-white/30 hover:text-white/50'
+          }`}
+        >
+          <BarChart3 className="w-3 h-3" />
+          Show Stats
+        </button>
       </div>
 
       {loading ? (
@@ -533,6 +627,7 @@ function BrowseView({
               onBuy={() => onBuy(listing)}
               onZoom={() => onZoom(listing.card)}
               isSelf={listing.sellerId === userId}
+              showStats={showStats}
             />
           ))}
         </div>
@@ -566,7 +661,7 @@ function BrowseView({
 // ═══════════════════════════════════════
 // Listing Card
 // ═══════════════════════════════════════
-function ListingCard({ listing, onBuy, onZoom, isSelf }) {
+function ListingCard({ listing, onBuy, onZoom, isSelf, showStats }) {
   const { card } = listing
 
   return (
@@ -574,6 +669,8 @@ function ListingCard({ listing, onBuy, onZoom, isSelf }) {
       <div className="card-zoomable" onClick={onZoom}>
         <MarketCard card={card} size={BROWSE_CARD_SIZE} />
       </div>
+
+      {showStats && <div className="mt-1"><CardEffectDisplay card={card} /></div>}
 
       <div className="w-full mt-2 space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -693,6 +790,16 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
 // ═══════════════════════════════════════
 function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
   const [filter, setFilter] = useState('')
+  const [rarity, setRarity] = useState([])
+  const [cardType, setCardType] = useState([])
+  const [holoType, setHoloType] = useState([])
+  const [role, setRole] = useState([])
+
+  const toggleRarity = (r) => setRarity(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  const toggleCardType = (t) => setCardType(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  const toggleHoloType = (h) => setHoloType(prev => prev.includes(h) ? prev.filter(x => x !== h) : [...prev, h])
+  const toggleRole = (r) => setRole(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  const hasFilters = rarity.length > 0 || cardType.length > 0 || holoType.length > 0 || role.length > 0
 
   const filtered = useMemo(() => {
     let list = cards
@@ -700,8 +807,18 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
       const q = filter.toLowerCase()
       list = list.filter(c => c.godName.toLowerCase().includes(q))
     }
-    return list.slice().sort((a, b) => (a.godName || '').localeCompare(b.godName || ''))
-  }, [cards, filter])
+    if (rarity.length) list = list.filter(c => rarity.includes(c.rarity))
+    if (cardType.length) list = list.filter(c => cardType.includes(c.cardType || 'god'))
+    if (holoType.length) list = list.filter(c => holoType.includes(c.holoType))
+    if (role.length) list = list.filter(c => role.includes(c.role))
+    return list.slice().sort((a, b) => {
+      const nameComp = (a.godName || '').localeCompare(b.godName || '')
+      if (nameComp !== 0) return nameComp
+      const teamComp = (a.cardData?.teamName || '').localeCompare(b.cardData?.teamName || '')
+      if (teamComp !== 0) return teamComp
+      return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+    })
+  }, [cards, filter, rarity, cardType, holoType, role])
 
   if (activeCount >= MAX_LISTINGS) {
     return (
@@ -730,9 +847,83 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head">Rarity:</span>
+        {RARITY_ORDER.map(r => (
+          <button
+            key={r}
+            onClick={() => toggleRarity(r)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              rarity.includes(r)
+                ? 'border-current bg-current/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+            style={rarity.includes(r) ? { color: RARITIES[r].color } : {}}
+          >
+            {r}
+          </button>
+        ))}
+
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Type:</span>
+        {CARD_TYPES.map(t => (
+          <button
+            key={t}
+            onClick={() => toggleCardType(t)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              cardType.includes(t)
+                ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Holo:</span>
+        {HOLO_TYPES.map(h => (
+          <button
+            key={h}
+            onClick={() => toggleHoloType(h)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              holoType.includes(h)
+                ? 'border-[var(--cd-magenta)]/50 text-[var(--cd-magenta)] bg-[var(--cd-magenta)]/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {HOLO_TYPE_LABELS[h]}
+          </button>
+        ))}
+
+        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Role:</span>
+        {ROLES.map(r => (
+          <button
+            key={r}
+            onClick={() => toggleRole(r)}
+            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+              role.includes(r)
+                ? 'border-amber-400/50 text-amber-400 bg-amber-400/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+
+        {hasFilters && (
+          <button
+            onClick={() => { setRarity([]); setCardType([]); setHoloType([]); setRole([]) }}
+            className="text-xs text-white/30 hover:text-white/50 ml-2 cursor-pointer"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <div className="text-xs text-white/30 mb-3 cd-head">{filtered.length} card{filtered.length !== 1 ? 's' : ''}</div>
+
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-white/30">
-          <p className="text-sm">No cards available to sell</p>
+          <p className="text-sm">{hasFilters || filter ? 'No cards match your filters' : 'No cards available to sell'}</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-3 justify-center sm:justify-start">

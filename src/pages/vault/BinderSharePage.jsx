@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { vaultService } from '../../services/database'
 import GameCard from './components/GameCard'
@@ -86,12 +86,40 @@ export default function BinderSharePage() {
   const [spread, setSpread] = useState(0)
   const [showCover, setShowCover] = useState(true)
   const [flipping, setFlipping] = useState(null)
+  const [mobilePage, setMobilePage] = useState(1)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  )
+  const touchStartX = useRef(null)
 
   useEffect(() => {
     vaultService.getBinderView(token)
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message || 'Failed to load binder'); setLoading(false) })
   }, [token])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  const handleTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX
+  }, [])
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(dx) < 50) return
+    if (dx < 0 && mobilePage < PAGES) setMobilePage(p => p + 1)
+    if (dx > 0) {
+      if (mobilePage > 1) setMobilePage(p => p - 1)
+      else setShowCover(true)
+    }
+  }, [mobilePage])
 
   const cardsBySlot = useMemo(() => {
     if (!data) return {}
@@ -195,7 +223,9 @@ export default function BinderSharePage() {
             )}
             <span className="text-white/50 text-sm">{data.owner.username}'s</span>
             <span className="text-white/70 text-sm font-bold cd-head tracking-wider">{data.binder.name}</span>
-            <span className="text-white/20 text-xs ml-auto">Pages {leftPage}-{rightPage}</span>
+            <span className="text-white/20 text-xs ml-auto">
+              {isMobile ? `Page ${mobilePage} of ${PAGES}` : `Pages ${leftPage}-${rightPage}`}
+            </span>
           </div>
         )}
 
@@ -226,23 +256,60 @@ export default function BinderSharePage() {
               </div>
             )}
           </div>
+
+          {/* Mobile: single page with swipe */}
+          <div
+            className="binder-mobile-page"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <ReadOnlyPage
+              page={mobilePage}
+              side="left"
+              color={color}
+              cardsBySlot={cardsBySlot}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center justify-center gap-6 mt-4">
-          <button onClick={flipBackward} disabled={flipping} className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30">
-            <ChevronLeft size={18} />
-            <span className="text-xs cd-head tracking-wider">{spread === 0 ? 'Cover' : 'Prev'}</span>
-          </button>
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: 5 }, (_, i) => (
-              <button key={i} onClick={() => { if (!flipping) setSpread(i) }} className={`w-2 h-2 rounded-full transition-all cursor-pointer ${i === spread ? 'bg-[var(--cd-cyan)] scale-125' : 'bg-white/15 hover:bg-white/30'}`} />
-            ))}
+        {isMobile ? (
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <button
+              onClick={() => { if (mobilePage > 1) setMobilePage(p => p - 1); else setShowCover(true) }}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer"
+            >
+              <ChevronLeft size={18} />
+              <span className="text-xs cd-head tracking-wider">{mobilePage === 1 ? 'Cover' : 'Prev'}</span>
+            </button>
+            <span className="text-xs text-white/30 cd-head tracking-wider tabular-nums">
+              {mobilePage} / {PAGES}
+            </span>
+            <button
+              onClick={() => mobilePage < PAGES && setMobilePage(p => p + 1)}
+              disabled={mobilePage >= PAGES}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30"
+            >
+              <span className="text-xs cd-head tracking-wider">Next</span>
+              <ChevronRight size={18} />
+            </button>
           </div>
-          <button onClick={flipForward} disabled={spread >= 4 || flipping} className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30">
-            <span className="text-xs cd-head tracking-wider">Next</span>
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center justify-center gap-6 mt-4">
+            <button onClick={flipBackward} disabled={flipping} className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30">
+              <ChevronLeft size={18} />
+              <span className="text-xs cd-head tracking-wider">{spread === 0 ? 'Cover' : 'Prev'}</span>
+            </button>
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: 5 }, (_, i) => (
+                <button key={i} onClick={() => { if (!flipping) setSpread(i) }} className={`w-2 h-2 rounded-full transition-all cursor-pointer ${i === spread ? 'bg-[var(--cd-cyan)] scale-125' : 'bg-white/15 hover:bg-white/30'}`} />
+              ))}
+            </div>
+            <button onClick={flipForward} disabled={spread >= 4 || flipping} className="flex items-center gap-1 px-3 py-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all cursor-pointer disabled:opacity-30">
+              <span className="text-xs cd-head tracking-wider">Next</span>
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,0 +1,133 @@
+================================================================================
+OFFENSE FILE: semajwf / Semaj
+Generated: 2026-03-14T10:48:25
+================================================================================
+
+SUMMARY
+----------------------------------------
+semajwf (player: Semaj, team: The Crew) operates 3 dedicated feeder accounts that
+exist solely to funnel gifts. All 3 alts opened only the 4 free starter packs, sent
+all gifts exclusively to semajwf, received nothing, did no trades, no battles.
+
+- godlike01_: fresh Discord (2026-03-12), 36 gifts to semajwf
+- v2monolith: fresh Discord (2026-03-13), 18 gifts to semajwf
+- maryanne8968: older Discord (2023-02-07) repurposed, 21 gifts to semajwf
+
+Total: 75 gifts funneled to semajwf from 3 single-purpose accounts.
+semajwf has 986 cards and 208 packs from the operation.
+
+MAIN ACCOUNT
+----------------------------------------
+  Username:        semajwf
+  User ID:         299
+  Discord ID:      1409826547019415576
+  Discord Created: 2025-08-26
+  Site Joined:     2026-02-26
+  Player:          Semaj
+  Teams:           The Crew
+  Packs Opened:    208
+  Cards Owned:     986
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  75 (3 unique senders)
+  Trades Done:     0
+  Market Sales:    0
+  Market Buys:     5
+
+ALT ACCOUNTS (3)
+----------------------------------------
+  Username:        godlike01_
+  User ID:         1676
+  Discord ID:      1481717104276144270
+  Discord Created: 2026-03-12
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     24
+  Battles:         0
+  Gifts Sent:      36 (1 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     0
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        v2monolith
+  User ID:         1904
+  Discord ID:      1482029736677867640
+  Discord Created: 2026-03-13
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     24
+  Battles:         0
+  Gifts Sent:      18 (1 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     0
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        maryanne8968
+  User ID:         1939
+  Discord ID:      1072372204836233236
+  Discord Created: 2023-02-07
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     24
+  Battles:         0
+  Gifts Sent:      21 (1 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     0
+  Market Sales:    0
+  Market Buys:     0
+
+
+GIFT EVIDENCE
+----------------------------------------
+
+  semajwf [299] gift activity:
+    <- godlike01_ [1676]: 36x (2026-03-12 to 2026-03-14)
+    <- maryanne8968 [1939]: 21x (2026-03-13 to 2026-03-14)
+    <- v2monolith [1904]: 18x (2026-03-13 to 2026-03-13)
+    -> vayu17 [230]: 1x (2026-03-12 to 2026-03-12)
+    -> primexxi [346]: 1x (2026-03-12 to 2026-03-12)
+    -> godsend. [62]: 1x (2026-03-12 to 2026-03-12)
+    -> azteck. [69]: 1x (2026-03-12 to 2026-03-12)
+    -> monkeybrother. [371]: 1x (2026-03-12 to 2026-03-12)
+
+  godlike01_ [1676] gift activity:
+    -> semajwf [299]: 36x (2026-03-12 to 2026-03-14)
+
+  v2monolith [1904] gift activity:
+    -> semajwf [299]: 18x (2026-03-13 to 2026-03-13)
+
+  maryanne8968 [1939] gift activity:
+    -> semajwf [299]: 21x (2026-03-13 to 2026-03-14)
+
+TRADE EVIDENCE
+----------------------------------------
+
+MARKETPLACE EVIDENCE
+----------------------------------------
+
+  semajwf [299] marketplace:
+    BUY zxnithhhh [81]: 1x avg 26.0 cores (total: 26)
+    BUY pineappleislazy [144]: 1x avg 137.0 cores (total: 137)
+    BUY tekknoz [174]: 1x avg 120.0 cores (total: 120)
+    BUY physicsdzn [504]: 1x avg 15.0 cores (total: 15)
+    BUY pieflavor28 [1225]: 1x avg 6.0 cores (total: 6)
+
+TIMELINE
+----------------------------------------
+  2026-02-26 21:33:23  semajwf [299] joined site (Discord created 2025-08-26)
+  2026-03-12 17:17:32  godlike01_ [1676] joined site (Discord created 2026-03-12)
+  2026-03-12 18:19:42  godlike01_ first gift to semajwf: 36 total
+  2026-03-13 13:59:36  v2monolith [1904] joined site (Discord created 2026-03-13)
+  2026-03-13 15:01:32  v2monolith first gift to semajwf: 18 total
+  2026-03-13 16:49:53  maryanne8968 [1939] joined site (Discord created 2023-02-07)
+  2026-03-13 17:51:46  maryanne8968 first gift to semajwf: 21 total
+
+================================================================================

@@ -32,25 +32,26 @@ const handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) }
     }
 
-    // Admin delete action
-    if (body.action === 'delete') {
+    // Admin delete action (single or bulk)
+    if (body.action === 'delete' || body.action === 'delete-bulk') {
         const admin = await requirePermission(event, 'feedback_manage')
         if (!admin) {
             return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
         }
 
-        if (!body.id) {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing feedback id' }) }
+        const ids = body.action === 'delete-bulk' ? body.ids : body.id ? [body.id] : null
+        if (!ids || !ids.length) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing feedback id(s)' }) }
         }
 
         const sql = getDB()
-        await sql`DELETE FROM feedback WHERE id = ${body.id}`
+        await sql`DELETE FROM feedback WHERE id = ANY(${ids})`
 
         await logAudit(sql, admin, {
             action: 'delete-feedback',
             endpoint: 'feedback',
             targetType: 'feedback',
-            targetId: body.id,
+            targetId: ids.length === 1 ? ids[0] : ids.join(','),
         })
 
         return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }

@@ -26,6 +26,11 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
     () => RARITY_ORDER.filter(r => ownedRarities.includes(r)),
     [ownedRarities]
   )
+  const rarityCounts = useMemo(() => {
+    const counts = {}
+    for (const r of ownedRarities) counts[r] = (counts[r] || 0) + 1
+    return counts
+  }, [ownedRarities])
   const [displayRarity, setDisplayRarity] = useState(gameCard?.rarity || playerCard?.rarity || 'common')
 
   // Sell form state
@@ -165,16 +170,17 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
         </div>
 
         {/* Rarity switcher */}
-        {sortedOwned.length > 1 && (
-          <div className="mt-2 flex gap-1.5 justify-center">
+        {ownedRarities.length > 1 && (
+          <div className="mt-2 flex gap-1.5 justify-center flex-wrap">
             {sortedOwned.map(r => {
               const ri = RARITIES[r]
               const active = displayRarity === r
+              const count = rarityCounts[r] || 1
               return (
                 <button
                   key={r}
                   onClick={() => { setDisplayRarity(r); setSellRarity(null) }}
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cd-head border transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cd-head border transition-all cursor-pointer ${
                     active
                       ? 'border-current bg-current/10'
                       : 'border-white/10 text-white/30 hover:text-white/60'
@@ -182,6 +188,17 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
                   style={active ? { color: ri?.color, borderColor: `${ri?.color}44` } : undefined}
                 >
                   {ri?.name || r}
+                  {count > 1 && (
+                    <span
+                      className="cd-num text-[9px] rounded-full px-1 py-px leading-none"
+                      style={active
+                        ? { backgroundColor: `${ri?.color}25`, color: ri?.color }
+                        : { backgroundColor: 'rgba(255,255,255,0.08)', color: 'inherit' }
+                      }
+                    >
+                      x{count}
+                    </span>
+                  )}
                 </button>
               )
             })}

@@ -706,6 +706,9 @@ export const feedbackService = {
     async remove(id) {
         return apiPost('feedback', {}, { action: 'delete', id })
     },
+    async removeBulk(ids) {
+        return apiPost('feedback', {}, { action: 'delete-bulk', ids })
+    },
 }
 
 export const tierlistFeedService = {

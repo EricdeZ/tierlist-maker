@@ -38,7 +38,10 @@ export const PassionProvider = ({ children }) => {
             setLastDailyClaim(data.lastDailyClaim || null)
             setClaimableCount(data.claimableCount || 0)
             setInDiscord(!!data.inDiscord)
-            if (data.ember) setEmber(data.ember)
+            if (data.ember) setEmber(prev => {
+                if (prev.balance === data.ember.balance && prev.currentStreak === data.ember.currentStreak && prev.canClaimDaily === data.ember.canClaimDaily && prev.lastDailyClaim === data.ember.lastDailyClaim) return prev
+                return data.ember
+            })
         } catch (err) {
             console.error('Failed to fetch passion balance:', err)
         }

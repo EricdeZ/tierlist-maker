@@ -157,4 +157,5 @@ scripts/video-generator/output/
 scripts/video-generator/.tmp/
 
 .playwright-mcp/
+.superpowers/
 sketches/

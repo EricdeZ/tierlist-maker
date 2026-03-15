@@ -1,0 +1,393 @@
+================================================================================
+OFFENSE FILE: rimcleaner / RimCleaner
+Generated: 2026-03-14T10:47:58
+================================================================================
+
+SUMMARY
+----------------------------------------
+rimcleaner (player: RimCleaner, teams: The Crew, Nat 20) is the largest alt operator
+detected. 7 confirmed alt accounts, plus likely ownership of the drstimmy0404 cluster
+(4 accounts). All alts have fresh Discord accounts created March 12-14, 2026 — the same
+days they joined the site. None have player links or battle activity.
+
+Key patterns:
+- itsyahboytimbo: 282 trades exclusively with rimcleaner, starter packs only
+- willyfrom/billyfrom/gillyfrom: naming pattern alts, all gift to rimcleaner + friends
+- twarven./werethy: fresh Discords, trade-wash with itzwitzx, gift to rimcleaner
+- drstimmy0404 cluster: 4 paired accounts doing trade-washing, feeds into rimcleaner
+- rimcleaner has 468 packs opened but only 30 cards — everything traded/sold out
+
+The *from accounts also gift to mist309, zapzy, zxnithhhh, itzwitzx, azureeffectz,
+kazar5. These recipients are real players who benefit from the scheme but may not be
+the ones running the alts.
+
+MAIN ACCOUNT
+----------------------------------------
+  Username:        rimcleaner
+  User ID:         308
+  Discord ID:      528037922188951552
+  Discord Created: 2018-12-28
+  Site Joined:     2026-02-26
+  Player:          RimCleaner
+  Teams:           Nat 20, The Crew
+  Packs Opened:    468
+  Cards Owned:     30
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  12 (12 unique senders)
+  Trades Done:     394
+  Market Sales:    12
+  Market Buys:     9
+
+ALT ACCOUNTS (10)
+----------------------------------------
+  Username:        itsyahboytimbo
+  User ID:         1559
+  Discord ID:      1179682037200859198
+  Discord Created: 2023-11-30
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     0
+  Battles:         0
+  Gifts Sent:      0 (0 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     282
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        willyfrom
+  User ID:         1621
+  Discord ID:      1481671088797909032
+  Discord Created: 2026-03-12
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    181
+  Cards Owned:     0
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  2 (2 unique senders)
+  Trades Done:     77
+  Market Sales:    15
+  Market Buys:     4
+
+  Username:        billyfrom
+  User ID:         1893
+  Discord ID:      1482003213090816122
+  Discord Created: 2026-03-13
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    47
+  Cards Owned:     75
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     1
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        gillyfrom
+  User ID:         1960
+  Discord ID:      1482085484795793488
+  Discord Created: 2026-03-13
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    40
+  Cards Owned:     6
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     2
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        twarven.
+  User ID:         1700
+  Discord ID:      1481742819889647646
+  Discord Created: 2026-03-12
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    121
+  Cards Owned:     96
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     145
+  Market Sales:    3
+  Market Buys:     0
+
+  Username:        werethy
+  User ID:         2033
+  Discord ID:      1482216444123943055
+  Discord Created: 2026-03-14
+  Site Joined:     2026-03-14
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    14
+  Cards Owned:     24
+  Battles:         0
+  Gifts Sent:      5 (5 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     59
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        p.i.cjles_67519
+  User ID:         1778
+  Discord ID:      1481821655733899394
+  Discord Created: 2026-03-13
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     2
+  Battles:         0
+  Gifts Sent:      0 (0 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     70
+  Market Sales:    0
+  Market Buys:     1
+
+  Username:        drstimmy0404
+  User ID:         1594
+  Discord ID:      1476091421370093669
+  Discord Created: 2026-02-25
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    293
+  Cards Owned:     0
+  Battles:         0
+  Gifts Sent:      0 (0 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     256
+  Market Sales:    0
+  Market Buys:     1
+
+  Username:        massesofhistory_93717
+  User ID:         1595
+  Discord ID:      1481652344444944458
+  Discord Created: 2026-03-12
+  Site Joined:     2026-03-12
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     0
+  Battles:         0
+  Gifts Sent:      0 (0 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     252
+  Market Sales:    0
+  Market Buys:     0
+
+  Username:        dylanbrandt0404
+  User ID:         1777
+  Discord ID:      1481821230230274089
+  Discord Created: 2026-03-13
+  Site Joined:     2026-03-13
+  Player:          NONE
+  Teams:           NONE
+  Packs Opened:    4
+  Cards Owned:     27
+  Battles:         0
+  Gifts Sent:      0 (0 unique recipients)
+  Gifts Received:  0 (0 unique senders)
+  Trades Done:     51
+  Market Sales:    0
+  Market Buys:     0
+
+
+GIFT EVIDENCE
+----------------------------------------
+
+  rimcleaner [308] gift activity:
+    <- zapzy [80]: 1x (2026-03-12 to 2026-03-12)
+    <- mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    <- archonicprince [83]: 1x (2026-03-12 to 2026-03-12)
+    -> zapzy [80]: 1x (2026-03-12 to 2026-03-12)
+    -> zxnithhhh [81]: 1x (2026-03-12 to 2026-03-12)
+    -> mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    -> itzwitzx [84]: 1x (2026-03-12 to 2026-03-12)
+    -> azureeffectz [755]: 1x (2026-03-12 to 2026-03-12)
+    <- mylosis [428]: 1x (2026-03-12 to 2026-03-12)
+    <- _kcham [737]: 1x (2026-03-13 to 2026-03-13)
+    <- azureeffectz [755]: 1x (2026-03-12 to 2026-03-12)
+    <- willyfrom [1621]: 1x (2026-03-12 to 2026-03-12)
+    <- twarven. [1700]: 1x (2026-03-12 to 2026-03-12)
+    <- billyfrom [1893]: 1x (2026-03-13 to 2026-03-13)
+    <- gillyfrom [1960]: 1x (2026-03-13 to 2026-03-13)
+    <- werethy [2033]: 1x (2026-03-14 to 2026-03-14)
+    <- tycoon6565 [2034]: 1x (2026-03-14 to 2026-03-14)
+
+  willyfrom [1621] gift activity:
+    <- mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    -> zapzy [80]: 1x (2026-03-12 to 2026-03-12)
+    -> zxnithhhh [81]: 1x (2026-03-12 to 2026-03-12)
+    -> mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    -> rimcleaner [308]: 1x (2026-03-12 to 2026-03-12)
+    -> azureeffectz [755]: 1x (2026-03-12 to 2026-03-12)
+    <- billyfrom [1893]: 1x (2026-03-13 to 2026-03-13)
+
+  billyfrom [1893] gift activity:
+    -> zxnithhhh [81]: 1x (2026-03-13 to 2026-03-13)
+    -> mist309 [82]: 1x (2026-03-13 to 2026-03-13)
+    -> itzwitzx [84]: 1x (2026-03-13 to 2026-03-13)
+    -> rimcleaner [308]: 1x (2026-03-13 to 2026-03-13)
+    -> willyfrom [1621]: 1x (2026-03-13 to 2026-03-13)
+
+  gillyfrom [1960] gift activity:
+    -> kazar5 [66]: 1x (2026-03-13 to 2026-03-13)
+    -> zapzy [80]: 1x (2026-03-13 to 2026-03-13)
+    -> mist309 [82]: 1x (2026-03-13 to 2026-03-13)
+    -> rimcleaner [308]: 1x (2026-03-13 to 2026-03-13)
+    -> azureeffectz [755]: 1x (2026-03-13 to 2026-03-13)
+
+  twarven. [1700] gift activity:
+    -> zapzy [80]: 1x (2026-03-12 to 2026-03-12)
+    -> zxnithhhh [81]: 1x (2026-03-12 to 2026-03-12)
+    -> mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    -> itzwitzx [84]: 1x (2026-03-12 to 2026-03-12)
+    -> rimcleaner [308]: 1x (2026-03-12 to 2026-03-12)
+
+  werethy [2033] gift activity:
+    -> zapzy [80]: 1x (2026-03-14 to 2026-03-14)
+    -> mist309 [82]: 1x (2026-03-14 to 2026-03-14)
+    -> itzwitzx [84]: 1x (2026-03-14 to 2026-03-14)
+    -> rimcleaner [308]: 1x (2026-03-14 to 2026-03-14)
+    -> squiddysquirt [765]: 1x (2026-03-14 to 2026-03-14)
+
+TRADE EVIDENCE
+----------------------------------------
+
+  rimcleaner [308] trade partners:
+    itsyahboytimbo [1559]: 282x (2026-03-12 to 2026-03-12) ** INTERNAL **
+    zapzy [80]: 87x (2026-03-12 to 2026-03-12)
+    p.i.cjles_67519 [1778]: 19x (2026-03-13 to 2026-03-13) ** INTERNAL **
+    drstimmy0404 [1594]: 3x (2026-03-12 to 2026-03-12) ** INTERNAL **
+    mist309 [82]: 1x (2026-03-12 to 2026-03-12)
+    deathlyshriek [817]: 1x (2026-03-12 to 2026-03-12)
+    zxnithhhh [81]: 1x (2026-03-13 to 2026-03-13)
+
+  itsyahboytimbo [1559] trade partners:
+    rimcleaner [308]: 282x (2026-03-12 to 2026-03-12) ** INTERNAL **
+
+  willyfrom [1621] trade partners:
+    mist309 [82]: 75x (2026-03-12 to 2026-03-13)
+    twarven. [1700]: 1x (2026-03-12 to 2026-03-12) ** INTERNAL **
+    zxnithhhh [81]: 1x (2026-03-12 to 2026-03-12)
+
+  billyfrom [1893] trade partners:
+    mist309 [82]: 1x (2026-03-13 to 2026-03-13)
+
+  gillyfrom [1960] trade partners:
+    mist309 [82]: 2x (2026-03-13 to 2026-03-13)
+
+  twarven. [1700] trade partners:
+    itzwitzx [84]: 132x (2026-03-12 to 2026-03-14)
+    werethy [2033]: 10x (2026-03-14 to 2026-03-14) ** INTERNAL **
+    zxnithhhh [81]: 2x (2026-03-12 to 2026-03-12)
+    willyfrom [1621]: 1x (2026-03-12 to 2026-03-12) ** INTERNAL **
+
+  werethy [2033] trade partners:
+    itzwitzx [84]: 49x (2026-03-14 to 2026-03-14)
+    twarven. [1700]: 10x (2026-03-14 to 2026-03-14) ** INTERNAL **
+
+  p.i.cjles_67519 [1778] trade partners:
+    dylanbrandt0404 [1777]: 51x (2026-03-13 to 2026-03-13) ** INTERNAL **
+    rimcleaner [308]: 19x (2026-03-13 to 2026-03-13) ** INTERNAL **
+
+  drstimmy0404 [1594] trade partners:
+    massesofhistory_93717 [1595]: 252x (2026-03-12 to 2026-03-12) ** INTERNAL **
+    rimcleaner [308]: 3x (2026-03-12 to 2026-03-12) ** INTERNAL **
+    zapzy [80]: 1x (2026-03-12 to 2026-03-12)
+
+  massesofhistory_93717 [1595] trade partners:
+    drstimmy0404 [1594]: 252x (2026-03-12 to 2026-03-12) ** INTERNAL **
+
+  dylanbrandt0404 [1777] trade partners:
+    p.i.cjles_67519 [1778]: 51x (2026-03-13 to 2026-03-13) ** INTERNAL **
+
+MARKETPLACE EVIDENCE
+----------------------------------------
+
+  rimcleaner [308] marketplace:
+    BUY m1nny [165]: 4x avg 425.0 cores (total: 1700)
+    SELL tcongo [461]: 2x avg 70.0 cores (total: 140)
+    BUY blue_bird32 [488]: 1x avg 400.0 cores (total: 400)
+    BUY cjcalton29 [493]: 1x avg 30.0 cores (total: 30)
+    BUY imsanko [668]: 1x avg 250.0 cores (total: 250)
+    SELL brudif [1]: 1x avg 15.0 cores (total: 15)
+    SELL stonewall [63]: 1x avg 200.0 cores (total: 200)
+    SELL zxnithhhh [81]: 1x avg 90.0 cores (total: 90)
+    SELL unstrick [123]: 1x avg 100.0 cores (total: 100)
+    SELL chaotichydra [129]: 1x avg 100.0 cores (total: 100)
+    SELL tekknoz [174]: 1x avg 50.0 cores (total: 50)
+    SELL kuzcode [193]: 1x avg 100.0 cores (total: 100)
+    SELL physicsdzn [504]: 1x avg 90.0 cores (total: 90)
+    SELL graypolarbear [1398]: 1x avg 3.0 cores (total: 3)
+    BUY minidelvin [74]: 1x avg 400.0 cores (total: 400)
+    SELL xnyhus [1803]: 1x avg 70.0 cores (total: 70)
+    BUY tcongo [461]: 1x avg 400.0 cores (total: 400)
+
+  willyfrom [1621] marketplace:
+    SELL xandyreoch [1581]: 4x avg 22.3 cores (total: 89)
+    SELL chubbychibi [670]: 3x avg 24.0 cores (total: 72)
+    SELL crispeehouse [873]: 3x avg 19.7 cores (total: 59)
+    BUY imintegrity [87]: 2x avg 10.0 cores (total: 20)
+    SELL llama._ [204]: 1x avg 21.0 cores (total: 21)
+    SELL munchingboo [311]: 1x avg 35.0 cores (total: 35)
+    SELL takemytempo [392]: 1x avg 38.0 cores (total: 38)
+    SELL mechaniscaduceus [169]: 1x avg 20.0 cores (total: 20)
+    SELL mackweel [760]: 1x avg 20.0 cores (total: 20)
+    BUY crispeehouse [873]: 1x avg 61.0 cores (total: 61)
+    BUY tekknoz [174]: 1x avg 90.0 cores (total: 90)
+
+  twarven. [1700] marketplace:
+    SELL itzwitzx [84]: 3x avg 1.0 cores (total: 3)
+
+  p.i.cjles_67519 [1778] marketplace:
+    BUY ferendum [125]: 1x avg 450.0 cores (total: 450)
+
+  drstimmy0404 [1594] marketplace:
+    BUY gsdenny [67]: 1x avg 500.0 cores (total: 500)
+
+TIMELINE
+----------------------------------------
+  2026-02-26 21:36:11  rimcleaner [308] joined site (Discord created 2018-12-28)
+  2026-03-12 06:08:04  itsyahboytimbo [1559] joined site (Discord created 2023-11-30)
+  2026-03-12 07:32:19  rimcleaner first trade with itsyahboytimbo: 282 total
+  2026-03-12 07:32:19  itsyahboytimbo first trade with rimcleaner: 282 total
+  2026-03-12 12:56:48  drstimmy0404 [1594] joined site (Discord created 2026-02-25)
+  2026-03-12 12:58:52  massesofhistory_93717 [1595] joined site (Discord created 2026-03-12)
+  2026-03-12 14:07:08  drstimmy0404 first trade with massesofhistory_93717: 252 total
+  2026-03-12 14:07:08  massesofhistory_93717 first trade with drstimmy0404: 252 total
+  2026-03-12 14:17:47  willyfrom [1621] joined site (Discord created 2026-03-12)
+  2026-03-12 15:53:51  willyfrom first gift to rimcleaner: 1 total
+  2026-03-12 18:24:26  rimcleaner first trade with drstimmy0404: 3 total
+  2026-03-12 18:24:26  drstimmy0404 first trade with rimcleaner: 3 total
+  2026-03-12 18:59:46  twarven. [1700] joined site (Discord created 2026-03-12)
+  2026-03-12 20:00:39  twarven. first gift to rimcleaner: 1 total
+  2026-03-12 20:54:57  willyfrom first trade with twarven.: 1 total
+  2026-03-12 20:54:57  twarven. first trade with willyfrom: 1 total
+  2026-03-13 00:09:37  dylanbrandt0404 [1777] joined site (Discord created 2026-03-13)
+  2026-03-13 00:12:27  p.i.cjles_67519 [1778] joined site (Discord created 2026-03-13)
+  2026-03-13 01:14:27  p.i.cjles_67519 first trade with dylanbrandt0404: 51 total
+  2026-03-13 01:14:27  dylanbrandt0404 first trade with p.i.cjles_67519: 51 total
+  2026-03-13 01:32:52  rimcleaner first trade with p.i.cjles_67519: 19 total
+  2026-03-13 01:32:52  p.i.cjles_67519 first trade with rimcleaner: 19 total
+  2026-03-13 12:14:44  billyfrom [1893] joined site (Discord created 2026-03-13)
+  2026-03-13 13:17:06  billyfrom first gift to willyfrom: 1 total
+  2026-03-13 13:20:11  billyfrom first gift to rimcleaner: 1 total
+  2026-03-13 18:37:32  gillyfrom [1960] joined site (Discord created 2026-03-13)
+  2026-03-13 20:47:24  gillyfrom first gift to rimcleaner: 1 total
+  2026-03-14 02:22:08  werethy [2033] joined site (Discord created 2026-03-14)
+  2026-03-14 03:22:45  werethy first gift to rimcleaner: 1 total
+  2026-03-14 06:04:08  twarven. first trade with werethy: 10 total
+  2026-03-14 06:04:08  werethy first trade with twarven.: 10 total
+
+================================================================================

@@ -27,6 +27,7 @@ const RARITY_OPTIONS = [
   { value: 'rare', label: 'Rare' },
   { value: 'epic', label: 'Epic' },
   { value: 'legendary', label: 'Legendary' },
+  { value: 'mythic', label: 'Mythic' },
 ]
 
 export default function CCAdminShare() {

@@ -535,7 +535,7 @@ async function handleCollectionCatalog(sql) {
 
 // ═══ GET: Collection owned (lightweight — only user's ownership data) ═══
 async function handleCollectionOwned(sql, user) {
-  const [gameCards, playerCards] = await Promise.all([
+  const [gameCards, playerCards, recentRows] = await Promise.all([
     sql`
       SELECT card_type, god_id, array_agg(rarity) AS rarities
       FROM cc_cards
@@ -549,6 +549,21 @@ async function handleCollectionOwned(sql, user) {
       WHERE owner_id = ${user.id} AND card_type = 'player' AND def_id IS NOT NULL
       GROUP BY def_id
     `,
+    sql`
+      SELECT c.id, c.card_type, c.god_id, c.rarity, c.is_first_edition, c.def_id, c.created_at,
+             d.player_name, d.team_name, d.team_color, d.role, d.best_god_name,
+             d.league_slug, d.division_tier, d.division_slug, d.season_slug, d.card_index,
+             CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
+             CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_connected
+      FROM cc_cards c
+      LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+      LEFT JOIN players p ON p.slug = d.player_slug
+      LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN user_preferences up ON up.user_id = u.id
+      WHERE c.owner_id = ${user.id}
+      ORDER BY c.created_at DESC
+      LIMIT 8
+    `,
   ])
 
   const gameMap = {}
@@ -561,7 +576,29 @@ async function handleCollectionOwned(sql, user) {
     if (c.fe_rarities?.length) feMap[c.def_id] = c.fe_rarities
   }
 
-  return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap, firstEditions: feMap }) }
+  const recentPulls = recentRows.map(c => ({
+    id: c.id,
+    cardType: c.card_type,
+    godId: c.god_id,
+    rarity: c.rarity,
+    isFirstEdition: c.is_first_edition,
+    defId: c.def_id,
+    createdAt: c.created_at,
+    playerName: c.player_name,
+    teamName: c.team_name,
+    teamColor: c.team_color,
+    role: c.role,
+    bestGodName: c.best_god_name,
+    avatarUrl: c.avatar_url,
+    isConnected: c.is_connected,
+    leagueSlug: c.league_slug,
+    divisionTier: c.division_tier,
+    divisionSlug: c.division_slug,
+    seasonSlug: c.season_slug,
+    cardIndex: c.card_index,
+  }))
+
+  return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap, firstEditions: feMap, recentPulls }) }
 }
 
 // ═══ GET: Collection set defs (static — cacheable, no ownership) ═══
