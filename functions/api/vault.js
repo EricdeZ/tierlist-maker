@@ -108,7 +108,7 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend] = await Promise.all([
     sql`SELECT c.*, d.best_god_name,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -156,6 +156,11 @@ async function handleLoad(sql, user) {
       WHERE status IN ('waiting', 'active')
         AND last_polled_at < NOW() - make_interval(mins => 2)
     `,
+    sql`
+      SELECT created_at FROM ember_transactions
+      WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount <= 0
+      ORDER BY created_at DESC LIMIT 1
+    `,
   ])
 
   return {
@@ -202,6 +207,11 @@ async function handleLoad(sql, user) {
         source: i.source,
         createdAt: i.created_at,
       })),
+      vendingCooldown: (() => {
+        if (!lastVend[0]) return 0
+        const elapsed = (Date.now() - new Date(lastVend[0].created_at).getTime()) / 1000
+        return elapsed < VENDING_COOLDOWN_SECONDS ? Math.ceil(VENDING_COOLDOWN_SECONDS - elapsed) : 0
+      })(),
     }),
   }
 }
@@ -313,21 +323,24 @@ async function handleOpenPack(sql, user, body) {
 const VENDING_COOLDOWN_SECONDS = 15
 
 async function handleSalePurchase(sql, user, saleId) {
-  // Enforce per-user cooldown between vending machine purchases
-  const [lastPurchase] = await sql`
-    SELECT created_at FROM ember_transactions
-    WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount < 0
-    ORDER BY created_at DESC LIMIT 1
-  `
-  if (lastPurchase) {
-    const elapsed = (Date.now() - new Date(lastPurchase.created_at).getTime()) / 1000
-    if (elapsed < VENDING_COOLDOWN_SECONDS) {
-      const retryAfter = Math.ceil(VENDING_COOLDOWN_SECONDS - elapsed)
-      return { statusCode: 429, headers, body: JSON.stringify({ error: `Vending machine cooling down — ${retryAfter}s`, retryAfter }) }
-    }
-  }
-
   const result = await transaction(async (tx) => {
+    // Lock user's ember balance row to serialize per-user vending purchases
+    await tx`SELECT 1 FROM ember_balances WHERE user_id = ${user.id} FOR UPDATE`
+
+    // Enforce per-user cooldown (inside transaction to prevent races)
+    const [lastPurchase] = await tx`
+      SELECT created_at FROM ember_transactions
+      WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount <= 0
+      ORDER BY created_at DESC LIMIT 1
+    `
+    if (lastPurchase) {
+      const elapsed = (Date.now() - new Date(lastPurchase.created_at).getTime()) / 1000
+      if (elapsed < VENDING_COOLDOWN_SECONDS) {
+        const retryAfter = Math.ceil(VENDING_COOLDOWN_SECONDS - elapsed)
+        throw Object.assign(new Error(`Vending machine cooling down — ${retryAfter}s`), { retryAfter, cooldown: true })
+      }
+    }
+
     // Lock the sale row and verify availability
     const [sale] = await tx`
       SELECT s.*, pt.id AS pack_type_id_ref
@@ -348,16 +361,26 @@ async function handleSalePurchase(sql, user, saleId) {
     `
     if (!updated) throw new Error('Sold out')
 
-    // Charge sale price
+    // Charge sale price (always record transaction for cooldown tracking)
+    const [bal] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
     if (sale.price > 0) {
-      const [bal] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`
       if (!bal || bal.balance < sale.price) throw new Error('Not enough Ember')
-      await grantEmber(tx, user.id, 'cc_pack', -sale.price, `Card Clash: ${sale.name || 'Sale Pack'}`)
     }
+    await grantEmber(tx, user.id, 'cc_pack', -(sale.price || 0), `Card Clash: ${sale.name || 'Sale Pack'}`)
 
     const packResult = await openPack(tx, user.id, sale.pack_type_id, { skipPayment: true })
     return { ...packResult, stock: updated.stock }
+  }).catch(err => {
+    // Convert cooldown errors to 429 response
+    if (err.cooldown) {
+      return { _cooldown: true, retryAfter: err.retryAfter, message: err.message }
+    }
+    throw err
   })
+
+  if (result._cooldown) {
+    return { statusCode: 429, headers, body: JSON.stringify({ error: result.message, retryAfter: result.retryAfter }) }
+  }
 
   const cards = result.cards.map((c) => {
     const formatted = formatCard(c)

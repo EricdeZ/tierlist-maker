@@ -236,7 +236,7 @@ function PackZoomModal({ slot, onClose, packTypesMap }) {
 // ═══ Sale vending machine — always renders with min 6 slots ═══
 
 export default function SaleVendingMachine() {
-  const { salePacks, ember, buySalePack, packTypesMap, refreshSalePacks } = useVault();
+  const { salePacks, ember, buySalePack, packTypesMap, refreshSalePacks, vendingCooldownEnd, setVendingCooldownEnd } = useVault();
 
   useEffect(() => {
     refreshSalePacks();
@@ -256,25 +256,30 @@ export default function SaleVendingMachine() {
   const [openResult, setOpenResult] = useState(null);
   const [error, setError] = useState('');
   const [zoomedSlot, setZoomedSlot] = useState(null);
-  const [cooldownEnd, setCooldownEnd] = useState(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [cooldownProgress, setCooldownProgress] = useState(0);
 
-  // Countdown timer for vending cooldown
+  const COOLDOWN_DURATION = 15;
+
+  // Countdown timer for vending cooldown — driven by context
   useEffect(() => {
-    if (!cooldownEnd) { setCooldownLeft(0); return; }
+    if (!vendingCooldownEnd) { setCooldownLeft(0); setCooldownProgress(0); return; }
     const tick = () => {
-      const remaining = Math.ceil((cooldownEnd - Date.now()) / 1000);
+      const remainingMs = vendingCooldownEnd - Date.now();
+      const remaining = Math.ceil(remainingMs / 1000);
       if (remaining <= 0) {
-        setCooldownEnd(null);
+        setVendingCooldownEnd(null);
         setCooldownLeft(0);
+        setCooldownProgress(0);
       } else {
         setCooldownLeft(remaining);
+        setCooldownProgress(Math.max(0, Math.min(1, remainingMs / (COOLDOWN_DURATION * 1000))));
       }
     };
     tick();
-    const id = setInterval(tick, 250);
+    const id = setInterval(tick, 50);
     return () => clearInterval(id);
-  }, [cooldownEnd]);
+  }, [vendingCooldownEnd, setVendingCooldownEnd]);
 
   const slotMap = useMemo(() => Object.fromEntries(slots.map(s => [s.code, s])), [slots]);
   const rowLetters = useMemo(() => [...new Set(slots.map(s => s.code[0]))], [slots]);
@@ -310,7 +315,7 @@ export default function SaleVendingMachine() {
       setCoinsInserted(true);
       setCoinAnimating(false);
     }, 400);
-  }, [selectedPack, canAfford, coinsInserted, phase]);
+  }, [selectedPack, canAfford, coinsInserted, phase, cooldownLeft]);
 
   const handleVend = useCallback(async () => {
     if (!selectedSlot || !coinsInserted || phase !== 'idle' || cooldownLeft > 0) return;
@@ -325,8 +330,7 @@ export default function SaleVendingMachine() {
         setDispensedSlot(null);
         return;
       }
-      // Start 15s cooldown after successful purchase
-      setCooldownEnd(Date.now() + 15000);
+      // Cooldown is set by VaultContext after successful purchase
       setTimeout(() => {
         setPhase('dropped');
         setPendingResult({ ...result, packType: selectedSlot.pack.packTypeId || selectedSlot.pack.id });
@@ -334,14 +338,14 @@ export default function SaleVendingMachine() {
     } catch (err) {
       // Handle server-side cooldown (429)
       if (err.retryAfter) {
-        setCooldownEnd(Date.now() + err.retryAfter * 1000);
+        setVendingCooldownEnd(Date.now() + err.retryAfter * 1000);
       }
       setError(err.message || 'MACHINE ERROR');
       setPhase('idle');
       setCoinsInserted(false);
       setDispensedSlot(null);
     }
-  }, [selectedSlot, coinsInserted, phase, buySalePack, cooldownLeft]);
+  }, [selectedSlot, coinsInserted, phase, buySalePack, cooldownLeft, setVendingCooldownEnd]);
 
   const handleGrabPack = useCallback(() => {
     if (phase !== 'dropped' || !pendingResult) return;
@@ -458,9 +462,17 @@ export default function SaleVendingMachine() {
             <div className="vm-controls">
               <div className="vm-controls-row">
                 <div className="vm-left-col">
-                  <div className={`vm-display ${display.isError ? 'vm-display-error' : ''}`}>
+                  <div className={`vm-display ${display.isError ? 'vm-display-error' : ''} ${cooldownLeft > 0 ? 'vm-display-cooldown' : ''}`}>
                     <div className="vm-display-line1">{display.line1}</div>
                     <div className="vm-display-line2">{display.line2}</div>
+                    {cooldownLeft > 0 && (
+                      <div className="vm-cooldown-bar-track">
+                        <div
+                          className="vm-cooldown-bar-fill"
+                          style={{ width: `${cooldownProgress * 100}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="vm-keypad">
                   {rowLetters.map(k => (

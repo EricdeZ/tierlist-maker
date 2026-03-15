@@ -304,16 +304,17 @@ async function handleBulkUpdateCards(sql, body) {
 
 // ═══ POST: Grant card to user ═══
 async function handleGrantCard(sql, body) {
-  const { userId, godId, godName, godClass, role, rarity, power, holoEffect, imageUrl } = body
+  const { userId, godId, godName, godClass, role, rarity, power, holoEffect, holoType, imageUrl, cardType, cardData, defId } = body
   if (!userId || !godId || !godName) {
     return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'userId, godId, godName required' }) }
   }
 
   const serialNumber = Math.floor(Math.random() * 9999) + 1
+  const resolvedHoloType = holoType || (rarity && rarity !== 'common' ? ['holo','reverse','full'][Math.floor(Math.random()*3)] : null)
 
   const [card] = await sql`
-    INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via)
-    VALUES (${userId}, ${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${rarity && rarity !== 'common' ? ['holo','reverse','full'][Math.floor(Math.random()*3)] : null}, ${imageUrl || ''}, 'admin_grant')
+    INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+    VALUES (${userId}, ${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${resolvedHoloType}, ${imageUrl || ''}, 'admin_grant', ${cardType || 'god'}, ${cardData ? JSON.stringify(cardData) : null}, ${defId || null})
     RETURNING *
   `
 

@@ -25,6 +25,7 @@ export function VaultProvider({ children }) {
   const [binderCards, setBinderCards] = useState([])
   const [vaultBanned, setVaultBanned] = useState(false)
   const [accountTooNew, setAccountTooNew] = useState(null)
+  const [vendingCooldownEnd, setVendingCooldownEnd] = useState(null)
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
   const passionCtxRef = useRef(passionCtx)
@@ -49,6 +50,9 @@ export function VaultProvider({ children }) {
       setSalePacks(ccData.salePacks || [])
       setPendingTradeCount(ccData.pendingTradeCount || 0)
       setInventory(ccData.inventory || [])
+      if (ccData.vendingCooldown > 0) {
+        setVendingCooldownEnd(Date.now() + ccData.vendingCooldown * 1000)
+      }
       setDefOverrides(overridesData.overrides || {})
       setLoaded(true)
       setLoading(false)
@@ -326,6 +330,7 @@ export function VaultProvider({ children }) {
       setSalePacks(prev => prev.map(s =>
         s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
       ))
+      setVendingCooldownEnd(Date.now() + 15000)
       passionCtxRef.current?.refreshBalance?.()
       return result
     } catch (err) {
@@ -347,6 +352,7 @@ export function VaultProvider({ children }) {
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, setPendingTradeCount,
     inventory, openInventoryPack,
+    vendingCooldownEnd, setVendingCooldownEnd,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride,
@@ -355,6 +361,7 @@ export function VaultProvider({ children }) {
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, inventory, openInventoryPack,
+    vendingCooldownEnd,
   ])
 
   return (

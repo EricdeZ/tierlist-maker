@@ -430,6 +430,41 @@
   color: rgba(255, 85, 68, 0.45);
 }
 
+/* ── Cooldown state — pulsing amber ── */
+.vm-display-cooldown .vm-display-line1 {
+  color: #ff9922;
+  text-shadow: 0 0 10px rgba(255, 153, 34, 0.6);
+  animation: vm-cooldown-pulse 1.2s ease-in-out infinite;
+}
+
+.vm-display-cooldown .vm-display-line2 {
+  color: rgba(255, 153, 34, 0.45);
+}
+
+@keyframes vm-cooldown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Cooldown progress bar */
+.vm-cooldown-bar-track {
+  position: relative;
+  z-index: 2;
+  height: 4px;
+  margin-top: 6px;
+  background: rgba(255, 153, 34, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.vm-cooldown-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff9922, #ffcc55);
+  box-shadow: 0 0 6px rgba(255, 153, 34, 0.5);
+  border-radius: 2px;
+  transition: width 0.08s linear;
+}
+
 /* ── Keypad — rounded, clean ── */
 .vm-keypad {
   display: grid;
@@ -986,6 +1021,11 @@
 
   .vm-display-line2 {
     font-size: 9px;
+  }
+
+  .vm-cooldown-bar-track {
+    height: 3px;
+    margin-top: 4px;
   }
 
   .vm-keypad {

@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { usePassion } from '../../context/PassionContext'
 import { useAuth } from '../../context/AuthContext'
-import { challengeService, predictionsService, passionService, emberService } from '../../services/database'
+import { challengeService, predictionsService, passionService, emberService, vaultAdminService } from '../../services/database'
 import { RANK_THRESHOLDS, formatRank } from '../../config/ranks'
 import RankBadge from '../../components/RankBadge'
 import PageTitle from '../../components/PageTitle'
 
 export default function DebugTools() {
-    const { permissions } = useAuth()
+    const { user, permissions } = useAuth()
     const {
         balance, totalEarned, currentStreak, longestStreak,
         canClaimDaily, claimableCount, rank, nextRank,
@@ -36,7 +36,53 @@ export default function DebugTools() {
     const [coresGranting, setCoresGranting] = useState(false)
     const [coresResult, setCoresResult] = useState(null)
 
+    const [grantingCard, setGrantingCard] = useState(false)
+    const [grantCardResult, setGrantCardResult] = useState(null)
+    const [grantCardRarity, setGrantCardRarity] = useState('unique')
+
     const selectedRank = RANK_THRESHOLDS[selectedRankIdx]
+
+    const handleGrantTestCard = async (rarity) => {
+        setGrantingCard(true)
+        setGrantCardResult(null)
+        try {
+            const res = await vaultAdminService.grantCard({
+                userId: user.id,
+                godId: `player-test-${rarity}`,
+                godName: 'TestPlayer',
+                godClass: 'JUNGLE',
+                role: 'jungle',
+                rarity,
+                holoEffect: rarity === 'unique' ? 'secret' : rarity === 'mythic' ? 'rainbow' : rarity === 'legendary' ? 'gold' : 'cosmos',
+                holoType: 'reverse',
+                imageUrl: user.avatar ? `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.webp?size=256` : '',
+                cardType: 'player',
+                cardData: {
+                    playerName: user.discord_username || 'TestPlayer',
+                    teamName: 'Debug Squad',
+                    teamColor: '#e8e8ff',
+                    role: 'JUNGLE',
+                    isConnected: true,
+                    stats: { gamesPlayed: 14, wins: 12, winRate: 85.7, kda: 4.3, avgDamage: 21886, avgMitigated: 13313, totalKills: 102, totalDeaths: 40, totalAssists: 141 },
+                    bestGod: { name: 'Medusa', games: 3, winRate: 100 },
+                },
+            })
+            setGrantCardResult({ card: res.card })
+        } catch (err) {
+            setGrantCardResult({ error: err.message })
+        } finally {
+            setGrantingCard(false)
+        }
+    }
+
+    const handleDeleteTestCard = async (cardId) => {
+        try {
+            await vaultAdminService.deleteCard(cardId)
+            setGrantCardResult(null)
+        } catch (err) {
+            setGrantCardResult({ error: err.message })
+        }
+    }
 
     const handleResetPassion = async () => {
         if (!confirm('Full passion reset: challenges, balance, transactions, streak, daily claim. Continue?')) return
@@ -368,6 +414,50 @@ export default function DebugTools() {
                         {coresResult.error
                             ? `Error: ${coresResult.error}`
                             : `Granted ${coresResult.amount} Cores to ${coresResult.targetUsername}. New balance: ${coresResult.newBalance}`}
+                    </div>
+                )}
+            </section>
+
+            {/* Grant Test Card */}
+            <section className="bg-(--color-secondary) rounded-xl border border-purple-500/20 p-6 mb-6">
+                <h2 className="font-heading text-lg font-bold text-purple-400 mb-4">
+                    Grant Test Card
+                </h2>
+                <div className="text-xs text-(--color-text-secondary) mb-3">
+                    Creates a test player card in your collection. Refresh Vault after granting.
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                    <select
+                        value={grantCardRarity}
+                        onChange={e => setGrantCardRarity(e.target.value)}
+                        className="px-3 py-2 rounded-lg bg-(--color-primary) border border-white/10 text-(--color-text) text-sm focus:outline-none"
+                    >
+                        {['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique'].map(r => (
+                            <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => handleGrantTestCard(grantCardRarity)}
+                        disabled={grantingCard}
+                        className="px-5 py-2 rounded-lg font-bold text-sm transition-colors shrink-0 bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50"
+                    >
+                        {grantingCard ? 'Granting...' : 'Grant to Me'}
+                    </button>
+                </div>
+                {grantCardResult && (
+                    <div className={`text-xs p-2 rounded-lg ${grantCardResult.error ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {grantCardResult.error
+                            ? `Error: ${grantCardResult.error}`
+                            : <>
+                                Card #{grantCardResult.card.id} granted ({grantCardResult.card.rarity}).{' '}
+                                <button
+                                    onClick={() => handleDeleteTestCard(grantCardResult.card.id)}
+                                    className="underline text-red-400 hover:text-red-300 ml-1"
+                                >
+                                    Delete it
+                                </button>
+                            </>
+                        }
                     </div>
                 )}
             </section>
