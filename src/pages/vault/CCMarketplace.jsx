@@ -11,7 +11,7 @@ import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
 const HOLO_TYPES = ['holo', 'reverse', 'full']
 const ROLES = ['solo', 'jungle', 'mid', 'support', 'adc']

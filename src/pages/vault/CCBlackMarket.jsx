@@ -18,6 +18,7 @@ const RARITY_COLORS = {
   epic: '#a855f7',
   legendary: '#ff8c00',
   mythic: '#ef4444',
+  unique: '#e8e8ff',
 }
 
 const RARITY_LABELS = {
@@ -27,6 +28,7 @@ const RARITY_LABELS = {
   epic: 'Epic',
   legendary: 'Legendary',
   mythic: 'Mythic',
+  unique: 'Unique',
 }
 
 const REWARD_TIERS = {
@@ -45,6 +47,7 @@ const RARITY_GLOW = {
   epic: '60px',
   legendary: '80px',
   mythic: '110px',
+  unique: '140px',
 }
 
 const RARITY_GLOW_ALPHA = {
@@ -54,6 +57,7 @@ const RARITY_GLOW_ALPHA = {
   epic: '0.55',
   legendary: '0.65',
   mythic: '0.8',
+  unique: '0.9',
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))

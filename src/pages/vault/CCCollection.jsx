@@ -12,7 +12,7 @@ import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
 import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock } from 'lucide-react'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const BATCH_SIZE = 50
 
 // Only types acquirable in packs

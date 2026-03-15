@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 const CARD_TYPES = ['god', 'player', 'item', 'consumable']
 const HOLO_TYPES = ['holo', 'reverse', 'full']
 const HOLO_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'reward_desc', label: 'Reward: High to Low' },

@@ -38,7 +38,7 @@ const CARD_TYPES = [
   { key: 'consumables', label: 'Consumables', count: CONSUMABLES.length },
 ]
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 
 const GOD_CLASSES = ['All', 'Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter']
 

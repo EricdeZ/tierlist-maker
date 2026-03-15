@@ -13,7 +13,7 @@ import CardZoomModal from './components/CardZoomModal'
 import emberIcon from '../../assets/ember.png'
 import { Search, X, Handshake, Loader2, Check, Plus, History, ChevronLeft, ChevronRight, Filter, Wifi, WifiOff, Timer, ArrowLeftRight, Package, RefreshCw } from 'lucide-react'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const TYPE_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'god', label: 'Gods' },

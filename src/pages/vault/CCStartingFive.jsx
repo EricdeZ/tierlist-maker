@@ -22,8 +22,8 @@ const ROLES = [
   { key: 'adc', label: 'ADC', icon: adcIcon },
 ]
 
-const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
-const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 }
+const RARITY_ORDER = ['unique', 'mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
+const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
 
 function getCardType(card) {
   return card.cardType || 'god'

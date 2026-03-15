@@ -9,7 +9,7 @@ import { CLASS_ROLE } from '../../../data/vault/gods'
 import { useVault } from '../VaultContext'
 import { X, Tag } from 'lucide-react'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 
 function calculateFee(price) {
   const raw = Math.floor(price * MARKETPLACE.feePercent)

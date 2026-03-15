@@ -7,7 +7,8 @@ export const RARITIES = {
   rare:      { tier: 3, name: 'Rare',      holoEffects: ['galaxy', 'vstar', 'shiny', 'ultra'], dropRate: 0.06, color: '#3b82f6', emberValue: 40,  craftCost: 200, targetedCraftCost: 400,  dismantleValue: 3 },
   epic:      { tier: 2, name: 'Epic',      holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'], dropRate: 0.025, color: '#a855f7', emberValue: 100, craftCost: 500, targetedCraftCost: 1000, dismantleValue: 8 },
   legendary: { tier: 1, name: 'Legendary', holoEffects: ['rainbow', 'secret', 'gold'],     dropRate: 0.003, color: '#ff8c00', emberValue: 300, craftCost: 1500, targetedCraftCost: 3000, dismantleValue: 25 },
-  mythic:    { tier: 0, name: 'Mythic',    holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'], dropRate: 0.0005, color: '#ef4444', emberValue: 750, craftCost: 5000, targetedCraftCost: 10000, dismantleValue: 75 },
+  mythic:    { tier: 0, name: 'Mythic',    holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'], dropRate: 0.00045, color: '#ef4444', emberValue: 750, craftCost: 5000, targetedCraftCost: 10000, dismantleValue: 75 },
+  unique:    { tier: -1, name: 'Unique',  holoEffects: ['secret'], dropRate: 0.00005, color: '#e8e8ff', emberValue: 1050, craftCost: 0, targetedCraftCost: 0, dismantleValue: 0 },
   full_art:  { tier: 0, holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'], dropRate: 0, color: '#d4af37', emberValue: 0, dismantleValue: 0, craftCost: 0 },
 };
 
@@ -32,7 +33,7 @@ export const PACKS = {
 // Canonical holo effect per rarity — one fixed effect per tier
 export const RARITY_HOLO_MAP = {
   common: 'common', uncommon: 'holo', rare: 'galaxy',
-  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow',
+  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow', unique: 'secret',
 };
 
 export function getHoloEffect(rarity) {
@@ -100,11 +101,11 @@ export const MARKETPLACE = {
 
 // Starting 5 passive income rates (per day, per card)
 export const STARTING_FIVE_RATES = {
-  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16 },
-  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24 },
+  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16, unique: 22.4 },
+  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24, unique: 33.6 },
   full: {
-    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6 },
-    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4 },
+    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6, unique: 13.44 },
+    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4, unique: 20.16 },
   },
 };
 
@@ -114,12 +115,12 @@ export const STARTING_FIVE_CAP_DAYS = 2;
 // God cards give larger bonuses than items; cores bonuses are higher than passion
 export const ATTACHMENT_BONUSES = {
   god: {
-    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50 },
-    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80 },
+    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50, unique: 0.70 },
+    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80, unique: 1.12 },
   },
   item: {
-    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30 },
-    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60 },
+    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30, unique: 0.42 },
+    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60, unique: 0.84 },
   },
 };
 
@@ -128,7 +129,7 @@ export const GOD_SYNERGY_BONUS = 0.30;
 export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
 // Consumable slot — rarity-based total boost (non-linear scaling)
 export const CONSUMABLE_SLOT_SCALING = {
-  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00,
+  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,
 };
 
 // Per-consumable passion/cores spread (ratios sum to 1.0)

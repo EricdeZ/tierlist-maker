@@ -5,7 +5,7 @@ import PlayerAvatar from '../../components/PlayerAvatar'
 import { RARITIES, getHoloEffect } from '../../data/vault/economy'
 import { Search, Loader2, User } from 'lucide-react'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 
 export default function CCPlayerCards() {
   const [query, setQuery] = useState('')

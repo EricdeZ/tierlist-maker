@@ -3,10 +3,10 @@ import PageTitle from '../../components/PageTitle'
 import { packCreatorService } from '../../services/database'
 
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
-const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const RARITY_COLORS = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',
-  epic: '#a855f7', legendary: '#ff8c00', mythic: '#ef4444',
+  epic: '#a855f7', legendary: '#ff8c00', mythic: '#ef4444', unique: '#e8e8ff',
 }
 
 const GROUP_LABELS = ['', 'A', 'B', 'C', 'D', 'E']

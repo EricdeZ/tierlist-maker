@@ -9,6 +9,7 @@
 .game-card[data-rarity="epic"] { --border-color: #a855f7; --border-light: #c084fc; --border-dark: #7c3aed; --border-glow: #a855f740; }
 .game-card[data-rarity="legendary"] { --border-color: #ff8c00; --border-light: #ffaa33; --border-dark: #cc7000; --border-glow: #ff8c0040; }
 .game-card[data-rarity="mythic"] { --border-color: #ef4444; --border-light: #f87171; --border-dark: #dc2626; --border-glow: #ef444440; }
+.game-card[data-rarity="unique"] { --border-color: #e8e8ff; --border-light: #ffffff; --border-dark: #c0c0e0; --border-glow: #e8e8ff60; }
 
 /* --- Role accent palettes (gods) --- */
 .game-card { --accent: #c4884a; --accent-light: #e0a866; --accent-dark: #8a5c2a; --accent-glow: #c4884a40;

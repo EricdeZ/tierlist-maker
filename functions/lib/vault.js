@@ -9,11 +9,12 @@ const RARITIES = {
   rare:      { name: 'Rare',      dropRate: 0.06, color: '#3b82f6', holoEffects: ['galaxy', 'vstar', 'shiny', 'ultra'] },
   epic:      { name: 'Epic',      dropRate: 0.025, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
   legendary: { name: 'Legendary', dropRate: 0.003, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
-  mythic:    { name: 'Mythic',    dropRate: 0.0005, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  mythic:    { name: 'Mythic',    dropRate: 0.00045, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  unique:    { name: 'Unique',    dropRate: 0.00005, color: '#e8e8ff', holoEffects: ['secret'] },
   full_art:  { name: 'Full Art',  dropRate: 0, color: '#d4af37', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'] },
 }
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 
 function rollRarity(minRarity = 'common') {
   const minIdx = RARITY_ORDER.indexOf(minRarity)
@@ -45,7 +46,7 @@ function rollRarityBounded(minRarity = 'common', maxRarity = null) {
 // Fixed holo effect per rarity — matches catalog
 const RARITY_HOLO_MAP = {
   common: 'common', uncommon: 'holo', rare: 'galaxy',
-  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow',
+  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow', unique: 'secret',
 }
 
 function rollHoloEffect(rarity) {
@@ -59,6 +60,7 @@ function rollHoloType(rarity) {
 }
 
 function generateCard(rarity) {
+  if (rarity === 'unique') rarity = 'mythic'
   const god = GODS[Math.floor(Math.random() * GODS.length)]
   const role = CLASS_ROLE[god.class] || 'mid'
   return {
@@ -82,6 +84,7 @@ function generateCard(rarity) {
 }
 
 function generateItemCard(rarity) {
+  if (rarity === 'unique') rarity = 'mythic'
   const item = ITEMS[Math.floor(Math.random() * ITEMS.length)]
   return {
     card_type: 'item',
@@ -107,6 +110,7 @@ function generateItemCard(rarity) {
 }
 
 function generateConsumableCard(rarity) {
+  if (rarity === 'unique') rarity = 'mythic'
   const con = CONSUMABLES[Math.floor(Math.random() * CONSUMABLES.length)]
   return {
     card_type: 'consumable',
@@ -141,6 +145,12 @@ async function generatePlayerCard(sql, rarity, leagueId) {
   if (!def) {
     // Fallback: no defs generated yet, pick random league_player
     return generatePlayerCardLegacy(sql, rarity, leagueId)
+  }
+
+  // Unique rarity: only one unique card per def can exist globally
+  if (rarity === 'unique') {
+    const [existing] = await sql`SELECT 1 FROM cc_cards WHERE def_id = ${def.id} AND rarity = 'unique' LIMIT 1`
+    if (existing) rarity = 'mythic'
   }
 
   // Get stats (frozen or live)
@@ -189,8 +199,9 @@ async function generatePlayerCard(sql, rarity, leagueId) {
   }
 }
 
-// Legacy fallback when no cc_player_defs exist yet
+// Legacy fallback when no cc_player_defs exist yet (unique not supported — no def_id)
 async function generatePlayerCardLegacy(sql, rarity, leagueId) {
+  if (rarity === 'unique') rarity = 'mythic'
   const players = leagueId
     ? await sql`
       SELECT lp.id as lp_id, lp.team_id, p.id, p.name, p.main_role,
@@ -320,6 +331,13 @@ async function generatePlayerCardByDivisions(sql, rarity, divisionIds) {
   }
 
   const def = defs[0]
+
+  // Unique rarity: only one unique card per def can exist globally
+  if (rarity === 'unique') {
+    const [existing] = await sql`SELECT 1 FROM cc_cards WHERE def_id = ${def.id} AND rarity = 'unique' LIMIT 1`
+    if (existing) rarity = 'mythic'
+  }
+
   const stats = def.frozen_stats || await computePlayerStats(sql, def.player_id, def.team_id, def.season_id)
   const role = (def.role || 'adc').toUpperCase()
 

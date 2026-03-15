@@ -14,7 +14,7 @@ const STATIC_CARD_DATA = {
   item: ITEMS.map(i => ({ name: i.name, detail: i.category, avatar: null })),
   consumable: CONSUMABLES.map(c => ({ name: c.name, detail: null, avatar: null })),
 }
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const HOLO_OPTIONS = [
   { value: '', label: 'Any' },
   { value: 'holo', label: 'Holo' },

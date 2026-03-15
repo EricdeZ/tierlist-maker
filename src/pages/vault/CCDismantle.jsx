@@ -6,7 +6,7 @@ import TradingCard from '../../components/TradingCard'
 import { Hammer, Check, Trash2, Info } from 'lucide-react'
 import emberIcon from '../../assets/ember.png'
 
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_SIZE = 130
 
 function getCardType(card) {
@@ -155,7 +155,7 @@ export default function CCDismantle() {
   }, [startingFive, binderCards])
 
   const cards = useMemo(() => {
-    let list = collection.filter(c => !lockedCardIds.has(c.id))
+    let list = collection.filter(c => !lockedCardIds.has(c.id) && c.rarity !== 'unique')
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
     list.sort((a, b) => {

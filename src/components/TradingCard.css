@@ -10,6 +10,7 @@
 .trading-card[data-rarity="epic"] { --gold: #a855f7; --gold-light: #c084fc; --gold-dark: #7c3aed; --gold-edge: #d8b4fe; }
 .trading-card[data-rarity="legendary"] { --gold: #ff8c00; --gold-light: #ffaa33; --gold-dark: #cc7000; --gold-edge: #ffc966; }
 .trading-card[data-rarity="mythic"] { --gold: #ef4444; --gold-light: #f87171; --gold-dark: #dc2626; --gold-edge: #fca5a5; }
+.trading-card[data-rarity="unique"] { --gold: #e8e8ff; --gold-light: #ffffff; --gold-dark: #c0c0e0; --gold-edge: #ffffff; }
 
 /* --- Role accent palettes --- */
 /* ADC = warm bronze/amber */

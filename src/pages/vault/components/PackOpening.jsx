@@ -18,7 +18,7 @@ function CardBack() {
   )
 }
 
-const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
+const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
 
 function getCardType(card) {
   return card.cardType || card.card_type || 'god'

@@ -13,7 +13,7 @@ const VALID_CARD_NAMES = new Set([
 ])
 
 const VALID_CARD_TYPES = new Set(['god', 'item', 'consumable', 'player'])
-const VALID_RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'])
+const VALID_RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique'])
 const VALID_HOLO_TYPES = new Set(['holo', 'reverse', 'full'])
 
 const handler = async (event) => {
