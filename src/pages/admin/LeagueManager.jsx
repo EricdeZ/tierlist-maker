@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Power, Check, X, Globe, Layers, Calendar, MessageCircle, Flag } from 'lucide-react'
 import { LeagueManagerHelp } from '../../components/admin/AdminHelp'
 import BaseModal from '../../components/BaseModal'
+import ImageUpload from '../../components/ImageUpload'
 import { getAuthHeaders } from '../../services/adminApi.js'
 import { useAuth } from '../../context/AuthContext'
 
@@ -264,25 +265,59 @@ export default function LeagueManager() {
                                 <Globe className="w-4 h-4 text-blue-400 shrink-0" />
 
                                 {editItem?.type === 'league' && editItem.id === league.id ? (
-                                    <InlineEdit
-                                        fields={[
-                                            { key: 'name', label: 'Name', value: editItem.name },
-                                            { key: 'slug', label: 'Slug', value: editItem.slug },
-                                            { key: 'slogan', label: 'Slogan', value: editItem.slogan || '', wide: true },
-                                            { key: 'description', label: 'Description', value: editItem.description || '', wide: true },
-                                            { key: 'promotional_text', label: 'Promo Text', value: editItem.promotional_text || '', wide: true },
-                                            { key: 'discord_url', label: 'Discord URL', value: editItem.discord_url || '', wide: true },
-                                            { key: 'color', label: 'Color', value: editItem.color || '#3b82f6', type: 'color', small: true },
-                                        ]}
-                                        onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
-                                        onSave={handleSaveEdit}
-                                        onCancel={() => setEditItem(null)}
-                                        saving={saving}
-                                    />
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <ImageUpload
+                                            currentUrl={league.image_url}
+                                            uploadFn={async (file) => {
+                                                const formData = new FormData()
+                                                formData.append('leagueId', league.id)
+                                                formData.append('file', file)
+                                                const token = localStorage.getItem('auth_token')
+                                                const res = await fetch(`${API}/league-upload`, {
+                                                    method: 'POST',
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                    body: formData,
+                                                })
+                                                const d = await res.json()
+                                                if (!res.ok) throw new Error(d.error || 'Upload failed')
+                                            }}
+                                            onRemove={async () => {
+                                                const token = localStorage.getItem('auth_token')
+                                                const res = await fetch(`${API}/league-upload?leagueId=${league.id}`, {
+                                                    method: 'DELETE',
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                })
+                                                const d = await res.json()
+                                                if (!res.ok) throw new Error(d.error || 'Delete failed')
+                                            }}
+                                            onComplete={fetchData}
+                                            onError={(msg) => showToast('error', msg)}
+                                            size={48}
+                                            maxDim={512}
+                                        />
+                                        <InlineEdit
+                                            fields={[
+                                                { key: 'name', label: 'Name', value: editItem.name },
+                                                { key: 'slug', label: 'Slug', value: editItem.slug },
+                                                { key: 'slogan', label: 'Slogan', value: editItem.slogan || '', wide: true },
+                                                { key: 'description', label: 'Description', value: editItem.description || '', wide: true },
+                                                { key: 'promotional_text', label: 'Promo Text', value: editItem.promotional_text || '', wide: true },
+                                                { key: 'discord_url', label: 'Discord URL', value: editItem.discord_url || '', wide: true },
+                                                { key: 'color', label: 'Color', value: editItem.color || '#3b82f6', type: 'color', small: true },
+                                            ]}
+                                            onChange={(k, v) => setEditItem(prev => ({ ...prev, [k]: v }))}
+                                            onSave={handleSaveEdit}
+                                            onCancel={() => setEditItem(null)}
+                                            saving={saving}
+                                        />
+                                    </div>
                                 ) : (
                                     <>
                                         <div className="flex-1 min-w-0 flex items-center gap-2">
-                                            {league.color && <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: league.color }} />}
+                                            {league.image_url
+                                                ? <img src={league.image_url} alt="" className="w-5 h-5 rounded-sm object-contain shrink-0" />
+                                                : league.color && <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: league.color }} />
+                                            }
                                             <span className="font-semibold text-[var(--color-text)]">{league.name}</span>
                                             <span className="text-xs text-[var(--color-text-secondary)]">/{league.slug}</span>
                                             <span className="text-xs text-[var(--color-text-secondary)]">{divs.length} div{divs.length !== 1 ? 's' : ''}</span>

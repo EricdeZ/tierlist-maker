@@ -9,7 +9,7 @@ export const EXT_MAP = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 
 export const ALL_EXTS = Object.values(EXT_MAP)
 
 // Allowed key prefixes for the r2-image serving endpoint
-export const ALLOWED_PREFIXES = ['team-icons/', 'codex/', 'community-teams/', 'vault-assets/']
+export const ALLOWED_PREFIXES = ['team-icons/', 'codex/', 'community-teams/', 'vault-assets/', 'league-icons/']
 
 // ─── Validation ───
 

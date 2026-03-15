@@ -448,7 +448,7 @@ export default function GlobalSidebar() {
                             )}
 
                             {leagues.map(league => {
-                                const logo = getLeagueLogo(league.slug)
+                                const logo = getLeagueLogo(league.slug, league.image_url)
                                 const activeDivisions = (league.divisions || []).filter(
                                     d => d.seasons?.some(s => s.is_active)
                                 )
@@ -456,7 +456,7 @@ export default function GlobalSidebar() {
                                 return (
                                     <div key={league.id} className="mt-1">
                                         <Link
-                                            to={league.slug === 'agl' ? '/agl/signup' : `/${league.slug}`}
+                                            to={league.slug === 'agl' ? '/agl/signup' : league.slug === 'sal' ? '/sal/signup' : `/${league.slug}`}
                                             className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                                                 isActive(`/${league.slug}`, true)
                                                     ? 'text-(--color-accent) bg-(--color-accent)/10'

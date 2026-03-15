@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import salLogo from '../assets/leagues/sap.png'
+import salLogo from '../assets/leagues/sal.png'
 
 // Set embed URLs here — leave null for "Unlocking Soon"
 const PLAYER_EMBED_URL = 'https://forms.gle/VjiqocWrtYyscK7UA'
@@ -96,6 +96,7 @@ export default function SALSignup() {
                         </svg>
                         Join the Discord
                     </a>
+
                 </div>
             </div>
 

@@ -15,7 +15,7 @@ const handler = async (event, context) => {
             // Get single league with divisions and seasons
             if (slug) {
                 const [league] = await sql`
-                    SELECT id, name, slug, description, discord_url, color, slogan, promotional_text
+                    SELECT id, name, slug, description, discord_url, color, slogan, promotional_text, image_url
                     FROM leagues
                     WHERE slug = ${slug}
                 `
@@ -119,7 +119,7 @@ const handler = async (event, context) => {
 
             // Get all leagues (basic info)
             const leagues = await sql`
-                SELECT id, name, slug, description, discord_url, color, slogan, promotional_text
+                SELECT id, name, slug, description, discord_url, color, slogan, promotional_text, image_url
                 FROM leagues
                 ORDER BY name
             `

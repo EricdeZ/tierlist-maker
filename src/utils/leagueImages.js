@@ -16,15 +16,18 @@ const ALIASES = {
     'albion-giants-league': 'agl',
     'babylon-smite-league': 'babylon',
     'oceanic-smite-league': 'osl',
+    'serpent-ascension-league': 'sal',
     'tanuki-smite-league': 'tsl',
 }
 
 /**
  * Get the logo image for a league by slug.
  * @param {string} slug
+ * @param {string} [imageUrl] - DB image_url (preferred over static asset)
  * @returns {string|null} image URL or null
  */
-export function getLeagueLogo(slug) {
+export function getLeagueLogo(slug, imageUrl) {
+    if (imageUrl) return imageUrl
     if (!slug) return null
     return logosBySlug[slug] || logosBySlug[ALIASES[slug]] || null
 }

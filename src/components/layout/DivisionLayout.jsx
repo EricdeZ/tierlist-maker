@@ -26,7 +26,7 @@ const DivisionContent = () => {
     ]
 
     const rankImg = getDivisionImage(leagueSlug, divisionSlug, division?.tier)
-    const leagueLogo = getLeagueLogo(leagueSlug)
+    const leagueLogo = getLeagueLogo(leagueSlug, league?.image_url)
     const hasManyDivisions = !loading && league?.divisions?.length > 1
 
     // Close picker on click outside

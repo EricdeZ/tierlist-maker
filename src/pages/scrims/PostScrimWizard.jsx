@@ -480,7 +480,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                             Select which division tiers you are willing to accept scrims from.
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            {[1, 2, 3, 4, 5].map(tier => {
+                                            {[1, 2, 3, 4, 5, 6, 7].map(tier => {
                                                 const img = getDivisionImage(null, null, tier)
                                                 return (
                                                     <label key={tier} className="xp-checkbox-label">
@@ -664,7 +664,7 @@ export default function PostScrimWizard({ captainTeams, allTeams, myScrims, onSu
                                         </span>
                                         <span className="xp-text">
                                             {filterMode === 'tier'
-                                                ? (acceptableTiers.length === 5 ? 'All tiers' : acceptableTiers.map(t => RANK_LABELS[t]).join(', '))
+                                                ? (acceptableTiers.length === 7 ? 'All tiers' : acceptableTiers.map(t => RANK_LABELS[t]).join(', '))
                                                 : acceptableDivisions.map(id => activeDivisions.find(d => d.id === id)?.name).filter(Boolean).join(', ')
                                             }
                                         </span>

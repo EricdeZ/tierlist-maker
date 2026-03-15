@@ -28,13 +28,13 @@ for (const [path, url] of Object.entries(allImages)) {
 }
 
 // Tier → generic rank image (same mapping as before)
-const TIER_TO_NAME = { 1: 'deity', 2: 'demigod', 3: 'master', 4: 'obsidian', 5: 'diamond' }
+const TIER_TO_NAME = { 1: 'deity', 2: 'demigod', 3: 'master', 4: 'obsidian', 5: 'diamond', 6: 'platinum', 7: 'gold' }
 const RANK_IMAGES = {}
 for (const [tier, name] of Object.entries(TIER_TO_NAME)) {
     if (genericByName[name]) RANK_IMAGES[tier] = genericByName[name]
 }
 
-export const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond' }
+export const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond', 6: 'Platinum', 7: 'Gold' }
 
 /**
  * Get the best image for a division.
@@ -53,4 +53,4 @@ export function getDivisionImage(leagueSlug, divisionSlug, tier) {
 }
 
 /** All generic rank images as an array (for decorative use) */
-export const ALL_RANK_IMAGES = [1, 2, 3, 4, 5].map(t => RANK_IMAGES[t]).filter(Boolean)
+export const ALL_RANK_IMAGES = [1, 2, 3, 4, 5, 6, 7].map(t => RANK_IMAGES[t]).filter(Boolean)

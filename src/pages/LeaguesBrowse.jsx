@@ -98,7 +98,7 @@ const LeaguesBrowse = () => {
                 <div className="max-w-5xl mx-auto space-y-12">
                     {mainLeagues.map(league => {
                         const divisions = league.divisions || []
-                        const logo = getLeagueLogo(league.slug)
+                        const logo = getLeagueLogo(league.slug, league.image_url)
                         const leagueColor = league.color || 'var(--color-accent)'
                         const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))
                         const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))

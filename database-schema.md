@@ -13,6 +13,7 @@
 | color | varchar(7) | YES | |
 | slogan | text | YES | |
 | promotional_text | text | YES | |
+| image_url | text | YES | |
 | created_at | timestamp | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp | YES | CURRENT_TIMESTAMP |
 

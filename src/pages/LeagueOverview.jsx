@@ -227,7 +227,7 @@ const LeagueOverview = () => {
     }
 
     const divisions = league.divisions || []
-    const logo = getLeagueLogo(league.slug)
+    const logo = getLeagueLogo(league.slug, league.image_url)
     const activeDivisions = divisions.filter(d => d.seasons?.some(s => s.is_active || canPreview()))
     const leagueColor = league.color || 'var(--color-accent)'
     const totalTeams = activeDivisions.reduce((sum, d) => sum + (d.team_count || 0), 0)

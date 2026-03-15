@@ -4,7 +4,7 @@ import { sendDM, sendDMWithReturn, fetchChannelMessages } from './discord.js'
 // ═══════════════════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════════════════
-export const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond' }
+export const RANK_LABELS = { 1: 'Deity', 2: 'Demigod', 3: 'Master', 4: 'Obsidian', 5: 'Diamond', 6: 'Platinum', 7: 'Gold' }
 export const PICK_MODE_LABELS = { regular: 'Regular', fearless: 'Fearless', fearless_picks: 'Fearless Picks', fearless_bans: 'Fearless Bans' }
 const VALID_PICK_MODES = ['regular', 'fearless', 'fearless_picks', 'fearless_bans']
 const VALID_REGIONS = ['NA', 'EU']
@@ -1002,8 +1002,8 @@ export async function createScrim(sql, user, body) {
 
     // Validate acceptable_tiers if provided
     if (acceptable_tiers) {
-        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 5)) {
-            return { error: 'acceptable_tiers must be an array of integers 1-5', status: 400 }
+        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 7)) {
+            return { error: 'acceptable_tiers must be an array of integers 1-7', status: 400 }
         }
     }
 
@@ -1211,8 +1211,8 @@ export async function updateScrim(sql, user, body) {
         return { error: 'Scheduled date must be in the future', status: 400 }
     }
     if (acceptable_tiers) {
-        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 5)) {
-            return { error: 'acceptable_tiers must be an array of integers 1-5', status: 400 }
+        if (!Array.isArray(acceptable_tiers) || !acceptable_tiers.every(t => Number.isInteger(t) && t >= 1 && t <= 7)) {
+            return { error: 'acceptable_tiers must be an array of integers 1-7', status: 400 }
         }
     }
     if (acceptable_divisions) {
