@@ -1,22 +1,33 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
-import { requirePermission, getAllowedLeagueIds, leagueFilter } from '../lib/auth.js'
+import { requireAnyPermission, getUserPermissions, leagueFilter } from '../lib/auth.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers, body: '' }
     }
 
-    const admin = await requirePermission(event, 'match_report')
-    if (!admin) {
+    const authResult = await requireAnyPermission(event, ['match_report', 'match_manage', 'match_manage_own'])
+    if (!authResult) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
+    const admin = authResult.user
 
     const sql = getDB()
 
     try {
-        // Determine which leagues this user can access for match_report
-        const allowed = await getAllowedLeagueIds(admin.id, 'match_report')
+        // Determine which leagues this user can access across all match permissions
+        const perms = await getUserPermissions(admin.id)
+        const matchKeys = ['match_report', 'match_manage', 'match_manage_own']
+        const hasGlobal = matchKeys.some(key => perms.global.includes(key))
+        let allowed = null
+        if (!hasGlobal) {
+            const ids = new Set()
+            for (const [lid, keys] of Object.entries(perms.byLeague)) {
+                if (matchKeys.some(key => keys.includes(key))) ids.add(Number(lid))
+            }
+            allowed = [...ids]
+        }
         const lf = leagueFilter(sql, allowed)
 
         // Fetch seasons with their league/division info (filtered by allowed leagues)
