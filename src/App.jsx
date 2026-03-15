@@ -1,7 +1,7 @@
 // src/App.jsx
 import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { PassionProvider } from './context/PassionContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -111,6 +111,14 @@ const CardCreator = lazy(() => import('./pages/vault-dashboard/CardCreator'))
 const TemplatesPage = lazy(() => import('./pages/vault-dashboard/TemplatesPage'))
 const DraftsPage = lazy(() => import('./pages/vault-dashboard/DraftsPage'))
 const AssetsPage = lazy(() => import('./pages/vault-dashboard/AssetsPage'))
+const PlayerDashboard = lazy(() => import('./pages/dashboard/PlayerDashboard'))
+
+function HomeRoute() {
+    const { user, loading } = useAuth()
+    if (loading) return null
+    if (user) return <Suspense fallback={null}><PlayerDashboard /></Suspense>
+    return <Homepage />
+}
 
 function App() {
     return (
@@ -134,8 +142,8 @@ function App() {
                         <Route path="vault/binder/:token" element={<Suspense fallback={null}><BinderSharePage /></Suspense>} />
 
                         <Route path="/" element={<AppLayout />}>
-                            {/* Homepage — league & division selector */}
-                            <Route index element={<Homepage />} />
+                            {/* Homepage — league & division selector, or PlayerDashboard for logged-in users */}
+                            <Route index element={<HomeRoute />} />
 
                             {/* Admin pages (nested under AdminLayout with shared navbar) */}
                             <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLayout /></ProtectedRoute>}>
