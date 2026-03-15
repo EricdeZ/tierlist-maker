@@ -2,7 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import {getDB, handleCors, headers, getHeaders} from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 
-const handler = async (event, context) => {
+const handler = async (event) => {
     const cors = handleCors(event)
     if (cors) return cors
     const sql = getDB()
