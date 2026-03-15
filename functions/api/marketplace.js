@@ -101,7 +101,7 @@ async function handleList(sql, params) {
     filtered = filtered.filter(l => l.core_price <= parseInt(maxPrice))
   }
 
-  const rarityOrder = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 }
+  const rarityOrder = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
   switch (sort) {
     case 'price_asc': filtered.sort((a, b) => a.core_price - b.core_price); break
     case 'price_desc': filtered.sort((a, b) => b.core_price - a.core_price); break

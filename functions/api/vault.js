@@ -560,7 +560,11 @@ async function handleCollectionOwned(sql, user) {
       SELECT c.id, c.card_type, c.god_id, c.rarity, c.is_first_edition, c.def_id, c.created_at,
              d.player_name, d.team_name, d.team_color, d.role, d.best_god_name,
              d.league_slug, d.division_tier, d.division_slug, d.season_slug, d.card_index,
-             CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
+             CASE
+               WHEN COALESCE(up.allow_discord_avatar, true) AND u.discord_id IS NOT NULL AND u.discord_avatar IS NOT NULL
+               THEN 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+               ELSE NULL
+             END AS avatar_url,
              CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_connected
       FROM cc_cards c
       LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
@@ -1024,10 +1028,11 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Too many cards (max 200)' }) }
   }
 
-  // Fetch cards owned by user, excluding those locked on market, in active trades, or in Starting 5
+  // Fetch cards owned by user, excluding unique, those locked on market, in active trades, or in Starting 5
   const cards = await sql`
     SELECT c.id, c.rarity FROM cc_cards c
     WHERE c.id = ANY(${cardIds}) AND c.owner_id = ${user.id}
+      AND c.rarity != 'unique'
       AND NOT EXISTS (
         SELECT 1 FROM cc_market_listings ml
         WHERE ml.card_id = c.id AND ml.status = 'active'
@@ -1168,6 +1173,9 @@ async function handleBlackMarketTurnIn(sql, user, body) {
     }
     if (card.player_name !== 'Brudih') {
       throw new Error('Card is not a Brudih card')
+    }
+    if (card.rarity === 'unique') {
+      throw new Error('Unique cards cannot be turned in')
     }
 
     // Check pending mythic claim
@@ -1800,9 +1808,11 @@ function formatCard(row) {
     holoEffect: row.holo_effect,
     holoType: row.holo_type,
     imageUrl: row.card_type === 'player'
-      ? (row.allow_discord_avatar && row.player_discord_id && row.player_discord_avatar
-        ? `https://cdn.discordapp.com/avatars/${row.player_discord_id}/${row.player_discord_avatar}.webp?size=256`
-        : '')
+      ? ('player_discord_id' in row
+        ? (row.allow_discord_avatar && row.player_discord_id && row.player_discord_avatar
+          ? `https://cdn.discordapp.com/avatars/${row.player_discord_id}/${row.player_discord_avatar}.webp?size=256`
+          : '')
+        : (row.image_url || ''))
       : row.image_url,
     ability: row.ability,
     metadata: row.metadata || {},

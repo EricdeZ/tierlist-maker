@@ -3,22 +3,22 @@ import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
 
 const RATES = {
-  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16 },
-  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24 },
+  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16, unique: 22.4 },
+  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24, unique: 33.6 },
   full: {
-    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6 },
-    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4 },
+    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6, unique: 13.44 },
+    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4, unique: 20.16 },
   },
 }
 
 const ATTACHMENT_BONUSES = {
   god: {
-    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50 },
-    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80 },
+    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50, unique: 0.70 },
+    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80, unique: 1.12 },
   },
   item: {
-    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30 },
-    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60 },
+    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30, unique: 0.42 },
+    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60, unique: 0.84 },
   },
 }
 const FULL_HOLO_RATIO = 0.6
@@ -26,10 +26,10 @@ const GOD_SYNERGY_BONUS = 0.30
 const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
-const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0 }
+const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
 
 const CONSUMABLE_SLOT_SCALING = {
-  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00,
+  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,
 }
 const CONSUMABLE_SPREADS = {
   'health-pot':  { passion: 0.75, cores: 0.25 },
@@ -167,6 +167,8 @@ export async function tick(sql, userId) {
 
   const cards = await sql`
     SELECT l.role AS slot_role, c.*, pd.best_god_name, pd.team_id AS team_id,
+      pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+      COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
       g.id AS god_id, g.rarity AS god_rarity, g.holo_type AS god_holo_type,
       g.card_type AS god_card_type, g.role AS god_role, g.card_data AS god_card_data,
       g.god_name AS god_god_name, g.god_class AS god_god_class, g.image_url AS god_image_url,
@@ -180,6 +182,8 @@ export async function tick(sql, userId) {
     FROM cc_lineups l
     JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs pd ON c.def_id = pd.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = pd.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     LEFT JOIN cc_cards g ON l.god_card_id = g.id
     LEFT JOIN cc_cards i ON l.item_card_id = i.id
     WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
