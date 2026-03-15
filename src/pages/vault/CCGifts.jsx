@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useVault } from './VaultContext'
 import { vaultService } from '../../services/database'
 import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck, Trophy } from 'lucide-react'
@@ -10,7 +11,15 @@ import emberIcon from '../../assets/ember.png'
 export default function CCGifts() {
   const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack, ember, packTypes, packTypesMap } = useVault()
   const { user } = useAuth()
-  const [tab, setTab] = useState('received')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('subtab') || 'received'
+  const setTab = useCallback((key) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (key === 'received') next.delete('subtab'); else next.set('subtab', key)
+      return next
+    })
+  }, [setSearchParams])
   const [openResult, setOpenResult] = useState(null)
   const [giftLb, setGiftLb] = useState(null)
   const [giftLbLoading, setGiftLbLoading] = useState(false)

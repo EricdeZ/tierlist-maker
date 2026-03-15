@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
@@ -170,7 +171,15 @@ export default function CCMarketplace() {
     return ids
   }, [startingFive, binderCards])
 
-  const [view, setView] = useState('browse')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('subtab') || 'browse'
+  const setView = useCallback((key) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (key === 'browse') next.delete('subtab'); else next.set('subtab', key)
+      return next
+    })
+  }, [setSearchParams])
   const [listings, setListings] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)

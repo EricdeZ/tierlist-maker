@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
@@ -67,7 +68,15 @@ export default function CCTrading() {
     return ids
   }, [startingFive, binderCards])
 
-  const [view, setView] = useState('inbox')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('subtab') || 'inbox'
+  const setView = useCallback((key) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (key === 'inbox') next.delete('subtab'); else next.set('subtab', key)
+      return next
+    })
+  }, [setSearchParams])
   const [pending, setPending] = useState([])
   const [historyTrades, setHistoryTrades] = useState([])
   const [activeTrade, setActiveTrade] = useState(null)
@@ -99,7 +108,7 @@ export default function CCTrading() {
     } catch (err) {
       console.error('Failed to fetch pending trades:', err)
     }
-  }, [])
+  }, [setView])
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -176,7 +185,7 @@ export default function CCTrading() {
     refreshCollection()
     passionCtxRef.current?.refreshBalance?.()
     setPendingTradeCount?.(0)
-  }, [fetchPending, refreshCollection, setPendingTradeCount])
+  }, [setView, fetchPending, refreshCollection, setPendingTradeCount])
 
   const inviteTimeLeft = invitePolling
     ? Math.max(0, 45 - Math.floor((Date.now() - invitePolling.startTime) / 1000))
