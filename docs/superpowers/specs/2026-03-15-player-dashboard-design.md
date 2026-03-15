@@ -9,7 +9,9 @@ Replace the marketing homepage with a personalized player dashboard for logged-i
 - **Logged out** at `/` → existing `Homepage.jsx` (no changes)
 - **Logged in** at `/` → new `PlayerDashboard.jsx`
 
-Controlled in `App.jsx` — conditionally render based on auth state from `AuthContext`.
+Controlled in `App.jsx` — conditionally render based on auth state from `AuthContext`. Use a wrapper component that reads `useAuth()` to pick between `PlayerDashboard` and `Homepage`. During the auth loading state, show neither page to avoid a flash of the wrong content.
+
+`PlayerDashboard` must be lazy-loaded via `React.lazy()` since it's only needed for logged-in users and pulls from many feature APIs.
 
 ## File Structure
 
@@ -31,29 +33,29 @@ src/pages/dashboard/
 
 ## Data Loading
 
-`PlayerDashboard` fires all API calls in parallel on mount. Each widget receives data as props. Single top-level loading state — no nested spinners per widget.
+`PlayerDashboard` fires API calls in parallel on mount. Each widget receives data as props. Single top-level loading state — no nested spinners per widget.
+
+**Leverage existing contexts:** PassionContext already provides balance, rank, streak, canClaimDaily, claimableCount, and Cores (ember) state on every route. The dashboard consumes `usePassion()` directly for Passion and Cores data rather than making redundant API calls.
 
 ### API Calls Required
 
-| Widget | Endpoint | Action |
-|--------|----------|--------|
-| ActionBar | `passion` | `balance` (daily claim status, claimable challenges) |
-| ActionBar | `vault` | `starting-five` (income collectible), `gifts` (pending count) |
-| ActionBar | `trading` | `pending` (trade invite count) |
-| ActionBar | `community-teams` | `pending-count` (invitation count) |
-| ActionBar | `scrim` | `incoming` (request count) |
-| ActionBar | `ember` | `balance` (daily claim status) |
-| UpcomingMatches | New endpoint or existing `matches` | Upcoming scheduled matches for user's teams |
-| RecentResults | `stats` or `player-profile` | Recent game history for linked player |
-| PassionStatus | `passion` | `balance` (rank, balance, streak, progress) |
-| VaultOverview | `vault` | `load` or `collection-owned` + `starting-five` |
-| ForgePortfolio | `forge` | `portfolio` (holdings, value, Sparks balance) |
-| ChallengesProgress | `challenges` | List with user progress |
-| CoresClaim | `ember` | `balance` (Cores balance, claim status, streak) |
-| TeamWidget | `community-teams` | `my-teams` (membership, roster) |
-| ScrimWidget | `scrim` | `my-scrims` (upcoming scrims) |
+| Widget | Source | Details |
+|--------|--------|---------|
+| ActionBar + PassionStatus + CoresClaim | `usePassion()` context | balance, rank, streak, canClaimDaily, claimableCount, cores state — already loaded |
+| ActionBar (vault) | `vault?action=starting-five` | Income collectible status + card thumbnails (shared with VaultOverview) |
+| ActionBar (gifts) | `vault?action=gifts` | Pending gift count |
+| ActionBar (trades) | `trading?action=pending` | Returns full trade objects — use `.trades.length` for count, discard details |
+| ActionBar (teams) | `community-teams?action=pending-count` | Returns `{ count }` — lightweight |
+| ActionBar (scrims) | `scrim?action=incoming` | Returns full scrim objects — use `.scrims.length` for count |
+| UpcomingMatches | `matches?action=my-upcoming` | **New endpoint** — see below |
+| RecentResults | `player-profile?slug={linkedPlayer.slug}` | Game history from profile endpoint; `linkedPlayer` available from `useAuth()` context |
+| VaultOverview | `vault?action=load` | Collection count + card stats (Starting Five data shared from above) |
+| ForgePortfolio | `forge?action=market-statuses` then `forge?action=portfolio&seasonId={activeSeasonId}` | Fetch active market first, then portfolio for the most recent active season |
+| ChallengesProgress | `challenges` (plain GET, no action param) | Returns `{ challenges, claimableCount }` with user progress if authed |
+| TeamWidget | `community-teams?action=my-teams` | Community teams the user owns/plays for |
+| ScrimWidget | `scrim?action=my-scrims` | Upcoming scrims |
 
-Many of these overlap (e.g., Passion balance needed by ActionBar and PassionStatus). Deduplicate at the orchestrator level — fetch once, pass to multiple widgets.
+Data shared between widgets (e.g., Starting Five data used by both ActionBar and VaultOverview) is fetched once at the orchestrator level and passed down.
 
 ### New API Endpoint Needed
 
@@ -62,7 +64,36 @@ Many of these overlap (e.g., Passion balance needed by ActionBar and PassionStat
 2. New action on existing `matches` endpoint: `?action=my-upcoming`
 3. Fetch `community-teams?action=my-teams` then `matches` per team client-side
 
-Recommendation: **Option 2** — add `my-upcoming` action to the matches endpoint. Takes the auth token, looks up user's linked player → team memberships → upcoming scheduled matches. Returns max 3 matches sorted by date.
+Recommendation: **Option 2** — add `my-upcoming` action to the matches endpoint.
+
+**Server-side query:**
+1. `requireAuth(event)` → get `userId`
+2. Look up `users.linked_player_id` → get `playerId`
+3. Query `league_players` for the player's current team IDs across all active seasons
+4. Query `scheduled_matches` where either `team1_id` or `team2_id` matches, `status = 'scheduled'`, and `scheduled_time > NOW()`
+5. Join team names, logos, division/league info
+6. ORDER BY `scheduled_time ASC`, LIMIT 3
+
+**Response shape:**
+```json
+{
+  "matches": [
+    {
+      "scheduledMatchId": 123,
+      "scheduledTime": "2026-03-20T20:00:00Z",
+      "team1": { "id": 1, "name": "Team A", "logoUrl": "..." },
+      "team2": { "id": 2, "name": "Team B", "logoUrl": "..." },
+      "userTeamId": 1,
+      "divisionName": "Division 1",
+      "leagueSlug": "osl",
+      "divisionSlug": "div-1",
+      "stageName": "Week 5"
+    }
+  ]
+}
+```
+
+If the user has no linked player or no team memberships, returns `{ matches: [] }`.
 
 ## Layout
 
@@ -70,13 +101,15 @@ Responsive CSS grid with varied widget sizes.
 
 ### Desktop (3-column grid)
 
+Uses CSS Grid with named template areas. Passion Status spans 2 rows (alongside Upcoming Matches and Recent Results) using `grid-row: span 2`.
+
 ```
 ┌─────────────────────────────────────────────┐
 │              Action Bar (full width)         │
 ├─────────────────────────────────────────────┤
 │    Upcoming Matches (2 cols)    │  Passion   │
 │                                 │  Status    │
-├─────────────────────────────────┤            │
+├─────────────────────────────────┤  (span 2)  │
 │    Recent Results (2 cols)      │            │
 │                                 ├────────────┤
 ├──────────────┬──────────────────┤   Cores    │
@@ -87,6 +120,8 @@ Responsive CSS grid with varied widget sizes.
 │  Progress    │    Widget        │   Widget   │
 └──────────────┴──────────────────┴────────────┘
 ```
+
+Implementation: `grid-template-columns: 1fr 1fr 1fr` with explicit `grid-template-areas` for the named placement, or auto-placement with `grid-row: span 2` on the Passion widget.
 
 ### Tablet (2-column grid)
 
@@ -154,6 +189,7 @@ Each item links to its relevant page. Items with nothing pending are **hidden** 
 - Top 3 holdings: player name + current price
 - Links to Forge page
 - **Empty state:** PromoCard — "Invest in players"
+- **Season resolution:** Forge requires a `seasonId`. The orchestrator first calls `forge?action=market-statuses` to get active markets, picks the most recent open season, then calls `forge?action=portfolio&seasonId={id}`. If no markets are open, shows "Markets closed" state instead of PromoCard.
 
 ### Challenges Progress (Medium)
 
@@ -171,6 +207,7 @@ Each item links to its relevant page. Items with nothing pending are **hidden** 
 
 ### Team Widget (Small)
 
+- Shows community teams (from `my-teams`), not league teams
 - Team name + logo
 - Roster preview (player avatar row)
 - Pending invitation count badge
@@ -203,6 +240,22 @@ Styled consistently across all widgets. Subtle background, not aggressive — sh
 All widgets always render. Unused features show their PromoCard empty state rather than being hidden. This promotes feature discovery.
 
 Exception: Scrim Widget hides entirely if the user is not a captain on any team (scrims are captain-initiated, so non-captains have no actions).
+
+## Error Handling
+
+Individual widget error states rather than failing the whole dashboard. If an API call fails, the affected widget shows a subtle "Couldn't load" message with a retry link. Other widgets remain functional.
+
+The orchestrator uses `Promise.allSettled()` instead of `Promise.all()` so one failure doesn't block the rest.
+
+## Claim Action State Propagation
+
+When a user clicks an inline claim button (Passion daily, Cores daily, Starting Five income):
+1. The claim API call fires
+2. On success, update local widget state immediately (optimistic or post-response)
+3. For Passion/Cores: call `refreshPassion()` from PassionContext to sync global state
+4. ActionBar re-evaluates — the claimed item disappears from the bar
+
+This keeps the dashboard self-contained without requiring a full page reload.
 
 ## No New Dependencies
 
