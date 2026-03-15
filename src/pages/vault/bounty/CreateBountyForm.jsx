@@ -9,26 +9,34 @@ import { X, Loader2 } from 'lucide-react'
 
 const CARD_TYPES = ['god', 'player', 'item', 'consumable']
 
+const ROLE_LABELS = { solo: 'Solo', jungle: 'Jungle', mid: 'Mid', support: 'Support', adc: 'ADC' }
+
 const STATIC_CARD_DATA = {
-  god: GODS.map(g => ({ name: g.name, detail: g.class, avatar: null })),
-  item: ITEMS.map(i => ({ name: i.name, detail: i.category, avatar: null })),
-  consumable: CONSUMABLES.map(c => ({ name: c.name, detail: null, avatar: null })),
+  god: GODS.map(g => ({
+    name: g.name,
+    detail: `${g.class} · ${ROLE_LABELS[g.role] || g.role}`,
+    avatar: null,
+    godId: g.slug,
+  })),
+  item: ITEMS.map(i => ({ name: i.name, detail: i.category, avatar: null, godId: `item-${i.id}` })),
+  consumable: CONSUMABLES.map(c => ({ name: c.name, detail: null, avatar: null, godId: `consumable-${c.id}` })),
 }
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const HOLO_OPTIONS = [
-  { value: '', label: 'Any' },
   { value: 'holo', label: 'Holo' },
   { value: 'reverse', label: 'Reverse' },
   { value: 'full', label: 'Full Art' },
+  { value: 'any_holo', label: 'All' },
 ]
 const MAX_BOUNTIES = 3
 
 export default function CreateBountyForm({ onSubmit, onClose, emberBalance, activeBountyCount }) {
   const [cardType, setCardType] = useState('god')
   const [cardName, setCardName] = useState('')
+  const [targetGodId, setTargetGodId] = useState('')
   const [searchText, setSearchText] = useState('')
   const [rarity, setRarity] = useState('common')
-  const [holoType, setHoloType] = useState('')
+  const [holoType, setHoloType] = useState('holo')
   const [coreReward, setCoreReward] = useState(10)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -60,9 +68,10 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
         const res = await bountyService.searchPlayers(term)
         setPlayerResults((res.players || []).map(p => ({
           name: p.player_name,
-          detail: [p.role, p.team_name].filter(Boolean).join(' · '),
+          detail: [p.role?.toUpperCase(), p.team_name, p.division_name, p.season_slug].filter(Boolean).join(' · '),
           avatar: p.avatar_url,
           teamColor: p.team_color,
+          godId: `player-${p.player_id}-t${p.team_id}`,
         })))
       } catch {
         setPlayerResults([])
@@ -80,16 +89,17 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
       card_type: cardType,
       card_name: cardName,
       rarity,
-      holo_type: holoType || null,
+      holo_type: holoType,
       core_reward: coreReward,
+      target_god_id: targetGodId,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       avatar_url: selectedAvatar,
     }
-  }, [cardType, cardName, rarity, holoType, coreReward, selectedAvatar])
+  }, [cardType, cardName, rarity, holoType, coreReward, targetGodId, selectedAvatar])
 
   const handleSubmit = async () => {
-    if (!cardName.trim()) {
-      setError('Card name is required')
+    if (!cardName.trim() || !targetGodId) {
+      setError('Select a specific card from the search results')
       return
     }
     if (coreReward < 1) {
@@ -107,8 +117,9 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
         cardType,
         cardName: cardName.trim(),
         rarity,
-        holoType: holoType || null,
+        holoType,
         coreReward,
+        targetGodId,
       })
     } catch (err) {
       setError(err.message || 'Failed to post bounty')
@@ -119,7 +130,8 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
 
   const selectCard = (card) => {
     setCardName(card.name)
-    setSearchText(card.name)
+    setTargetGodId(card.godId)
+    setSearchText(isPlayer ? `${card.name} — ${card.detail}` : card.name)
     setShowDropdown(false)
     setSelectedAvatar(card.avatar || null)
   }
@@ -171,7 +183,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                 {CARD_TYPES.map(t => (
                   <button
                     key={t}
-                    onClick={() => { setCardType(t); setCardName(''); setSearchText(''); setPlayerResults([]); setSelectedAvatar(null) }}
+                    onClick={() => { setCardType(t); setCardName(''); setTargetGodId(''); setSearchText(''); setPlayerResults([]); setSelectedAvatar(null) }}
                     className={`text-[10px] sm:text-xs px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
                       cardType === t
                         ? 'border-[#ff8c00]/50 text-[#ff8c00] bg-[#ff8c00]/10'
@@ -194,6 +206,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                   onChange={(e) => {
                     setSearchText(e.target.value)
                     setCardName('')
+                    setTargetGodId('')
                     setShowDropdown(true)
                     if (isPlayer) searchPlayerDefs(e.target.value)
                   }}
@@ -212,7 +225,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                   >
                     {searchMatches.map(c => (
                       <button
-                        key={c.name}
+                        key={c.godId}
                         onClick={() => selectCard(c)}
                         className="w-full text-left px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white cursor-pointer flex items-center gap-2"
                       >
@@ -246,7 +259,11 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                 {RARITY_ORDER.map(r => (
                   <button
                     key={r}
-                    onClick={() => setRarity(r)}
+                    onClick={() => {
+                      setRarity(r)
+                      if (r === 'common') setHoloType('none')
+                      else if (holoType === 'none') setHoloType('holo')
+                    }}
                     className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
                       rarity === r
                         ? 'border-current bg-current/10'
@@ -260,7 +277,8 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
               </div>
             </div>
 
-            {/* Holo Type */}
+            {/* Holo Type — common is always non-holo */}
+            {rarity !== 'common' && (
             <div>
               <label className="block text-[10px] text-white/40 uppercase tracking-wider mb-1.5 cd-head">Holo Type</label>
               <div className="flex flex-wrap gap-1.5">
@@ -279,6 +297,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
                 ))}
               </div>
             </div>
+            )}
 
             {/* Core Reward */}
             <div>
@@ -321,7 +340,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
         <div className="mt-6 flex items-center gap-3">
           <button
             onClick={handleSubmit}
-            disabled={submitting || atMax || !cardName.trim()}
+            disabled={submitting || atMax || !cardName.trim() || !targetGodId}
             className="px-6 py-2 rounded font-bold text-sm uppercase tracking-wider cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             style={{
               background: 'rgba(255, 140, 0, 0.15)',

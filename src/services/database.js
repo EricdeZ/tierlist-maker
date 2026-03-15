@@ -1028,6 +1028,9 @@ export const vaultService = {
     async loadGifts() {
         return apiCall('vault', { action: 'gifts' })
     },
+    loadGiftLeaderboard() {
+        return apiCall('vault', { action: 'gift-leaderboard' })
+    },
     async searchUsers(q) {
         return apiCall('vault', { action: 'search-users', q })
     },
@@ -1048,6 +1051,9 @@ export const vaultService = {
     },
     loadStartingFive() {
         return apiCall('vault', { action: 'starting-five' })
+    },
+    loadS5Leaderboard() {
+        return apiCall('vault', { action: 'starting-five-leaderboard' })
     },
     slotCard(cardId, role, slotType = 'player') {
         return apiPost('vault', { action: 'slot-card' }, { cardId, role, slotType })

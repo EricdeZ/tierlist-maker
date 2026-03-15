@@ -3,8 +3,8 @@ import WantedPoster from '../components/WantedPoster'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const CARD_TYPES = ['god', 'player', 'item', 'consumable']
-const HOLO_TYPES = ['holo', 'reverse', 'full']
-const HOLO_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
+const HOLO_TYPES = ['holo', 'reverse', 'full', 'any_holo']
+const HOLO_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art', any_holo: 'All' }
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },

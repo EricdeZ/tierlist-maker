@@ -18,7 +18,8 @@ function getDaysRemaining(expiresAt) {
 }
 
 function formatHoloType(holoType) {
-  if (!holoType || holoType === 'common') return null
+  if (!holoType || holoType === 'none') return null
+  if (holoType === 'any_holo') return 'Any Holo'
   return holoType.charAt(0).toUpperCase() + holoType.slice(1)
 }
 
@@ -55,14 +56,16 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
   // Resolve mugshot image
   const mugshot = useMemo(() => {
     if (bounty.card_type === 'god') {
-      const god = GODS.find(g => g.name === bounty.card_name)
+      const god = bounty.target_god_id
+        ? GODS.find(g => g.slug === bounty.target_god_id)
+        : GODS.find(g => g.name === bounty.card_name)
       if (god) return { url: getGodCardUrl(god.imageKey), isPlayer: false }
     }
     if (bounty.card_type === 'player' && bounty.avatar_url) {
       return { url: bounty.avatar_url, isPlayer: true }
     }
     return null
-  }, [bounty.card_type, bounty.card_name, bounty.avatar_url])
+  }, [bounty.card_type, bounty.card_name, bounty.target_god_id, bounty.avatar_url])
 
   const pinSize = isLg ? 10 : 8
   const mugshotH = isLg ? 120 : 96

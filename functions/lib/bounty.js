@@ -39,7 +39,7 @@ export async function expireStale(tx) {
   return refunds
 }
 
-export async function createBounty(tx, userId, { cardType, cardName, rarity, holoType, coreReward }) {
+export async function createBounty(tx, userId, { cardType, cardName, rarity, holoType, coreReward, targetGodId }) {
   if (!coreReward || coreReward < BOUNTY_RULES.min_reward || coreReward > BOUNTY_RULES.max_reward) {
     throw new Error(`Reward must be between ${BOUNTY_RULES.min_reward} and ${BOUNTY_RULES.max_reward} Core`)
   }
@@ -66,8 +66,8 @@ export async function createBounty(tx, userId, { cardType, cardName, rarity, hol
     `Bounty posted: ${cardName} (${rarity})`)
 
   const [bounty] = await tx`
-    INSERT INTO cc_bounties (poster_id, card_type, card_name, rarity, holo_type, core_reward, expires_at)
-    VALUES (${userId}, ${cardType}, ${cardName}, ${rarity}, ${holoType || null}, ${coreReward},
+    INSERT INTO cc_bounties (poster_id, card_type, card_name, rarity, holo_type, core_reward, target_god_id, expires_at)
+    VALUES (${userId}, ${cardType}, ${cardName}, ${rarity}, ${holoType}, ${coreReward}, ${targetGodId},
             NOW() + INTERVAL '14 days')
     RETURNING *
   `
@@ -84,7 +84,7 @@ export async function fulfillBounty(tx, fulfillerId, { bountyId, cardId }) {
   if (!bounty) throw new Error('Bounty not found or already fulfilled')
 
   const [card] = await tx`
-    SELECT id, owner_id, card_type, god_name, rarity, holo_type
+    SELECT id, owner_id, card_type, god_id, god_name, rarity, holo_type
     FROM cc_cards WHERE id = ${cardId}
     FOR UPDATE
   `
@@ -92,9 +92,13 @@ export async function fulfillBounty(tx, fulfillerId, { bountyId, cardId }) {
   if (card.owner_id !== fulfillerId) throw new Error('You do not own this card')
 
   if (card.card_type !== bounty.card_type) throw new Error('Card type does not match')
-  if (card.god_name !== bounty.card_name) throw new Error('Card name does not match')
+  if (bounty.target_god_id && card.god_id !== bounty.target_god_id) throw new Error('Card variant does not match')
+  if (!bounty.target_god_id && card.god_name !== bounty.card_name) throw new Error('Card name does not match')
   if (card.rarity !== bounty.rarity) throw new Error('Card rarity does not match')
-  if (bounty.holo_type && card.holo_type !== bounty.holo_type) throw new Error('Card holo type does not match')
+  // holo_type: 'none' = non-holo only, 'any_holo' = any holo, specific = exact match
+  if (bounty.holo_type === 'none' && card.holo_type) throw new Error('Bounty requires a non-holo card')
+  if (bounty.holo_type === 'any_holo' && !card.holo_type) throw new Error('Bounty requires a holo card')
+  if (bounty.holo_type && bounty.holo_type !== 'none' && bounty.holo_type !== 'any_holo' && card.holo_type !== bounty.holo_type) throw new Error('Card holo type does not match')
 
   // Lock checks (same as marketplace)
   const [tradeLock] = await tx`

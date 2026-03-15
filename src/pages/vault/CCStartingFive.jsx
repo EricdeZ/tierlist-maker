@@ -12,7 +12,9 @@ import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
 import suppIcon from '../../assets/roles/supp.webp'
 import adcIcon from '../../assets/roles/adc.webp'
-import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap } from 'lucide-react'
+import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
+import { vaultService } from '../../services/database'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: soloIcon },
@@ -191,6 +193,9 @@ export default function CCStartingFive() {
   const [showConsumablePicker, setShowConsumablePicker] = useState(false)
   const [slottingConsumable, setSlottingConsumable] = useState(false)
   const [error, setError] = useState(null)
+  const [s5Leaderboard, setS5Leaderboard] = useState(null)
+  const [s5LbLoading, setS5LbLoading] = useState(false)
+  const { user } = useAuth()
   const slotSize = useSlotSize()
 
   const showError = useCallback((msg) => {
@@ -226,6 +231,14 @@ export default function CCStartingFive() {
     }, 1000)
     return () => clearInterval(interval)
   }, [startingFive?.totalPassionPerHour, startingFive?.totalCoresPerHour, startingFive?.passionCap, startingFive?.coresCap])
+
+  useEffect(() => {
+    setS5LbLoading(true)
+    vaultService.loadS5Leaderboard()
+      .then(data => setS5Leaderboard(data))
+      .catch(() => {})
+      .finally(() => setS5LbLoading(false))
+  }, [])
 
   const slottedCards = useMemo(() => {
     if (!startingFive?.cards) return {}
@@ -550,6 +563,9 @@ export default function CCStartingFive() {
         })}
       </div>
 
+      {/* Leaderboard */}
+      <S5Leaderboard data={s5Leaderboard} loading={s5LbLoading} currentUserId={user?.id} />
+
       {/* Card Picker Modal */}
       {pickerRole && (
         <CardPicker
@@ -850,6 +866,141 @@ function TutorialModal({ onClose }) {
   )
 }
 
+
+function S5Leaderboard({ data, loading, currentUserId }) {
+  if (loading) {
+    return (
+      <div className="mt-8 cd-panel cd-corners rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Trophy size={16} className="text-amber-400" />
+          <h2 className="text-sm font-bold cd-head tracking-wider text-white/60">LEADERBOARD</h2>
+        </div>
+        <div className="flex justify-center py-8">
+          <div className="cd-spinner w-6 h-6" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!data?.leaderboard?.length) return null
+
+  const entries = data.leaderboard
+  const myEntry = data.myEntry
+
+  return (
+    <div className="mt-8 cd-panel cd-corners rounded-xl p-4 sm:p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Trophy size={16} className="text-amber-400" />
+        <h2 className="text-sm font-bold cd-head tracking-wider text-white/60">TOP 20 — 2-DAY CAP</h2>
+      </div>
+      <div className="space-y-[2px]">
+        {entries.map(entry => {
+          const isMe = entry.userId === currentUserId
+          return (
+            <div
+              key={entry.userId}
+              className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 rounded-lg ${
+                isMe ? 'bg-[var(--cd-cyan)]/[0.06] border border-[var(--cd-cyan)]/20' : 'bg-white/[0.02]'
+              }`}
+            >
+              <div className={`w-7 sm:w-9 text-center cd-num text-sm sm:text-base font-bold ${
+                entry.position === 1 ? 'text-yellow-400' :
+                entry.position === 2 ? 'text-gray-300' :
+                entry.position === 3 ? 'text-amber-600' : 'text-white/25'
+              }`}>
+                #{entry.position}
+              </div>
+              {entry.avatar && entry.discordId ? (
+                <img
+                  src={`https://cdn.discordapp.com/avatars/${entry.discordId}/${entry.avatar}.png?size=32`}
+                  alt=""
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/30">
+                  {(entry.username || '?')[0]}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold cd-head truncate text-white/80">
+                  {entry.username || 'Unknown'}
+                  {isMe && <span className="text-[var(--cd-cyan)] text-xs ml-1">(you)</span>}
+                </div>
+                <div className="text-[10px] text-white/25 cd-num">
+                  {entry.cardCount} card{entry.cardCount !== 1 ? 's' : ''} slotted
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-sm font-bold cd-num text-white/70">{entry.totalCap}</div>
+                <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
+                  {entry.passionCap > 0 && (
+                    <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
+                      <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+                      {entry.passionCap}
+                    </span>
+                  )}
+                  {entry.coresCap > 0 && (
+                    <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
+                      <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+                      {entry.coresCap}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        {myEntry && (
+          <>
+            <div className="text-center text-white/15 text-xs py-1">...</div>
+            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 rounded-lg bg-[var(--cd-cyan)]/[0.06] border border-[var(--cd-cyan)]/20">
+              <div className="w-7 sm:w-9 text-center cd-num text-sm sm:text-base font-bold text-white/25">
+                #{myEntry.position}
+              </div>
+              {myEntry.avatar && myEntry.discordId ? (
+                <img
+                  src={`https://cdn.discordapp.com/avatars/${myEntry.discordId}/${myEntry.avatar}.png?size=32`}
+                  alt=""
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/30">
+                  {(myEntry.username || '?')[0]}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold cd-head truncate text-white/80">
+                  {myEntry.username || 'Unknown'}
+                  <span className="text-[var(--cd-cyan)] text-xs ml-1">(you)</span>
+                </div>
+                <div className="text-[10px] text-white/25 cd-num">
+                  {myEntry.cardCount} card{myEntry.cardCount !== 1 ? 's' : ''} slotted
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-sm font-bold cd-num text-white/70">{myEntry.totalCap}</div>
+                <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
+                  {myEntry.passionCap > 0 && (
+                    <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
+                      <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+                      {myEntry.passionCap}
+                    </span>
+                  )}
+                  {myEntry.coresCap > 0 && (
+                    <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
+                      <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+                      {myEntry.coresCap}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function EmptySlot({ role, onClick, size = 170 }) {
   const iconSize = size < 150 ? 22 : 28

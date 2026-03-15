@@ -70,6 +70,7 @@ export default function CCBountyBoard() {
         rarity: b.rarity,
         holo_type: b.holoType,
         core_reward: b.coreReward,
+        target_god_id: b.targetGodId,
         status: b.status,
         created_at: b.createdAt,
         expires_at: b.expiresAt,
@@ -101,12 +102,20 @@ export default function CCBountyBoard() {
     const bounty = [...heroBounties, ...bounties].find(b => b.id === bountyId)
     if (!bounty) return
 
-    const match = collection.find(c =>
-      c.cardType === bounty.card_type &&
-      c.godName === bounty.card_name &&
-      c.rarity === bounty.rarity &&
-      (!bounty.holo_type || c.holoType === bounty.holo_type)
-    )
+    const match = collection.find(c => {
+      if (c.cardType !== bounty.card_type || c.rarity !== bounty.rarity) return false
+      // Match on specific variant via god_id
+      if (bounty.target_god_id) {
+        if (c.godId !== bounty.target_god_id) return false
+      } else {
+        if (c.godName !== bounty.card_name) return false
+      }
+      // Holo matching
+      if (bounty.holo_type === 'none' && c.holoType) return false
+      if (bounty.holo_type === 'any_holo' && !c.holoType) return false
+      if (bounty.holo_type && bounty.holo_type !== 'none' && bounty.holo_type !== 'any_holo' && c.holoType !== bounty.holo_type) return false
+      return true
+    })
     if (!match) {
       setConfirmModal({
         type: 'error',

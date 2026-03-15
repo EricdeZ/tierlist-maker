@@ -12,9 +12,15 @@ const VALID_CARD_NAMES = new Set([
   ...CONSUMABLES.map(c => c.name),
 ])
 
+const VALID_GOD_IDS = new Set([
+  ...GODS.map(g => g.slug),
+  ...ITEMS.map(i => `item-${i.id}`),
+  ...CONSUMABLES.map(c => `consumable-${c.id}`),
+])
+
 const VALID_CARD_TYPES = new Set(['god', 'item', 'consumable', 'player'])
 const VALID_RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique'])
-const VALID_HOLO_TYPES = new Set(['holo', 'reverse', 'full'])
+const VALID_HOLO_TYPES = new Set(['none', 'holo', 'reverse', 'full', 'any_holo'])
 
 const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -85,8 +91,10 @@ async function handleList(sql, params) {
   const lim = Math.min(parseInt(limit), 50)
 
   const rows = await sql`
-    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.created_at, b.expires_at,
-      (SELECT pd.avatar_url FROM cc_player_defs pd WHERE pd.player_name = b.card_name AND b.card_type = 'player' LIMIT 1) AS avatar_url
+    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
+      (SELECT pd.avatar_url FROM cc_player_defs pd
+       WHERE CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id AND b.card_type = 'player'
+       LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'
     ORDER BY b.created_at DESC
@@ -104,7 +112,7 @@ async function handleList(sql, params) {
   }
   if (holoType) {
     const types = holoType.split(',')
-    filtered = filtered.filter(b => b.holo_type && types.includes(b.holo_type))
+    filtered = filtered.filter(b => types.includes(b.holo_type))
   }
   if (search) {
     const q = search.toLowerCase()
@@ -164,6 +172,7 @@ async function handleMyBounties(sql, user) {
         rarity: b.rarity,
         holoType: b.holo_type,
         coreReward: b.core_reward,
+        targetGodId: b.target_god_id,
         status: b.status,
         createdAt: b.created_at,
         expiresAt: b.expires_at,
@@ -182,8 +191,10 @@ async function handleHero(sql) {
   await maybeExpireStale(sql)
 
   const rows = await sql`
-    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.created_at, b.expires_at,
-      (SELECT pd.avatar_url FROM cc_player_defs pd WHERE pd.player_name = b.card_name AND b.card_type = 'player' LIMIT 1) AS avatar_url
+    SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
+      (SELECT pd.avatar_url FROM cc_player_defs pd
+       WHERE CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id AND b.card_type = 'player'
+       LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'
     ORDER BY b.core_reward DESC
@@ -202,9 +213,13 @@ async function handleFulfillable(sql, user) {
     SELECT DISTINCT b.id AS bounty_id
     FROM cc_bounties b
     JOIN cc_cards c ON c.card_type = b.card_type
-      AND c.god_name = b.card_name
       AND c.rarity = b.rarity
-      AND (b.holo_type IS NULL OR c.holo_type = b.holo_type)
+      AND (b.target_god_id IS NOT NULL AND c.god_id = b.target_god_id OR b.target_god_id IS NULL AND c.god_name = b.card_name)
+      AND (
+        b.holo_type = 'any_holo' AND c.holo_type IS NOT NULL
+        OR b.holo_type = 'none' AND c.holo_type IS NULL
+        OR b.holo_type NOT IN ('any_holo', 'none') AND c.holo_type = b.holo_type
+      )
     WHERE b.status = 'active'
       AND c.owner_id = ${user.id}
       AND NOT EXISTS (
@@ -238,12 +253,14 @@ async function handleSearchPlayers(sql, params) {
   }
   const term = `%${q.trim()}%`
   const rows = await sql`
-    SELECT DISTINCT ON (pd.player_name)
-      pd.player_name, pd.team_name, pd.team_color, pd.role, pd.avatar_url
+    SELECT pd.player_id, pd.team_id, pd.player_name, pd.team_name, pd.team_color, pd.role,
+           pd.avatar_url, pd.division_slug, pd.season_slug,
+           d.name AS division_name
     FROM cc_player_defs pd
+    LEFT JOIN divisions d ON d.id = pd.division_id
     WHERE pd.player_name ILIKE ${term}
-    ORDER BY pd.player_name
-    LIMIT 15
+    ORDER BY pd.player_name, pd.season_slug DESC, pd.team_name
+    LIMIT 30
   `
   return {
     statusCode: 200, headers,
@@ -259,9 +276,9 @@ function pushBountyProgress(sql, userId) {
 
 // ═══ POST: Create bounty ═══
 async function handleCreate(sql, user, body) {
-  const { cardType, cardName, rarity, holoType, coreReward } = body
-  if (!cardType || !cardName || !rarity || !coreReward) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType, cardName, rarity, and coreReward required' }) }
+  const { cardType, cardName, rarity, holoType, coreReward, targetGodId } = body
+  if (!cardType || !cardName || !rarity || !holoType || !coreReward || !targetGodId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType, cardName, rarity, holoType, coreReward, and targetGodId required' }) }
   }
   if (!VALID_CARD_TYPES.has(cardType)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid card type: ${cardType}` }) }
@@ -269,19 +286,19 @@ async function handleCreate(sql, user, body) {
   if (!VALID_RARITIES.has(rarity)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid rarity: ${rarity}` }) }
   }
-  if (holoType && !VALID_HOLO_TYPES.has(holoType)) {
+  if (!VALID_HOLO_TYPES.has(holoType)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid holo type: ${holoType}` }) }
   }
-  // Validate card name for non-player types (player names are dynamic)
-  if (cardType !== 'player' && !VALID_CARD_NAMES.has(cardName)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown card name: ${cardName}` }) }
+  // Validate targetGodId for non-player types (player god_ids are dynamic)
+  if (cardType !== 'player' && !VALID_GOD_IDS.has(targetGodId)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown card variant: ${targetGodId}` }) }
   }
 
   const parsedReward = parseInt(coreReward)
 
   const bounty = await transaction(async (tx) => {
     return await createBounty(tx, user.id, {
-      cardType, cardName, rarity, holoType: holoType || null, coreReward: parsedReward,
+      cardType, cardName, rarity, holoType, coreReward: parsedReward, targetGodId,
     })
   })
 

@@ -446,6 +446,11 @@ async function transferMatch(sql, body, admin, isOwnOnly, event) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No permission for target league' }) }
     }
 
+    // Block cross-league transfers — player stats are tied to league-specific league_player entries
+    if (String(sourceLeagueId) !== String(targetLeagueId)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Cannot transfer matches across leagues. Delete and re-report in the correct league.' }) }
+    }
+
     // Get current season for forge recalc
     const [matchRow] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
     if (!matchRow) {

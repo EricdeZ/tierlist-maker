@@ -1,15 +1,19 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useVault } from './VaultContext'
 import { vaultService } from '../../services/database'
-import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck } from 'lucide-react'
+import { Gift, Send, Search, X, Package, Plus, ShoppingCart, TicketCheck, Trophy } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 import PackOpening from './components/PackOpening'
 import PackArt from './components/PackArt'
 import emberIcon from '../../assets/ember.png'
 
 export default function CCGifts() {
   const { giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack, ember, packTypes, packTypesMap } = useVault()
+  const { user } = useAuth()
   const [tab, setTab] = useState('received')
   const [openResult, setOpenResult] = useState(null)
+  const [giftLb, setGiftLb] = useState(null)
+  const [giftLbLoading, setGiftLbLoading] = useState(false)
 
   // Mark as seen when viewing received tab
   useEffect(() => {
@@ -17,6 +21,16 @@ export default function CCGifts() {
       markGiftsSeen()
     }
   }, [tab, giftData.unseenCount, markGiftsSeen])
+
+  useEffect(() => {
+    if (tab === 'leaderboard' && !giftLb) {
+      setGiftLbLoading(true)
+      vaultService.loadGiftLeaderboard()
+        .then(data => setGiftLb(data))
+        .catch(() => {})
+        .finally(() => setGiftLbLoading(false))
+    }
+  }, [tab, giftLb])
 
   const { sent, received, giftsRemaining, giftInventory = [] } = giftData
   const totalSendable = giftsRemaining + giftInventory.reduce((sum, i) => sum + i.quantity, 0)
@@ -41,6 +55,7 @@ export default function CCGifts() {
           { key: 'received', label: 'Received', count: received.filter(g => !g.opened).length },
           { key: 'send', label: 'Send', count: totalSendable },
           { key: 'sent', label: 'Sent', count: 0 },
+          { key: 'leaderboard', label: 'Top Gifters', count: 0 },
           { key: 'redeem', label: 'Redeem', count: 0 },
         ].map(t => (
           <button
@@ -76,6 +91,7 @@ export default function CCGifts() {
         />
       )}
       {tab === 'sent' && <SentGifts sent={sent} packTypesMap={packTypesMap} />}
+      {tab === 'leaderboard' && <GiftLeaderboard data={giftLb} loading={giftLbLoading} currentUserId={user?.id} />}
       {tab === 'redeem' && <RedeemSection setOpenResult={setOpenResult} />}
 
       {openResult && (
@@ -650,6 +666,85 @@ function SentGifts({ sent, packTypesMap }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function GiftLeaderboard({ data, loading, currentUserId }) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="cd-spinner w-6 h-6" />
+      </div>
+    )
+  }
+
+  if (!data?.leaderboard?.length) {
+    return (
+      <div className="text-center py-16">
+        <Trophy className="w-10 h-10 text-white/15 mx-auto mb-3" />
+        <p className="text-white/30 cd-head tracking-wider text-sm">No gifts sent yet</p>
+      </div>
+    )
+  }
+
+  const { leaderboard, myEntry } = data
+
+  const renderRow = (entry, isMe) => (
+    <div
+      key={entry.userId}
+      className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg ${
+        isMe ? 'bg-[var(--cd-cyan)]/[0.06] border border-[var(--cd-cyan)]/20' : 'bg-white/[0.02]'
+      }`}
+    >
+      <div className={`w-8 sm:w-9 text-center cd-num text-sm sm:text-base font-bold ${
+        entry.position === 1 ? 'text-yellow-400' :
+        entry.position === 2 ? 'text-gray-300' :
+        entry.position === 3 ? 'text-amber-600' : 'text-white/25'
+      }`}>
+        #{entry.position}
+      </div>
+      {entry.avatar && entry.discordId ? (
+        <img
+          src={`https://cdn.discordapp.com/avatars/${entry.discordId}/${entry.avatar}.png?size=32`}
+          alt=""
+          className="w-8 h-8 rounded-full flex-shrink-0"
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-full flex-shrink-0 bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/30">
+          {(entry.username || '?')[0]}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-bold cd-head truncate text-white/80">
+          {entry.username || 'Unknown'}
+          {isMe && <span className="text-[var(--cd-cyan)] text-xs ml-1">(you)</span>}
+        </div>
+        <div className="text-[10px] text-white/25 cd-num">
+          {entry.totalGifts} total gift{entry.totalGifts !== 1 ? 's' : ''}
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <div className="flex items-center gap-1.5">
+          <Gift size={14} className="text-[var(--cd-cyan)]/60" />
+          <span className="text-base font-bold cd-num text-white/70">{entry.uniqueRecipients}</span>
+        </div>
+        <div className="text-[10px] text-white/25 cd-num">
+          player{entry.uniqueRecipients !== 1 ? 's' : ''} gifted
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-[2px]">
+      {leaderboard.map(entry => renderRow(entry, entry.userId === currentUserId))}
+      {myEntry && (
+        <>
+          <div className="text-center text-white/15 text-xs py-1">...</div>
+          {renderRow(myEntry, true)}
+        </>
+      )}
     </div>
   )
 }

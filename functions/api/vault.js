@@ -57,8 +57,10 @@ const handler = async (event) => {
         case 'collection-search': return await handleCollectionSearch(sql, event.queryStringParameters)
         case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
         case 'gifts': return await handleLoadGifts(sql, user)
+        case 'gift-leaderboard': return await handleGiftLeaderboard(sql, user)
         case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
         case 'starting-five': return await handleStartingFive(sql, user)
+        case 'starting-five-leaderboard': return await handleS5Leaderboard(sql, user)
         case 'binder': return await handleLoadBinder(sql, user)
         case 'admin-redeem-codes': return await handleAdminRedeemCodes(sql, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
@@ -846,6 +848,71 @@ async function handleLoadGifts(sql, user) {
   }
 }
 
+// ═══ GET: Gift leaderboard — top 20 by unique individuals gifted ═══
+async function handleGiftLeaderboard(sql, user) {
+  const rows = await sql`
+    SELECT g.sender_id,
+      COUNT(DISTINCT g.recipient_id)::int AS unique_recipients,
+      COUNT(*)::int AS total_gifts,
+      u.discord_username, u.discord_avatar, u.discord_id,
+      pl.slug AS player_slug
+    FROM cc_gifts g
+    JOIN users u ON g.sender_id = u.id
+    LEFT JOIN players pl ON u.linked_player_id = pl.id
+    GROUP BY g.sender_id, u.discord_username, u.discord_avatar, u.discord_id, pl.slug
+    ORDER BY unique_recipients DESC, total_gifts DESC
+    LIMIT 20
+  `
+
+  const leaderboard = rows.map((r, i) => ({
+    position: i + 1,
+    userId: r.sender_id,
+    username: r.discord_username,
+    avatar: r.discord_avatar,
+    discordId: r.discord_id,
+    playerSlug: r.player_slug,
+    uniqueRecipients: r.unique_recipients,
+    totalGifts: r.total_gifts,
+  }))
+
+  // Find current user's position if not in top 20
+  let myPosition = null
+  let myEntry = null
+  const inTop = leaderboard.find(e => e.userId === user.id)
+  if (!inTop) {
+    const [myRow] = await sql`
+      SELECT COUNT(DISTINCT recipient_id)::int AS unique_recipients,
+        COUNT(*)::int AS total_gifts
+      FROM cc_gifts WHERE sender_id = ${user.id}
+    `
+    if (myRow && myRow.unique_recipients > 0) {
+      const [rank] = await sql`
+        SELECT COUNT(*)::int + 1 AS rank
+        FROM (
+          SELECT sender_id, COUNT(DISTINCT recipient_id) AS cnt
+          FROM cc_gifts GROUP BY sender_id
+        ) sub
+        WHERE cnt > ${myRow.unique_recipients}
+      `
+      myPosition = rank?.rank || null
+      myEntry = {
+        position: myPosition,
+        userId: user.id,
+        username: user.discord_username,
+        avatar: user.discord_avatar,
+        discordId: user.discord_id,
+        uniqueRecipients: myRow.unique_recipients,
+        totalGifts: myRow.total_gifts,
+      }
+    }
+  }
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ leaderboard, myPosition, myEntry }),
+  }
+}
+
 // ═══ POST: Send a gift pack ═══
 async function handleSendGift(sql, user, body, event) {
   const { recipientId, message, packType = 'gift' } = body
@@ -1416,6 +1483,88 @@ function formatS5Response(state, extra = {}) {
 async function handleStartingFive(sql, user) {
   const state = await tick(sql, user.id)
   return formatS5Response(state)
+}
+
+async function handleS5Leaderboard(sql, user) {
+  const rows = await sql`
+    SELECT l.user_id, l.role AS slot_role,
+      c.rarity, c.holo_type, c.card_type,
+      pd.best_god_name, pd.team_id,
+      g.rarity AS god_rarity, g.holo_type AS god_holo_type, g.card_type AS god_card_type,
+      g.god_name AS god_god_name, g.role AS god_role,
+      i.rarity AS item_rarity, i.holo_type AS item_holo_type, i.card_type AS item_card_type,
+      u.discord_username, u.discord_avatar, u.discord_id,
+      pl.slug AS player_slug
+    FROM cc_lineups l
+    JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_player_defs pd ON c.def_id = pd.id AND c.card_type = 'player'
+    LEFT JOIN cc_cards g ON l.god_card_id = g.id
+    LEFT JOIN cc_cards i ON l.item_card_id = i.id
+    JOIN users u ON l.user_id = u.id
+    LEFT JOIN players pl ON u.linked_player_id = pl.id
+    WHERE l.card_id IS NOT NULL
+  `
+
+  const TEAM_SYNERGY = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
+  const byUser = {}
+  for (const r of rows) {
+    if (!byUser[r.user_id]) {
+      byUser[r.user_id] = {
+        userId: r.user_id,
+        username: r.discord_username,
+        avatar: r.discord_avatar,
+        discordId: r.discord_id,
+        playerSlug: r.player_slug,
+        cards: [],
+      }
+    }
+    byUser[r.user_id].cards.push(r)
+  }
+
+  const entries = []
+  for (const u of Object.values(byUser)) {
+    const teamCounts = {}
+    for (const c of u.cards) {
+      if (c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+    }
+    let totalPassion = 0, totalCores = 0
+    for (const c of u.cards) {
+      const godCard = c.god_rarity ? { rarity: c.god_rarity, holo_type: c.god_holo_type, god_name: c.god_god_name } : null
+      const itemCard = c.item_rarity ? { rarity: c.item_rarity, holo_type: c.item_holo_type } : null
+      const { passionPerHour, coresPerHour } = getSlotRates(c, godCard, itemCard)
+      const teamMult = 1 + (TEAM_SYNERGY[teamCounts[c.team_id]] || 0)
+      totalPassion += passionPerHour * teamMult * 24
+      totalCores += coresPerHour * teamMult * 24
+    }
+    const passionCap = totalPassion * 2
+    const coresCap = totalCores * 2
+    if (passionCap === 0 && coresCap === 0) continue
+    entries.push({
+      userId: u.userId,
+      username: u.username,
+      avatar: u.avatar,
+      discordId: u.discordId,
+      playerSlug: u.playerSlug,
+      passionCap: +passionCap.toFixed(1),
+      coresCap: +coresCap.toFixed(1),
+      totalCap: +(passionCap + coresCap).toFixed(1),
+      cardCount: u.cards.length,
+    })
+  }
+
+  entries.sort((a, b) => b.totalCap - a.totalCap)
+  const top = entries.slice(0, 20).map((e, i) => ({ ...e, position: i + 1 }))
+  const myEntry = entries.find(e => e.userId === user.id)
+  const myPosition = myEntry ? entries.indexOf(myEntry) + 1 : null
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      leaderboard: top,
+      myPosition,
+      myEntry: myEntry && myPosition > 20 ? { ...myEntry, position: myPosition } : null,
+    }),
+  }
 }
 
 async function handleSlotCard(sql, user, body) {
