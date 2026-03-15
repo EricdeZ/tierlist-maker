@@ -259,8 +259,11 @@ function formatTradeCard(row) {
       rarity: row.rarity,
       holoEffect: row.holo_effect,
       holoType: row.holo_type,
-      imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
-        ? '' : row.image_url,
+      imageUrl: row.card_type === 'player'
+        ? (row.allow_discord_avatar && row.player_discord_id && row.player_discord_avatar
+          ? `https://cdn.discordapp.com/avatars/${row.player_discord_id}/${row.player_discord_avatar}.webp?size=256`
+          : '')
+        : row.image_url,
       cardType: row.card_type,
       cardData: row.card_data,
       serialNumber: row.serial_number,

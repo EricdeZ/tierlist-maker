@@ -357,10 +357,14 @@ export async function pollTrade(sql, userId, tradeId) {
   const cards = await sql`
     SELECT tc.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type,
            c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id,
-           d.best_god_name
+           d.best_god_name,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
     FROM cc_trade_cards tc
     JOIN cc_cards c ON tc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE tc.trade_id = ${tradeId}
   `
 

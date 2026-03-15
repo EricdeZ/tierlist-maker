@@ -59,10 +59,14 @@ async function handleList(sql, params) {
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
            d.best_god_name,
-           u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id
+           u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
     FROM cc_market_listings l
     JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     JOIN users u ON l.seller_id = u.id
     WHERE l.status = 'active'
     ORDER BY l.created_at DESC
@@ -127,10 +131,14 @@ async function handleMyListings(sql, user) {
     SELECT l.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
            c.card_type, c.card_data, c.serial_number, c.def_id,
            d.best_god_name,
-           bu.discord_username AS buyer_name
+           bu.discord_username AS buyer_name,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
     FROM cc_market_listings l
     JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     LEFT JOIN users bu ON l.buyer_id = bu.id
     WHERE l.seller_id = ${user.id}
     ORDER BY
@@ -238,8 +246,11 @@ function formatListing(row) {
       rarity: row.rarity,
       holoEffect: row.holo_effect,
       holoType: row.holo_type,
-      imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
-        ? '' : row.image_url,
+      imageUrl: row.card_type === 'player'
+        ? (row.allow_discord_avatar && row.player_discord_id && row.player_discord_avatar
+          ? `https://cdn.discordapp.com/avatars/${row.player_discord_id}/${row.player_discord_avatar}.webp?size=256`
+          : '')
+        : row.image_url,
       cardType: row.card_type,
       cardData: row.card_data,
       serialNumber: row.serial_number,

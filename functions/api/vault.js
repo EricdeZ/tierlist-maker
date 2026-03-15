@@ -109,7 +109,14 @@ async function handleLoad(sql, user) {
   await grantStarterPacks(sql, user.id)
 
   const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired] = await Promise.all([
-    sql`SELECT c.*, d.best_god_name FROM cc_cards c LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player' WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
+    sql`SELECT c.*, d.best_god_name,
+             pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+             COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
+         FROM cc_cards c
+         LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+         LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+         LEFT JOIN user_preferences pup ON pup.user_id = pu.id
+         WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
     sql`
@@ -1613,10 +1620,14 @@ async function handleLoadBinder(sql, user) {
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
            c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
            c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
-           d.best_god_name
+           d.best_god_name,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE bc.user_id = ${user.id}
     ORDER BY bc.page, bc.slot
   `
@@ -1651,10 +1662,14 @@ async function handleBinderView(sql, params) {
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
            c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
            c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
-           d.best_god_name
+           d.best_god_name,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
+    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE bc.user_id = ${binder.user_id}
     ORDER BY bc.page, bc.slot
   `
@@ -1784,8 +1799,11 @@ function formatCard(row) {
     serialNumber: row.serial_number,
     holoEffect: row.holo_effect,
     holoType: row.holo_type,
-    imageUrl: row.card_type === 'player' && row.image_url && !row.image_url.includes('cdn.discordapp.com')
-      ? '' : row.image_url,
+    imageUrl: row.card_type === 'player'
+      ? (row.allow_discord_avatar && row.player_discord_id && row.player_discord_avatar
+        ? `https://cdn.discordapp.com/avatars/${row.player_discord_id}/${row.player_discord_avatar}.webp?size=256`
+        : '')
+      : row.image_url,
     ability: row.ability,
     metadata: row.metadata || {},
     acquiredVia: row.acquired_via,
