@@ -110,7 +110,7 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards] = await Promise.all([
     sql`SELECT c.*, d.best_god_name,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -163,6 +163,12 @@ async function handleLoad(sql, user) {
       WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount <= 0
       ORDER BY created_at DESC LIMIT 1
     `,
+    sql`SELECT card_id FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active'`,
+    sql`
+      SELECT tc.card_id FROM cc_trade_cards tc
+      JOIN cc_trades t ON tc.trade_id = t.id
+      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active')
+    `,
   ])
 
   return {
@@ -209,6 +215,10 @@ async function handleLoad(sql, user) {
         source: i.source,
         createdAt: i.created_at,
       })),
+      lockedCardIds: [
+        ...marketLockedCards.map(r => r.card_id),
+        ...tradeLockedCards.map(r => r.card_id),
+      ],
       vendingCooldown: (() => {
         if (!lastVend[0]) return 0
         const elapsed = (Date.now() - new Date(lastVend[0].created_at).getTime()) / 1000

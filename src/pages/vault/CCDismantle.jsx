@@ -133,7 +133,7 @@ function SalvageGauge({ dismantledToday, dismantledValueToday = 0, currentRate }
 }
 
 export default function CCDismantle() {
-  const { collection, dismantleCards, startingFive, binderCards, getDefOverride, stats } = useVault()
+  const { collection, dismantleCards, startingFive, binderCards, getDefOverride, stats, lockedCardIds: apiLockedCardIds } = useVault()
   const dismantledToday = stats?.dismantledToday || 0
   const dismantledValueToday = stats?.dismantledValueToday || 0
   const [selected, setSelected] = useState(new Set())
@@ -155,8 +155,11 @@ export default function CCDismantle() {
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }
+    for (const id of (apiLockedCardIds || [])) {
+      ids.add(id)
+    }
     return ids
-  }, [startingFive, binderCards])
+  }, [startingFive, binderCards, apiLockedCardIds])
 
   const cards = useMemo(() => {
     let list = collection.filter(c => !lockedCardIds.has(c.id) && c.rarity !== 'unique')

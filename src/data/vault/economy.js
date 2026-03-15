@@ -8,7 +8,7 @@ export const RARITIES = {
   epic:      { tier: 2, name: 'Epic',      holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'], dropRate: 0.025, color: '#a855f7', emberValue: 100, craftCost: 500, targetedCraftCost: 1000, dismantleValue: 8 },
   legendary: { tier: 1, name: 'Legendary', holoEffects: ['rainbow', 'secret', 'gold'],     dropRate: 0.003, color: '#ff8c00', emberValue: 300, craftCost: 1500, targetedCraftCost: 3000, dismantleValue: 25 },
   mythic:    { tier: 0, name: 'Mythic',    holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'], dropRate: 0.00045, color: '#ef4444', emberValue: 750, craftCost: 5000, targetedCraftCost: 10000, dismantleValue: 75 },
-  unique:    { tier: -1, name: 'Unique',  holoEffects: ['secret'], dropRate: 0.00005, color: '#e8e8ff', emberValue: 1050, craftCost: 0, targetedCraftCost: 0, dismantleValue: 0 },
+  unique:    { tier: -1, name: 'Unique',  holoEffects: ['unique'], dropRate: 0.00005, color: '#e8e8ff', emberValue: 1050, craftCost: 0, targetedCraftCost: 0, dismantleValue: 0 },
   full_art:  { tier: 0, holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'], dropRate: 0, color: '#d4af37', emberValue: 0, dismantleValue: 0, craftCost: 0 },
 };
 
@@ -33,7 +33,7 @@ export const PACKS = {
 // Canonical holo effect per rarity — one fixed effect per tier
 export const RARITY_HOLO_MAP = {
   common: 'common', uncommon: 'holo', rare: 'galaxy',
-  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow', unique: 'secret',
+  epic: 'cosmos', legendary: 'gold', mythic: 'rainbow', unique: 'unique',
 };
 
 export function getHoloEffect(rarity) {

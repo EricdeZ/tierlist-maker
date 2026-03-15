@@ -91,6 +91,18 @@
 
 /* --- Tier-based glow scaling --- */
 
+/* Tier -1: Unique — maximum glow */
+.holo-card[data-rarity="unique"].interacting .holo-card__rotator,
+.holo-card[data-rarity="unique"].active .holo-card__rotator {
+    box-shadow:
+        0 0 6px -1px white,
+        0 0 6px 3px var(--card-edge),
+        0 0 24px 5px var(--card-glow),
+        0px 10px 20px -5px rgba(0,0,0,0.5),
+        0 0 60px -10px var(--card-glow),
+        0 0 90px -20px var(--card-glow);
+}
+
 /* Tier 1: Legendary — enhanced glow */
 .holo-card[data-rarity="gold"].interacting .holo-card__rotator,
 .holo-card[data-rarity="gold"].active .holo-card__rotator,
@@ -1359,6 +1371,219 @@
 }
 
 /* ============================================
+   Shine2 Layer — second overlay for stacked effects (unique)
+   ============================================ */
+.holo-card__shine2 {
+    z-index: 2;
+    border-radius: var(--card-radius);
+    overflow: hidden;
+    transform: translateZ(1.5px);
+    pointer-events: none;
+    will-change: transform, opacity, background-image, background-size,
+        background-position, background-blend-mode, filter;
+}
+
+.holo-card__shine2::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--card-radius);
+    z-index: 1;
+}
+
+.holo-card__shine2::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--card-radius);
+    z-index: 2;
+}
+
+/* ============================================
+   Rarity: unique — Radiant base + Secret overlay
+   Stacks crosshatch rainbow (radiant) with gold sparkle (secret)
+   ============================================ */
+
+/* --- Primary shine: Radiant crosshatch + rainbow bands --- */
+.holo-card[data-rarity="unique"] .holo-card__shine {
+    --barwidth: 1.2%;
+
+    background-image:
+        radial-gradient(
+            farthest-corner ellipse
+            at calc(((var(--pointer-x)) * 0.5) + 25%) calc(((var(--pointer-y)) * 0.5) + 25%),
+            hsl(0, 0%, 95%) 20%,
+            var(--card-glow) 130%
+        ),
+        repeating-linear-gradient(
+            45deg,
+            hsl(0,0%,10%) 0%,
+            hsl(0,0%,10%) 1%,
+            hsl(0,0%,10%) var(--barwidth),
+            hsl(0,0%,20%) calc(var(--barwidth) + 0.01%),
+            hsl(0,0%,20%) calc(var(--barwidth) * 2),
+            hsl(0,0%,35%) calc(var(--barwidth) * 2 + 0.01%),
+            hsl(0,0%,35%) calc(var(--barwidth) * 3),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 3 + 0.01%),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 4),
+            hsl(0,0%,50%) calc(var(--barwidth) * 4 + 0.01%),
+            hsl(0,0%,50%) calc(var(--barwidth) * 5),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 5 + 0.01%),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 6),
+            hsl(0,0%,35%) calc(var(--barwidth) * 6 + 0.01%),
+            hsl(0,0%,35%) calc(var(--barwidth) * 7),
+            hsl(0,0%,20%) calc(var(--barwidth) * 7 + 0.01%),
+            hsl(0,0%,20%) calc(var(--barwidth) * 8),
+            hsl(0,0%,10%) calc(var(--barwidth) * 8 + 0.01%),
+            hsl(0,0%,10%) calc(var(--barwidth) * 9),
+            hsl(0,0%,0%) calc(var(--barwidth) * 9 + 0.01%),
+            hsl(0,0%,0%) calc(var(--barwidth) * 10)
+        ),
+        repeating-linear-gradient(
+            -45deg,
+            hsl(0,0%,10%) 0%,
+            hsl(0,0%,10%) 1%,
+            hsl(0,0%,10%) var(--barwidth),
+            hsl(0,0%,20%) calc(var(--barwidth) + 0.01%),
+            hsl(0,0%,20%) calc(var(--barwidth) * 2),
+            hsl(0,0%,35%) calc(var(--barwidth) * 2 + 0.01%),
+            hsl(0,0%,35%) calc(var(--barwidth) * 3),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 3 + 0.01%),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 4),
+            hsl(0,0%,50%) calc(var(--barwidth) * 4 + 0.01%),
+            hsl(0,0%,50%) calc(var(--barwidth) * 5),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 5 + 0.01%),
+            hsl(0,0%,42.5%) calc(var(--barwidth) * 6),
+            hsl(0,0%,35%) calc(var(--barwidth) * 6 + 0.01%),
+            hsl(0,0%,35%) calc(var(--barwidth) * 7),
+            hsl(0,0%,20%) calc(var(--barwidth) * 7 + 0.01%),
+            hsl(0,0%,20%) calc(var(--barwidth) * 8),
+            hsl(0,0%,10%) calc(var(--barwidth) * 8 + 0.01%),
+            hsl(0,0%,10%) calc(var(--barwidth) * 9),
+            hsl(0,0%,0%) calc(var(--barwidth) * 9 + 0.01%),
+            hsl(0,0%,0%) calc(var(--barwidth) * 10)
+        );
+
+    background-size: cover, 210% 210%, 210% 210%;
+    background-position:
+        center,
+        calc(((var(--background-x) - 50%) * 1.5) + 50%) calc(((var(--background-y) - 50%) * 1.5) + 50%),
+        calc(((var(--background-x) - 50%) * 1.5) + 50%) calc(((var(--background-y) - 50%) * 1.5) + 50%);
+    background-blend-mode: exclusion, darken, color-dodge;
+    filter: brightness(.5) contrast(2) saturate(1.75);
+    mix-blend-mode: color-dodge;
+}
+
+/* Radiant ::after — trainer bg + rainbow bands */
+.holo-card[data-rarity="unique"] .holo-card__shine::after {
+    background-image:
+        url("/img/trainerbg.png"),
+        repeating-linear-gradient(55deg,
+            hsl(3, 95%, 85%) calc(200px*1),
+            hsl(207, 100%, 84%) calc(200px*2),
+            hsl(29, 100%, 85%) calc(200px*3),
+            hsl(160, 100%, 86%) calc(200px*4),
+            hsl(309, 94%, 87%) calc(200px*5),
+            hsl(188, 95%, 85%) calc(200px*6),
+            hsl(3, 95%, 85%) calc(200px*7)
+        );
+
+    background-size: 25% auto, 400% 100%;
+    background-position:
+        center,
+        calc(((var(--background-x) - 50%) * -2.5) + 50%) calc(((var(--background-y) - 50%) * -2.5) + 50%);
+    filter: brightness(.6) contrast(3) saturate(2);
+    mix-blend-mode: color-dodge;
+    background-blend-mode: difference;
+}
+
+/* Radiant ::before — glitter + radial glow */
+.holo-card[data-rarity="unique"] .holo-card__shine::before {
+    background-image:
+        var(--glitter),
+        radial-gradient(
+            farthest-corner ellipse at calc(((var(--pointer-x)) * 0.5) + 25%) calc(((var(--pointer-y)) * 0.5) + 25%),
+            hsla(0, 0%, 58%, 0.8) 10%,
+            hsla(0, 0%, 20%, 0.9) 20%,
+            hsla(0, 0%, 20%, 0.5) 50%
+        );
+
+    background-position: center;
+    background-size: 15% 15%, 350% 350%;
+    background-blend-mode: color-dodge;
+    mix-blend-mode: overlay;
+    filter: brightness(.66) contrast(2) saturate(.5);
+}
+
+/* --- Secondary shine2: Secret gold sparkle overlay --- */
+.holo-card[data-rarity="unique"] .holo-card__shine2 {
+    background-image:
+        var(--glitter),
+        var(--glitter),
+        conic-gradient(
+            var(--sunpillar-4),
+            var(--sunpillar-5),
+            var(--sunpillar-6),
+            var(--sunpillar-1),
+            var(--sunpillar-4)
+        ),
+        radial-gradient(
+            farthest-corner circle at var(--pointer-x) var(--pointer-y),
+            hsla(150, 0%, 0%, 0.98) 10%,
+            hsla(0, 0%, 95%, 0.15) 90%
+        );
+
+    background-size: var(--glittersize) var(--glittersize), var(--glittersize) var(--glittersize), cover, cover;
+    background-position: 45% 45%, 55% 55%, center center, center center;
+    background-blend-mode: soft-light, hard-light, overlay;
+    mix-blend-mode: color-dodge;
+    filter: brightness(calc(0.35 + (var(--pointer-from-center) * 0.2))) contrast(1.05) saturate(2.9);
+    opacity: calc(var(--card-opacity) * 0.65);
+}
+
+.holo-card[data-rarity="unique"] .holo-card__shine2::before {
+    background-image:
+        linear-gradient(45deg, hsl(44, 95%, 52%), hsl(50, 100%, 70%), hsl(44, 95%, 52%)),
+        radial-gradient(
+            farthest-corner circle at var(--pointer-x) var(--pointer-y),
+            hsla(10, 20%, 90%, 0.95) 10%,
+            hsl(0, 0%, 0%) 70%
+        );
+
+    background-size: cover, cover;
+    background-position: center center, center center;
+    background-blend-mode: multiply;
+    mix-blend-mode: lighten;
+    filter: brightness(1.3) contrast(1.25) saturate(0.4);
+    opacity: 0.7;
+}
+
+.holo-card[data-rarity="unique"] .holo-card__shine2::after {
+    background-image: var(--glitter);
+    background-size: var(--glittersize) var(--glittersize);
+    background-position:
+        calc(50% - (2px * var(--pointer-from-left)) + 1px)
+        calc(50% - (2px * var(--pointer-from-top)) + 1px);
+    filter: brightness(calc((var(--pointer-from-center) * 0.6) + 0.6)) contrast(1.5);
+    mix-blend-mode: overlay;
+}
+
+/* Unique glare — combines radiant white + secret gold */
+.holo-card[data-rarity="unique"] .holo-card__glare {
+    background-image:
+        radial-gradient(
+            farthest-corner circle at var(--pointer-x) var(--pointer-y),
+            hsla(45, 50%, 90%, 0.35) 0%,
+            hsla(0, 0%, 100%, 0.2) 20%,
+            hsla(30, 20%, 30%, 0.15) 50%,
+            hsl(22, 15%, 10%) 160%
+        );
+    filter: brightness(1.1) contrast(1.4);
+    mix-blend-mode: hard-light;
+    opacity: calc(var(--card-opacity) * 0.55);
+}
+
+/* ============================================
    Rarity: common — 3D tilt only, no shine
    ============================================ */
 .holo-card[data-rarity="common"] .holo-card__shine {
@@ -1388,6 +1613,9 @@
 .holo-card[data-holo-type="holo"] .holo-card__shine,
 .holo-card[data-holo-type="holo"] .holo-card__shine::before,
 .holo-card[data-holo-type="holo"] .holo-card__shine::after,
+.holo-card[data-holo-type="holo"] .holo-card__shine2,
+.holo-card[data-holo-type="holo"] .holo-card__shine2::before,
+.holo-card[data-holo-type="holo"] .holo-card__shine2::after,
 .holo-card[data-holo-type="holo"] .holo-card__glare,
 .holo-card[data-holo-type="holo"] .holo-card__glare::after {
     clip-path: inset(15% 6% 53% 6%);
@@ -1397,6 +1625,9 @@
 .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine,
 .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine::before,
 .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine::after,
+.holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine2,
+.holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine2::before,
+.holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__shine2::after,
 .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__glare,
 .holo-card[data-holo-type="holo"]:has(.trading-card--player) .holo-card__glare::after {
     clip-path: inset(8.6% 5.3% 47% 5.3%);
@@ -1409,6 +1640,9 @@
 .holo-card[data-holo-type="reverse"] .holo-card__shine,
 .holo-card[data-holo-type="reverse"] .holo-card__shine::before,
 .holo-card[data-holo-type="reverse"] .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"] .holo-card__shine2,
+.holo-card[data-holo-type="reverse"] .holo-card__shine2::before,
+.holo-card[data-holo-type="reverse"] .holo-card__shine2::after,
 .holo-card[data-holo-type="reverse"] .holo-card__glare,
 .holo-card[data-holo-type="reverse"] .holo-card__glare::after {
     clip-path: polygon(evenodd,
@@ -1427,6 +1661,9 @@
 .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine,
 .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine::before,
 .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine::after,
+.holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine2,
+.holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine2::before,
+.holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__shine2::after,
 .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__glare,
 .holo-card[data-holo-type="reverse"]:has(.trading-card--player) .holo-card__glare::after {
     clip-path: polygon(evenodd,

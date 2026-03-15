@@ -53,7 +53,7 @@ export default function DebugTools() {
                 godClass: 'JUNGLE',
                 role: 'jungle',
                 rarity,
-                holoEffect: rarity === 'unique' ? 'secret' : rarity === 'mythic' ? 'rainbow' : rarity === 'legendary' ? 'gold' : 'cosmos',
+                holoEffect: rarity === 'unique' ? 'unique' : rarity === 'mythic' ? 'rainbow' : rarity === 'legendary' ? 'gold' : 'cosmos',
                 holoType: 'reverse',
                 imageUrl: user.avatar ? `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.webp?size=256` : '',
                 cardType: 'player',

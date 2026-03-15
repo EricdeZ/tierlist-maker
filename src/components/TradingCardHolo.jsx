@@ -18,6 +18,7 @@ export default function TradingCardHolo({ children, rarity = 'holo', role = 'ADC
                     <div className="holo-card__front">
                         {children}
                         <div className="holo-card__shine" />
+                        {rarity === 'unique' && <div className="holo-card__shine2" />}
                         <div className="holo-card__glare" />
                     </div>
                 </div>
