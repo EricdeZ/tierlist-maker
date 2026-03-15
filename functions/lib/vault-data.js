@@ -20,7 +20,7 @@ export function getItemImageUrl(item) {
 // ═══════════════════════════════════════════════
 // 77 gods — full ability data for card generation
 // ═══════════════════════════════════════════════
-export const GODS = [
+const BASE_GODS = [
   // ─── WARRIORS ───
   { id: 1, slug: 'achilles', name: 'Achilles', class: 'Warrior', imageKey: 'Achilles',
     ability: { name: 'Combat Stance', type: 'split', description: 'Toggle: Offensive (+3 ATK, deal double structure damage this turn) or Defensive (+4 DEF, block enemy rotation through your zone)', manaCost: 2, cooldown: 1, value: 3 } },
@@ -185,6 +185,71 @@ export const GODS = [
   { id: 74, slug: 'xbalanque', name: 'Xbalanque', class: 'Hunter', imageKey: 'Xbalanque',
     ability: { name: 'Darkest of Nights', type: 'vision', description: 'All enemies on the map lose vision for 2 turns. -3 ATK and cannot use abilities. Map-wide disruption for objective steals', manaCost: 5, cooldown: 4, value: 3 } },
 ]
+
+// ═══════════════════════════════════════════════
+// Off-role variants — same god, different role
+// ═══════════════════════════════════════════════
+const ROLE_VARIANTS = [
+  // Solo variants
+  { ref: 'artio', id: 78, role: 'solo' },
+  { ref: 'baron-samedi', id: 79, role: 'solo' },
+  { ref: 'cabrakan', id: 80, role: 'solo' },
+  { ref: 'cerberus', id: 81, role: 'solo' },
+  { ref: 'eset', id: 82, role: 'solo' },
+  { ref: 'hades', id: 83, role: 'solo' },
+  { ref: 'jormungandr', id: 84, role: 'solo' },
+  { ref: 'kukulkan', id: 85, role: 'solo' },
+  { ref: 'loki', id: 86, role: 'solo' },
+  { ref: 'ne-zha', id: 87, role: 'solo' },
+  { ref: 'pele', id: 88, role: 'solo' },
+  { ref: 'sobek', id: 89, role: 'solo' },
+  { ref: 'thor', id: 90, role: 'solo' },
+  { ref: 'vulcan', id: 91, role: 'solo' },
+  { ref: 'apollo', id: 92, role: 'solo' },
+  // Jungle variants
+  { ref: 'achilles', id: 93, role: 'jungle' },
+  { ref: 'anhur', id: 94, role: 'jungle' },
+  { ref: 'apollo', id: 95, role: 'jungle' },
+  { ref: 'athena', id: 96, role: 'jungle' },
+  { ref: 'cernunnos', id: 97, role: 'jungle' },
+  { ref: 'hercules', id: 98, role: 'jungle' },
+  { ref: 'hou-yi', id: 99, role: 'jungle' },
+  { ref: 'kukulkan', id: 100, role: 'jungle' },
+  { ref: 'medusa', id: 101, role: 'jungle' },
+  { ref: 'odin', id: 102, role: 'jungle' },
+  { ref: 'osiris', id: 103, role: 'jungle' },
+  { ref: 'poseidon', id: 104, role: 'jungle' },
+  { ref: 'ullr', id: 105, role: 'jungle' },
+  // Mid variants
+  { ref: 'chiron', id: 106, role: 'mid' },
+  { ref: 'neith', id: 107, role: 'mid' },
+  { ref: 'bari', id: 108, role: 'mid' },
+  { ref: 'ullr', id: 109, role: 'mid' },
+  // Support variants
+  { ref: 'aphrodite', id: 110, role: 'support' },
+  { ref: 'apollo', id: 111, role: 'support' },
+  { ref: 'baron-samedi', id: 112, role: 'support' },
+  { ref: 'eset', id: 113, role: 'support' },
+  { ref: 'guan-yu', id: 114, role: 'support' },
+  { ref: 'hercules', id: 115, role: 'support' },
+  { ref: 'ne-zha', id: 116, role: 'support' },
+  { ref: 'nu-wa', id: 117, role: 'support' },
+  { ref: 'scylla', id: 118, role: 'support' },
+  // ADC variants
+  { ref: 'agni', id: 119, role: 'adc' },
+  { ref: 'da-ji', id: 120, role: 'adc' },
+  { ref: 'geb', id: 121, role: 'adc' },
+  { ref: 'nut', id: 122, role: 'adc' },
+  { ref: 'sol', id: 123, role: 'adc' },
+  { ref: 'susano', id: 124, role: 'adc' },
+]
+
+const VARIANTS = ROLE_VARIANTS.map(v => {
+  const base = BASE_GODS.find(g => g.slug === v.ref)
+  return { ...base, id: v.id, slug: `${v.ref}-${v.role}`, role: v.role }
+})
+
+export const GODS = [...BASE_GODS, ...VARIANTS]
 
 // ═══════════════════════════════════════════════
 // 73 items — full effects & passives

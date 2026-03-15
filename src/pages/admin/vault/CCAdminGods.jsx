@@ -163,7 +163,7 @@ export default function CCAdminGods() {
                     <td className="p-3 text-xs text-[var(--color-text-secondary)]">{god.id}</td>
                     <td className="p-3 font-medium">{god.name}</td>
                     <td className="p-3">{god.class}</td>
-                    <td className="p-3 text-xs uppercase">{CLASS_ROLE[god.class]}</td>
+                    <td className="p-3 text-xs uppercase">{god.role || CLASS_ROLE[god.class]}</td>
                     <td className="p-3 text-xs">{CLASS_DAMAGE[god.class]}</td>
                     <td className="p-3 text-xs max-w-xs truncate" title={god.ability?.description}>{god.ability?.name}</td>
                     <td className="p-3"><span className="px-1.5 py-0.5 rounded bg-white/5 text-xs">{god.ability?.type}</span></td>

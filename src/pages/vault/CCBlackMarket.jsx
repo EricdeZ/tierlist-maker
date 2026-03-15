@@ -132,7 +132,7 @@ function MythicSelectionModal({ onSelect, onClose }) {
       godId: g.slug,
       godName: g.name,
       godClass: g.class,
-      role: CLASS_ROLE[g.class] || 'mid',
+      role: g.role || CLASS_ROLE[g.class] || 'mid',
       label: g.name,
       sublabel: g.class,
     }))

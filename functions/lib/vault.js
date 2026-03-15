@@ -62,7 +62,7 @@ function rollHoloType(rarity) {
 function generateCard(rarity) {
   if (rarity === 'unique') rarity = 'mythic'
   const god = GODS[Math.floor(Math.random() * GODS.length)]
-  const role = CLASS_ROLE[god.class] || 'mid'
+  const role = god.role || CLASS_ROLE[god.class] || 'mid'
   return {
     card_type: 'god',
     god_id: god.slug,

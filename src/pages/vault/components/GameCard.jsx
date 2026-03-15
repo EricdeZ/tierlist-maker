@@ -26,7 +26,7 @@ function itemCatSlug(category) {
 
 export default function GameCard({ type = 'god', rarity = 'common', data, compact, size, onClick }) {
   const rarityInfo = RARITIES[rarity] || RARITIES.common
-  const role = type === 'god' ? (CLASS_ROLE[data.class] || data.role?.toLowerCase() || 'mid') : null
+  const role = type === 'god' ? (data.role || CLASS_ROLE[data.class] || 'mid') : null
   const scale = size ? parseFloat(size) / 240 : NaN
   const style = { '--card-scale': Number.isFinite(scale) ? scale : 1 }
   if (size) style.width = size
@@ -56,7 +56,7 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
 }
 
 function GodCardContent({ data, rarity, rarityInfo }) {
-  const role = CLASS_ROLE[data.class] || 'mid'
+  const role = data.role || CLASS_ROLE[data.class] || 'mid'
   const dmgType = CLASS_DAMAGE[data.class] || 'Physical'
   const imageUrl = data.imageUrl || getGodImageUrl(data)
   const imgStyle = imgTransformStyle(data.metadata)

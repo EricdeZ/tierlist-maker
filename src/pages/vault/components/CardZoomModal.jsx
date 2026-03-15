@@ -116,7 +116,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
   // Determine role for holo effect
   const role = playerCard
     ? (playerCard.role || 'ADC')
-    : (gameCard ? (CLASS_ROLE[gameCard.data?.class] || 'mid') : 'mid')
+    : (gameCard ? (gameCard.data?.role || CLASS_ROLE[gameCard.data?.class] || 'mid') : 'mid')
 
   return createPortal(
     <div
