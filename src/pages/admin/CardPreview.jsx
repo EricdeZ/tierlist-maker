@@ -6,7 +6,7 @@ const ROLES = ['ADC', 'SOLO', 'JUNGLE', 'MID', 'SUPPORT']
 // Ranked from highest (most premium) to lowest rarity
 const RARITIES = [
     // Tier -1: Unique
-    { key: 'unique', label: 'Unique', desc: 'Radiant + Secret stacked', tier: -1 },
+    { key: 'unique', label: 'Unique', desc: 'Radiant + Rainbow stacked', tier: -1 },
 
     // Tier 1: Legendary
     { key: 'gold', label: 'Gold', desc: 'Gold + conic rainbow burst', tier: 1 },

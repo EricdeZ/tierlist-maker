@@ -302,6 +302,7 @@ export default function TradingCard({
                         <div className="holo-card__front">
                             {cardContent}
                             <div className="holo-card__shine" />
+                            {holo.rarity === 'unique' && <div className="holo-card__shine2" />}
                             <div className="holo-card__glare" />
                         </div>
                     </div>

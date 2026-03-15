@@ -4,6 +4,7 @@ import TradingCard from '../../../components/TradingCard'
 import { Search, Loader2, User, Link2, Copy, Check } from 'lucide-react'
 
 const HOLO_OPTIONS = [
+  { value: 'unique', label: 'Unique (Radiant + Rainbow)' },
   { value: 'common', label: 'Common' },
   { value: 'holo', label: 'Holo' },
   { value: 'amazing', label: 'Amazing' },
@@ -22,6 +23,7 @@ const HOLO_OPTIONS = [
 ]
 
 const RARITY_OPTIONS = [
+  { value: 'unique', label: 'Unique' },
   { value: 'common', label: 'Common' },
   { value: 'uncommon', label: 'Uncommon' },
   { value: 'rare', label: 'Rare' },
