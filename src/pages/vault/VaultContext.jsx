@@ -73,7 +73,12 @@ export function VaultProvider({ children }) {
     const type = card.cardType || 'god'
     if (type === 'player') return null
     const id = type === 'god' ? card.godId : (card.godId || '').replace(/^(item|consumable|minion|buff)-/, '')
-    return defOverrides[`${type}:${id}`] || null
+    let override = defOverrides[`${type}:${id}`]
+    if (!override && type === 'god') {
+      const baseSlug = id.replace(/-(solo|jungle|mid|support|adc)$/, '')
+      if (baseSlug !== id) override = defOverrides[`god:${baseSlug}`]
+    }
+    return override || null
   }, [defOverrides])
 
   const refreshCollection = useCallback(async () => {

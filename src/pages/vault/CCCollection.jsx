@@ -121,7 +121,10 @@ export default function CCCollection() {
   }, [])
 
   const applyOverride = useCallback((type, id, data) => {
-    const override = defOverrides[`${type}:${id}`]
+    let override = defOverrides[`${type}:${id}`]
+    if (!override && type === 'god' && data.role) {
+      override = defOverrides[`god:${id.replace(`-${data.role}`, '')}`]
+    }
     if (!override) return data
     return { ...data, metadata: override, imageUrl: override.custom_image_url || data.imageUrl }
   }, [defOverrides])
