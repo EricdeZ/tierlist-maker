@@ -1292,6 +1292,21 @@ export const vaultAdminService = {
     async refreshBestGods() {
         return apiPost('vault-admin', { action: 'refresh-best-gods' }, {})
     },
+    async getSeasons() {
+        return apiCall('vault-admin', { action: 'seasons' })
+    },
+    async previewPlayerDefs(params = {}) {
+        return apiCall('vault-admin', { action: 'preview-player-defs', ...params })
+    },
+    async generateSelectedDefs(entries) {
+        return apiPost('vault-admin', { action: 'generate-selected-defs' }, { entries })
+    },
+    async excludePlayerDef(playerId, teamId, seasonId) {
+        return apiPost('vault-admin', { action: 'exclude-player-def' }, { playerId, teamId, seasonId })
+    },
+    async unexcludePlayerDef(playerId, teamId, seasonId) {
+        return apiPost('vault-admin', { action: 'unexclude-player-def' }, { playerId, teamId, seasonId })
+    },
     async banUser(userId) {
         return apiPost('vault-admin', { action: 'ban-user' }, { userId })
     },

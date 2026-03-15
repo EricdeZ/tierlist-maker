@@ -78,18 +78,11 @@ export async function computePlayerStats(sql, playerId, teamId, seasonId) {
   }
 }
 
-/**
- * Generate player card definitions for a season.
- * Finds all players (including those who transferred between teams)
- * and creates a cc_player_defs row for each player-team combo.
- *
- * @returns {{ created: number, updated: number, total: number }}
- */
-export async function generatePlayerDefs(sql, seasonId) {
-  // Get season info
+// Shared helper — discovers all player-team combos for a season
+async function discoverPlayerTeamCombos(sql, seasonId) {
   const [season] = await sql`
     SELECT s.id, s.name, s.slug, s.is_active,
-           d.id AS division_id, d.slug AS division_slug, d.tier AS division_tier,
+           d.id AS division_id, d.name AS division_name, d.slug AS division_slug, d.tier AS division_tier,
            l.id AS league_id, l.slug AS league_slug
     FROM seasons s
     JOIN divisions d ON s.division_id = d.id
@@ -98,7 +91,6 @@ export async function generatePlayerDefs(sql, seasonId) {
   `
   if (!season) throw new Error(`Season ${seasonId} not found`)
 
-  // Get all league_players for this season (current team assignments)
   const currentPlayers = await sql`
     SELECT lp.player_id, lp.team_id, lp.role,
            p.name AS player_name, p.slug AS player_slug,
@@ -110,7 +102,6 @@ export async function generatePlayerDefs(sql, seasonId) {
       AND lp.team_id IS NOT NULL
   `
 
-  // Get roster transactions to find historical team stints
   const transactions = await sql`
     SELECT player_id, from_team_id, to_team_id, from_team_name, to_team_name, type, created_at
     FROM roster_transactions
@@ -119,11 +110,8 @@ export async function generatePlayerDefs(sql, seasonId) {
     ORDER BY created_at ASC
   `
 
-  // Build a map of all player-team combos
-  // Key: "playerId-teamId", Value: { playerId, teamId, ... }
   const playerTeamMap = new Map()
 
-  // Add current team assignments
   for (const p of currentPlayers) {
     const key = `${p.player_id}-${p.team_id}`
     playerTeamMap.set(key, {
@@ -137,25 +125,13 @@ export async function generatePlayerDefs(sql, seasonId) {
     })
   }
 
-  // Add historical teams from transactions (transfers/releases)
   for (const tx of transactions) {
-    // If a player was transferred FROM a team, they had a stint on that team
     if (tx.from_team_id && tx.type !== 'pickup') {
       const key = `${tx.player_id}-${tx.from_team_id}`
       if (!playerTeamMap.has(key)) {
-        // Need to look up player info
-        const [p] = await sql`
-          SELECT p.name, p.slug FROM players p WHERE p.id = ${tx.player_id}
-        `
-        const [t] = await sql`
-          SELECT t.name, t.color FROM teams t WHERE t.id = ${tx.from_team_id}
-        `
-        // Get role from league_players
-        const [lp] = await sql`
-          SELECT role FROM league_players
-          WHERE player_id = ${tx.player_id} AND season_id = ${seasonId}
-          LIMIT 1
-        `
+        const [p] = await sql`SELECT p.name, p.slug FROM players p WHERE p.id = ${tx.player_id}`
+        const [t] = await sql`SELECT t.name, t.color FROM teams t WHERE t.id = ${tx.from_team_id}`
+        const [lp] = await sql`SELECT role FROM league_players WHERE player_id = ${tx.player_id} AND season_id = ${seasonId} LIMIT 1`
         if (p && t) {
           playerTeamMap.set(key, {
             playerId: tx.player_id,
@@ -171,7 +147,6 @@ export async function generatePlayerDefs(sql, seasonId) {
     }
   }
 
-  // Sort: by team name, then by player name within team
   const entries = [...playerTeamMap.values()]
   entries.sort((a, b) => {
     const teamCmp = (a.teamName || '').localeCompare(b.teamName || '')
@@ -179,81 +154,196 @@ export async function generatePlayerDefs(sql, seasonId) {
     return (a.playerName || '').localeCompare(b.playerName || '')
   })
 
-  // Assign card_index (1-based sequential)
+  return { season, entries }
+}
+
+// Helper — find best god with fallback: same team → any team in season → all-time
+async function findBestGod(sql, playerId, teamId, seasonId) {
+  // 1) Best god on this specific team in this season
+  const [onTeam] = await sql`
+    SELECT pgs.god_played FROM player_game_stats pgs
+    JOIN league_players lp ON pgs.league_player_id = lp.id
+    JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+    JOIN matches m ON g.match_id = m.id
+    WHERE lp.player_id = ${playerId} AND lp.season_id = ${seasonId}
+      AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${teamId}
+      AND pgs.god_played IS NOT NULL
+    GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+  `
+  if (onTeam) return onTeam.god_played
+
+  // 2) Best god on any team in this season
+  const [inSeason] = await sql`
+    SELECT pgs.god_played FROM player_game_stats pgs
+    JOIN league_players lp ON pgs.league_player_id = lp.id
+    JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+    WHERE lp.player_id = ${playerId} AND lp.season_id = ${seasonId}
+      AND pgs.god_played IS NOT NULL
+    GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+  `
+  if (inSeason) return inSeason.god_played
+
+  // 3) Best god all-time across any season
+  const [allTime] = await sql`
+    SELECT pgs.god_played FROM player_game_stats pgs
+    JOIN league_players lp ON pgs.league_player_id = lp.id
+    JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+    WHERE lp.player_id = ${playerId}
+      AND pgs.god_played IS NOT NULL
+    GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+  `
+  return allTime?.god_played || null
+}
+
+// Helper — upsert a single player def row
+async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
+  let avatarUrl = null
+  const [userRow] = await sql`
+    SELECT u.discord_id, u.discord_avatar,
+           COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    WHERE u.linked_player_id = ${e.playerId}
+  `
+  if (userRow?.allow_avatar && userRow.discord_id && userRow.discord_avatar) {
+    avatarUrl = `https://cdn.discordapp.com/avatars/${userRow.discord_id}/${userRow.discord_avatar}.webp?size=256`
+  }
+
+  const bestGodName = await findBestGod(sql, e.playerId, e.teamId, seasonId)
+
+  const [existing] = await sql`
+    SELECT id FROM cc_player_defs
+    WHERE player_id = ${e.playerId} AND team_id = ${e.teamId} AND season_id = ${seasonId}
+  `
+
+  if (existing) {
+    await sql`
+      UPDATE cc_player_defs SET
+        player_name = ${e.playerName}, player_slug = ${e.playerSlug},
+        team_name = ${e.teamName}, team_color = ${e.teamColor}, role = ${e.role},
+        league_id = ${season.league_id}, league_slug = ${season.league_slug},
+        division_id = ${season.division_id}, division_slug = ${season.division_slug},
+        division_tier = ${season.division_tier}, season_slug = ${season.slug},
+        card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
+        updated_at = NOW()
+      WHERE id = ${existing.id}
+    `
+    return 'updated'
+  } else {
+    await sql`
+      INSERT INTO cc_player_defs (
+        player_id, team_id, season_id, league_id, division_id,
+        player_name, player_slug, team_name, team_color, role,
+        league_slug, division_slug, season_slug, division_tier,
+        card_index, avatar_url, best_god_name
+      ) VALUES (
+        ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
+        ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
+        ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
+        ${cardIndex}, ${avatarUrl}, ${bestGodName}
+      )
+    `
+    return 'created'
+  }
+}
+
+/**
+ * Preview player-team combos that would be generated for given seasons.
+ * Dry-run — reads only, writes nothing.
+ */
+export async function previewPlayerDefs(sql, seasonIds) {
+  const results = []
+
+  for (const seasonId of seasonIds) {
+    const { season, entries } = await discoverPlayerTeamCombos(sql, seasonId)
+
+    const existingDefs = await sql`
+      SELECT player_id, team_id FROM cc_player_defs WHERE season_id = ${seasonId}
+    `
+    const exclusions = await sql`
+      SELECT player_id, team_id FROM cc_player_def_exclusions WHERE season_id = ${seasonId}
+    `
+    const defSet = new Set(existingDefs.map(d => `${d.player_id}-${d.team_id}`))
+    const exclSet = new Set(exclusions.map(e => `${e.player_id}-${e.team_id}`))
+
+    for (const e of entries) {
+      const key = `${e.playerId}-${e.teamId}`
+
+      const bestGodName = await findBestGod(sql, e.playerId, e.teamId, seasonId)
+
+      let status = 'new'
+      if (exclSet.has(key)) status = 'excluded'
+      else if (defSet.has(key)) status = 'exists'
+
+      results.push({
+        playerId: e.playerId,
+        playerName: e.playerName,
+        teamId: e.teamId,
+        teamName: e.teamName,
+        teamColor: e.teamColor,
+        role: e.role,
+        seasonId,
+        seasonName: season.name,
+        divisionName: season.division_name,
+        leagueSlug: season.league_slug,
+        divisionSlug: season.division_slug,
+        bestGodName,
+        status,
+      })
+    }
+  }
+
+  return results
+}
+
+/**
+ * Generate player defs for only the selected entries.
+ * Accepts explicit list of { playerId, teamId, seasonId }.
+ */
+export async function generateSelectedDefs(sql, selectedEntries) {
+  let created = 0
+  let updated = 0
+
+  const bySeasonId = new Map()
+  for (const e of selectedEntries) {
+    if (!bySeasonId.has(e.seasonId)) bySeasonId.set(e.seasonId, [])
+    bySeasonId.get(e.seasonId).push(e)
+  }
+
+  for (const [seasonId, seasonEntries] of bySeasonId) {
+    const { season, entries: allEntries } = await discoverPlayerTeamCombos(sql, seasonId)
+
+    const requestedKeys = new Set(seasonEntries.map(e => `${e.playerId}-${e.teamId}`))
+    const filtered = allEntries.filter(e => requestedKeys.has(`${e.playerId}-${e.teamId}`))
+
+    // Build index map from ALL entries so card_index stays stable
+    const indexMap = new Map()
+    allEntries.forEach((e, i) => indexMap.set(`${e.playerId}-${e.teamId}`, i + 1))
+
+    for (const e of filtered) {
+      const cardIndex = indexMap.get(`${e.playerId}-${e.teamId}`)
+      const result = await upsertPlayerDef(sql, e, seasonId, season, cardIndex)
+      if (result === 'created') created++
+      else updated++
+    }
+  }
+
+  return { created, updated, total: created + updated }
+}
+
+/**
+ * Generate player card definitions for a season (all combos).
+ * @returns {{ created: number, updated: number, total: number }}
+ */
+export async function generatePlayerDefs(sql, seasonId) {
+  const { season, entries } = await discoverPlayerTeamCombos(sql, seasonId)
+
   let created = 0
   let updated = 0
   for (let i = 0; i < entries.length; i++) {
-    const e = entries[i]
-    const cardIndex = i + 1
-
-    // Build avatar URL
-    let avatarUrl = null
-    const [userRow] = await sql`
-      SELECT u.discord_id, u.discord_avatar,
-             COALESCE(up.allow_discord_avatar, true) AS allow_avatar
-      FROM users u
-      LEFT JOIN user_preferences up ON up.user_id = u.id
-      WHERE u.linked_player_id = ${e.playerId}
-    `
-    if (userRow?.allow_avatar && userRow.discord_id && userRow.discord_avatar) {
-      avatarUrl = `https://cdn.discordapp.com/avatars/${userRow.discord_id}/${userRow.discord_avatar}.webp?size=256`
-    }
-
-    // Best god name for avatar fallback
-    const [bestGodRow] = await sql`
-      SELECT pgs.god_played FROM player_game_stats pgs
-      JOIN league_players lp ON pgs.league_player_id = lp.id
-      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
-      JOIN matches m ON g.match_id = m.id
-      WHERE lp.player_id = ${e.playerId} AND lp.season_id = ${seasonId}
-        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${e.teamId}
-        AND pgs.god_played IS NOT NULL
-      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
-    `
-    const bestGodName = bestGodRow?.god_played || null
-
-    const [existing] = await sql`
-      SELECT id FROM cc_player_defs
-      WHERE player_id = ${e.playerId} AND team_id = ${e.teamId} AND season_id = ${seasonId}
-    `
-
-    if (existing) {
-      await sql`
-        UPDATE cc_player_defs SET
-          player_name = ${e.playerName},
-          player_slug = ${e.playerSlug},
-          team_name = ${e.teamName},
-          team_color = ${e.teamColor},
-          role = ${e.role},
-          league_id = ${season.league_id},
-          league_slug = ${season.league_slug},
-          division_id = ${season.division_id},
-          division_slug = ${season.division_slug},
-          division_tier = ${season.division_tier},
-          season_slug = ${season.slug},
-          card_index = ${cardIndex},
-          avatar_url = ${avatarUrl},
-          best_god_name = ${bestGodName},
-          updated_at = NOW()
-        WHERE id = ${existing.id}
-      `
-      updated++
-    } else {
-      await sql`
-        INSERT INTO cc_player_defs (
-          player_id, team_id, season_id, league_id, division_id,
-          player_name, player_slug, team_name, team_color, role,
-          league_slug, division_slug, season_slug, division_tier,
-          card_index, avatar_url, best_god_name
-        ) VALUES (
-          ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
-          ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
-          ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
-          ${cardIndex}, ${avatarUrl}, ${bestGodName}
-        )
-      `
-      created++
-    }
+    const result = await upsertPlayerDef(sql, entries[i], seasonId, season, i + 1)
+    if (result === 'created') created++
+    else updated++
   }
 
   return { created, updated, total: entries.length }
@@ -319,22 +409,17 @@ export async function refreshBestGods(sql, matchId) {
   `
 
   for (const p of players) {
-    const [row] = await sql`
-      SELECT pgs.god_played FROM player_game_stats pgs
-      JOIN league_players lp ON pgs.league_player_id = lp.id
-      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
-      JOIN matches m ON g.match_id = m.id
-      WHERE lp.player_id = ${p.player_id} AND lp.season_id = ${p.season_id}
-        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${p.team_id}
-        AND pgs.god_played IS NOT NULL
-      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+    const bestGodName = await findBestGod(sql, p.player_id, p.team_id, p.season_id)
+    const [lp] = await sql`
+      SELECT role FROM league_players
+      WHERE player_id = ${p.player_id} AND season_id = ${p.season_id} LIMIT 1
     `
-    if (row) {
-      await sql`
-        UPDATE cc_player_defs
-        SET best_god_name = ${row.god_played}, updated_at = NOW()
-        WHERE player_id = ${p.player_id} AND team_id = ${p.team_id} AND season_id = ${p.season_id}
-      `
-    }
+    await sql`
+      UPDATE cc_player_defs
+      SET best_god_name = COALESCE(${bestGodName}, best_god_name),
+          role = COALESCE(${lp?.role || null}, role),
+          updated_at = NOW()
+      WHERE player_id = ${p.player_id} AND team_id = ${p.team_id} AND season_id = ${p.season_id}
+    `
   }
 }

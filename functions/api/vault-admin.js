@@ -5,7 +5,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { SignJWT } from 'jose'
-import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs } from '../lib/vault-defs.js'
+import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs, previewPlayerDefs, generateSelectedDefs } from '../lib/vault-defs.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -31,6 +31,8 @@ const handler = async (event) => {
         case 'users':       return await handleListUsers(sql, event.queryStringParameters)
         case 'holo-types':  return await handleHoloTypes()
         case 'definition-overrides': return await handleGetDefinitionOverrides(sql, event.queryStringParameters)
+        case 'seasons':             return await handleGetSeasons(sql)
+        case 'preview-player-defs': return await handlePreviewPlayerDefs(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -49,6 +51,9 @@ const handler = async (event) => {
         case 'freeze-season-stats':    return await handleFreezeSeasonStats(sql, body)
         case 'backfill-card-defs':     return await handleBackfillCardDefs(sql)
         case 'refresh-best-gods':     return await handleRefreshBestGods(sql)
+        case 'generate-selected-defs': return await handleGenerateSelectedDefs(sql, body)
+        case 'exclude-player-def':     return await handleExcludePlayerDef(sql, body, user)
+        case 'unexclude-player-def':   return await handleUnexcludePlayerDef(sql, body)
         case 'ban-user':           return await handleBanUser(sql, body, user)
         case 'unban-user':         return await handleUnbanUser(sql, body)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
@@ -521,6 +526,77 @@ async function handleUnbanUser(sql, body) {
 
   await sql`DELETE FROM cc_vault_bans WHERE user_id = ${userId}`
 
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ GET: All seasons with league info (for player defs tab) ═══
+async function handleGetSeasons(sql) {
+  const seasons = await sql`
+    SELECT s.id, s.name, s.slug, s.is_active,
+           l.name AS league_name, l.slug AS league_slug,
+           d.name AS division_name, d.slug AS division_slug
+    FROM seasons s
+    JOIN divisions d ON s.division_id = d.id
+    JOIN leagues l ON d.league_id = l.id
+    ORDER BY l.name, d.tier, s.start_date DESC
+  `
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ seasons }) }
+}
+
+// ═══ GET: Preview player-team combos (dry-run) ═══
+async function handlePreviewPlayerDefs(sql, params) {
+  const { seasonIds, allActive } = params
+  let ids = []
+
+  if (allActive === 'true') {
+    const rows = await sql`SELECT id FROM seasons WHERE is_active = true`
+    ids = rows.map(r => r.id)
+  } else if (seasonIds) {
+    ids = seasonIds.split(',').map(Number).filter(Boolean)
+  }
+
+  if (!ids.length) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonIds or allActive required' }) }
+  }
+
+  const entries = await previewPlayerDefs(sql, ids)
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ entries }) }
+}
+
+// ═══ POST: Generate only selected player defs ═══
+async function handleGenerateSelectedDefs(sql, body) {
+  const { entries } = body
+  if (!entries?.length) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'entries array required' }) }
+  }
+  const result = await generateSelectedDefs(sql, entries)
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
+}
+
+// ═══ POST: Permanently exclude a player-team-season combo ═══
+async function handleExcludePlayerDef(sql, body, user) {
+  const { playerId, teamId, seasonId } = body
+  if (!playerId || !teamId || !seasonId) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'playerId, teamId, seasonId required' }) }
+  }
+  await sql`
+    INSERT INTO cc_player_def_exclusions (player_id, team_id, season_id, excluded_by)
+    VALUES (${playerId}, ${teamId}, ${seasonId}, ${user.discord_name || String(user.id)})
+    ON CONFLICT (player_id, team_id, season_id) DO NOTHING
+  `
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ POST: Remove exclusion ═══
+async function handleUnexcludePlayerDef(sql, body) {
+  const { playerId, teamId, seasonId } = body
+  if (!playerId || !teamId || !seasonId) {
+    return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'playerId, teamId, seasonId required' }) }
+  }
+  await sql`
+    DELETE FROM cc_player_def_exclusions
+    WHERE player_id = ${playerId} AND team_id = ${teamId} AND season_id = ${seasonId}
+  `
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
 }
 
