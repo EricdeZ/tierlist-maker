@@ -142,9 +142,14 @@ function reshapeAttachments(row) {
   return { godCard, itemCard }
 }
 
+function isRoleMismatch(card) {
+  return card.slot_role && card.role && card.role !== card.slot_role && card.role !== 'fill'
+}
+
 function getTotalDailyRates(cards, teamCounts = {}) {
   let totalPassion = 0, totalCores = 0
   for (const card of cards) {
+    if (isRoleMismatch(card)) continue
     const { godCard, itemCard } = reshapeAttachments(card)
     const { passionPerHour, coresPerHour } = getSlotRates(card, godCard, itemCard)
     const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
@@ -235,11 +240,12 @@ export async function tick(sql, userId) {
 
   const teamCounts = {}
   for (const card of cards) {
-    if (card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
+    if (!isRoleMismatch(card) && card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
   }
 
   let passionAccrued = 0, coresAccrued = 0
   for (const card of cards) {
+    if (isRoleMismatch(card)) continue
     const { passionPerHour, coresPerHour } = getSlotRates(card, card._godCard, card._itemCard)
     const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
     passionAccrued += passionPerHour * teamBonus * elapsedHours

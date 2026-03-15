@@ -12,7 +12,7 @@ import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
 import suppIcon from '../../assets/roles/supp.webp'
 import adcIcon from '../../assets/roles/adc.webp'
-import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy } from 'lucide-react'
+import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
 
@@ -1051,6 +1051,7 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         style={{
           ...(isAnimating ? { '--glow-color': `${color}66`, animation: 's5-glow-pulse 0.8s ease-in-out 2' } : {}),
           ...(!isAnimating ? { animation: 's5-card-enter 0.3s ease-out' } : {}),
+          ...(card.roleMismatch ? { opacity: 0.5, filter: 'grayscale(0.6)' } : {}),
         }}
         onClick={onToggleOptions}
       >
@@ -1101,26 +1102,35 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
           <span className="text-[10px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
           <HoloTypeIcon holoType={card.holoType} size={11} />
         </div>
-        <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
-          {income.passion > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
-              <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
-              {income.passion % 1 === 0 ? income.passion : income.passion.toFixed(1)}/d
-            </span>
-          )}
-          {income.cores > 0 && (
-            <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-              <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
-              {income.cores % 1 === 0 ? income.cores : income.cores.toFixed(1)}/d
-            </span>
-          )}
-        </div>
-        {card.teamSynergyBonus > 0 && (
-          <div className="flex items-center justify-center gap-1 mt-0.5">
-            <span className="text-[9px] font-bold cd-head text-emerald-400">
-              +{Math.round(card.teamSynergyBonus * 100)}% Team
-            </span>
+        {card.roleMismatch ? (
+          <div className="flex items-center justify-center gap-1 mt-1">
+            <AlertTriangle size={10} className="text-red-400" />
+            <span className="text-[9px] font-bold cd-head text-red-400 tracking-wider">WRONG ROLE</span>
           </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
+              {income.passion > 0 && (
+                <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
+                  <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
+                  {income.passion % 1 === 0 ? income.passion : income.passion.toFixed(1)}/d
+                </span>
+              )}
+              {income.cores > 0 && (
+                <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
+                  <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+                  {income.cores % 1 === 0 ? income.cores : income.cores.toFixed(1)}/d
+                </span>
+              )}
+            </div>
+            {card.teamSynergyBonus > 0 && (
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <span className="text-[9px] font-bold cd-head text-emerald-400">
+                  +{Math.round(card.teamSynergyBonus * 100)}% Team
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

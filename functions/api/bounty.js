@@ -97,6 +97,7 @@ async function handleList(sql, params) {
          (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
        )
+       ORDER BY pd.avatar_url NULLS LAST, pd.updated_at DESC NULLS LAST
        LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'
@@ -200,6 +201,7 @@ async function handleHero(sql) {
          (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
        )
+       ORDER BY pd.avatar_url NULLS LAST, pd.updated_at DESC NULLS LAST
        LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'

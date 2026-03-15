@@ -1423,10 +1423,11 @@ function formatS5Response(state, extra = {}) {
   const cardsWithRates = state.cards.map(c => {
     const godCard = c._godCard || null
     const itemCard = c._itemCard || null
+    const roleMismatch = !!(c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill')
     const baseRates = getCardRates(c.holo_type, c.rarity)
-    const effectiveRates = getSlotRates(c, godCard, itemCard)
+    const effectiveRates = roleMismatch ? { passionPerHour: 0, coresPerHour: 0 } : getSlotRates(c, godCard, itemCard)
     const synergy = !!(godCard && c.best_god_name && godCard.god_name && godCard.god_name.toLowerCase() === c.best_god_name.toLowerCase())
-    const teamSynergyBonus = TEAM_SYNERGY[teamCounts[c.team_id]] || 0
+    const teamSynergyBonus = roleMismatch ? 0 : (TEAM_SYNERGY[teamCounts[c.team_id]] || 0)
     const teamMult = 1 + teamSynergyBonus
 
     return {
@@ -1434,6 +1435,7 @@ function formatS5Response(state, extra = {}) {
       slotRole: c.slot_role,
       teamId: c.team_id || null,
       teamSynergyBonus,
+      roleMismatch,
       passionPerHour: baseRates.passionPerHour,
       coresPerHour: baseRates.coresPerHour,
       effectivePassionPerHour: effectiveRates.passionPerHour * teamMult,
@@ -1488,7 +1490,7 @@ async function handleStartingFive(sql, user) {
 async function handleS5Leaderboard(sql, user) {
   const rows = await sql`
     SELECT l.user_id, l.role AS slot_role,
-      c.rarity, c.holo_type, c.card_type,
+      c.rarity, c.holo_type, c.card_type, c.role,
       pd.best_god_name, pd.team_id,
       g.rarity AS god_rarity, g.holo_type AS god_holo_type, g.card_type AS god_card_type,
       g.god_name AS god_god_name, g.role AS god_role,
@@ -1525,10 +1527,12 @@ async function handleS5Leaderboard(sql, user) {
   for (const u of Object.values(byUser)) {
     const teamCounts = {}
     for (const c of u.cards) {
-      if (c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+      const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
+      if (!mismatch && c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
     }
     let totalPassion = 0, totalCores = 0
     for (const c of u.cards) {
+      if (c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill') continue
       const godCard = c.god_rarity ? { rarity: c.god_rarity, holo_type: c.god_holo_type, god_name: c.god_god_name } : null
       const itemCard = c.item_rarity ? { rarity: c.item_rarity, holo_type: c.item_holo_type } : null
       const { passionPerHour, coresPerHour } = getSlotRates(c, godCard, itemCard)
