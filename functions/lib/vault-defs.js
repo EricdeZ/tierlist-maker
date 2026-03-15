@@ -2,6 +2,32 @@
 // Generates one cc_player_defs row per player-team-season combination
 
 /**
+ * Sync a role change from league_players to unfrozen vault defs and their minted cards.
+ * Call after any league_players.role update to keep vault data consistent.
+ */
+export async function syncRoleToVault(sql, leaguePlayerId, role) {
+  await sql`
+    UPDATE cc_player_defs
+    SET role = ${role}, updated_at = NOW()
+    FROM league_players lp
+    WHERE lp.id = ${leaguePlayerId}
+    AND cc_player_defs.player_id = lp.player_id
+    AND cc_player_defs.season_id = lp.season_id
+    AND cc_player_defs.frozen_stats IS NULL
+  `
+  await sql`
+    UPDATE cc_cards
+    SET role = ${role.toLowerCase()}
+    FROM cc_player_defs d
+    WHERE cc_cards.def_id = d.id
+    AND cc_cards.card_type = 'player'
+    AND d.player_id = (SELECT player_id FROM league_players WHERE id = ${leaguePlayerId})
+    AND d.season_id = (SELECT season_id FROM league_players WHERE id = ${leaguePlayerId})
+    AND d.frozen_stats IS NULL
+  `
+}
+
+/**
  * Compute stats for a player on a specific team in a specific season.
  * Uses team_side to correctly attribute games to the right team (handles transfers).
  */
@@ -227,6 +253,12 @@ async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
         card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
         updated_at = NOW()
       WHERE id = ${existing.id}
+    `
+    // Cascade role to minted cards from this def
+    await sql`
+      UPDATE cc_cards
+      SET role = ${(e.role || 'adc').toLowerCase()}
+      WHERE def_id = ${existing.id} AND card_type = 'player'
     `
     return 'updated'
   } else {

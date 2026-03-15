@@ -44,7 +44,7 @@ function toGameCardData(card, override) {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
   }
-  if (type === 'god') return { ...base, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
+  if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
   if (type === 'consumable') return { ...base, color: cd.color || '#10b981', description: cd.description || '', manaCost: cd.manaCost || 1 }
   return base

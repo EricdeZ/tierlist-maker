@@ -58,6 +58,7 @@ import Predictions from "./pages/Predictions.jsx";
 import MatchupDetail from "./pages/MatchupDetail.jsx";
 import FeaturedStream from "./pages/FeaturedStream.jsx"
 import AGLSignup from "./pages/AGLSignup.jsx";
+import SALSignup from "./pages/SALSignup.jsx";
 import OrgPage from "./pages/OrgPage.jsx";
 import OrgManager from "./pages/admin/OrgManager.jsx";
 import FantasyForge from "./pages/FantasyForge.jsx";
@@ -250,6 +251,9 @@ function App() {
 
                             {/* AGL signup page */}
                             <Route path="agl/signup" element={<AGLSignup />} />
+
+                            {/* SAL signup page */}
+                            <Route path="sal/signup" element={<SALSignup />} />
 
                             {/* Organization page */}
                             <Route path="org/:orgSlug" element={<OrgPage />} />

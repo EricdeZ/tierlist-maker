@@ -4,6 +4,7 @@ import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason }
 import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
 import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange, ensurePlayerSparks } from '../lib/forge.js'
+import { syncRoleToVault } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -114,6 +115,7 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
+    await syncRoleToVault(sql, league_player_id, role)
     await logAudit(sql, admin, { action: 'change-role', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { role, secondary_role } })
 
     return {

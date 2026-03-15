@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { syncRoleToVault } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -192,6 +193,7 @@ async function apply(sql, body, admin, event) {
         `
 
         if (updated) {
+            await syncRoleToVault(sql, leaguePlayerId, newRole.toLowerCase())
             applied++
         } else {
             skipped++

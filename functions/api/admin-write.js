@@ -8,7 +8,7 @@ import { resolvePredictions } from '../lib/predictions.js'
 import { updateForgeAfterMatch } from '../lib/forge.js'
 import { sendChannelMessage } from '../lib/discord.js'
 import { advanceFromMatch } from '../lib/advancement.js'
-import { refreshBestGods } from '../lib/vault-defs.js'
+import { refreshBestGods, syncRoleToVault } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -108,26 +108,7 @@ async function updatePlayerRoles(sql, matchId) {
                 SET role = ${role}, secondary_role = ${secondaryRole}, updated_at = NOW()
                 WHERE id = ${league_player_id}
             `
-            // Sync role to unfrozen card definitions and their minted cards
-            await sql`
-                UPDATE cc_player_defs
-                SET role = ${role}, updated_at = NOW()
-                FROM league_players lp
-                WHERE lp.id = ${league_player_id}
-                AND cc_player_defs.player_id = lp.player_id
-                AND cc_player_defs.season_id = lp.season_id
-                AND cc_player_defs.frozen_stats IS NULL
-            `
-            await sql`
-                UPDATE cc_cards
-                SET role = ${role.toLowerCase()}
-                FROM cc_player_defs d
-                WHERE cc_cards.def_id = d.id
-                AND cc_cards.card_type = 'player'
-                AND d.player_id = (SELECT player_id FROM league_players WHERE id = ${league_player_id})
-                AND d.season_id = (SELECT season_id FROM league_players WHERE id = ${league_player_id})
-                AND d.frozen_stats IS NULL
-            `
+            await syncRoleToVault(sql, league_player_id, role)
         }
     }
 }

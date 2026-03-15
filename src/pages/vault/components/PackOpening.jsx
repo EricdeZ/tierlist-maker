@@ -36,7 +36,7 @@ function toGameCardData(card, override) {
     metadata: override || undefined,
   }
   if (type === 'god') {
-    return { ...base, ability: card.ability || cd.ability, imageKey: cd.imageKey }
+    return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd.imageKey }
   }
   if (type === 'item') {
     return { ...base, category: cd.category || card.class, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd.imageKey }
