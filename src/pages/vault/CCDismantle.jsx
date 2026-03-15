@@ -7,6 +7,9 @@ import { Hammer, Check, Trash2, Info } from 'lucide-react'
 import emberIcon from '../../assets/ember.png'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
+const DISMANTLE_RARITIES = RARITY_ORDER.filter(r => r !== 'unique')
+const HOLO_TYPES = ['holo', 'reverse', 'full']
+const HOLO_TYPE_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
 const CARD_SIZE = 130
 
 function getCardType(card) {
@@ -138,6 +141,7 @@ export default function CCDismantle() {
   const [result, setResult] = useState(null)
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
+  const [filterHolo, setFilterHolo] = useState('all')
   const [showRates, setShowRates] = useState(true)
   const [visibleCount, setVisibleCount] = useState(50)
 
@@ -158,15 +162,18 @@ export default function CCDismantle() {
     let list = collection.filter(c => !lockedCardIds.has(c.id) && c.rarity !== 'unique')
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
+    if (filterHolo !== 'all') list = list.filter(c => c.holoType === filterHolo)
     list.sort((a, b) => {
       const nameComp = (a.godName || '').localeCompare(b.godName || '')
       if (nameComp !== 0) return nameComp
       const teamComp = (a.cardData?.teamName || '').localeCompare(b.cardData?.teamName || '')
       if (teamComp !== 0) return teamComp
-      return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+      const rarityComp = RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+      if (rarityComp !== 0) return rarityComp
+      return HOLO_TYPES.indexOf(a.holoType) - HOLO_TYPES.indexOf(b.holoType)
     })
     return list
-  }, [collection, filterRarity, filterType, lockedCardIds])
+  }, [collection, filterRarity, filterType, filterHolo, lockedCardIds])
 
   const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount])
   const hasMore = visibleCount < cards.length
@@ -264,7 +271,7 @@ export default function CCDismantle() {
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Base Rates</div>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                {RARITY_ORDER.map(r => {
+                {DISMANTLE_RARITIES.map(r => {
                   const info = RARITIES[r]
                   return (
                     <div key={r} className="text-center p-2 rounded-lg bg-black/20">
@@ -320,8 +327,19 @@ export default function CCDismantle() {
           className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
         >
           <option value="all">All Rarities</option>
-          {RARITY_ORDER.map(r => (
+          {DISMANTLE_RARITIES.map(r => (
             <option key={r} value={r}>{RARITIES[r].name}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterHolo}
+          onChange={e => { setFilterHolo(e.target.value); setVisibleCount(50) }}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
+        >
+          <option value="all">All Holo Types</option>
+          {HOLO_TYPES.map(h => (
+            <option key={h} value={h}>{HOLO_TYPE_LABELS[h]}</option>
           ))}
         </select>
 
