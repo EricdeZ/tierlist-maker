@@ -92,7 +92,10 @@ async function handleList(sql, params) {
 
   const rows = await sql`
     SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
-      (SELECT pd.avatar_url FROM cc_player_defs pd
+      (SELECT COALESCE(pd.avatar_url,
+         (SELECT 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+          FROM users u WHERE u.linked_player_id = pd.player_id AND u.discord_avatar IS NOT NULL LIMIT 1)
+       ) FROM cc_player_defs pd
        WHERE b.card_type = 'player' AND (
          (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
@@ -196,7 +199,10 @@ async function handleHero(sql) {
 
   const rows = await sql`
     SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
-      (SELECT pd.avatar_url FROM cc_player_defs pd
+      (SELECT COALESCE(pd.avatar_url,
+         (SELECT 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+          FROM users u WHERE u.linked_player_id = pd.player_id AND u.discord_avatar IS NOT NULL LIMIT 1)
+       ) FROM cc_player_defs pd
        WHERE b.card_type = 'player' AND (
          (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
@@ -262,10 +268,17 @@ async function handleSearchPlayers(sql, params) {
   const term = `%${q.trim()}%`
   const rows = await sql`
     SELECT pd.player_id, pd.team_id, pd.player_name, pd.team_name, pd.team_color, pd.role,
-           pd.avatar_url, pd.division_slug, pd.season_slug,
+           COALESCE(pd.avatar_url,
+             CASE WHEN u.discord_id IS NOT NULL AND u.discord_avatar IS NOT NULL
+               THEN 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+             END
+           ) AS avatar_url,
+           pd.division_slug, pd.season_slug,
            d.name AS division_name
     FROM cc_player_defs pd
     LEFT JOIN divisions d ON d.id = pd.division_id
+    LEFT JOIN players p ON p.slug = pd.player_slug
+    LEFT JOIN users u ON u.linked_player_id = p.id
     WHERE pd.player_name ILIKE ${term}
     ORDER BY pd.player_name, pd.season_slug DESC, pd.team_name
     LIMIT 30

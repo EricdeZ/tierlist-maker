@@ -645,7 +645,12 @@ async function handleCollectionSet(sql, params) {
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
            d.role, d.best_god_name,
-           CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
+           CASE
+             WHEN COALESCE(up.allow_discord_avatar, true) AND u.discord_id IS NOT NULL AND u.discord_avatar IS NOT NULL
+             THEN 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+             WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url
+             ELSE NULL
+           END AS avatar_url,
            d.league_slug, d.division_tier, d.season_slug,
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM cc_player_defs d
@@ -683,7 +688,12 @@ async function handleCollectionSearch(sql, params) {
   const defs = await sql`
     SELECT d.id, d.card_index, d.player_name, d.player_slug, d.team_name, d.team_color,
            d.role, d.best_god_name,
-           CASE WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url ELSE NULL END AS avatar_url,
+           CASE
+             WHEN COALESCE(up.allow_discord_avatar, true) AND u.discord_id IS NOT NULL AND u.discord_avatar IS NOT NULL
+             THEN 'https://cdn.discordapp.com/avatars/' || u.discord_id || '/' || u.discord_avatar || '.webp?size=256'
+             WHEN COALESCE(up.allow_discord_avatar, true) THEN d.avatar_url
+             ELSE NULL
+           END AS avatar_url,
            d.league_slug, d.division_tier, d.division_slug, d.season_slug,
            div.name AS division_name,
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
