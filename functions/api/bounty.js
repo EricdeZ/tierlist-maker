@@ -93,7 +93,10 @@ async function handleList(sql, params) {
   const rows = await sql`
     SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
       (SELECT pd.avatar_url FROM cc_player_defs pd
-       WHERE CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id AND b.card_type = 'player'
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
        LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'
@@ -193,7 +196,10 @@ async function handleHero(sql) {
   const rows = await sql`
     SELECT b.id, b.card_type, b.card_name, b.rarity, b.holo_type, b.core_reward, b.target_god_id, b.created_at, b.expires_at,
       (SELECT pd.avatar_url FROM cc_player_defs pd
-       WHERE CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id AND b.card_type = 'player'
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
        LIMIT 1) AS avatar_url
     FROM cc_bounties b
     WHERE b.status = 'active'

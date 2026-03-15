@@ -108,6 +108,16 @@ async function updatePlayerRoles(sql, matchId) {
                 SET role = ${role}, secondary_role = ${secondaryRole}, updated_at = NOW()
                 WHERE id = ${league_player_id}
             `
+            // Sync role to unfrozen card definitions
+            await sql`
+                UPDATE cc_player_defs
+                SET role = ${role}, updated_at = NOW()
+                FROM league_players lp
+                WHERE lp.id = ${league_player_id}
+                AND cc_player_defs.player_id = lp.player_id
+                AND cc_player_defs.season_id = lp.season_id
+                AND cc_player_defs.frozen_stats IS NULL
+            `
         }
     }
 }
