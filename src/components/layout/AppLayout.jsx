@@ -20,10 +20,11 @@ const AppLayout = () => {
     const location = useLocation()
 
     // League and division pages render their own navbar with UserMenu,
-    // so hide the global one. Known top-level routes that need the global menu:
+    // so hide the global one. Dashboard (logged-in homepage) also has its own navbar.
     const firstSegment = location.pathname.split('/')[1]
     const knownRoutes = ['']
-    const hasOwnNav = firstSegment && !knownRoutes.includes(firstSegment)
+    const isLoggedInHomepage = firstSegment === '' && !loading && user
+    const hasOwnNav = isLoggedInHomepage || (firstSegment && !knownRoutes.includes(firstSegment))
 
     return (
         <SidebarProvider>

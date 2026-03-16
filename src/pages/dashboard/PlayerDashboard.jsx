@@ -8,6 +8,7 @@ import {
 } from '../../services/database'
 
 import { getDiscordAvatarUrl } from '../../utils/playerAvatar'
+import Navbar from '../../components/layout/Navbar'
 import ActionBar from './ActionBar'
 import UpcomingMatches from './UpcomingMatches'
 import RecentResults from './RecentResults'
@@ -42,7 +43,7 @@ function SectionLabel({ children }) {
 
 function LoadingSkeleton() {
     return (
-        <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <div className="px-4 sm:px-6 lg:px-8 pt-20 sm:pt-22 pb-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                     <div
@@ -177,21 +178,26 @@ export default function PlayerDashboard() {
         .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
 
     return (
-        <div className="relative px-4 sm:px-6 lg:px-8 pt-14 sm:pt-16 pb-6 min-h-screen">
+        <>
+        <Navbar title="Dashboard" />
+        <div className="relative px-4 sm:px-6 lg:px-8 pt-20 sm:pt-22 pb-6 min-h-screen">
             {/* Background */}
             <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-                {/* Dot pattern */}
+                {/* Noise texture via dot grid */}
                 <div
-                    className="absolute inset-0 opacity-[0.07]"
+                    className="absolute inset-0 opacity-[0.05]"
                     style={{
-                        backgroundImage: 'radial-gradient(rgba(255,255,255,.4) 1px, transparent 1px)',
-                        backgroundSize: '24px 24px',
+                        backgroundImage: 'radial-gradient(rgba(255,255,255,.5) 1px, transparent 1px)',
+                        backgroundSize: '20px 20px',
                     }}
                 />
-                {/* Subtle ambient color blobs */}
-                <div className="absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.04]" style={{ background: 'radial-gradient(circle, #f59e0b, transparent 70%)' }} />
-                <div className="absolute top-1/3 left-0 w-[400px] h-[400px] rounded-full opacity-[0.03]" style={{ background: 'radial-gradient(circle, #00e5ff, transparent 70%)' }} />
-                <div className="absolute bottom-1/4 right-0 w-[400px] h-[400px] rounded-full opacity-[0.03]" style={{ background: 'radial-gradient(circle, #a855f7, transparent 70%)' }} />
+                {/* Ambient color blobs — slowly shifting */}
+                <div className="absolute -top-20 right-1/4 w-[600px] h-[600px] rounded-full opacity-[0.05] blur-3xl" style={{ background: '#f59e0b' }} />
+                <div className="absolute top-1/3 -left-20 w-[500px] h-[500px] rounded-full opacity-[0.04] blur-3xl" style={{ background: '#00e5ff' }} />
+                <div className="absolute bottom-1/4 -right-10 w-[500px] h-[500px] rounded-full opacity-[0.04] blur-3xl" style={{ background: '#a855f7' }} />
+                <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full opacity-[0.03] blur-3xl" style={{ background: '#e86520' }} />
+                {/* Vignette */}
+                <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%)' }} />
             </div>
 
             {/* Greeting */}
@@ -281,5 +287,6 @@ export default function PlayerDashboard() {
                 <CoinFlipCard stats={data.coinflipStats} />
             </div>
         </div>
+        </>
     )
 }
