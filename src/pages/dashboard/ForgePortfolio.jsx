@@ -1,6 +1,7 @@
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Zap } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import TeamLogo from '../../components/TeamLogo'
 
 function PLBadge({ value }) {
     if (value == null) return null
@@ -61,15 +62,17 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                     <div className="space-y-1.5">
                         {holdings.slice(0, 3).map(h => (
                             <div key={h.sparkId} className="flex items-center gap-2 text-sm">
-                                {h.teamColor && (
-                                    <span
-                                        className="w-2 h-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: h.teamColor }}
-                                        title={h.teamName}
-                                    />
-                                )}
+                                <TeamLogo
+                                    name={h.teamName}
+                                    color={h.teamColor}
+                                    size={18}
+                                    className="shrink-0"
+                                />
                                 <span className="flex-1 truncate">{h.playerName}</span>
-                                <span className="text-(--color-text-secondary) shrink-0 text-xs">{h.sparks} sparks</span>
+                                <div className="flex items-center gap-0.5 shrink-0 text-xs text-(--color-text-secondary)">
+                                    <Zap size={10} className="text-cyan-400" />
+                                    {h.sparks}
+                                </div>
                                 <PLBadge value={h.unrealizedPL} />
                             </div>
                         ))}

@@ -1,4 +1,4 @@
-import { Target } from 'lucide-react'
+import { Target, Gift } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 
 const TIER_STYLES = {
@@ -25,7 +25,8 @@ export default function ChallengesProgress({ challenges, claimableCount }) {
         <DashboardWidget title="Challenges" icon={<Target size={16} />} linkTo="/challenges" accent="emerald">
             <div className="space-y-3">
                 {claimableCount > 0 && (
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/10">
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                        <Gift size={13} className="text-emerald-400 shrink-0" />
                         <span className="text-xs font-bold text-emerald-400">{claimableCount} reward{claimableCount !== 1 ? 's' : ''} to claim!</span>
                     </div>
                 )}
