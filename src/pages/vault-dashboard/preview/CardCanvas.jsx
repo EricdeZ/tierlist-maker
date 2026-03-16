@@ -230,38 +230,38 @@ function CanvasElement({ el, isSelected, onMouseDown, onHandleMouseDown }) {
             break
         }
 
-        case 'effect': {
-            const gradients = {
-                rainbow: 'linear-gradient(135deg, #ff000030, #ff800030, #ffff0030, #00ff0030, #0000ff30, #80008030)',
-                gold: 'linear-gradient(135deg, #ffd70040, #daa52040, #b8860b40)',
-                cosmos: 'radial-gradient(ellipse at center, #1a053340, #0d001a40)',
-                galaxy: 'linear-gradient(135deg, #0f0c2940, #302b6340, #24243e40)',
-            }
-            content = null
+        case 'effect':
+            content = (
+                <div className="w-full h-full flex items-center justify-center pointer-events-none"
+                    style={{ background: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(245,158,11,0.08) 4px, rgba(245,158,11,0.08) 8px)' }}>
+                    <span className="text-[10px] text-amber-400/60 font-medium uppercase tracking-wider px-2 py-0.5 bg-black/30 rounded">
+                        {el.effectName}
+                    </span>
+                </div>
+            )
             style.width = '100%'
             style.height = '100%'
             style.left = 0
             style.top = 0
-            style.background = gradients[el.effectName] || gradients.rainbow
             style.pointerEvents = 'none'
-            style.cursor = 'default'
             break
-        }
 
         default:
             content = null
     }
 
+    const isEffect = el.type === 'effect'
+
     return (
         <div
             style={style}
-            onMouseDown={el.type !== 'effect' ? onMouseDown : undefined}
+            onMouseDown={!isEffect ? onMouseDown : undefined}
             className={isSelected ? 'ring-1 ring-amber-400' : ''}
         >
             {content}
 
             {/* Resize handles */}
-            {isSelected && el.type !== 'effect' && (
+            {isSelected && !isEffect && (
                 <>
                     {HANDLES.map(h => {
                         const pos = {}

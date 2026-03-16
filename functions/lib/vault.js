@@ -9,8 +9,8 @@ const RARITIES = {
   rare:      { name: 'Rare',      dropRate: 0.06, color: '#3b82f6', holoEffects: ['galaxy', 'vstar', 'shiny', 'ultra'] },
   epic:      { name: 'Epic',      dropRate: 0.025, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
   legendary: { name: 'Legendary', dropRate: 0.003, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
-  mythic:    { name: 'Mythic',    dropRate: 0.00045, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
-  unique:    { name: 'Unique',    dropRate: 0.00005, color: '#e8e8ff', holoEffects: ['secret'] },
+  mythic:    { name: 'Mythic',    dropRate: 0.0005, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  unique:    { name: 'Unique',    dropRate: 0.0001, color: '#e8e8ff', holoEffects: ['secret'] },
   full_art:  { name: 'Full Art',  dropRate: 0, color: '#d4af37', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'] },
 }
 

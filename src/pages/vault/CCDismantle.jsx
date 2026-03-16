@@ -152,6 +152,7 @@ export default function CCDismantle() {
       if (card.godCard) ids.add(card.godCard.id)
       if (card.itemCard) ids.add(card.itemCard.id)
     }
+    if (startingFive?.consumableCard) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }

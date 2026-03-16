@@ -1,8 +1,13 @@
-import { useRef } from 'react'
-import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical } from 'lucide-react'
 
 const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace']
-const EFFECTS = ['rainbow', 'gold', 'cosmos', 'galaxy']
+const HOLO_EFFECTS = [
+    'common', 'amazing',
+    'galaxy', 'vstar', 'shiny', 'ultra',
+    'radiant', 'sparkle', 'rainbow-alt', 'cosmos',
+    'rainbow', 'secret', 'gold',
+]
 
 const btn = 'flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors'
 const input = 'px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500'
@@ -12,17 +17,21 @@ export default function CardSidebar({
     elements,
     selectedId,
     selectedElement,
+    onSelect,
     onAddImage,
     onAddText,
     onAddStats,
     onAddEffect,
     onUpdateElement,
     onDeleteElement,
+    onReorder,
     border,
     onBorderChange,
     onUploadImage,
 }) {
     const fileRef = useRef(null)
+    const [dragId, setDragId] = useState(null)
+    const [dragOverId, setDragOverId] = useState(null)
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0]
@@ -47,7 +56,7 @@ export default function CardSidebar({
                     <button onClick={onAddStats} className={`${btn} bg-purple-600/20 text-purple-400 hover:bg-purple-600/30`}>
                         <BarChart3 size={16} /> Stats
                     </button>
-                    <button onClick={onAddEffect} className={`${btn} bg-amber-600/20 text-amber-400 hover:bg-amber-600/30`}>
+                    <button onClick={() => onAddEffect('rainbow')} className={`${btn} bg-amber-600/20 text-amber-400 hover:bg-amber-600/30`}>
                         <Sparkles size={16} /> Effect
                     </button>
                 </div>
@@ -116,7 +125,7 @@ export default function CardSidebar({
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                            {sel.type === 'image' ? 'Image' : sel.type === 'text' ? 'Text' : sel.type === 'stats' ? 'Stats' : 'Effect'}
+                            {sel.type === 'image' ? 'Image' : sel.type === 'text' ? 'Text' : sel.type === 'effect' ? 'Holo Effect' : 'Stats'}
                         </h3>
                         <button
                             onClick={() => onDeleteElement(sel.id)}
@@ -269,15 +278,16 @@ export default function CardSidebar({
                         </div>
                     )}
 
+
                     {/* Effect properties */}
                     {sel.type === 'effect' && (
                         <div className="space-y-3">
                             <div>
-                                <label className={label}>Effect</label>
-                                <div className="grid grid-cols-2 gap-1">
-                                    {EFFECTS.map(e => (
-                                        <button key={e} onClick={() => onUpdateElement(sel.id, { effectName: e })}
-                                            className={`px-2 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                                <label className={label}>Effect Type</label>
+                                <div className="grid grid-cols-3 gap-1">
+                                    {HOLO_EFFECTS.map(e => (
+                                        <button key={e} onClick={() => onUpdateElement(sel.id, { effectName: e, name: e })}
+                                            className={`px-1.5 py-1.5 rounded-lg text-[10px] font-medium capitalize transition-colors ${
                                                 sel.effectName === e
                                                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                                                     : 'bg-gray-800 text-gray-400 border border-gray-700 hover:text-gray-300'
@@ -288,15 +298,15 @@ export default function CardSidebar({
                                 </div>
                             </div>
                             <div>
-                                <label className={label}>Opacity: {Math.round((sel.opacity ?? 0.3) * 100)}%</label>
-                                <input type="range" min={0} max={1} step={0.05} value={sel.opacity ?? 0.3}
+                                <label className={label}>Opacity: {Math.round((sel.opacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.opacity ?? 1}
                                     onChange={e => onUpdateElement(sel.id, { opacity: parseFloat(e.target.value) })}
                                     className="w-full accent-amber-500" />
                             </div>
                         </div>
                     )}
 
-                    {/* Position (non-effect elements) */}
+                    {/* Position & Size */}
                     {sel.type !== 'effect' && (
                         <div className="mt-3 pt-3 border-t border-gray-800">
                             <label className={label}>Position & Size</label>
@@ -329,44 +339,65 @@ export default function CardSidebar({
                         </div>
                     )}
 
-                    {/* Z-order */}
-                    {sel.type !== 'effect' && (
-                        <div className="flex gap-1 mt-2">
-                            <button onClick={() => onUpdateElement(sel.id, { z: (sel.z ?? 0) + 1 })}
-                                className="flex-1 px-2 py-1 bg-gray-800 text-gray-400 hover:text-white rounded text-[10px] transition-colors">
-                                Bring Forward
-                            </button>
-                            <button onClick={() => onUpdateElement(sel.id, { z: Math.max(0, (sel.z ?? 0) - 1) })}
-                                className="flex-1 px-2 py-1 bg-gray-800 text-gray-400 hover:text-white rounded text-[10px] transition-colors">
-                                Send Back
-                            </button>
-                        </div>
-                    )}
                 </div>
             )}
 
-            {/* Element list */}
+            {/* Layer list (drag to reorder) */}
             {elements.length > 0 && (
                 <div>
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                        Elements ({elements.length})
+                        Layers ({elements.length})
                     </h3>
                     <div className="space-y-0.5">
                         {[...elements].sort((a, b) => (b.z ?? 0) - (a.z ?? 0)).map(el => (
                             <div
                                 key={el.id}
-                                onClick={() => {/* onSelect is handled by parent */}}
-                                className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+                                draggable
+                                onDragStart={(e) => {
+                                    setDragId(el.id)
+                                    e.dataTransfer.effectAllowed = 'move'
+                                }}
+                                onDragOver={(e) => {
+                                    e.preventDefault()
+                                    e.dataTransfer.dropEffect = 'move'
+                                    if (dragOverId !== el.id) setDragOverId(el.id)
+                                }}
+                                onDragLeave={() => {
+                                    if (dragOverId === el.id) setDragOverId(null)
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault()
+                                    setDragOverId(null)
+                                    if (!dragId || dragId === el.id) return
+                                    const sorted = [...elements].sort((a, b) => (b.z ?? 0) - (a.z ?? 0))
+                                    const ids = sorted.map(e => e.id)
+                                    const fromIdx = ids.indexOf(dragId)
+                                    const toIdx = ids.indexOf(el.id)
+                                    if (fromIdx < 0 || toIdx < 0) return
+                                    ids.splice(fromIdx, 1)
+                                    ids.splice(toIdx, 0, dragId)
+                                    onReorder(ids)
+                                }}
+                                onDragEnd={() => {
+                                    setDragId(null)
+                                    setDragOverId(null)
+                                }}
+                                onClick={() => onSelect?.(el.id)}
+                                className={`flex items-center gap-1.5 px-1.5 py-1 rounded text-xs cursor-grab active:cursor-grabbing transition-colors ${
+                                    dragOverId === el.id ? 'border-t-2 border-amber-400' : 'border-t-2 border-transparent'
+                                } ${
                                     el.id === selectedId
                                         ? 'bg-amber-500/10 text-amber-300'
-                                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                                        : dragId === el.id
+                                            ? 'opacity-40 text-gray-500'
+                                            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
                                 }`}
                             >
-                                {el.type === 'image' && el.url && (
-                                    <img src={el.url} alt="" className="w-5 h-5 rounded object-cover" />
-                                )}
-                                {(!el.url || el.type !== 'image') && (
-                                    <span className="w-5 h-5 rounded bg-gray-700 flex items-center justify-center text-[8px] uppercase">
+                                <GripVertical size={12} className="text-gray-600 flex-shrink-0" />
+                                {el.type === 'image' && el.url ? (
+                                    <img src={el.url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                ) : (
+                                    <span className="w-5 h-5 rounded bg-gray-700 flex items-center justify-center text-[8px] uppercase flex-shrink-0">
                                         {el.type[0]}
                                     </span>
                                 )}

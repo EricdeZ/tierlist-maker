@@ -129,6 +129,20 @@ const WeekSection = ({ title, matches, defaultOpen, basePath, formatDate, league
 /* ═══════════════════════════════════════════════════════════════════════════
    Match Card — Esports-grade design
    ═══════════════════════════════════════════════════════════════════════════ */
+const TeamName = ({ name, slug, basePath, className }) => (
+    slug ? (
+        <Link
+            to={`${basePath}/teams/${slug}`}
+            className={`${className} hover:underline`}
+            onClick={e => e.stopPropagation()}
+        >
+            {name}
+        </Link>
+    ) : (
+        <span className={className}>{name}</span>
+    )
+)
+
 const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
     const isCompleted = match.is_completed
     const team1Won = match.winner_team_id === match.team1_id
@@ -177,11 +191,14 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                                     ringOffsetColor: 'transparent',
                                 }}
                             />
-                            <span className={`text-sm font-bold truncate transition-colors ${
-                                team1Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
-                            }`}>
-                                {match.team1_name}
-                            </span>
+                            <TeamName
+                                name={match.team1_name}
+                                slug={match.team1_slug}
+                                basePath={basePath}
+                                className={`text-sm font-bold truncate transition-colors ${
+                                    team1Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
+                                }`}
+                            />
                         </>
                     ) : (
                         <span className="text-sm font-bold text-(--color-text-secondary)/40 italic">{tbd}</span>
@@ -235,11 +252,14 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                     )}
                     {match.team2_id ? (
                         <>
-                            <span className={`text-sm font-bold truncate text-right transition-colors ${
-                                team2Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
-                            }`}>
-                                {match.team2_name}
-                            </span>
+                            <TeamName
+                                name={match.team2_name}
+                                slug={match.team2_slug}
+                                basePath={basePath}
+                                className={`text-sm font-bold truncate text-right transition-colors ${
+                                    team2Won ? 'text-(--color-text)' : 'text-(--color-text) group-hover:text-(--color-accent)'
+                                }`}
+                            />
                             <div
                                 className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-offset-1"
                                 style={{
@@ -314,7 +334,12 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                             <>
                                 <TeamLogo slug={match.team1_slug} name={match.team1_name} size={20} color={match.team1_color} />
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: match.team1_color }} />
-                                <span className="text-sm font-bold text-(--color-text) flex-1 truncate">{match.team1_name}</span>
+                                <TeamName
+                                    name={match.team1_name}
+                                    slug={match.team1_slug}
+                                    basePath={basePath}
+                                    className="text-sm font-bold text-(--color-text) flex-1 truncate"
+                                />
                             </>
                         ) : (
                             <span className="text-sm font-bold text-(--color-text-secondary)/40 italic flex-1">{tbd}</span>
@@ -345,7 +370,12 @@ const MatchCard = ({ match, formatDate, basePath, leagueColor }) => {
                             <>
                                 <TeamLogo slug={match.team2_slug} name={match.team2_name} size={20} color={match.team2_color} />
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: match.team2_color }} />
-                                <span className="text-sm font-bold text-(--color-text) flex-1 truncate">{match.team2_name}</span>
+                                <TeamName
+                                    name={match.team2_name}
+                                    slug={match.team2_slug}
+                                    basePath={basePath}
+                                    className="text-sm font-bold text-(--color-text) flex-1 truncate"
+                                />
                             </>
                         ) : (
                             <span className="text-sm font-bold text-(--color-text-secondary)/40 italic flex-1">{tbd}</span>

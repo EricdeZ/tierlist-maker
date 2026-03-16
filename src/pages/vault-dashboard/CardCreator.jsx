@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
-import { Save, Download, Send, Check, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultDashboardService } from '../../services/database'
 import CardCanvas from './preview/CardCanvas'
 import CardSidebar from './editor/CardSidebar'
+import HoloPreview from './preview/HoloPreview'
 import { exportCardToPNG, downloadBlob } from './preview/ExportCanvas'
 
 const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom']
@@ -19,28 +20,58 @@ const STATUS_COLORS = {
 
 const inputClass = 'px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500'
 
-let nextId = 1
+const STORAGE_KEY = 'vault-studio-draft'
+
+function loadDraft() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+// Seed nextId from restored elements to avoid ID collisions
+let nextId = (() => {
+    const draft = loadDraft()
+    if (!draft?.elements?.length) return 1
+    let max = 0
+    for (const el of draft.elements) {
+        const num = parseInt(el.id?.split('-')[1]) || 0
+        if (num > max) max = num
+    }
+    return max + 1
+})()
 
 export default function CardCreator() {
     const { hasPermission } = useAuth()
     const canApprove = hasPermission('vault_approve')
+    const initialized = useRef(false)
 
-    const [name, setName] = useState('')
-    const [cardType, setCardType] = useState('player')
-    const [rarity, setRarity] = useState('full_art')
+    const saved = useRef(loadDraft())
+
+    const [name, setName] = useState(() => saved.current?.name || '')
+    const [cardType, setCardType] = useState(() => saved.current?.cardType || 'player')
+    const [rarity, setRarity] = useState(() => saved.current?.rarity || 'full_art')
     const [zoom, setZoom] = useState(100)
 
     // Card elements (images, text, stats, effects)
-    const [elements, setElements] = useState([])
+    const [elements, setElements] = useState(() => saved.current?.elements || [])
     const [selectedId, setSelectedId] = useState(null)
-    const [border, setBorder] = useState({ enabled: true, color: '#d4af37', width: 3, radius: 12 })
+    const [border, setBorder] = useState(() => saved.current?.border || { enabled: true, color: '#d4af37', width: 3, radius: 12 })
 
     // Save state
-    const [saveTarget, setSaveTarget] = useState(null)
-    const [status, setStatus] = useState('draft')
+    const [saveTarget, setSaveTarget] = useState(() => saved.current?.saveTarget || null)
+    const [status, setStatus] = useState(() => saved.current?.status || 'draft')
     const [dirty, setDirty] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState(null)
+    const [showHolo, setShowHolo] = useState(false)
+
+    // Persist to localStorage on changes
+    useEffect(() => {
+        if (!initialized.current) { initialized.current = true; return }
+        const draft = { name, cardType, rarity, elements, border, saveTarget, status }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    }, [name, cardType, rarity, elements, border, saveTarget, status])
 
     const selectedElement = elements.find(el => el.id === selectedId) || null
 
@@ -54,6 +85,15 @@ export default function CardCreator() {
         if (selectedId === id) setSelectedId(null)
         setDirty(true)
     }, [selectedId])
+
+    const reorderElements = useCallback((orderedIds) => {
+        // orderedIds is top-to-bottom (highest z first)
+        setElements(prev => prev.map(el => {
+            const idx = orderedIds.indexOf(el.id)
+            return idx >= 0 ? { ...el, z: (orderedIds.length - 1 - idx) * 10 } : el
+        }))
+        setDirty(true)
+    }, [])
 
     // Upload image to R2 and replace blob URL
     const handleUploadImage = useCallback(async (file, elementId) => {
@@ -80,21 +120,41 @@ export default function CardCreator() {
         const url = URL.createObjectURL(file)
         const id = `img-${nextId++}`
         const count = elements.filter(el => el.type === 'image').length
-        setElements(prev => [...prev, {
-            id,
-            type: 'image',
-            name: count === 0 ? 'Background' : `Image ${count + 1}`,
-            url,
-            _pendingFile: file,
-            x, y,
-            w: count === 0 ? 300 : 150,
-            h: count === 0 ? 420 : 200,
-            z: prev.length,
-            opacity: 1,
-            visible: true,
-        }])
-        setSelectedId(id)
-        setDirty(true)
+        const isFirst = count === 0
+
+        const img = new Image()
+        img.onload = () => {
+            let w, h
+            if (isFirst) {
+                // First image fills card
+                w = 300; h = 420
+            } else {
+                const ratio = img.naturalWidth / img.naturalHeight
+                // Fit within card bounds, preserving aspect ratio
+                if (ratio >= 300 / 420) {
+                    w = Math.min(img.naturalWidth, 300)
+                    h = Math.round(w / ratio)
+                } else {
+                    h = Math.min(img.naturalHeight, 420)
+                    w = Math.round(h * ratio)
+                }
+            }
+            setElements(prev => [...prev, {
+                id,
+                type: 'image',
+                name: isFirst ? 'Background' : `Image ${count + 1}`,
+                url,
+                _pendingFile: file,
+                x, y,
+                w, h,
+                z: prev.length,
+                opacity: 1,
+                visible: true,
+            }])
+            setSelectedId(id)
+            setDirty(true)
+        }
+        img.src = url
         handleUploadImage(file, id)
     }, [elements, handleUploadImage])
 
@@ -136,15 +196,15 @@ export default function CardCreator() {
         setDirty(true)
     }, [elements.length])
 
-    const addEffect = useCallback(() => {
+    const addEffect = useCallback((effectName = 'rainbow') => {
         const id = `fx-${nextId++}`
         setElements(prev => [...prev, {
             id,
             type: 'effect',
-            name: 'Holo Effect',
-            effectName: 'rainbow',
-            opacity: 0.3,
-            z: 100,
+            name: effectName,
+            effectName,
+            opacity: 1,
+            z: prev.length + 100,
             visible: true,
         }])
         setSelectedId(id)
@@ -239,12 +299,14 @@ export default function CardCreator() {
                         elements={elements}
                         selectedId={selectedId}
                         selectedElement={selectedElement}
+                        onSelect={setSelectedId}
                         onAddImage={addImageFromFile}
                         onAddText={addText}
                         onAddStats={addStats}
                         onAddEffect={addEffect}
                         onUpdateElement={updateElement}
                         onDeleteElement={deleteElement}
+                        onReorder={reorderElements}
                         border={border}
                         onBorderChange={(b) => { setBorder(b); setDirty(true) }}
                         onUploadImage={handleUploadImage}
@@ -253,29 +315,47 @@ export default function CardCreator() {
 
                 {/* Canvas area */}
                 <div className="flex-1 flex flex-col items-center justify-center bg-gray-950/50 overflow-auto p-8">
-                    {/* Zoom */}
-                    <div className="flex items-center gap-1 mb-4">
-                        <ZoomOut size={14} className="text-gray-600" />
-                        {ZOOM_LEVELS.map(z => (
-                            <button key={z} onClick={() => setZoom(z)}
-                                className={`px-2 py-0.5 text-xs rounded transition-colors ${zoom === z ? 'bg-amber-600 text-white' : 'text-gray-500 hover:text-white'}`}>
-                                {z}%
-                            </button>
-                        ))}
-                        <ZoomIn size={14} className="text-gray-600" />
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-1">
+                            <ZoomOut size={14} className="text-gray-600" />
+                            {ZOOM_LEVELS.map(z => (
+                                <button key={z} onClick={() => setZoom(z)}
+                                    className={`px-2 py-0.5 text-xs rounded transition-colors ${zoom === z ? 'bg-amber-600 text-white' : 'text-gray-500 hover:text-white'}`}>
+                                    {z}%
+                                </button>
+                            ))}
+                            <ZoomIn size={14} className="text-gray-600" />
+                        </div>
+                        <button
+                            onClick={() => setShowHolo(h => !h)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                showHolo ? 'bg-amber-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <Eye size={13} /> Holo Preview
+                        </button>
                     </div>
 
-                    <div data-card-preview style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}>
-                        <CardCanvas
-                            elements={elements}
-                            selectedId={selectedId}
-                            onSelect={setSelectedId}
-                            onUpdateElement={updateElement}
-                            onDeleteElement={deleteElement}
-                            onDropImage={addImageFromFile}
-                            border={border}
-                            zoom={zoom}
-                        />
+                    <div className="flex items-start gap-8">
+                        <div data-card-preview style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}>
+                            <CardCanvas
+                                elements={elements}
+                                selectedId={selectedId}
+                                onSelect={setSelectedId}
+                                onUpdateElement={updateElement}
+                                onDeleteElement={deleteElement}
+                                onDropImage={addImageFromFile}
+                                border={border}
+                                zoom={zoom}
+                            />
+                        </div>
+
+                        {showHolo && elements.length > 0 && (
+                            <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}>
+                                <HoloPreview elements={elements} border={border} />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

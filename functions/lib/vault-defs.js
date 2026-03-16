@@ -254,10 +254,12 @@ async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
         updated_at = NOW()
       WHERE id = ${existing.id}
     `
-    // Cascade role to minted cards from this def
+    // Cascade role + card_data.role to minted cards from this def
+    const normalizedRole = (e.role || 'adc').toLowerCase()
     await sql`
       UPDATE cc_cards
-      SET role = ${(e.role || 'adc').toLowerCase()}
+      SET role = ${normalizedRole},
+          card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
       WHERE def_id = ${existing.id} AND card_type = 'player'
     `
     return 'updated'

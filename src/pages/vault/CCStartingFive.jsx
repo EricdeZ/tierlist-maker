@@ -54,7 +54,7 @@ function toPlayerCardProps(card) {
   const cd = card.cardData || {}
   return {
     playerName: card.godName, teamName: cd.teamName || '', teamColor: cd.teamColor || '#6366f1',
-    role: cd.role || card.role || 'ADC', avatarUrl: card.imageUrl || '',
+    role: card.role || cd.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     seasonName: cd.seasonName || '',
     bestGod: card.bestGodName ? { name: card.bestGodName } : null,

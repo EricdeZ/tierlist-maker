@@ -45,11 +45,17 @@ export async function createTrade(sql, userId, targetUserId) {
   const [target] = await sql`SELECT id FROM users WHERE id = ${targetUserId}`
   if (!target) throw new Error('User not found')
 
-  const [trade] = await sql`
-    INSERT INTO cc_trades (player_a_id, player_b_id)
-    VALUES (${userId}, ${targetUserId})
-    RETURNING *
-  `
+  let trade
+  try {
+    ;[trade] = await sql`
+      INSERT INTO cc_trades (player_a_id, player_b_id)
+      VALUES (${userId}, ${targetUserId})
+      RETURNING *
+    `
+  } catch (e) {
+    if (e.code === '23505') throw new Error('You or the target user already has an active trade')
+    throw e
+  }
   return trade
 }
 
