@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Users, Bell, Shield } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
@@ -11,8 +12,13 @@ function TeamRow({ team, isLeague }) {
     const slug = team.slug || team.team_slug
     const memberCount = team.members?.length ?? team.member_count ?? 0
 
-    return (
-        <div className="flex items-center gap-2.5">
+    // Build link — league teams link to their division team page
+    const teamLink = isLeague && team.league_slug && team.division_slug && slug
+        ? `/${team.league_slug}/${team.division_slug}/teams/${slug}`
+        : null
+
+    const content = (
+        <div className={`flex items-center gap-2.5 ${teamLink ? 'hover:bg-white/5 -mx-1.5 px-1.5 py-0.5 rounded transition-colors' : ''}`}>
             <div className="rounded-md p-0.5 shrink-0" style={{ boxShadow: `0 0 0 1.5px ${accentColor}40` }}>
                 <TeamLogo logoUrl={logo} slug={slug} name={name} color={accentColor} size={24} />
             </div>
@@ -27,6 +33,8 @@ function TeamRow({ team, isLeague }) {
             )}
         </div>
     )
+
+    return teamLink ? <Link to={teamLink}>{content}</Link> : content
 }
 
 export default function TeamWidget({ teams, leagueTeams, pendingCount }) {

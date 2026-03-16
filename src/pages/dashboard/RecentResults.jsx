@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
@@ -39,7 +40,11 @@ function ResultRow({ game, index }) {
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: game.league_color }} title={game.league_name} />
                     )}
                     <TeamLogo slug={opponentSlug} name={opponentName} color={opponentColor} size={14} />
-                    <p className="text-sm truncate">{opponentName || 'Unknown'}</p>
+                    {game.league_slug && game.division_slug && opponentSlug ? (
+                        <Link to={`/${game.league_slug}/${game.division_slug}/teams/${opponentSlug}`} className="text-sm truncate hover:underline">{opponentName || 'Unknown'}</Link>
+                    ) : (
+                        <p className="text-sm truncate">{opponentName || 'Unknown'}</p>
+                    )}
                 </div>
                 <div className="flex items-center gap-1">
                     {roleIcon && <img src={roleIcon} alt="" className="w-3 h-3 object-contain opacity-60" />}

@@ -95,7 +95,7 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                                         }}
                                     >
                                         <TeamLogo slug={h.teamSlug} name={h.teamName} color={h.teamColor} size={18} className="shrink-0" />
-                                        <span className="flex-1 truncate" style={{ color: '#e0dcd4' }}>{h.playerName}</span>
+                                        <Link to={`/forge${forgeLeagueSlug ? `/${forgeLeagueSlug}` : ''}/${h.playerSlug || ''}`} className="flex-1 truncate hover:underline" style={{ color: '#e0dcd4' }} onClick={e => e.stopPropagation()}>{h.playerName}</Link>
                                         <div className="flex items-center gap-0.5 shrink-0 text-xs" style={{ color: '#6a6050' }}>
                                             <Zap size={10} style={{ color: GOLD }} />
                                             {h.sparks}

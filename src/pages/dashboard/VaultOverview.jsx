@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Layers, Package, Sparkles, Gift, Repeat2 } from 'lucide-react'
 import PromoCard from './PromoCard'
+import TradingCard from '../../components/TradingCard'
 import passionCoin from '../../assets/passion/passion.png'
 import coresIcon from '../../assets/ember.png'
 import soloImg from '../../assets/roles/solo.webp'
@@ -8,11 +9,6 @@ import jungleImg from '../../assets/roles/jungle.webp'
 import midImg from '../../assets/roles/mid.webp'
 import suppImg from '../../assets/roles/supp.webp'
 import adcImg from '../../assets/roles/adc.webp'
-
-const RARITY_BORDER = {
-    common: '#94a3b8', uncommon: '#22c55e', rare: '#3b82f6',
-    epic: '#a855f7', legendary: '#ff8c00', mythic: '#ef4444', unique: '#e8e8ff',
-}
 
 const SLOT_ROLES = ['solo', 'jungle', 'mid', 'support', 'carry']
 const ROLE_ICONS = { solo: soloImg, jungle: jungleImg, mid: midImg, support: suppImg, carry: adcImg }
@@ -86,29 +82,38 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                         {packsOpened !== null && <Stat icon={<Package size={13} />} value={packsOpened} label="Packs" />}
                     </div>
 
-                    {/* Starting Five preview */}
+                    {/* Starting Five preview — real mini cards */}
                     {slots && (
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.5 items-end">
                             {slots.map((card, i) => {
                                 const role = SLOT_ROLES[i]
-                                const rarityColor = card ? (RARITY_BORDER[card.rarity] || '#94a3b8') : '#111a2a'
                                 const roleIcon = ROLE_ICONS[role]
+                                if (!card) {
+                                    return (
+                                        <div
+                                            key={role}
+                                            className="w-[52px] aspect-[63/88] rounded overflow-hidden flex items-center justify-center"
+                                            style={{ border: '1px dashed #1a2838', background: 'rgba(4,6,14,0.6)' }}
+                                            title={role}
+                                        >
+                                            <img src={roleIcon} alt={role} className="w-5 h-5 object-contain opacity-25" />
+                                        </div>
+                                    )
+                                }
+                                const cd = card.cardData || {}
                                 return (
-                                    <div
-                                        key={role}
-                                        className="w-10 h-13 rounded overflow-hidden flex items-center justify-center relative"
-                                        style={{
-                                            border: `2px solid ${rarityColor}`,
-                                            background: 'rgba(4,6,14,0.85)',
-                                            boxShadow: card ? `0 0 8px ${rarityColor}30` : 'none',
-                                        }}
-                                        title={card ? `${card.godName || 'Card'} (${role})` : role}
-                                    >
-                                        {card?.imageUrl ? (
-                                            <img src={card.imageUrl} alt={card.godName} className="w-full h-full object-cover object-[center_20%]" />
-                                        ) : (
-                                            <img src={roleIcon} alt={role} className="w-5 h-5 object-contain opacity-30" />
-                                        )}
+                                    <div key={role} className="w-[52px]" title={`${card.godName || 'Card'} (${role})`}>
+                                        <TradingCard
+                                            playerName={card.godName}
+                                            teamName={cd.teamName || ''}
+                                            teamColor={cd.teamColor || '#6366f1'}
+                                            role={card.role || cd.role || 'ADC'}
+                                            avatarUrl={card.imageUrl || ''}
+                                            rarity={card.rarity}
+                                            isFirstEdition={card.isFirstEdition}
+                                            bestGod={card.bestGodName ? { name: card.bestGodName } : null}
+                                            size={52}
+                                        />
                                     </div>
                                 )
                             })}
