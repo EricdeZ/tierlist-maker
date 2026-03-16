@@ -1,6 +1,7 @@
 import { Users } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import TeamLogo from '../../components/TeamLogo'
 
 export default function TeamWidget({ teams, pendingCount }) {
     if (!teams || teams.length === 0) {
@@ -18,38 +19,56 @@ export default function TeamWidget({ teams, pendingCount }) {
     }
 
     const team = teams[0]
+    const accentColor = team.color || '#3b82f6'
+    const memberCount = team.members?.length ?? team.member_count ?? 0
 
     return (
         <DashboardWidget title="My Team" icon={<Users size={16} />} accent="blue" linkTo="/scrims">
-            <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                    {team.logo_url ? (
-                        <img src={team.logo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold">
-                            {team.name?.charAt(0)}
-                        </div>
-                    )}
-                    <p className="text-sm font-semibold truncate">{team.name}</p>
+            <div className="space-y-3">
+                {/* Team identity */}
+                <div className="flex items-center gap-3">
+                    <div
+                        className="rounded-lg p-0.5 flex-shrink-0"
+                        style={{ boxShadow: `0 0 0 2px ${accentColor}40` }}
+                    >
+                        <TeamLogo
+                            logoUrl={team.logo_url}
+                            name={team.name}
+                            color={team.color}
+                            size={32}
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold truncate leading-tight">{team.name}</p>
+                        <p className="text-xs" style={{ color: accentColor }}>
+                            {memberCount} member{memberCount !== 1 ? 's' : ''}
+                        </p>
+                    </div>
                 </div>
 
-                {/* Roster avatars */}
+                {/* Roster initials */}
                 {team.members?.length > 0 && (
                     <div className="flex -space-x-1.5">
-                        {team.members.slice(0, 6).map(m => (
-                            <div key={m.user_id} className="w-6 h-6 rounded-full bg-white/10 border border-(--color-primary) overflow-hidden" title={m.username}>
-                                {m.avatar ? (
-                                    <img src={`https://cdn.discordapp.com/avatars/${m.discord_id}/${m.avatar}.webp?size=32`} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[8px]">{m.username?.[0]}</div>
-                                )}
-                            </div>
-                        ))}
+                        {team.members.slice(0, 7).map((m, i) => {
+                            const name = m.displayName || m.discord_username || m.player_name || '?'
+                            return (
+                                <div
+                                    key={m.user_id ?? i}
+                                    className="w-6 h-6 rounded-full border border-black/30 flex items-center justify-center text-[9px] font-bold text-white/90 flex-shrink-0"
+                                    style={{ backgroundColor: accentColor }}
+                                    title={name}
+                                >
+                                    {name[0]?.toUpperCase()}
+                                </div>
+                            )
+                        })}
                     </div>
                 )}
 
                 {pendingCount > 0 && (
-                    <p className="text-xs text-blue-400 font-semibold">{pendingCount} pending invite{pendingCount !== 1 ? 's' : ''}</p>
+                    <p className="text-xs font-semibold" style={{ color: accentColor }}>
+                        {pendingCount} pending invite{pendingCount !== 1 ? 's' : ''}
+                    </p>
                 )}
             </div>
         </DashboardWidget>

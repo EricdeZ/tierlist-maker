@@ -17,6 +17,17 @@ import CoresClaim from './CoresClaim'
 import TeamWidget from './TeamWidget'
 import ScrimWidget from './ScrimWidget'
 
+function getTimeGreeting() {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+}
+
+function formatGreetingDate() {
+    return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
 export default function PlayerDashboard() {
     const { user, linkedPlayer } = useAuth()
     const passion = usePassion()
@@ -45,19 +56,20 @@ export default function PlayerDashboard() {
 
             const val = (i) => results[i].status === 'fulfilled' ? results[i].value : null
 
-            // Resolve Forge portfolio: find active market, then fetch portfolio
+            // Resolve Forge portfolio: find an open market from statuses object
+            // getMarketStatuses returns { statuses: { [seasonId]: 'open'|'closed'|... } }
             let forgePortfolio = null
             let forgeLeagueSlug = null
             let marketClosed = true
             let forgeError = false
             const marketStatuses = val(7)
-            if (marketStatuses?.seasons) {
-                const activeSeason = marketStatuses.seasons.find(s => s.status === 'open')
-                if (activeSeason) {
+            const statusMap = marketStatuses?.statuses
+            if (statusMap && typeof statusMap === 'object') {
+                const openSeasonId = Object.keys(statusMap).find(id => statusMap[id] === 'open')
+                if (openSeasonId) {
                     marketClosed = false
-                    forgeLeagueSlug = activeSeason.leagueSlug
                     try {
-                        forgePortfolio = await forgeService.getPortfolio(activeSeason.seasonId)
+                        forgePortfolio = await forgeService.getPortfolio(openSeasonId)
                     } catch (e) {
                         console.error('Forge portfolio load failed:', e)
                         forgeError = true
@@ -71,11 +83,21 @@ export default function PlayerDashboard() {
                 ? Object.values(challengeData.challenges).flat()
                 : []
 
+            // Gift count: gifts response is { sent, received, unseenCount }
+            const giftsData = val(3)
+            const pendingGiftCount = giftsData?.received?.filter(g => !g.opened)?.length || 0
+
+            // Starting Five income: pending if passionPending or coresPending > 0
+            const startingFive = val(2)
+            const incomeCollectible = (startingFive?.passionPending > 0 || startingFive?.coresPending > 0)
+
             setData({
                 upcomingMatches: val(0)?.matches || [],
                 profile: val(1),
-                startingFive: val(2),
-                gifts: val(3),
+                startingFive,
+                giftsData,
+                pendingGiftCount,
+                incomeCollectible,
                 pendingTrades: val(4)?.trades || [],
                 teamPendingCount: val(5)?.count || 0,
                 incomingScrims: val(6)?.scrims || [],
@@ -87,7 +109,7 @@ export default function PlayerDashboard() {
                 claimableChallenges: challengeData?.claimableCount || 0,
                 myTeams: val(9)?.teams || [],
                 myScrims: val(10)?.scrims || [],
-                captainTeams: val(11)?.teams || [],
+                captainTeams: val(11)?.captainTeams || val(11)?.teams || [],
                 vaultData: val(12),
             })
             setLoading(false)
@@ -110,14 +132,16 @@ export default function PlayerDashboard() {
 
     const hasTeam = data.myTeams.length > 0 || data.upcomingMatches.length > 0
     const isCaptain = data.captainTeams.length > 0
-    const pendingGiftCount = data.gifts?.gifts?.filter(g => !g.opened)?.length || 0
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-6">
             {/* Greeting */}
-            <h1 className="font-heading text-2xl font-bold mb-5">
-                Welcome back{user?.discord_username ? `, ${user.discord_username}` : ''}
-            </h1>
+            <div className="mb-5">
+                <h1 className="font-heading text-2xl font-bold">
+                    {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
+                </h1>
+                <p className="text-sm text-(--color-text-secondary) mt-0.5">{formatGreetingDate()}</p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Action Bar */}
@@ -125,8 +149,8 @@ export default function PlayerDashboard() {
                     canClaimPassion={passion.canClaimDaily}
                     canClaimCores={passion.ember?.canClaimDaily}
                     claimableChallenges={data.claimableChallenges}
-                    incomeCollectible={data.startingFive?.incomeCollectible}
-                    pendingGifts={pendingGiftCount}
+                    incomeCollectible={data.incomeCollectible}
+                    pendingGifts={data.pendingGiftCount}
                     pendingTrades={data.pendingTrades.length}
                     pendingTeamInvites={data.teamPendingCount}
                     incomingScrimRequests={data.incomingScrims.length}
@@ -134,7 +158,6 @@ export default function PlayerDashboard() {
 
                 {/* Large widgets */}
                 <UpcomingMatches matches={data.upcomingMatches} hasTeam={hasTeam} />
-                {/* Passion spans 2 rows on desktop */}
                 <PassionStatus
                     balance={passion.balance}
                     rank={passion.rank}
@@ -150,7 +173,7 @@ export default function PlayerDashboard() {
                 <VaultOverview
                     vaultData={data.vaultData}
                     startingFive={data.startingFive}
-                    pendingGifts={pendingGiftCount}
+                    pendingGifts={data.pendingGiftCount}
                     pendingTrades={data.pendingTrades.length}
                 />
                 <ForgePortfolio
