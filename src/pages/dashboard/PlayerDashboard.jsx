@@ -177,48 +177,42 @@ export default function PlayerDashboard() {
         .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
 
     return (
-        <div className="relative px-4 sm:px-6 lg:px-8 py-6">
-            {/* Background effects */}
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="relative px-4 sm:px-6 lg:px-8 py-6 min-h-screen">
+            {/* Background */}
+            <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+                {/* Dot pattern */}
                 <div
-                    className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[400px] opacity-30"
-                    style={{ background: 'radial-gradient(circle, var(--color-accent) 0%, transparent 70%)' }}
-                />
-                <div
-                    className="absolute inset-0 opacity-[0.03]"
+                    className="absolute inset-0 opacity-[0.07]"
                     style={{
-                        backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
-                        backgroundSize: '60px 60px',
+                        backgroundImage: 'radial-gradient(rgba(255,255,255,.4) 1px, transparent 1px)',
+                        backgroundSize: '24px 24px',
                     }}
                 />
+                {/* Subtle ambient color blobs */}
+                <div className="absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.04]" style={{ background: 'radial-gradient(circle, #f59e0b, transparent 70%)' }} />
+                <div className="absolute top-1/3 left-0 w-[400px] h-[400px] rounded-full opacity-[0.03]" style={{ background: 'radial-gradient(circle, #00e5ff, transparent 70%)' }} />
+                <div className="absolute bottom-1/4 right-0 w-[400px] h-[400px] rounded-full opacity-[0.03]" style={{ background: 'radial-gradient(circle, #a855f7, transparent 70%)' }} />
             </div>
 
             {/* Greeting */}
             <div className="relative mb-5">
                 <div className="flex items-center gap-4">
                     {user?.discord_id && user?.discord_avatar && (
-                        <div className="relative shrink-0">
-                            <div
-                                className="absolute -inset-2 rounded-full opacity-40 blur-md"
-                                style={{ background: 'radial-gradient(circle, var(--color-accent), transparent 70%)' }}
-                            />
-                            <img
-                                src={getDiscordAvatarUrl(user.discord_id, user.discord_avatar, 64)}
-                                alt=""
-                                className="relative w-12 h-12 rounded-full ring-2 ring-white/10"
-                            />
-                        </div>
+                        <img
+                            src={getDiscordAvatarUrl(user.discord_id, user.discord_avatar, 64)}
+                            alt=""
+                            className="w-11 h-11 rounded-full ring-2 ring-white/10 shrink-0"
+                        />
                     )}
                     <div>
                         <h1 className="font-heading text-2xl font-bold">
                             {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
                         </h1>
-                        <p className="text-sm mt-0.5" style={{ color: 'color-mix(in srgb, var(--color-accent) 50%, var(--color-text-secondary))' }}>
+                        <p className="text-sm text-(--color-text-secondary) mt-0.5">
                             {formatGreetingDate()}
                         </p>
                     </div>
                 </div>
-                <div className="mt-4 h-px bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
             </div>
 
             <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
