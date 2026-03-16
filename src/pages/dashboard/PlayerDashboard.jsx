@@ -4,6 +4,7 @@ import { usePassion } from '../../context/PassionContext'
 import {
     matchService, profileService, vaultService, forgeService,
     challengeService, communityTeamService, scrimService, tradingService,
+    coinflipService,
 } from '../../services/database'
 
 import { getDiscordAvatarUrl } from '../../utils/playerAvatar'
@@ -17,6 +18,7 @@ import ForgePortfolio from './ForgePortfolio'
 import ChallengesProgress from './ChallengesProgress'
 import TeamWidget from './TeamWidget'
 import ScrimWidget from './ScrimWidget'
+import CoinFlipCard from './CoinFlipCard'
 
 function getTimeGreeting() {
     const hour = new Date().getHours()
@@ -86,6 +88,7 @@ export default function PlayerDashboard() {
                 scrimService.getMyScrims(),                             // 10
                 scrimService.getCaptainTeams(),                         // 11
                 vaultService.load(),                                    // 12
+                coinflipService.getMyStats(),                               // 13
             ])
 
             const val = (i) => results[i].status === 'fulfilled' ? results[i].value : null
@@ -145,6 +148,7 @@ export default function PlayerDashboard() {
                 myScrims: val(10)?.scrims || [],
                 captainTeams: val(11)?.captainTeams || val(11)?.teams || [],
                 vaultData: val(12),
+                coinflipStats: val(13),
             })
             setLoading(false)
         }
@@ -156,6 +160,21 @@ export default function PlayerDashboard() {
 
     const hasTeam = data.myTeams.length > 0 || data.upcomingMatches.length > 0
     const isCaptain = data.captainTeams.length > 0
+
+    // Extract league teams from profile seasonHistory (active seasons only)
+    const leagueTeams = (data.profile?.seasonHistory || [])
+        .filter(s => s.is_active && s.team_name)
+        .map(s => ({
+            id: s.team_id,
+            name: s.team_name,
+            slug: s.team_slug,
+            color: s.team_color,
+            logo_url: s.team_logo_url,
+            league_name: s.league_name,
+            division_name: s.division_name,
+        }))
+        // Deduplicate by team_id
+        .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
 
     return (
         <div className="relative px-4 sm:px-6 lg:px-8 py-6">
@@ -259,12 +278,13 @@ export default function PlayerDashboard() {
                     challenges={data.challenges}
                     claimableCount={data.claimableChallenges}
                 />
-                <TeamWidget teams={data.myTeams} pendingCount={data.teamPendingCount} />
+                <TeamWidget teams={data.myTeams} leagueTeams={leagueTeams} pendingCount={data.teamPendingCount} />
                 <ScrimWidget
                     scrims={data.myScrims}
                     incomingCount={data.incomingScrims.length}
                     isCaptain={isCaptain}
                 />
+                <CoinFlipCard stats={data.coinflipStats} />
             </div>
         </div>
     )
