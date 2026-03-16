@@ -10,11 +10,11 @@ import { getDiscordAvatarUrl } from '../../utils/playerAvatar'
 import ActionBar from './ActionBar'
 import UpcomingMatches from './UpcomingMatches'
 import RecentResults from './RecentResults'
-import PassionStatus from './PassionStatus'
+import BalancesCard from './BalancesCard'
+import RankCard from './RankCard'
 import VaultOverview from './VaultOverview'
 import ForgePortfolio from './ForgePortfolio'
 import ChallengesProgress from './ChallengesProgress'
-import CoresClaim from './CoresClaim'
 import TeamWidget from './TeamWidget'
 import ScrimWidget from './ScrimWidget'
 
@@ -219,14 +219,20 @@ export default function PlayerDashboard() {
 
                 {/* Large widgets */}
                 <UpcomingMatches matches={data.upcomingMatches} hasTeam={hasTeam} />
-                <PassionStatus
-                    balance={passion.balance}
+                <BalancesCard
+                    passionBalance={passion.balance}
+                    passionStreak={passion.currentStreak}
+                    canClaimPassion={passion.canClaimDaily}
+                    onClaimPassion={passion.claimDaily}
+                    coresBalance={passion.ember?.balance}
+                    coresStreak={passion.ember?.currentStreak}
+                    canClaimCores={passion.ember?.canClaimDaily}
+                    onClaimCores={passion.claimEmberDaily}
+                />
+                <RankCard
                     rank={passion.rank}
                     nextRank={passion.nextRank}
                     totalEarned={passion.totalEarned}
-                    currentStreak={passion.currentStreak}
-                    canClaimDaily={passion.canClaimDaily}
-                    onClaimDaily={passion.claimDaily}
                 />
                 <RecentResults games={data.profile?.gameHistory} linkedPlayer={linkedPlayer} />
 
@@ -244,13 +250,6 @@ export default function PlayerDashboard() {
                     marketClosed={data.marketClosed}
                     forgeLeagueSlug={data.forgeLeagueSlug}
                     error={data.forgeError}
-                />
-
-                <CoresClaim
-                    balance={passion.ember?.balance}
-                    currentStreak={passion.ember?.currentStreak}
-                    canClaimDaily={passion.ember?.canClaimDaily}
-                    onClaimDaily={passion.claimEmberDaily}
                 />
 
                 <SectionLabel>Community</SectionLabel>
