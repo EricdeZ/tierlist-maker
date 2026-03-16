@@ -123,9 +123,17 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                     {/* Income / pending */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                         {incomeReady && (
-                            <div
-                                className="flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded"
-                                style={{ color: CYAN, background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.15)' }}
+                            <button
+                                className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded transition-all cursor-pointer"
+                                style={{
+                                    color: '#fff',
+                                    background: `linear-gradient(135deg, #0891b2, ${CYAN})`,
+                                    boxShadow: `0 0 12px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15)`,
+                                    letterSpacing: '0.08em',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 20px rgba(0,229,255,0.5), inset 0 1px 0 rgba(255,255,255,0.15)`}
+                                onMouseLeave={e => e.currentTarget.style.boxShadow = `0 0 12px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15)`}
+                                onClick={() => window.location.href = '/vault'}
                             >
                                 {startingFive.passionPending > 0 && (
                                     <span className="flex items-center gap-0.5"><img src={passionCoin} alt="" className="w-3.5 h-3.5 object-contain" />+{Math.floor(startingFive.passionPending)}</span>
@@ -133,8 +141,8 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                                 {startingFive.coresPending > 0 && (
                                     <span className="flex items-center gap-0.5"><img src={coresIcon} alt="" className="w-3.5 h-3.5 object-contain" />+{Math.floor(startingFive.coresPending)}</span>
                                 )}
-                                <span>to collect</span>
-                            </div>
+                                <span>Collect</span>
+                            </button>
                         )}
                         {(pendingGifts > 0 || pendingTrades > 0) && (
                             <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#ff2d78' }}>
