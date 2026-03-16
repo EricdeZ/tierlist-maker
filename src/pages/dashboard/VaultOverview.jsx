@@ -82,7 +82,7 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                     {/* Card counts */}
                     <div className="flex gap-5">
                         <Stat icon={<Layers size={13} />} value={cardCount} label="Cards" />
-                        <Stat icon={<Sparkles size={13} />} value={uniqueCount} label="Unique" />
+                        <Stat icon={<Sparkles size={13} />} value={uniqueCount} label="Collected" />
                         {packsOpened !== null && <Stat icon={<Package size={13} />} value={packsOpened} label="Packs" />}
                     </div>
 

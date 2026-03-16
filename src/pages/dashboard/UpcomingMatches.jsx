@@ -6,20 +6,11 @@ import TeamLogo from '../../components/TeamLogo'
 
 function formatCountdown(dateStr) {
     const diff = new Date(dateStr) - new Date()
-    if (diff < 0) return 'Starting soon'
+    if (diff < 0) return 'Today'
     const days = Math.floor(diff / 86400000)
-    const hours = Math.floor((diff % 86400000) / 3600000)
-    if (days > 0) return `${days}d ${hours}h`
-    const mins = Math.floor((diff % 3600000) / 60000)
-    return `${hours}h ${mins}m`
-}
-
-function countdownColor(dateStr) {
-    const diff = new Date(dateStr) - new Date()
-    if (diff < 0) return 'text-red-400'
-    if (diff < 2 * 3600000) return 'text-red-400'
-    if (diff < 24 * 3600000) return 'text-amber-400'
-    return 'text-emerald-400'
+    if (days === 0) return 'Today'
+    if (days === 1) return 'Tomorrow'
+    return `in ${days} days`
 }
 
 function MatchRow({ match, isNext }) {
@@ -31,10 +22,6 @@ function MatchRow({ match, isNext }) {
         ? { name: match.team2_name, logo: match.team2_logo, color: match.team2_color, slug: match.team2_slug }
         : { name: match.team1_name, logo: match.team1_logo, color: match.team1_color, slug: match.team1_slug }
 
-    const timeStr = new Date(match.scheduled_time).toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-    })
     const dateStr = new Date(match.scheduled_time).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -62,17 +49,9 @@ function MatchRow({ match, isNext }) {
             </div>
             <div className="text-right shrink-0">
                 {isNext ? (
-                    <>
-                        <p className={`text-xs font-bold ${countdownColor(match.scheduled_time)}`}>
-                            {formatCountdown(match.scheduled_time)}
-                        </p>
-                        <p className="text-[10px] text-(--color-text-secondary)">{timeStr}</p>
-                    </>
+                    <p className="text-xs font-bold text-(--color-accent)">{formatCountdown(match.scheduled_time)}</p>
                 ) : (
-                    <>
-                        <p className="text-xs text-(--color-text-secondary)">{dateStr}</p>
-                        <p className="text-[10px] text-(--color-text-secondary)">{timeStr}</p>
-                    </>
+                    <p className="text-xs text-(--color-text-secondary)">{dateStr}</p>
                 )}
             </div>
         </Link>

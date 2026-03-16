@@ -27,7 +27,14 @@ export default function BalancesCard({
                     {canClaimPassion && (
                         <button
                             onClick={onClaimPassion}
-                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0"
+                            className="px-3 py-1.5 rounded text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0"
+                            style={{
+                                background: 'linear-gradient(135deg, #d97706, #f59e0b)',
+                                boxShadow: '0 0 12px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+                                letterSpacing: '0.08em',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(245,158,11,0.5), inset 0 1px 0 rgba(255,255,255,0.15)'}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 12px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'}
                         >
                             <img src={passionCoin} alt="" className="w-3.5 h-3.5 object-contain" />
                             Claim
@@ -54,7 +61,14 @@ export default function BalancesCard({
                     {canClaimCores && (
                         <button
                             onClick={onClaimCores}
-                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-500 hover:to-cyan-400 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0"
+                            className="px-3 py-1.5 rounded text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0"
+                            style={{
+                                background: 'linear-gradient(135deg, #0d9488, #06b6d4)',
+                                boxShadow: '0 0 12px rgba(6,182,212,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+                                letterSpacing: '0.08em',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(6,182,212,0.5), inset 0 1px 0 rgba(255,255,255,0.15)'}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 12px rgba(6,182,212,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'}
                         >
                             <img src={coresIcon} alt="" className="w-3.5 h-3.5 object-contain" />
                             Claim

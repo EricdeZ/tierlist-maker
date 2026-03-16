@@ -23,7 +23,7 @@ export default function DashboardWidget({ title, icon, linkTo, size = 'medium', 
     const styles = accentStyles[accent] || accentStyles.white
 
     return (
-        <div className={`relative overflow-hidden rounded-xl border ${styles.border} bg-gradient-to-b ${styles.bg} p-4 sm:p-5 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 ${sizeClasses[size]} ${className}`}>
+        <div className={`relative overflow-hidden rounded-xl border ${styles.border} bg-gradient-to-b ${styles.bg} p-3 sm:p-4 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 ${sizeClasses[size]} ${className}`}>
             {/* Top border highlight */}
             <div className={`absolute top-0 left-0 right-0 h-px ${styles.topBorder}`} />
             {/* Inner glow */}

@@ -21,7 +21,7 @@ function ResultRow({ game, index }) {
     const roleIcon = game.role_played ? ROLE_ICONS[game.role_played.toUpperCase()] : null
 
     return (
-        <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${index % 2 === 0 ? 'bg-white/[0.03]' : ''}`}>
+        <div className={`flex items-center gap-2 px-2 py-2 rounded-lg ${index % 2 === 0 ? 'bg-white/[0.03]' : ''}`}>
             <span className={`text-xs font-bold w-5 text-center px-1 py-0.5 rounded shrink-0 ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                 {won ? 'W' : 'L'}
             </span>
@@ -35,6 +35,9 @@ function ResultRow({ game, index }) {
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
+                    {game.league_color && (
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: game.league_color }} title={game.league_name} />
+                    )}
                     <TeamLogo slug={opponentSlug} name={opponentName} color={opponentColor} size={14} />
                     <p className="text-sm truncate">{opponentName || 'Unknown'}</p>
                 </div>
@@ -52,6 +55,9 @@ function ResultRow({ game, index }) {
                 <span className="text-(--color-text-secondary)">/</span>
                 <span className="text-blue-400">{game.assists ?? '—'}</span>
             </div>
+            {game.damage > 0 && (
+                <span className="text-[10px] text-(--color-text-secondary) shrink-0 hidden sm:block">{(game.damage / 1000).toFixed(0)}k dmg</span>
+            )}
         </div>
     )
 }
