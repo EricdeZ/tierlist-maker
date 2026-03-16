@@ -177,7 +177,7 @@ export default function PlayerDashboard() {
         .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
 
     return (
-        <div className="relative px-4 sm:px-6 lg:px-8 py-6 min-h-screen">
+        <div className="relative px-4 sm:px-6 lg:px-8 pt-14 sm:pt-16 pb-6 min-h-screen">
             {/* Background */}
             <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
                 {/* Dot pattern */}
