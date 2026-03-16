@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Calendar, Clock } from 'lucide-react'
+import { Calendar } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import TeamLogo from '../../components/TeamLogo'
 
 function formatCountdown(dateStr) {
     const diff = new Date(dateStr) - new Date()
@@ -13,23 +14,43 @@ function formatCountdown(dateStr) {
     return `${hours}h ${mins}m`
 }
 
+function countdownColor(dateStr) {
+    const diff = new Date(dateStr) - new Date()
+    if (diff < 0) return 'text-red-400'
+    if (diff < 2 * 3600000) return 'text-red-400'
+    if (diff < 24 * 3600000) return 'text-amber-400'
+    return 'text-emerald-400'
+}
+
 function MatchRow({ match, isNext }) {
     const opponent = match.user_team_id === match.team1_id
         ? { name: match.team2_name, logo: match.team2_logo }
         : { name: match.team1_name, logo: match.team1_logo }
+
+    const timeStr = new Date(match.scheduled_time).toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+    })
+    const dateStr = new Date(match.scheduled_time).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+    })
 
     return (
         <Link
             to={`/${match.league_slug}/${match.division_slug}/matches`}
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
         >
-            {opponent.logo ? (
-                <img src={opponent.logo} alt="" className="w-8 h-8 rounded-full object-cover" />
-            ) : (
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold">
-                    {opponent.name?.charAt(0)}
-                </div>
-            )}
+            <div className="relative shrink-0">
+                <TeamLogo
+                    logoUrl={opponent.logo}
+                    name={opponent.name}
+                    size={32}
+                />
+                {isNext && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse ring-2 ring-[--color-bg-primary]" />
+                )}
+            </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">vs {opponent.name}</p>
                 <p className="text-xs text-(--color-text-secondary)">
@@ -38,11 +59,17 @@ function MatchRow({ match, isNext }) {
             </div>
             <div className="text-right shrink-0">
                 {isNext ? (
-                    <span className="text-xs font-bold text-(--color-accent)">{formatCountdown(match.scheduled_time)}</span>
+                    <>
+                        <p className={`text-xs font-bold ${countdownColor(match.scheduled_time)}`}>
+                            {formatCountdown(match.scheduled_time)}
+                        </p>
+                        <p className="text-[10px] text-(--color-text-secondary)">{timeStr}</p>
+                    </>
                 ) : (
-                    <span className="text-xs text-(--color-text-secondary)">
-                        {new Date(match.scheduled_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
+                    <>
+                        <p className="text-xs text-(--color-text-secondary)">{dateStr}</p>
+                        <p className="text-[10px] text-(--color-text-secondary)">{timeStr}</p>
+                    </>
                 )}
             </div>
         </Link>
