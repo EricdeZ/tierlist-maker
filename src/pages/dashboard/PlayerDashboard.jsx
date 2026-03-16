@@ -40,8 +40,8 @@ function SectionLabel({ children }) {
 
 function LoadingSkeleton() {
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="px-4 sm:px-6 lg:px-8 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                     <div
                         key={i}
@@ -158,7 +158,7 @@ export default function PlayerDashboard() {
     const isCaptain = data.captainTeams.length > 0
 
     return (
-        <div className="relative max-w-7xl mx-auto px-4 py-6">
+        <div className="relative px-4 sm:px-6 lg:px-8 py-6">
             {/* Background effects */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div
@@ -202,7 +202,7 @@ export default function PlayerDashboard() {
                 <div className="mt-4 h-px bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
             </div>
 
-            <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {/* Action Bar */}
                 <ActionBar
                     canClaimPassion={passion.canClaimDaily}

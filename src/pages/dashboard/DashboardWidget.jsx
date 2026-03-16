@@ -4,6 +4,7 @@ const sizeClasses = {
     large: 'col-span-1 md:col-span-2',
     medium: 'col-span-1',
     small: 'col-span-1',
+    xlarge: 'col-span-1 md:col-span-2 xl:col-span-3',
 }
 
 // Tailwind CSS 4 requires complete class names (no dynamic interpolation)
