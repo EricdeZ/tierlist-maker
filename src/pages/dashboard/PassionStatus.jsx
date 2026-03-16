@@ -1,4 +1,4 @@
-import { Flame } from 'lucide-react'
+import passionCoin from '../../assets/passion/passion.png'
 import DashboardWidget from './DashboardWidget'
 import RankBadge from '../../components/RankBadge'
 import { formatRank } from '../../config/ranks'
@@ -9,22 +9,27 @@ export default function PassionStatus({ balance, rank, nextRank, totalEarned, cu
         : 100
 
     return (
-        <DashboardWidget title="Passion" icon={<Flame size={16} />} linkTo="/leaderboard" accent="amber">
+        <DashboardWidget title="Passion" icon={<img src={passionCoin} alt="" className="w-4 h-4 object-contain" />} linkTo="/leaderboard" accent="amber">
             <div className="flex flex-col gap-3">
                 {/* Rank badge + name on one line */}
                 <div className="flex items-center gap-3">
                     <RankBadge rank={rank} size="lg" />
                     <div>
                         <p className="font-heading font-bold text-sm leading-tight">{formatRank(rank) || 'Unranked'}</p>
-                        <p className="text-2xl font-bold leading-tight">{(balance || 0).toLocaleString()}</p>
-                        <p className="text-xs text-amber-400/70">Passion</p>
+                        <p className="text-2xl font-bold leading-tight" style={{ textShadow: '0 0 12px rgba(245, 158, 11, 0.5), 0 0 24px rgba(245, 158, 11, 0.25)' }}>
+                            {(balance || 0).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-amber-400/70 flex items-center gap-1">
+                            <img src={passionCoin} alt="" className="w-3 h-3 object-contain" />
+                            Passion
+                        </p>
                     </div>
                 </div>
 
                 {/* Streak */}
                 {currentStreak > 0 && (
                     <div className="flex items-center gap-1.5">
-                        <Flame size={13} className="text-orange-400" />
+                        <img src={passionCoin} alt="" className="w-3.5 h-3.5 object-contain" />
                         <span className="text-sm font-semibold">{currentStreak} day streak</span>
                     </div>
                 )}
@@ -37,7 +42,7 @@ export default function PassionStatus({ balance, rank, nextRank, totalEarned, cu
                             <span>{formatRank(nextRank)}</span>
                         </div>
                         <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                            <div className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
                         </div>
                     </div>
                 )}
@@ -46,9 +51,9 @@ export default function PassionStatus({ balance, rank, nextRank, totalEarned, cu
                 {canClaimDaily && (
                     <button
                         onClick={onClaimDaily}
-                        className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
                     >
-                        <Flame size={14} />
+                        <img src={passionCoin} alt="" className="w-4 h-4 object-contain" />
                         Claim Daily Passion
                     </button>
                 )}
