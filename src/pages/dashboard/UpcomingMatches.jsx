@@ -25,11 +25,11 @@ function countdownColor(dateStr) {
 function MatchRow({ match, isNext }) {
     const isTeam1 = match.user_team_id === match.team1_id
     const myTeam = isTeam1
-        ? { name: match.team1_name, logo: match.team1_logo }
-        : { name: match.team2_name, logo: match.team2_logo }
+        ? { name: match.team1_name, logo: match.team1_logo, color: match.team1_color, slug: match.team1_slug }
+        : { name: match.team2_name, logo: match.team2_logo, color: match.team2_color, slug: match.team2_slug }
     const opponent = isTeam1
-        ? { name: match.team2_name, logo: match.team2_logo }
-        : { name: match.team1_name, logo: match.team1_logo }
+        ? { name: match.team2_name, logo: match.team2_logo, color: match.team2_color, slug: match.team2_slug }
+        : { name: match.team1_name, logo: match.team1_logo, color: match.team1_color, slug: match.team1_slug }
 
     const timeStr = new Date(match.scheduled_time).toLocaleTimeString(undefined, {
         hour: 'numeric',
@@ -46,10 +46,10 @@ function MatchRow({ match, isNext }) {
             className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors"
         >
             {/* Both team logos with VS */}
-            <div className="flex items-center gap-1 shrink-0 relative">
-                <TeamLogo logoUrl={myTeam.logo} name={myTeam.name} size={26} />
-                <span className="text-[9px] font-bold text-(--color-text-secondary) mx-0.5">vs</span>
-                <TeamLogo logoUrl={opponent.logo} name={opponent.name} size={26} />
+            <div className="flex items-center gap-1.5 shrink-0 relative">
+                <TeamLogo logoUrl={myTeam.logo} slug={myTeam.slug} name={myTeam.name} color={myTeam.color} size={28} />
+                <span className="text-[9px] font-bold text-(--color-text-secondary)">vs</span>
+                <TeamLogo logoUrl={opponent.logo} slug={opponent.slug} name={opponent.name} color={opponent.color} size={28} />
                 {isNext && (
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse ring-2 ring-(--color-primary)" />
                 )}

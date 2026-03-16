@@ -2,6 +2,7 @@ import { Users, Bell } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
 import TeamLogo from '../../components/TeamLogo'
+import { getDiscordAvatarUrl } from '../../utils/playerAvatar'
 
 export default function TeamWidget({ teams, pendingCount }) {
     if (!teams || teams.length === 0) {
@@ -46,22 +47,36 @@ export default function TeamWidget({ teams, pendingCount }) {
                     </div>
                 </div>
 
-                {/* Roster initials */}
+                {/* Roster avatars — use Discord pfps when available */}
                 {team.members?.length > 0 && (
                     <div className="flex -space-x-1.5">
                         {team.members.slice(0, 7).map((m, i) => {
                             const name = m.displayName || m.discord_username || m.player_name || '?'
+                            const avatarUrl = getDiscordAvatarUrl(m.discord_id, m.discord_avatar, 32)
                             return (
                                 <div
                                     key={m.user_id ?? i}
-                                    className="w-6 h-6 rounded-full border border-black/30 flex items-center justify-center text-[9px] font-bold text-white/90 flex-shrink-0"
-                                    style={{ backgroundColor: accentColor }}
+                                    className="w-7 h-7 rounded-full border-2 border-(--color-primary) overflow-hidden flex-shrink-0"
                                     title={name}
                                 >
-                                    {name[0]?.toUpperCase()}
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div
+                                            className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white/90"
+                                            style={{ backgroundColor: accentColor }}
+                                        >
+                                            {name[0]?.toUpperCase()}
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}
+                        {memberCount > 7 && (
+                            <div className="w-7 h-7 rounded-full border-2 border-(--color-primary) bg-white/10 flex items-center justify-center text-[9px] text-(--color-text-secondary) flex-shrink-0">
+                                +{memberCount - 7}
+                            </div>
+                        )}
                     </div>
                 )}
 

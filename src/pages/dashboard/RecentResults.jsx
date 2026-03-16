@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import TeamLogo from '../../components/TeamLogo'
 import { getGodCardUrl } from '../../utils/playerAvatar'
 import soloImg from '../../assets/roles/solo.webp'
 import jungleImg from '../../assets/roles/jungle.webp'
@@ -12,17 +13,20 @@ const ROLE_ICONS = { SOLO: soloImg, JUNGLE: jungleImg, MID: midImg, SUPPORT: sup
 
 function ResultRow({ game, index }) {
     const won = game.winner_team_id === game.player_team_id
-    const opponentName = game.team_side === 1 ? game.team2_name : game.team1_name
+    const isTeam1 = game.team_side === 1
+    const opponentName = isTeam1 ? game.team2_name : game.team1_name
+    const opponentColor = isTeam1 ? game.team2_color : game.team1_color
+    const opponentSlug = isTeam1 ? game.team2_slug : game.team1_slug
     const godImg = getGodCardUrl(game.god_played, 64)
     const roleIcon = game.role_played ? ROLE_ICONS[game.role_played.toUpperCase()] : null
 
     return (
-        <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg ${index % 2 === 0 ? 'bg-white/[0.03]' : ''}`}>
+        <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${index % 2 === 0 ? 'bg-white/[0.03]' : ''}`}>
             <span className={`text-xs font-bold w-5 text-center px-1 py-0.5 rounded shrink-0 ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                 {won ? 'W' : 'L'}
             </span>
             {/* God portrait */}
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 shrink-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 shrink-0 ring-1 ring-white/10">
                 {godImg ? (
                     <img src={godImg} alt={game.god_played} className="w-full h-full object-cover object-[center_20%]" />
                 ) : (
@@ -30,7 +34,10 @@ function ResultRow({ game, index }) {
                 )}
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">vs {opponentName || 'Unknown'}</p>
+                <div className="flex items-center gap-1.5">
+                    <TeamLogo slug={opponentSlug} name={opponentName} color={opponentColor} size={14} />
+                    <p className="text-sm truncate">{opponentName || 'Unknown'}</p>
+                </div>
                 <div className="flex items-center gap-1">
                     {roleIcon && <img src={roleIcon} alt="" className="w-3 h-3 object-contain opacity-60" />}
                     {game.god_played && (

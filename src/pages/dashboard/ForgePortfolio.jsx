@@ -67,6 +67,7 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                         {holdings.slice(0, 3).map(h => (
                             <div key={h.sparkId} className="flex items-center gap-2 text-sm">
                                 <TeamLogo
+                                    slug={h.teamSlug}
                                     name={h.teamName}
                                     color={h.teamColor}
                                     size={18}

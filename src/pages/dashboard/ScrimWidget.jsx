@@ -1,6 +1,7 @@
 import { Swords, Bell, Circle } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import TeamLogo from '../../components/TeamLogo'
 
 const STATUS_COLORS = {
     open: 'text-orange-400',
@@ -39,23 +40,24 @@ export default function ScrimWidget({ scrims, incomingCount, isCaptain }) {
     })
     const next = sorted[0]
 
-    // Determine opponent name: for accepted scrims use acceptedTeamName,
-    // for challenged scrims use challengedTeamName, else show open slot
-    const opponent =
-        next.acceptedTeamName ||
-        next.challengedTeamName ||
-        (next.status === 'open' ? 'Open slot' : 'TBD')
+    // Determine opponent info with logo/color
+    const opponentName = next.acceptedTeamName || next.accepted_team_name
+        || next.challengedTeamName || next.challenged_team_name
+        || (next.status === 'open' ? 'Open challenge' : 'TBD')
+    const opponentLogo = next.accepted_team_logo || next.challenged_team_logo || next.team_logo
+    const opponentColor = next.accepted_team_color || next.challenged_team_color || next.team_color
 
-    const scheduledAt = next.scheduledDate || next.scheduled_at || next.scheduled_time
+    const scheduledAt = next.scheduledDate || next.scheduled_at || next.scheduled_time || next.scheduled_date
     const statusColor = STATUS_COLORS[next.status] || 'text-white/60'
 
     return (
         <DashboardWidget title="Scrims" icon={<Swords size={16} />} linkTo="/scrims" accent="orange">
             <div className="space-y-2">
-                {/* Sword clash accent */}
+                {/* Opponent with team logo */}
                 <div className="flex items-center gap-2">
-                    <Swords size={14} className="text-orange-400 shrink-0" />
-                    <p className="text-sm font-semibold truncate">vs {opponent}</p>
+                    <TeamLogo logoUrl={opponentLogo} name={opponentName} color={opponentColor} size={22} />
+                    <Swords size={12} className="text-orange-400 shrink-0" />
+                    <p className="text-sm font-semibold truncate">{opponentName}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
