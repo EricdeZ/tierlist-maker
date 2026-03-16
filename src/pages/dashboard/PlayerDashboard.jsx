@@ -32,14 +32,6 @@ function formatGreetingDate() {
     return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-function SectionLabel({ children }) {
-    return (
-        <div className="col-span-full flex items-center gap-3 mt-2 -mb-1">
-            <span className="text-xs font-heading font-bold uppercase tracking-widest text-(--color-text-secondary)/50">{children}</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
-        </div>
-    )
-}
 
 function LoadingSkeleton() {
     return (
@@ -234,9 +226,6 @@ export default function PlayerDashboard() {
                     incomingScrimRequests={data.incomingScrims.length}
                 />
 
-                <SectionLabel>Activity</SectionLabel>
-
-                {/* Large widgets */}
                 <UpcomingMatches matches={data.upcomingMatches} hasTeam={hasTeam} />
                 <BalancesCard
                     passionBalance={passion.balance}
@@ -254,10 +243,6 @@ export default function PlayerDashboard() {
                     totalEarned={passion.totalEarned}
                 />
                 <RecentResults games={data.profile?.gameHistory} linkedPlayer={linkedPlayer} />
-
-                <SectionLabel>Collection</SectionLabel>
-
-                {/* Medium widgets */}
                 <VaultOverview
                     vaultData={data.vaultData}
                     startingFive={data.startingFive}
@@ -270,10 +255,6 @@ export default function PlayerDashboard() {
                     forgeLeagueSlug={data.forgeLeagueSlug}
                     error={data.forgeError}
                 />
-
-                <SectionLabel>Community</SectionLabel>
-
-                {/* Bottom row */}
                 <ChallengesProgress
                     challenges={data.challenges}
                     claimableCount={data.claimableChallenges}
