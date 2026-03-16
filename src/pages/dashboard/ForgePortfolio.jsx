@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { TrendingUp, Zap, Flame } from 'lucide-react'
+import { TrendingUp, Flame } from 'lucide-react'
 import PromoCard from './PromoCard'
 import TeamLogo from '../../components/TeamLogo'
+import sparkIcon from '../../assets/spark.png'
 
 const FIRE = '#e86520'
 const GOLD = '#ffcc44'
@@ -62,7 +63,7 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                     {/* Portfolio value */}
                     <div>
                         <div className="flex items-baseline gap-2">
-                            <Zap size={16} style={{ color: GOLD, filter: `drop-shadow(0 0 4px ${GOLD}80)` }} className="shrink-0 self-center" />
+                            <img src={sparkIcon} alt="" className="w-5 h-5 object-contain shrink-0 self-center" style={{ filter: `drop-shadow(0 0 4px ${GOLD}80)` }} />
                             <p className="text-2xl font-bold" style={{ color: '#e0dcd4', textShadow: `0 0 12px rgba(232,101,32,0.3)` }}>
                                 {totalValue.toLocaleString()}
                             </p>
@@ -97,7 +98,7 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                                         <TeamLogo slug={h.teamSlug} name={h.teamName} color={h.teamColor} size={18} className="shrink-0" />
                                         <Link to={`/forge${forgeLeagueSlug ? `/${forgeLeagueSlug}` : ''}/${h.playerSlug || ''}`} className="flex-1 truncate hover:underline" style={{ color: '#e0dcd4' }} onClick={e => e.stopPropagation()}>{h.playerName}</Link>
                                         <div className="flex items-center gap-0.5 shrink-0 text-xs" style={{ color: '#6a6050' }}>
-                                            <Zap size={10} style={{ color: GOLD }} />
+                                            <img src={sparkIcon} alt="" className="w-3 h-3 object-contain" />
                                             {h.sparks}
                                         </div>
                                         <PLBadge value={h.unrealizedPL} />
