@@ -1,4 +1,4 @@
-import { Target, Gift } from 'lucide-react'
+import { Target, Gift, Flame } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 
 const TIER_STYLES = {
@@ -44,7 +44,15 @@ export default function ChallengesProgress({ challenges, claimableCount }) {
                                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tier.dot}`} />
                                     <span className="truncate">{c.title}</span>
                                 </div>
-                                <span className="text-(--color-text-secondary) shrink-0">{c.progress}/{c.targetValue}</span>
+                                <span className="flex items-center gap-1.5 shrink-0">
+                                    <span className="text-(--color-text-secondary)">{c.progress}/{c.targetValue}</span>
+                                    {c.reward && (
+                                        <span className="flex items-center gap-0.5 text-amber-400/70">
+                                            <Flame size={9} />
+                                            <span>{c.reward}</span>
+                                        </span>
+                                    )}
+                                </span>
                             </div>
                             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                                 <div className={`h-full rounded-full transition-all ${barColor(c.pct)}`} style={{ width: `${c.pct}%` }} />

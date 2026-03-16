@@ -58,8 +58,12 @@ export default function ForgePortfolio({ portfolio, marketClosed, forgeLeagueSlu
                 </div>
 
                 {/* Top holdings */}
+                {holdings.length === 0 && (
+                    <p className="text-xs text-(--color-text-secondary)">No holdings yet — invest to get started</p>
+                )}
                 {holdings.length > 0 && (
                     <div className="space-y-1.5">
+                        <p className="text-[10px] text-(--color-text-secondary) uppercase tracking-wider font-semibold">Top {Math.min(3, holdings.length)} of {holdings.length} holdings</p>
                         {holdings.slice(0, 3).map(h => (
                             <div key={h.sparkId} className="flex items-center gap-2 text-sm">
                                 <TeamLogo

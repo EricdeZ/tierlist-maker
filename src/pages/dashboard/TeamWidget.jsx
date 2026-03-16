@@ -1,4 +1,4 @@
-import { Users } from 'lucide-react'
+import { Users, Bell } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
 import TeamLogo from '../../components/TeamLogo'
@@ -66,7 +66,8 @@ export default function TeamWidget({ teams, pendingCount }) {
                 )}
 
                 {pendingCount > 0 && (
-                    <p className="text-xs font-semibold" style={{ color: accentColor }}>
+                    <p className="text-xs font-semibold flex items-center gap-1" style={{ color: accentColor }}>
+                        <Bell size={11} />
                         {pendingCount} pending invite{pendingCount !== 1 ? 's' : ''}
                     </p>
                 )}

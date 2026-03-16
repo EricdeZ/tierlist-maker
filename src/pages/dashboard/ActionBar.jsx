@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Gift, Repeat2, Users, Swords, Flame, Trophy, Coins, BarChart3 } from 'lucide-react'
+import { Gift, Repeat2, Users, Swords, Flame, Trophy, Coins, BarChart3, CheckCircle2 } from 'lucide-react'
 
 // Each action type has its own color — Tailwind CSS 4 requires complete static class names
 const actionStyles = {
@@ -44,8 +44,9 @@ export default function ActionBar({
 
     if (!hasAny) {
         return (
-            <div className="col-span-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-(--color-text-secondary)">
-                You're all caught up!
+            <div className="col-span-full rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-center justify-center gap-2 text-sm text-emerald-400">
+                <CheckCircle2 size={16} />
+                <span>You're all caught up!</span>
             </div>
         )
     }

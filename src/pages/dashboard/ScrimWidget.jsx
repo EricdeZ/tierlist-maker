@@ -1,4 +1,4 @@
-import { Swords } from 'lucide-react'
+import { Swords, Bell, Circle } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
 
@@ -60,7 +60,8 @@ export default function ScrimWidget({ scrims, incomingCount, isCaptain }) {
 
                 <div className="flex items-center gap-3">
                     {next.status && (
-                        <span className={`text-xs font-semibold ${statusColor}`}>
+                        <span className={`text-xs font-semibold flex items-center gap-1 ${statusColor}`}>
+                            <Circle size={6} fill="currentColor" />
                             {statusLabel(next.status)}
                         </span>
                     )}
@@ -77,7 +78,8 @@ export default function ScrimWidget({ scrims, incomingCount, isCaptain }) {
                 </div>
 
                 {incomingCount > 0 && (
-                    <p className="text-xs text-orange-400 font-semibold">
+                    <p className="text-xs text-orange-400 font-semibold flex items-center gap-1">
+                        <Bell size={11} />
                         {incomingCount} incoming request{incomingCount !== 1 ? 's' : ''}
                     </p>
                 )}

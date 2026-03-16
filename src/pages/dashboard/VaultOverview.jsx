@@ -1,4 +1,4 @@
-import { Layers, Package, Sparkles } from 'lucide-react'
+import { Layers, Package, Sparkles, Flame, Coins, Gift, Repeat2 } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
 import soloImg from '../../assets/roles/solo.webp'
@@ -39,7 +39,6 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
     const cardCount = collection.length
     const uniqueCount = new Set(collection.map(c => c.defId)).size
     const incomeReady = (startingFive?.passionPending > 0) || (startingFive?.coresPending > 0)
-    const pendingCount = (pendingGifts || 0) + (pendingTrades || 0) + (vaultData.pendingTradeCount || 0)
     const packsOpened = vaultData.stats?.packsOpened ?? null
 
     const slots = startingFive?.cards
@@ -101,18 +100,27 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                 )}
 
                 {/* Income / pending */}
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     {incomeReady && (
-                        <p className="text-xs text-emerald-400 font-semibold">
-                            Income ready
-                            {startingFive.passionPending > 0 && ` · +${startingFive.passionPending} Passion`}
-                            {startingFive.coresPending > 0 && ` · +${startingFive.coresPending} Cores`}
-                        </p>
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                            {startingFive.passionPending > 0 && (
+                                <span className="flex items-center gap-0.5"><Flame size={11} />+{Math.floor(startingFive.passionPending)}</span>
+                            )}
+                            {startingFive.coresPending > 0 && (
+                                <span className="flex items-center gap-0.5"><Coins size={11} />+{Math.floor(startingFive.coresPending)}</span>
+                            )}
+                            <span>to collect</span>
+                        </div>
                     )}
-                    {pendingCount > 0 && (
-                        <p className="text-xs text-violet-400 font-semibold">
-                            {pendingCount} pending {pendingCount === 1 ? 'item' : 'items'}
-                        </p>
+                    {(pendingGifts > 0 || pendingTrades > 0) && (
+                        <div className="flex items-center gap-2 text-xs text-violet-400 font-semibold">
+                            {pendingGifts > 0 && (
+                                <span className="flex items-center gap-0.5"><Gift size={11} />{pendingGifts}</span>
+                            )}
+                            {pendingTrades > 0 && (
+                                <span className="flex items-center gap-0.5"><Repeat2 size={11} />{pendingTrades}</span>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

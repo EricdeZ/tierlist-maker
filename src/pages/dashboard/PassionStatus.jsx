@@ -17,7 +17,7 @@ export default function PassionStatus({ balance, rank, nextRank, totalEarned, cu
                     <div>
                         <p className="font-heading font-bold text-sm leading-tight">{formatRank(rank) || 'Unranked'}</p>
                         <p className="text-2xl font-bold leading-tight">{(balance || 0).toLocaleString()}</p>
-                        <p className="text-xs text-(--color-text-secondary)">Passion</p>
+                        <p className="text-xs text-amber-400/70">Passion</p>
                     </div>
                 </div>
 
@@ -46,8 +46,9 @@ export default function PassionStatus({ balance, rank, nextRank, totalEarned, cu
                 {canClaimDaily && (
                     <button
                         onClick={onClaimDaily}
-                        className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors"
+                        className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
                     >
+                        <Flame size={14} />
                         Claim Daily Passion
                     </button>
                 )}

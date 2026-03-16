@@ -6,6 +6,7 @@ import {
     challengeService, communityTeamService, scrimService, tradingService,
 } from '../../services/database'
 
+import { getDiscordAvatarUrl } from '../../utils/playerAvatar'
 import ActionBar from './ActionBar'
 import UpcomingMatches from './UpcomingMatches'
 import RecentResults from './RecentResults'
@@ -136,11 +137,20 @@ export default function PlayerDashboard() {
     return (
         <div className="max-w-7xl mx-auto px-4 py-6">
             {/* Greeting */}
-            <div className="mb-5">
-                <h1 className="font-heading text-2xl font-bold">
-                    {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
-                </h1>
-                <p className="text-sm text-(--color-text-secondary) mt-0.5">{formatGreetingDate()}</p>
+            <div className="mb-5 flex items-center gap-3">
+                {user?.discord_id && user?.discord_avatar && (
+                    <img
+                        src={getDiscordAvatarUrl(user.discord_id, user.discord_avatar, 64)}
+                        alt=""
+                        className="w-12 h-12 rounded-full ring-2 ring-white/10 shrink-0"
+                    />
+                )}
+                <div>
+                    <h1 className="font-heading text-2xl font-bold">
+                        {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
+                    </h1>
+                    <p className="text-sm text-(--color-text-secondary) mt-0.5">{formatGreetingDate()}</p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
