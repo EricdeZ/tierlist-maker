@@ -1,5 +1,6 @@
-import { Target, Gift, Flame } from 'lucide-react'
+import { Target, Gift } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
+import passionCoin from '../../assets/passion/passion.png'
 
 const TIER_STYLES = {
     bronze:   { color: 'text-amber-600',  dot: 'bg-amber-600' },
@@ -25,7 +26,7 @@ export default function ChallengesProgress({ challenges, claimableCount }) {
         <DashboardWidget title="Challenges" icon={<Target size={16} />} linkTo="/challenges" accent="emerald">
             <div className="space-y-3">
                 {claimableCount > 0 && (
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 animate-[pulse_3s_ease-in-out_infinite]">
                         <Gift size={13} className="text-emerald-400 shrink-0" />
                         <span className="text-xs font-bold text-emerald-400">{claimableCount} reward{claimableCount !== 1 ? 's' : ''} to claim!</span>
                     </div>
@@ -37,6 +38,7 @@ export default function ChallengesProgress({ challenges, claimableCount }) {
 
                 {sorted.map(c => {
                     const tier = TIER_STYLES[c.tier] || TIER_STYLES.bronze
+                    const nearComplete = c.pct >= 80
                     return (
                         <div key={c.id}>
                             <div className="flex justify-between text-xs mb-1">
@@ -48,19 +50,39 @@ export default function ChallengesProgress({ challenges, claimableCount }) {
                                     <span className="text-(--color-text-secondary)">{c.progress}/{c.targetValue}</span>
                                     {c.reward && (
                                         <span className="flex items-center gap-0.5 text-amber-400/70">
-                                            <Flame size={9} />
+                                            <img src={passionCoin} alt="" className="w-3 h-3 object-contain" />
                                             <span>{c.reward}</span>
                                         </span>
                                     )}
                                 </span>
                             </div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full transition-all ${barColor(c.pct)}`} style={{ width: `${c.pct}%` }} />
+                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden relative">
+                                <div
+                                    className={`h-full rounded-full transition-all ${barColor(c.pct)}${nearComplete ? ' shadow-[0_0_6px_rgba(52,211,153,0.5)]' : ''}`}
+                                    style={{ width: `${c.pct}%` }}
+                                />
+                                {nearComplete && (
+                                    <div
+                                        className="absolute inset-0 rounded-full overflow-hidden animate-[shimmer_2s_ease-in-out_infinite]"
+                                        style={{
+                                            width: `${c.pct}%`,
+                                            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                                            backgroundSize: '200% 100%',
+                                        }}
+                                    />
+                                )}
                             </div>
                         </div>
                     )
                 })}
             </div>
+
+            <style>{`
+                @keyframes shimmer {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                }
+            `}</style>
         </DashboardWidget>
     )
 }

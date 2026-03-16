@@ -1,6 +1,8 @@
-import { Layers, Package, Sparkles, Flame, Coins, Gift, Repeat2 } from 'lucide-react'
+import { Layers, Package, Sparkles, Gift, Repeat2 } from 'lucide-react'
 import DashboardWidget from './DashboardWidget'
 import PromoCard from './PromoCard'
+import passionCoin from '../../assets/passion/passion.png'
+import coresIcon from '../../assets/ember.png'
 import soloImg from '../../assets/roles/solo.webp'
 import jungleImg from '../../assets/roles/jungle.webp'
 import midImg from '../../assets/roles/mid.webp'
@@ -15,6 +17,16 @@ const RARITY_BORDER = {
     legendary: 'border-amber-500',
     mythic: 'border-red-500',
     unique: 'border-rose-300',
+}
+
+const RARITY_GLOW = {
+    common: '',
+    uncommon: 'shadow-[0_0_6px_rgba(34,197,94,0.2)]',
+    rare: 'shadow-[0_0_6px_rgba(59,130,246,0.25)]',
+    epic: 'shadow-[0_0_8px_rgba(168,85,247,0.3)]',
+    legendary: 'shadow-[0_0_8px_rgba(245,158,11,0.35)]',
+    mythic: 'shadow-[0_0_10px_rgba(239,68,68,0.35)]',
+    unique: 'shadow-[0_0_10px_rgba(251,113,133,0.35)]',
 }
 
 const SLOT_ROLES = ['solo', 'jungle', 'mid', 'support', 'carry']
@@ -81,11 +93,12 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                         {slots.map((card, i) => {
                             const role = SLOT_ROLES[i]
                             const borderClass = card ? (RARITY_BORDER[card.rarity] || 'border-slate-500') : 'border-white/10'
+                            const glowClass = card ? (RARITY_GLOW[card.rarity] || '') : ''
                             const roleIcon = ROLE_ICONS[role]
                             return (
                                 <div
                                     key={role}
-                                    className={`w-10 h-13 rounded border-2 ${borderClass} bg-white/5 overflow-hidden flex flex-col items-center justify-center relative`}
+                                    className={`w-10 h-13 rounded border-2 ${borderClass} ${glowClass} bg-white/5 overflow-hidden flex flex-col items-center justify-center relative`}
                                     title={card ? `${card.godName || 'Card'} (${role})` : role}
                                 >
                                     {card?.imageUrl ? (
@@ -102,12 +115,12 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
                 {/* Income / pending */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     {incomeReady && (
-                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                             {startingFive.passionPending > 0 && (
-                                <span className="flex items-center gap-0.5"><Flame size={11} />+{Math.floor(startingFive.passionPending)}</span>
+                                <span className="flex items-center gap-0.5"><img src={passionCoin} alt="" className="w-3.5 h-3.5 object-contain" />+{Math.floor(startingFive.passionPending)}</span>
                             )}
                             {startingFive.coresPending > 0 && (
-                                <span className="flex items-center gap-0.5"><Coins size={11} />+{Math.floor(startingFive.coresPending)}</span>
+                                <span className="flex items-center gap-0.5"><img src={coresIcon} alt="" className="w-3.5 h-3.5 object-contain" />+{Math.floor(startingFive.coresPending)}</span>
                             )}
                             <span>to collect</span>
                         </div>

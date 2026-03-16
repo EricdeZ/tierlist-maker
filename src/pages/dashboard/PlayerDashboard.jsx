@@ -29,6 +29,39 @@ function formatGreetingDate() {
     return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+function SectionLabel({ children }) {
+    return (
+        <div className="col-span-full flex items-center gap-3 mt-2 -mb-1">
+            <span className="text-xs font-heading font-bold uppercase tracking-widest text-(--color-text-secondary)/50">{children}</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
+        </div>
+    )
+}
+
+function LoadingSkeleton() {
+    return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className={`relative overflow-hidden rounded-xl border border-white/10 bg-white/5 ${i < 2 ? 'md:col-span-2 h-48' : 'h-40'}`}
+                    >
+                        <div
+                            className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                            style={{
+                                background: 'linear-gradient(90deg, transparent, rgba(248,197,106,0.04), transparent)',
+                                animationDelay: `${i * 150}ms`,
+                            }}
+                        />
+                    </div>
+                ))}
+            </div>
+            <style>{`@keyframes shimmer { 100% { transform: translateX(100%); } }`}</style>
+        </div>
+    )
+}
+
 export default function PlayerDashboard() {
     const { user, linkedPlayer } = useAuth()
     const passion = usePassion()
@@ -119,41 +152,57 @@ export default function PlayerDashboard() {
         load()
     }, [linkedPlayer?.slug])
 
-    if (loading) {
-        return (
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className={`rounded-xl border border-white/10 bg-white/5 animate-pulse ${i < 2 ? 'md:col-span-2 h-48' : 'h-40'}`} />
-                    ))}
-                </div>
-            </div>
-        )
-    }
+    if (loading) return <LoadingSkeleton />
 
     const hasTeam = data.myTeams.length > 0 || data.upcomingMatches.length > 0
     const isCaptain = data.captainTeams.length > 0
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-            {/* Greeting */}
-            <div className="mb-5 flex items-center gap-3">
-                {user?.discord_id && user?.discord_avatar && (
-                    <img
-                        src={getDiscordAvatarUrl(user.discord_id, user.discord_avatar, 64)}
-                        alt=""
-                        className="w-12 h-12 rounded-full ring-2 ring-white/10 shrink-0"
-                    />
-                )}
-                <div>
-                    <h1 className="font-heading text-2xl font-bold">
-                        {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
-                    </h1>
-                    <p className="text-sm text-(--color-text-secondary) mt-0.5">{formatGreetingDate()}</p>
-                </div>
+        <div className="relative max-w-7xl mx-auto px-4 py-6">
+            {/* Background effects */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div
+                    className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[400px] opacity-30"
+                    style={{ background: 'radial-gradient(circle, var(--color-accent) 0%, transparent 70%)' }}
+                />
+                <div
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                        backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+                        backgroundSize: '60px 60px',
+                    }}
+                />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Greeting */}
+            <div className="relative mb-5">
+                <div className="flex items-center gap-4">
+                    {user?.discord_id && user?.discord_avatar && (
+                        <div className="relative shrink-0">
+                            <div
+                                className="absolute -inset-2 rounded-full opacity-40 blur-md"
+                                style={{ background: 'radial-gradient(circle, var(--color-accent), transparent 70%)' }}
+                            />
+                            <img
+                                src={getDiscordAvatarUrl(user.discord_id, user.discord_avatar, 64)}
+                                alt=""
+                                className="relative w-12 h-12 rounded-full ring-2 ring-white/10"
+                            />
+                        </div>
+                    )}
+                    <div>
+                        <h1 className="font-heading text-2xl font-bold">
+                            {getTimeGreeting()}{user?.discord_username ? `, ${user.discord_username}` : ''}
+                        </h1>
+                        <p className="text-sm mt-0.5" style={{ color: 'color-mix(in srgb, var(--color-accent) 50%, var(--color-text-secondary))' }}>
+                            {formatGreetingDate()}
+                        </p>
+                    </div>
+                </div>
+                <div className="mt-4 h-px bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
+            </div>
+
+            <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Action Bar */}
                 <ActionBar
                     canClaimPassion={passion.canClaimDaily}
@@ -165,6 +214,8 @@ export default function PlayerDashboard() {
                     pendingTeamInvites={data.teamPendingCount}
                     incomingScrimRequests={data.incomingScrims.length}
                 />
+
+                <SectionLabel>Activity</SectionLabel>
 
                 {/* Large widgets */}
                 <UpcomingMatches matches={data.upcomingMatches} hasTeam={hasTeam} />
@@ -178,6 +229,8 @@ export default function PlayerDashboard() {
                     onClaimDaily={passion.claimDaily}
                 />
                 <RecentResults games={data.profile?.gameHistory} linkedPlayer={linkedPlayer} />
+
+                <SectionLabel>Collection</SectionLabel>
 
                 {/* Medium widgets */}
                 <VaultOverview
@@ -199,6 +252,8 @@ export default function PlayerDashboard() {
                     canClaimDaily={passion.ember?.canClaimDaily}
                     onClaimDaily={passion.claimEmberDaily}
                 />
+
+                <SectionLabel>Community</SectionLabel>
 
                 {/* Bottom row */}
                 <ChallengesProgress
