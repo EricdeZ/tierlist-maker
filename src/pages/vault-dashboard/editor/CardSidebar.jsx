@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical } from 'lucide-react'
+import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom } from 'lucide-react'
+import { ROLES } from '../preview/prebuiltRenderers'
 
-const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace']
+const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace', "'Segoe UI', system-ui, sans-serif"]
 const HOLO_EFFECTS = [
     'common', 'amazing',
     'galaxy', 'vstar', 'shiny', 'ultra',
@@ -22,6 +23,10 @@ export default function CardSidebar({
     onAddText,
     onAddStats,
     onAddEffect,
+    onAddNameBanner,
+    onAddStatsBlock,
+    onAddSubtitle,
+    onAddFooter,
     onUpdateElement,
     onDeleteElement,
     onReorder,
@@ -61,6 +66,25 @@ export default function CardSidebar({
                     </button>
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+            </div>
+
+            {/* Prebuilt Components */}
+            <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prebuilt Components</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={onAddNameBanner} className={`${btn} bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/30`}>
+                        <CreditCard size={16} /> Banner
+                    </button>
+                    <button onClick={onAddStatsBlock} className={`${btn} bg-rose-600/20 text-rose-400 hover:bg-rose-600/30`}>
+                        <Table2 size={16} /> Stats
+                    </button>
+                    <button onClick={onAddSubtitle} className={`${btn} bg-teal-600/20 text-teal-400 hover:bg-teal-600/30`}>
+                        <AlignCenter size={16} /> Subtitle
+                    </button>
+                    <button onClick={onAddFooter} className={`${btn} bg-orange-600/20 text-orange-400 hover:bg-orange-600/30`}>
+                        <PanelBottom size={16} /> Footer
+                    </button>
+                </div>
             </div>
 
             {/* Border */}
@@ -125,7 +149,9 @@ export default function CardSidebar({
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                            {sel.type === 'image' ? 'Image' : sel.type === 'text' ? 'Text' : sel.type === 'effect' ? 'Holo Effect' : 'Stats'}
+                            {{ image: 'Image', text: 'Text', effect: 'Holo Effect', stats: 'Stats',
+                               'name-banner': 'Name Banner', 'stats-block': 'Stats Block',
+                               subtitle: 'Subtitle', footer: 'Footer' }[sel.type] || sel.type}
                         </h3>
                         <button
                             onClick={() => onDeleteElement(sel.id)}
@@ -303,6 +329,216 @@ export default function CardSidebar({
                                     onChange={e => onUpdateElement(sel.id, { opacity: parseFloat(e.target.value) })}
                                     className="w-full accent-amber-500" />
                             </div>
+                        </div>
+                    )}
+
+                    {/* Name Banner properties */}
+                    {sel.type === 'name-banner' && (
+                        <div className="space-y-3">
+                            <div>
+                                <label className={label}>Player Name</label>
+                                <input type="text" value={sel.playerName || ''} onChange={e => onUpdateElement(sel.id, { playerName: e.target.value })}
+                                    className={`${input} w-full`} />
+                            </div>
+                            <div>
+                                <label className={label}>Role Label</label>
+                                <input type="text" value={sel.roleLabel || ''} onChange={e => onUpdateElement(sel.id, { roleLabel: e.target.value })}
+                                    className={`${input} w-full`} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Role Colors</label>
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                        className={`${input} w-full capitalize`}>
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={label}>Font</label>
+                                    <select value={sel.font || "'Segoe UI', system-ui, sans-serif"} onChange={e => onUpdateElement(sel.id, { font: e.target.value })}
+                                        className={`${input} w-full`}>
+                                        {FONTS.map(f => <option key={f} value={f}>{f.split(',')[0].replace(/'/g, '')}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className={label}>Size: {sel.fontSize ?? 16}px</label>
+                                <input type="range" min={10} max={32} value={sel.fontSize ?? 16}
+                                    onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stats Block properties */}
+                    {sel.type === 'stats-block' && (
+                        <div className="space-y-3">
+                            <div>
+                                <label className={label}>Role Colors</label>
+                                <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                    className={`${input} w-full capitalize`}>
+                                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Font</label>
+                                    <select value={sel.font || "'Segoe UI', system-ui, sans-serif"} onChange={e => onUpdateElement(sel.id, { font: e.target.value })}
+                                        className={`${input} w-full`}>
+                                        {FONTS.map(f => <option key={f} value={f}>{f.split(',')[0].replace(/'/g, '')}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={label}>Size: {sel.fontSize ?? 10}px</label>
+                                    <input type="range" min={7} max={18} value={sel.fontSize ?? 10}
+                                        onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                                        className="w-full accent-amber-500" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={label}>Stat Rows</label>
+                                {(sel.rows || []).map((row, i) => (
+                                    <div key={i} className="flex items-center gap-1 mb-1">
+                                        <input type="text" value={row.label} placeholder="Label"
+                                            onChange={e => {
+                                                const rows = [...(sel.rows || [])]
+                                                rows[i] = { ...rows[i], label: e.target.value }
+                                                onUpdateElement(sel.id, { rows })
+                                            }}
+                                            className={`${input} w-14`} />
+                                        <input type="text" value={row.value} placeholder="Value"
+                                            onChange={e => {
+                                                const rows = [...(sel.rows || [])]
+                                                rows[i] = { ...rows[i], value: e.target.value }
+                                                onUpdateElement(sel.id, { rows })
+                                            }}
+                                            className={`${input} w-12`} />
+                                        <input type="text" value={row.sub || ''} placeholder="Sub"
+                                            onChange={e => {
+                                                const rows = [...(sel.rows || [])]
+                                                rows[i] = { ...rows[i], sub: e.target.value }
+                                                onUpdateElement(sel.id, { rows })
+                                            }}
+                                            className={`${input} flex-1`} />
+                                        <button onClick={() => {
+                                            const rows = (sel.rows || []).filter((_, j) => j !== i)
+                                            onUpdateElement(sel.id, { rows })
+                                        }} className="text-gray-500 hover:text-red-400 p-0.5">
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => onUpdateElement(sel.id, { rows: [...(sel.rows || []), { label: 'Stat', value: '0', sub: '' }] })}
+                                    className="text-xs text-amber-400 hover:text-amber-300 mt-1"
+                                >
+                                    + Add Row
+                                </button>
+                            </div>
+                            <div>
+                                <label className={label}>Record Bar</label>
+                                <div className="grid grid-cols-3 gap-1">
+                                    <div>
+                                        <span className="text-[9px] text-gray-600">WR</span>
+                                        <input type="text" value={sel.record?.winRate || ''} placeholder="70%"
+                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, winRate: e.target.value } })}
+                                            className={`${input} w-full`} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] text-gray-600">Record</span>
+                                        <input type="text" value={sel.record?.record || ''} placeholder="7W-3L"
+                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, record: e.target.value } })}
+                                            className={`${input} w-full`} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] text-gray-600">Games</span>
+                                        <input type="text" value={sel.record?.games || ''} placeholder="10"
+                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, games: e.target.value } })}
+                                            className={`${input} w-full`} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Subtitle properties */}
+                    {sel.type === 'subtitle' && (
+                        <div className="space-y-3">
+                            <div>
+                                <label className={label}>Text</label>
+                                <input type="text" value={sel.text || ''} onChange={e => onUpdateElement(sel.id, { text: e.target.value })}
+                                    className={`${input} w-full`} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Role Colors</label>
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                        className={`${input} w-full capitalize`}>
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={label}>Color</label>
+                                    <div className="flex gap-1">
+                                        <input type="color" value={sel.color || '#9a8a70'}
+                                            onChange={e => onUpdateElement(sel.id, { color: e.target.value })}
+                                            className="w-8 h-8 bg-gray-800 border border-gray-700 rounded cursor-pointer" />
+                                        <input type="text" value={sel.color || ''}
+                                            onChange={e => onUpdateElement(sel.id, { color: e.target.value })}
+                                            placeholder="auto"
+                                            className={`${input} flex-1`} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className={label}>Size: {sel.fontSize ?? 9}px</label>
+                                <input type="range" min={6} max={20} value={sel.fontSize ?? 9}
+                                    onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
+                            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+                                <input type="checkbox" checked={!!sel.showBg} onChange={e => onUpdateElement(sel.id, { showBg: e.target.checked })}
+                                    className="accent-amber-500" />
+                                Show Background
+                            </label>
+                        </div>
+                    )}
+
+                    {/* Footer properties */}
+                    {sel.type === 'footer' && (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Left Text</label>
+                                    <input type="text" value={sel.leftText || ''} onChange={e => onUpdateElement(sel.id, { leftText: e.target.value })}
+                                        className={`${input} w-full`} />
+                                </div>
+                                <div>
+                                    <label className={label}>Right Text</label>
+                                    <input type="text" value={sel.rightText || ''} onChange={e => onUpdateElement(sel.id, { rightText: e.target.value })}
+                                        className={`${input} w-full`} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Role Colors</label>
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                        className={`${input} w-full capitalize`}>
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={label}>Size: {sel.fontSize ?? 9}px</label>
+                                    <input type="range" min={6} max={20} value={sel.fontSize ?? 9}
+                                        onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                                        className="w-full accent-amber-500" />
+                                </div>
+                            </div>
+                            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+                                <input type="checkbox" checked={!!sel.showBg} onChange={e => onUpdateElement(sel.id, { showBg: e.target.checked })}
+                                    className="accent-amber-500" />
+                                Show Background
+                            </label>
                         </div>
                     )}
 

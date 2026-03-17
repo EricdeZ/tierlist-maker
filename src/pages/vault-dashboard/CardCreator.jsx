@@ -211,6 +211,60 @@ export default function CardCreator() {
         setDirty(true)
     }, [])
 
+    const addNameBanner = useCallback(() => {
+        const id = `banner-${nextId++}`
+        setElements(prev => [...prev, {
+            id, type: 'name-banner', name: 'Name Banner',
+            playerName: 'Player Name', roleLabel: 'ADC', role: 'adc',
+            font: "'Segoe UI', system-ui, sans-serif", fontSize: 16,
+            x: 0, y: 0, w: 300, z: prev.length + 10, visible: true,
+        }])
+        setSelectedId(id)
+        setDirty(true)
+    }, [])
+
+    const addStatsBlock = useCallback(() => {
+        const id = `sblock-${nextId++}`
+        setElements(prev => [...prev, {
+            id, type: 'stats-block', name: 'Stats Block', role: 'adc',
+            font: "'Segoe UI', system-ui, sans-serif", fontSize: 10,
+            rows: [
+                { label: 'KDA', value: '3.5', sub: '5/2/4' },
+                { label: 'Damage', value: '25k', sub: 'Avg per game' },
+            ],
+            record: { winRate: '70%', record: '7W-3L', games: '10' },
+            x: 0, y: 280, w: 300, z: prev.length + 10, visible: true,
+        }])
+        setSelectedId(id)
+        setDirty(true)
+    }, [])
+
+    const addSubtitle = useCallback(() => {
+        const id = `sub-${nextId++}`
+        setElements(prev => [...prev, {
+            id, type: 'subtitle', name: 'Subtitle', role: 'adc',
+            text: 'Guardian \u00b7 Physical', color: '',
+            font: "'Segoe UI', system-ui, sans-serif", fontSize: 9,
+            showBg: false,
+            x: 0, y: 255, w: 300, z: prev.length + 10, visible: true,
+        }])
+        setSelectedId(id)
+        setDirty(true)
+    }, [])
+
+    const addFooter = useCallback(() => {
+        const id = `ftr-${nextId++}`
+        setElements(prev => [...prev, {
+            id, type: 'footer', name: 'Footer', role: 'adc',
+            leftText: '#001', rightText: 'LEGENDARY',
+            font: "'Segoe UI', system-ui, sans-serif", fontSize: 9,
+            showBg: false,
+            x: 0, y: 395, w: 300, z: prev.length + 10, visible: true,
+        }])
+        setSelectedId(id)
+        setDirty(true)
+    }, [])
+
     // Save
     const handleSave = useCallback(async (type) => {
         setSaving(true)
@@ -304,6 +358,10 @@ export default function CardCreator() {
                         onAddText={addText}
                         onAddStats={addStats}
                         onAddEffect={addEffect}
+                        onAddNameBanner={addNameBanner}
+                        onAddStatsBlock={addStatsBlock}
+                        onAddSubtitle={addSubtitle}
+                        onAddFooter={addFooter}
                         onUpdateElement={updateElement}
                         onDeleteElement={deleteElement}
                         onReorder={reorderElements}

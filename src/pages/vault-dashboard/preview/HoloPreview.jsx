@@ -1,4 +1,5 @@
 import useHoloEffect from '../../../hooks/useHoloEffect'
+import { isPrebuiltType, renderPrebuiltContent } from './prebuiltRenderers'
 import '../../../components/TradingCardHolo.css'
 
 const CARD_W = 300
@@ -51,6 +52,13 @@ function PreviewElement({ el }) {
                 </div>
             )
         default:
+            if (isPrebuiltType(el.type)) {
+                return (
+                    <div style={{ ...style, width: el.w ?? 300, height: 'auto' }}>
+                        {renderPrebuiltContent(el)}
+                    </div>
+                )
+            }
             return null
     }
 }

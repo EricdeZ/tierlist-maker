@@ -3,7 +3,7 @@ import { useVault } from './VaultContext'
 import { RARITIES, DISMANTLE_TIERS, getDismantleMultiplier, calcDismantleTotal } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
-import { Hammer, Check, Trash2, Info } from 'lucide-react'
+import { Hammer, Check, Trash2, Info, Copy } from 'lucide-react'
 import emberIcon from '../../assets/ember.png'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
@@ -142,6 +142,7 @@ export default function CCDismantle() {
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterHolo, setFilterHolo] = useState('all')
+  const [filterDuplicates, setFilterDuplicates] = useState(false)
   const [showRates, setShowRates] = useState(true)
   const [visibleCount, setVisibleCount] = useState(50)
 
@@ -167,6 +168,20 @@ export default function CCDismantle() {
     if (filterRarity !== 'all') list = list.filter(c => c.rarity === filterRarity)
     if (filterType !== 'all') list = list.filter(c => getCardType(c) === filterType)
     if (filterHolo !== 'all') list = list.filter(c => c.holoType === filterHolo)
+    if (filterDuplicates) {
+      const groups = new Map()
+      for (const c of list) {
+        const key = `${c.godId}:${c.rarity}:${c.holoType || ''}`
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(c)
+      }
+      list = []
+      for (const group of groups.values()) {
+        if (group.length < 2) continue
+        group.sort((a, b) => (b.level || 1) - (a.level || 1) || (b.power || 0) - (a.power || 0) || a.id - b.id)
+        list.push(...group.slice(1))
+      }
+    }
     list.sort((a, b) => {
       const nameComp = (a.godName || '').localeCompare(b.godName || '')
       if (nameComp !== 0) return nameComp
@@ -177,7 +192,7 @@ export default function CCDismantle() {
       return HOLO_TYPES.indexOf(a.holoType) - HOLO_TYPES.indexOf(b.holoType)
     })
     return list
-  }, [collection, filterRarity, filterType, filterHolo, lockedCardIds])
+  }, [collection, filterRarity, filterType, filterHolo, filterDuplicates, lockedCardIds])
 
   const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount])
   const hasMore = visibleCount < cards.length
@@ -346,6 +361,18 @@ export default function CCDismantle() {
             <option key={h} value={h}>{HOLO_TYPE_LABELS[h]}</option>
           ))}
         </select>
+
+        <button
+          onClick={() => { setFilterDuplicates(d => !d); setVisibleCount(50) }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cd-head border transition-all cursor-pointer ${
+            filterDuplicates
+              ? 'border-[var(--cd-cyan)]/40 bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)]'
+              : 'border-[var(--cd-border)] text-[var(--cd-text-mid)] hover:bg-white/[0.03]'
+          }`}
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Duplicates
+        </button>
 
         <div className="flex gap-2 ml-auto">
           <button

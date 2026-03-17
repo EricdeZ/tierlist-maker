@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
+import { isPrebuiltType, renderPrebuiltContent } from './prebuiltRenderers'
 
 const CARD_W = 300
 const CARD_H = 420
@@ -247,7 +248,13 @@ function CanvasElement({ el, isSelected, onMouseDown, onHandleMouseDown }) {
             break
 
         default:
-            content = null
+            if (isPrebuiltType(el.type)) {
+                content = renderPrebuiltContent(el)
+                style.width = el.w ?? 300
+                style.height = 'auto'
+            } else {
+                content = null
+            }
     }
 
     const isEffect = el.type === 'effect'
