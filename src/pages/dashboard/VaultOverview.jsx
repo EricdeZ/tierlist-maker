@@ -10,8 +10,8 @@ import midImg from '../../assets/roles/mid.webp'
 import suppImg from '../../assets/roles/supp.webp'
 import adcImg from '../../assets/roles/adc.webp'
 
-const SLOT_ROLES = ['solo', 'jungle', 'mid', 'support', 'carry']
-const ROLE_ICONS = { solo: soloImg, jungle: jungleImg, mid: midImg, support: suppImg, carry: adcImg }
+const SLOT_ROLES = ['solo', 'jungle', 'mid', 'support', 'adc']
+const ROLE_ICONS = { solo: soloImg, jungle: jungleImg, mid: midImg, support: suppImg, adc: adcImg }
 
 const CYAN = '#00e5ff'
 
