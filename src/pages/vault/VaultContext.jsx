@@ -25,7 +25,24 @@ export function VaultProvider({ children }) {
   const [binderCards, setBinderCards] = useState([])
   const [vaultBanned, setVaultBanned] = useState(false)
   const [accountTooNew, setAccountTooNew] = useState(null)
-  const [vendingCooldownEnd, setVendingCooldownEnd] = useState(null)
+  const [vendingCooldownEnd, setVendingCooldownEndRaw] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vendingCooldownEnd')
+      if (saved) {
+        const end = Number(saved)
+        if (end > Date.now()) return end
+        localStorage.removeItem('vendingCooldownEnd')
+      }
+    } catch {}
+    return null
+  })
+  const setVendingCooldownEnd = useCallback((val) => {
+    try {
+      if (val) localStorage.setItem('vendingCooldownEnd', String(val))
+      else localStorage.removeItem('vendingCooldownEnd')
+    } catch {}
+    setVendingCooldownEndRaw(val)
+  }, [])
   const [lockedCardIds, setLockedCardIds] = useState([])
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
@@ -175,14 +192,36 @@ export function VaultProvider({ children }) {
     return data.shareToken
   }, [])
 
+  // Sync card roles from S5 data back to collection (S5 data is fresh from DB)
+  const syncS5RolesToCollection = useCallback((s5Data) => {
+    if (!s5Data?.cards?.length) return
+    setCollection(prev => {
+      const roleUpdates = new Map()
+      for (const c of s5Data.cards) {
+        if (c.id && c.role) roleUpdates.set(c.id, c.role)
+      }
+      let changed = false
+      const next = prev.map(c => {
+        const freshRole = roleUpdates.get(c.id)
+        if (freshRole && freshRole !== c.role) {
+          changed = true
+          return { ...c, role: freshRole }
+        }
+        return c
+      })
+      return changed ? next : prev
+    })
+  }, [])
+
   const loadStartingFive = useCallback(async () => {
     try {
       const data = await vaultService.loadStartingFive()
       setStartingFive(data)
+      syncS5RolesToCollection(data)
     } catch (err) {
       console.error('Failed to load Starting 5:', err)
     }
-  }, [])
+  }, [syncS5RolesToCollection])
 
   const slotS5Card = useCallback(async (cardId, role, slotType = 'player') => {
     const data = await vaultService.slotCard(cardId, role, slotType)
@@ -332,7 +371,7 @@ export function VaultProvider({ children }) {
       setSalePacks(prev => prev.map(s =>
         s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
       ))
-      setVendingCooldownEnd(Date.now() + 15000)
+      setVendingCooldownEnd(Date.now() + 60000)
       passionCtxRef.current?.refreshBalance?.()
       return result
     } catch (err) {

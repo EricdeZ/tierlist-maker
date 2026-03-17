@@ -332,7 +332,7 @@ async function handleOpenPack(sql, user, body) {
 }
 
 // ═══ POST: Sale purchase — transactional stock + payment ═══
-const VENDING_COOLDOWN_SECONDS = 15
+const VENDING_COOLDOWN_SECONDS = 60
 
 async function handleSalePurchase(sql, user, saleId) {
   const result = await transaction(async (tx) => {
@@ -1437,10 +1437,11 @@ async function handleBlackMarketDebugPending(sql, user) {
 // ═══ Starting 5 ═══
 
 function formatS5Response(state, extra = {}) {
-  // Count teammates for team synergy
+  // Count teammates for team synergy (exclude role-mismatched cards, matching tick() logic)
   const teamCounts = {}
   for (const c of state.cards) {
-    if (c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+    const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
+    if (!mismatch && c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
   }
   const TEAM_SYNERGY = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
 

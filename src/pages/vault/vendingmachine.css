@@ -450,10 +450,10 @@
 .vm-cooldown-bar-track {
   position: relative;
   z-index: 2;
-  height: 4px;
+  height: 14px;
   margin-top: 6px;
   background: rgba(255, 153, 34, 0.12);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -461,8 +461,23 @@
   height: 100%;
   background: linear-gradient(90deg, #ff9922, #ffcc55);
   box-shadow: 0 0 6px rgba(255, 153, 34, 0.5);
-  border-radius: 2px;
+  border-radius: 3px;
   transition: width 0.08s linear;
+}
+
+.vm-cooldown-bar-timer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.08em;
+  pointer-events: none;
 }
 
 /* ── Keypad — rounded, clean ── */

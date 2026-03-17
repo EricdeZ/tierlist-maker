@@ -259,7 +259,7 @@ export default function SaleVendingMachine() {
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [cooldownProgress, setCooldownProgress] = useState(0);
 
-  const COOLDOWN_DURATION = 15;
+  const COOLDOWN_DURATION = 60;
 
   // Countdown timer for vending cooldown — driven by context
   useEffect(() => {
@@ -306,7 +306,7 @@ export default function SaleVendingMachine() {
     } else if (colNumbers.includes(key) && inputCode.length === 1 && rowLetters.includes(inputCode)) {
       setInputCode(prev => prev + key);
     }
-  }, [phase, inputCode, rowLetters, colNumbers]);
+  }, [phase, inputCode, rowLetters, colNumbers, cooldownLeft]);
 
   const handleInsertCoins = useCallback(() => {
     if (!selectedPack || !canAfford || coinsInserted || phase !== 'idle' || cooldownLeft > 0) return;
@@ -471,6 +471,7 @@ export default function SaleVendingMachine() {
                           className="vm-cooldown-bar-fill"
                           style={{ width: `${cooldownProgress * 100}%` }}
                         />
+                        <span className="vm-cooldown-bar-timer">{cooldownLeft}s</span>
                       </div>
                     )}
                   </div>

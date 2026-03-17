@@ -15,9 +15,11 @@ export async function syncRoleToVault(sql, leaguePlayerId, role) {
     AND cc_player_defs.season_id = lp.season_id
     AND cc_player_defs.frozen_stats IS NULL
   `
+  const normalizedRole = role.toLowerCase()
   await sql`
     UPDATE cc_cards
-    SET role = ${role.toLowerCase()}
+    SET role = ${normalizedRole},
+        card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
     FROM cc_player_defs d
     WHERE cc_cards.def_id = d.id
     AND cc_cards.card_type = 'player'
