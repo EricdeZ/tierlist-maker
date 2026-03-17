@@ -366,13 +366,15 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
     if (slot) {
       if (slot.god_card_id) {
         const [godCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.god_card_id}`
-        if (godCard && RARITY_TIER[godCard.rarity] > RARITY_TIER[card.rarity]) {
+        if (godCard && RARITY_TIER[godCard.rarity] > RARITY_TIER[card.rarity]
+          && !(card.rarity === 'unique' && godCard.rarity === 'mythic')) {
           await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
         }
       }
       if (slot.item_card_id) {
         const [itemCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.item_card_id}`
-        if (itemCard && RARITY_TIER[itemCard.rarity] > RARITY_TIER[card.rarity]) {
+        if (itemCard && RARITY_TIER[itemCard.rarity] > RARITY_TIER[card.rarity]
+          && !(card.rarity === 'unique' && itemCard.rarity === 'mythic')) {
           await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
         }
       }
@@ -394,8 +396,10 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
     if (!playerSlot) throw new Error('No player card in this slot — slot a player first')
 
     // Check rarity floor: attachment rarity cannot be worse than player rarity
+    // Exception: unique players allow mythic attachments
     const [playerCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${playerSlot.card_id}`
-    if (playerCard && RARITY_TIER[card.rarity] > RARITY_TIER[playerCard.rarity]) {
+    if (playerCard && RARITY_TIER[card.rarity] > RARITY_TIER[playerCard.rarity]
+      && !(playerCard.rarity === 'unique' && card.rarity === 'mythic')) {
       throw new Error('Attachment rarity cannot be lower than the player card rarity')
     }
 

@@ -1430,7 +1430,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         const type = getCardType(card)
         if (type !== slotType) return false
         if (!card.holoType) return false
-        if ((RARITY_TIER[card.rarity] || 0) < playerTier) return false
+        if ((RARITY_TIER[card.rarity] || 0) < playerTier && !(playerRarity === 'unique' && card.rarity === 'mythic')) return false
         if (slotType === 'god') {
           const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
           if (cardRole !== role && cardRole !== 'fill') return false
