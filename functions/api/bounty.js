@@ -297,10 +297,12 @@ function pushBountyProgress(sql, userId) {
 
 // ═══ POST: Create bounty ═══
 async function handleCreate(sql, user, body) {
-  const { cardType, cardName, rarity, holoType, coreReward, targetGodId } = body
-  if (!cardType || !cardName || !rarity || !holoType || !coreReward || !targetGodId) {
+  const { cardType, cardName, rarity, holoType: rawHoloType, coreReward, targetGodId } = body
+  if (!cardType || !cardName || !rarity || !rawHoloType || !coreReward || !targetGodId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType, cardName, rarity, holoType, coreReward, and targetGodId required' }) }
   }
+  // Common cards never have holo — force 'none' regardless of client
+  const holoType = rarity === 'common' ? 'none' : rawHoloType
   if (!VALID_CARD_TYPES.has(cardType)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid card type: ${cardType}` }) }
   }

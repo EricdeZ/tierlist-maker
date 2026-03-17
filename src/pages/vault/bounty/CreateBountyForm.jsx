@@ -36,7 +36,7 @@ export default function CreateBountyForm({ onSubmit, onClose, emberBalance, acti
   const [targetGodId, setTargetGodId] = useState('')
   const [searchText, setSearchText] = useState('')
   const [rarity, setRarity] = useState('common')
-  const [holoType, setHoloType] = useState('holo')
+  const [holoType, setHoloType] = useState('none')
   const [coreReward, setCoreReward] = useState(10)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
