@@ -262,6 +262,7 @@ const ROLE_VARIANTS = [
   { ref: 'thor', id: 90, role: 'solo' },
   { ref: 'vulcan', id: 91, role: 'solo' },
   { ref: 'apollo', id: 92, role: 'solo' },
+  { ref: 'ganesha', id: 127, role: 'solo' },
   // ─── Jungle variants ───
   { ref: 'achilles', id: 93, role: 'jungle' },
   { ref: 'anhur', id: 94, role: 'jungle' },
@@ -276,11 +277,13 @@ const ROLE_VARIANTS = [
   { ref: 'osiris', id: 103, role: 'jungle' },
   { ref: 'poseidon', id: 104, role: 'jungle' },
   { ref: 'ullr', id: 105, role: 'jungle' },
+  { ref: 'ganesha', id: 125, role: 'jungle' },
   // ─── Mid variants ───
   { ref: 'chiron', id: 106, role: 'mid' },
   { ref: 'neith', id: 107, role: 'mid' },
   { ref: 'bari', id: 108, role: 'mid' },
   { ref: 'ullr', id: 109, role: 'mid' },
+  { ref: 'ganesha', id: 126, role: 'mid' },
   // ─── Support variants ───
   { ref: 'aphrodite', id: 110, role: 'support' },
   { ref: 'apollo', id: 111, role: 'support' },
