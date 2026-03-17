@@ -8,6 +8,13 @@ export const ROLE_PALETTES = {
     support: { accent: '#4aaab8', accentLight: '#66c8d4', accentDark: '#2a7a84', bodyBg: '#101c1e', bodySurface: '#182a30', bodyBorder: '#284a50', textDim: '#70949a' },
 }
 
+function hexToRgba(hex, opacity) {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `rgba(${r},${g},${b},${opacity})`
+}
+
 const PREBUILT_TYPES = new Set(['name-banner', 'stats-block', 'subtitle', 'footer'])
 
 export function isPrebuiltType(type) {
@@ -17,6 +24,7 @@ export function isPrebuiltType(type) {
 export function renderPrebuiltContent(el) {
     const p = ROLE_PALETTES[el.role] || ROLE_PALETTES.adc
     const font = el.font || "'Segoe UI', system-ui, sans-serif"
+    const bgO = el.bgOpacity ?? 1
 
     switch (el.type) {
         case 'name-banner':
@@ -26,7 +34,7 @@ export function renderPrebuiltContent(el) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '7px 10px',
-                    background: p.bodyBg,
+                    background: hexToRgba(p.bodyBg, bgO),
                     gap: 6,
                 }}>
                     <span style={{
@@ -65,8 +73,8 @@ export function renderPrebuiltContent(el) {
             const hasRecord = record.winRate || record.record || record.games
             return (
                 <div className="pointer-events-none" style={{
-                    background: p.bodySurface,
-                    border: `1px solid ${p.bodyBorder}`,
+                    background: hexToRgba(p.bodySurface, bgO),
+                    border: `1px solid ${hexToRgba(p.bodyBorder, bgO)}`,
                     borderRadius: 5,
                     padding: '5px 8px',
                     fontFamily: font,
@@ -131,7 +139,7 @@ export function renderPrebuiltContent(el) {
                     padding: '2px 10px',
                     textAlign: 'center',
                     lineHeight: 1,
-                    background: el.showBg ? p.bodyBg : 'transparent',
+                    background: el.showBg ? hexToRgba(p.bodyBg, bgO) : 'transparent',
                 }}>
                     <span style={{
                         fontSize: el.fontSize ?? 9,
@@ -153,7 +161,7 @@ export function renderPrebuiltContent(el) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '3px 10px 5px',
-                    background: el.showBg ? p.bodyBg : 'transparent',
+                    background: el.showBg ? hexToRgba(p.bodyBg, bgO) : 'transparent',
                 }}>
                     <span style={{
                         fontSize: el.fontSize ?? 9,

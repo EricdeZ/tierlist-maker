@@ -107,7 +107,7 @@ export default function HoloPreview({ elements, border }) {
         width: CARD_W,
         height: CARD_H,
         borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
-        border: border?.enabled ? `${border.width ?? 3}px solid ${border.color ?? '#d4af37'}` : 'none',
+        border: 'none',
         background: '#111827',
         position: 'relative',
         overflow: 'hidden',
@@ -129,6 +129,14 @@ export default function HoloPreview({ elements, border }) {
                                     ? <EffectElement key={el.id} el={el} />
                                     : <PreviewElement key={el.id} el={el} />
                             )}
+                            <div style={{
+                                position: 'absolute', inset: 0, pointerEvents: 'none',
+                                borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
+                                boxShadow: border?.enabled
+                                    ? `inset 0 0 0 ${border.width ?? 3}px ${border.color ?? '#d4af37'}`
+                                    : 'none',
+                                zIndex: 900,
+                            }} />
                         </div>
                     </div>
                 </div>

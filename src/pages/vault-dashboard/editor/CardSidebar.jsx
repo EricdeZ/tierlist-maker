@@ -367,6 +367,12 @@ export default function CardSidebar({
                                     onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
                                     className="w-full accent-amber-500" />
                             </div>
+                            <div>
+                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
                         </div>
                     )}
 
@@ -458,6 +464,12 @@ export default function CardSidebar({
                                     </div>
                                 </div>
                             </div>
+                            <div>
+                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
                         </div>
                     )}
 
@@ -501,6 +513,12 @@ export default function CardSidebar({
                                     className="accent-amber-500" />
                                 Show Background
                             </label>
+                            <div>
+                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
                         </div>
                     )}
 
@@ -539,6 +557,12 @@ export default function CardSidebar({
                                     className="accent-amber-500" />
                                 Show Background
                             </label>
+                            <div>
+                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
                         </div>
                     )}
 

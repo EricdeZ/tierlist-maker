@@ -131,7 +131,7 @@ export default function CardCanvas({
                 width: CARD_W,
                 height: CARD_H,
                 borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
-                border: border?.enabled ? `${border.width ?? 3}px solid ${border.color ?? '#d4af37'}` : '1px solid #374151',
+                border: 'none',
                 background: '#111827',
                 cursor: dragging ? (dragging.type === 'move' ? 'grabbing' : HANDLE_CURSORS[dragging.handle]) : 'default',
             }}
@@ -163,6 +163,15 @@ export default function CardCanvas({
                     onHandleMouseDown={(e, handle) => handleMouseDown(e, el.id, 'resize', handle)}
                 />
             ))}
+
+            {/* Border overlay — renders on top of all content */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+                borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
+                boxShadow: border?.enabled
+                    ? `inset 0 0 0 ${border.width ?? 3}px ${border.color ?? '#d4af37'}`
+                    : 'inset 0 0 0 1px #374151',
+                zIndex: 900,
+            }} />
         </div>
     )
 }
