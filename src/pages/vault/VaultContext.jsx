@@ -371,7 +371,7 @@ export function VaultProvider({ children }) {
       setSalePacks(prev => prev.map(s =>
         s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
       ))
-      setVendingCooldownEnd(Date.now() + 60000)
+      setVendingCooldownEnd(Date.now() + 45000)
       passionCtxRef.current?.refreshBalance?.()
       return result
     } catch (err) {
