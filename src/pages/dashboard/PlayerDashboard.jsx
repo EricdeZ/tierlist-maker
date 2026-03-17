@@ -156,7 +156,7 @@ export default function PlayerDashboard() {
 
     // Extract league teams from profile seasonHistory (active seasons only)
     const leagueTeams = (data.profile?.seasonHistory || [])
-        .filter(s => s.is_active && s.team_name)
+        .filter(s => s.is_active && s.team_name && s.roster_status !== 'sub')
         .map(s => ({
             id: s.team_id,
             name: s.team_name,

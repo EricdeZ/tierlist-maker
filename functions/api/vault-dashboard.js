@@ -57,7 +57,7 @@ async function getTemplates(sql, event, user, canApprove) {
     let rows
     if (canApprove) {
         rows = await sql`
-            SELECT t.*, u.username AS creator_name
+            SELECT t.*, u.discord_username AS creator_name
             FROM cc_card_templates t
             LEFT JOIN users u ON u.id = t.created_by
             WHERE (${status || null}::text IS NULL OR t.status = ${status})
@@ -68,7 +68,7 @@ async function getTemplates(sql, event, user, canApprove) {
         `
     } else {
         rows = await sql`
-            SELECT t.*, u.username AS creator_name
+            SELECT t.*, u.discord_username AS creator_name
             FROM cc_card_templates t
             LEFT JOIN users u ON u.id = t.created_by
             WHERE t.created_by = ${user.id}
@@ -95,7 +95,7 @@ async function getDrafts(sql, event, user, canApprove) {
     let rows
     if (canApprove) {
         rows = await sql`
-            SELECT d.*, u.username AS creator_name
+            SELECT d.*, u.discord_username AS creator_name
             FROM cc_card_drafts d
             LEFT JOIN users u ON u.id = d.created_by
             WHERE (${status || null}::text IS NULL OR d.status = ${status})
@@ -105,7 +105,7 @@ async function getDrafts(sql, event, user, canApprove) {
         `
     } else {
         rows = await sql`
-            SELECT d.*, u.username AS creator_name
+            SELECT d.*, u.discord_username AS creator_name
             FROM cc_card_drafts d
             LEFT JOIN users u ON u.id = d.created_by
             WHERE d.created_by = ${user.id}

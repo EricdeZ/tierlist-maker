@@ -4,6 +4,7 @@ import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { RARITIES } from '../../data/vault/economy'
 import { Search, FileText } from 'lucide-react'
+import MiniCardPreview from './preview/MiniCardPreview'
 
 const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom']
 const STATUS_OPTIONS = ['draft', 'pending_review', 'approved', 'rejected', 'archived']
@@ -151,18 +152,8 @@ export default function TemplatesPage() {
                             onClick={() => navigate('/vault-dashboard', { state: { loadTemplate: t.id } })}
                             className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-amber-500/30 cursor-pointer transition-colors"
                         >
-                            {/* Thumbnail */}
-                            {t.thumbnail_url ? (
-                                <img
-                                    src={t.thumbnail_url}
-                                    alt={t.name}
-                                    className="w-16 h-20 object-cover rounded flex-shrink-0"
-                                />
-                            ) : (
-                                <div className="w-16 h-20 bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
-                                    <FileText size={24} className="text-gray-500" />
-                                </div>
-                            )}
+                            {/* Preview */}
+                            <MiniCardPreview templateData={t.template_data} />
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">

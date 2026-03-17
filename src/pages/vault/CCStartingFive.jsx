@@ -831,34 +831,40 @@ function TutorialModal({ onClose }) {
             <p>
               <span style={{ color: '#f8c56a' }}>Holo</span> cards earn Passion.{' '}
               <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards earn Cores.{' '}
-              <span className="text-purple-400">Full holo</span> cards earn a portion of both.
+              <span className="text-purple-400">Full holo</span> cards earn both at 60% of single-type rates.
             </p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ATTACHMENTS</h4>
-            <p>Each player slot has two attachment slots: one for a god card and one for an item card. Attachments boost the player's income with a percentage multiplier based on their rarity.</p>
-            <p className="mt-1 text-white/40">God cards give larger bonuses than items. Attachments must be at least the same rarity as the player card and must match holo type (full holo attachments always fit).</p>
+            <p>Each player slot has two attachment slots: one for a god card and one for an item card. Attachments boost the player's income with a percentage multiplier based on their rarity. God cards give larger bonuses than items.</p>
+            <p className="mt-1 text-white/40">Attachments must be at least the same rarity as the player (unique players can use mythic attachments). The attachment's holo type must match the player's — mismatched holos provide no bonus. Full holo attachments always fit but apply their bonus at 60%.</p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">GOD SYNERGY</h4>
-            <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator.</p>
+            <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator on the attachment.</p>
           </div>
 
           <div>
-            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLE BOOST</h4>
-            <p>Use consumable cards to instantly boost your pending income. Higher rarity consumables give a bigger percentage boost. The consumable is destroyed on use.</p>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">TEAM SYNERGY</h4>
+            <p>Slot multiple players from the same team for a stacking bonus: <span className="text-white/80">+10%</span> at 2 teammates, up to <span className="text-white/80">+50%</span> with a full team of 5.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLE SLOT</h4>
+            <p>Slot a consumable card to multiply all income rates. Different consumables favor different currencies — potions split between Passion and Cores, while elixirs focus on one. Higher rarity consumables give a bigger multiplier.</p>
+            <p className="mt-1 text-white/40">The consumable stays active permanently. Replacing it destroys the old one — choose carefully.</p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">INCOME CAP</h4>
-            <p>Income accumulates up to a 2-day cap. Collect regularly to avoid wasting earnings.</p>
+            <p>Passion and Cores each accumulate up to a 2-day cap based on your unboosted rates. Collect regularly to avoid wasting earnings.</p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ROLE MATCHING</h4>
-            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Item cards can be attached to any slot.</p>
+            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Fill-role cards can go in any slot. Item cards can be attached to any slot regardless of role. A mismatched role earns zero income.</p>
           </div>
         </div>
       </div>

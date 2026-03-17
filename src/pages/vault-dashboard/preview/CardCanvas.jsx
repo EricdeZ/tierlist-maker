@@ -43,7 +43,16 @@ export default function CardCanvas({
         const el = elements.find(el => el.id === id)
         if (!el) return
         const { x, y } = toCanvas(e.clientX, e.clientY)
-        setDragging({ id, type, handle, startX: x, startY: y, startEl: { ...el } })
+        const startEl = { ...el }
+        // Resolve auto dimensions from DOM for resize
+        if (type === 'resize' && (startEl.w == null || startEl.h == null)) {
+            const dom = canvasRef.current?.querySelector(`[data-el-id="${id}"]`)
+            if (dom) {
+                if (startEl.w == null) startEl.w = dom.offsetWidth
+                if (startEl.h == null) startEl.h = dom.offsetHeight
+            }
+        }
+        setDragging({ id, type, handle, startX: x, startY: y, startEl })
     }, [elements, onSelect, toCanvas])
 
     useEffect(() => {
@@ -260,7 +269,7 @@ function CanvasElement({ el, isSelected, onMouseDown, onHandleMouseDown }) {
             if (isPrebuiltType(el.type)) {
                 content = renderPrebuiltContent(el)
                 style.width = el.w ?? 300
-                style.height = 'auto'
+                style.height = el.h ?? 'auto'
             } else {
                 content = null
             }
@@ -270,6 +279,7 @@ function CanvasElement({ el, isSelected, onMouseDown, onHandleMouseDown }) {
 
     return (
         <div
+            data-el-id={el.id}
             style={style}
             onMouseDown={!isEffect ? onMouseDown : undefined}
             className={isSelected ? 'ring-1 ring-amber-400' : ''}

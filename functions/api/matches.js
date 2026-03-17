@@ -26,6 +26,7 @@ const handler = async (event) => {
                 WHERE lp.player_id = ${user.linked_player_id}
                   AND s.is_active = true
                   AND lp.team_id IS NOT NULL
+                  AND lp.roster_status IS DISTINCT FROM 'sub'
             `
 
             if (teamIds.length === 0) {

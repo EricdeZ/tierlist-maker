@@ -96,6 +96,7 @@ const handler = async (event) => {
                     t.slug AS team_slug,
                     lp.role,
                     lp.secondary_role,
+                    lp.roster_status,
                     COUNT(DISTINCT pgs.game_id) AS games_played,
                     COUNT(DISTINCT pgs.game_id) FILTER (
                         WHERE g.winner_team_id = CASE pgs.team_side
@@ -119,7 +120,7 @@ const handler = async (event) => {
                          d.name, d.slug, d.tier,
                          l.id, l.name, l.slug, l.color,
                          lp.team_id, t.name, t.color, t.slug,
-                         lp.role, lp.secondary_role
+                         lp.role, lp.secondary_role, lp.roster_status
                 ORDER BY s.is_active DESC, s.start_date DESC
             `,
             // All game history across all seasons

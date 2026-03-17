@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom } from 'lucide-react'
+import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom, FileText } from 'lucide-react'
 import { ROLES } from '../preview/prebuiltRenderers'
 
 const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace', "'Segoe UI', system-ui, sans-serif"]
@@ -25,6 +25,7 @@ export default function CardSidebar({
     onAddEffect,
     onAddNameBanner,
     onAddStatsBlock,
+    onAddTextBlock,
     onAddSubtitle,
     onAddFooter,
     onUpdateElement,
@@ -77,6 +78,9 @@ export default function CardSidebar({
                     </button>
                     <button onClick={onAddStatsBlock} className={`${btn} bg-rose-600/20 text-rose-400 hover:bg-rose-600/30`}>
                         <Table2 size={16} /> Stats
+                    </button>
+                    <button onClick={onAddTextBlock} className={`${btn} bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30`}>
+                        <FileText size={16} /> Text
                     </button>
                     <button onClick={onAddSubtitle} className={`${btn} bg-teal-600/20 text-teal-400 hover:bg-teal-600/30`}>
                         <AlignCenter size={16} /> Subtitle
@@ -151,7 +155,7 @@ export default function CardSidebar({
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                             {{ image: 'Image', text: 'Text', effect: 'Holo Effect', stats: 'Stats',
                                'name-banner': 'Name Banner', 'stats-block': 'Stats Block',
-                               subtitle: 'Subtitle', footer: 'Footer' }[sel.type] || sel.type}
+                               'text-block': 'Text Block', subtitle: 'Subtitle', footer: 'Footer' }[sel.type] || sel.type}
                         </h3>
                         <button
                             onClick={() => onDeleteElement(sel.id)}
@@ -329,6 +333,12 @@ export default function CardSidebar({
                                     onChange={e => onUpdateElement(sel.id, { opacity: parseFloat(e.target.value) })}
                                     className="w-full accent-amber-500" />
                             </div>
+                            <div>
+                                <label className={label}>Intensity: {(sel.intensity ?? 1).toFixed(1)}x</label>
+                                <input type="range" min={0.5} max={3} step={0.1} value={sel.intensity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { intensity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
                         </div>
                     )}
 
@@ -442,27 +452,88 @@ export default function CardSidebar({
                                 </button>
                             </div>
                             <div>
-                                <label className={label}>Record Bar</label>
-                                <div className="grid grid-cols-3 gap-1">
-                                    <div>
-                                        <span className="text-[9px] text-gray-600">WR</span>
-                                        <input type="text" value={sel.record?.winRate || ''} placeholder="70%"
-                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, winRate: e.target.value } })}
-                                            className={`${input} w-full`} />
+                                <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer mb-1">
+                                    <input type="checkbox" checked={sel.showRecord !== false} onChange={e => onUpdateElement(sel.id, { showRecord: e.target.checked })}
+                                        className="accent-amber-500" />
+                                    Record Bar
+                                </label>
+                                {sel.showRecord !== false && (
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div>
+                                            <span className="text-[9px] text-gray-600">WR</span>
+                                            <input type="text" value={sel.record?.winRate || ''} placeholder="70%"
+                                                onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, winRate: e.target.value } })}
+                                                className={`${input} w-full`} />
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-gray-600">Record</span>
+                                            <input type="text" value={sel.record?.record || ''} placeholder="7W-3L"
+                                                onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, record: e.target.value } })}
+                                                className={`${input} w-full`} />
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-gray-600">Games</span>
+                                            <input type="text" value={sel.record?.games || ''} placeholder="10"
+                                                onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, games: e.target.value } })}
+                                                className={`${input} w-full`} />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span className="text-[9px] text-gray-600">Record</span>
-                                        <input type="text" value={sel.record?.record || ''} placeholder="7W-3L"
-                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, record: e.target.value } })}
-                                            className={`${input} w-full`} />
-                                    </div>
-                                    <div>
-                                        <span className="text-[9px] text-gray-600">Games</span>
-                                        <input type="text" value={sel.record?.games || ''} placeholder="10"
-                                            onChange={e => onUpdateElement(sel.id, { record: { ...sel.record, games: e.target.value } })}
-                                            className={`${input} w-full`} />
+                                )}
+                            </div>
+                            <div>
+                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Text Block properties */}
+                    {sel.type === 'text-block' && (
+                        <div className="space-y-3">
+                            <div>
+                                <label className={label}>Title</label>
+                                <input type="text" value={sel.title || ''} onChange={e => onUpdateElement(sel.id, { title: e.target.value })}
+                                    placeholder="Optional title" className={`${input} w-full`} />
+                            </div>
+                            <div>
+                                <label className={label}>Content</label>
+                                <textarea value={sel.content || ''} onChange={e => onUpdateElement(sel.id, { content: e.target.value })}
+                                    rows={3} className={`${input} w-full resize-none`} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={label}>Role Colors</label>
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                        className={`${input} w-full capitalize`}>
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={label}>Color</label>
+                                    <div className="flex gap-1">
+                                        <input type="color" value={sel.color || '#9a8a70'}
+                                            onChange={e => onUpdateElement(sel.id, { color: e.target.value })}
+                                            className="w-8 h-8 bg-gray-800 border border-gray-700 rounded cursor-pointer" />
+                                        <input type="text" value={sel.color || ''} placeholder="auto"
+                                            onChange={e => onUpdateElement(sel.id, { color: e.target.value })}
+                                            className={`${input} flex-1`} />
                                     </div>
                                 </div>
+                            </div>
+                            <div>
+                                <label className={label}>Font</label>
+                                <select value={sel.font || "'Segoe UI', system-ui, sans-serif"} onChange={e => onUpdateElement(sel.id, { font: e.target.value })}
+                                    className={`${input} w-full`}>
+                                    {FONTS.map(f => <option key={f} value={f}>{f.split(',')[0].replace(/'/g, '')}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className={label}>Size: {sel.fontSize ?? 10}px</label>
+                                <input type="range" min={7} max={20} value={sel.fontSize ?? 10}
+                                    onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                                    className="w-full accent-amber-500" />
                             </div>
                             <div>
                                 <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>

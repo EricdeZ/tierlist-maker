@@ -54,7 +54,7 @@ function PreviewElement({ el }) {
         default:
             if (isPrebuiltType(el.type)) {
                 return (
-                    <div style={{ ...style, width: el.w ?? 300, height: 'auto' }}>
+                    <div style={{ ...style, width: el.w ?? 300, height: el.h ?? 'auto' }}>
                         {renderPrebuiltContent(el)}
                     </div>
                 )
@@ -67,8 +67,11 @@ function PreviewElement({ el }) {
 // The wrapper has NO z-index — it doesn't create a stacking context.
 // The shine/glare have z-index so they interleave with content in the parent stacking context.
 // Blend modes work because there's no stacking context barrier between shine and content.
-function EffectElement({ el }) {
+function EffectElement({ el, parentOpacity }) {
     const z = el.z ?? 0
+    const intensity = el.intensity ?? 1
+    // Scale the parent's --card-opacity by this effect's intensity
+    const scaledOpacity = (parentOpacity ?? 0) * intensity
     return (
         <div
             className="holo-card"
@@ -87,6 +90,7 @@ function EffectElement({ el }) {
                 pointerEvents: 'none',
                 // Opacity on wrapper scales the --card-opacity driven shine
                 opacity: el.opacity ?? 1,
+                '--card-opacity': scaledOpacity,
                 // NO z-index here — avoids creating a stacking context
             }}
         >
@@ -99,6 +103,7 @@ function EffectElement({ el }) {
 
 export default function HoloPreview({ elements, border }) {
     const { cardRef, dynamicStyles, interacting, active, handlers } = useHoloEffect()
+    const parentOpacity = parseFloat(dynamicStyles['--card-opacity']) || 0
 
     const visible = elements.filter(el => el.visible !== false)
     const sorted = [...visible].sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
@@ -126,7 +131,7 @@ export default function HoloPreview({ elements, border }) {
                         <div style={cardStyle}>
                             {sorted.map(el =>
                                 el.type === 'effect'
-                                    ? <EffectElement key={el.id} el={el} />
+                                    ? <EffectElement key={el.id} el={el} parentOpacity={parentOpacity} />
                                     : <PreviewElement key={el.id} el={el} />
                             )}
                             <div style={{

@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultDashboardService } from '../../services/database'
 import CardCanvas from './preview/CardCanvas'
 import CardSidebar from './editor/CardSidebar'
+import RaritySetPanel from './editor/RaritySetPanel'
 import HoloPreview from './preview/HoloPreview'
 import { exportCardToPNG, downloadBlob } from './preview/ExportCanvas'
 
@@ -41,10 +43,22 @@ let nextId = (() => {
     return max + 1
 })()
 
+function seedNextId(elements) {
+    if (!elements?.length) return
+    let max = 0
+    for (const el of elements) {
+        const num = parseInt(el.id?.split('-')[1]) || 0
+        if (num > max) max = num
+    }
+    if (max >= nextId) nextId = max + 1
+}
+
 export default function CardCreator() {
     const { hasPermission } = useAuth()
     const canApprove = hasPermission('vault_approve')
     const initialized = useRef(false)
+    const location = useLocation()
+    const navigate = useNavigate()
 
     const saved = useRef(loadDraft())
 
@@ -65,13 +79,71 @@ export default function CardCreator() {
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState(null)
     const [showHolo, setShowHolo] = useState(false)
+    const [showRaritySet, setShowRaritySet] = useState(false)
+    const [cardData, setCardData] = useState(() => saved.current?.cardData || {
+        name: '', imageUrl: '', serialNumber: '001', role: 'mid', class: 'Mage',
+        subtitle: '', topStatLabel: '', topStatValue: '', blocks: [],
+    })
 
     // Persist to localStorage on changes
     useEffect(() => {
         if (!initialized.current) { initialized.current = true; return }
-        const draft = { name, cardType, rarity, elements, border, saveTarget, status }
+        const draft = { name, cardType, rarity, elements, border, saveTarget, status, cardData }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
-    }, [name, cardType, rarity, elements, border, saveTarget, status])
+    }, [name, cardType, rarity, elements, border, saveTarget, status, cardData])
+
+    // Auto-sync card name and first image into cardData
+    useEffect(() => {
+        const firstImg = elements.find(el => el.type === 'image' && el.url && !el.url.startsWith('blob:'))
+        setCardData(prev => ({
+            ...prev,
+            name: prev.name || name,
+            imageUrl: prev.imageUrl || firstImg?.url || '',
+        }))
+    }, [name, elements])
+
+    // Load draft/template from navigation state
+    const loadedRef = useRef(false)
+    useEffect(() => {
+        if (loadedRef.current) return
+        const state = location.state
+        if (!state) return
+
+        const load = async () => {
+            try {
+                let data, type
+                if (state.loadDraft) {
+                    const res = await vaultDashboardService.getDraft(state.loadDraft)
+                    data = res.draft
+                    type = 'draft'
+                } else if (state.loadTemplate) {
+                    const res = await vaultDashboardService.getTemplate(state.loadTemplate)
+                    data = res.template
+                    type = 'template'
+                }
+                if (!data) return
+
+                const td = typeof data.template_data === 'string' ? JSON.parse(data.template_data) : data.template_data
+                setName(data.name || '')
+                setCardType(data.card_type || 'player')
+                setRarity(data.rarity || 'full_art')
+                setElements(td?.elements || [])
+                setBorder(td?.border || { enabled: true, color: '#d4af37', width: 3, radius: 12 })
+                setSaveTarget({ type, id: data.id })
+                setStatus(data.status || 'draft')
+                if (td?.cardData) setCardData(td.cardData)
+                setDirty(false)
+                seedNextId(td?.elements)
+                loadedRef.current = true
+                // Clear navigation state so refresh doesn't re-fetch
+                navigate(location.pathname, { replace: true, state: null })
+            } catch (e) {
+                console.error('Failed to load:', e)
+                setError(e.message)
+            }
+        }
+        load()
+    }, [location.state, location.pathname, navigate])
 
     const selectedElement = elements.find(el => el.id === selectedId) || null
 
@@ -95,10 +167,40 @@ export default function CardCreator() {
         setDirty(true)
     }, [])
 
+    // Resize image client-side to stay under 2MB upload limit
+    const resizeImage = useCallback((file) => {
+        const MAX_BYTES = 1.8 * 1024 * 1024 // target under 2MB limit
+        if (file.size <= MAX_BYTES && /^image\/webp$/.test(file.type)) return Promise.resolve(file)
+        return new Promise((resolve) => {
+            const img = new Image()
+            img.onload = () => {
+                const tryCompress = (maxDim, quality) => {
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+                    const canvas = document.createElement('canvas')
+                    canvas.width = Math.round(img.width * scale)
+                    canvas.height = Math.round(img.height * scale)
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+                    canvas.toBlob((blob) => {
+                        if (blob.size > MAX_BYTES && quality > 0.4) {
+                            tryCompress(maxDim * 0.75, quality - 0.15)
+                        } else {
+                            URL.revokeObjectURL(img.src)
+                            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
+                        }
+                    }, 'image/webp', quality)
+                }
+                tryCompress(2048, 0.85)
+            }
+            img.onerror = () => resolve(file)
+            img.src = URL.createObjectURL(file)
+        })
+    }, [])
+
     // Upload image to R2 and replace blob URL
     const handleUploadImage = useCallback(async (file, elementId) => {
         try {
-            const res = await vaultDashboardService.uploadAsset(file, {
+            const resized = await resizeImage(file)
+            const res = await vaultDashboardService.uploadAsset(resized, {
                 name: file.name.replace(/\.[^.]+$/, ''),
                 category: 'character',
                 tags: [],
@@ -113,7 +215,7 @@ export default function CardCreator() {
         } catch (e) {
             console.error('Upload failed:', e)
         }
-    }, [])
+    }, [resizeImage])
 
     // Add image from file (drop or browse)
     const addImageFromFile = useCallback((file, x = 0, y = 0) => {
@@ -239,6 +341,18 @@ export default function CardCreator() {
         setDirty(true)
     }, [])
 
+    const addTextBlock = useCallback(() => {
+        const id = `tblock-${nextId++}`
+        setElements(prev => [...prev, {
+            id, type: 'text-block', name: 'Text Block', role: 'adc',
+            title: '', content: 'Description text here',
+            font: "'Segoe UI', system-ui, sans-serif", fontSize: 10, color: '',
+            x: 10, y: 270, w: 280, h: 60, z: prev.length + 10, visible: true,
+        }])
+        setSelectedId(id)
+        setDirty(true)
+    }, [])
+
     const addSubtitle = useCallback(() => {
         const id = `sub-${nextId++}`
         setElements(prev => [...prev, {
@@ -270,7 +384,15 @@ export default function CardCreator() {
         setSaving(true)
         setError(null)
         try {
-            const templateData = { elements, border }
+            // Strip non-serializable props (File objects, blob URLs without R2 upload)
+            const cleanElements = elements.map(({ _pendingFile, ...el }) => {
+                // Replace blob URLs with null if not yet uploaded to R2
+                if (el.type === 'image' && el.url?.startsWith('blob:') && !el.assetId) {
+                    return { ...el, url: null }
+                }
+                return el
+            })
+            const templateData = { elements: cleanElements, border, cardData }
             const payload = {
                 name: name || 'Untitled',
                 card_type: cardType,
@@ -290,6 +412,7 @@ export default function CardCreator() {
             }
             setDirty(false)
         } catch (e) {
+            console.error('Save failed:', e)
             setError(e.message)
         } finally {
             setSaving(false)
@@ -360,6 +483,7 @@ export default function CardCreator() {
                         onAddEffect={addEffect}
                         onAddNameBanner={addNameBanner}
                         onAddStatsBlock={addStatsBlock}
+                        onAddTextBlock={addTextBlock}
                         onAddSubtitle={addSubtitle}
                         onAddFooter={addFooter}
                         onUpdateElement={updateElement}
@@ -393,6 +517,14 @@ export default function CardCreator() {
                         >
                             <Eye size={13} /> Holo Preview
                         </button>
+                        <button
+                            onClick={() => setShowRaritySet(r => !r)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                showRaritySet ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <Layers size={13} /> Rarity Set
+                        </button>
                     </div>
 
                     <div className="flex items-start gap-8">
@@ -416,6 +548,19 @@ export default function CardCreator() {
                         )}
                     </div>
                 </div>
+
+                {/* Rarity Set panel */}
+                {showRaritySet && (
+                    <div className="w-[300px] border-l border-gray-700/50 overflow-y-auto p-3 bg-gray-900/30">
+                        <RaritySetPanel
+                            cardData={cardData}
+                            onCardDataChange={(d) => { setCardData(d); setDirty(true) }}
+                            cardType={cardType}
+                            elements={elements}
+                            border={border}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Status Bar */}

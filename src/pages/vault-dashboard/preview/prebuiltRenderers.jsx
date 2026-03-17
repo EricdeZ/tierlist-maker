@@ -15,7 +15,7 @@ function hexToRgba(hex, opacity) {
     return `rgba(${r},${g},${b},${opacity})`
 }
 
-const PREBUILT_TYPES = new Set(['name-banner', 'stats-block', 'subtitle', 'footer'])
+const PREBUILT_TYPES = new Set(['name-banner', 'stats-block', 'text-block', 'subtitle', 'footer'])
 
 export function isPrebuiltType(type) {
     return PREBUILT_TYPES.has(type)
@@ -33,7 +33,7 @@ export function renderPrebuiltContent(el) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '7px 10px',
+                    padding: '10px 14px',
                     background: hexToRgba(p.bodyBg, bgO),
                     gap: 6,
                 }}>
@@ -70,7 +70,7 @@ export function renderPrebuiltContent(el) {
         case 'stats-block': {
             const rows = el.rows || []
             const record = el.record || {}
-            const hasRecord = record.winRate || record.record || record.games
+            const hasRecord = el.showRecord !== false && (record.winRate || record.record || record.games)
             return (
                 <div className="pointer-events-none" style={{
                     background: hexToRgba(p.bodySurface, bgO),
@@ -133,10 +133,44 @@ export function renderPrebuiltContent(el) {
             )
         }
 
+        case 'text-block':
+            return (
+                <div className="pointer-events-none" style={{
+                    background: hexToRgba(p.bodySurface, bgO),
+                    border: `1px solid ${hexToRgba(p.bodyBorder, bgO)}`,
+                    borderRadius: 5,
+                    padding: '6px 10px',
+                    fontFamily: font,
+                    height: '100%',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                }}>
+                    {el.title && (
+                        <div style={{
+                            fontSize: (el.fontSize ?? 10) + 1,
+                            fontWeight: 700,
+                            color: p.accentLight,
+                            lineHeight: 1.2,
+                            marginBottom: 3,
+                        }}>
+                            {el.title}
+                        </div>
+                    )}
+                    <div style={{
+                        fontSize: el.fontSize ?? 10,
+                        color: el.color || p.textDim,
+                        lineHeight: 1.4,
+                        whiteSpace: 'pre-wrap',
+                    }}>
+                        {el.content || 'Text content'}
+                    </div>
+                </div>
+            )
+
         case 'subtitle':
             return (
                 <div className="pointer-events-none" style={{
-                    padding: '2px 10px',
+                    padding: '6px 14px',
                     textAlign: 'center',
                     lineHeight: 1,
                     background: el.showBg ? hexToRgba(p.bodyBg, bgO) : 'transparent',
@@ -160,7 +194,7 @@ export function renderPrebuiltContent(el) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '3px 10px 5px',
+                    padding: '6px 14px 8px',
                     background: el.showBg ? hexToRgba(p.bodyBg, bgO) : 'transparent',
                 }}>
                     <span style={{
