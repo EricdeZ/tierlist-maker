@@ -1372,3 +1372,40 @@ export const vaultDashboardService = {
     },
 }
 
+export const tournamentService = {
+    async getAll() {
+        return apiCall('tournaments')
+    },
+    async getBySlug(slug) {
+        return apiCall('tournaments', { slug })
+    },
+    async getSignup(tournamentId) {
+        return apiCall('tournament-signup', { tournamentId })
+    },
+    async signup(data) {
+        return apiPost('tournament-signup', {}, { action: 'signup', ...data })
+    },
+    // Admin
+    async adminList() {
+        return apiCall('tournament-manage')
+    },
+    async adminGetSignups(tournamentId) {
+        return apiCall('tournament-manage', { tournamentId })
+    },
+    async adminCreate(data) {
+        return apiPost('tournament-manage', {}, { action: 'create', ...data })
+    },
+    async adminUpdate(data) {
+        return apiPost('tournament-manage', {}, { action: 'update', ...data })
+    },
+    async adminToggleSignups(tournamentId) {
+        return apiPost('tournament-manage', {}, { action: 'toggle-signups', tournamentId })
+    },
+    async adminUpdateStatus(tournamentId, status) {
+        return apiPost('tournament-manage', {}, { action: 'update-status', tournamentId, status })
+    },
+    async adminReviewSignup(signupId, status) {
+        return apiPost('tournament-manage', {}, { action: 'review-signup', signupId, status })
+    },
+}
+
