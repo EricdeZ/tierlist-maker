@@ -156,7 +156,7 @@ export default function TournamentManager() {
         pending: signups.filter(s => s.status === 'pending').length,
         approved: signups.filter(s => s.status === 'approved').length,
         rejected: signups.filter(s => s.status === 'rejected').length,
-        captains: signups.filter(s => s.status === 'approved' && s.applying_as_captain).length,
+        captains: signups.filter(s => s.status === 'approved' && s.signup_role !== 'player').length,
     }
 
     if (loading) {
@@ -348,7 +348,7 @@ export default function TournamentManager() {
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Player</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Smite Name</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Captain</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Role</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Available Dates</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Status</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-(--color-text-secondary) uppercase tracking-wider">Actions</th>
@@ -376,7 +376,9 @@ export default function TournamentManager() {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                {s.applying_as_captain && <Shield className="w-4 h-4 text-(--color-accent)" />}
+                                                <span className={`text-xs font-medium capitalize ${s.signup_role !== 'player' ? 'text-(--color-accent)' : 'text-(--color-text-secondary)'}`}>
+                                                    {s.signup_role}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-1">

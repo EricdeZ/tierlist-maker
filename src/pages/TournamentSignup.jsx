@@ -43,7 +43,7 @@ export default function TournamentSignup() {
     const [smiteName, setSmiteName] = useState('')
     const [trackerUrl, setTrackerUrl] = useState('')
     const [nameChanged, setNameChanged] = useState(false)
-    const [applyingAsCaptain, setApplyingAsCaptain] = useState(false)
+    const [signupRole, setSignupRole] = useState('player')
     const [availableDraftDate, setAvailableDraftDate] = useState(false)
     const [availableGameDates, setAvailableGameDates] = useState([])
 
@@ -91,7 +91,7 @@ export default function TournamentSignup() {
                 tournamentId: tournament.id,
                 smiteName,
                 trackerUrl: nameChanged ? trackerUrl : undefined,
-                applyingAsCaptain,
+                signupRole,
                 availableGameDates,
                 availableDraftDate,
             })
@@ -202,7 +202,7 @@ export default function TournamentSignup() {
                     {signup && (
                         <div className="mt-3 space-y-1 text-sm text-(--color-text-secondary)">
                             <div>Smite Name: <span className="text-(--color-text)">{signup.smite_name}</span></div>
-                            {signup.applying_as_captain && <div className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-(--color-accent)" /> Applied as Captain</div>}
+                            <div>Role: <span className="text-(--color-text) capitalize">{signup.signup_role}</span></div>
                         </div>
                     )}
                 </div>
@@ -249,10 +249,11 @@ export default function TournamentSignup() {
                         </div>
                     )}
 
-                    {/* Game Day Availability */}
+                    {/* Game Day Availability — all dates required */}
                     {gameDates.length > 0 && (
                         <div>
                             <label className="block text-sm font-medium text-(--color-text-secondary) mb-2">Game Day Availability</label>
+                            <p className="text-xs text-(--color-text-secondary) mb-2">You must be available for all game days to participate.</p>
                             <div className="space-y-2">
                                 {gameDates.map(date => (
                                     <label key={date} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
@@ -266,32 +267,51 @@ export default function TournamentSignup() {
                                     </label>
                                 ))}
                             </div>
+                            {gameDates.length > 0 && availableGameDates.length < gameDates.length && (
+                                <p className="mt-1.5 text-xs text-red-400">All game dates must be selected</p>
+                            )}
                         </div>
                     )}
 
-                    {/* Captain Toggle */}
+                    {/* Signup Role */}
                     <div>
-                        <label className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
-                            <input
-                                type="checkbox"
-                                checked={applyingAsCaptain}
-                                onChange={e => {
-                                    setApplyingAsCaptain(e.target.checked)
-                                    if (!e.target.checked) setAvailableDraftDate(false)
-                                }}
-                                className="w-4 h-4 rounded accent-(--color-accent)"
-                            />
-                            <div>
-                                <div className="text-(--color-text) text-sm font-medium flex items-center gap-1.5">
-                                    <Shield className="w-4 h-4 text-(--color-accent)" /> Apply as Captain
-                                </div>
-                                <div className="text-(--color-text-secondary) text-xs mt-0.5">Captains draft their teams and lead them through the tournament</div>
-                            </div>
-                        </label>
+                        <label className="block text-sm font-medium text-(--color-text-secondary) mb-2">Signing up as</label>
+                        <div className="space-y-2">
+                            {[
+                                { value: 'player', label: 'Player', desc: 'Get drafted onto a team' },
+                                { value: 'captain', label: 'Captain', desc: 'Draft and lead your own team' },
+                                { value: 'both', label: 'Both', desc: 'Open to either role' },
+                            ].map(opt => (
+                                <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                    signupRole === opt.value
+                                        ? 'bg-(--color-accent)/10 border-(--color-accent)/30'
+                                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                }`}>
+                                    <input
+                                        type="radio"
+                                        name="signupRole"
+                                        value={opt.value}
+                                        checked={signupRole === opt.value}
+                                        onChange={() => {
+                                            setSignupRole(opt.value)
+                                            if (opt.value === 'player') setAvailableDraftDate(false)
+                                        }}
+                                        className="w-4 h-4 accent-(--color-accent)"
+                                    />
+                                    <div>
+                                        <div className="text-(--color-text) text-sm font-medium flex items-center gap-1.5">
+                                            {opt.value !== 'player' && <Shield className="w-4 h-4 text-(--color-accent)" />}
+                                            {opt.label}
+                                        </div>
+                                        <div className="text-(--color-text-secondary) text-xs mt-0.5">{opt.desc}</div>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Draft Date Availability — shown only if applying as captain */}
-                    {applyingAsCaptain && tournament.draft_date && (
+                    {/* Draft Date Availability — shown if captain or both */}
+                    {signupRole !== 'player' && tournament.draft_date && (
                         <div>
                             <label className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 cursor-pointer hover:bg-yellow-500/10 transition-colors">
                                 <input
@@ -311,7 +331,7 @@ export default function TournamentSignup() {
 
                     <button
                         type="submit"
-                        disabled={submitting || (applyingAsCaptain && !availableDraftDate)}
+                        disabled={submitting || availableGameDates.length < gameDates.length || (signupRole !== 'player' && !availableDraftDate)}
                         className="w-full py-3 rounded-lg bg-(--color-accent) text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
                     >
                         {submitting ? 'Submitting...' : 'Sign Up'}

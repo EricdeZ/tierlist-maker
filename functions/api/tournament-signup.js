@@ -48,10 +48,14 @@ const handler = async (event) => {
             const { action } = body
 
             if (action === 'signup') {
-                const { tournamentId, smiteName, trackerUrl, applyingAsCaptain, availableGameDates, availableDraftDate } = body
+                const { tournamentId, smiteName, trackerUrl, signupRole, availableGameDates, availableDraftDate } = body
 
                 if (!tournamentId || !smiteName) {
                     return { statusCode: 400, headers, body: JSON.stringify({ error: 'tournamentId and smiteName are required' }) }
+                }
+
+                if (!signupRole || !['player', 'captain', 'both'].includes(signupRole)) {
+                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'signupRole must be player, captain, or both' }) }
                 }
 
                 // Check tournament exists and signups are open
@@ -65,6 +69,12 @@ const handler = async (event) => {
                     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Signups are not open for this tournament' }) }
                 }
 
+                // All game dates must be selected
+                const gameDates = tournament.game_dates || []
+                if (gameDates.length > 0 && (!availableGameDates || availableGameDates.length !== gameDates.length)) {
+                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'You must be available for all game dates' }) }
+                }
+
                 // Check for existing signup
                 const [existing] = await sql`
                     SELECT id FROM tournament_signups
@@ -74,8 +84,8 @@ const handler = async (event) => {
                     return { statusCode: 400, headers, body: JSON.stringify({ error: 'You have already signed up for this tournament' }) }
                 }
 
-                // Captain must be available for draft
-                if (applyingAsCaptain && !availableDraftDate) {
+                // Captain/both must be available for draft
+                if (signupRole !== 'player' && !availableDraftDate) {
                     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Captains must be available for the draft date' }) }
                 }
 
@@ -101,10 +111,10 @@ const handler = async (event) => {
                 const [signup] = await sql`
                     INSERT INTO tournament_signups (
                         tournament_id, user_id, player_id, smite_name, tracker_url,
-                        applying_as_captain, available_game_dates, available_draft_date
+                        signup_role, available_game_dates, available_draft_date
                     ) VALUES (
                         ${tournamentId}, ${user.id}, ${playerId}, ${smiteName}, ${finalTrackerUrl},
-                        ${!!applyingAsCaptain}, ${JSON.stringify(availableGameDates || [])}, ${!!availableDraftDate}
+                        ${signupRole}, ${JSON.stringify(availableGameDates || [])}, ${!!availableDraftDate}
                     ) RETURNING *
                 `
 
