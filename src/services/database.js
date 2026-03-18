@@ -1110,6 +1110,29 @@ export const vaultService = {
     async binderGenerateShare() {
         return apiPost('vault', { action: 'binder-generate-share' }, {})
     },
+    async requestSignature(cardId) {
+        return apiPost('vault', { action: 'request-signature' }, { cardId })
+    },
+    async getPendingSignatures() {
+        return apiCall('vault', { action: 'pending-signatures' })
+    },
+    async declineSignature(requestId) {
+        return apiPost('vault', { action: 'decline-signature' }, { requestId })
+    },
+    async submitSignature(requestId, file) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('requestId', String(requestId))
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch('/api/vault-signature-upload', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Upload failed')
+        return data
+    },
     blackMarketTurnIn(cardId) {
         return apiPost('vault', { action: 'black-market-turn-in' }, { cardId })
     },
@@ -1317,6 +1340,21 @@ export const vaultAdminService = {
     async unbanUser(userId) {
         return apiPost('vault-admin', { action: 'unban-user' }, { userId })
     },
+    async listSignatureRequests(status = 'all') {
+        return apiCall('vault-admin', { action: 'signature-requests', status })
+    },
+    async searchUniqueCards(search = '') {
+        return apiPost('vault-admin', { action: 'search-unique-cards' }, { search })
+    },
+    async adminRequestSignature(cardId) {
+        return apiPost('vault-admin', { action: 'admin-request-signature' }, { cardId })
+    },
+    async deleteSignatureRequest(requestId) {
+        return apiPost('vault-admin', { action: 'delete-signature-request' }, { requestId })
+    },
+    async createTestSignatureCard(playerDefId) {
+        return apiPost('vault-admin', { action: 'create-test-signature-card' }, { playerDefId })
+    },
 }
 
 // ─── Vault Dashboard (card creator) ───
@@ -1406,6 +1444,9 @@ export const tournamentService = {
     },
     async adminReviewSignup(signupId, status) {
         return apiPost('tournament-manage', {}, { action: 'review-signup', signupId, status })
+    },
+    async adminDeleteSignup(signupId) {
+        return apiPost('tournament-manage', {}, { action: 'delete-signup', signupId })
     },
 }
 

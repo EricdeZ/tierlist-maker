@@ -149,6 +149,17 @@ export default function TournamentManager() {
         }
     }
 
+    const handleDeleteSignup = async (signupId, name) => {
+        if (!confirm(`Delete signup from ${name}?`)) return
+        try {
+            await tournamentService.adminDeleteSignup(signupId)
+            showToast('Signup deleted')
+            fetchSignups(selected.id)
+        } catch (err) {
+            showToast(err.message, 'error')
+        }
+    }
+
     const filteredSignups = signups.filter(s => filter === 'all' || s.status === filter)
 
     const counts = {
@@ -405,6 +416,10 @@ export default function TournamentManager() {
                                                             <XCircle className="w-4 h-4" />
                                                         </button>
                                                     )}
+                                                    <button onClick={() => handleDeleteSignup(s.id, s.discord_username)}
+                                                        className="p-1.5 rounded-lg hover:bg-white/10 text-(--color-text-secondary) hover:text-red-400 transition-colors" title="Delete">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>

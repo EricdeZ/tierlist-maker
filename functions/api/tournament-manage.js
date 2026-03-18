@@ -207,6 +207,29 @@ const handler = async (event) => {
                 return { statusCode: 200, headers, body: JSON.stringify({ signup }) }
             }
 
+            if (action === 'delete-signup') {
+                const { signupId } = body
+                if (!signupId) {
+                    return { statusCode: 400, headers, body: JSON.stringify({ error: 'signupId is required' }) }
+                }
+
+                const [signup] = await sql`
+                    DELETE FROM tournament_signups WHERE id = ${signupId} RETURNING *
+                `
+
+                if (!signup) {
+                    return { statusCode: 404, headers, body: JSON.stringify({ error: 'Signup not found' }) }
+                }
+
+                await logAudit(sql, admin, {
+                    action: 'delete-tournament-signup', endpoint: 'tournament-manage',
+                    targetType: 'tournament_signup', targetId: signupId,
+                    details: { tournament_id: signup.tournament_id, smite_name: signup.smite_name },
+                })
+
+                return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+            }
+
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
         }
 
