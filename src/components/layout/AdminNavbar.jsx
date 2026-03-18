@@ -34,6 +34,7 @@ const morePages = [
     { path: '/admin/leaguestaff',    label: 'League Staff',    permission: 'league_staff_manage' },
     { path: '/admin/permissions',    label: 'Permissions',     permission: 'permission_manage' },
     { path: '/admin/auditlog',       label: 'Audit Log',       permission: 'audit_log_view' },
+    { path: '/admin/tournaments',    label: 'Tournaments',     permission: 'tournament_manage', globalOnly: true },
     { path: '/admin/debug',          label: 'Debug Tools',     permission: 'permission_manage' },
     { path: '/admin/feedback',       label: 'Feedback',        permission: 'feedback_manage', globalOnly: true },
     { path: '/admin/card-preview',   label: 'Card Preview',    permission: 'permission_manage' },

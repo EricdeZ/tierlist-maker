@@ -89,8 +89,10 @@ import VaultAdmin from "./pages/admin/VaultAdmin.jsx";
 import VendingRestock from "./pages/admin/VendingRestock.jsx";
 import PackCreator from "./pages/admin/PackCreator.jsx";
 import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
+import TournamentManager from "./pages/admin/TournamentManager.jsx";
 import Features from "./pages/Features.jsx";
 import Players from "./pages/Players.jsx";
+import TournamentSignup from "./pages/TournamentSignup.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import VaultPage from "./pages/VaultPage.jsx";
 import CardSharePage from "./pages/vault/CardSharePage.jsx";
@@ -187,6 +189,7 @@ function App() {
                                 <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />
                                 <Route path="gods" element={<ProtectedRoute requiredPermission="league_manage"><GodManager /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />
+                                <Route path="tournaments" element={<ProtectedRoute requiredPermission="tournament_manage"><TournamentManager /></ProtectedRoute>} />
                             </Route>
 
                             {/* Codex pages (nested under CodexLayout with shared navbar) */}
@@ -262,6 +265,9 @@ function App() {
 
                             {/* SAL signup page */}
                             <Route path="sal/signup" element={<SALSignup />} />
+
+                            {/* Tournament signup */}
+                            <Route path="tournaments/:slug" element={<TournamentSignup />} />
 
                             {/* Organization page */}
                             <Route path="org/:orgSlug" element={<OrgPage />} />
