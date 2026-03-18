@@ -17,7 +17,7 @@ export default function SALInviteModal() {
     useEffect(() => {
         if (!user || !linkedPlayer) return
         if (linkedPlayer.division_tier !== 5) return
-        if (sessionStorage.getItem(SESSION_KEY)) return
+        if (localStorage.getItem(SESSION_KEY)) return
 
         const timer = setTimeout(() => setOpen(true), DELAY_MS)
         return () => clearTimeout(timer)
@@ -50,7 +50,7 @@ export default function SALInviteModal() {
 
     function dismiss() {
         setOpen(false)
-        sessionStorage.setItem(SESSION_KEY, '1')
+        localStorage.setItem(SESSION_KEY, '1')
     }
 
     if (!open) return null
