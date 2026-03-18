@@ -2,7 +2,6 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
-import { syncRoleToVault } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -176,29 +175,65 @@ async function apply(sql, body, admin, event) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'seasonId(s) and updates required' }) }
     }
 
-    let applied = 0
-    let skipped = 0
+    // Validate upfront, collect valid updates
+    const validUpdates = updates.filter(({ leaguePlayerId, newRole }) =>
+        leaguePlayerId && newRole && VALID_ROLES.includes(newRole.toLowerCase())
+    )
+    const skippedValidation = updates.length - validUpdates.length
 
-    for (const { leaguePlayerId, newRole } of updates) {
-        if (!leaguePlayerId || !newRole) { skipped++; continue }
-        if (!VALID_ROLES.includes(newRole.toLowerCase())) { skipped++; continue }
-
-        const [updated] = await sql`
-            UPDATE league_players
-            SET role = ${newRole.toLowerCase()}, updated_at = NOW()
-            WHERE id = ${leaguePlayerId}
-              AND season_id = ANY(${ids})
-              AND is_active = true
-            RETURNING id, role
-        `
-
-        if (updated) {
-            await syncRoleToVault(sql, leaguePlayerId, newRole.toLowerCase())
-            applied++
-        } else {
-            skipped++
+    if (!validUpdates.length) {
+        return {
+            statusCode: 200, headers,
+            body: JSON.stringify({ success: true, applied: 0, skipped: updates.length }),
         }
     }
+
+    const lpIds = validUpdates.map(u => u.leaguePlayerId)
+    const roles = validUpdates.map(u => u.newRole.toLowerCase())
+
+    // Batch update league_players (1 query instead of N)
+    const updated = await sql`
+        UPDATE league_players lp
+        SET role = v.role, updated_at = NOW()
+        FROM unnest(${lpIds}::int[], ${roles}::text[]) AS v(id, role)
+        WHERE lp.id = v.id
+          AND lp.season_id = ANY(${ids})
+          AND lp.is_active = true
+        RETURNING lp.id, lp.player_id, lp.season_id, v.role
+    `
+
+    const applied = updated.length
+
+    if (applied > 0) {
+        const updatedPlayerIds = updated.map(r => r.player_id)
+        const updatedSeasonIds = updated.map(r => r.season_id)
+        const updatedRoles = updated.map(r => r.role)
+
+        // Batch sync to vault defs (1 query instead of N)
+        await sql`
+            UPDATE cc_player_defs d
+            SET role = v.role, updated_at = NOW()
+            FROM unnest(${updatedPlayerIds}::int[], ${updatedSeasonIds}::int[], ${updatedRoles}::text[]) AS v(player_id, season_id, role)
+            WHERE d.player_id = v.player_id
+              AND d.season_id = v.season_id
+              AND d.frozen_stats IS NULL
+        `
+
+        // Batch sync to minted cards (1 query instead of N)
+        await sql`
+            UPDATE cc_cards c
+            SET role = d.role,
+                card_data = jsonb_set(COALESCE(c.card_data, '{}'::jsonb), '{role}', to_jsonb(UPPER(d.role)))
+            FROM cc_player_defs d
+            WHERE c.def_id = d.id
+              AND c.card_type = 'player'
+              AND d.frozen_stats IS NULL
+              AND d.player_id = ANY(${updatedPlayerIds})
+              AND d.season_id = ANY(${updatedSeasonIds})
+        `
+    }
+
+    const skipped = skippedValidation + (validUpdates.length - applied)
 
     await logAudit(sql, admin, {
         action: 'role-sync-apply',
