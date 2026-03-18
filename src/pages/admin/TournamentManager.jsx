@@ -59,7 +59,7 @@ export default function TournamentManager() {
                 name: tournament.name,
                 slug: tournament.slug,
                 description: tournament.description || '',
-                draftDate: tournament.draft_date || '',
+                draftDate: tournament.draft_date ? tournament.draft_date.slice(0, 10) : '',
                 gameDates: (tournament.game_dates || []).join(', '),
                 discordInviteUrl: tournament.discord_invite_url || '',
             })
