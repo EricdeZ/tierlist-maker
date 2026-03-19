@@ -99,34 +99,52 @@ export const MARKETPLACE = {
   maxListings: 15,
 };
 
-// Starting 5 passive income rates (per day, per card)
-export const STARTING_FIVE_RATES = {
-  holo: { uncommon: 2, rare: 4, epic: 6, legendary: 10, mythic: 16, unique: 22.4 },
-  reverse: { uncommon: 2, rare: 4, epic: 8, legendary: 16, mythic: 24, unique: 33.6 },
-  full: {
-    passion: { uncommon: 1.2, rare: 2.4, epic: 3.6, legendary: 6, mythic: 9.6, unique: 13.44 },
-    cores: { uncommon: 1.2, rare: 2.4, epic: 4.8, legendary: 9.6, mythic: 14.4, unique: 20.16 },
-  },
+// Starting 5 — flat income per day per holo card (Cores)
+export const S5_FLAT_CORES = {
+  uncommon: 0.80, rare: 1.90, epic: 3.50, legendary: 7.60, mythic: 8.75, unique: 10.10,
 };
+
+// Starting 5 — flat income per day per holo card (Passion)
+export const S5_FLAT_PASSION = {
+  uncommon: 0.05, rare: 0.12, epic: 0.22, legendary: 0.47, mythic: 0.54, unique: 0.63,
+};
+
+// Starting 5 — reverse card multiplier (multiplicative stacking)
+export const S5_REVERSE_MULT = {
+  uncommon: 1.15, rare: 1.25, epic: 1.40, legendary: 1.50, mythic: 1.65, unique: 1.85,
+};
+
+// Full cards get 44% of both flat and mult
+export const S5_FULL_RATIO = 0.44;
+
+// Bench slot effectiveness
+export const S5_BENCH_EFFECTIVENESS = 0.50;
+
+// All-Star lineup output modifier
+export const S5_ALLSTAR_MODIFIER = 0.615;
+
+// Attachment bonuses — holo attachments: % boost to flat values
+export const S5_ATT_FLAT = {
+  god:  { uncommon: 0.06, rare: 0.10, epic: 0.16, legendary: 0.25, mythic: 0.35, unique: 0.48 },
+  item: { uncommon: 0.04, rare: 0.06, epic: 0.10, legendary: 0.15, mythic: 0.22, unique: 0.30 },
+};
+
+// Attachment bonuses — reverse attachments: additive to multiplier
+export const S5_ATT_MULT = {
+  god:  { uncommon: 0.030, rare: 0.050, epic: 0.080, legendary: 0.125, mythic: 0.175, unique: 0.240 },
+  item: { uncommon: 0.015, rare: 0.025, epic: 0.040, legendary: 0.060, mythic: 0.085, unique: 0.120 },
+};
+
+// Full attachment ratio (60% of pure type's bonus)
+export const S5_FULL_ATT_RATIO = 0.6;
+
+export const GOD_SYNERGY_BONUS = 0.30;
+export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
 
-// Attachment bonuses — percentage multipliers on the player's base income
-// God cards give larger bonuses than items; cores bonuses are higher than passion
-export const ATTACHMENT_BONUSES = {
-  god: {
-    passion: { uncommon: 0.08, rare: 0.14, epic: 0.22, legendary: 0.38, mythic: 0.50, unique: 0.70 },
-    cores:   { uncommon: 0.15, rare: 0.25, epic: 0.40, legendary: 0.65, mythic: 0.80, unique: 1.12 },
-  },
-  item: {
-    passion: { uncommon: 0.03, rare: 0.07, epic: 0.14, legendary: 0.22, mythic: 0.30, unique: 0.42 },
-    cores:   { uncommon: 0.08, rare: 0.16, epic: 0.30, legendary: 0.48, mythic: 0.60, unique: 0.84 },
-  },
-};
+export const FULL_HOLO_ATTACHMENT_RATIO = S5_FULL_ATT_RATIO; // deprecated alias
 
-export const FULL_HOLO_ATTACHMENT_RATIO = 0.6;
-export const GOD_SYNERGY_BONUS = 0.30;
-export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
 // Consumable slot — rarity-based total boost (non-linear scaling)
 export const CONSUMABLE_SLOT_SCALING = {
   common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,
