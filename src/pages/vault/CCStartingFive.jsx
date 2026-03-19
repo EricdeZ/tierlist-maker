@@ -1247,24 +1247,25 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
         style={{
           ...(isAnimating ? { '--glow-color': `${color}66`, animation: 's5-glow-pulse 0.8s ease-in-out 2' } : {}),
           ...(!isAnimating ? { animation: 's5-card-enter 0.3s ease-out' } : {}),
-          ...(card.roleMismatch ? { opacity: 0.5, filter: 'grayscale(0.6)' } : {}),
         }}
         onClick={onToggleOptions}
       >
-        {type === 'collection' ? (
-          <VaultCard card={card} getTemplate={getTemplate} size={size} holo />
-        ) : isPlayer ? (
-          <TradingCard
-            {...toPlayerCardProps(card)}
-            rarity={card.rarity}
-            size={size}
-            holo={{ rarity: getHoloEffect(card.rarity), holoType: card.holoType || 'reverse' }}
-          />
-        ) : (
-          <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
-            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
-          </TradingCardHolo>
-        )}
+        <div style={card.roleMismatch ? { opacity: 0.5, filter: 'grayscale(0.6)' } : undefined}>
+          {type === 'collection' ? (
+            <VaultCard card={card} getTemplate={getTemplate} size={size} holo />
+          ) : isPlayer ? (
+            <TradingCard
+              {...toPlayerCardProps(card)}
+              rarity={card.rarity}
+              size={size}
+              holo={{ rarity: getHoloEffect(card.rarity), holoType: card.holoType || 'reverse' }}
+            />
+          ) : (
+            <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={size}>
+              <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
+            </TradingCardHolo>
+          )}
+        </div>
 
         {/* Options dropdown - positioned right under the card */}
         {optionsOpen && (

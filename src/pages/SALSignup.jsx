@@ -61,14 +61,14 @@ export default function SALSignup() {
                         Serpent Ascension League
                     </span>
                     <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black mb-5 leading-[1.1]">
-                        <span className="block text-white drop-shadow-lg">Rise. Compete.</span>
+                        <span className="block text-white drop-shadow-lg">Slither. Strike.</span>
                         <span className="block mt-1" style={{
                             background: `linear-gradient(135deg, ${COLOR_LIGHT}, ${COLOR}, #5a7d2e)`,
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             filter: `drop-shadow(0 2px 8px ${COLOR_GLOW})`,
                         }}>
-                            Ascend.
+                            Dominate.
                         </span>
                     </h1>
                     <p className="text-white/80 text-base sm:text-lg max-w-2xl mx-auto mb-6 leading-relaxed">
