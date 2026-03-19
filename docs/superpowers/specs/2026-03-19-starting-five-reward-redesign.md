@@ -69,6 +69,42 @@ All-holo is viable at 74%. All-reverse is dead.
 
 Full card values: 44% of holo flat, mult = 1 + 0.44 x (M - 1). All values rounded to 2 decimal places for flat, 3 for multipliers.
 
+### How It Adds Up (Player-Facing Breakdown)
+
+The flat numbers look small on their own — that's the point. Multipliers are where the power comes from. Here's what a lineup actually produces at each rarity:
+
+**Example: 3 Holo + 2 Reverse starters (optimal at Legendary)**
+
+| Rarity | 3x Holo Flat | 2x Reverse Mult | Base Output | Per Card Avg |
+|---|---:|---:|---:|---:|
+| Uncommon | 3 x 0.80 = 2.40 | 1.15 x 1.15 = 1.32x | **3.17** | 0.63 |
+| Rare | 3 x 1.90 = 5.70 | 1.25 x 1.25 = 1.56x | **8.91** | 1.78 |
+| Epic | 3 x 3.50 = 10.50 | 1.40 x 1.40 = 1.96x | **20.58** | 4.12 |
+| Legendary | 3 x 7.60 = 22.80 | 1.50 x 1.50 = 2.25x | **51.30** | 10.26 |
+| Mythic | 3 x 8.75 = 26.25 | 1.65 x 1.65 = 2.72x | **71.44** | 14.29 |
+| Unique | 3 x 10.10 = 30.30 | 1.85 x 1.85 = 3.42x | **103.66** | 20.73 |
+
+**Then the layers stack on top:**
+
+| Layer | Legendary Example |
+|---|---:|
+| Base (3H + 2R) | 51.30 Cores/day |
+| + Bench (reverse, 50%) | 64.13 |
+| + Attachments (~2.2x) | 140.30 |
+| + Team Synergy (+20%) | 168.36 |
+| + Consumable (3x mythic) | **505 Cores/day** |
+| + All-Star lineup | **816 Cores/day** |
+
+**What each card type contributes to YOUR lineup:**
+
+| Card Type | What It Does | Why You Want It |
+|---|---|---|
+| Holo | Generates 7.60 Cores/day flat (at Legendary) | Without flat income, multipliers have nothing to multiply. More holo = bigger base. |
+| Reverse | Multiplies ALL flat income by 1.50x (at Legendary) | Two reverse cards = 2.25x your entire flat pool. Huge scaling. |
+| Full | Adds 3.34 flat + 1.22x mult (at Legendary) | Flexible filler — covers both roles at 44% effectiveness. |
+
+**The takeaway:** A single Legendary holo card looks like "only" 7.60 Cores/day. But paired with 2 reverse cards (2.25x), a bench card, attachments, team synergy, and a consumable — that 7.60 becomes part of a 505 Cores/day engine. The small flat number is the seed; everything else is the growth.
+
 ### Combined Output vs Current System
 
 | Rarity | Current System | New System (combined) | Change |
