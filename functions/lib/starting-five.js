@@ -13,7 +13,7 @@ const S5_REVERSE_MULT = {
 }
 const S5_FULL_RATIO = 0.44
 const S5_BENCH_EFFECTIVENESS = 0.50
-const S5_ALLSTAR_MODIFIER = 0.615
+export const S5_ALLSTAR_MODIFIER = 0.615
 
 const S5_ATT_FLAT = {
   god:  { uncommon: 0.06, rare: 0.10, epic: 0.16, legendary: 0.25, mythic: 0.35, unique: 0.48 },
@@ -249,6 +249,8 @@ export async function tick(sql, userId) {
       csOutput: emptyOutput, asOutput: emptyOutput,
       passionPending: Number(state?.passion_pending) || 0,
       coresPending: Number(state?.cores_pending) || 0,
+      passionCap: 0,
+      coresCap: 0,
       lastTick: new Date().toISOString(),
       consumableCard: consumableCard || null,
     }
@@ -265,6 +267,8 @@ export async function tick(sql, userId) {
       csOutput: emptyOutput, asOutput: emptyOutput,
       passionPending: Number(state.passion_pending) || 0,
       coresPending: Number(state.cores_pending) || 0,
+      passionCap: 0,
+      coresCap: 0,
       lastTick: state.last_tick,
       consumableCard: consumableCard || null,
     }

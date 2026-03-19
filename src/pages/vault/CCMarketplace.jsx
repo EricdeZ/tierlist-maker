@@ -170,12 +170,15 @@ export default function CCMarketplace() {
 
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
-    for (const card of (startingFive?.cards || [])) {
-      ids.add(card.id)
-      if (card.godCard) ids.add(card.godCard.id)
-      if (card.itemCard) ids.add(card.itemCard.id)
+    for (const lineup of [startingFive?.currentSeason, startingFive?.allStar]) {
+      if (!lineup?.slots) continue
+      for (const slot of Object.values(lineup.slots)) {
+        if (slot.card?.id) ids.add(slot.card.id)
+        if (slot.godCard?.id) ids.add(slot.godCard.id)
+        if (slot.itemCard?.id) ids.add(slot.itemCard.id)
+      }
     }
-    if (startingFive?.consumableCard) ids.add(startingFive.consumableCard.id)
+    if (startingFive?.consumableCard?.id) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }

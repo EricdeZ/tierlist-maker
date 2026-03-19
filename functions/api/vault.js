@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput, S5_ALLSTAR_MODIFIER } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -1506,15 +1506,9 @@ function formatS5Response(state, extra = {}) {
       const itemBonusInfo = getAttachmentBonusInfo(card._itemCard, 'item', card.holo_type)
 
       slots[card.slot_role] = {
-        card: { id: card.id, rarity: card.rarity, holo_type: card.holo_type, role: card.role,
-                card_type: card.card_type, def_id: card.def_id, image_url: card.image_url,
-                holo_effect: card.holo_effect, serial_number: card.serial_number,
-                god_name: card.god_name, god_class: card.god_class, god_id: card.god_id,
-                best_god_name: card.best_god_name, team_id: card.team_id,
-                player_discord_id: card.player_discord_id, player_discord_avatar: card.player_discord_avatar,
-                allow_discord_avatar: card.allow_discord_avatar, is_first_edition: card.is_first_edition },
-        godCard: card._godCard,
-        itemCard: card._itemCard,
+        card: formatCard(card),
+        godCard: card._godCard ? formatCard(card._godCard) : null,
+        itemCard: card._itemCard ? formatCard(card._itemCard) : null,
         contribution: contrib,
         godBonus: godBonusInfo,
         itemBonus: itemBonusInfo,
@@ -1530,7 +1524,6 @@ function formatS5Response(state, extra = {}) {
     consumableBoost = getConsumableBoost(consumableCard.card_data.consumableId, consumableCard.rarity)
   }
 
-  const S5_ALLSTAR_MODIFIER = 0.615
   const combined = {
     coresPerDay: (csOutput?.coresPerDay || 0) + (asOutput?.coresPerDay || 0) * S5_ALLSTAR_MODIFIER,
     passionPerDay: (csOutput?.passionPerDay || 0) + (asOutput?.passionPerDay || 0) * S5_ALLSTAR_MODIFIER,
@@ -1579,7 +1572,6 @@ async function handleS5Leaderboard(sql, user) {
     WHERE l.card_id IS NOT NULL
   `
 
-  const S5_ALLSTAR_MODIFIER = 0.615
   const byUser = {}
   for (const r of rows) {
     if (!byUser[r.user_id]) {

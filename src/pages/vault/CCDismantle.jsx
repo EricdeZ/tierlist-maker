@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, DISMANTLE_TIERS, getDismantleMultiplier, calcDismantleTotal } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import { Hammer, Check, Trash2, Info, Copy } from 'lucide-react'
 import emberIcon from '../../assets/ember.png'
@@ -22,6 +23,7 @@ function toGameCardData(card, override) {
   const base = {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
+    signatureUrl: card.signatureUrl || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -42,6 +44,7 @@ function toPlayerCardProps(card) {
     isConnected: card.isConnected,
     defId: card.defId,
     rarity: card.rarity,
+    signatureUrl: card.signatureUrl || undefined,
   }
 }
 
@@ -148,12 +151,15 @@ export default function CCDismantle() {
 
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
-    for (const card of (startingFive?.cards || [])) {
-      ids.add(card.id)
-      if (card.godCard) ids.add(card.godCard.id)
-      if (card.itemCard) ids.add(card.itemCard.id)
+    for (const lineup of [startingFive?.currentSeason, startingFive?.allStar]) {
+      if (!lineup?.slots) continue
+      for (const slot of Object.values(lineup.slots)) {
+        if (slot.card?.id) ids.add(slot.card.id)
+        if (slot.godCard?.id) ids.add(slot.godCard.id)
+        if (slot.itemCard?.id) ids.add(slot.itemCard.id)
+      }
     }
-    if (startingFive?.consumableCard) ids.add(startingFive.consumableCard.id)
+    if (startingFive?.consumableCard?.id) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }
@@ -506,6 +512,7 @@ export default function CCDismantle() {
 }
 
 function DismantleSlot({ card, isSelected, onToggle, override }) {
+  const { getTemplate } = useVault()
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
@@ -519,7 +526,9 @@ function DismantleSlot({ card, isSelected, onToggle, override }) {
       }`}
       onClick={() => onToggle(card.id)}
     >
-      {isPlayer ? (
+      {type === 'collection' ? (
+        <VaultCard card={card} getTemplate={getTemplate} size={CARD_SIZE} holo={false} />
+      ) : isPlayer ? (
         <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={CARD_SIZE} />
       ) : (
         <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={CARD_SIZE} />

@@ -9,6 +9,7 @@ import { GODS } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import emberIcon from '../../assets/ember.png'
@@ -57,12 +58,15 @@ export default function CCTrading() {
 
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
-    for (const card of (startingFive?.cards || [])) {
-      ids.add(card.id)
-      if (card.godCard) ids.add(card.godCard.id)
-      if (card.itemCard) ids.add(card.itemCard.id)
+    for (const lineup of [startingFive?.currentSeason, startingFive?.allStar]) {
+      if (!lineup?.slots) continue
+      for (const slot of Object.values(lineup.slots)) {
+        if (slot.card?.id) ids.add(slot.card.id)
+        if (slot.godCard?.id) ids.add(slot.godCard.id)
+        if (slot.itemCard?.id) ids.add(slot.itemCard.id)
+      }
     }
-    if (startingFive?.consumableCard) ids.add(startingFive.consumableCard.id)
+    if (startingFive?.consumableCard?.id) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }
@@ -720,6 +724,10 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
 
   const handleZoomCard = (card) => {
     if (!card) return
+    if (card.cardType === 'collection') {
+      setZoomedCard({ collectionCard: card, holoType: card.holoType })
+      return
+    }
     if (card.cardType === 'player' && card.defId) {
       const cd = typeof card.cardData === 'string' ? JSON.parse(card.cardData) : card.cardData
       setZoomedCard({
@@ -995,6 +1003,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
         {zoomedCard && (
           <CardZoomModal
             onClose={() => setZoomedCard(null)}
+            collectionCard={zoomedCard.collectionCard}
             gameCard={zoomedCard.gameCard}
             playerCard={zoomedCard.playerCard}
             holoType={zoomedCard.holoType}
@@ -1311,9 +1320,10 @@ function MobileCardSlideshow({ cards, onRemoveCard, onZoomCard, canRemove, empty
 }
 
 function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const { card } = tradeCard
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
+  const isCollection = card.cardType === 'collection'
   const isPlayer = card.cardType === 'player'
 
   let cardData = null
@@ -1321,7 +1331,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
     cardData = typeof card.cardData === 'string' ? JSON.parse(card.cardData) : card.cardData
   }
 
-  const dataMap = !isPlayer ? DATA_MAPS[card.cardType] : null
+  const dataMap = !isPlayer && !isCollection ? DATA_MAPS[card.cardType] : null
   const dataKey = card.godId?.replace(/^(item|consumable)-/, '') || card.godId
   const rawData = dataMap?.get(dataKey)
   const override = !isPlayer ? getDefOverride(card) : null
@@ -1336,7 +1346,9 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
         className="w-full cursor-pointer active:scale-95 transition-transform"
       >
         <div>
-          {isPlayer ? (
+          {isCollection ? (
+            <VaultCard card={card} getTemplate={getTemplate} size={105} holo={false} />
+          ) : isPlayer ? (
               <TradingCard
                 playerName={cardData?.playerName || card.godName}
                 teamName={cardData?.teamName || ''}
@@ -1350,6 +1362,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
                 bestGod={card.bestGodName ? { name: card.bestGodName } : null}
                 isFirstEdition={cardData?.isFirstEdition}
                 isConnected={card.isConnected}
+                signatureUrl={card.signatureUrl}
                 size={105}
               />
           ) : (
@@ -1357,7 +1370,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
               <GameCard
                 type={card.cardType}
                 rarity={card.rarity}
-                data={resolvedData || { name: card.godName, slug: card.godId }}
+                data={{ ...(resolvedData || { name: card.godName, slug: card.godId }), signatureUrl: card.signatureUrl }}
                 size={105}
               />
             </div>
@@ -1627,13 +1640,14 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
               bestGod={card.bestGodName ? { name: card.bestGodName } : null}
               isFirstEdition={cardData?.isFirstEdition}
               isConnected={card.isConnected}
+              signatureUrl={card.signatureUrl}
               size={100}
             />
           ) : (
             <GameCard
               type={card.cardType}
               rarity={card.rarity}
-              data={resolvedData || { name: card.godName, slug: card.godId }}
+              data={{ ...(resolvedData || { name: card.godName, slug: card.godId }), signatureUrl: card.signatureUrl }}
               size={100}
             />
           )}
@@ -1701,13 +1715,14 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
             bestGod={card.bestGodName ? { name: card.bestGodName } : null}
             isFirstEdition={card.isFirstEdition || false}
             isConnected={card.isConnected}
+            signatureUrl={card.signatureUrl}
             size={cardSize}
           />
         ) : (
           <GameCard
             type={card.cardType}
             rarity={card.rarity}
-            data={resolvedData || { name: card.godName, slug: card.godId }}
+            data={{ ...(resolvedData || { name: card.godName, slug: card.godId }), signatureUrl: card.signatureUrl }}
             size={cardSize}
           />
         )}

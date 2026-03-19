@@ -40,8 +40,8 @@ export default function VaultOverview({ vaultData, startingFive, pendingGifts, p
     const incomeReady = (startingFive?.passionPending > 0) || (startingFive?.coresPending > 0)
     const packsOpened = vaultData.stats?.packsOpened ?? null
 
-    const slots = startingFive?.cards
-        ? SLOT_ROLES.map(role => startingFive.cards.find(c => c.slotRole === role) || null)
+    const slots = startingFive?.currentSeason?.slots
+        ? SLOT_ROLES.map(role => startingFive.currentSeason.slots[role]?.card || null)
         : null
 
     return (

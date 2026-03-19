@@ -950,8 +950,8 @@ function TutorialModal({ onClose }) {
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">HOLO TYPES</h4>
             <p>
-              <span style={{ color: '#f8c56a' }}>Holo</span> cards provide flat Passion income.{' '}
-              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards multiply Cores output.{' '}
+              <span style={{ color: '#f8c56a' }}>Holo</span> cards provide flat Cores + small Passion income.{' '}
+              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards multiply ALL flat income.{' '}
               <span className="text-purple-400">Full holo</span> cards contribute both at 44% effectiveness.
             </p>
           </div>
