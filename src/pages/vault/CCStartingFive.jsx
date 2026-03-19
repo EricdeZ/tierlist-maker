@@ -416,25 +416,19 @@ export default function CCStartingFive() {
                 <span className="text-lg sm:text-xl font-bold cd-num" style={{ color: '#f8c56a' }}>
                   {displayPassion.toFixed(1)}
                 </span>
-                {passionCap > 0 && (
-                  <span className="text-xs text-white/20 cd-num">/ {passionCap % 1 === 0 ? passionCap : passionCap.toFixed(1)}</span>
-                )}
+                <span className="text-xs text-white/20 cd-num">/ {passionCap > 0 ? (passionCap % 1 === 0 ? passionCap : passionCap.toFixed(1)) : '0'}</span>
               </div>
-              {(passionCap > 0 || displayPassion > 0) && (
-                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${passionPct}%`,
-                      background: 'linear-gradient(90deg, #f8c56a88, #f8c56a)',
-                      boxShadow: '0 0 6px #f8c56a66',
-                    }}
-                  />
-                </div>
-              )}
-              {totalPph > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalPph.toFixed(2)}/hr</span>
-              )}
+              <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${passionPct}%`,
+                    background: 'linear-gradient(90deg, #f8c56a88, #f8c56a)',
+                    boxShadow: passionPct > 0 ? '0 0 6px #f8c56a66' : 'none',
+                  }}
+                />
+              </div>
+              <span className="text-[10px] text-white/30 cd-num">+{totalPph.toFixed(2)}/hr</span>
             </div>
 
             {/* Cores income */}
@@ -447,25 +441,19 @@ export default function CCStartingFive() {
                 <span className="text-lg sm:text-xl font-bold cd-num text-[var(--cd-cyan)]">
                   {displayCores.toFixed(1)}
                 </span>
-                {coresCap > 0 && (
-                  <span className="text-xs text-white/20 cd-num">/ {coresCap % 1 === 0 ? coresCap : coresCap.toFixed(1)}</span>
-                )}
+                <span className="text-xs text-white/20 cd-num">/ {coresCap > 0 ? (coresCap % 1 === 0 ? coresCap : coresCap.toFixed(1)) : '0'}</span>
               </div>
-              {(coresCap > 0 || displayCores > 0) && (
-                <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${coresPct}%`,
-                      background: 'linear-gradient(90deg, var(--cd-cyan-dim), var(--cd-cyan))',
-                      boxShadow: '0 0 6px rgba(0,229,255,0.4)',
-                    }}
-                  />
-                </div>
-              )}
-              {totalCph > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalCph.toFixed(2)}/hr</span>
-              )}
+              <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${coresPct}%`,
+                    background: 'linear-gradient(90deg, var(--cd-cyan-dim), var(--cd-cyan))',
+                    boxShadow: coresPct > 0 ? '0 0 6px rgba(0,229,255,0.4)' : 'none',
+                  }}
+                />
+              </div>
+              <span className="text-[10px] text-white/30 cd-num">+{totalCph.toFixed(2)}/hr</span>
             </div>
           </div>
           <div className="text-[10px] text-white/20">
