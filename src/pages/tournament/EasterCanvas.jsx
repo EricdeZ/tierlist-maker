@@ -10,7 +10,7 @@ const EGG_COLORS = [
 
 const CHICK_COUNT = 8
 const EGG_COUNT = 5
-const LERP_FACTOR = 0.012
+const BUNNY_SPEED = 2.5 // pixels per frame
 const COLLECT_RADIUS = 50
 const FORM_PADDING = 20
 const SPAWN_MIN_BUNNY_DIST = 100
@@ -395,20 +395,22 @@ export default function EasterCanvas({ formRef, onEggCollected, enabled }) {
             const bunny = state.bunny
             bunny.targetX = state.mouseX
             bunny.targetY = state.mouseY
-            bunny.x += (bunny.targetX - bunny.x) * LERP_FACTOR
-            bunny.y += (bunny.targetY - bunny.y) * LERP_FACTOR
-
             const dx = bunny.targetX - bunny.x
             const dy = bunny.targetY - bunny.y
-            const speed = Math.sqrt(dx * dx + dy * dy)
-            if (speed > 0.5) {
+            const dist = Math.sqrt(dx * dx + dy * dy)
+
+            const isMoving = dist > 5
+            if (isMoving) {
+                // Move at fixed speed toward cursor
+                const step = Math.min(BUNNY_SPEED, dist)
+                bunny.x += (dx / dist) * step
+                bunny.y += (dy / dist) * step
                 bunny.angle = Math.atan2(dy, dx)
-                bunny.hopPhase += 0.15 // hop faster when moving
+                bunny.hopPhase += 0.15
             }
-            // Hop: scale bounces between 1.0 and 1.15 when moving
-            const hopScale = speed > 2 ? 1.0 + Math.abs(Math.sin(bunny.hopPhase)) * 0.15 : 1.0
-            // Vertical offset for shadow separation when "airborne"
-            const hopLift = speed > 2 ? Math.abs(Math.sin(bunny.hopPhase)) * 4 : 0
+            // Hop animation when moving
+            const hopScale = isMoving ? 1.0 + Math.abs(Math.sin(bunny.hopPhase)) * 0.15 : 1.0
+            const hopLift = isMoving ? Math.abs(Math.sin(bunny.hopPhase)) * 4 : 0
 
             // --- Update chicks ---
             for (const chick of state.chicks) {

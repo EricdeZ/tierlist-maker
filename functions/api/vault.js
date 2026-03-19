@@ -154,6 +154,7 @@ async function handleLoad(sql, user) {
       FROM cc_pack_types pt
       LEFT JOIN leagues l ON pt.league_id = l.id
       WHERE pt.enabled = true
+         OR pt.id IN (SELECT pack_type_id FROM cc_pack_inventory WHERE user_id = ${user.id})
       ORDER BY pt.sort_order
     `,
     sql`

@@ -218,7 +218,7 @@ function MyPacks() {
       {inventory.length > 0 && (
         <div className="mb-8">
           <div className="text-[10px] text-white/30 uppercase tracking-widest cd-head mb-4">
-            Starter Packs
+            My Packs
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {inventory.map((item, i) => {
