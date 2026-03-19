@@ -609,24 +609,52 @@ export default function CCStartingFive() {
       })()}
 
       {/* Lineup Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-3 mb-4">
         <button
           onClick={() => setActiveLineup('current')}
-          className={`px-4 py-2 rounded font-medium transition-colors cursor-pointer ${
+          className={`px-5 py-2.5 font-bold tracking-wider uppercase text-sm cursor-pointer transition-all duration-250 ${
             activeLineup === 'current'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700/50 text-gray-400 hover:text-gray-200'
+              ? 'text-white'
+              : 'text-gray-500 hover:text-gray-300'
           }`}
+          style={{
+            fontFamily: "'Teko', sans-serif",
+            letterSpacing: '0.12em',
+            clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+            ...(activeLineup === 'current'
+              ? {
+                  background: 'linear-gradient(135deg, #e86520, #c44a10)',
+                  boxShadow: '0 2px 12px rgba(232,101,32,0.35), 0 0 30px rgba(232,101,32,0.12)',
+                }
+              : {
+                  background: 'rgba(14,14,14,0.6)',
+                  border: '1px solid #222',
+                }),
+          }}
         >
           Current Season
         </button>
         <button
           onClick={() => setActiveLineup('allstar')}
-          className={`px-4 py-2 rounded font-medium transition-colors cursor-pointer ${
+          className={`px-5 py-2.5 font-bold tracking-wider uppercase text-sm cursor-pointer transition-all duration-250 ${
             activeLineup === 'allstar'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-700/50 text-gray-400 hover:text-gray-200'
+              ? 'text-white'
+              : 'text-gray-500 hover:text-gray-300'
           }`}
+          style={{
+            fontFamily: "'Teko', sans-serif",
+            letterSpacing: '0.12em',
+            clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+            ...(activeLineup === 'allstar'
+              ? {
+                  background: 'linear-gradient(135deg, #9333ea, #6b21a8)',
+                  boxShadow: '0 2px 12px rgba(147,51,234,0.35), 0 0 30px rgba(147,51,234,0.12)',
+                }
+              : {
+                  background: 'rgba(14,14,14,0.6)',
+                  border: '1px solid #222',
+                }),
+          }}
         >
           All-Star
         </button>
