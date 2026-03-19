@@ -565,11 +565,20 @@ export default function CCStartingFive() {
               {(lineupBreakdown.flatCores * lineupBreakdown.totalMult).toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
             </span>
           </div>
-          {boostedCoresPerDay > 0 && boostedCoresPerDay !== combinedOutput.coresPerDay && (
+          {startingFive?.consumableCard && (
             <div className="flex items-center justify-between">
-              <span className="text-white/30 text-[10px]">With consumable</span>
-              <span className="text-[var(--cd-cyan)]/70 text-[10px]">
-                {boostedCoresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
+              <span className="text-white/30 text-[10px]">Consumable</span>
+              <span className="text-white/30 text-[10px]">
+                {startingFive.consumableCard.coresBoostPct > 0 && <span className="text-purple-400">+{startingFive.consumableCard.coresBoostPct}% <img src={emberIcon} alt="" className="w-2 h-2 inline" /></span>}
+                {startingFive.consumableCard.passionBoostPct > 0 && <span className="text-purple-400 ml-1">+{startingFive.consumableCard.passionBoostPct}% <img src={passionCoin} alt="" className="w-2 h-2 inline" /></span>}
+              </span>
+            </div>
+          )}
+          {startingFive?.consumableCard?.coresBoostPct > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-white/30 text-[10px]">Boosted Output</span>
+              <span className="text-purple-400 font-bold text-[10px]">
+                {(lineupBreakdown.flatCores * lineupBreakdown.totalMult * (1 + (startingFive.consumableCard.coresBoostPct / 100))).toFixed(1)} <img src={emberIcon} alt="" className="w-2 h-2 inline" />/day
               </span>
             </div>
           )}
