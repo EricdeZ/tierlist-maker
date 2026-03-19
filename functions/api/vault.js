@@ -1541,7 +1541,13 @@ function formatS5Response(state, extra = {}) {
       coresPending: state.coresPending,
       passionCap: state.passionCap,
       coresCap: state.coresCap,
-      consumableCard: consumableCard || null,
+      consumableCard: consumableCard ? (() => {
+        const fc = formatCard(consumableCard)
+        const boost = consumableBoost
+        fc.passionBoostPct = Math.round(boost.passionBoost * 100)
+        fc.coresBoostPct = Math.round(boost.coresBoost * 100)
+        return fc
+      })() : null,
       ...extra,
     }),
   }
