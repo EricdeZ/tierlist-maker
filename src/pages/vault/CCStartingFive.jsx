@@ -8,8 +8,6 @@ import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
-import passionCoin from '../../assets/passion/passion.png'
-import emberIcon from '../../assets/ember.png'
 import soloIcon from '../../assets/roles/solo.webp'
 import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
@@ -112,16 +110,7 @@ function getSlotContribution(slot) {
   }
 }
 
-function HoloTypeIcon({ holoType, size = 14 }) {
-  const px = `${size}px`
-  if (holoType === 'full') return (
-    <span className="inline-flex items-center gap-0.5">
-      <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
-      <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
-    </span>
-  )
-  if (holoType === 'holo') return <img src={passionCoin} alt="Passion" style={{ width: px, height: px }} />
-  if (holoType === 'reverse') return <img src={emberIcon} alt="Cores" style={{ width: px, height: px }} />
+function HoloTypeIcon() {
   return null
 }
 
@@ -437,7 +426,6 @@ export default function CCStartingFive() {
             {/* Passion income */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <img src={passionCoin} alt="" className="w-4 h-4" />
                 <span className="text-xs text-white/40 cd-head tracking-wider">PASSION</span>
               </div>
               <div className="flex items-center gap-2">
@@ -462,7 +450,6 @@ export default function CCStartingFive() {
             {/* Cores income */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <img src={emberIcon} alt="" className="w-4 h-4 cd-icon-glow" />
                 <span className="text-xs text-white/40 cd-head tracking-wider">CORES</span>
               </div>
               <div className="flex items-center gap-2">
@@ -512,13 +499,11 @@ export default function CCStartingFive() {
                   <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[10px] font-bold cd-num">
                     {startingFive.consumableCard.passionBoostPct > 0 && (
                       <span className="flex items-center gap-0.5 text-amber-400">
-                        <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
                         +{startingFive.consumableCard.passionBoostPct}%
                       </span>
                     )}
                     {startingFive.consumableCard.coresBoostPct > 0 && (
                       <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                        <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
                         +{startingFive.consumableCard.coresBoostPct}%
                       </span>
                     )}
@@ -550,10 +535,10 @@ export default function CCStartingFive() {
                 style={{ animation: 's5-notif-float 2.5s ease-out forwards' }}
               >
                 {collectNotif.passion > 0 && (
-                  <span style={{ color: '#f8c56a' }}>+{collectNotif.passion} <img src={passionCoin} alt="" className="w-3 h-3 inline" /></span>
+                  <span style={{ color: '#f8c56a' }}>+{collectNotif.passion}</span>
                 )}
                 {collectNotif.cores > 0 && (
-                  <span className="text-[var(--cd-cyan)]">+{collectNotif.cores} <img src={emberIcon} alt="" className="w-3 h-3 inline" /></span>
+                  <span className="text-[var(--cd-cyan)]">+{collectNotif.cores}</span>
                 )}
               </div>
             )}
@@ -577,7 +562,7 @@ export default function CCStartingFive() {
               <div className="text-2xl sm:text-3xl font-black text-amber-400 leading-none">
                 {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)}
               </div>
-              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat/day</div>
             </div>
             <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">×</span>
             <div className="text-center">
@@ -591,7 +576,7 @@ export default function CCStartingFive() {
               <div className="text-2xl sm:text-3xl font-black text-[var(--cd-cyan)] leading-none">
                 {output.toFixed(1)}
               </div>
-              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider"><img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Cores/day</div>
             </div>
           </div>
           {/* Team synergy & consumable modifiers */}
@@ -607,13 +592,13 @@ export default function CCStartingFive() {
                 <span className="text-purple-400">+{consumablePct}% consumable</span>
               )}
               {startingFive?.consumableCard?.passionBoostPct > 0 && (
-                <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}% <img src={passionCoin} alt="" className="w-2 h-2 inline" /></span>
+                <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}%</span>
               )}
               {consumablePct > 0 && (
                 <>
                   <span className="text-white/20">→</span>
                   <span className="text-purple-400 font-bold">
-                    {finalOutput.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
+                    {finalOutput.toFixed(1)}/day
                   </span>
                 </>
               )}
@@ -1121,13 +1106,11 @@ function S5Leaderboard({ data, loading, currentUserId }) {
                 <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
                   {entry.passionCap > 0 && (
                     <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
-                      <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
                       {entry.passionCap}
                     </span>
                   )}
                   {entry.coresCap > 0 && (
                     <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
-                      <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
                       {entry.coresCap}
                     </span>
                   )}
@@ -1168,13 +1151,11 @@ function S5Leaderboard({ data, loading, currentUserId }) {
                 <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
                   {myEntry.passionCap > 0 && (
                     <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
-                      <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
                       {myEntry.passionCap}
                     </span>
                   )}
                   {myEntry.coresCap > 0 && (
                     <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
-                      <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
                       {myEntry.coresCap}
                     </span>
                   )}
@@ -1301,7 +1282,6 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
             <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
               {(income.type === 'flat' || income.type === 'full') && income.cores > 0 && (
                 <span className="flex items-center gap-0.5 text-amber-400">
-                  <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
                   {income.cores < 1 ? income.cores.toFixed(2) : income.cores.toFixed(1)}/d
                 </span>
               )}
@@ -1397,28 +1377,27 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, onSwap, size
         )}
       </div>
       <div className="text-center mt-0.5">
-        <div className={`text-[7px] font-bold truncate cd-head ${holoMismatch ? 'text-white/25' : 'text-white/50'}`} style={{ maxWidth: attachSize }}>{attachment.godName}</div>
-        <div className="text-[7px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[attachment.rarity]?.name}</div>
+        <div className={`text-[9px] font-bold truncate cd-head ${holoMismatch ? 'text-white/25' : 'text-white/50'}`} style={{ maxWidth: attachSize }}>{attachment.godName}</div>
+        <div className="text-[9px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[attachment.rarity]?.name}</div>
         {!holoMismatch && attachment.bonus && (attachment.bonus.flatBoost > 0 || attachment.bonus.multAdd > 0) && (
-          <div className="flex items-center justify-center gap-1 mt-0.5 text-[7px] font-bold cd-num">
+          <div className="flex items-center justify-center gap-1 mt-0.5 text-[9px] font-bold cd-num">
             {attachment.bonus.flatBoost > 0 && (
               <span className="flex items-center gap-0.5 text-amber-400">
-                <img src={emberIcon} alt="" className="w-2 h-2" />
                 +{Math.round(attachment.bonus.flatBoost * 100)}%
               </span>
             )}
             {attachment.bonus.multAdd > 0 && (
               <span className="flex items-center gap-0.5 text-emerald-400">
-                +{(attachment.bonus.multAdd).toFixed(2)}x
+                +{Math.round(attachment.bonus.multAdd * 100)}%
               </span>
             )}
           </div>
         )}
         {synergy && !holoMismatch && (
-          <div className="text-[6px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +30%</div>
+          <div className="text-[8px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY +40%</div>
         )}
         {holoMismatch && (
-          <div className="text-[5px] font-bold cd-head text-red-400/60 tracking-wider">NO BONUS</div>
+          <div className="text-[7px] font-bold cd-head text-red-400/60 tracking-wider">NO BONUS</div>
         )}
       </div>
       <button
@@ -1763,7 +1742,6 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
             {(income.type === 'flat' || income.type === 'full') && income.flatCores > 0 && (
               <span className="flex items-center gap-0.5 text-amber-400">
-                <img src={emberIcon} alt="" className="w-2 h-2" />
                 {income.flatCores < 1 ? income.flatCores.toFixed(2) : income.flatCores.toFixed(1)}/d
               </span>
             )}
