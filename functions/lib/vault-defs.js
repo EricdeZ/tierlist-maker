@@ -332,9 +332,105 @@ export async function previewPlayerDefs(sql, seasonIds) {
   return results
 }
 
+// Bulk pre-fetch avatars, best gods, and existing defs for a set of players in a season.
+// Reduces ~4-5 queries per player down to ~6 queries total per season.
+async function bulkPreFetch(sql, playerIds, seasonId) {
+  if (!playerIds.length) return { avatarMap: new Map(), godTeamMap: new Map(), godSeasonMap: new Map(), godAllTimeMap: new Map(), existingMap: new Map() }
+
+  // 1) Bulk avatar lookup
+  const avatarRows = await sql`
+    SELECT u.linked_player_id AS player_id, u.discord_id, u.discord_avatar,
+           COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    WHERE u.linked_player_id = ANY(${playerIds})
+  `
+  const avatarMap = new Map()
+  for (const r of avatarRows) {
+    if (r.allow_avatar && r.discord_id && r.discord_avatar) {
+      avatarMap.set(r.player_id, `https://cdn.discordapp.com/avatars/${r.discord_id}/${r.discord_avatar}.webp?size=256`)
+    }
+  }
+
+  // 2) Bulk best god: specific team in season
+  const godOnTeamRows = await sql`
+    SELECT player_id, team_id, god_played FROM (
+      SELECT sub.player_id, sub.team_id, sub.god_played,
+             ROW_NUMBER() OVER (PARTITION BY sub.player_id, sub.team_id ORDER BY sub.cnt DESC, sub.god_played ASC) AS rn
+      FROM (
+        SELECT lp.player_id,
+               CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END AS team_id,
+               pgs.god_played, COUNT(*) AS cnt
+        FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+        JOIN matches m ON g.match_id = m.id
+        WHERE lp.season_id = ${seasonId}
+          AND lp.player_id = ANY(${playerIds})
+          AND pgs.god_played IS NOT NULL
+        GROUP BY lp.player_id, CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END, pgs.god_played
+      ) sub
+    ) ranked WHERE rn = 1
+  `
+  const godTeamMap = new Map()
+  for (const r of godOnTeamRows) godTeamMap.set(`${r.player_id}-${r.team_id}`, r.god_played)
+
+  // 3) Bulk best god: any team in season (fallback)
+  const godInSeasonRows = await sql`
+    SELECT player_id, god_played FROM (
+      SELECT sub.player_id, sub.god_played,
+             ROW_NUMBER() OVER (PARTITION BY sub.player_id ORDER BY sub.cnt DESC, sub.god_played ASC) AS rn
+      FROM (
+        SELECT lp.player_id, pgs.god_played, COUNT(*) AS cnt
+        FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+        WHERE lp.season_id = ${seasonId}
+          AND lp.player_id = ANY(${playerIds})
+          AND pgs.god_played IS NOT NULL
+        GROUP BY lp.player_id, pgs.god_played
+      ) sub
+    ) ranked WHERE rn = 1
+  `
+  const godSeasonMap = new Map()
+  for (const r of godInSeasonRows) godSeasonMap.set(r.player_id, r.god_played)
+
+  // 4) Bulk best god: all-time (only for players not found in season)
+  const needsAllTime = playerIds.filter(id => !godSeasonMap.has(id))
+  const godAllTimeMap = new Map()
+  if (needsAllTime.length) {
+    const godAllTimeRows = await sql`
+      SELECT player_id, god_played FROM (
+        SELECT sub.player_id, sub.god_played,
+               ROW_NUMBER() OVER (PARTITION BY sub.player_id ORDER BY sub.cnt DESC, sub.god_played ASC) AS rn
+        FROM (
+          SELECT lp.player_id, pgs.god_played, COUNT(*) AS cnt
+          FROM player_game_stats pgs
+          JOIN league_players lp ON pgs.league_player_id = lp.id
+          JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+          WHERE lp.player_id = ANY(${needsAllTime})
+            AND pgs.god_played IS NOT NULL
+          GROUP BY lp.player_id, pgs.god_played
+        ) sub
+      ) ranked WHERE rn = 1
+    `
+    for (const r of godAllTimeRows) godAllTimeMap.set(r.player_id, r.god_played)
+  }
+
+  // 5) Bulk existing defs lookup
+  const existingRows = await sql`
+    SELECT id, player_id, team_id FROM cc_player_defs WHERE season_id = ${seasonId}
+  `
+  const existingMap = new Map()
+  for (const d of existingRows) existingMap.set(`${d.player_id}-${d.team_id}`, d.id)
+
+  return { avatarMap, godTeamMap, godSeasonMap, godAllTimeMap, existingMap }
+}
+
 /**
  * Generate player defs for only the selected entries.
  * Accepts explicit list of { playerId, teamId, seasonId }.
+ * Uses lightweight queries — avoids loading full season roster.
  */
 export async function generateSelectedDefs(sql, selectedEntries) {
   let created = 0
@@ -347,20 +443,123 @@ export async function generateSelectedDefs(sql, selectedEntries) {
   }
 
   for (const [seasonId, seasonEntries] of bySeasonId) {
-    const { season, entries: allEntries } = await discoverPlayerTeamCombos(sql, seasonId)
+    // Lightweight season metadata (no full roster discovery)
+    const [season] = await sql`
+      SELECT s.id, s.name, s.slug, s.is_active,
+             d.id AS division_id, d.name AS division_name, d.slug AS division_slug, d.tier AS division_tier,
+             l.id AS league_id, l.slug AS league_slug
+      FROM seasons s
+      JOIN divisions d ON s.division_id = d.id
+      JOIN leagues l ON d.league_id = l.id
+      WHERE s.id = ${seasonId}
+    `
+    if (!season) continue
 
-    const requestedKeys = new Set(seasonEntries.map(e => `${e.playerId}-${e.teamId}`))
-    const filtered = allEntries.filter(e => requestedKeys.has(`${e.playerId}-${e.teamId}`))
+    const playerIds = [...new Set(seasonEntries.map(e => e.playerId))]
+    const teamIds = [...new Set(seasonEntries.map(e => e.teamId))]
 
-    // Build index map from ALL entries so card_index stays stable
+    // Bulk-fetch player, team, and role data for selected entries only
+    const [players, teams, roles] = await Promise.all([
+      sql`SELECT id, name, slug FROM players WHERE id = ANY(${playerIds})`,
+      sql`SELECT id, name, color FROM teams WHERE id = ANY(${teamIds})`,
+      sql`SELECT player_id, role FROM league_players WHERE season_id = ${seasonId} AND player_id = ANY(${playerIds})`,
+    ])
+    const playerMap = new Map(players.map(p => [p.id, p]))
+    const teamMap = new Map(teams.map(t => [t.id, t]))
+    const roleMap = new Map(roles.map(r => [r.player_id, r.role]))
+
+    // Build enriched entries from selected IDs + bulk-fetched data
+    const filtered = seasonEntries
+      .filter(e => playerMap.has(e.playerId) && teamMap.has(e.teamId))
+      .map(e => {
+        const player = playerMap.get(e.playerId)
+        const team = teamMap.get(e.teamId)
+        return {
+          playerId: e.playerId,
+          teamId: e.teamId,
+          playerName: player.name,
+          playerSlug: player.slug,
+          teamName: team.name,
+          teamColor: team.color,
+          role: roleMap.get(e.playerId) || null,
+        }
+      })
+    if (!filtered.length) continue
+
+    // Lightweight card_index: fetch just IDs from current roster, sorted
+    const rosterCombos = await sql`
+      SELECT lp.player_id, lp.team_id
+      FROM league_players lp
+      JOIN players p ON p.id = lp.player_id
+      LEFT JOIN teams t ON t.id = lp.team_id
+      WHERE lp.season_id = ${seasonId} AND lp.team_id IS NOT NULL
+      ORDER BY t.name ASC, p.name ASC
+    `
     const indexMap = new Map()
-    allEntries.forEach((e, i) => indexMap.set(`${e.playerId}-${e.teamId}`, i + 1))
-
+    rosterCombos.forEach((c, i) => indexMap.set(`${c.player_id}-${c.team_id}`, i + 1))
+    // Entries not in current roster get index after the roster
+    let extraIndex = rosterCombos.length
     for (const e of filtered) {
-      const cardIndex = indexMap.get(`${e.playerId}-${e.teamId}`)
-      const result = await upsertPlayerDef(sql, e, seasonId, season, cardIndex)
-      if (result === 'created') created++
-      else updated++
+      const key = `${e.playerId}-${e.teamId}`
+      if (!indexMap.has(key)) indexMap.set(key, ++extraIndex)
+    }
+
+    // Bulk pre-fetch avatars, best gods, existing defs
+    const { avatarMap, godTeamMap, godSeasonMap, godAllTimeMap, existingMap } =
+      await bulkPreFetch(sql, playerIds, seasonId)
+
+    // Upsert in smaller chunks to stay within memory limits
+    const CHUNK = 10
+    for (let i = 0; i < filtered.length; i += CHUNK) {
+      const chunk = filtered.slice(i, i + CHUNK)
+      const results = await Promise.all(chunk.map(async (e) => {
+        const key = `${e.playerId}-${e.teamId}`
+        const cardIndex = indexMap.get(key)
+        const avatarUrl = avatarMap.get(e.playerId) || null
+        const bestGodName = godTeamMap.get(key) || godSeasonMap.get(e.playerId) || godAllTimeMap.get(e.playerId) || null
+        const existingId = existingMap.get(key)
+
+        if (existingId) {
+          await sql`
+            UPDATE cc_player_defs SET
+              player_name = ${e.playerName}, player_slug = ${e.playerSlug},
+              team_name = ${e.teamName}, team_color = ${e.teamColor}, role = ${e.role},
+              league_id = ${season.league_id}, league_slug = ${season.league_slug},
+              division_id = ${season.division_id}, division_slug = ${season.division_slug},
+              division_tier = ${season.division_tier}, season_slug = ${season.slug},
+              card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
+              updated_at = NOW()
+            WHERE id = ${existingId}
+          `
+          const normalizedRole = (e.role || 'adc').toLowerCase()
+          await sql`
+            UPDATE cc_cards
+            SET role = ${normalizedRole},
+                card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
+            WHERE def_id = ${existingId} AND card_type = 'player'
+          `
+          return 'updated'
+        } else {
+          await sql`
+            INSERT INTO cc_player_defs (
+              player_id, team_id, season_id, league_id, division_id,
+              player_name, player_slug, team_name, team_color, role,
+              league_slug, division_slug, season_slug, division_tier,
+              card_index, avatar_url, best_god_name
+            ) VALUES (
+              ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
+              ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
+              ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
+              ${cardIndex}, ${avatarUrl}, ${bestGodName}
+            )
+          `
+          return 'created'
+        }
+      }))
+      for (const r of results) {
+        if (r === 'created') created++
+        else updated++
+      }
     }
   }
 
@@ -373,13 +572,65 @@ export async function generateSelectedDefs(sql, selectedEntries) {
  */
 export async function generatePlayerDefs(sql, seasonId) {
   const { season, entries } = await discoverPlayerTeamCombos(sql, seasonId)
+  if (!entries.length) return { created: 0, updated: 0, total: 0 }
+
+  const playerIds = [...new Set(entries.map(e => e.playerId))]
+  const { avatarMap, godTeamMap, godSeasonMap, godAllTimeMap, existingMap } =
+    await bulkPreFetch(sql, playerIds, seasonId)
 
   let created = 0
   let updated = 0
-  for (let i = 0; i < entries.length; i++) {
-    const result = await upsertPlayerDef(sql, entries[i], seasonId, season, i + 1)
-    if (result === 'created') created++
-    else updated++
+  const CHUNK = 50
+  for (let i = 0; i < entries.length; i += CHUNK) {
+    const chunk = entries.slice(i, i + CHUNK)
+    const results = await Promise.all(chunk.map(async (e, j) => {
+      const key = `${e.playerId}-${e.teamId}`
+      const cardIndex = i + j + 1
+      const avatarUrl = avatarMap.get(e.playerId) || null
+      const bestGodName = godTeamMap.get(key) || godSeasonMap.get(e.playerId) || godAllTimeMap.get(e.playerId) || null
+      const existingId = existingMap.get(key)
+
+      if (existingId) {
+        await sql`
+          UPDATE cc_player_defs SET
+            player_name = ${e.playerName}, player_slug = ${e.playerSlug},
+            team_name = ${e.teamName}, team_color = ${e.teamColor}, role = ${e.role},
+            league_id = ${season.league_id}, league_slug = ${season.league_slug},
+            division_id = ${season.division_id}, division_slug = ${season.division_slug},
+            division_tier = ${season.division_tier}, season_slug = ${season.slug},
+            card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
+            updated_at = NOW()
+          WHERE id = ${existingId}
+        `
+        const normalizedRole = (e.role || 'adc').toLowerCase()
+        await sql`
+          UPDATE cc_cards
+          SET role = ${normalizedRole},
+              card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
+          WHERE def_id = ${existingId} AND card_type = 'player'
+        `
+        return 'updated'
+      } else {
+        await sql`
+          INSERT INTO cc_player_defs (
+            player_id, team_id, season_id, league_id, division_id,
+            player_name, player_slug, team_name, team_color, role,
+            league_slug, division_slug, season_slug, division_tier,
+            card_index, avatar_url, best_god_name
+          ) VALUES (
+            ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
+            ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
+            ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
+            ${cardIndex}, ${avatarUrl}, ${bestGodName}
+          )
+        `
+        return 'created'
+      }
+    }))
+    for (const r of results) {
+      if (r === 'created') created++
+      else updated++
+    }
   }
 
   return { created, updated, total: entries.length }
