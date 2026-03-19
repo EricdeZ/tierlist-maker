@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput, S5_ALLSTAR_MODIFIER } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -1499,12 +1499,22 @@ function formatS5Response(state, extra = {}) {
   const { csCards = [], asCards = [], csOutput, asOutput, consumableCard } = state
 
   function formatLineup(lineupCards, output) {
+    // Compute team synergy (starters only, excluding role mismatches)
+    const teamCounts = {}
+    for (const card of lineupCards) {
+      if (card.isBench || isRoleMismatch(card)) continue
+      if (card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
+    }
+    const maxTeamCount = Math.max(...Object.values(teamCounts), 0)
+    const teamSynergyBonus = TEAM_SYNERGY_BONUS[maxTeamCount] || 0
+
     const slots = {}
     for (const card of lineupCards) {
       const synergy = checkSynergy(card, card._godCard)
       const contrib = getCardContribution(card.holo_type, card.rarity, card.isBench ? 0.5 : 1.0)
       const godBonusInfo = getAttachmentBonusInfo(card._godCard, 'god', card.holo_type, synergy)
       const itemBonusInfo = getAttachmentBonusInfo(card._itemCard, 'item', card.holo_type)
+      const roleMismatch = isRoleMismatch(card)
 
       slots[card.slot_role] = {
         card: formatCard(card),
@@ -1515,6 +1525,8 @@ function formatS5Response(state, extra = {}) {
         itemBonus: itemBonusInfo,
         synergy,
         isBench: card.isBench || false,
+        teamSynergyBonus: card.isBench ? 0 : teamSynergyBonus,
+        roleMismatch,
       }
     }
     return { slots, output: output || { coresPerDay: 0, passionPerDay: 0 } }

@@ -84,14 +84,30 @@ function getBaseIncomeEstimate(card) {
   return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
 }
 
-// Extract slot contribution from API-provided slot data
+// Effective slot contribution: base player card + attachment bonuses
 function getSlotContribution(slot) {
   if (!slot?.contribution) return { passion: 0, cores: 0, multiplier: 0, type: 'none' }
   const c = slot.contribution
+  const playerHasFlat = c.type === 'flat' || c.type === 'full'
+  const playerHasMult = c.type === 'mult' || c.type === 'full'
+
+  let cores = c.cores || 0, passion = c.passion || 0, multiplier = c.multiplier || 0
+
+  if (playerHasFlat) {
+    const godFlatMult = 1 + (slot.godBonus?.flatBoost || 0)
+    const itemFlatMult = 1 + (slot.itemBonus?.flatBoost || 0)
+    cores = cores * godFlatMult * itemFlatMult
+    passion = passion * godFlatMult * itemFlatMult
+  }
+  if (playerHasMult) {
+    const effectiveness = slot.isBench ? 0.5 : 1.0
+    multiplier = multiplier + (slot.godBonus?.multAdd || 0) * effectiveness + (slot.itemBonus?.multAdd || 0) * effectiveness
+  }
+
   return {
-    passion: c.passion || 0,
-    cores: c.cores || 0,
-    multiplier: c.multiplier || 0,
+    passion,
+    cores,
+    multiplier,
     type: c.type || 'none',
   }
 }
@@ -200,14 +216,26 @@ export default function CCStartingFive() {
 
   // Compute flat total and mult total from active lineup's slots
   const lineupBreakdown = useMemo(() => {
-    let flatCores = 0, totalMult = 1
+    let flatCores = 0, totalMult = 1, teamSynergy = 0
     for (const slotData of Object.values(slots)) {
       if (!slotData?.contribution) continue
+      if (slotData.roleMismatch) continue
       const c = slotData.contribution
-      if (c.type === 'flat' || c.type === 'full') flatCores += c.cores || 0
-      if (c.type === 'mult' || c.type === 'full') totalMult *= c.multiplier || 1
+      const hasFlat = c.type === 'flat' || c.type === 'full'
+      const hasMult = c.type === 'mult' || c.type === 'full'
+      if (hasFlat) {
+        const godFlatMult = 1 + (slotData.godBonus?.flatBoost || 0)
+        const itemFlatMult = 1 + (slotData.itemBonus?.flatBoost || 0)
+        flatCores += (c.cores || 0) * godFlatMult * itemFlatMult
+      }
+      if (hasMult) {
+        const eff = slotData.isBench ? 0.5 : 1.0
+        const slotMult = (c.multiplier || 1) + (slotData.godBonus?.multAdd || 0) * eff + (slotData.itemBonus?.multAdd || 0) * eff
+        totalMult *= slotMult
+      }
+      if (slotData.teamSynergyBonus > teamSynergy) teamSynergy = slotData.teamSynergyBonus
     }
-    return { flatCores, totalMult }
+    return { flatCores, totalMult, teamSynergy }
   }, [slots])
   const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
@@ -253,15 +281,15 @@ export default function CCStartingFive() {
       if (slotData?.card) {
         map[role] = {
           ...slotData.card,
-          godCard: slotData.godCard || null,
-          itemCard: slotData.itemCard || null,
+          godCard: slotData.godCard ? { ...slotData.godCard, bonus: slotData.godBonus } : null,
+          itemCard: slotData.itemCard ? { ...slotData.itemCard, bonus: slotData.itemBonus } : null,
           synergy: slotData.synergy,
           isBench: slotData.isBench,
           contribution: slotData.contribution,
           godBonus: slotData.godBonus,
           itemBonus: slotData.itemBonus,
-          teamSynergyBonus: slotData.card.teamSynergyBonus || 0,
-          roleMismatch: slotData.card.roleMismatch || false,
+          teamSynergyBonus: slotData.teamSynergyBonus || 0,
+          roleMismatch: slotData.roleMismatch || false,
         }
       }
     }
@@ -534,46 +562,66 @@ export default function CCStartingFive() {
 
       </div>
 
-      {/* Lineup Flat + Mult Breakdown */}
-      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (
-        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 text-sm cd-num space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-white/40">Total Flat</span>
-            <span className="text-amber-400 font-bold">
-              {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-white/40">Total Multiplier</span>
-            <span className="text-emerald-400 font-bold">
-              {lineupBreakdown.totalMult.toFixed(2)}x
-            </span>
-          </div>
-          <div className="flex items-center justify-between pt-1.5 border-t border-white/[0.06]">
-            <span className="text-white/40">Output</span>
-            <span className="text-[var(--cd-cyan)] font-bold">
-              {(lineupBreakdown.flatCores * lineupBreakdown.totalMult).toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
-            </span>
-          </div>
-          {startingFive?.consumableCard && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/30 text-xs">Consumable</span>
-              <span className="text-white/30 text-xs">
-                {startingFive.consumableCard.coresBoostPct > 0 && <span className="text-purple-400">+{startingFive.consumableCard.coresBoostPct}% <img src={emberIcon} alt="" className="w-2 h-2 inline" /></span>}
-                {startingFive.consumableCard.passionBoostPct > 0 && <span className="text-purple-400 ml-1">+{startingFive.consumableCard.passionBoostPct}% <img src={passionCoin} alt="" className="w-2 h-2 inline" /></span>}
-              </span>
+      {/* Lineup Flat × Mult Breakdown */}
+      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (() => {
+        const baseOutput = lineupBreakdown.flatCores * lineupBreakdown.totalMult
+        const teamBonus = 1 + lineupBreakdown.teamSynergy
+        const output = baseOutput * teamBonus
+        const consumablePct = startingFive?.consumableCard?.coresBoostPct || 0
+        const finalOutput = output * (1 + consumablePct / 100)
+        return (
+        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 cd-num">
+          {/* Hero numbers */}
+          <div className="flex items-center justify-center gap-3 sm:gap-4">
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-amber-400 leading-none">
+                {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)}
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</div>
             </div>
-          )}
-          {startingFive?.consumableCard?.coresBoostPct > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/30 text-xs">Boosted Output</span>
-              <span className="text-purple-400 font-bold text-xs">
-                {(lineupBreakdown.flatCores * lineupBreakdown.totalMult * (1 + (startingFive.consumableCard.coresBoostPct / 100))).toFixed(1)} <img src={emberIcon} alt="" className="w-2 h-2 inline" />/day
-              </span>
+            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">×</span>
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-emerald-400 leading-none">
+                {lineupBreakdown.totalMult.toFixed(2)}x
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Multiplier</div>
+            </div>
+            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">=</span>
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-[var(--cd-cyan)] leading-none">
+                {output.toFixed(1)}
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider"><img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</div>
+            </div>
+          </div>
+          {/* Team synergy & consumable modifiers */}
+          {(lineupBreakdown.teamSynergy > 0 || consumablePct > 0 || startingFive?.consumableCard?.passionBoostPct > 0) && (
+            <div className="flex items-center justify-center gap-2 flex-wrap mt-2 pt-2 border-t border-white/[0.06] text-xs">
+              {lineupBreakdown.teamSynergy > 0 && (
+                <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergy * 100)}% team</span>
+              )}
+              {lineupBreakdown.teamSynergy > 0 && consumablePct > 0 && (
+                <span className="text-white/20">·</span>
+              )}
+              {consumablePct > 0 && (
+                <span className="text-purple-400">+{consumablePct}% consumable</span>
+              )}
+              {startingFive?.consumableCard?.passionBoostPct > 0 && (
+                <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}% <img src={passionCoin} alt="" className="w-2 h-2 inline" /></span>
+              )}
+              {consumablePct > 0 && (
+                <>
+                  <span className="text-white/20">→</span>
+                  <span className="text-purple-400 font-bold">
+                    {finalOutput.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* Lineup Tabs */}
       <div className="flex gap-2 mb-4">
@@ -1283,7 +1331,7 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
           onRemove={() => onAttachRemove(role.key, 'god')}
           size={size}
           getDefOverride={getDefOverride}
-          synergy={card.godCard?.synergy}
+          synergy={card.synergy}
           playerHoloType={card.holoType}
         />
         <AttachmentSlot
@@ -1351,18 +1399,17 @@ function AttachmentSlot({ attachment, slotType, onAttach, onRemove, onSwap, size
       <div className="text-center mt-0.5">
         <div className={`text-[7px] font-bold truncate cd-head ${holoMismatch ? 'text-white/25' : 'text-white/50'}`} style={{ maxWidth: attachSize }}>{attachment.godName}</div>
         <div className="text-[7px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[attachment.rarity]?.name}</div>
-        {!holoMismatch && (Number(attachment.passionBonus) > 0 || Number(attachment.coresBonus) > 0) && (
+        {!holoMismatch && attachment.bonus && (attachment.bonus.flatBoost > 0 || attachment.bonus.multAdd > 0) && (
           <div className="flex items-center justify-center gap-1 mt-0.5 text-[7px] font-bold cd-num">
-            {Number(attachment.passionBonus) > 0 && (
+            {attachment.bonus.flatBoost > 0 && (
               <span className="flex items-center gap-0.5 text-amber-400">
-                <img src={passionCoin} alt="" className="w-2 h-2" />
-                +{Math.round(Number(attachment.passionBonus) * 100)}%
+                <img src={emberIcon} alt="" className="w-2 h-2" />
+                +{Math.round(attachment.bonus.flatBoost * 100)}%
               </span>
             )}
-            {Number(attachment.coresBonus) > 0 && (
-              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                <img src={emberIcon} alt="" className="w-2 h-2" />
-                +{Math.round(Number(attachment.coresBonus) * 100)}%
+            {attachment.bonus.multAdd > 0 && (
+              <span className="flex items-center gap-0.5 text-emerald-400">
+                +{(attachment.bonus.multAdd).toFixed(2)}x
               </span>
             )}
           </div>

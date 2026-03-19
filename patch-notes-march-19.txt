@@ -1,0 +1,72 @@
+# 📋 Patch Notes — March 16–19, 2026
+
+───────────────────────────────
+
+## ⭐ Starting 5 — Reward Redesign
+
+Starting 5 now has **two lineups**: **Current Season** and **All-Star**.
+
+**Current Season** is your main lineup — slot players from the active season and earn at the full rate. **All-Star** lets you slot cards from any season, past or present, but earns at a reduced rate. Cards are exclusive to one lineup — you can't double-dip.
+
+Each lineup also has a **Bench slot** — a 6th slot with no role restriction that earns at half effectiveness. Good for parking a card you want to keep ready.
+
+### How earning works now
+
+Every card contributes two things: a **flat income** (Passion + Cores per day) and a **multiplier** that scales your entire lineup's output. Higher rarity means more of both.
+
+> 🟡 **Holo** cards provide the flat income — your baseline earning
+> 🔵 **Reverse holo** cards provide the multiplier — they amplify everything else
+> 🟣 **Full art** cards give both
+
+Attachments work the same way — a holo god/item attachment boosts your flat values, a reverse attachment adds to the multiplier. God attachments are stronger than item attachments. God synergy and team synergy bonuses still apply.
+
+**Consumable slot** — Slot a consumable card (health pots, wards, elixirs, etc.) for a rarity-scaled boost. Different consumables lean toward Passion or Cores, so you can tune your earnings.
+
+The lineup summary now shows a **full breakdown** of your flat income, combined multiplier, and total rate per hour — no more guessing.
+
+───────────────────────────────
+
+## ✒️ Card Signatures
+
+Players can now **sign Unique cards** that depict them.
+
+Pull a Unique card of a player? You can **request their autograph**. They get a notification in their Vault and can draw their signature directly on a canvas overlaid on the card — with a **live preview** showing exactly how it'll look with holo effects.
+
+It's a **two-step process**:
+1. The depicted player draws and submits their signature
+2. The card owner reviews it and approves or rejects — rejecting lets the player redo it
+
+Players who own their **own** Unique card can sign it directly — no request needed.
+
+Signed cards display the signature **permanently** on the card art, visible everywhere: collection, binder, marketplace, and Starting 5.
+
+───────────────────────────────
+
+## 🏠 Player Dashboard
+
+A brand new home screen for logged-in users, replacing the old landing page.
+
+Full-width responsive grid with themed widgets:
+- 💰 **Balances** — Passion and Cores in one card with real currency icons
+- 🏆 **SmiteComp Rank** — Its own dedicated card
+- 📅 **Upcoming Matches** — Countdown timers with league context
+- 📊 **Recent Results** — God portraits and role icons
+- 🃏 **Vault Overview** — Live Starting 5 preview with collect button
+- 🔥 **Forge Portfolio** — Molten fire aesthetic
+- ⚔️ **Challenges** — Richer display with inline claim buttons
+- 👥 **Team & Scrims** — Linkable team names and player profiles
+- 🪙 **Coinflip** — Quick access
+- 🔔 **Action Bar** — Pending item badges
+
+Dot pattern background with blurred color blobs and vignette. Real profile pictures, team logos, and god images throughout.
+
+───────────────────────────────
+
+## 🏟️ Tournament Signups Page (opening soon)
+
+───────────────────────────────
+
+## 🔄 Role Detection — Most Played, Not Last Played
+
+Role detection now uses **total games played per role** instead of the single most recent game. If a player has 15 games as Support and 1 recent game as Mid, they'll correctly show as a Support main.
+

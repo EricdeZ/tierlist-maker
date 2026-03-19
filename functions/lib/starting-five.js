@@ -25,7 +25,7 @@ const S5_ATT_MULT = {
 }
 const S5_FULL_ATT_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.30
-const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
+export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
@@ -176,7 +176,7 @@ function reshapeAttachments(row) {
   return { godCard, itemCard }
 }
 
-function isRoleMismatch(card) {
+export function isRoleMismatch(card) {
   if (card.slot_role === 'bench') return false
   return card.slot_role && card.role && card.role !== card.slot_role && card.role !== 'fill'
 }
@@ -256,24 +256,6 @@ export async function tick(sql, userId) {
     }
   }
 
-  const now = new Date()
-  const lastTick = new Date(state.last_tick)
-  const elapsedHours = (now - lastTick) / (1000 * 60 * 60)
-
-  if (elapsedHours < 0.001) {
-    return {
-      cards,
-      csCards, asCards,
-      csOutput: emptyOutput, asOutput: emptyOutput,
-      passionPending: Number(state.passion_pending) || 0,
-      coresPending: Number(state.cores_pending) || 0,
-      passionCap: 0,
-      coresCap: 0,
-      lastTick: state.last_tick,
-      consumableCard: consumableCard || null,
-    }
-  }
-
   function getTeamCounts(lineupCards) {
     const counts = {}
     for (const card of lineupCards) {
@@ -292,11 +274,29 @@ export async function tick(sql, userId) {
   const combinedCoresPerDay = csOutput.coresPerDay + asOutput.coresPerDay * S5_ALLSTAR_MODIFIER
   const combinedPassionPerDay = csOutput.passionPerDay + asOutput.passionPerDay * S5_ALLSTAR_MODIFIER
 
-  let coresAccrued = (combinedCoresPerDay / HOURS_PER_DAY) * elapsedHours
-  let passionAccrued = (combinedPassionPerDay / HOURS_PER_DAY) * elapsedHours
-
   const coresCap = combinedCoresPerDay * CAP_DAYS
   const passionCap = combinedPassionPerDay * CAP_DAYS
+
+  const now = new Date()
+  const lastTick = new Date(state.last_tick)
+  const elapsedHours = (now - lastTick) / (1000 * 60 * 60)
+
+  if (elapsedHours < 0.001) {
+    return {
+      cards,
+      csCards, asCards,
+      csOutput, asOutput,
+      passionPending: Number(state.passion_pending) || 0,
+      coresPending: Number(state.cores_pending) || 0,
+      passionCap,
+      coresCap,
+      lastTick: state.last_tick,
+      consumableCard: consumableCard || null,
+    }
+  }
+
+  let coresAccrued = (combinedCoresPerDay / HOURS_PER_DAY) * elapsedHours
+  let passionAccrued = (combinedPassionPerDay / HOURS_PER_DAY) * elapsedHours
 
   // Apply consumable boost to accrued amounts (not cap)
   if (consumableCard?.card_data?.consumableId) {

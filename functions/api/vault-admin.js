@@ -77,12 +77,11 @@ const handler = async (event) => {
 async function handleStats(sql) {
   const [cardStats] = await sql`
     SELECT
-      COUNT(*)::int AS total_cards,
-      COUNT(DISTINCT owner_id)::int AS total_players,
-      jsonb_object_agg(rarity, cnt) AS rarity_counts
-    FROM (
-      SELECT rarity, COUNT(*)::int AS cnt FROM cc_cards GROUP BY rarity
-    ) sub
+      (SELECT COUNT(*)::int FROM cc_cards) AS total_cards,
+      (SELECT COUNT(DISTINCT owner_id)::int FROM cc_cards) AS total_players,
+      (SELECT jsonb_object_agg(rarity, cnt) FROM (
+        SELECT rarity, COUNT(*)::int AS cnt FROM cc_cards GROUP BY rarity
+      ) sub) AS rarity_counts
   `
 
   const [packStats] = await sql`
