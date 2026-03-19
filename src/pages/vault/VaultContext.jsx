@@ -15,6 +15,8 @@ export function VaultProvider({ children }) {
   const [packTypes, setPackTypes] = useState([])
   const [salePacks, setSalePacks] = useState([])
   const [pendingTradeCount, setPendingTradeCount] = useState(0)
+  const [pendingSignatureCount, setPendingSignatureCount] = useState(0)
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [inventory, setInventory] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,6 +25,7 @@ export function VaultProvider({ children }) {
   const [defOverrides, setDefOverrides] = useState({})
   const [binder, setBinder] = useState(null)
   const [binderCards, setBinderCards] = useState([])
+  const [templateCache, setTemplateCache] = useState({})
   const [vaultBanned, setVaultBanned] = useState(false)
   const [accountTooNew, setAccountTooNew] = useState(null)
   const [vendingCooldownEnd, setVendingCooldownEndRaw] = useState(() => {
@@ -50,6 +53,15 @@ export function VaultProvider({ children }) {
   passionCtxRef.current = passionCtx
   const startingFiveRef = useRef(startingFive)
   startingFiveRef.current = startingFive
+  const delayedRefreshTimer = useRef(null)
+
+  // Refresh balance now + again after 3s to catch fire-and-forget challenge progress on the backend
+  const refreshBalanceWithRetry = useCallback(() => {
+    passionCtxRef.current?.refreshBalance?.()
+    clearTimeout(delayedRefreshTimer.current)
+    delayedRefreshTimer.current = setTimeout(() => passionCtxRef.current?.refreshBalance?.(), 3000)
+  }, [])
+  useEffect(() => () => clearTimeout(delayedRefreshTimer.current), [])
 
   useEffect(() => {
     if (!user) return
@@ -63,10 +75,13 @@ export function VaultProvider({ children }) {
       if (ccData.vault_banned) { setVaultBanned(true); setLoading(false); return }
       if (ccData.account_too_new) { setAccountTooNew(ccData.days_left); setLoading(false); return }
       setCollection(ccData.collection || [])
+      setTemplateCache(ccData.templateCache || {})
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
       setPackTypes(ccData.packTypes || [])
       setSalePacks(ccData.salePacks || [])
       setPendingTradeCount(ccData.pendingTradeCount || 0)
+      setPendingSignatureCount(ccData.pendingSignatureCount || 0)
+      setPendingApprovalCount(ccData.pendingApprovalCount || 0)
       setInventory(ccData.inventory || [])
       setLockedCardIds(ccData.lockedCardIds || [])
       if (ccData.vendingCooldown > 0) {
@@ -104,6 +119,10 @@ export function VaultProvider({ children }) {
     return override || null
   }, [defOverrides])
 
+  const getTemplate = useCallback((templateId) => {
+    return templateCache[templateId] || null
+  }, [templateCache])
+
   const refreshCollection = useCallback(async () => {
     try {
       const ccData = await vaultService.load()
@@ -138,16 +157,31 @@ export function VaultProvider({ children }) {
   const sendGift = useCallback(async (recipientId, message, packType = 'gift') => {
     const result = await vaultService.sendGift(recipientId, message, packType)
     await refreshGifts()
+    refreshBalanceWithRetry()
     return result
-  }, [refreshGifts])
+  }, [refreshGifts, refreshBalanceWithRetry])
+
+  const mergeInlineTemplates = useCallback((cards) => {
+    const newTemplates = {}
+    for (const card of cards) {
+      if (card._templateData && card.templateId) {
+        newTemplates[card.templateId] = card._templateData
+      }
+    }
+    if (Object.keys(newTemplates).length > 0) {
+      setTemplateCache(prev => ({ ...prev, ...newTemplates }))
+    }
+  }, [])
 
   const openGift = useCallback(async (giftId) => {
     const result = await vaultService.openGift(giftId)
     setCollection(prev => [...prev, ...result.cards])
+    mergeInlineTemplates(result.cards)
     setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
     await refreshGifts()
+    refreshBalanceWithRetry()
     return result
-  }, [refreshGifts])
+  }, [refreshGifts, refreshBalanceWithRetry, mergeInlineTemplates])
 
   const markGiftsSeen = useCallback(async () => {
     await vaultService.markGiftsSeen()
@@ -157,9 +191,9 @@ export function VaultProvider({ children }) {
   const buyGiftPack = useCallback(async (packType) => {
     const result = await vaultService.buyGiftPack(packType)
     setGiftData(prev => ({ ...prev, giftInventory: result.giftInventory }))
-    passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return result
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const loadBinder = useCallback(async () => {
     try {
@@ -223,42 +257,42 @@ export function VaultProvider({ children }) {
     }
   }, [syncS5RolesToCollection])
 
-  const slotS5Card = useCallback(async (cardId, role, slotType = 'player') => {
-    const data = await vaultService.slotCard(cardId, role, slotType)
+  const slotS5Card = useCallback(async (cardId, role, slotType = 'player', lineupType = 'current') => {
+    const data = await vaultService.slotCard(cardId, role, slotType, lineupType)
     setStartingFive(data)
-    await passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return data
-  }, [])
+  }, [refreshBalanceWithRetry])
 
-  const unslotS5Card = useCallback(async (role) => {
-    const data = await vaultService.unslotCard(role)
+  const unslotS5Card = useCallback(async (role, lineupType = 'current') => {
+    const data = await vaultService.unslotCard(role, lineupType)
     setStartingFive(data)
-    await passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return data
-  }, [])
+  }, [refreshBalanceWithRetry])
 
-  const unslotS5Attachment = useCallback(async (role, slotType) => {
-    const data = await vaultService.unslotAttachment(role, slotType)
+  const unslotS5Attachment = useCallback(async (role, slotType, lineupType = 'current') => {
+    const data = await vaultService.unslotAttachment(role, slotType, lineupType)
     setStartingFive(data)
-    await passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return data
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const collectS5Income = useCallback(async () => {
     const data = await vaultService.collectIncome()
     setStartingFive(data)
-    await passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return data
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const slotS5Consumable = useCallback(async (cardId) => {
     const prevConsumableId = startingFiveRef.current?.consumableCard?.id
     const data = await vaultService.slotConsumable(cardId)
     setStartingFive(data)
     setCollection(prev => prev.filter(c => c.id !== cardId && c.id !== prevConsumableId))
-    await passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return data
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   useEffect(() => {
     if (loaded) {
@@ -273,9 +307,9 @@ export function VaultProvider({ children }) {
     if (result.dismantledToday != null) {
       setStats(prev => ({ ...prev, dismantledToday: result.dismantledToday, dismantledValueToday: result.dismantledValueToday ?? prev.dismantledValueToday }))
     }
-    passionCtxRef.current?.refreshBalance?.()
+    refreshBalanceWithRetry()
     return result
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const blackMarketTurnIn = useCallback(async (cardId) => {
     const result = await vaultService.blackMarketTurnIn(cardId)
@@ -314,52 +348,54 @@ export function VaultProvider({ children }) {
         conversionsToday: result.conversionsToday,
         nextConversionCost: result.nextConversionCost,
       })
-      passionCtxRef.current?.refreshBalance?.()
+      refreshBalanceWithRetry()
       return result
     } catch (err) {
       console.error('Failed to convert passion to ember:', err)
       throw err
     }
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const buyPacksToInventory = useCallback(async (packType, quantity) => {
     try {
       const result = await vaultService.buyPacksToInventory(packType, quantity)
       setInventory(prev => [...prev, ...result.inventory])
-      passionCtxRef.current?.refreshBalance?.()
+      refreshBalanceWithRetry()
       return result
     } catch (err) {
       console.error('Failed to buy packs to inventory:', err)
       throw err
     }
-  }, [])
+  }, [refreshBalanceWithRetry])
 
   const buyPack = useCallback(async (packType) => {
     try {
       const result = await vaultService.openPack(packType)
       setCollection(prev => [...prev, ...result.cards])
+      mergeInlineTemplates(result.cards)
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
-      passionCtxRef.current?.refreshBalance?.()
+      refreshBalanceWithRetry()
       return result
     } catch (err) {
       console.error('Failed to open pack:', err)
       throw err
     }
-  }, [])
+  }, [refreshBalanceWithRetry, mergeInlineTemplates])
 
   const openInventoryPack = useCallback(async (inventoryId) => {
     try {
       const result = await vaultService.openInventoryPack(inventoryId)
       setCollection(prev => [...prev, ...result.cards])
+      mergeInlineTemplates(result.cards)
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
       setInventory(prev => prev.filter(i => i.id !== inventoryId))
-      passionCtxRef.current?.refreshBalance?.()
+      refreshBalanceWithRetry()
       return result
     } catch (err) {
       console.error('Failed to open inventory pack:', err)
       throw err
     }
-  }, [])
+  }, [refreshBalanceWithRetry, mergeInlineTemplates])
 
   const buySalePack = useCallback(async (saleId) => {
     try {
@@ -367,42 +403,45 @@ export function VaultProvider({ children }) {
       if (!sale) throw new Error('Sale not found')
       const result = await vaultService.openSalePack(saleId, sale.packTypeId)
       setCollection(prev => [...prev, ...result.cards])
+      mergeInlineTemplates(result.cards)
       setStats(prev => ({ ...prev, packsOpened: prev.packsOpened + 1 }))
       setSalePacks(prev => prev.map(s =>
         s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
       ))
       setVendingCooldownEnd(Date.now() + 45000)
-      passionCtxRef.current?.refreshBalance?.()
+      refreshBalanceWithRetry()
       return result
     } catch (err) {
       console.error('Failed to open sale pack:', err)
       throw err
     }
-  }, [salePacks])
+  }, [salePacks, refreshBalanceWithRetry, mergeInlineTemplates])
 
   // Stable wrappers for passionCtx methods — avoids context value changing when PassionContext updates
-  const refreshBalance = useCallback(() => passionCtxRef.current?.refreshBalance?.(), [])
+  const refreshBalance = refreshBalanceWithRetry
   const claimEmberDaily = useCallback(() => passionCtxRef.current?.claimEmberDaily?.(), [])
 
   const value = useMemo(() => ({
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
-    loaded, loading, vaultBanned, accountTooNew, getDefOverride,
+    loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, setPendingTradeCount,
+    pendingSignatureCount, setPendingSignatureCount,
+    pendingApprovalCount, setPendingApprovalCount,
     inventory, openInventoryPack,
     vendingCooldownEnd, setVendingCooldownEnd,
     lockedCardIds,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
-    loaded, loading, vaultBanned, accountTooNew, getDefOverride,
+    loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
-    pendingTradeCount, inventory, openInventoryPack,
+    pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack,
     vendingCooldownEnd, lockedCardIds,
   ])
 
