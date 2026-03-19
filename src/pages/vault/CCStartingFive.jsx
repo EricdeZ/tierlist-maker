@@ -1620,7 +1620,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         if (type !== slotType) return false
         if (!card.holoType) return false
         if ((RARITY_TIER[card.rarity] || 0) < playerTier && !(playerRarity === 'unique' && card.rarity === 'mythic')) return false
-        if (slotType === 'god') {
+        if (slotType === 'god' && role !== 'bench') {
           const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
           if (cardRole !== role && cardRole !== 'fill') return false
         }
@@ -1654,7 +1654,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
           <div className="flex items-center gap-2">
             {roleIcon && <img src={roleIcon} alt="" className="w-[18px] h-[18px] object-contain" />}
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
-              Attach {slotType === 'god' ? 'God' : 'Item'}{slotType === 'god' ? ` \u2014 ${roleInfo?.label}` : ''}
+              Attach {slotType === 'god' ? 'God' : 'Item'}{slotType === 'god' && roleInfo?.label ? ` \u2014 ${roleInfo.label}` : ''}
             </h3>
           </div>
           <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">

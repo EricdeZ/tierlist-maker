@@ -430,7 +430,7 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
     if (!card.holo_type) throw new Error('Attachment must have a holo type')
     if (card.card_type !== slotType) throw new Error(`Card type (${card.card_type}) does not match slot type (${slotType})`)
 
-    if (slotType === 'god' && card.role !== role && card.role !== 'fill') {
+    if (slotType === 'god' && role !== 'bench' && card.role !== role && card.role !== 'fill') {
       throw new Error(`God card role (${card.role}) does not match slot (${role})`)
     }
 
