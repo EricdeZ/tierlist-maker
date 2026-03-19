@@ -373,6 +373,8 @@ export default function CCStartingFive() {
   const canCollect = displayPassion >= 1 || displayCores >= 1
   const totalPpd = boostedPassionPerDay
   const totalCpd = boostedCoresPerDay
+  const totalPph = totalPpd / 24
+  const totalCph = totalCpd / 24
 
   if (!startingFive) {
     return (
@@ -418,7 +420,7 @@ export default function CCStartingFive() {
                   <span className="text-xs text-white/20 cd-num">/ {passionCap % 1 === 0 ? passionCap : passionCap.toFixed(1)}</span>
                 )}
               </div>
-              {passionCap > 0 && (
+              {(passionCap > 0 || displayPassion > 0) && (
                 <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
@@ -430,8 +432,8 @@ export default function CCStartingFive() {
                   />
                 </div>
               )}
-              {totalPpd > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalPpd.toFixed(1)}/day</span>
+              {totalPph > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalPph.toFixed(2)}/hr</span>
               )}
             </div>
 
@@ -449,7 +451,7 @@ export default function CCStartingFive() {
                   <span className="text-xs text-white/20 cd-num">/ {coresCap % 1 === 0 ? coresCap : coresCap.toFixed(1)}</span>
                 )}
               </div>
-              {coresCap > 0 && (
+              {(coresCap > 0 || displayCores > 0) && (
                 <div className="w-24 sm:w-32 h-1 bg-white/[0.06] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
@@ -461,8 +463,8 @@ export default function CCStartingFive() {
                   />
                 </div>
               )}
-              {totalCpd > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalCpd.toFixed(1)}/day</span>
+              {totalCph > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalCph.toFixed(2)}/hr</span>
               )}
             </div>
           </div>
