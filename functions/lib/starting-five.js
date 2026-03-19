@@ -53,78 +53,110 @@ export function getConsumableBoost(consumableId, rarity) {
 const CAP_DAYS = 2
 const HOURS_PER_DAY = 24
 
-export function getCardRates(holoType, rarity) {
-  if (!holoType) return { passionPerHour: 0, coresPerHour: 0 }
-  let passionDaily = 0, coresDaily = 0
+// Returns a card's economic contribution based on holo type
+export function getCardContribution(holoType, rarity, effectiveness = 1.0) {
+  if (!holoType) return { type: 'none' }
+
   if (holoType === 'holo') {
-    passionDaily = RATES.holo[rarity] || 0
-  } else if (holoType === 'reverse') {
-    coresDaily = RATES.reverse[rarity] || 0
-  } else if (holoType === 'full') {
-    passionDaily = RATES.full.passion[rarity] || 0
-    coresDaily = RATES.full.cores[rarity] || 0
+    return {
+      type: 'flat',
+      cores: (S5_FLAT_CORES[rarity] || 0) * effectiveness,
+      passion: (S5_FLAT_PASSION[rarity] || 0) * effectiveness,
+    }
   }
-  return {
-    passionPerHour: passionDaily / HOURS_PER_DAY,
-    coresPerHour: coresDaily / HOURS_PER_DAY,
+  if (holoType === 'reverse') {
+    const baseMult = S5_REVERSE_MULT[rarity] || 1
+    const multBonus = (baseMult - 1) * effectiveness
+    return { type: 'mult', multiplier: 1 + multBonus }
   }
+  if (holoType === 'full') {
+    const cores = (S5_FLAT_CORES[rarity] || 0) * S5_FULL_RATIO * effectiveness
+    const passion = (S5_FLAT_PASSION[rarity] || 0) * S5_FULL_RATIO * effectiveness
+    const baseMult = S5_REVERSE_MULT[rarity] || 1
+    const multBonus = (baseMult - 1) * S5_FULL_RATIO * effectiveness
+    return { type: 'full', cores, passion, multiplier: 1 + multBonus }
+  }
+  return { type: 'none' }
 }
 
-function getAttachmentMultiplier(attachment, type, synergy = false) {
-  if (!attachment || !attachment.holo_type || !attachment.rarity) return { passionMult: 1, coresMult: 1 }
-  const bonuses = ATTACHMENT_BONUSES[type]
-  if (!bonuses) return { passionMult: 1, coresMult: 1 }
+function getAttachmentBonus(attachment, type, playerHasFlat, playerHasMult, synergy = false) {
+  if (!attachment?.holo_type || !attachment?.rarity) return { flatBoost: 0, multAdd: 0 }
 
-  let passionBonus = bonuses.passion[attachment.rarity] || 0
-  let coresBonus = bonuses.cores[attachment.rarity] || 0
+  const attType = type // 'god' or 'item'
+  let flatPct = S5_ATT_FLAT[attType]?.[attachment.rarity] || 0
+  let multAdd = S5_ATT_MULT[attType]?.[attachment.rarity] || 0
 
   if (synergy && type === 'god') {
-    passionBonus *= (1 + GOD_SYNERGY_BONUS)
-    coresBonus *= (1 + GOD_SYNERGY_BONUS)
+    flatPct *= (1 + GOD_SYNERGY_BONUS)
+    multAdd *= (1 + GOD_SYNERGY_BONUS)
   }
 
-  let passionMult = 1, coresMult = 1
+  let resultFlat = 0, resultMult = 0
+
   if (attachment.holo_type === 'holo') {
-    passionMult = 1 + passionBonus
+    resultFlat = playerHasFlat ? flatPct : 0
   } else if (attachment.holo_type === 'reverse') {
-    coresMult = 1 + coresBonus
+    resultMult = playerHasMult ? multAdd : 0
   } else if (attachment.holo_type === 'full') {
-    passionMult = 1 + passionBonus * FULL_HOLO_RATIO
-    coresMult = 1 + coresBonus * FULL_HOLO_RATIO
+    resultFlat = playerHasFlat ? flatPct * S5_FULL_ATT_RATIO : 0
+    resultMult = playerHasMult ? multAdd * S5_FULL_ATT_RATIO : 0
   }
-  return { passionMult, coresMult }
+
+  return { flatBoost: resultFlat, multAdd: resultMult }
 }
 
-function checkSynergy(playerCard, godCard) {
+export function checkSynergy(playerCard, godCard) {
   if (!playerCard?.best_god_name || !godCard?.god_name) return false
   return godCard.god_name.toLowerCase() === playerCard.best_god_name.toLowerCase()
 }
 
-export function getSlotRates(playerCard, godCard, itemCard) {
-  const base = getCardRates(playerCard.holo_type, playerCard.rarity)
-  const synergy = checkSynergy(playerCard, godCard)
-  const god = getAttachmentMultiplier(godCard, 'god', synergy)
-  const item = getAttachmentMultiplier(itemCard, 'item')
+// Calculate a single lineup's daily output (before consumable)
+export function calculateLineupOutput(cards, teamCounts = {}) {
+  let totalFlatCores = 0, totalFlatPassion = 0, totalMult = 1.0
+
+  for (const card of cards) {
+    if (isRoleMismatch(card)) continue
+
+    const effectiveness = card.isBench ? S5_BENCH_EFFECTIVENESS : 1.0
+    const contrib = getCardContribution(card.holo_type, card.rarity, effectiveness)
+    const synergy = checkSynergy(card, card._godCard)
+    const playerHasFlat = contrib.type === 'flat' || contrib.type === 'full'
+    const playerHasMult = contrib.type === 'mult' || contrib.type === 'full'
+
+    const godBonus = getAttachmentBonus(card._godCard, 'god', playerHasFlat, playerHasMult, synergy)
+    const itemBonus = getAttachmentBonus(card._itemCard, 'item', playerHasFlat, playerHasMult)
+
+    // Attachment flat boosts — effectiveness already in contrib.cores/passion
+    if (playerHasFlat) {
+      const godFlatMult = 1 + godBonus.flatBoost
+      const itemFlatMult = 1 + itemBonus.flatBoost
+      totalFlatCores += contrib.cores * godFlatMult * itemFlatMult
+      totalFlatPassion += contrib.passion * godFlatMult * itemFlatMult
+    }
+
+    // Attachment mult additions — scaled by effectiveness
+    if (playerHasMult) {
+      const slotMult = contrib.multiplier + godBonus.multAdd * effectiveness + itemBonus.multAdd * effectiveness
+      totalMult *= slotMult
+    }
+  }
+
+  // Team synergy as global multiplier (starters only counted)
+  const maxTeamCount = Math.max(...Object.values(teamCounts), 0)
+  const teamBonus = 1 + (TEAM_SYNERGY_BONUS[maxTeamCount] || 0)
+
   return {
-    passionPerHour: base.passionPerHour * god.passionMult * item.passionMult,
-    coresPerHour: base.coresPerHour * god.coresMult * item.coresMult,
+    coresPerDay: totalFlatCores * totalMult * teamBonus,
+    passionPerDay: totalFlatPassion * totalMult * teamBonus,
   }
 }
 
-export function getAttachmentBonusInfo(attachment, type, synergy = false) {
-  if (!attachment || !attachment.holo_type) return { passionBonus: 0, coresBonus: 0 }
-  const bonuses = ATTACHMENT_BONUSES[type]
-  if (!bonuses) return { passionBonus: 0, coresBonus: 0 }
-  let pB = bonuses.passion[attachment.rarity] || 0
-  let cB = bonuses.cores[attachment.rarity] || 0
-  if (synergy && type === 'god') {
-    pB *= (1 + GOD_SYNERGY_BONUS)
-    cB *= (1 + GOD_SYNERGY_BONUS)
-  }
-  if (attachment.holo_type === 'holo') return { passionBonus: +pB.toFixed(4), coresBonus: 0 }
-  if (attachment.holo_type === 'reverse') return { passionBonus: 0, coresBonus: +cB.toFixed(4) }
-  if (attachment.holo_type === 'full') return { passionBonus: +(pB * FULL_HOLO_RATIO).toFixed(4), coresBonus: +(cB * FULL_HOLO_RATIO).toFixed(4) }
-  return { passionBonus: 0, coresBonus: 0 }
+export function getAttachmentBonusInfo(attachment, type, playerHoloType, synergy = false) {
+  if (!attachment?.holo_type) return { flatBoost: 0, multAdd: 0, effectiveType: 'none' }
+  const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full'
+  const playerHasMult = playerHoloType === 'reverse' || playerHoloType === 'full'
+  const bonus = getAttachmentBonus(attachment, type, playerHasFlat, playerHasMult, synergy)
+  return { ...bonus, effectiveType: bonus.flatBoost > 0 ? 'flat' : bonus.multAdd > 0 ? 'mult' : 'none' }
 }
 
 function reshapeAttachments(row) {
@@ -146,20 +178,8 @@ function reshapeAttachments(row) {
 }
 
 function isRoleMismatch(card) {
+  if (card.slot_role === 'bench') return false
   return card.slot_role && card.role && card.role !== card.slot_role && card.role !== 'fill'
-}
-
-function getTotalDailyRates(cards, teamCounts = {}) {
-  let totalPassion = 0, totalCores = 0
-  for (const card of cards) {
-    if (isRoleMismatch(card)) continue
-    const { godCard, itemCard } = reshapeAttachments(card)
-    const { passionPerHour, coresPerHour } = getSlotRates(card, godCard, itemCard)
-    const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
-    totalPassion += passionPerHour * teamBonus * HOURS_PER_DAY
-    totalCores += coresPerHour * teamBonus * HOURS_PER_DAY
-  }
-  return { totalPassionPerDay: totalPassion, totalCoresPerDay: totalCores }
 }
 
 async function ensureState(sql, userId) {
