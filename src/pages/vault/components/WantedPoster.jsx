@@ -53,19 +53,29 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
   const subtitleParts = [holoLabel, typeLabel].filter(Boolean).join(' \u00b7 ')
   const daysLeft = getDaysRemaining(bounty.expires_at)
 
-  // Resolve mugshot image
-  const mugshot = useMemo(() => {
+  // Resolve mugshot image + god class
+  const { mugshot, godClass } = useMemo(() => {
     if (bounty.card_type === 'god') {
       const god = bounty.target_god_id
         ? GODS.find(g => g.slug === bounty.target_god_id)
         : GODS.find(g => g.name === bounty.card_name)
-      if (god) return { url: getGodCardUrl(god.imageKey), isPlayer: false }
+      if (god) return { mugshot: { url: getGodCardUrl(god.imageKey), isPlayer: false }, godClass: god.class }
     }
     if (bounty.card_type === 'player' && bounty.avatar_url) {
-      return { url: bounty.avatar_url, isPlayer: true }
+      return { mugshot: { url: bounty.avatar_url, isPlayer: true }, godClass: null }
+    }
+    return { mugshot: null, godClass: null }
+  }, [bounty.card_type, bounty.card_name, bounty.target_god_id, bounty.avatar_url])
+
+  // Context line: god class for gods, team + division for players
+  const contextLine = useMemo(() => {
+    if (bounty.card_type === 'god' && godClass) return godClass
+    if (bounty.card_type === 'player') {
+      const parts = [bounty.team_name, bounty.division_name].filter(Boolean)
+      if (parts.length) return parts.join(' · ')
     }
     return null
-  }, [bounty.card_type, bounty.card_name, bounty.target_god_id, bounty.avatar_url])
+  }, [bounty.card_type, godClass, bounty.team_name, bounty.division_name])
 
   const pinSize = isLg ? 10 : 8
   const mugshotH = isLg ? 120 : 96
@@ -230,13 +240,29 @@ export default function WantedPoster({ bounty, size = 'sm', canFulfill, onFulfil
             color: '#fff',
             fontSize: isLg ? 13 : 11,
             letterSpacing: '0.04em',
-            marginBottom: 4,
+            marginBottom: contextLine ? 2 : 4,
             paddingLeft: 2,
             paddingRight: 2,
           }}
         >
           {bounty.card_name}
         </div>
+
+        {/* Context: god class or team + division */}
+        {contextLine && (
+          <div
+            className="text-center truncate w-full"
+            style={{
+              fontSize: isLg ? 10 : 8,
+              color: 'rgba(255,255,255,0.35)',
+              marginBottom: 4,
+              paddingLeft: 2,
+              paddingRight: 2,
+            }}
+          >
+            {contextLine}
+          </div>
+        )}
 
         {/* Rarity badge */}
         <div

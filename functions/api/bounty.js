@@ -101,7 +101,20 @@ async function handleList(sql, params) {
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
        )
        ORDER BY pd.avatar_url NULLS LAST, pd.updated_at DESC NULLS LAST
-       LIMIT 1) AS avatar_url
+       LIMIT 1) AS avatar_url,
+      (SELECT pd.team_name FROM cc_player_defs pd
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
+       ORDER BY pd.updated_at DESC NULLS LAST LIMIT 1) AS team_name,
+      (SELECT d.name FROM cc_player_defs pd
+       JOIN divisions d ON d.id = pd.division_id
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
+       ORDER BY pd.updated_at DESC NULLS LAST LIMIT 1) AS division_name
     FROM cc_bounties b
     WHERE b.status = 'active'
     ORDER BY b.created_at DESC
@@ -208,7 +221,20 @@ async function handleHero(sql) {
          OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
        )
        ORDER BY pd.avatar_url NULLS LAST, pd.updated_at DESC NULLS LAST
-       LIMIT 1) AS avatar_url
+       LIMIT 1) AS avatar_url,
+      (SELECT pd.team_name FROM cc_player_defs pd
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
+       ORDER BY pd.updated_at DESC NULLS LAST LIMIT 1) AS team_name,
+      (SELECT d.name FROM cc_player_defs pd
+       JOIN divisions d ON d.id = pd.division_id
+       WHERE b.card_type = 'player' AND (
+         (b.target_god_id IS NOT NULL AND CONCAT('player-', pd.player_id, '-t', pd.team_id) = b.target_god_id)
+         OR (b.target_god_id IS NULL AND pd.player_name = b.card_name)
+       )
+       ORDER BY pd.updated_at DESC NULLS LAST LIMIT 1) AS division_name
     FROM cc_bounties b
     WHERE b.status = 'active'
     ORDER BY b.core_reward DESC

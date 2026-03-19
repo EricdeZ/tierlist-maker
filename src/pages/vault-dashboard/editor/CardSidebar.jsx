@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom, FileText } from 'lucide-react'
+import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom, FileText, Plus, Minus, X } from 'lucide-react'
 import { ROLES } from '../preview/prebuiltRenderers'
 
 const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace', "'Segoe UI', system-ui, sans-serif"]
@@ -10,9 +10,147 @@ const HOLO_EFFECTS = [
     'rainbow', 'secret', 'gold',
 ]
 
+const DEFAULT_RIGHT_OPTIONS = ['LEGENDARY', 'EPIC', 'RARE', 'COMMON', 'MYTHIC', 'LIMITED EDITION', 'PROMO']
+
 const btn = 'flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors'
 const input = 'px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500'
 const label = 'block text-[10px] text-gray-500 mb-1 uppercase tracking-wider'
+
+function FooterProperties({ sel, onUpdateElement }) {
+    const [newOption, setNewOption] = useState('')
+    const [showAddOption, setShowAddOption] = useState(false)
+    const counterNum = parseInt((sel.leftText || '0').replace(/\D/g, '')) || 0
+    const options = sel.rightOptions || DEFAULT_RIGHT_OPTIONS
+    const counterPad = sel.counterPad ?? 3
+
+    const setCounter = (n) => {
+        const val = Math.max(0, n)
+        onUpdateElement(sel.id, { leftText: `#${String(val).padStart(counterPad, '0')}` })
+    }
+
+    const addOption = () => {
+        const trimmed = newOption.trim().toUpperCase()
+        if (!trimmed || options.includes(trimmed)) return
+        const updated = [...options, trimmed]
+        onUpdateElement(sel.id, { rightOptions: updated, rightText: trimmed })
+        setNewOption('')
+        setShowAddOption(false)
+    }
+
+    const removeOption = (opt) => {
+        const updated = options.filter(o => o !== opt)
+        const updates = { rightOptions: updated }
+        if (sel.rightText === opt) updates.rightText = updated[0] || ''
+        onUpdateElement(sel.id, updates)
+    }
+
+    return (
+        <div className="space-y-3">
+            {/* Counter (left) */}
+            <div>
+                <label className={label}>Counter</label>
+                <div className="flex items-center gap-1">
+                    <button onClick={() => setCounter(counterNum - 1)}
+                        className="p-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-amber-500 transition-colors">
+                        <Minus size={12} />
+                    </button>
+                    <input type="text" value={sel.leftText || '#001'} readOnly
+                        className={`${input} w-full text-center font-mono`} />
+                    <button onClick={() => setCounter(counterNum + 1)}
+                        className="p-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-amber-500 transition-colors">
+                        <Plus size={12} />
+                    </button>
+                </div>
+                <div className="mt-1.5">
+                    <label className={label}>Digits: {counterPad}</label>
+                    <input type="range" min={1} max={6} value={counterPad}
+                        onChange={e => {
+                            const pad = parseInt(e.target.value)
+                            onUpdateElement(sel.id, {
+                                counterPad: pad,
+                                leftText: `#${String(counterNum).padStart(pad, '0')}`
+                            })
+                        }}
+                        className="w-full accent-amber-500" />
+                </div>
+            </div>
+
+            {/* Right text options */}
+            <div>
+                <label className={label}>Label</label>
+                <div className="flex flex-wrap gap-1">
+                    {options.map(opt => (
+                        <button key={opt}
+                            onClick={() => onUpdateElement(sel.id, { rightText: opt })}
+                            className={`group relative px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                                sel.rightText === opt
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                    : 'bg-gray-800 text-gray-400 border border-gray-700 hover:text-gray-200 hover:border-gray-600'
+                            }`}>
+                            {opt}
+                            {!DEFAULT_RIGHT_OPTIONS.includes(opt) && (
+                                <span onClick={e => { e.stopPropagation(); removeOption(opt) }}
+                                    className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                    <X size={8} className="text-white" />
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                    {showAddOption ? (
+                        <div className="flex items-center gap-1">
+                            <input type="text" value={newOption} onChange={e => setNewOption(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') addOption(); if (e.key === 'Escape') setShowAddOption(false) }}
+                                placeholder="New label..."
+                                autoFocus
+                                className={`${input} w-24 text-[10px]`} />
+                            <button onClick={addOption}
+                                className="p-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition-colors">
+                                <Plus size={10} />
+                            </button>
+                            <button onClick={() => { setShowAddOption(false); setNewOption('') }}
+                                className="p-1 bg-gray-700 text-gray-400 rounded hover:text-gray-200 transition-colors">
+                                <X size={10} />
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setShowAddOption(true)}
+                            className="px-2 py-1 rounded text-[10px] bg-gray-800 text-gray-500 border border-dashed border-gray-700 hover:text-amber-400 hover:border-amber-500/40 transition-colors">
+                            <Plus size={10} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Role colors & size */}
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className={label}>Role Colors</label>
+                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                        className={`${input} w-full capitalize`}>
+                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className={label}>Size: {sel.fontSize ?? 9}px</label>
+                    <input type="range" min={6} max={20} value={sel.fontSize ?? 9}
+                        onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
+                        className="w-full accent-amber-500" />
+                </div>
+            </div>
+            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+                <input type="checkbox" checked={!!sel.showBg} onChange={e => onUpdateElement(sel.id, { showBg: e.target.checked })}
+                    className="accent-amber-500" />
+                Show Background
+            </label>
+            <div>
+                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
+                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
+                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
+                    className="w-full accent-amber-500" />
+            </div>
+        </div>
+    )
+}
 
 export default function CardSidebar({
     elements,
@@ -595,46 +733,7 @@ export default function CardSidebar({
 
                     {/* Footer properties */}
                     {sel.type === 'footer' && (
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className={label}>Left Text</label>
-                                    <input type="text" value={sel.leftText || ''} onChange={e => onUpdateElement(sel.id, { leftText: e.target.value })}
-                                        className={`${input} w-full`} />
-                                </div>
-                                <div>
-                                    <label className={label}>Right Text</label>
-                                    <input type="text" value={sel.rightText || ''} onChange={e => onUpdateElement(sel.id, { rightText: e.target.value })}
-                                        className={`${input} w-full`} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className={label}>Role Colors</label>
-                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
-                                        className={`${input} w-full capitalize`}>
-                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={label}>Size: {sel.fontSize ?? 9}px</label>
-                                    <input type="range" min={6} max={20} value={sel.fontSize ?? 9}
-                                        onChange={e => onUpdateElement(sel.id, { fontSize: parseInt(e.target.value) })}
-                                        className="w-full accent-amber-500" />
-                                </div>
-                            </div>
-                            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
-                                <input type="checkbox" checked={!!sel.showBg} onChange={e => onUpdateElement(sel.id, { showBg: e.target.checked })}
-                                    className="accent-amber-500" />
-                                Show Background
-                            </label>
-                            <div>
-                                <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
-                                <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
-                                    onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
-                                    className="w-full accent-amber-500" />
-                            </div>
-                        </div>
+                        <FooterProperties sel={sel} onUpdateElement={onUpdateElement} />
                     )}
 
                     {/* Position & Size */}

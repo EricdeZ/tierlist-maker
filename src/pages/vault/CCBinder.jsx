@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useVault } from './VaultContext'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import { ChevronLeft, ChevronRight, Share2, Settings, X, Check, BookMarked } from 'lucide-react'
 import './binder.css'
@@ -609,6 +610,7 @@ function toGameCardData(card) {
   const base = {
     name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
+    signatureUrl: card.signatureUrl || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -629,10 +631,15 @@ function toPlayerCardProps(card) {
     isConnected: card.isConnected,
     defId: card.defId,
     rarity: card.rarity,
+    signatureUrl: card.signatureUrl || undefined,
   }
 }
 
 function BinderCardRender({ card }) {
+  const { getTemplate } = useVault()
+  if ((card.cardType || 'god') === 'collection') {
+    return <VaultCard card={card} getTemplate={getTemplate} holo={false} />
+  }
   const isPlayer = (card.cardType || 'god') === 'player'
   if (isPlayer) {
     return <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} />

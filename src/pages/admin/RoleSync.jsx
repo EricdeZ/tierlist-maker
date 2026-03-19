@@ -147,7 +147,7 @@ export default function RoleSync() {
         }
     }
 
-    const matchUrl = (ch) => `/${ch.leagueSlug}/${ch.divisionSlug}/matches/${ch.matchId}`
+    const matchUrl = (ch) => `/${ch.leagueSlug}/${ch.divisionSlug}/matches`
 
     const resetPreview = () => {
         setPreview(null)
@@ -169,7 +169,7 @@ export default function RoleSync() {
             <div className="max-w-7xl mx-auto p-4 space-y-6">
                 <div>
                     <h1 className="text-lg font-semibold">Role Sync</h1>
-                    <p className="text-xs text-gray-500">Detect role mismatches by comparing each player's assigned role to their most recently played game</p>
+                    <p className="text-xs text-gray-500">Detect role mismatches by comparing each player's assigned role to their most played role</p>
                 </div>
 
                 {toast && (
@@ -339,8 +339,8 @@ export default function RoleSync() {
                                                         onClick={e => e.stopPropagation()}
                                                         className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 shrink-0 ml-auto"
                                                     >
-                                                        {ch.matchWeek ? `W${ch.matchWeek}` : ''} G{ch.gameNumber}
-                                                        {ch.matchDate && <span className="text-gray-600 ml-1">{new Date(ch.matchDate).toLocaleDateString()}</span>}
+                                                        {ch.gameCount} game{ch.gameCount !== 1 ? 's' : ''}
+                                                        {ch.matchDate && <span className="text-gray-600 ml-1">last {new Date(ch.matchDate).toLocaleDateString()}</span>}
                                                     </a>
                                                 </label>
                                             )

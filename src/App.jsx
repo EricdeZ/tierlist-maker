@@ -113,6 +113,7 @@ const CardCreator = lazy(() => import('./pages/vault-dashboard/CardCreator'))
 const TemplatesPage = lazy(() => import('./pages/vault-dashboard/TemplatesPage'))
 const DraftsPage = lazy(() => import('./pages/vault-dashboard/DraftsPage'))
 const AssetsPage = lazy(() => import('./pages/vault-dashboard/AssetsPage'))
+const CollectionsPage = lazy(() => import('./pages/vault-dashboard/CollectionsPage'))
 const PlayerDashboard = lazy(() => import('./pages/dashboard/PlayerDashboard'))
 
 function HomeRoute() {
@@ -211,6 +212,7 @@ function App() {
                                 <Route path="templates" element={<Suspense fallback={null}><TemplatesPage /></Suspense>} />
                                 <Route path="drafts" element={<Suspense fallback={null}><DraftsPage /></Suspense>} />
                                 <Route path="assets" element={<Suspense fallback={null}><AssetsPage /></Suspense>} />
+                                <Route path="collections" element={<Suspense fallback={null}><CollectionsPage /></Suspense>} />
                             </Route>
 
                             {/* Passion pages */}

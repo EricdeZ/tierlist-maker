@@ -297,6 +297,7 @@ export async function confirmTrade(tx, userId, tradeId) {
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${aCardIds})`
     await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${aCardIds})`
     await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${aCardIds})`
+    await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${aCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }
   if (bCards.length > 0) {
     const bCardIds = bCards.map(c => c.card_id)
@@ -306,6 +307,7 @@ export async function confirmTrade(tx, userId, tradeId) {
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${bCardIds})`
     await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${bCardIds})`
     await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${bCardIds})`
+    await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${bCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }
 
   // Transfer Core
@@ -362,7 +364,7 @@ export async function pollTrade(sql, userId, tradeId) {
   // Get cards in trade
   const cards = await sql`
     SELECT tc.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type,
-           c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id,
+           c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url,
            d.best_god_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
            COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar

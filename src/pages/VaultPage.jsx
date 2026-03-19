@@ -26,6 +26,8 @@ const CCDismantle = lazy(() => import('./vault/CCDismantle'))
 const CCStartingFive = lazy(() => import('./vault/CCStartingFive'))
 const CCBinder = lazy(() => import('./vault/CCBinder'))
 const CCBountyBoard = lazy(() => import('./vault/CCBountyBoard'))
+const CCSignatureRequests = lazy(() => import('./vault/CCSignatureRequests'))
+const CCSignatureApprovals = lazy(() => import('./vault/CCSignatureApprovals'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
@@ -126,14 +128,14 @@ export default function VaultPage() {
 
 function VaultInner() {
     const { user } = useAuth()
-    const { claimableCount, refreshBalance } = usePassion()
+    const { vaultClaimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
 
-    // Poll claimableCount every 60s while vault is visible
+    // Poll vaultClaimableCount every 60s while vault is visible
     useEffect(() => {
         const id = setInterval(() => {
             if (document.visibilityState === 'visible') refreshBalance()
@@ -249,9 +251,9 @@ function VaultInner() {
                                 {tab.key === 'trade' && pendingTradeCount > 0 && (
                                     <span className="w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
                                 )}
-                                {tab.key === 'challenges' && claimableCount > 0 && (
+                                {tab.key === 'challenges' && vaultClaimableCount > 0 && (
                                     <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black flex items-center justify-center animate-pulse">
-                                        {claimableCount}
+                                        {vaultClaimableCount}
                                     </span>
                                 )}
                                 {active && (
@@ -318,6 +320,18 @@ function VaultInner() {
                     </button>
                 )}
 
+                {pendingApprovalCount > 0 && (
+                    <Suspense fallback={null}>
+                        <CCSignatureApprovals />
+                    </Suspense>
+                )}
+
+                {pendingSignatureCount > 0 && (
+                    <Suspense fallback={null}>
+                        <CCSignatureRequests />
+                    </Suspense>
+                )}
+
                 {/* Content */}
                 {loading && !loaded ? (
                     <div className="flex items-center justify-center py-20">
@@ -346,12 +360,13 @@ function VaultInner() {
                     onTabChange={setTab}
                     unseenGifts={unseenGifts}
                     pendingTradeCount={pendingTradeCount}
-                    claimableCount={claimableCount}
+                    vaultClaimableCount={vaultClaimableCount}
                     packMode={packMode}
                     onPackModeChange={setPackMode}
                     myPacksCount={myPacksCount}
                 />
             </div>
+
         </div>
     )
 }

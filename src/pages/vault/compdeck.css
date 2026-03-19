@@ -1196,6 +1196,9 @@
     justify-content: center;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(8px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 2.5rem 1rem;
 }
 
 .card-zoom-backdrop.card-zoom-in {
@@ -1209,6 +1212,7 @@
 .card-zoom-content {
     position: relative;
     max-width: 90vw;
+    margin: auto;
 }
 
 .card-zoom-in .card-zoom-content {

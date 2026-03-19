@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import GameCard from './GameCard'
+import VaultCard from './VaultCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
-import { marketplaceService } from '../../../services/database'
+import { marketplaceService, vaultService } from '../../../services/database'
 import { RARITIES, getHoloEffect, MARKETPLACE } from '../../../data/vault/economy'
 import { CLASS_ROLE } from '../../../data/vault/gods'
 import { useVault } from '../VaultContext'
-import { X, Tag } from 'lucide-react'
+import { useAuth } from '../../../context/AuthContext'
+import { X, Tag, PenLine } from 'lucide-react'
+
+const DirectSignModal = lazy(() => import('./DirectSignModal'))
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 
@@ -16,9 +20,14 @@ function calculateFee(price) {
   return Math.max(raw, MARKETPLACE.minFee)
 }
 
-export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, holoType: holoTypeProp }) {
-  const { collection } = useVault()
+export default function CardZoomModal({ onClose, gameCard, playerCard, collectionCard, canSell, holoType: holoTypeProp }) {
+  const { collection, refreshCollection, getTemplate } = useVault()
+  const { linkedPlayer } = useAuth()
   const [closing, setClosing] = useState(false)
+  const [requestingSignature, setRequestingSignature] = useState(false)
+  const [signatureRequested, setSignatureRequested] = useState(false)
+  const [signError, setSignError] = useState(null)
+  const [directSignMode, setDirectSignMode] = useState(false)
 
   // Rarity switcher
   const ownedRarities = gameCard?.ownedRarities || playerCard?.ownedRarities || []
@@ -113,6 +122,38 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
   const matchedInstance = ownedInstances.find(i => i.rarity === rarity)
   const holoType = holoTypeProp || matchedInstance?.holoType || 'reverse'
 
+  // Merge signature URL from the owned instance into the card display data
+  const gameCardData = useMemo(() => {
+    if (!gameCard?.data) return null
+    const sigUrl = matchedInstance?.signatureUrl
+    return sigUrl ? { ...gameCard.data, signatureUrl: sigUrl } : gameCard.data
+  }, [gameCard?.data, matchedInstance?.signatureUrl])
+
+  // Owner of unique player card, not already signed
+  const cardPlayerId = matchedInstance?.defPlayerId || matchedInstance?.cardData?._testPlayerId
+  const isUniqueOwner = canSell && rarity === 'unique' && matchedInstance
+    && !matchedInstance.signatureUrl && cardPlayerId
+
+  // Can direct-sign: owner IS the depicted player
+  const canDirectSign = isUniqueOwner && linkedPlayer && linkedPlayer.id === cardPlayerId
+
+  // Can request signature from someone else
+  const canRequestSignature = isUniqueOwner && !canDirectSign
+
+  const handleRequestSignature = async () => {
+    if (!matchedInstance) return
+    setRequestingSignature(true)
+    setSignError(null)
+    try {
+      await vaultService.requestSignature(matchedInstance.id)
+      setSignatureRequested(true)
+    } catch (err) {
+      setSignError(err.message || 'Failed to request signature')
+    } finally {
+      setRequestingSignature(false)
+    }
+  }
+
   // Determine role for holo effect
   const role = playerCard
     ? (playerCard.role || 'ADC')
@@ -131,12 +172,16 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
           <X className="w-6 h-6" />
         </button>
 
-        {gameCard && (
-          <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size="min(340px, 85vw)">
+        {collectionCard && (
+          <VaultCard card={{ ...collectionCard, rarity }} getTemplate={getTemplate} size={280} holo />
+        )}
+
+        {gameCard && !collectionCard && (
+          <TradingCardHolo rarity={holoEffect} role={role} holoType={holoType} size={280}>
             <GameCard
               type={gameCard.type}
               rarity={rarity}
-              data={gameCard.data}
+              data={gameCardData}
             />
           </TradingCardHolo>
         )}
@@ -156,7 +201,9 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
             isConnected={playerCard.isConnected}
             isFirstEdition={matchedInstance?.isFirstEdition ?? playerCard?.isFirstEdition}
             loadStats={playerCard.defId}
+            size={280}
             holo={{ rarity: holoEffect, holoType }}
+            signatureUrl={matchedInstance?.signatureUrl}
           />
         )}
 
@@ -269,6 +316,59 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, canSell, 
           <div className="mt-3 w-full text-center py-3 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/20">
             <div className="text-xs font-bold text-emerald-400 cd-head uppercase tracking-wider">Listed on Market!</div>
             <div className="text-[11px] text-[var(--cd-text-dim)] mt-1 cd-num">{priceNum} Core</div>
+          </div>
+        )}
+
+        {/* Direct sign button (owner IS the depicted player) */}
+        {canDirectSign && !directSignMode && !sellMode && !sellSuccess && (
+          <button
+            onClick={() => setDirectSignMode(true)}
+            className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#e8e8ff]/[0.08] border border-[#e8e8ff]/20 text-[#e8e8ff] text-xs font-bold uppercase tracking-wider cd-head hover:bg-[#e8e8ff]/[0.15] transition-all cursor-pointer"
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            Sign Your Card
+          </button>
+        )}
+
+        {directSignMode && (
+          <Suspense fallback={null}>
+            <DirectSignModal
+              cardId={matchedInstance.id}
+              playerCard={playerCard}
+              gameCard={gameCard}
+              onClose={() => setDirectSignMode(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* Request signature button (owner is NOT the depicted player) */}
+        {canRequestSignature && !signatureRequested && !sellMode && !sellSuccess && (
+          <button
+            onClick={handleRequestSignature}
+            disabled={requestingSignature}
+            className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#e8e8ff]/[0.08] border border-[#e8e8ff]/20 text-[#e8e8ff] text-xs font-bold uppercase tracking-wider cd-head hover:bg-[#e8e8ff]/[0.15] transition-all cursor-pointer disabled:opacity-30"
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            {requestingSignature ? 'Requesting...' : 'Request Signature'}
+          </button>
+        )}
+
+        {signatureRequested && (
+          <div className="mt-2 w-full text-center py-3 rounded-lg bg-[#e8e8ff]/[0.06] border border-[#e8e8ff]/15">
+            <div className="text-xs font-bold text-[#e8e8ff] cd-head uppercase tracking-wider">Signature Requested</div>
+            <div className="text-[11px] text-[var(--cd-text-dim)] mt-1">The player will be notified</div>
+          </div>
+        )}
+
+        {signError && (
+          <div className="text-[11px] text-red-400 text-center cd-mono mt-1">{signError}</div>
+        )}
+
+        {matchedInstance?.signatureUrl && (
+          <div className="mt-2 text-center">
+            <span className="text-[10px] text-[#e8e8ff]/50 cd-head uppercase tracking-wider">
+              Signed
+            </span>
           </div>
         )}
       </div>

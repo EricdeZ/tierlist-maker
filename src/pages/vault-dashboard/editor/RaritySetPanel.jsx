@@ -1,22 +1,14 @@
-import { useState } from 'react'
-import StructuredCard from '../preview/StructuredCard'
-import MiniCardPreview from '../preview/MiniCardPreview'
-import { RARITIES } from '../../../data/vault/economy'
 import { Trash2, ChevronUp, ChevronDown, BarChart3, FileText, Zap } from 'lucide-react'
 
 const CLASSES = ['Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter']
 const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support']
 const ABILITY_TYPES = ['damage', 'aoe_damage', 'heal', 'buff', 'debuff', 'cc', 'execute', 'shield', 'summon', 'global', 'stealth', 'mobility']
 
-const STRUCTURED_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary']
-const FULL_ART_RARITIES = ['mythic', 'unique']
-
 const input = 'px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500'
 const label = 'block text-[10px] text-gray-500 mb-1 uppercase tracking-wider'
 const btn = 'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors'
 
-export default function RaritySetPanel({ cardData, onCardDataChange, cardType, elements, border }) {
-    const [selectedPreview, setSelectedPreview] = useState(null)
+export default function RaritySetPanel({ cardData, onCardDataChange, cardType }) {
     const d = cardData
 
     const update = (updates) => onCardDataChange({ ...d, ...updates })
@@ -222,37 +214,6 @@ export default function RaritySetPanel({ cardData, onCardDataChange, cardType, e
                 </div>
             </div>
 
-            {/* Rarity previews */}
-            <div className="border-t border-gray-800 pt-3">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Rarity Set Preview</h3>
-                <div className="grid grid-cols-2 gap-2">
-                    {STRUCTURED_RARITIES.map(r => (
-                        <div key={r} className={`cursor-pointer rounded-lg p-1.5 transition-colors ${
-                            selectedPreview === r ? 'bg-gray-700/50 ring-1 ring-amber-500/50' : 'hover:bg-gray-800/50'
-                        }`} onClick={() => setSelectedPreview(selectedPreview === r ? null : r)}>
-                            <div className="flex justify-center">
-                                <StructuredCard cardData={d} rarity={r} cardType={cardType} size="110px" />
-                            </div>
-                            <p className="text-center text-[10px] mt-1 font-medium" style={{ color: RARITIES[r]?.color }}>
-                                {RARITIES[r]?.name}
-                            </p>
-                        </div>
-                    ))}
-
-                    {FULL_ART_RARITIES.map(r => (
-                        <div key={r} className={`cursor-pointer rounded-lg p-1.5 transition-colors ${
-                            selectedPreview === r ? 'bg-gray-700/50 ring-1 ring-amber-500/50' : 'hover:bg-gray-800/50'
-                        }`} onClick={() => setSelectedPreview(selectedPreview === r ? null : r)}>
-                            <div className="flex justify-center">
-                                <MiniCardPreview templateData={{ elements, border }} />
-                            </div>
-                            <p className="text-center text-[10px] mt-1 font-medium" style={{ color: RARITIES[r]?.color }}>
-                                {RARITIES[r]?.name} (Full Art)
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </div>
     )
 }

@@ -80,6 +80,7 @@ function renderCard(card, size) {
       bestGod={card.bestGodName ? { name: card.bestGodName } : null}
       isConnected={card.isConnected}
       isFirstEdition={cd.isFirstEdition}
+      signatureUrl={card.signatureUrl}
       size={size}
     />
   )

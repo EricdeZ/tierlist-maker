@@ -8,8 +8,9 @@ const ABILITY_ICONS = {
     summon: 'Smn', global: 'Glbl', stealth: 'Stlh', mobility: 'Move',
 }
 
-export default function StructuredCard({ cardData, rarity = 'common', cardType = 'god', size }) {
+export default function StructuredCard({ cardData, rarity = 'common', cardType = 'god', size, overrides, footer, banner, canvasBlocks, subtitleEl }) {
     const d = cardData || {}
+    const o = overrides || {}
     const rarityInfo = RARITIES[rarity] || RARITIES.common
     const role = d.role || 'mid'
     const scale = size ? parseFloat(size) / 240 : NaN
@@ -17,30 +18,42 @@ export default function StructuredCard({ cardData, rarity = 'common', cardType =
     if (size) style.width = size
 
     const type = (cardType === 'player' || cardType === 'custom') ? 'god' : cardType
-    const blocks = d.blocks || []
+    const blocks = canvasBlocks || d.blocks || []
+    const imageUrl = d.imageUrl
 
     return (
         <div className="game-card" data-rarity={rarity} data-role={type === 'god' ? role : undefined}
             data-type={type !== 'god' ? type : undefined} style={style}>
             <div className="game-card__border">
-                <div className="game-card__body">
+                <div className="game-card__body" style={o.bgColor ? { background: o.bgColor } : undefined}>
                     {/* Top banner */}
                     <div className="game-card__top">
-                        <span className="game-card__top-name">{d.name || 'Card Name'}</span>
-                        {type === 'god' && <span className="game-card__type-label">{role}</span>}
-                        {type !== 'god' && d.topStatLabel && (
-                            <div className="game-card__top-stat">
-                                <span className="game-card__power-label">{d.topStatLabel}</span>
-                                <span className="game-card__power-value"> {d.topStatValue || '0'}</span>
-                            </div>
+                        <span className="game-card__top-name">{banner ? (banner.playerName || 'Name') : (d.name || 'Card Name')}</span>
+                        {banner ? (
+                            banner.roleLabel && <span className="game-card__type-label">{banner.roleLabel}</span>
+                        ) : (
+                            <>
+                                {type === 'god' && <span className="game-card__type-label">{role}</span>}
+                                {type !== 'god' && d.topStatLabel && (
+                                    <div className="game-card__top-stat">
+                                        <span className="game-card__power-label">{d.topStatLabel}</span>
+                                        <span className="game-card__power-value"> {d.topStatValue || '0'}</span>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 
                     {/* Image */}
                     <div className="game-card__image-wrap">
-                        <div className="game-card__image">
-                            {d.imageUrl ? (
-                                <img src={d.imageUrl} alt={d.name} loading="lazy" />
+                        <div className="game-card__image" style={d.imageBgColor ? { background: d.imageBgColor } : undefined}>
+                            {imageUrl ? (
+                                <img src={imageUrl} alt={d.name} loading="lazy"
+                                    style={(d.imageX != null || d.imageY != null || d.imageZoom != null) ? {
+                                        objectFit: 'cover', height: '100%',
+                                        objectPosition: `${d.imageX ?? 50}% ${d.imageY ?? 50}%`,
+                                        transform: d.imageZoom && d.imageZoom !== 100 ? `scale(${d.imageZoom / 100})` : undefined,
+                                    } : undefined} />
                             ) : (
                                 <div className="game-card__image-placeholder">
                                     {(type === 'god' ? 'G' : type[0]?.toUpperCase()) || '?'}
@@ -50,9 +63,9 @@ export default function StructuredCard({ cardData, rarity = 'common', cardType =
                     </div>
 
                     {/* Subtitle */}
-                    {d.subtitle && (
+                    {(subtitleEl?.text || d.subtitle) && (
                         <div className="game-card__subtitle">
-                            <span>{d.subtitle}</span>
+                            <span>{subtitleEl ? subtitleEl.text : d.subtitle}</span>
                         </div>
                     )}
 
@@ -61,10 +74,17 @@ export default function StructuredCard({ cardData, rarity = 'common', cardType =
                         <ContentBlock key={i} block={block} />
                     ))}
 
+                    {/* Signature overlay */}
+                    {d.signatureUrl && (
+                        <div className="game-card__signature">
+                            <img src={d.signatureUrl} alt="Signature" loading="lazy" />
+                        </div>
+                    )}
+
                     {/* Footer */}
                     <div className="game-card__footer">
-                        <span className="game-card__serial">#{d.serialNumber || '???'}</span>
-                        <span className="game-card__rarity-label">{rarityInfo.name}</span>
+                        <span className="game-card__serial">{footer ? (footer.leftText || '') : `#${d.serialNumber || '???'}`}</span>
+                        <span className="game-card__rarity-label">{footer ? (footer.rightText || rarityInfo.name) : rarityInfo.name}</span>
                     </div>
                 </div>
             </div>

@@ -345,15 +345,26 @@ async function claimChallenge(sql, user, event) {
     pushChallengeProgress(sql, user.id, { total_earned: Number(result.totalEarned) })
         .catch(err => console.error('Challenge push (total_earned) failed:', err))
 
-    // Get remaining claimable count
-    const [{ count: claimableCount }] = await sql`
-        SELECT COUNT(*) as count FROM user_challenges uc
-        JOIN challenges c ON c.id = uc.challenge_id
-        WHERE uc.user_id = ${user.id}
-          AND uc.completed = false
-          AND uc.current_value >= c.target_value
-          AND c.is_active = true
-    `
+    // Get remaining claimable counts (all + vault-only)
+    const [[{ count: claimableCount }], [{ count: vaultClaimableCount }]] = await Promise.all([
+        sql`
+            SELECT COUNT(*) as count FROM user_challenges uc
+            JOIN challenges c ON c.id = uc.challenge_id
+            WHERE uc.user_id = ${user.id}
+              AND uc.completed = false
+              AND uc.current_value >= c.target_value
+              AND c.is_active = true
+        `,
+        sql`
+            SELECT COUNT(*) as count FROM user_challenges uc
+            JOIN challenges c ON c.id = uc.challenge_id
+            WHERE uc.user_id = ${user.id}
+              AND uc.completed = false
+              AND uc.current_value >= c.target_value
+              AND c.is_active = true
+              AND c.category = 'vault'
+        `,
+    ])
 
     return {
         statusCode: 200,
@@ -367,6 +378,7 @@ async function claimChallenge(sql, user, event) {
             rank: { name: newRank.name, division: newRank.division, display: formatRank(newRank) },
             rankedUp,
             claimableCount: parseInt(claimableCount),
+            vaultClaimableCount: parseInt(vaultClaimableCount),
             badge: challenge.gives_badge ? { label: challenge.badge_label } : null,
         }),
     }

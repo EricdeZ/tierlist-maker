@@ -1484,5 +1484,11 @@ export const tournamentService = {
     async adminDeleteSignup(signupId) {
         return apiPost('tournament-manage', {}, { action: 'delete-signup', signupId })
     },
+    async eggHuntStatus(tournamentId) {
+        return apiCall('tournament-egg-hunt', { tournamentId })
+    },
+    async eggHuntComplete(tournamentId, eggsCollected) {
+        return apiPost('tournament-egg-hunt', {}, { tournamentId, eggsCollected })
+    },
 }
 

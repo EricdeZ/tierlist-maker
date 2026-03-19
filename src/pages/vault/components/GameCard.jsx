@@ -49,6 +49,12 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
           {type === 'minion' && <MinionCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
           {type === 'buff' && <BuffCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
           {type === 'consumable' && <ConsumableCardContent data={data} rarity={rarity} rarityInfo={rarityInfo} />}
+
+          {data.signatureUrl && (
+            <div className="game-card__signature">
+              <img src={data.signatureUrl} alt="Signature" loading="lazy" />
+            </div>
+          )}
         </div>
       </div>
     </div>

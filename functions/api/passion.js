@@ -74,7 +74,7 @@ async function getBalance(sql, user) {
         ensureEmberBalance(sql, user.id),
     ])
 
-    const [[pb], [eb], [{ count: claimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
+    const [[pb], [eb], [{ count: claimableCount }], [{ count: vaultClaimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
         sql`
             SELECT balance, total_earned, total_spent,
                    last_daily_claim, current_streak, longest_streak
@@ -92,6 +92,15 @@ async function getBalance(sql, user) {
               AND uc.completed = false
               AND uc.current_value >= c.target_value
               AND c.is_active = true
+        `,
+        sql`
+            SELECT COUNT(*) as count FROM user_challenges uc
+            JOIN challenges c ON c.id = uc.challenge_id
+            WHERE uc.user_id = ${user.id}
+              AND uc.completed = false
+              AND uc.current_value >= c.target_value
+              AND c.is_active = true
+              AND c.category = 'vault'
         `,
         sql`
             SELECT EXISTS(
@@ -133,6 +142,7 @@ async function getBalance(sql, user) {
             longestStreak: pb.longest_streak,
             canClaimDaily,
             claimableCount: parseInt(claimableCount),
+            vaultClaimableCount: parseInt(vaultClaimableCount),
             inDiscord: inDiscord,
             lastDailyClaim: pb.last_daily_claim,
             rank: { name: rank.name, division: rank.division, display: formatRank(rank) },

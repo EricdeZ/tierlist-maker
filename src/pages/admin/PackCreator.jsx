@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import PageTitle from '../../components/PageTitle'
-import { packCreatorService } from '../../services/database'
+import { packCreatorService, vaultDashboardService } from '../../services/database'
 
-const CARD_TYPES = ['god', 'item', 'consumable', 'player']
+const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'collection']
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const RARITY_COLORS = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',
@@ -12,7 +12,7 @@ const RARITY_COLORS = {
 const GROUP_LABELS = ['', 'A', 'B', 'C', 'D', 'E']
 const DEFAULT_SLOT = { types: ['god', 'item', 'consumable'], typeWeights: {}, minRarity: 'common', maxRarity: null, group: '' }
 
-function SlotEditor({ slot, index, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast }) {
+function SlotEditor({ slot, index, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, collections }) {
   const updateField = (field, value) => onChange({ ...slot, [field]: value })
 
   const toggleType = (type) => {
@@ -119,30 +119,45 @@ function SlotEditor({ slot, index, onChange, onRemove, onDuplicate, onMoveUp, on
         </div>
       )}
 
-      {/* Rarity range */}
-      <div className="flex gap-3">
+      {/* Collection slot — show collection picker instead of rarity range */}
+      {slot.types.length === 1 && slot.types[0] === 'collection' ? (
         <div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Min Rarity</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Collection</div>
           <select
-            value={slot.minRarity || 'common'}
-            onChange={e => updateField('minRarity', e.target.value)}
-            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
+            value={slot.collectionId || ''}
+            onChange={e => onChange({ ...slot, type: 'collection', collectionId: parseInt(e.target.value) || null })}
+            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white w-full"
           >
-            {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+            <option value="">Select collection...</option>
+            {(collections || []).map(c => <option key={c.id} value={c.id}>{c.name} ({c.entry_count} cards)</option>)}
           </select>
         </div>
-        <div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Max Rarity</div>
-          <select
-            value={slot.maxRarity || ''}
-            onChange={e => updateField('maxRarity', e.target.value || null)}
-            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
-          >
-            <option value="">No cap</option>
-            {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
+      ) : (
+        /* Rarity range */
+        <div className="flex gap-3">
+          <div>
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Min Rarity</div>
+            <select
+              value={slot.minRarity || 'common'}
+              onChange={e => updateField('minRarity', e.target.value)}
+              className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
+            >
+              {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Max Rarity</div>
+            <select
+              value={slot.maxRarity || ''}
+              onChange={e => updateField('maxRarity', e.target.value || null)}
+              className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
+            >
+              <option value="">No cap</option>
+              {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -219,7 +234,7 @@ function DivisionPicker({ divisions, selected, onChange }) {
   )
 }
 
-function PackForm({ initial, divisions, onSave, onCancel, saving }) {
+function PackForm({ initial, divisions, collections, onSave, onCancel, saving }) {
   const isEdit = !!initial?.id
   const [form, setForm] = useState({
     id: initial?.id || '',
@@ -255,9 +270,12 @@ function PackForm({ initial, divisions, onSave, onCancel, saving }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    // Clean slots: remove empty group labels
+    // Clean slots: remove empty group labels, handle collection slot shape
     const cleanedSlots = form.slots.map(s => {
-      const { group, ...rest } = s
+      if (s.types.length === 1 && s.types[0] === 'collection' && s.collectionId) {
+        return { type: 'collection', collectionId: s.collectionId, ...(s.group ? { group: s.group } : {}) }
+      }
+      const { group, collectionId, ...rest } = s
       return group ? { ...rest, group } : rest
     })
     // Clean group constraints: remove groups with no constraints
@@ -369,6 +387,7 @@ function PackForm({ initial, divisions, onSave, onCancel, saving }) {
               onMoveDown={() => moveSlot(i, 1)}
               isFirst={i === 0}
               isLast={i === form.slots.length - 1}
+              collections={collections}
             />
           ))}
         </div>
@@ -487,11 +506,17 @@ function PackForm({ initial, divisions, onSave, onCancel, saving }) {
             <div key={i} className="flex items-center gap-1.5">
               <span className="text-white/30 font-mono w-6">#{i+1}</span>
               {s.group && <span className="text-amber-400/60 text-[10px] font-bold">[{s.group}]</span>}
-              <span>{s.types.join('/')}</span>
-              <span style={{ color: RARITY_COLORS[s.minRarity] }}>{s.minRarity}+</span>
-              {s.maxRarity && <span className="text-white/30">cap: <span style={{ color: RARITY_COLORS[s.maxRarity] }}>{s.maxRarity}</span></span>}
-              {Object.keys(s.typeWeights || {}).length > 0 && <span className="text-white/20">(weighted)</span>}
-              {s.weightByCardCount && !Object.keys(s.typeWeights || {}).length && <span className="text-white/20">(by pool size)</span>}
+              {s.types.length === 1 && s.types[0] === 'collection' ? (
+                <span className="text-purple-400">collection{s.collectionId ? ` #${s.collectionId}` : ''}</span>
+              ) : (
+                <>
+                  <span>{s.types.join('/')}</span>
+                  <span style={{ color: RARITY_COLORS[s.minRarity] }}>{s.minRarity}+</span>
+                  {s.maxRarity && <span className="text-white/30">cap: <span style={{ color: RARITY_COLORS[s.maxRarity] }}>{s.maxRarity}</span></span>}
+                  {Object.keys(s.typeWeights || {}).length > 0 && <span className="text-white/20">(weighted)</span>}
+                  {s.weightByCardCount && !Object.keys(s.typeWeights || {}).length && <span className="text-white/20">(by pool size)</span>}
+                </>
+              )}
             </div>
           ))}
           {Object.entries(form.groupConstraints).filter(([, c]) => c.length > 0).map(([g, constraints]) => (
@@ -525,6 +550,7 @@ function PackForm({ initial, divisions, onSave, onCancel, saving }) {
 export default function PackCreator() {
   const [packTypes, setPackTypes] = useState([])
   const [divisions, setDivisions] = useState([])
+  const [collections, setCollections] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [mode, setMode] = useState(null) // null | 'create' | packId (edit)
@@ -533,9 +559,13 @@ export default function PackCreator() {
 
   const load = useCallback(async () => {
     try {
-      const data = await packCreatorService.load()
+      const [data, collData] = await Promise.all([
+        packCreatorService.load(),
+        vaultDashboardService.getCollections().catch(() => ({ collections: [] })),
+      ])
       setPackTypes(data.packTypes)
       setDivisions(data.divisions)
+      setCollections(collData.collections?.filter(c => c.status === 'active') || [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -616,6 +646,7 @@ export default function PackCreator() {
           <PackForm
             initial={mode === 'create' ? template : editingPack}
             divisions={divisions}
+            collections={collections}
             onSave={handleSave}
             onCancel={() => { setMode(null); setTemplate(null) }}
             saving={saving}

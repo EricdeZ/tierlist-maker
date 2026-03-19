@@ -57,6 +57,7 @@ export default function TradingCard({
     size,
     holo,
     loadStats,
+    signatureUrl,
 }) {
     const normalizedRole = normalizeRole(role)
     const roleImg = ROLE_IMAGES[normalizedRole]
@@ -280,6 +281,13 @@ export default function TradingCard({
                         </div>
                         <span className="card-footer-set">{seasonNameResolved}</span>
                     </div>
+
+                    {/* Signature overlay */}
+                    {signatureUrl && (
+                        <div style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', borderRadius: 'inherit', overflow: 'hidden' }}>
+                            <img src={signatureUrl} alt="Signature" style={{ width: '100%', height: '100%', objectFit: 'fill', filter: 'drop-shadow(0 0 3px #e8e8ff66)' }} />
+                        </div>
+                    )}
 
                 </div>
             </div>

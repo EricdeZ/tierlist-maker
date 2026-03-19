@@ -805,6 +805,7 @@ function RecentPullCard({ card, applyOverride, onZoom, owned }) {
           bestGod={card.bestGodName ? { name: card.bestGodName } : null}
           isConnected={card.isConnected}
           isFirstEdition={isFirstEdition}
+          signatureUrl={card.signatureUrl}
           size={CARD_SIZE}
         />
       </div>
@@ -826,7 +827,7 @@ function RecentPullCard({ card, applyOverride, onZoom, owned }) {
         canSell: true,
       })}
     >
-      <GameCard type={card.cardType} rarity={card.rarity} data={data} size={CARD_SIZE} />
+      <GameCard type={card.cardType} rarity={card.rarity} data={card.signatureUrl ? { ...data, signatureUrl: card.signatureUrl } : data} size={CARD_SIZE} />
     </div>
   )
 }

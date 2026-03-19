@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import PackArt from './PackArt'
 import GameCard from './GameCard'
+import VaultCard from './VaultCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { RARITIES, getHoloEffect } from '../../../data/vault/economy'
@@ -34,6 +35,7 @@ function toGameCardData(card, override) {
     id: card.godId || card.god_id || card.id,
     serialNumber: card.serialNumber || card.serial_number,
     metadata: override || undefined,
+    signatureUrl: card.signatureUrl || card.signature_url || undefined,
   }
   if (type === 'god') {
     return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd.imageKey }
@@ -62,6 +64,7 @@ function toPlayerCardProps(card) {
     bestGod: cd.bestGod || null,
     isFirstEdition: card.isFirstEdition || card.is_first_edition || false,
     isConnected: cd.isConnected,
+    signatureUrl: card.signatureUrl || card.signature_url || undefined,
   }
 }
 
@@ -70,11 +73,16 @@ function toPlayerCardProps(card) {
  * Pass holo=false to skip the TradingCardHolo wrapper (e.g. inside flip animation).
  */
 function PackCard({ card, size, holo = true, override }) {
+  const { getTemplate } = useVault()
   const type = getCardType(card)
-  const isPlayer = type === 'player'
   const holoEffect = getHoloEffect(card.rarity)
   const holoType = card.holoType || card.holo_type || 'reverse'
 
+  if (type === 'collection') {
+    return <VaultCard card={card} getTemplate={getTemplate} size={size} holo={holo} />
+  }
+
+  const isPlayer = type === 'player'
   if (isPlayer) {
     return (
       <TradingCard
@@ -105,7 +113,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
   const [zoomedIdx, setZoomedIdx] = useState(null)
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 920
 
-  // Lock scroll on parent when zoom is active
+  // Lock scroll on parent when zoom is active + arrow key navigation
   useEffect(() => {
     if (zoomedIdx === null) return
     const el = document.querySelector('.pack-opening')
@@ -114,12 +122,19 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
     const prevent = (e) => e.preventDefault()
     el.addEventListener('wheel', prevent, { passive: false })
     el.addEventListener('touchmove', prevent, { passive: false })
+    const handleKey = (e) => {
+      if (e.key === 'ArrowLeft' && zoomedIdx > 0) { e.preventDefault(); setZoomedIdx(zoomedIdx - 1) }
+      else if (e.key === 'ArrowRight' && zoomedIdx < cards.length - 1) { e.preventDefault(); setZoomedIdx(zoomedIdx + 1) }
+      else if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); setZoomedIdx(null) }
+    }
+    window.addEventListener('keydown', handleKey)
     return () => {
       el.style.overflowY = ''
       el.removeEventListener('wheel', prevent)
       el.removeEventListener('touchmove', prevent)
+      window.removeEventListener('keydown', handleKey)
     }
-  }, [zoomedIdx])
+  }, [zoomedIdx, cards.length])
 
   const cardSize = useMemo(() => {
     if (typeof window === 'undefined') return 200
@@ -497,6 +512,19 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
       setTimeout(() => { flipLockRef.current = false }, 350)
     }
   }, [phase, cardFlipped, topIndex, cards])
+
+  // ─── Keyboard: Space / Arrow keys flip cards in stack phase ───
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (phase === 'stack' && (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault()
+        onCardClick()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [phase, onCardClick])
 
   // ─── Computed ───
   const tearLineLeft = tearSide === 'right' ? (1 - tearProgress) * 100 : 0

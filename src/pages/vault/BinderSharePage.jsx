@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { vaultService } from '../../services/database'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react'
 import Navbar from '../../components/layout/Navbar'
@@ -49,6 +50,7 @@ function toGameCardData(card) {
   const base = {
     name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
+    signatureUrl: card.signatureUrl || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -67,10 +69,14 @@ function toPlayerCardProps(card) {
     stats: cd.stats || null,
     isFirstEdition: card.isFirstEdition || false,
     isConnected: card.isConnected,
+    signatureUrl: card.signatureUrl || undefined,
   }
 }
 
 function ShareCardRender({ card }) {
+  if ((card.cardType || 'god') === 'collection' && card._templateData) {
+    return <VaultCard card={card} holo={false} />
+  }
   const isPlayer = (card.cardType || 'god') === 'player'
   if (isPlayer) {
     return <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} />

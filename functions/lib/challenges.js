@@ -56,7 +56,7 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
     if (statKeys.length === 0) return []
 
     const challenges = await sql`
-        SELECT c.id, c.stat_key, c.target_value, c.title, c.reward,
+        SELECT c.id, c.stat_key, c.target_value, c.title, c.reward, c.category,
                COALESCE(uc.current_value, 0)::integer as old_value,
                COALESCE(uc.completed, false) as completed,
                COALESCE(uc.admin_altered, false) as admin_altered
@@ -77,7 +77,7 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
         upsertRows.push([ch.id, newValue])
 
         if (newValue >= Number(ch.target_value) && Number(ch.old_value) < Number(ch.target_value)) {
-            newlyClaimable.push({ id: ch.id, title: ch.title, reward: ch.reward })
+            newlyClaimable.push({ id: ch.id, title: ch.title, reward: ch.reward, category: ch.category })
         }
     }
 

@@ -7,16 +7,11 @@ export const BOUNTY_RULES = {
   max_reward: 10000,
   expiry_days: 14,
   cancel_fee_percent: 0.25,
-  expiry_fee_percent: 0.10,
   min_fee: 1,
 }
 
 export function calculateCancelFee(reward) {
   return Math.max(Math.floor(reward * BOUNTY_RULES.cancel_fee_percent), BOUNTY_RULES.min_fee)
-}
-
-export function calculateExpiryFee(reward) {
-  return Math.max(Math.floor(reward * BOUNTY_RULES.expiry_fee_percent), BOUNTY_RULES.min_fee)
 }
 
 export async function expireStale(tx) {
@@ -28,13 +23,9 @@ export async function expireStale(tx) {
   `
   const refunds = []
   for (const b of expired) {
-    const fee = calculateExpiryFee(b.core_reward)
-    const refund = b.core_reward - fee
-    if (refund > 0) {
-      await grantEmber(tx, b.poster_id, 'bounty_refund', refund,
-        `Bounty expired: ${b.card_name} (${b.rarity})`, String(b.id))
-    }
-    refunds.push({ bountyId: b.id, posterId: b.poster_id, fee, refund })
+    await grantEmber(tx, b.poster_id, 'bounty_refund', b.core_reward,
+      `Bounty expired: ${b.card_name} (${b.rarity})`, String(b.id))
+    refunds.push({ bountyId: b.id, posterId: b.poster_id, fee: 0, refund: b.core_reward })
   }
   return refunds
 }
@@ -126,6 +117,7 @@ export async function fulfillBounty(tx, fulfillerId, { bountyId, cardId }) {
   if (listed) throw new Error('Card is listed on the marketplace — cancel listing first')
 
   await tx`UPDATE cc_cards SET owner_id = ${bounty.poster_id} WHERE id = ${cardId}`
+  await tx`DELETE FROM cc_signature_requests WHERE card_id = ${cardId} AND status IN ('pending', 'awaiting_approval')`
 
   await grantEmber(tx, fulfillerId, 'bounty_reward', bounty.core_reward,
     `Bounty fulfilled: ${bounty.card_name} (${bounty.rarity})`, String(bountyId))

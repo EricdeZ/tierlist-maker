@@ -33,6 +33,8 @@ const handler = async (event) => {
         case 'definition-overrides': return await handleGetDefinitionOverrides(sql, event.queryStringParameters)
         case 'seasons':             return await handleGetSeasons(sql)
         case 'preview-player-defs': return await handlePreviewPlayerDefs(sql, event.queryStringParameters)
+        case 'signature-requests':  return await handleListSignatureRequests(sql, event.queryStringParameters)
+        case 'search-player-defs':  return await handleSearchPlayerDefs(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -56,6 +58,10 @@ const handler = async (event) => {
         case 'unexclude-player-def':   return await handleUnexcludePlayerDef(sql, body)
         case 'ban-user':           return await handleBanUser(sql, body, user)
         case 'unban-user':         return await handleUnbanUser(sql, body)
+        case 'admin-request-signature': return await handleAdminRequestSignature(sql, body, user)
+        case 'search-unique-cards':     return await handleSearchUniqueCards(sql, body)
+        case 'delete-signature-request': return await handleDeleteSignatureRequest(sql, body)
+        case 'create-test-signature-card': return await handleCreateTestSignatureCard(sql, body, user)
         default: return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -91,7 +97,7 @@ async function handleStats(sql) {
   `
 
   const topPlayers = await sql`
-    SELECT s.user_id, u.discord_name, s.elo, s.wins, s.losses, s.packs_opened, s.embers,
+    SELECT s.user_id, u.discord_username, s.elo, s.wins, s.losses, s.packs_opened, s.embers,
            (SELECT COUNT(*)::int FROM cc_cards WHERE owner_id = s.user_id) AS card_count
     FROM cc_stats s
     JOIN users u ON u.id = s.user_id
@@ -100,7 +106,7 @@ async function handleStats(sql) {
   `
 
   const recentCards = await sql`
-    SELECT c.*, u.discord_name AS owner_name
+    SELECT c.*, u.discord_username AS owner_name
     FROM cc_cards c
     JOIN users u ON u.id = c.owner_id
     ORDER BY c.created_at DESC
@@ -131,10 +137,10 @@ async function handleListCards(sql, params) {
   let cards
   if (search) {
     cards = await sql`
-      SELECT c.*, u.discord_name AS owner_name
+      SELECT c.*, u.discord_username AS owner_name
       FROM cc_cards c
       JOIN users u ON u.id = c.owner_id
-      WHERE (c.god_name ILIKE ${'%' + search + '%'} OR u.discord_name ILIKE ${'%' + search + '%'})
+      WHERE (c.god_name ILIKE ${'%' + search + '%'} OR u.discord_username ILIKE ${'%' + search + '%'})
         AND (${rarity || null}::text IS NULL OR c.rarity = ${rarity})
         AND (${holo || null}::text IS NULL OR c.holo_effect = ${holo})
         AND (${owner || null}::text IS NULL OR c.owner_id = ${parseInt(owner) || 0})
@@ -144,7 +150,7 @@ async function handleListCards(sql, params) {
     `
   } else {
     cards = await sql`
-      SELECT c.*, u.discord_name AS owner_name
+      SELECT c.*, u.discord_username AS owner_name
       FROM cc_cards c
       JOIN users u ON u.id = c.owner_id
       WHERE (${rarity || null}::text IS NULL OR c.rarity = ${rarity})
@@ -170,7 +176,7 @@ async function handleGetCard(sql, params) {
   if (!id) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'id required' }) }
 
   const [card] = await sql`
-    SELECT c.*, u.discord_name AS owner_name
+    SELECT c.*, u.discord_username AS owner_name
     FROM cc_cards c
     JOIN users u ON u.id = c.owner_id
     WHERE c.id = ${parseInt(id)}
@@ -276,7 +282,7 @@ async function handleUpdateCard(sql, body) {
   }
 
   const [card] = await sql`
-    SELECT c.*, u.discord_name AS owner_name
+    SELECT c.*, u.discord_username AS owner_name
     FROM cc_cards c
     JOIN users u ON u.id = c.owner_id
     WHERE c.id = ${id}
@@ -581,7 +587,7 @@ async function handleExcludePlayerDef(sql, body, user) {
   }
   await sql`
     INSERT INTO cc_player_def_exclusions (player_id, team_id, season_id, excluded_by)
-    VALUES (${playerId}, ${teamId}, ${seasonId}, ${user.discord_name || String(user.id)})
+    VALUES (${playerId}, ${teamId}, ${seasonId}, ${user.discord_username || String(user.id)})
     ON CONFLICT (player_id, team_id, season_id) DO NOTHING
   `
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
@@ -623,6 +629,152 @@ function formatAdminCard(row) {
     metadata: row.metadata || {},
     acquiredVia: row.acquired_via,
     createdAt: row.created_at,
+  }
+}
+
+// ═══ Signature Requests (Admin) ═══
+
+async function handleListSignatureRequests(sql, params) {
+  const status = params?.status || 'all'
+  const where = status !== 'all' ? sql`AND sr.status = ${status}` : sql``
+
+  const requests = await sql`
+    SELECT sr.*, c.god_name, c.rarity, c.card_type, c.image_url, c.signature_url,
+           d.player_name, d.team_name, d.player_id,
+           u_req.discord_username AS requester_name,
+           u_sign.discord_username AS signer_username
+    FROM cc_signature_requests sr
+    JOIN cc_cards c ON sr.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    LEFT JOIN users u_req ON sr.requester_id = u_req.id
+    LEFT JOIN users u_sign ON u_sign.linked_player_id = sr.signer_player_id
+    WHERE 1=1 ${where}
+    ORDER BY sr.created_at DESC
+    LIMIT 100
+  `
+  return {
+    statusCode: 200, headers: adminHeaders,
+    body: JSON.stringify({
+      requests: requests.map(r => ({
+        id: r.id, cardId: r.card_id, requesterId: r.requester_id,
+        requesterName: r.requester_name, signerPlayerId: r.signer_player_id,
+        signerUsername: r.signer_username, playerName: r.player_name,
+        teamName: r.team_name, godName: r.god_name, rarity: r.rarity,
+        cardType: r.card_type, imageUrl: r.image_url, signatureUrl: r.signature_url,
+        status: r.status, createdAt: r.created_at, signedAt: r.signed_at,
+      })),
+    }),
+  }
+}
+
+async function handleSearchUniqueCards(sql, body) {
+  const { search } = body
+  const cards = await sql`
+    SELECT c.id, c.god_id, c.god_name, c.card_type, c.image_url, c.rarity, c.signature_url, c.card_data,
+           c.owner_id, d.player_name, d.team_name, d.player_id,
+           u.discord_username AS owner_name,
+           EXISTS(SELECT 1 FROM cc_signature_requests sr WHERE sr.card_id = c.id) AS has_request
+    FROM cc_cards c
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    LEFT JOIN users u ON c.owner_id = u.id
+    WHERE c.rarity = 'unique'
+      AND (${search || ''} = '' OR c.god_name ILIKE ${'%' + (search || '') + '%'} OR d.player_name ILIKE ${'%' + (search || '') + '%'} OR u.discord_username ILIKE ${'%' + (search || '') + '%'})
+    ORDER BY c.created_at DESC
+    LIMIT 50
+  `
+  return {
+    statusCode: 200, headers: adminHeaders,
+    body: JSON.stringify({
+      cards: cards.map(c => ({
+        id: c.id, godName: c.god_name, cardType: c.card_type, imageUrl: c.image_url,
+        rarity: c.rarity, signatureUrl: c.signature_url, ownerId: c.owner_id,
+        ownerName: c.owner_name, playerName: c.player_name || c.card_data?.teamName, teamName: c.team_name || c.card_data?.teamName,
+        playerId: c.player_id || c.card_data?._testPlayerId, hasRequest: c.has_request,
+        isTest: (c.god_id || '').startsWith('test-sig-'),
+      })),
+    }),
+  }
+}
+
+async function handleAdminRequestSignature(sql, body, adminUser) {
+  const { cardId } = body
+  if (!cardId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'cardId required' }) }
+
+  const [card] = await sql`
+    SELECT c.id, c.owner_id, c.rarity, c.signature_url, c.card_data, d.player_id
+    FROM cc_cards c
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    WHERE c.id = ${cardId}
+  `
+  if (!card) return { statusCode: 404, headers: adminHeaders, body: JSON.stringify({ error: 'Card not found' }) }
+  if (card.rarity !== 'unique') return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Only unique cards' }) }
+  if (card.signature_url) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Already signed' }) }
+
+  // Support test cards: player_id from def join, or _testPlayerId from card_data
+  const playerId = card.player_id || card.card_data?._testPlayerId
+  if (!playerId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Not a player card' }) }
+
+  const [existing] = await sql`SELECT id FROM cc_signature_requests WHERE card_id = ${cardId}`
+  if (existing) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Request already exists' }) }
+
+  await sql`
+    INSERT INTO cc_signature_requests (card_id, requester_id, signer_player_id)
+    VALUES (${cardId}, ${card.owner_id}, ${playerId})
+  `
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+async function handleSearchPlayerDefs(sql, params) {
+  const q = params?.q || ''
+  if (!q) return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ defs: [] }) }
+  const defs = await sql`
+    SELECT d.id, d.player_id, d.player_name, d.team_name, d.team_color, d.role,
+           d.season_slug, d.league_slug, d.division_slug
+    FROM cc_player_defs d
+    WHERE d.player_name ILIKE ${'%' + q + '%'} OR d.team_name ILIKE ${'%' + q + '%'}
+    ORDER BY d.id DESC
+    LIMIT 20
+  `
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ defs }) }
+}
+
+async function handleDeleteSignatureRequest(sql, body) {
+  const { requestId } = body
+  if (!requestId) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'requestId required' }) }
+  await sql`DELETE FROM cc_signature_requests WHERE id = ${requestId}`
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ success: true }) }
+}
+
+async function handleCreateTestSignatureCard(sql, body, adminUser) {
+  const { playerDefId } = body
+
+  // Use a player def for name/team info but do NOT link the card to it (def_id = NULL).
+  // This prevents blocking real unique pulls which check: "SELECT 1 FROM cc_cards WHERE def_id = X AND rarity = 'unique'"
+  let def
+  if (playerDefId) {
+    ;[def] = await sql`SELECT id, player_id, player_name, team_name, team_color, role FROM cc_player_defs WHERE id = ${playerDefId} LIMIT 1`
+  } else {
+    ;[def] = await sql`SELECT id, player_id, player_name, team_name, team_color, role FROM cc_player_defs ORDER BY RANDOM() LIMIT 1`
+  }
+  if (!def) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'No player defs found' }) }
+
+  const serial = Math.floor(Math.random() * 9999) + 1
+  // god_id uses test- prefix, def_id is NULL so it doesn't block real unique pulls.
+  // We store the real player_id in card_data so the signature request can still target the right player.
+  const [card] = await sql`
+    INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+    VALUES (${adminUser.id}, ${adminUser.id}, ${'test-sig-' + def.player_id}, ${def.player_name + ' [TEST]'}, 'Warrior', ${def.role || 'solo'}, 'unique', 50, 1, 0, ${serial}, 'unique', 'reverse', '', 'admin_test', 'player',
+      ${JSON.stringify({ teamName: def.team_name, teamColor: def.team_color, isConnected: true, _testPlayerId: def.player_id })}, ${null})
+    RETURNING *
+  `
+
+  return {
+    statusCode: 200, headers: adminHeaders,
+    body: JSON.stringify({
+      success: true,
+      card: { id: card.id, godName: card.god_name, playerName: def.player_name, teamName: def.team_name, playerId: def.player_id },
+    }),
   }
 }
 

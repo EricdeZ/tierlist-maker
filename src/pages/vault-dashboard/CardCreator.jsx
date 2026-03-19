@@ -6,6 +6,7 @@ import { vaultDashboardService } from '../../services/database'
 import CardCanvas from './preview/CardCanvas'
 import CardSidebar from './editor/CardSidebar'
 import RaritySetPanel from './editor/RaritySetPanel'
+import RarityStrip from './editor/RarityStrip'
 import HoloPreview from './preview/HoloPreview'
 import { exportCardToPNG, downloadBlob } from './preview/ExportCanvas'
 
@@ -217,6 +218,24 @@ export default function CardCreator() {
         }
     }, [resizeImage])
 
+    // Upload shared structured card image to R2
+    const handleUploadRarityImage = useCallback(async (file) => {
+        try {
+            const resized = await resizeImage(file)
+            const res = await vaultDashboardService.uploadAsset(resized, {
+                name: file.name.replace(/\.[^.]+$/, ''),
+                category: 'character',
+                tags: [],
+            })
+            if (res.success && res.asset?.url) {
+                setCardData(prev => ({ ...prev, imageUrl: res.asset.url }))
+                setDirty(true)
+            }
+        } catch (e) {
+            console.error('Rarity image upload failed:', e)
+        }
+    }, [resizeImage])
+
     // Add image from file (drop or browse)
     const addImageFromFile = useCallback((file, x = 0, y = 0) => {
         const url = URL.createObjectURL(file)
@@ -370,7 +389,7 @@ export default function CardCreator() {
         const id = `ftr-${nextId++}`
         setElements(prev => [...prev, {
             id, type: 'footer', name: 'Footer', role: 'adc',
-            leftText: '#001', rightText: 'LEGENDARY',
+            leftText: '#001', rightText: 'LEGENDARY', counterPad: 3,
             font: "'Segoe UI', system-ui, sans-serif", fontSize: 9,
             showBg: false,
             x: 0, y: 395, w: 300, z: prev.length + 10, visible: true,
@@ -496,7 +515,7 @@ export default function CardCreator() {
                 </div>
 
                 {/* Canvas area */}
-                <div className="flex-1 flex flex-col items-center justify-center bg-gray-950/50 overflow-auto p-8">
+                <div className="flex-1 flex flex-col items-center bg-gray-950/50 overflow-auto p-8">
                     {/* Toolbar */}
                     <div className="flex items-center gap-3 mb-4">
                         <div className="flex items-center gap-1">
@@ -547,11 +566,25 @@ export default function CardCreator() {
                             </div>
                         )}
                     </div>
+
+                    {/* Rarity Strip — central, below main card */}
+                    {showRaritySet && (
+                        <div className="mt-6 w-full">
+                            <RarityStrip
+                                cardData={cardData}
+                                onCardDataChange={(d) => { setCardData(d); setDirty(true) }}
+                                cardType={cardType}
+                                elements={elements}
+                                border={border}
+                                onUploadRarityImage={handleUploadRarityImage}
+                            />
+                        </div>
+                    )}
                 </div>
 
-                {/* Rarity Set panel */}
+                {/* Card Data panel (structured card fields) */}
                 {showRaritySet && (
-                    <div className="w-[300px] border-l border-gray-700/50 overflow-y-auto p-3 bg-gray-900/30">
+                    <div className="w-[280px] border-l border-gray-700/50 overflow-y-auto p-3 bg-gray-900/30">
                         <RaritySetPanel
                             cardData={cardData}
                             onCardDataChange={(d) => { setCardData(d); setDirty(true) }}

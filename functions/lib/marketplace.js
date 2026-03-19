@@ -132,6 +132,9 @@ export async function buyListing(tx, buyerId, listingId) {
   // Remove card from binder
   await tx`DELETE FROM cc_binder_cards WHERE card_id = ${listing.card_id}`
 
+  // Cancel open signature requests
+  await tx`DELETE FROM cc_signature_requests WHERE card_id = ${listing.card_id} AND status IN ('pending', 'awaiting_approval')`
+
   // Mark listing sold
   const [updated] = await tx`
     UPDATE cc_market_listings

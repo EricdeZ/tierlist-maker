@@ -543,7 +543,7 @@ export default function CCStartingFive() {
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span>All-Star <span className="text-white/20">(0.615x)</span></span>
+            <span>All-Star</span>
             <span>
               {startingFive?.allStar?.output?.coresPerDay > 0 && (
                 <span className="text-[var(--cd-cyan)]">{startingFive.allStar.output.coresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
@@ -587,7 +587,7 @@ export default function CCStartingFive() {
               : 'bg-gray-700/50 text-gray-400 hover:text-gray-200'
           }`}
         >
-          All-Star {activeLineup !== 'allstar' && <span className="text-xs opacity-60 ml-1">0.615x</span>}
+          All-Star
         </button>
       </div>
 
@@ -888,9 +888,7 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
                     className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="transition-all group-hover:scale-[1.03]">
-                      <TradingCardHolo rarity={getHoloEffect(card.rarity)} role="ADC" holoType={card.holoType || 'reverse'} size={120}>
-                        <GameCard type="consumable" rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
-                      </TradingCardHolo>
+                      <GameCard type="consumable" rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
                     </div>
                     <div className="mt-1.5 text-center" style={{ maxWidth: 120 }}>
                       <div className="text-[10px] font-bold text-white/60 truncate cd-head">{card.godName}</div>
@@ -1680,12 +1678,9 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
             {...toPlayerCardProps(card)}
             rarity={card.rarity}
             size={120}
-            holo={{ rarity: getHoloEffect(card.rarity), holoType: card.holoType || 'reverse' }}
           />
         ) : (
-          <TradingCardHolo rarity={getHoloEffect(card.rarity)} role={(card.role || card.cardData?.role || 'adc').toUpperCase()} holoType={card.holoType || 'reverse'} size={120}>
-            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
-          </TradingCardHolo>
+          <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={120} />
         )}
         {holoMismatch && (
           <div className="absolute inset-0 rounded-lg bg-black/60 flex flex-col items-center justify-center pointer-events-none">

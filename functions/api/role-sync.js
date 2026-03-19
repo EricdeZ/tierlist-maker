@@ -75,21 +75,27 @@ async function preview(sql, body, event) {
 
     const lpIds = players.map(p => p.league_player_id)
     const lastGames = await sql`
-        SELECT DISTINCT ON (pgs.league_player_id)
-            pgs.league_player_id,
-            pgs.role_played,
-            pgs.game_id,
-            g.game_number,
-            g.match_id,
-            m.date as match_date,
-            m.week as match_week
-        FROM player_game_stats pgs
-        JOIN games g ON g.id = pgs.game_id
-        JOIN matches m ON m.id = g.match_id
-        WHERE pgs.league_player_id = ANY(${lpIds})
-          AND pgs.role_played IS NOT NULL
-          AND pgs.role_played != ''
-        ORDER BY pgs.league_player_id, m.date DESC, g.game_number DESC
+        SELECT DISTINCT ON (sub.league_player_id)
+            sub.league_player_id,
+            sub.role_played,
+            sub.game_count,
+            sub.match_date,
+            sub.match_week
+        FROM (
+            SELECT pgs.league_player_id,
+                   pgs.role_played,
+                   COUNT(*)::int AS game_count,
+                   MAX(m.date) AS match_date,
+                   MAX(m.week)::int AS match_week
+            FROM player_game_stats pgs
+            JOIN games g ON g.id = pgs.game_id
+            JOIN matches m ON m.id = g.match_id
+            WHERE pgs.league_player_id = ANY(${lpIds})
+              AND pgs.role_played IS NOT NULL
+              AND pgs.role_played != ''
+            GROUP BY pgs.league_player_id, pgs.role_played
+        ) sub
+        ORDER BY sub.league_player_id, sub.game_count DESC, sub.match_date DESC
     `
 
     const lastGameMap = {}
@@ -144,10 +150,9 @@ async function preview(sql, body, event) {
                 playerSlug: p.player_slug,
                 currentRole: currentRole || null,
                 newRole,
-                matchId: lastGame.match_id,
                 matchDate: lastGame.match_date,
                 matchWeek: lastGame.match_week,
-                gameNumber: lastGame.game_number,
+                gameCount: lastGame.game_count,
                 leagueSlug: p.league_slug,
                 divisionSlug: p.division_slug,
             })

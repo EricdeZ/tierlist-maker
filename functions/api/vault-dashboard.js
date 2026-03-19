@@ -26,6 +26,8 @@ async function handler(event) {
             case 'draft': return getDraft(sql, event, user, canApprove)
             case 'assets': return getAssets(sql, event)
             case 'asset': return getAsset(sql, event)
+            case 'collections': return getCollections(sql, user, canApprove)
+            case 'collection': return getCollection(sql, event, user, canApprove)
             default: return err('Unknown action')
         }
     }
@@ -40,6 +42,10 @@ async function handler(event) {
             case 'reject': return rejectItem(sql, body, user, canApprove)
             case 'archive-template': return archiveTemplate(sql, body, canApprove)
             case 'delete-asset': return deleteAsset(sql, body, canApprove, event)
+            case 'save-collection': return saveCollection(sql, body, user, canApprove)
+            case 'add-collection-entries': return addCollectionEntries(sql, body, user, canApprove)
+            case 'remove-collection-entry': return removeCollectionEntry(sql, body, canApprove)
+            case 'collection-status': return setCollectionStatus(sql, body, canApprove)
             default: return err('Unknown action')
         }
     }
@@ -244,6 +250,30 @@ async function approveItem(sql, body, user, canApprove) {
     if (!rows[0]) return err('Not found', 404)
     if (rows[0].status !== 'pending_review') return err('Only pending items can be approved')
 
+    // Auto-increment footer counters
+    const td = typeof rows[0].template_data === 'string' ? JSON.parse(rows[0].template_data) : rows[0].template_data
+    if (td?.elements) {
+        let changed = false
+        for (const el of td.elements) {
+            if (el.type !== 'footer' || !el.rightText) continue
+            const label = el.rightText.toUpperCase()
+            const pad = el.counterPad ?? 3
+            // Atomically get-and-increment the counter for this label
+            const [counter] = await sql`
+                INSERT INTO cc_footer_counters (label, next_serial)
+                VALUES (${label}, 2)
+                ON CONFLICT (label) DO UPDATE SET next_serial = cc_footer_counters.next_serial + 1
+                RETURNING next_serial - 1 AS serial
+            `
+            el.leftText = `#${String(counter.serial).padStart(pad, '0')}`
+            changed = true
+        }
+        if (changed) {
+            await sql`UPDATE ${sql(table)} SET template_data = ${JSON.stringify(td)}, status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
+            return ok({ success: true })
+        }
+    }
+
     await sql`UPDATE ${sql(table)} SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
     return ok({ success: true })
 }
@@ -287,6 +317,96 @@ async function deleteAsset(sql, body, canApprove, event) {
 
     await sql`DELETE FROM cc_asset_library WHERE id = ${id}`
     return ok({ success: true })
+}
+
+// ─── Collection Handlers ───
+
+async function getCollections(sql) {
+    const rows = await sql`
+        SELECT c.*, u.discord_username AS creator_name,
+               COUNT(e.id)::int AS entry_count
+        FROM cc_collections c
+        LEFT JOIN users u ON c.created_by = u.id
+        LEFT JOIN cc_collection_entries e ON e.collection_id = c.id
+        GROUP BY c.id, u.discord_username
+        ORDER BY c.updated_at DESC
+    `
+    return ok({ collections: rows })
+}
+
+async function getCollection(sql, event) {
+    const { id } = event.queryStringParameters || {}
+    if (!id) return err('Missing id')
+    const [collection] = await sql`SELECT * FROM cc_collections WHERE id = ${id}`
+    if (!collection) return err('Not found', 404)
+    const entries = await sql`
+        SELECT e.*, t.name AS template_name, t.card_type, t.rarity, t.thumbnail_url,
+               t.template_data, u.discord_username AS added_by_name
+        FROM cc_collection_entries e
+        JOIN cc_card_templates t ON e.template_id = t.id
+        LEFT JOIN users u ON e.added_by = u.id
+        WHERE e.collection_id = ${id}
+        ORDER BY e.added_at DESC
+    `
+    return ok({ collection, entries })
+}
+
+async function saveCollection(sql, body, user, canApprove) {
+    if (!canApprove) return err('Requires vault_approve', 403)
+    const { id, name, description, cover_image_url } = body
+    if (!name?.trim()) return err('Name required')
+    if (id) {
+        const [row] = await sql`
+            UPDATE cc_collections SET name = ${name.trim()}, description = ${description || null},
+                cover_image_url = ${cover_image_url || null}, updated_at = NOW()
+            WHERE id = ${id} RETURNING *
+        `
+        return ok({ collection: row })
+    }
+    const [row] = await sql`
+        INSERT INTO cc_collections (name, description, cover_image_url, created_by)
+        VALUES (${name.trim()}, ${description || null}, ${cover_image_url || null}, ${user.id})
+        RETURNING *
+    `
+    return ok({ collection: row })
+}
+
+async function addCollectionEntries(sql, body, user, canApprove) {
+    if (!canApprove) return err('Requires vault_approve', 403)
+    const { collection_id, template_ids } = body
+    if (!collection_id || !template_ids?.length) return err('Missing collection_id or template_ids')
+    const approved = await sql`
+        SELECT id FROM cc_card_templates WHERE id = ANY(${template_ids}) AND status = 'approved'
+    `
+    const approvedIds = approved.map(r => r.id)
+    if (approvedIds.length === 0) return err('No approved templates found')
+    for (const tid of approvedIds) {
+        await sql`
+            INSERT INTO cc_collection_entries (collection_id, template_id, added_by)
+            VALUES (${collection_id}, ${tid}, ${user.id})
+            ON CONFLICT (collection_id, template_id) DO NOTHING
+        `
+    }
+    return ok({ added: approvedIds.length })
+}
+
+async function removeCollectionEntry(sql, body, canApprove) {
+    if (!canApprove) return err('Requires vault_approve', 403)
+    const { id } = body
+    if (!id) return err('Missing id')
+    await sql`DELETE FROM cc_collection_entries WHERE id = ${id}`
+    return ok({ removed: true })
+}
+
+async function setCollectionStatus(sql, body, canApprove) {
+    if (!canApprove) return err('Requires vault_approve', 403)
+    const { id, status } = body
+    if (!id || !['draft', 'active', 'archived'].includes(status)) return err('Invalid params')
+    const [row] = await sql`
+        UPDATE cc_collections SET status = ${status}, updated_at = NOW()
+        WHERE id = ${id} RETURNING *
+    `
+    return ok({ collection: row })
 }
 
 export const onRequest = adapt(handler)

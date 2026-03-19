@@ -16,6 +16,7 @@ export const PassionProvider = ({ children }) => {
     const [canClaimDaily, setCanClaimDaily] = useState(false)
     const [lastDailyClaim, setLastDailyClaim] = useState(null)
     const [claimableCount, setClaimableCount] = useState(0)
+    const [vaultClaimableCount, setVaultClaimableCount] = useState(0)
     const [inDiscord, setInDiscord] = useState(false)
     const [loading, setLoading] = useState(true)
     const [rankUpInfo, setRankUpInfo] = useState(null)
@@ -37,6 +38,7 @@ export const PassionProvider = ({ children }) => {
             setCanClaimDaily(data.canClaimDaily)
             setLastDailyClaim(data.lastDailyClaim || null)
             setClaimableCount(data.claimableCount || 0)
+            setVaultClaimableCount(data.vaultClaimableCount || 0)
             setInDiscord(!!data.inDiscord)
             if (data.ember) setEmber(prev => {
                 if (prev.balance === data.ember.balance && prev.currentStreak === data.ember.currentStreak && prev.canClaimDaily === data.ember.canClaimDaily && prev.lastDailyClaim === data.ember.lastDailyClaim) return prev
@@ -58,6 +60,7 @@ export const PassionProvider = ({ children }) => {
             setCanClaimDaily(false)
             setLastDailyClaim(null)
             setClaimableCount(0)
+            setVaultClaimableCount(0)
             setInDiscord(false)
             setEmber({ balance: 0, currentStreak: 0, canClaimDaily: false, lastDailyClaim: null })
             setLoading(false)
@@ -106,6 +109,8 @@ export const PassionProvider = ({ children }) => {
             if (result.newlyClaimable?.length > 0) {
                 addChallengeNotification(result.newlyClaimable)
                 setClaimableCount(prev => prev + result.newlyClaimable.length)
+                const vaultNew = result.newlyClaimable.filter(c => c.category === 'vault').length
+                if (vaultNew > 0) setVaultClaimableCount(prev => prev + vaultNew)
             }
 
             return result
@@ -140,6 +145,8 @@ export const PassionProvider = ({ children }) => {
             if (result.newlyClaimable?.length > 0) {
                 addChallengeNotification(result.newlyClaimable)
                 setClaimableCount(prev => prev + result.newlyClaimable.length)
+                const vaultNew = result.newlyClaimable.filter(c => c.category === 'vault').length
+                if (vaultNew > 0) setVaultClaimableCount(prev => prev + vaultNew)
             }
             return result
         } catch (err) {
@@ -152,6 +159,7 @@ export const PassionProvider = ({ children }) => {
         setBalance(result.balance)
         setTotalEarned(result.totalEarned)
         setClaimableCount(result.claimableCount ?? 0)
+        if (result.vaultClaimableCount !== undefined) setVaultClaimableCount(result.vaultClaimableCount)
         if (result.rankedUp) {
             setRankUpInfo({ rank: result.rank })
         }
@@ -169,6 +177,7 @@ export const PassionProvider = ({ children }) => {
         canClaimDaily,
         lastDailyClaim,
         claimableCount,
+        vaultClaimableCount,
         inDiscord,
         ember,
         rank,
@@ -188,7 +197,7 @@ export const PassionProvider = ({ children }) => {
         dismissChallengeNotification,
     }), [
         balance, totalEarned, currentStreak, longestStreak, canClaimDaily,
-        lastDailyClaim, claimableCount, inDiscord, ember, rank, nextRank,
+        lastDailyClaim, claimableCount, vaultClaimableCount, inDiscord, ember, rank, nextRank,
         loading, rankUpInfo, challengeNotifications, claimDaily, claimEmberDaily,
         trackAction, refreshBalance, updateFromClaim, updateEmber, dismissRankUp, triggerRankUp,
         addChallengeNotification, dismissChallengeNotification,

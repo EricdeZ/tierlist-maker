@@ -270,6 +270,7 @@ function formatTradeCard(row) {
       defId: row.def_id,
       isConnected: row.card_data?.isConnected ?? null,
       bestGodName: row.best_god_name || null,
+      signatureUrl: row.signature_url || null,
     },
   }
 }

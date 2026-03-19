@@ -10,6 +10,7 @@ const tabs = [
     { path: '/vault-dashboard', label: 'Card Creator', exact: true },
     { path: '/vault-dashboard/templates', label: 'Templates' },
     { path: '/vault-dashboard/drafts', label: 'Drafts' },
+    { path: '/vault-dashboard/collections', label: 'Collections' },
     { path: '/vault-dashboard/assets', label: 'Assets' },
 ]
 
