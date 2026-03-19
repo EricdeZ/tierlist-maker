@@ -12,6 +12,26 @@ import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsum
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
+async function inlineTemplateData(sql, formattedCards) {
+  const collectionCards = formattedCards.filter(c => c.cardType === 'collection' && c.templateId)
+  if (collectionCards.length === 0) return
+  const tids = [...new Set(collectionCards.map(c => c.templateId))]
+  const templates = await sql`
+    SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${tids})
+  `
+  const cache = {}
+  for (const t of templates) {
+    const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
+    cache[t.id] = {
+      cardData: td?.cardData || {},
+      cardType: t.card_type || 'custom',
+    }
+  }
+  for (const card of collectionCards) {
+    if (cache[card.templateId]) card._templateData = cache[card.templateId]
+  }
+}
+
 const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' }
@@ -62,6 +82,8 @@ const handler = async (event) => {
         case 'starting-five': return await handleStartingFive(sql, user)
         case 'starting-five-leaderboard': return await handleS5Leaderboard(sql, user)
         case 'binder': return await handleLoadBinder(sql, user)
+        case 'pending-signatures': return await handlePendingSignatures(sql, user)
+        case 'pending-approval-signatures': return await handlePendingApprovalSignatures(sql, user)
         case 'admin-redeem-codes': return await handleAdminRedeemCodes(sql, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
@@ -90,6 +112,11 @@ const handler = async (event) => {
         case 'binder-slot': return await handleBinderSlot(sql, user, body)
         case 'binder-unslot': return await handleBinderUnslot(sql, user, body)
         case 'binder-generate-share': return await handleBinderGenerateShare(sql, user, event)
+        case 'request-signature': return await handleRequestSignature(sql, user, body)
+        case 'decline-signature': return await handleDeclineSignature(sql, user, body)
+        case 'approve-signature': return await handleApproveSignature(sql, user, body)
+        case 'reject-signature': return await handleRejectSignature(sql, user, body)
+        case 'direct-sign': return await handleDirectSign(sql, user, body)
         case 'redeem-code': return await handleRedeemCode(sql, user, body)
         case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
         case 'toggle-redeem-code': return await handleToggleRedeemCode(sql, event, body)
@@ -110,8 +137,8 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards] = await Promise.all([
-    sql`SELECT c.*, d.best_god_name,
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, pendingSignatureCount, pendingApprovalCount] = await Promise.all([
+    sql`SELECT c.*, d.best_god_name, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
          FROM cc_cards c
@@ -169,12 +196,36 @@ async function handleLoad(sql, user) {
       JOIN cc_trades t ON tc.trade_id = t.id
       WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active')
     `,
+    user.linked_player_id
+      ? sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests WHERE signer_player_id = ${user.linked_player_id} AND status = 'pending'`
+      : Promise.resolve([{ count: 0 }]),
+    sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests sr JOIN cc_cards c ON sr.card_id = c.id WHERE c.owner_id = ${user.id} AND sr.status = 'awaiting_approval'`,
   ])
+
+  // Build template cache for collection cards
+  const collectionTemplateIds = [...new Set(
+    collection.filter(c => c.card_type === 'collection' && c.template_id)
+      .map(c => c.template_id)
+  )]
+  let templateCache = {}
+  if (collectionTemplateIds.length > 0) {
+    const templates = await sql`
+      SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${collectionTemplateIds})
+    `
+    for (const t of templates) {
+      const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
+      templateCache[t.id] = {
+        cardData: td?.cardData || {},
+        cardType: t.card_type || 'custom',
+      }
+    }
+  }
 
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
       collection: collection.map(formatCard),
+      templateCache,
       stats: formatStats(stats[0]),
       emberBalance: ember[0]?.balance || 0,
       packTypes: packTypes.map(p => ({
@@ -208,6 +259,8 @@ async function handleLoad(sql, user) {
         endsAt: s.ends_at,
       })),
       pendingTradeCount: tradeCount[0]?.count || 0,
+      pendingSignatureCount: pendingSignatureCount[0]?.count || 0,
+      pendingApprovalCount: pendingApprovalCount[0]?.count || 0,
       inventory: inventory.map(i => ({
         id: i.id,
         packTypeId: i.pack_type_id,
@@ -246,6 +299,7 @@ async function handleOpenInventoryPack(sql, user, body) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
+  await inlineTemplateData(sql, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -318,6 +372,7 @@ async function handleOpenPack(sql, user, body) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
+  await inlineTemplateData(sql, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -399,6 +454,7 @@ async function handleSalePurchase(sql, user, saleId) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
+  await inlineTemplateData(sql, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -592,7 +648,7 @@ async function handleCollectionOwned(sql, user) {
       GROUP BY def_id
     `,
     sql`
-      SELECT c.id, c.card_type, c.god_id, c.rarity, c.is_first_edition, c.def_id, c.created_at,
+      SELECT c.id, c.card_type, c.god_id, c.rarity, c.is_first_edition, c.def_id, c.created_at, c.signature_url,
              d.player_name, d.team_name, d.team_color, d.role, d.best_god_name,
              d.league_slug, d.division_tier, d.division_slug, d.season_slug, d.card_index,
              CASE
@@ -642,6 +698,7 @@ async function handleCollectionOwned(sql, user) {
     divisionSlug: c.division_slug,
     seasonSlug: c.season_slug,
     cardIndex: c.card_index,
+    signatureUrl: c.signature_url || null,
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap, firstEditions: feMap, recentPulls }) }
@@ -1330,6 +1387,7 @@ async function handleBlackMarketTurnIn(sql, user, body) {
       WHERE d.player_name = 'Brudih'
       LIMIT 1
     `
+    await tx`DELETE FROM cc_signature_requests WHERE card_id = ${cardId} AND status IN ('pending', 'awaiting_approval')`
     if (brudihUser) {
       await tx`UPDATE cc_cards SET owner_id = ${brudihUser.id} WHERE id = ${cardId}`
     } else {
@@ -1597,11 +1655,11 @@ async function handleS5Leaderboard(sql, user) {
 }
 
 async function handleSlotCard(sql, user, body) {
-  const { cardId, role, slotType } = body
+  const { cardId, role, slotType, lineupType } = body
   if (!cardId || !role) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId and role required' }) }
   }
-  const state = await slotCard(sql, user.id, cardId, role, slotType || 'player')
+  const state = await slotCard(sql, user.id, cardId, role, slotType || 'player', lineupType || 'current')
 
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
@@ -1611,11 +1669,11 @@ async function handleSlotCard(sql, user, body) {
 }
 
 async function handleUnslotCard(sql, user, body) {
-  const { role } = body
+  const { role, lineupType } = body
   if (!role) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'role required' }) }
   }
-  const state = await unslotCard(sql, user.id, role)
+  const state = await unslotCard(sql, user.id, role, lineupType || 'current')
 
   // Push vault challenge progress (fire-and-forget) — updates starting_five counts
   getVaultStats(sql, user.id)
@@ -1626,11 +1684,11 @@ async function handleUnslotCard(sql, user, body) {
 }
 
 async function handleUnslotAttachment(sql, user, body) {
-  const { role, slotType } = body
+  const { role, slotType, lineupType } = body
   if (!role || !slotType) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'role and slotType required' }) }
   }
-  const state = await unslotAttachment(sql, user.id, role, slotType)
+  const state = await unslotAttachment(sql, user.id, role, slotType, lineupType || 'current')
 
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
@@ -1678,6 +1736,164 @@ async function handleCollectIncome(sql, user) {
     passionGranted: result.passionGranted,
     coresGranted: result.coresGranted,
   })
+}
+
+// ═══ Card Signature ═══
+
+async function handleRequestSignature(sql, user, body) {
+  const { cardId } = body
+  if (!cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+
+  const [card] = await sql`
+    SELECT c.id, c.owner_id, c.rarity, c.signature_url, c.def_id, d.player_id
+    FROM cc_cards c
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    WHERE c.id = ${cardId}
+  `
+  if (!card) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Card not found' }) }
+  if (card.owner_id !== user.id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'You do not own this card' }) }
+  if (card.rarity !== 'unique') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only unique cards can be signed' }) }
+  if (card.signature_url) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is already signed' }) }
+  if (!card.player_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only player cards can be signed' }) }
+
+  // Check no existing pending request
+  const [existing] = await sql`SELECT id FROM cc_signature_requests WHERE card_id = ${cardId}`
+  if (existing) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Signature already requested' }) }
+
+  await sql`
+    INSERT INTO cc_signature_requests (card_id, requester_id, signer_player_id)
+    VALUES (${cardId}, ${user.id}, ${card.player_id})
+  `
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handlePendingSignatures(sql, user) {
+  if (!user.linked_player_id) {
+    return { statusCode: 200, headers, body: JSON.stringify({ requests: [] }) }
+  }
+
+  const requests = await sql`
+    SELECT sr.id, sr.card_id, sr.requester_id, sr.created_at,
+           c.god_name, c.rarity, c.card_type, c.holo_type, c.holo_effect, c.image_url,
+           c.card_data, c.def_id, c.role, c.god_class,
+           d.player_name, d.team_name, d.team_color, d.role AS def_role,
+           d.season_slug, d.league_slug, d.division_slug,
+           u.discord_username AS requester_name
+    FROM cc_signature_requests sr
+    JOIN cc_cards c ON sr.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    LEFT JOIN users u ON sr.requester_id = u.id
+    WHERE sr.signer_player_id = ${user.linked_player_id} AND sr.status = 'pending'
+    ORDER BY sr.created_at DESC
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      requests: requests.map(r => ({
+        id: r.id,
+        cardId: r.card_id,
+        requesterId: r.requester_id,
+        requesterName: r.requester_name,
+        createdAt: r.created_at,
+        cardType: r.card_type,
+        godName: r.god_name,
+        rarity: r.rarity,
+        holoType: r.holo_type,
+        holoEffect: r.holo_effect,
+        imageUrl: r.image_url,
+        role: r.def_role || r.role,
+        godClass: r.god_class,
+        cardData: r.card_data,
+        defId: r.def_id,
+        playerName: r.player_name,
+        teamName: r.team_name,
+        teamColor: r.team_color,
+      })),
+    }),
+  }
+}
+
+async function handleDeclineSignature(sql, user, body) {
+  const { requestId } = body
+  if (!requestId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'requestId required' }) }
+  if (!user.linked_player_id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Not a linked player' }) }
+
+  const [req] = await sql`
+    SELECT id, signer_player_id, status FROM cc_signature_requests WHERE id = ${requestId}
+  `
+  if (!req) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Request not found' }) }
+  if (req.signer_player_id !== user.linked_player_id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Not your request' }) }
+  if (req.status !== 'pending') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request is not pending' }) }
+
+  await sql`UPDATE cc_signature_requests SET status = 'declined' WHERE id = ${requestId}`
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handlePendingApprovalSignatures(sql, user) {
+  const requests = await sql`
+    SELECT sr.id, sr.card_id, sr.pending_signature_url, sr.signed_at,
+           c.god_name, c.card_type, c.image_url, c.card_data, c.def_id, c.role, c.god_class,
+           d.player_name, d.team_name, d.team_color
+    FROM cc_signature_requests sr
+    JOIN cc_cards c ON sr.card_id = c.id
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    WHERE c.owner_id = ${user.id} AND sr.status = 'awaiting_approval'
+    ORDER BY sr.signed_at DESC
+  `
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      requests: requests.map(r => ({
+        id: r.id, cardId: r.card_id, pendingSignatureUrl: r.pending_signature_url,
+        signedAt: r.signed_at, godName: r.god_name, cardType: r.card_type,
+        imageUrl: r.image_url, cardData: r.card_data, defId: r.def_id,
+        role: r.role, godClass: r.god_class,
+        playerName: r.player_name, teamName: r.team_name, teamColor: r.team_color,
+      })),
+    }),
+  }
+}
+
+async function handleApproveSignature(sql, user, body) {
+  const { requestId } = body
+  if (!requestId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'requestId required' }) }
+
+  const [req] = await sql`
+    SELECT sr.id, sr.card_id, sr.status, sr.pending_signature_url, c.owner_id
+    FROM cc_signature_requests sr
+    JOIN cc_cards c ON sr.card_id = c.id
+    WHERE sr.id = ${requestId}
+  `
+  if (!req) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Request not found' }) }
+  if (req.owner_id !== user.id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Not your card' }) }
+  if (req.status !== 'awaiting_approval') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Not awaiting approval' }) }
+
+  await sql`UPDATE cc_cards SET signature_url = ${req.pending_signature_url} WHERE id = ${req.card_id}`
+  await sql`UPDATE cc_signature_requests SET status = 'signed' WHERE id = ${requestId}`
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+async function handleRejectSignature(sql, user, body) {
+  const { requestId } = body
+  if (!requestId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'requestId required' }) }
+
+  const [req] = await sql`
+    SELECT sr.id, sr.card_id, sr.status, c.owner_id
+    FROM cc_signature_requests sr
+    JOIN cc_cards c ON sr.card_id = c.id
+    WHERE sr.id = ${requestId}
+  `
+  if (!req) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Request not found' }) }
+  if (req.owner_id !== user.id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Not your card' }) }
+  if (req.status !== 'awaiting_approval') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Not awaiting approval' }) }
+
+  // Reset to pending so the player can sign again
+  await sql`UPDATE cc_signature_requests SET status = 'pending', pending_signature_url = NULL, signed_at = NULL WHERE id = ${requestId}`
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
 
 // ═══ Redeem Codes ═══
@@ -1871,6 +2087,7 @@ async function handleBinderView(sql, params) {
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
            c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
            c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
+           c.template_id,
            d.best_god_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
            COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -1883,6 +2100,20 @@ async function handleBinderView(sql, params) {
     ORDER BY bc.page, bc.slot
   `
 
+  // Inline template data for collection cards in binder
+  const collBinder = cards.filter(c => c.card_type === 'collection' && c.template_id)
+  let binderTemplateCache = {}
+  if (collBinder.length > 0) {
+    const tids = [...new Set(collBinder.map(c => c.template_id))]
+    const templates = await sql`
+      SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${tids})
+    `
+    for (const t of templates) {
+      const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
+      binderTemplateCache[t.id] = { cardData: td?.cardData || {}, cardType: t.card_type || 'custom' }
+    }
+  }
+
   const avatarUrl = binder.discord_id && binder.discord_avatar
     ? `https://cdn.discordapp.com/avatars/${binder.discord_id}/${binder.discord_avatar}.webp?size=128`
     : null
@@ -1892,11 +2123,13 @@ async function handleBinderView(sql, params) {
     body: JSON.stringify({
       binder: { name: binder.name, color: binder.color },
       owner: { username: binder.discord_username, avatar: avatarUrl },
-      cards: cards.map(c => ({
-        page: c.page,
-        slot: c.slot,
-        card: formatCard(c),
-      })),
+      cards: cards.map(c => {
+        const formatted = formatCard(c)
+        if (c.card_type === 'collection' && binderTemplateCache[c.template_id]) {
+          formatted._templateData = binderTemplateCache[c.template_id]
+        }
+        return { page: c.page, slot: c.slot, card: formatted }
+      }),
     }),
   }
 }
@@ -2030,6 +2263,9 @@ function formatCard(row) {
     isFirstEdition: row.is_first_edition || false,
     isConnected: row.card_data?.isConnected ?? null,
     bestGodName: row.best_god_name || null,
+    defPlayerId: row.def_player_id || null,
+    signatureUrl: row.signature_url || null,
+    templateId: row.template_id || null,
   }
 }
 

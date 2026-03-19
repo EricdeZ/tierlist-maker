@@ -151,6 +151,38 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
   }
 }
 
+// Per-card rates for Starting Five display (passionPerHour, coresPerHour)
+export function getCardRates(holoType, rarity) {
+  const contrib = getCardContribution(holoType, rarity)
+  if (contrib.type === 'flat') return { passionPerHour: contrib.passion, coresPerHour: contrib.cores }
+  if (contrib.type === 'full') return { passionPerHour: contrib.passion, coresPerHour: contrib.cores }
+  return { passionPerHour: 0, coresPerHour: 0 }
+}
+
+// Per-slot effective rates including attachment bonuses
+export function getSlotRates(card, godCard, itemCard) {
+  const contrib = getCardContribution(card.holo_type, card.rarity)
+  if (contrib.type === 'none') return { passionPerHour: 0, coresPerHour: 0 }
+  const playerHasFlat = contrib.type === 'flat' || contrib.type === 'full'
+  const playerHasMult = contrib.type === 'mult' || contrib.type === 'full'
+  const synergy = checkSynergy(card, godCard)
+  const godBonus = getAttachmentBonus(godCard, 'god', playerHasFlat, playerHasMult, synergy)
+  const itemBonus = getAttachmentBonus(itemCard, 'item', playerHasFlat, playerHasMult)
+  let passion = 0, cores = 0
+  if (playerHasFlat) {
+    const godFlatMult = 1 + godBonus.flatBoost
+    const itemFlatMult = 1 + itemBonus.flatBoost
+    passion = contrib.passion * godFlatMult * itemFlatMult
+    cores = contrib.cores * godFlatMult * itemFlatMult
+  }
+  if (playerHasMult) {
+    const mult = contrib.multiplier + godBonus.multAdd + itemBonus.multAdd
+    passion *= mult
+    cores *= mult
+  }
+  return { passionPerHour: passion, coresPerHour: cores }
+}
+
 export function getAttachmentBonusInfo(attachment, type, playerHoloType, synergy = false) {
   if (!attachment?.holo_type) return { flatBoost: 0, multAdd: 0, effectiveType: 'none' }
   const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full'
@@ -357,9 +389,10 @@ export async function collectIncome(sql, userId) {
   }
 }
 
-export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc']
+export async function slotCard(sql, userId, cardId, role, slotType = 'player', lineupType = 'current') {
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
+  if (!['current', 'allstar'].includes(lineupType)) throw new Error('Invalid lineup type')
 
   const [card] = await sql`
     SELECT id, rarity, holo_type, role, card_type
@@ -381,41 +414,43 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
   if (slotType === 'player') {
     if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
     if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
-    if (card.role !== role && card.role !== 'fill') throw new Error(`Card role (${card.role}) does not match slot (${role})`)
+    if (role !== 'bench' && card.role !== role && card.role !== 'fill') {
+      throw new Error(`Card role (${card.role}) does not match slot (${role})`)
+    }
 
     const [existing] = await sql`
-      SELECT role FROM cc_lineups
+      SELECT role, lineup_type FROM cc_lineups
       WHERE user_id = ${userId} AND card_id = ${cardId}
     `
-    if (existing) throw new Error(`Card is already slotted in ${existing.role}`)
+    if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
 
     await collectIncome(sql, userId)
 
     await sql`
-      INSERT INTO cc_lineups (user_id, role, card_id, slotted_at)
-      VALUES (${userId}, ${role}, ${cardId}, NOW())
-      ON CONFLICT (user_id, role)
+      INSERT INTO cc_lineups (user_id, lineup_type, role, card_id, slotted_at)
+      VALUES (${userId}, ${lineupType}, ${role}, ${cardId}, NOW())
+      ON CONFLICT (user_id, lineup_type, role)
       DO UPDATE SET card_id = ${cardId}, slotted_at = NOW()
     `
 
     // Check if existing god/item attachments still meet the new player's rarity floor
     const [slot] = await sql`
       SELECT god_card_id, item_card_id FROM cc_lineups
-      WHERE user_id = ${userId} AND role = ${role}
+      WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}
     `
     if (slot) {
       if (slot.god_card_id) {
         const [godCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.god_card_id}`
         if (godCard && RARITY_TIER[godCard.rarity] > RARITY_TIER[card.rarity]
           && !(card.rarity === 'unique' && godCard.rarity === 'mythic')) {
-          await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
+          await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
         }
       }
       if (slot.item_card_id) {
         const [itemCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.item_card_id}`
         if (itemCard && RARITY_TIER[itemCard.rarity] > RARITY_TIER[card.rarity]
           && !(card.rarity === 'unique' && itemCard.rarity === 'mythic')) {
-          await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
+          await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
         }
       }
     }
@@ -431,7 +466,7 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
     // A player card must already exist in the slot
     const [playerSlot] = await sql`
       SELECT card_id FROM cc_lineups
-      WHERE user_id = ${userId} AND role = ${role} AND card_id IS NOT NULL
+      WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role} AND card_id IS NOT NULL
     `
     if (!playerSlot) throw new Error('No player card in this slot — slot a player first')
 
@@ -455,17 +490,17 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player') {
     await collectIncome(sql, userId)
 
     if (slotType === 'god') {
-      await sql`UPDATE cc_lineups SET god_card_id = ${cardId} WHERE user_id = ${userId} AND role = ${role}`
+      await sql`UPDATE cc_lineups SET god_card_id = ${cardId} WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
     } else {
-      await sql`UPDATE cc_lineups SET item_card_id = ${cardId} WHERE user_id = ${userId} AND role = ${role}`
+      await sql`UPDATE cc_lineups SET item_card_id = ${cardId} WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
     }
   }
 
   return await tick(sql, userId)
 }
 
-export async function unslotCard(sql, userId, role) {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc']
+export async function unslotCard(sql, userId, role, lineupType = 'current') {
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
 
   await collectIncome(sql, userId)
@@ -473,23 +508,23 @@ export async function unslotCard(sql, userId, role) {
   await sql`
     UPDATE cc_lineups
     SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL
-    WHERE user_id = ${userId} AND role = ${role}
+    WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}
   `
 
   return await tick(sql, userId)
 }
 
-export async function unslotAttachment(sql, userId, role, slotType) {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc']
+export async function unslotAttachment(sql, userId, role, slotType, lineupType = 'current') {
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
   if (slotType !== 'god' && slotType !== 'item') throw new Error('slotType must be god or item')
 
   await collectIncome(sql, userId)
 
   if (slotType === 'god') {
-    await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
+    await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
   } else {
-    await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND role = ${role}`
+    await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
   }
 
   return await tick(sql, userId)
