@@ -228,12 +228,19 @@ export function VaultProvider({ children }) {
 
   // Sync card roles from S5 data back to collection (S5 data is fresh from DB)
   const syncS5RolesToCollection = useCallback((s5Data) => {
-    if (!s5Data?.cards?.length) return
-    setCollection(prev => {
-      const roleUpdates = new Map()
-      for (const c of s5Data.cards) {
-        if (c.id && c.role) roleUpdates.set(c.id, c.role)
+    const roleUpdates = new Map()
+    const extractFromSlots = (slots) => {
+      if (!slots) return
+      for (const slotData of Object.values(slots)) {
+        if (slotData?.card?.id && slotData.card.role) {
+          roleUpdates.set(slotData.card.id, slotData.card.role)
+        }
       }
+    }
+    extractFromSlots(s5Data?.currentSeason?.slots)
+    extractFromSlots(s5Data?.allStar?.slots)
+    if (roleUpdates.size === 0) return
+    setCollection(prev => {
       let changed = false
       const next = prev.map(c => {
         const freshRole = roleUpdates.get(c.id)

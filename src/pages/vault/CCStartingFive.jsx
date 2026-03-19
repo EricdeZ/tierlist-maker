@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
-import { RARITIES, STARTING_FIVE_RATES, STARTING_FIVE_CAP_DAYS, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, GOD_SYNERGY_BONUS, TEAM_SYNERGY_BONUS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
+import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
+  S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO,
+  STARTING_FIVE_CAP_DAYS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
@@ -43,6 +46,7 @@ function toGameCardData(card, override) {
   const base = {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
+    signatureUrl: card.signatureUrl || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -63,54 +67,29 @@ function toPlayerCardProps(card) {
     isConnected: card.isConnected,
     defId: card.defId,
     rarity: card.rarity,
+    signatureUrl: card.signatureUrl || undefined,
   }
 }
 
-function getIncomeRate(card) {
+// Estimate base income for a card (used in picker sorting only — display uses API-provided data)
+function getBaseIncomeEstimate(card) {
   if (!card) return { passion: 0, cores: 0 }
   const ht = card.holoType
   const r = card.rarity
-  if (ht === 'full') {
-    return {
-      passion: STARTING_FIVE_RATES.full?.passion?.[r] || 0,
-      cores: STARTING_FIVE_RATES.full?.cores?.[r] || 0,
-    }
-  }
-  if (ht === 'holo') return { passion: STARTING_FIVE_RATES.holo?.[r] || 0, cores: 0 }
-  if (ht === 'reverse') return { passion: 0, cores: STARTING_FIVE_RATES.reverse?.[r] || 0 }
+  const flatP = S5_FLAT_PASSION[r] || 0
+  const flatC = S5_FLAT_CORES[r] || 0
+  const mult = S5_REVERSE_MULT[r] || 1
+  if (ht === 'full') return { passion: flatP * S5_FULL_RATIO, cores: flatC * S5_FULL_RATIO * mult }
+  if (ht === 'holo') return { passion: flatP, cores: 0 }
+  if (ht === 'reverse') return { passion: 0, cores: flatC * mult }
   return { passion: 0, cores: 0 }
 }
 
-function getAttachmentBonus(attachment, type, synergy = false) {
-  if (!attachment) return { passionMult: 1, coresMult: 1 }
-  const bonuses = ATTACHMENT_BONUSES[type]
-  if (!bonuses) return { passionMult: 1, coresMult: 1 }
-  let pBonus = bonuses.passion[attachment.rarity] || 0
-  let cBonus = bonuses.cores[attachment.rarity] || 0
-  if (synergy && type === 'god') {
-    pBonus *= (1 + GOD_SYNERGY_BONUS)
-    cBonus *= (1 + GOD_SYNERGY_BONUS)
-  }
-  let passionMult = 1, coresMult = 1
-  if (attachment.holoType === 'holo') passionMult = 1 + pBonus
-  else if (attachment.holoType === 'reverse') coresMult = 1 + cBonus
-  else if (attachment.holoType === 'full') {
-    passionMult = 1 + pBonus * FULL_HOLO_ATTACHMENT_RATIO
-    coresMult = 1 + cBonus * FULL_HOLO_ATTACHMENT_RATIO
-  }
-  return { passionMult, coresMult }
-}
-
-function getEffectiveIncomeRate(card) {
-  const base = getIncomeRate(card)
-  const synergy = card.godCard?.synergy || false
-  const god = getAttachmentBonus(card.godCard, 'god', synergy)
-  const item = getAttachmentBonus(card.itemCard, 'item')
-  const teamMult = 1 + (card.teamSynergyBonus || 0)
-  return {
-    passion: base.passion * god.passionMult * item.passionMult * teamMult,
-    cores: base.cores * god.coresMult * item.coresMult * teamMult,
-  }
+// Extract slot contribution from API-provided slot data
+function getSlotContribution(slot) {
+  if (!slot?.contribution) return { passion: 0, cores: 0 }
+  const c = slot.contribution
+  return { passion: c.passion || 0, cores: c.cores || 0 }
 }
 
 function HoloTypeIcon({ holoType, size = 14 }) {
@@ -182,6 +161,7 @@ function useSlotSize() {
 
 export default function CCStartingFive() {
   const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable, getDefOverride } = useVault()
+  const [activeLineup, setActiveLineup] = useState('current')
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
   const [slotAnimation, setSlotAnimation] = useState(null)
@@ -207,6 +187,15 @@ export default function CCStartingFive() {
   const [displayPassion, setDisplayPassion] = useState(0)
   const [displayCores, setDisplayCores] = useState(0)
 
+  // Derive lineup-specific and combined data from new response shape
+  const lineupData = activeLineup === 'current'
+    ? startingFive?.currentSeason
+    : startingFive?.allStar
+  const slots = useMemo(() => lineupData?.slots || {}, [lineupData?.slots])
+  const combinedOutput = startingFive?.combined || { coresPerDay: 0, passionPerDay: 0 }
+  const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
+  const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
+
   useEffect(() => {
     if (!startingFive) return
     setDisplayPassion(startingFive.passionPending || 0)
@@ -215,22 +204,22 @@ export default function CCStartingFive() {
 
   useEffect(() => {
     if (!startingFive) return
-    const pph = startingFive.totalPassionPerHour || 0
-    const cph = startingFive.totalCoresPerHour || 0
-    if (pph === 0 && cph === 0) return
+    const ppd = boostedPassionPerDay
+    const cpd = boostedCoresPerDay
+    if (ppd === 0 && cpd === 0) return
 
     const interval = setInterval(() => {
       setDisplayPassion(prev => {
         const cap = startingFive.passionCap || Infinity
-        return Math.min(prev + pph / 3600, cap)
+        return Math.min(prev + ppd / 86400, cap)
       })
       setDisplayCores(prev => {
         const cap = startingFive.coresCap || Infinity
-        return Math.min(prev + cph / 3600, cap)
+        return Math.min(prev + cpd / 86400, cap)
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [startingFive?.totalPassionPerHour, startingFive?.totalCoresPerHour, startingFive?.passionCap, startingFive?.coresCap])
+  }, [boostedPassionPerDay, boostedCoresPerDay, startingFive?.passionCap, startingFive?.coresCap])
 
   useEffect(() => {
     setS5LbLoading(true)
@@ -240,31 +229,49 @@ export default function CCStartingFive() {
       .finally(() => setS5LbLoading(false))
   }, [])
 
+  // Build slotted cards map from the active lineup's slots
   const slottedCards = useMemo(() => {
-    if (!startingFive?.cards) return {}
     const map = {}
-    for (const card of startingFive.cards) {
-      map[card.slotRole] = card
+    if (!slots) return map
+    for (const [role, slotData] of Object.entries(slots)) {
+      if (slotData?.card) {
+        map[role] = {
+          ...slotData.card,
+          godCard: slotData.godCard || null,
+          itemCard: slotData.itemCard || null,
+          synergy: slotData.synergy,
+          isBench: slotData.isBench,
+          contribution: slotData.contribution,
+          godBonus: slotData.godBonus,
+          itemBonus: slotData.itemBonus,
+          teamSynergyBonus: slotData.card.teamSynergyBonus || 0,
+          roleMismatch: slotData.card.roleMismatch || false,
+        }
+      }
     }
     return map
-  }, [startingFive?.cards])
+  }, [slots])
 
+  // Collect IDs from BOTH lineups so excluded cards span both
   const allSlottedIds = useMemo(() => {
-    if (!startingFive?.cards) return new Set()
     const ids = new Set()
-    for (const card of startingFive.cards) {
-      ids.add(card.id)
-      if (card.godCard) ids.add(card.godCard.id)
-      if (card.itemCard) ids.add(card.itemCard.id)
+    const collectFromSlots = (lineupSlots) => {
+      if (!lineupSlots) return
+      for (const slotData of Object.values(lineupSlots)) {
+        if (slotData?.card) ids.add(slotData.card.id)
+        if (slotData?.godCard) ids.add(slotData.godCard.id)
+        if (slotData?.itemCard) ids.add(slotData.itemCard.id)
+      }
     }
+    collectFromSlots(startingFive?.currentSeason?.slots)
+    collectFromSlots(startingFive?.allStar?.slots)
     return ids
-  }, [startingFive?.cards])
+  }, [startingFive?.currentSeason?.slots, startingFive?.allStar?.slots])
 
   const handleSlot = useCallback(async (cardId, role) => {
     setSlotting(true)
     try {
-      await slotS5Card(cardId, role)
-      // Find the card to determine rarity for animation
+      await slotS5Card(cardId, role, 'player', activeLineup)
       const card = collection.find(c => c.id === cardId)
       if (card) {
         setSlotAnimation({ role, rarity: card.rarity, color: RARITIES[card.rarity]?.color || '#9ca3af' })
@@ -277,23 +284,23 @@ export default function CCStartingFive() {
     } finally {
       setSlotting(false)
     }
-  }, [slotS5Card, collection, showError])
+  }, [slotS5Card, collection, showError, activeLineup])
 
   const handleUnslot = useCallback(async (role) => {
     try {
-      await unslotS5Card(role)
+      await unslotS5Card(role, activeLineup)
       setOptionsRole(null)
     } catch (err) {
       showError(err.message || 'Failed to remove card')
     }
-  }, [unslotS5Card, showError])
+  }, [unslotS5Card, showError, activeLineup])
 
   const [attachPickerState, setAttachPickerState] = useState(null)
 
   const handleAttachSlot = useCallback(async (cardId, role, slotType) => {
     setSlotting(true)
     try {
-      await slotS5Card(cardId, role, slotType)
+      await slotS5Card(cardId, role, slotType, activeLineup)
       const card = collection.find(c => c.id === cardId)
       if (card) {
         setSlotAnimation({ role, rarity: card.rarity, color: RARITIES[card.rarity]?.color || '#9ca3af' })
@@ -305,15 +312,15 @@ export default function CCStartingFive() {
     } finally {
       setSlotting(false)
     }
-  }, [slotS5Card, collection, showError])
+  }, [slotS5Card, collection, showError, activeLineup])
 
   const handleAttachUnslot = useCallback(async (role, slotType) => {
     try {
-      await unslotS5Attachment(role, slotType)
+      await unslotS5Attachment(role, slotType, activeLineup)
     } catch (err) {
       showError(err.message || 'Failed to remove attachment')
     }
-  }, [unslotS5Attachment, showError])
+  }, [unslotS5Attachment, showError, activeLineup])
 
   const handleCollect = useCallback(async () => {
     if (collecting) return
@@ -348,8 +355,8 @@ export default function CCStartingFive() {
   const passionPct = passionCap > 0 ? Math.min((displayPassion / passionCap) * 100, 100) : 0
   const coresPct = coresCap > 0 ? Math.min((displayCores / coresCap) * 100, 100) : 0
   const canCollect = displayPassion >= 1 || displayCores >= 1
-  const totalPph = startingFive?.totalPassionPerHour || 0
-  const totalCph = startingFive?.totalCoresPerHour || 0
+  const totalPpd = boostedPassionPerDay
+  const totalCpd = boostedCoresPerDay
 
   if (!startingFive) {
     return (
@@ -407,8 +414,8 @@ export default function CCStartingFive() {
                   />
                 </div>
               )}
-              {totalPph > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalPph.toFixed(1)}/hr</span>
+              {totalPpd > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalPpd.toFixed(1)}/day</span>
               )}
             </div>
 
@@ -438,8 +445,8 @@ export default function CCStartingFive() {
                   />
                 </div>
               )}
-              {totalCph > 0 && (
-                <span className="text-[10px] text-white/30 cd-num">+{totalCph.toFixed(1)}/hr</span>
+              {totalCpd > 0 && (
+                <span className="text-[10px] text-white/30 cd-num">+{totalCpd.toFixed(1)}/day</span>
               )}
             </div>
           </div>
@@ -487,7 +494,7 @@ export default function CCStartingFive() {
             ) : (
               <button
                 onClick={() => setShowConsumablePicker(true)}
-                disabled={!startingFive?.cards?.length}
+                disabled={Object.keys(slots).length === 0}
                 className="group flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
                 style={{ width: 58, aspectRatio: '63/88' }}
                 title="Slot a consumable to boost income rate"
@@ -521,10 +528,74 @@ export default function CCStartingFive() {
 
       </div>
 
+      {/* Lineup Rate Summary */}
+      {(combinedOutput.coresPerDay > 0 || combinedOutput.passionPerDay > 0) && (
+        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 text-[11px] cd-num text-white/40 space-y-1">
+          <div className="flex items-center justify-between">
+            <span>Current Season</span>
+            <span>
+              {startingFive?.currentSeason?.output?.coresPerDay > 0 && (
+                <span className="text-[var(--cd-cyan)]">{startingFive.currentSeason.output.coresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+              {startingFive?.currentSeason?.output?.passionPerDay > 0 && (
+                <span className="ml-2" style={{ color: '#f8c56a' }}>{startingFive.currentSeason.output.passionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>All-Star <span className="text-white/20">(0.615x)</span></span>
+            <span>
+              {startingFive?.allStar?.output?.coresPerDay > 0 && (
+                <span className="text-[var(--cd-cyan)]">{startingFive.allStar.output.coresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+              {startingFive?.allStar?.output?.passionPerDay > 0 && (
+                <span className="ml-2" style={{ color: '#f8c56a' }}>{startingFive.allStar.output.passionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-white/60 font-bold">
+            <span>Combined{boostedCoresPerDay !== combinedOutput.coresPerDay || boostedPassionPerDay !== combinedOutput.passionPerDay ? ' (boosted)' : ''}</span>
+            <span>
+              {boostedCoresPerDay > 0 && (
+                <span className="text-[var(--cd-cyan)]">{boostedCoresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+              {boostedPassionPerDay > 0 && (
+                <span className="ml-2" style={{ color: '#f8c56a' }}>{boostedPassionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Lineup Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveLineup('current')}
+          className={`px-4 py-2 rounded font-medium transition-colors cursor-pointer ${
+            activeLineup === 'current'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700/50 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Current Season
+        </button>
+        <button
+          onClick={() => setActiveLineup('allstar')}
+          className={`px-4 py-2 rounded font-medium transition-colors cursor-pointer ${
+            activeLineup === 'allstar'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-700/50 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          All-Star {activeLineup !== 'allstar' && <span className="text-xs opacity-60 ml-1">0.615x</span>}
+        </button>
+      </div>
+
       {/* 5 Role Slots */}
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
         {ROLES.map(role => {
           const card = slottedCards[role.key]
+          const slotData = slots[role.key]
           const isAnimating = slotAnimation?.role === role.key
 
           return (
@@ -541,6 +612,7 @@ export default function CCStartingFive() {
                   <FilledSlot
                     card={card}
                     role={role}
+                    slotData={slotData}
                     isAnimating={isAnimating}
                     animConfig={isAnimating ? getAnimationConfig(slotAnimation.rarity) : null}
                     onSwap={() => setPickerRole(role.key)}
@@ -563,6 +635,48 @@ export default function CCStartingFive() {
         })}
       </div>
 
+      {/* Bench Slot */}
+      <div className="mt-4 pt-4 border-t border-gray-700/50">
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider cd-head text-center">Bench (50%)</div>
+        <div className="flex justify-center">
+          {slottedCards.bench ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative">
+                <FilledSlot
+                  card={slottedCards.bench}
+                  role={{ key: 'bench', label: 'BENCH', icon: null }}
+                  slotData={slots.bench}
+                  isAnimating={slotAnimation?.role === 'bench'}
+                  animConfig={slotAnimation?.role === 'bench' ? getAnimationConfig(slotAnimation.rarity) : null}
+                  onSwap={() => setPickerRole('bench')}
+                  onRemove={() => handleUnslot('bench')}
+                  onZoom={() => { setOptionsRole(null); setZoomedCard(slottedCards.bench) }}
+                  optionsOpen={optionsRole === 'bench'}
+                  onToggleOptions={() => setOptionsRole(optionsRole === 'bench' ? null : 'bench')}
+                  size={slotSize}
+                  override={getDefOverride(slottedCards.bench)}
+                  onAttachPicker={(r, st) => setAttachPickerState({ role: r, slotType: st })}
+                  onAttachRemove={(r, st) => handleAttachUnslot(r, st)}
+                  getDefOverride={getDefOverride}
+                />
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setPickerRole('bench')}
+              className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
+              style={{ width: slotSize, aspectRatio: '63/88' }}
+            >
+              <Plus size={slotSize < 150 ? 22 : 28} className="opacity-[0.08] group-hover:opacity-30 transition-opacity mb-2 text-white" />
+              <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
+                <Plus size={12} />
+                Bench
+              </div>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Leaderboard */}
       <S5Leaderboard data={s5Leaderboard} loading={s5LbLoading} currentUserId={user?.id} />
 
@@ -577,6 +691,7 @@ export default function CCStartingFive() {
           onClose={() => setPickerRole(null)}
           slotting={slotting}
           getDefOverride={getDefOverride}
+          isBench={pickerRole === 'bench'}
         />
       )}
 
@@ -613,8 +728,9 @@ export default function CCStartingFive() {
       {zoomedCard && (
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
+          collectionCard={getCardType(zoomedCard) === 'collection' ? zoomedCard : undefined}
           playerCard={getCardType(zoomedCard) === 'player' ? toPlayerCardProps(zoomedCard) : undefined}
-          gameCard={getCardType(zoomedCard) !== 'player' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
+          gameCard={getCardType(zoomedCard) !== 'player' && getCardType(zoomedCard) !== 'collection' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
           holoType={zoomedCard.holoType}
         />
       )}
@@ -823,15 +939,20 @@ function TutorialModal({ onClose }) {
         <div className="p-5 overflow-y-auto space-y-4 text-sm text-white/60" style={{ maxHeight: 'calc(80vh - 70px)' }}>
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">PASSIVE INCOME</h4>
-            <p>Slot holo player cards into 5 role-based slots to earn passive Passion and Cores over time. Higher rarity cards generate more income.</p>
+            <p>Slot holo player cards into 5 role-based slots plus a bench slot to earn passive Passion and Cores over time. Higher rarity cards generate more income.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">TWO LINEUPS</h4>
+            <p>Build two lineups: <span className="text-blue-400">Current Season</span> runs at full rate, while <span className="text-purple-400">All-Star</span> runs at 61.5% rate. Both lineups generate income simultaneously.</p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">HOLO TYPES</h4>
             <p>
-              <span style={{ color: '#f8c56a' }}>Holo</span> cards earn Passion.{' '}
-              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards earn Cores.{' '}
-              <span className="text-purple-400">Full holo</span> cards earn both at 60% of single-type rates.
+              <span style={{ color: '#f8c56a' }}>Holo</span> cards provide flat Passion income.{' '}
+              <span className="text-[var(--cd-cyan)]">Reverse holo</span> cards multiply Cores output.{' '}
+              <span className="text-purple-400">Full holo</span> cards contribute both at 44% effectiveness.
             </p>
           </div>
 
@@ -863,8 +984,13 @@ function TutorialModal({ onClose }) {
           </div>
 
           <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">BENCH SLOT</h4>
+            <p>Each lineup has a 6th bench slot that accepts any player role. Bench cards contribute at 50% effectiveness — still worth filling if you have spare holos.</p>
+          </div>
+
+          <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ROLE MATCHING</h4>
-            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Fill-role cards can go in any slot. Item cards can be attached to any slot regardless of role. A mismatched role earns zero income.</p>
+            <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Fill-role cards can go in any slot. Item cards can be attached to any slot regardless of role. The bench slot accepts any role. A mismatched role earns zero income.</p>
           </div>
         </div>
       </div>
@@ -1026,9 +1152,10 @@ function EmptySlot({ role, onClick, size = 170 }) {
 }
 
 
-function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override, onAttachPicker, onAttachRemove, getDefOverride }) {
+function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override, onAttachPicker, onAttachRemove, getDefOverride }) {
+  const { getTemplate } = useVault()
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
-  const income = getEffectiveIncomeRate(card)
+  const income = getSlotContribution(slotData)
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const slotRef = useRef(null)
@@ -1061,7 +1188,9 @@ function FilledSlot({ card, role, isAnimating, animConfig, onSwap, onRemove, onZ
         }}
         onClick={onToggleOptions}
       >
-        {isPlayer ? (
+        {type === 'collection' ? (
+          <VaultCard card={card} getTemplate={getTemplate} size={size} holo />
+        ) : isPlayer ? (
           <TradingCard
             {...toPlayerCardProps(card)}
             rarity={card.rarity}
@@ -1348,31 +1477,33 @@ function SlotAnimationOverlay({ config, rarity }) {
 }
 
 
-function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride }) {
+function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride, isBench }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const roleIcon = roleInfo?.icon
 
-  // Filter eligible cards
+  // Filter eligible cards — bench slot accepts any player role
   const eligibleCards = useMemo(() => {
     const currentPlayerInSlot = slottedCards[role]?.id
     return collection
       .filter(card => {
-        const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
-        if (cardRole !== role && cardRole !== 'fill') return false
-        if (!card.holoType && card.rarity !== 'common') return false
         const type = getCardType(card)
         if (type !== 'player') return false
+        if (!isBench) {
+          const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
+          if (cardRole !== role && cardRole !== 'fill') return false
+        }
+        if (!card.holoType && card.rarity !== 'common') return false
         if (card.id !== currentPlayerInSlot && allSlottedIds.has(card.id)) return false
         return true
       })
       .sort((a, b) => {
         const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
         if (rDiff !== 0) return rDiff
-        const aIncome = getIncomeRate(a)
-        const bIncome = getIncomeRate(b)
+        const aIncome = getBaseIncomeEstimate(a)
+        const bIncome = getBaseIncomeEstimate(b)
         return (bIncome.passion + bIncome.cores) - (aIncome.passion + aIncome.cores)
       })
-  }, [collection, slottedCards, allSlottedIds, role])
+  }, [collection, slottedCards, allSlottedIds, role, isBench])
 
   return (
     <div
@@ -1389,7 +1520,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
           <div className="flex items-center gap-2">
             {roleIcon && <img src={roleIcon} alt="" className="w-[18px] h-[18px] object-contain" />}
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
-              Select {roleInfo?.label} Card
+              {isBench ? 'Select Bench Card' : `Select ${roleInfo?.label} Card`}
             </h3>
           </div>
           <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
@@ -1403,7 +1534,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
             <div className="text-center py-12 text-white/30">
               {roleIcon && <img src={roleIcon} alt="" className="w-10 h-10 mx-auto mb-3 opacity-20 object-contain" />}
               <p className="text-sm cd-head tracking-wider">No eligible cards</p>
-              <p className="text-xs text-white/20 mt-1">Need a player card with the {roleInfo?.label} role</p>
+              <p className="text-xs text-white/20 mt-1">{isBench ? 'Need a player card (any role)' : `Need a player card with the ${roleInfo?.label} role`}</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
@@ -1514,26 +1645,27 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
 
 function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
-  const income = getIncomeRate(card)
+  const income = getBaseIncomeEstimate(card)
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const isAttachment = type === 'god' || type === 'item'
 
-  // Compute attachment bonus percentages for god/item cards
+  // Compute attachment bonus percentages for god/item cards using new constants
   const attachBonus = useMemo(() => {
     if (!isAttachment || holoMismatch) return null
-    const bonuses = ATTACHMENT_BONUSES[type]
-    if (!bonuses) return null
-    let pB = bonuses.passion[card.rarity] || 0
-    let cB = bonuses.cores[card.rarity] || 0
-    let passionPct = 0, coresPct = 0
-    if (card.holoType === 'holo') passionPct = Math.round(pB * 100)
-    else if (card.holoType === 'reverse') coresPct = Math.round(cB * 100)
+    const flatBonuses = S5_ATT_FLAT[type]
+    const multBonuses = S5_ATT_MULT[type]
+    if (!flatBonuses && !multBonuses) return null
+    const flatVal = flatBonuses?.[card.rarity] || 0
+    const multVal = multBonuses?.[card.rarity] || 0
+    let flatPct = 0, multPct = 0
+    if (card.holoType === 'holo') flatPct = Math.round(flatVal * 100)
+    else if (card.holoType === 'reverse') multPct = Math.round(multVal * 100)
     else if (card.holoType === 'full') {
-      passionPct = Math.round(pB * FULL_HOLO_ATTACHMENT_RATIO * 100)
-      coresPct = Math.round(cB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+      flatPct = Math.round(flatVal * S5_FULL_ATT_RATIO * 100)
+      multPct = Math.round(multVal * S5_FULL_ATT_RATIO * 100)
     }
-    return { passionPct, coresPct }
+    return { flatPct, multPct }
   }, [isAttachment, holoMismatch, type, card.rarity, card.holoType])
 
   return (
@@ -1569,19 +1701,13 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           <span className="text-[9px] font-bold cd-head" style={{ color: holoMismatch ? `${color}66` : color }}>{RARITIES[card.rarity]?.name}</span>
           <HoloTypeIcon holoType={card.holoType} size={10} />
         </div>
-        {isAttachment && attachBonus && (attachBonus.passionPct > 0 || attachBonus.coresPct > 0) ? (
+        {isAttachment && attachBonus && (attachBonus.flatPct > 0 || attachBonus.multPct > 0) ? (
           <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-bold cd-num">
-            {attachBonus.passionPct > 0 && (
-              <span className="flex items-center gap-0.5 text-amber-400">
-                <img src={passionCoin} alt="" className="w-2 h-2" />
-                +{attachBonus.passionPct}%
-              </span>
+            {attachBonus.flatPct > 0 && (
+              <span className="text-amber-400">+{attachBonus.flatPct}% flat</span>
             )}
-            {attachBonus.coresPct > 0 && (
-              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                <img src={emberIcon} alt="" className="w-2 h-2" />
-                +{attachBonus.coresPct}%
-              </span>
+            {attachBonus.multPct > 0 && (
+              <span className="text-[var(--cd-cyan)]">+{attachBonus.multPct}% mult</span>
             )}
           </div>
         ) : !isAttachment ? (
@@ -1589,13 +1715,13 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
             {income.passion > 0 && (
               <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
                 <img src={passionCoin} alt="" className="w-2 h-2" />
-                {income.passion}/d
+                {income.passion.toFixed(1)}/d
               </span>
             )}
             {income.cores > 0 && (
               <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
                 <img src={emberIcon} alt="" className="w-2 h-2" />
-                {income.cores}/d
+                {income.cores.toFixed(1)}/d
               </span>
             )}
           </div>
