@@ -143,8 +143,6 @@ export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
 
-export const FULL_HOLO_ATTACHMENT_RATIO = S5_FULL_ATT_RATIO; // deprecated alias
-
 // Consumable slot — rarity-based total boost (non-linear scaling)
 export const CONSUMABLE_SLOT_SCALING = {
   common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,

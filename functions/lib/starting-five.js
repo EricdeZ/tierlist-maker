@@ -26,7 +26,6 @@ const S5_ATT_MULT = {
 const S5_FULL_ATT_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.30
 const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
-const FULL_HOLO_RATIO = S5_FULL_ATT_RATIO
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
@@ -149,38 +148,6 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
     coresPerDay: totalFlatCores * totalMult * teamBonus,
     passionPerDay: totalFlatPassion * totalMult * teamBonus,
   }
-}
-
-// Per-card rates for Starting Five display (passionPerHour, coresPerHour)
-export function getCardRates(holoType, rarity) {
-  const contrib = getCardContribution(holoType, rarity)
-  if (contrib.type === 'flat') return { passionPerHour: contrib.passion, coresPerHour: contrib.cores }
-  if (contrib.type === 'full') return { passionPerHour: contrib.passion, coresPerHour: contrib.cores }
-  return { passionPerHour: 0, coresPerHour: 0 }
-}
-
-// Per-slot effective rates including attachment bonuses
-export function getSlotRates(card, godCard, itemCard) {
-  const contrib = getCardContribution(card.holo_type, card.rarity)
-  if (contrib.type === 'none') return { passionPerHour: 0, coresPerHour: 0 }
-  const playerHasFlat = contrib.type === 'flat' || contrib.type === 'full'
-  const playerHasMult = contrib.type === 'mult' || contrib.type === 'full'
-  const synergy = checkSynergy(card, godCard)
-  const godBonus = getAttachmentBonus(godCard, 'god', playerHasFlat, playerHasMult, synergy)
-  const itemBonus = getAttachmentBonus(itemCard, 'item', playerHasFlat, playerHasMult)
-  let passion = 0, cores = 0
-  if (playerHasFlat) {
-    const godFlatMult = 1 + godBonus.flatBoost
-    const itemFlatMult = 1 + itemBonus.flatBoost
-    passion = contrib.passion * godFlatMult * itemFlatMult
-    cores = contrib.cores * godFlatMult * itemFlatMult
-  }
-  if (playerHasMult) {
-    const mult = contrib.multiplier + godBonus.multAdd + itemBonus.multAdd
-    passion *= mult
-    cores *= mult
-  }
-  return { passionPerHour: passion, coresPerHour: cores }
 }
 
 export function getAttachmentBonusInfo(attachment, type, playerHoloType, synergy = false) {

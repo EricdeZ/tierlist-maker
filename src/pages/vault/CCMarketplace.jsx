@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { marketplaceService } from '../../services/database'
-import { RARITIES, STARTING_FIVE_RATES, ATTACHMENT_BONUSES, FULL_HOLO_ATTACHMENT_RATIO, CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../data/vault/economy'
+import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_FULL_RATIO, S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../data/vault/economy'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
 import GameCard from './components/GameCard'
+import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react'
@@ -47,6 +48,7 @@ function buildCardData(card, override) {
     id: d.itemId || d.consumableId || card.serialNumber,
     ...d,
     metadata: override || undefined,
+    signatureUrl: card.signatureUrl || undefined,
   }
 }
 
@@ -57,29 +59,33 @@ function getCardEffect(card) {
 
   if (type === 'player') {
     let passion = 0, cores = 0
-    if (ht === 'full') {
-      passion = STARTING_FIVE_RATES.full?.passion?.[r] || 0
-      cores = STARTING_FIVE_RATES.full?.cores?.[r] || 0
-    } else if (ht === 'holo') {
-      passion = STARTING_FIVE_RATES.holo?.[r] || 0
-    } else if (ht === 'reverse') {
-      cores = STARTING_FIVE_RATES.reverse?.[r] || 0
+    if (ht === 'holo') {
+      passion = S5_FLAT_PASSION[r] || 0
+      cores = S5_FLAT_CORES[r] || 0
+    } else if (ht === 'full') {
+      passion = (S5_FLAT_PASSION[r] || 0) * S5_FULL_RATIO
+      cores = (S5_FLAT_CORES[r] || 0) * S5_FULL_RATIO
     }
     if (!passion && !cores) return null
     return { passion, cores, isFlat: true }
   }
 
   if (type === 'god' || type === 'item') {
-    const bonuses = ATTACHMENT_BONUSES[type]
-    if (!bonuses) return null
-    const pB = bonuses.passion[r] || 0
-    const cB = bonuses.cores[r] || 0
+    const flatTable = S5_ATT_FLAT[type]
+    const multTable = S5_ATT_MULT[type]
+    if (!flatTable) return null
+    const flatPct = flatTable[r] || 0
+    const multAdd = multTable?.[r] || 0
     let passionPct = 0, coresPct = 0
-    if (ht === 'holo') passionPct = Math.round(pB * 100)
-    else if (ht === 'reverse') coresPct = Math.round(cB * 100)
-    else if (ht === 'full') {
-      passionPct = Math.round(pB * FULL_HOLO_ATTACHMENT_RATIO * 100)
-      coresPct = Math.round(cB * FULL_HOLO_ATTACHMENT_RATIO * 100)
+    if (ht === 'holo') {
+      passionPct = Math.round(flatPct * 100)
+      coresPct = Math.round(flatPct * 100)
+    } else if (ht === 'reverse') {
+      passionPct = Math.round(multAdd * 100)
+      coresPct = Math.round(multAdd * 100)
+    } else if (ht === 'full') {
+      passionPct = Math.round(flatPct * S5_FULL_ATT_RATIO * 100)
+      coresPct = Math.round(flatPct * S5_FULL_ATT_RATIO * 100)
     }
     if (!passionPct && !coresPct) return null
     return { passion: passionPct, cores: coresPct, isFlat: false }
@@ -127,8 +133,11 @@ function CardEffectDisplay({ card }) {
 }
 
 function MarketCard({ card, size }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const override = getDefOverride(card)
+  if (card.cardType === 'collection') {
+    return <VaultCard card={card} getTemplate={getTemplate} size={size} holo={false} />
+  }
   if (card.cardType === 'player') {
     const d = card.cardData || {}
     return (
@@ -146,6 +155,7 @@ function MarketCard({ card, size }) {
         bestGod={card.bestGodName ? { name: card.bestGodName } : null}
         isFirstEdition={card.isFirstEdition}
         isConnected={card.isConnected}
+        signatureUrl={card.signatureUrl}
         size={size}
       />
     )
@@ -338,6 +348,10 @@ export default function CCMarketplace() {
 
   const handleCardZoom = (card) => {
     const type = card.cardType || 'god'
+    if (type === 'collection') {
+      setZoomedCard({ collectionCard: card, holoType: card.holoType })
+      return
+    }
     if (type === 'player') {
       setZoomedCard({ playerCard: {
         defId: card.defId || card.cardData?.defId,
@@ -465,6 +479,7 @@ export default function CCMarketplace() {
       {zoomedCard && (
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
+          collectionCard={zoomedCard.collectionCard}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
           holoType={zoomedCard.holoType}
