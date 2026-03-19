@@ -71,25 +71,29 @@ function toPlayerCardProps(card) {
   }
 }
 
-// Estimate base income for a card (used in picker sorting only — display uses API-provided data)
+// Estimate base contribution for a card (flat income + multiplier)
 function getBaseIncomeEstimate(card) {
-  if (!card) return { passion: 0, cores: 0 }
+  if (!card) return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
   const ht = card.holoType
   const r = card.rarity
-  const flatP = S5_FLAT_PASSION[r] || 0
   const flatC = S5_FLAT_CORES[r] || 0
   const mult = S5_REVERSE_MULT[r] || 1
-  if (ht === 'full') return { passion: flatP * S5_FULL_RATIO, cores: flatC * S5_FULL_RATIO * mult }
-  if (ht === 'holo') return { passion: flatP, cores: 0 }
-  if (ht === 'reverse') return { passion: 0, cores: flatC * mult }
-  return { passion: 0, cores: 0 }
+  if (ht === 'holo') return { flatCores: flatC, multiplier: 0, type: 'flat', sortValue: flatC }
+  if (ht === 'reverse') return { flatCores: 0, multiplier: mult, type: 'mult', sortValue: mult * 10 }
+  if (ht === 'full') return { flatCores: flatC * S5_FULL_RATIO, multiplier: 1 + (mult - 1) * S5_FULL_RATIO, type: 'full', sortValue: flatC * S5_FULL_RATIO + mult }
+  return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
 }
 
 // Extract slot contribution from API-provided slot data
 function getSlotContribution(slot) {
-  if (!slot?.contribution) return { passion: 0, cores: 0 }
+  if (!slot?.contribution) return { passion: 0, cores: 0, multiplier: 0, type: 'none' }
   const c = slot.contribution
-  return { passion: c.passion || 0, cores: c.cores || 0 }
+  return {
+    passion: c.passion || 0,
+    cores: c.cores || 0,
+    multiplier: c.multiplier || 0,
+    type: c.type || 'none',
+  }
 }
 
 function HoloTypeIcon({ holoType, size = 14 }) {
@@ -193,6 +197,18 @@ export default function CCStartingFive() {
     : startingFive?.allStar
   const slots = useMemo(() => lineupData?.slots || {}, [lineupData?.slots])
   const combinedOutput = startingFive?.combined || { coresPerDay: 0, passionPerDay: 0 }
+
+  // Compute flat total and mult total from active lineup's slots
+  const lineupBreakdown = useMemo(() => {
+    let flatCores = 0, totalMult = 1
+    for (const slotData of Object.values(slots)) {
+      if (!slotData?.contribution) continue
+      const c = slotData.contribution
+      if (c.type === 'flat' || c.type === 'full') flatCores += c.cores || 0
+      if (c.type === 'mult' || c.type === 'full') totalMult *= c.multiplier || 1
+    }
+    return { flatCores, totalMult }
+  }, [slots])
   const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
 
@@ -528,42 +544,35 @@ export default function CCStartingFive() {
 
       </div>
 
-      {/* Lineup Rate Summary */}
-      {(combinedOutput.coresPerDay > 0 || combinedOutput.passionPerDay > 0) && (
-        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 text-[11px] cd-num text-white/40 space-y-1">
+      {/* Lineup Flat + Mult Breakdown */}
+      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (
+        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 text-[11px] cd-num space-y-1.5">
           <div className="flex items-center justify-between">
-            <span>Current Season</span>
-            <span>
-              {startingFive?.currentSeason?.output?.coresPerDay > 0 && (
-                <span className="text-[var(--cd-cyan)]">{startingFive.currentSeason.output.coresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
-              {startingFive?.currentSeason?.output?.passionPerDay > 0 && (
-                <span className="ml-2" style={{ color: '#f8c56a' }}>{startingFive.currentSeason.output.passionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
+            <span className="text-white/40">Total Flat</span>
+            <span className="text-amber-400 font-bold">
+              {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span>All-Star</span>
-            <span>
-              {startingFive?.allStar?.output?.coresPerDay > 0 && (
-                <span className="text-[var(--cd-cyan)]">{startingFive.allStar.output.coresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
-              {startingFive?.allStar?.output?.passionPerDay > 0 && (
-                <span className="ml-2" style={{ color: '#f8c56a' }}>{startingFive.allStar.output.passionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
+            <span className="text-white/40">Total Multiplier</span>
+            <span className="text-emerald-400 font-bold">
+              {lineupBreakdown.totalMult.toFixed(2)}x
             </span>
           </div>
-          <div className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-white/60 font-bold">
-            <span>Combined{boostedCoresPerDay !== combinedOutput.coresPerDay || boostedPassionPerDay !== combinedOutput.passionPerDay ? ' (boosted)' : ''}</span>
-            <span>
-              {boostedCoresPerDay > 0 && (
-                <span className="text-[var(--cd-cyan)]">{boostedCoresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
-              {boostedPassionPerDay > 0 && (
-                <span className="ml-2" style={{ color: '#f8c56a' }}>{boostedPassionPerDay.toFixed(1)} <img src={passionCoin} alt="" className="w-2.5 h-2.5 inline" />/day</span>
-              )}
+          <div className="flex items-center justify-between pt-1.5 border-t border-white/[0.06]">
+            <span className="text-white/40">Output</span>
+            <span className="text-[var(--cd-cyan)] font-bold">
+              {(lineupBreakdown.flatCores * lineupBreakdown.totalMult).toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
             </span>
           </div>
+          {boostedCoresPerDay > 0 && boostedCoresPerDay !== combinedOutput.coresPerDay && (
+            <div className="flex items-center justify-between">
+              <span className="text-white/30 text-[10px]">With consumable</span>
+              <span className="text-[var(--cd-cyan)]/70 text-[10px]">
+                {boostedCoresPerDay.toFixed(1)} <img src={emberIcon} alt="" className="w-2.5 h-2.5 inline" />/day
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1243,16 +1252,15 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
         ) : (
           <>
             <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
-              {income.passion > 0 && (
-                <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
-                  <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
-                  {income.passion % 1 === 0 ? income.passion : income.passion.toFixed(1)}/d
+              {(income.type === 'flat' || income.type === 'full') && income.cores > 0 && (
+                <span className="flex items-center gap-0.5 text-amber-400">
+                  <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
+                  {income.cores < 1 ? income.cores.toFixed(2) : income.cores.toFixed(1)}/d
                 </span>
               )}
-              {income.cores > 0 && (
-                <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                  <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
-                  {income.cores % 1 === 0 ? income.cores : income.cores.toFixed(1)}/d
+              {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
+                <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
+                  {income.multiplier.toFixed(2)}x
                 </span>
               )}
             </div>
@@ -1499,7 +1507,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
         if (rDiff !== 0) return rDiff
         const aIncome = getBaseIncomeEstimate(a)
         const bIncome = getBaseIncomeEstimate(b)
-        return (bIncome.passion + bIncome.cores) - (aIncome.passion + aIncome.cores)
+        return bIncome.sortValue - aIncome.sortValue
       })
   }, [collection, slottedCards, allSlottedIds, role, isBench])
 
@@ -1707,16 +1715,15 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           </div>
         ) : !isAttachment ? (
           <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
-            {income.passion > 0 && (
-              <span className="flex items-center gap-0.5" style={{ color: '#f8c56a' }}>
-                <img src={passionCoin} alt="" className="w-2 h-2" />
-                {income.passion.toFixed(1)}/d
+            {(income.type === 'flat' || income.type === 'full') && income.flatCores > 0 && (
+              <span className="flex items-center gap-0.5 text-amber-400">
+                <img src={emberIcon} alt="" className="w-2 h-2" />
+                {income.flatCores < 1 ? income.flatCores.toFixed(2) : income.flatCores.toFixed(1)}/d
               </span>
             )}
-            {income.cores > 0 && (
-              <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                <img src={emberIcon} alt="" className="w-2 h-2" />
-                {income.cores.toFixed(1)}/d
+            {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
+              <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
+                {income.multiplier.toFixed(2)}x
               </span>
             )}
           </div>
