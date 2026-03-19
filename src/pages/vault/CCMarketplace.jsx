@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { marketplaceService } from '../../services/database'
-import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_FULL_RATIO, S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../data/vault/economy'
+import { RARITIES } from '../../data/vault/economy'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
 import GameCard from './components/GameCard'
+import CardEffectDisplay from './components/CardEffectDisplay'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
@@ -50,86 +51,6 @@ function buildCardData(card, override) {
     metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
   }
-}
-
-function getCardEffect(card) {
-  const type = card.cardType || 'god'
-  const r = card.rarity
-  const ht = card.holoType
-
-  if (type === 'player') {
-    let passion = 0, cores = 0
-    if (ht === 'holo') {
-      passion = S5_FLAT_PASSION[r] || 0
-      cores = S5_FLAT_CORES[r] || 0
-    } else if (ht === 'full') {
-      passion = (S5_FLAT_PASSION[r] || 0) * S5_FULL_RATIO
-      cores = (S5_FLAT_CORES[r] || 0) * S5_FULL_RATIO
-    }
-    if (!passion && !cores) return null
-    return { passion, cores, isFlat: true }
-  }
-
-  if (type === 'god' || type === 'item') {
-    const flatTable = S5_ATT_FLAT[type]
-    const multTable = S5_ATT_MULT[type]
-    if (!flatTable) return null
-    const flatPct = flatTable[r] || 0
-    const multAdd = multTable?.[r] || 0
-    let passionPct = 0, coresPct = 0
-    if (ht === 'holo') {
-      passionPct = Math.round(flatPct * 100)
-      coresPct = Math.round(flatPct * 100)
-    } else if (ht === 'reverse') {
-      passionPct = Math.round(multAdd * 100)
-      coresPct = Math.round(multAdd * 100)
-    } else if (ht === 'full') {
-      passionPct = Math.round(flatPct * S5_FULL_ATT_RATIO * 100)
-      coresPct = Math.round(flatPct * S5_FULL_ATT_RATIO * 100)
-    }
-    if (!passionPct && !coresPct) return null
-    return { passion: passionPct, cores: coresPct, isFlat: false }
-  }
-
-  if (type === 'consumable') {
-    const consumableId = card.cardData?.consumableId
-    const total = CONSUMABLE_SLOT_SCALING[r] || 0
-    const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 }
-    const passionPct = Math.round(total * spread.passion * 100)
-    const coresPct = Math.round(total * spread.cores * 100)
-    if (!passionPct && !coresPct) return null
-    return { passion: passionPct, cores: coresPct, isFlat: false }
-  }
-
-  return null
-}
-
-function CardEffectDisplay({ card }) {
-  const effect = getCardEffect(card)
-  if (!effect) return null
-
-  return (
-    <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold cd-num">
-      {effect.passion > 0 && (
-        <span className="flex items-center gap-0.5 text-amber-400">
-          <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
-          +{effect.isFlat
-            ? `${effect.passion % 1 === 0 ? effect.passion : effect.passion.toFixed(1)}/d`
-            : `${effect.passion}%`
-          }
-        </span>
-      )}
-      {effect.cores > 0 && (
-        <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-          <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
-          +{effect.isFlat
-            ? `${effect.cores % 1 === 0 ? effect.cores : effect.cores.toFixed(1)}/d`
-            : `${effect.cores}%`
-          }
-        </span>
-      )}
-    </div>
-  )
 }
 
 function MarketCard({ card, size }) {

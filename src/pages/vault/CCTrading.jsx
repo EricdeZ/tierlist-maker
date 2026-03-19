@@ -5,6 +5,7 @@ import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { tradingService } from '../../services/database'
 import { RARITIES } from '../../data/vault/economy'
+import CardEffectDisplay from './components/CardEffectDisplay'
 import { GODS } from '../../data/vault/gods'
 import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
@@ -1378,6 +1379,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
         </div>
         <div className="mt-1 text-[8px] font-bold text-white truncate text-center">{card.godName}</div>
         <div className="text-[7px] uppercase cd-head text-center" style={{ color: rarityInfo.color }}>{card.rarity}</div>
+        <CardEffectDisplay card={card} />
       </button>
 
       {/* Always-visible remove badge on mobile */}
@@ -1654,6 +1656,7 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
         </div>
         <div className="mt-1 text-[8px] font-bold text-white truncate text-center" style={{ maxWidth: 100 }}>{card.godName}</div>
         <div className="text-[7px] uppercase cd-head text-center" style={{ color: rarityInfo.color }}>{card.rarity}</div>
+        <CardEffectDisplay card={card} />
       </button>
 
       {canRemove && onRemove && (
@@ -1729,6 +1732,7 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
       </div>
       <div className={`text-[8px] font-bold text-white truncate mt-0.5 px-0.5 ${mobile ? '' : 'group-hover:text-[var(--cd-cyan)]'} transition-colors`} style={{ maxWidth: cardSize }}>{card.godName}</div>
       <div className="text-[7px] uppercase cd-head px-0.5" style={{ color: rarityInfo.color }}>{card.rarity}</div>
+      <CardEffectDisplay card={card} />
     </button>
   )
 }
