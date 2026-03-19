@@ -259,7 +259,7 @@ export async function tick(sql, userId) {
   function getTeamCounts(lineupCards) {
     const counts = {}
     for (const card of lineupCards) {
-      if (card.isBench || isRoleMismatch(card)) continue
+      if (isRoleMismatch(card)) continue
       if (card.team_id) counts[card.team_id] = (counts[card.team_id] || 0) + 1
     }
     return counts
