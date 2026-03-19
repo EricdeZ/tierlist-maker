@@ -194,7 +194,7 @@ export async function tick(sql, userId) {
   await ensureState(sql, userId)
 
   const cards = await sql`
-    SELECT l.role AS slot_role, c.*, pd.best_god_name, pd.team_id AS team_id,
+    SELECT l.role AS slot_role, l.lineup_type, c.*, pd.best_god_name, pd.team_id AS team_id,
       pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
       COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
       g.id AS god_id, g.rarity AS god_rarity, g.holo_type AS god_holo_type,
@@ -218,10 +218,14 @@ export async function tick(sql, userId) {
   `
 
   for (const card of cards) {
+    card.isBench = card.slot_role === 'bench'
     const { godCard, itemCard } = reshapeAttachments(card)
     card._godCard = godCard
     card._itemCard = itemCard
   }
+
+  const csCards = cards.filter(c => c.lineup_type === 'current')
+  const asCards = cards.filter(c => c.lineup_type === 'allstar')
 
   const [state] = await sql`
     SELECT * FROM cc_starting_five_state WHERE user_id = ${userId}
@@ -232,6 +236,8 @@ export async function tick(sql, userId) {
     SELECT * FROM cc_cards WHERE id = ${state.consumable_card_id}
   ` : [null]
 
+  const emptyOutput = { coresPerDay: 0, passionPerDay: 0 }
+
   if (!state || !state.last_tick || cards.length === 0) {
     await sql`
       UPDATE cc_starting_five_state
@@ -240,6 +246,8 @@ export async function tick(sql, userId) {
     `
     return {
       cards,
+      csCards, asCards,
+      csOutput: emptyOutput, asOutput: emptyOutput,
       passionPending: Number(state?.passion_pending) || 0,
       coresPending: Number(state?.cores_pending) || 0,
       lastTick: new Date().toISOString(),
@@ -254,6 +262,8 @@ export async function tick(sql, userId) {
   if (elapsedHours < 0.001) {
     return {
       cards,
+      csCards, asCards,
+      csOutput: emptyOutput, asOutput: emptyOutput,
       passionPending: Number(state.passion_pending) || 0,
       coresPending: Number(state.cores_pending) || 0,
       lastTick: state.last_tick,
@@ -261,24 +271,29 @@ export async function tick(sql, userId) {
     }
   }
 
-  const teamCounts = {}
-  for (const card of cards) {
-    if (!isRoleMismatch(card) && card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
+  function getTeamCounts(lineupCards) {
+    const counts = {}
+    for (const card of lineupCards) {
+      if (card.isBench || isRoleMismatch(card)) continue
+      if (card.team_id) counts[card.team_id] = (counts[card.team_id] || 0) + 1
+    }
+    return counts
   }
 
-  let passionAccrued = 0, coresAccrued = 0
-  for (const card of cards) {
-    if (isRoleMismatch(card)) continue
-    const { passionPerHour, coresPerHour } = getSlotRates(card, card._godCard, card._itemCard)
-    const teamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
-    passionAccrued += passionPerHour * teamBonus * elapsedHours
-    coresAccrued += coresPerHour * teamBonus * elapsedHours
-  }
+  const csTeamCounts = getTeamCounts(csCards)
+  const asTeamCounts = getTeamCounts(asCards)
 
-  // Cap always uses unboosted rates (before consumable, but including team synergy)
-  const { totalPassionPerDay, totalCoresPerDay } = getTotalDailyRates(cards, teamCounts)
-  const passionCap = totalPassionPerDay * CAP_DAYS
-  const coresCap = totalCoresPerDay * CAP_DAYS
+  const csOutput = calculateLineupOutput(csCards, csTeamCounts)
+  const asOutput = calculateLineupOutput(asCards, asTeamCounts)
+
+  const combinedCoresPerDay = csOutput.coresPerDay + asOutput.coresPerDay * S5_ALLSTAR_MODIFIER
+  const combinedPassionPerDay = csOutput.passionPerDay + asOutput.passionPerDay * S5_ALLSTAR_MODIFIER
+
+  let coresAccrued = (combinedCoresPerDay / HOURS_PER_DAY) * elapsedHours
+  let passionAccrued = (combinedPassionPerDay / HOURS_PER_DAY) * elapsedHours
+
+  const coresCap = combinedCoresPerDay * CAP_DAYS
+  const passionCap = combinedPassionPerDay * CAP_DAYS
 
   // Apply consumable boost to accrued amounts (not cap)
   if (consumableCard?.card_data?.consumableId) {
@@ -300,6 +315,8 @@ export async function tick(sql, userId) {
 
   return {
     cards,
+    csCards, asCards,
+    csOutput, asOutput,
     passionPending: newPassion,
     coresPending: newCores,
     lastTick: now.toISOString(),
