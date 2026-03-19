@@ -1059,14 +1059,14 @@ export const vaultService = {
     loadS5Leaderboard() {
         return apiCall('vault', { action: 'starting-five-leaderboard' })
     },
-    slotCard(cardId, role, slotType = 'player') {
-        return apiPost('vault', { action: 'slot-card' }, { cardId, role, slotType })
+    slotCard(cardId, role, slotType = 'player', lineupType = 'current') {
+        return apiPost('vault', { action: 'slot-card' }, { cardId, role, slotType, lineupType })
     },
-    unslotCard(role) {
-        return apiPost('vault', { action: 'unslot-card' }, { role })
+    unslotCard(role, lineupType = 'current') {
+        return apiPost('vault', { action: 'unslot-card' }, { role, lineupType })
     },
-    unslotAttachment(role, slotType) {
-        return apiPost('vault', { action: 'unslot-attachment' }, { role, slotType })
+    unslotAttachment(role, slotType, lineupType = 'current') {
+        return apiPost('vault', { action: 'unslot-attachment' }, { role, slotType, lineupType })
     },
     collectIncome() {
         return apiPost('vault', { action: 'collect-income' }, {})
@@ -1119,10 +1119,33 @@ export const vaultService = {
     async declineSignature(requestId) {
         return apiPost('vault', { action: 'decline-signature' }, { requestId })
     },
+    async getPendingApprovalSignatures() {
+        return apiCall('vault', { action: 'pending-approval-signatures' })
+    },
+    async approveSignature(requestId) {
+        return apiPost('vault', { action: 'approve-signature' }, { requestId })
+    },
+    async rejectSignature(requestId) {
+        return apiPost('vault', { action: 'reject-signature' }, { requestId })
+    },
     async submitSignature(requestId, file) {
         const formData = new FormData()
         formData.append('file', file)
         formData.append('requestId', String(requestId))
+        const token = localStorage.getItem('auth_token')
+        const res = await fetch('/api/vault-signature-upload', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Upload failed')
+        return data
+    },
+    async directSignCard(cardId, file) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('cardId', String(cardId))
         const token = localStorage.getItem('auth_token')
         const res = await fetch('/api/vault-signature-upload', {
             method: 'POST',
@@ -1352,6 +1375,9 @@ export const vaultAdminService = {
     async deleteSignatureRequest(requestId) {
         return apiPost('vault-admin', { action: 'delete-signature-request' }, { requestId })
     },
+    async searchPlayerDefs(q) {
+        return apiCall('vault-admin', { action: 'search-player-defs', q })
+    },
     async createTestSignatureCard(playerDefId) {
         return apiPost('vault-admin', { action: 'create-test-signature-card' }, { playerDefId })
     },
@@ -1380,6 +1406,16 @@ export const vaultDashboardService = {
     async getAssets(params = {}) { return apiCall('vault-dashboard', { action: 'assets', ...params }) },
     async getAsset(id) { return apiCall('vault-dashboard', { action: 'asset', id }) },
     async deleteAsset(id) { return apiPost('vault-dashboard', { action: 'delete-asset' }, { id }) },
+
+    // Collections
+    async getCollections() { return apiCall('vault-dashboard', { action: 'collections' }) },
+    async getCollection(id) { return apiCall('vault-dashboard', { action: 'collection', id }) },
+    async saveCollection(data) { return apiPost('vault-dashboard', { action: 'save-collection' }, data) },
+    async addCollectionEntries(collectionId, templateIds) {
+        return apiPost('vault-dashboard', { action: 'add-collection-entries' }, { collection_id: collectionId, template_ids: templateIds })
+    },
+    async removeCollectionEntry(id) { return apiPost('vault-dashboard', { action: 'remove-collection-entry' }, { id }) },
+    async setCollectionStatus(id, status) { return apiPost('vault-dashboard', { action: 'collection-status' }, { id, status }) },
 
     // Uploads (multipart — use fetch directly)
     async uploadAsset(file, { name, category, tags }) {
