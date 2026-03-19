@@ -10,7 +10,7 @@ Replace the current "holo type determines currency" model with a "holo type dete
 
 - **Holo** = flat income (Cores + small Passion per day)
 - **Reverse** = multiplier (multiplicatively stacks with other reverse cards)
-- **Full** = 35% of both flat and multiplier (jack of all trades, master of neither)
+- **Full** = 44% of both flat and multiplier (jack of all trades, master of neither)
 
 Total output = (sum of all flat values) x (product of all multipliers)
 
@@ -60,14 +60,14 @@ All-holo is viable at 74%. All-reverse is dead.
 
 | Rarity | Flat Cores | Flat Passion | Reverse Mult | Full Flat Cores | Full Flat Passion | Full Mult |
 |---|---:|---:|---:|---:|---:|---:|
-| Uncommon | 0.80 | 0.05 | 1.15x | 0.28 | 0.02 | 1.053x |
-| Rare | 1.90 | 0.12 | 1.25x | 0.67 | 0.04 | 1.088x |
-| Epic | 3.50 | 0.22 | 1.40x | 1.23 | 0.08 | 1.140x |
-| Legendary | 7.60 | 0.47 | 1.50x | 2.66 | 0.16 | 1.175x |
-| Mythic | 8.75 | 0.54 | 1.65x | 3.06 | 0.19 | 1.228x |
-| Unique | 10.10 | 0.63 | 1.85x | 3.54 | 0.22 | 1.298x |
+| Uncommon | 0.80 | 0.05 | 1.15x | 0.35 | 0.02 | 1.066x |
+| Rare | 1.90 | 0.12 | 1.25x | 0.84 | 0.05 | 1.110x |
+| Epic | 3.50 | 0.22 | 1.40x | 1.54 | 0.10 | 1.176x |
+| Legendary | 7.60 | 0.47 | 1.50x | 3.34 | 0.21 | 1.220x |
+| Mythic | 8.75 | 0.54 | 1.65x | 3.85 | 0.24 | 1.286x |
+| Unique | 10.10 | 0.63 | 1.85x | 4.44 | 0.28 | 1.374x |
 
-Full card values: 35% of holo flat, mult = 1 + 0.35 x (M - 1). All values rounded to 2 decimal places for flat, 3 for multipliers.
+Full card values: 44% of holo flat, mult = 1 + 0.44 x (M - 1). All values rounded to 2 decimal places for flat, 3 for multipliers.
 
 ### Combined Output vs Current System
 
@@ -157,8 +157,8 @@ Attachment holo type no longer determines which currency is boosted. Instead it 
 Attachments boost the dimension they match:
 - Holo attachment on holo player = boosts flat income (full benefit)
 - Reverse attachment on reverse player = boosts multiplier (full benefit)
-- Holo attachment on full player = boosts the 35% flat portion (works, but small base)
-- Reverse attachment on full player = boosts the 35% mult portion (works, but small base)
+- Holo attachment on full player = boosts the 44% flat portion (works, but small base)
+- Reverse attachment on full player = boosts the 44% mult portion (works, but small base)
 - Holo attachment on reverse player = no flat to boost = 0 benefit
 - Reverse attachment on holo player = no mult to boost = 0 benefit
 
@@ -233,16 +233,16 @@ function calculateLineupOutput(lineup, lineupModifier):
       totalMult *= (1 + multBonus)
 
     else if card.holo_type == 'full':
-      // 35% of both dimensions
-      flatC = FLAT_CORES[card.rarity] * 0.35 * effectiveness
-      flatP = FLAT_PASSION[card.rarity] * 0.35 * effectiveness
+      // 44% of both dimensions
+      flatC = FLAT_CORES[card.rarity] * 0.44 * effectiveness
+      flatP = FLAT_PASSION[card.rarity] * 0.44 * effectiveness
       flatC *= getAttFlatMult(god, card, 'cores') * getAttFlatMult(item, card, 'cores')
       flatP *= getAttFlatMult(god, card, 'passion') * getAttFlatMult(item, card, 'passion')
       totalFlatCores += flatC
       totalFlatPassion += flatP
 
       baseMult = REVERSE_MULT[card.rarity]
-      multBonus = (baseMult - 1) * 0.35 * effectiveness
+      multBonus = (baseMult - 1) * 0.44 * effectiveness
       multBonus += getAttMultAdd(god, card) * effectiveness
       multBonus += getAttMultAdd(item, card) * effectiveness
       totalMult *= (1 + multBonus)
