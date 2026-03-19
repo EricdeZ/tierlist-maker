@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, getCardRates, getSlotRates, getAttachmentBonusInfo, getConsumableBoost } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -1495,72 +1495,61 @@ async function handleBlackMarketDebugPending(sql, user) {
 // ═══ Starting 5 ═══
 
 function formatS5Response(state, extra = {}) {
-  // Count teammates for team synergy (exclude role-mismatched cards, matching tick() logic)
-  const teamCounts = {}
-  for (const c of state.cards) {
-    const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
-    if (!mismatch && c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+  const { csCards = [], asCards = [], csOutput, asOutput, consumableCard } = state
+
+  function formatLineup(lineupCards, output) {
+    const slots = {}
+    for (const card of lineupCards) {
+      const synergy = checkSynergy(card, card._godCard)
+      const contrib = getCardContribution(card.holo_type, card.rarity, card.isBench ? 0.5 : 1.0)
+      const godBonusInfo = getAttachmentBonusInfo(card._godCard, 'god', card.holo_type, synergy)
+      const itemBonusInfo = getAttachmentBonusInfo(card._itemCard, 'item', card.holo_type)
+
+      slots[card.slot_role] = {
+        card: { id: card.id, rarity: card.rarity, holo_type: card.holo_type, role: card.role,
+                card_type: card.card_type, def_id: card.def_id, image_url: card.image_url,
+                holo_effect: card.holo_effect, serial_number: card.serial_number,
+                god_name: card.god_name, god_class: card.god_class, god_id: card.god_id,
+                best_god_name: card.best_god_name, team_id: card.team_id,
+                player_discord_id: card.player_discord_id, player_discord_avatar: card.player_discord_avatar,
+                allow_discord_avatar: card.allow_discord_avatar, is_first_edition: card.is_first_edition },
+        godCard: card._godCard,
+        itemCard: card._itemCard,
+        contribution: contrib,
+        godBonus: godBonusInfo,
+        itemBonus: itemBonusInfo,
+        synergy,
+        isBench: card.isBench || false,
+      }
+    }
+    return { slots, output: output || { coresPerDay: 0, passionPerDay: 0 } }
   }
-  const TEAM_SYNERGY = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
 
-  const cardsWithRates = state.cards.map(c => {
-    const godCard = c._godCard || null
-    const itemCard = c._itemCard || null
-    const roleMismatch = !!(c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill')
-    const baseRates = getCardRates(c.holo_type, c.rarity)
-    const effectiveRates = roleMismatch ? { passionPerHour: 0, coresPerHour: 0 } : getSlotRates(c, godCard, itemCard)
-    const synergy = !!(godCard && c.best_god_name && godCard.god_name && godCard.god_name.toLowerCase() === c.best_god_name.toLowerCase())
-    const teamSynergyBonus = roleMismatch ? 0 : (TEAM_SYNERGY[teamCounts[c.team_id]] || 0)
-    const teamMult = 1 + teamSynergyBonus
+  let consumableBoost = { passionBoost: 0, coresBoost: 0 }
+  if (consumableCard?.card_data?.consumableId) {
+    consumableBoost = getConsumableBoost(consumableCard.card_data.consumableId, consumableCard.rarity)
+  }
 
-    return {
-      ...formatCard(c),
-      slotRole: c.slot_role,
-      teamId: c.team_id || null,
-      teamSynergyBonus,
-      roleMismatch,
-      passionPerHour: baseRates.passionPerHour,
-      coresPerHour: baseRates.coresPerHour,
-      effectivePassionPerHour: effectiveRates.passionPerHour * teamMult,
-      effectiveCoresPerHour: effectiveRates.coresPerHour * teamMult,
-      godCard: godCard ? { ...formatCard(godCard), ...getAttachmentBonusInfo(godCard, 'god', synergy), synergy } : null,
-      itemCard: itemCard ? { ...formatCard(itemCard), ...getAttachmentBonusInfo(itemCard, 'item') } : null,
-    }
-  })
-
-  const totalPassionPerHour = cardsWithRates.reduce((s, c) => s + c.effectivePassionPerHour, 0)
-  const totalCoresPerHour = cardsWithRates.reduce((s, c) => s + c.effectiveCoresPerHour, 0)
-
-  // Apply consumable boost to display rates (cap uses unboosted)
-  const consumable = state.consumableCard
-  let boostedPassionPerHour = totalPassionPerHour
-  let boostedCoresPerHour = totalCoresPerHour
-  let consumableResponse = null
-
-  if (consumable?.card_data?.consumableId) {
-    const boost = getConsumableBoost(consumable.card_data.consumableId, consumable.rarity)
-    boostedPassionPerHour = totalPassionPerHour * (1 + boost.passionBoost)
-    boostedCoresPerHour = totalCoresPerHour * (1 + boost.coresBoost)
-    consumableResponse = {
-      ...formatCard(consumable),
-      passionBoostPct: Math.round(boost.passionBoost * 100),
-      coresBoostPct: Math.round(boost.coresBoost * 100),
-    }
+  const S5_ALLSTAR_MODIFIER = 0.615
+  const combined = {
+    coresPerDay: (csOutput?.coresPerDay || 0) + (asOutput?.coresPerDay || 0) * S5_ALLSTAR_MODIFIER,
+    passionPerDay: (csOutput?.passionPerDay || 0) + (asOutput?.passionPerDay || 0) * S5_ALLSTAR_MODIFIER,
   }
 
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
-      ...extra,
-      cards: cardsWithRates,
+      currentSeason: formatLineup(csCards, csOutput),
+      allStar: formatLineup(asCards, asOutput),
+      combined,
+      boostedCoresPerDay: combined.coresPerDay * (1 + consumableBoost.coresBoost),
+      boostedPassionPerDay: combined.passionPerDay * (1 + consumableBoost.passionBoost),
       passionPending: state.passionPending,
       coresPending: state.coresPending,
-      lastTick: state.lastTick,
-      totalPassionPerHour: boostedPassionPerHour,
-      totalCoresPerHour: boostedCoresPerHour,
-      passionCap: state.passionCap || totalPassionPerHour * 48,
-      coresCap: state.coresCap || totalCoresPerHour * 48,
-      consumableCard: consumableResponse,
+      passionCap: state.passionCap,
+      coresCap: state.coresCap,
+      consumableCard: consumableCard || null,
+      ...extra,
     }),
   }
 }
@@ -1572,7 +1561,7 @@ async function handleStartingFive(sql, user) {
 
 async function handleS5Leaderboard(sql, user) {
   const rows = await sql`
-    SELECT l.user_id, l.role AS slot_role,
+    SELECT l.user_id, l.role AS slot_role, l.lineup_type,
       c.rarity, c.holo_type, c.card_type, c.role,
       pd.best_god_name, pd.team_id,
       g.rarity AS god_rarity, g.holo_type AS god_holo_type, g.card_type AS god_card_type,
@@ -1590,7 +1579,7 @@ async function handleS5Leaderboard(sql, user) {
     WHERE l.card_id IS NOT NULL
   `
 
-  const TEAM_SYNERGY = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 }
+  const S5_ALLSTAR_MODIFIER = 0.615
   const byUser = {}
   for (const r of rows) {
     if (!byUser[r.user_id]) {
@@ -1608,30 +1597,45 @@ async function handleS5Leaderboard(sql, user) {
 
   const entries = []
   for (const u of Object.values(byUser)) {
-    const teamCounts = {}
-    for (const c of u.cards) {
-      const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
-      if (!mismatch && c.team_id) teamCounts[c.team_id] = (teamCounts[c.team_id] || 0) + 1
+    // Reshape cards and split by lineup type
+    const shaped = u.cards.map(c => {
+      c.isBench = c.slot_role === 'bench'
+      c._godCard = c.god_rarity ? { rarity: c.god_rarity, holo_type: c.god_holo_type, god_name: c.god_god_name } : null
+      c._itemCard = c.item_rarity ? { rarity: c.item_rarity, holo_type: c.item_holo_type } : null
+      return c
+    })
+
+    const csCards = shaped.filter(c => c.lineup_type === 'current')
+    const asCards = shaped.filter(c => c.lineup_type === 'allstar')
+
+    function getTeamCounts(lineupCards) {
+      const counts = {}
+      for (const c of lineupCards) {
+        const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
+        if (!c.isBench && !mismatch && c.team_id) counts[c.team_id] = (counts[c.team_id] || 0) + 1
+      }
+      return counts
     }
-    let totalPassion = 0, totalCores = 0
-    for (const c of u.cards) {
-      if (c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill') continue
-      const godCard = c.god_rarity ? { rarity: c.god_rarity, holo_type: c.god_holo_type, god_name: c.god_god_name } : null
-      const itemCard = c.item_rarity ? { rarity: c.item_rarity, holo_type: c.item_holo_type } : null
-      const { passionPerHour, coresPerHour } = getSlotRates(c, godCard, itemCard)
-      const teamMult = 1 + (TEAM_SYNERGY[teamCounts[c.team_id]] || 0)
-      totalPassion += passionPerHour * teamMult * 24
-      totalCores += coresPerHour * teamMult * 24
-    }
-    const passionCap = totalPassion * 2
-    const coresCap = totalCores * 2
-    if (passionCap === 0 && coresCap === 0) continue
+
+    const csOutput = calculateLineupOutput(csCards, getTeamCounts(csCards))
+    const asOutput = calculateLineupOutput(asCards, getTeamCounts(asCards))
+
+    const coresPerDay = csOutput.coresPerDay + asOutput.coresPerDay * S5_ALLSTAR_MODIFIER
+    const passionPerDay = csOutput.passionPerDay + asOutput.passionPerDay * S5_ALLSTAR_MODIFIER
+
+    if (coresPerDay === 0 && passionPerDay === 0) continue
+
+    const coresCap = coresPerDay * 2
+    const passionCap = passionPerDay * 2
+
     entries.push({
       userId: u.userId,
       username: u.username,
       avatar: u.avatar,
       discordId: u.discordId,
       playerSlug: u.playerSlug,
+      coresPerDay: +coresPerDay.toFixed(1),
+      passionPerDay: +passionPerDay.toFixed(1),
       passionCap: +passionCap.toFixed(1),
       coresCap: +coresCap.toFixed(1),
       totalCap: +(passionCap + coresCap).toFixed(1),
@@ -1639,7 +1643,7 @@ async function handleS5Leaderboard(sql, user) {
     })
   }
 
-  entries.sort((a, b) => b.totalCap - a.totalCap)
+  entries.sort((a, b) => b.coresPerDay - a.coresPerDay)
   const top = entries.slice(0, 20).map((e, i) => ({ ...e, position: i + 1 }))
   const myEntry = entries.find(e => e.userId === user.id)
   const myPosition = myEntry ? entries.indexOf(myEntry) + 1 : null
