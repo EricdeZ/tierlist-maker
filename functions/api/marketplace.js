@@ -55,11 +55,6 @@ async function handleList(sql, params) {
   const offset = parseInt(page) * parseInt(limit)
   const lim = Math.min(parseInt(limit), 50)
 
-  // Build item_type filter
-  const typeFilter = itemType === 'card' ? sql`AND l.item_type = 'card'`
-    : itemType === 'pack' ? sql`AND l.item_type = 'pack'`
-    : sql``
-
   const rows = await sql`
     SELECT l.id, l.seller_id, l.card_id, l.core_price, l.created_at, l.item_type, l.pack_inventory_id,
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
@@ -79,12 +74,14 @@ async function handleList(sql, params) {
     LEFT JOIN cc_pack_types pt ON pi.pack_type_id = pt.id
     JOIN users u ON l.seller_id = u.id
     WHERE l.status = 'active'
-    ${typeFilter}
     ORDER BY l.created_at DESC
   `
 
   let filtered = Array.from(rows)
 
+  if (itemType === 'card' || itemType === 'pack') {
+    filtered = filtered.filter(l => l.item_type === itemType)
+  }
   if (rarity) {
     const rarities = rarity.split(',')
     filtered = filtered.filter(l => l.item_type === 'card' && rarities.includes(l.rarity))
