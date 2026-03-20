@@ -6,7 +6,7 @@ import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
@@ -28,6 +28,7 @@ const CCBinder = lazy(() => import('./vault/CCBinder'))
 const CCBountyBoard = lazy(() => import('./vault/CCBountyBoard'))
 const CCSignatureRequests = lazy(() => import('./vault/CCSignatureRequests'))
 const CCSignatureApprovals = lazy(() => import('./vault/CCSignatureApprovals'))
+const CCUniqueCards = lazy(() => import('./vault/CCUniqueCards'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
@@ -43,10 +44,11 @@ const TABS = [
     { key: 'binder', label: 'Binder', icon: BookMarked },
     // { key: 'players', label: 'Players', icon: UserSearch },
     { key: 'catalog', label: 'Catalog', icon: BookOpen },
+    { key: 'unique', label: 'Unique Cards', icon: Gem, authOnly: true },
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
 ]
 
-const DESKTOP_MORE_KEYS = new Set(['settings', 'binder', 'catalog'])
+const DESKTOP_MORE_KEYS = new Set(['settings', 'binder', 'catalog', 'unique'])
 
 const TAB_COMPONENTS = {
     packs: CCPackShop,
@@ -62,6 +64,7 @@ const TAB_COMPONENTS = {
     convert: CCConverter,
     challenges: CCChallenges,
     players: CCPlayerCards,
+    unique: CCUniqueCards,
     settings: CCSettings,
 }
 
