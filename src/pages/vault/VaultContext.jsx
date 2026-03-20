@@ -47,6 +47,7 @@ export function VaultProvider({ children }) {
     setVendingCooldownEndRaw(val)
   }, [])
   const [lockedCardIds, setLockedCardIds] = useState([])
+  const [lockedPackIds, setLockedPackIds] = useState([])
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
   const passionCtxRef = useRef(passionCtx)
@@ -84,6 +85,7 @@ export function VaultProvider({ children }) {
       setPendingApprovalCount(ccData.pendingApprovalCount || 0)
       setInventory(ccData.inventory || [])
       setLockedCardIds(ccData.lockedCardIds || [])
+      setLockedPackIds(ccData.lockedPackIds || [])
       if (ccData.vendingCooldown > 0) {
         setVendingCooldownEnd(Date.now() + ccData.vendingCooldown * 1000)
       }
@@ -444,7 +446,7 @@ export function VaultProvider({ children }) {
     pendingApprovalCount, setPendingApprovalCount,
     inventory, openInventoryPack,
     vendingCooldownEnd, setVendingCooldownEnd,
-    lockedCardIds,
+    lockedCardIds, lockedPackIds,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
@@ -453,7 +455,7 @@ export function VaultProvider({ children }) {
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack,
-    vendingCooldownEnd, lockedCardIds,
+    vendingCooldownEnd, lockedCardIds, lockedPackIds,
   ])
 
   return (
