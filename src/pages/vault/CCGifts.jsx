@@ -362,77 +362,7 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
         </div>
       )}
 
-      {/* ═══ Buy More ═══ */}
-      <div className="cd-divider max-w-lg mx-auto mb-6" />
-
-      <div className="max-w-lg mx-auto">
-        <div className="flex items-center gap-2 mb-4">
-          <ShoppingCart className="w-4 h-4 text-[var(--cd-cyan)]" />
-          <span className="text-sm font-bold text-[var(--cd-text)] cd-head tracking-wider">Buy Packs to Gift</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {packTypes.filter(p => p.leagueId).map((pack) => {
-            const key = pack.id
-            const canAfford = emberBalance >= pack.cost
-            const isBuying = buying === key
-            const justBought = buyResult === key
-
-            return (
-              <div key={key} className="cd-panel cd-corners rounded-xl p-4" style={{ animation: 'vault-card-enter 0.4s ease-out 0.1s both' }}>
-                <div className="flex items-center gap-3 mb-3">
-                  <PackArt tier={key} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={pack.sortOrder ?? 8} compact />
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-text)' }}>{pack.name}</div>
-                    <div className="text-[11px] text-white/40">{pack.cards} cards per pack</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <img src={emberIcon} alt="" className="h-4 w-auto object-contain cd-icon-glow" />
-                    <span className="text-lg font-bold text-[var(--cd-cyan)] cd-num">{pack.cost}</span>
-                    <span className="text-[10px] text-white/30">Cores</span>
-                  </div>
-                  {(() => {
-                    const inv = giftInventory.find(i => i.packType === key)
-                    return inv ? (
-                      <div className="text-[10px] text-white/40">
-                        <span className="text-[var(--cd-cyan)] font-bold">{inv.quantity}</span> owned
-                      </div>
-                    ) : null
-                  })()}
-                </div>
-
-                {justBought ? (
-                  <div className="text-center py-1.5 text-sm cd-result-flash rounded-lg">
-                    <span className="text-emerald-400 font-bold">Purchased!</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleBuy(key)}
-                    disabled={!canAfford || isBuying}
-                    className={`w-full py-2 rounded-lg font-bold text-xs cd-head tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      canAfford
-                        ? 'cd-btn-solid cd-btn-action'
-                        : 'bg-[var(--cd-edge)] text-[var(--cd-text-dim)] cursor-not-allowed'
-                    }`}
-                  >
-                    {isBuying ? (
-                      <div className="cd-spinner w-3.5 h-3.5" />
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        {canAfford ? 'Buy' : `Need ${pack.cost} Cores`}
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      {/* Buy Packs to Gift — hidden */}
 
       {/* Send Modal */}
       {sendingPack && (
