@@ -3,6 +3,7 @@ import { grantEmber, ensureEmberBalance } from './ember.js'
 
 export const TRADE_RULES = {
   max_cards_per_side: 10,
+  max_packs_per_side: 5,
   expiry_minutes: 2,
 }
 
@@ -12,6 +13,17 @@ export async function isCardInTrade(sql, cardId) {
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
     WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active')
+    LIMIT 1
+  `
+  return !!row
+}
+
+// Check if a pack is locked in an active/waiting trade
+export async function isPackInTrade(sql, packInventoryId) {
+  const [row] = await sql`
+    SELECT tc.id FROM cc_trade_cards tc
+    JOIN cc_trades t ON tc.trade_id = t.id
+    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active')
     LIMIT 1
   `
   return !!row
@@ -141,7 +153,7 @@ export async function addCard(tx, userId, tradeId, cardId) {
   // Check max cards per side
   const [{ count }] = await tx`
     SELECT COUNT(*)::int AS count FROM cc_trade_cards
-    WHERE trade_id = ${tradeId} AND offered_by = ${userId}
+    WHERE trade_id = ${tradeId} AND offered_by = ${userId} AND item_type = 'card'
   `
   if (count >= TRADE_RULES.max_cards_per_side) {
     throw new Error(`Maximum ${TRADE_RULES.max_cards_per_side} cards per side`)
@@ -162,6 +174,64 @@ export async function addCard(tx, userId, tradeId, cardId) {
   `
 }
 
+export async function addPack(tx, userId, tradeId, packInventoryId) {
+  // Verify trade is active and user is a participant
+  const [trade] = await tx`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+    FOR UPDATE
+  `
+  if (!trade) throw new Error('Trade not found or not active')
+
+  // Verify pack ownership
+  const [pack] = await tx`
+    SELECT id, user_id FROM cc_pack_inventory WHERE id = ${packInventoryId}
+  `
+  if (!pack) throw new Error('Pack not found')
+  if (pack.user_id !== userId) throw new Error('You do not own this pack')
+
+  // Check pack not in another active trade
+  const [locked] = await tx`
+    SELECT tc.id FROM cc_trade_cards tc
+    JOIN cc_trades t ON tc.trade_id = t.id
+    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active') AND t.id != ${tradeId}
+    LIMIT 1
+  `
+  if (locked) throw new Error('Pack is locked in another trade')
+
+  // Check pack not listed on marketplace
+  const [listed] = await tx`
+    SELECT id FROM cc_market_listings
+    WHERE pack_inventory_id = ${packInventoryId} AND status = 'active'
+    LIMIT 1
+  `
+  if (listed) throw new Error('Pack is listed on the marketplace')
+
+  // Check max packs per side
+  const [{ count }] = await tx`
+    SELECT COUNT(*)::int AS count FROM cc_trade_cards
+    WHERE trade_id = ${tradeId} AND offered_by = ${userId} AND item_type = 'pack'
+  `
+  if (count >= TRADE_RULES.max_packs_per_side) {
+    throw new Error(`Maximum ${TRADE_RULES.max_packs_per_side} packs per side`)
+  }
+
+  await tx`
+    INSERT INTO cc_trade_cards (trade_id, pack_inventory_id, offered_by, item_type)
+    VALUES (${tradeId}, ${packInventoryId}, ${userId}, 'pack')
+  `
+
+  // Reset ready flags
+  await tx`
+    UPDATE cc_trades
+    SET player_a_ready = false, player_b_ready = false,
+        player_a_confirmed = false, player_b_confirmed = false,
+        updated_at = NOW()
+    WHERE id = ${tradeId}
+  `
+}
+
 export async function removeCard(sql, userId, tradeId, cardId) {
   const [removed] = await sql`
     DELETE FROM cc_trade_cards
@@ -169,6 +239,23 @@ export async function removeCard(sql, userId, tradeId, cardId) {
     RETURNING id
   `
   if (!removed) throw new Error('Card not found in your trade offer')
+
+  await sql`
+    UPDATE cc_trades
+    SET player_a_ready = false, player_b_ready = false,
+        player_a_confirmed = false, player_b_confirmed = false,
+        updated_at = NOW()
+    WHERE id = ${tradeId} AND status = 'active'
+  `
+}
+
+export async function removePack(sql, userId, tradeId, packInventoryId) {
+  const [removed] = await sql`
+    DELETE FROM cc_trade_cards
+    WHERE trade_id = ${tradeId} AND pack_inventory_id = ${packInventoryId} AND offered_by = ${userId}
+    RETURNING id
+  `
+  if (!removed) throw new Error('Pack not found in your trade offer')
 
   await sql`
     UPDATE cc_trades
@@ -250,21 +337,33 @@ export async function confirmTrade(tx, userId, tradeId) {
 
   // ═══ BOTH CONFIRMED — EXECUTE SWAP ═══
 
-  // Get all trade cards
-  const cards = await tx`SELECT * FROM cc_trade_cards WHERE trade_id = ${tradeId}`
-  const aCards = cards.filter(c => c.offered_by === trade.player_a_id)
-  const bCards = cards.filter(c => c.offered_by === trade.player_b_id)
+  // Get all trade items
+  const items = await tx`SELECT * FROM cc_trade_cards WHERE trade_id = ${tradeId}`
+  const aItems = items.filter(c => c.offered_by === trade.player_a_id)
+  const bItems = items.filter(c => c.offered_by === trade.player_b_id)
+  const aCards = aItems.filter(c => c.item_type === 'card')
+  const bCards = bItems.filter(c => c.item_type === 'card')
+  const aPacks = aItems.filter(c => c.item_type === 'pack')
+  const bPacks = bItems.filter(c => c.item_type === 'pack')
 
   // Must have at least something to trade
-  if (aCards.length === 0 && bCards.length === 0 && trade.player_a_core === 0 && trade.player_b_core === 0) {
-    throw new Error('Trade is empty — add cards or Core')
+  if (aItems.length === 0 && bItems.length === 0 && trade.player_a_core === 0 && trade.player_b_core === 0) {
+    throw new Error('Trade is empty — add cards, packs, or Core')
   }
 
   // Verify card ownership still valid
-  for (const tc of cards) {
+  for (const tc of [...aCards, ...bCards]) {
     const [card] = await tx`SELECT owner_id FROM cc_cards WHERE id = ${tc.card_id} FOR UPDATE`
     if (!card || card.owner_id !== tc.offered_by) {
       throw new Error('A card in the trade is no longer owned by the trader')
+    }
+  }
+
+  // Verify pack ownership still valid
+  for (const tp of [...aPacks, ...bPacks]) {
+    const [pack] = await tx`SELECT user_id FROM cc_pack_inventory WHERE id = ${tp.pack_inventory_id} FOR UPDATE`
+    if (!pack || pack.user_id !== tp.offered_by) {
+      throw new Error('A pack in the trade is no longer owned by the trader')
     }
   }
 
@@ -310,6 +409,14 @@ export async function confirmTrade(tx, userId, tradeId) {
     await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${bCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }
 
+  // Transfer packs: A's packs → B, B's packs → A
+  for (const tp of aPacks) {
+    await tx`UPDATE cc_pack_inventory SET user_id = ${trade.player_b_id} WHERE id = ${tp.pack_inventory_id}`
+  }
+  for (const tp of bPacks) {
+    await tx`UPDATE cc_pack_inventory SET user_id = ${trade.player_a_id} WHERE id = ${tp.pack_inventory_id}`
+  }
+
   // Transfer Core
   if (trade.player_a_core > 0) {
     await grantEmber(tx, trade.player_a_id, 'cc_trade', -trade.player_a_core, `Trade #${tradeId}: sent Core`, tradeId)
@@ -332,6 +439,7 @@ export async function confirmTrade(tx, userId, tradeId) {
     status: 'completed',
     trade: completed,
     cardsSwapped: { aToB: aCards.length, bToA: bCards.length },
+    packsSwapped: { aToB: aPacks.length, bToA: bPacks.length },
     coreSwapped: { aToB: trade.player_a_core, bToA: trade.player_b_core },
   }
 }
@@ -361,8 +469,8 @@ export async function pollTrade(sql, userId, tradeId) {
   `
   if (!trade) throw new Error('Trade not found')
 
-  // Get cards in trade
-  const cards = await sql`
+  // Get card items in trade
+  const cardItems = await sql`
     SELECT tc.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type,
            c.image_url, c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url,
            d.best_god_name,
@@ -373,8 +481,18 @@ export async function pollTrade(sql, userId, tradeId) {
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     LEFT JOIN users pu ON pu.linked_player_id = d.player_id
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
-    WHERE tc.trade_id = ${tradeId}
+    WHERE tc.trade_id = ${tradeId} AND tc.item_type = 'card'
   `
 
-  return { trade, cards }
+  // Get pack items in trade
+  const packItems = await sql`
+    SELECT tc.id, tc.pack_inventory_id, tc.offered_by, tc.item_type,
+           pi.pack_type_id, pt.name AS pack_name, pt.cards_per_pack, pt.category
+    FROM cc_trade_cards tc
+    JOIN cc_pack_inventory pi ON tc.pack_inventory_id = pi.id
+    JOIN cc_pack_types pt ON pi.pack_type_id = pt.id
+    WHERE tc.trade_id = ${tradeId} AND tc.item_type = 'pack'
+  `
+
+  return { trade, cards: cardItems, packs: packItems }
 }
