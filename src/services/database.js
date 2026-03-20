@@ -316,6 +316,14 @@ export const challengeService = {
         return apiPost('challenges', { action: 'claim' }, { challengeId })
     },
 
+    async getRotating() {
+        return apiCall('challenges', { action: 'rotating' })
+    },
+
+    async claimRotating(assignmentId) {
+        return apiPost('challenges', { action: 'claim-rotating' }, { assignmentId })
+    },
+
     // Admin methods
     async adminGetAll() {
         return apiCall('challenge-manage')
@@ -1239,6 +1247,12 @@ export const tradingService = {
     },
     async removeCard(tradeId, cardId) {
         return apiPost('trading', { action: 'remove-card' }, { tradeId, cardId })
+    },
+    async addPack(tradeId, packInventoryId) {
+        return apiPost('trading', { action: 'add-pack' }, { tradeId, packInventoryId })
+    },
+    async removePack(tradeId, packInventoryId) {
+        return apiPost('trading', { action: 'remove-pack' }, { tradeId, packInventoryId })
     },
     async setCore(tradeId, amount) {
         return apiPost('trading', { action: 'set-core' }, { tradeId, amount })
