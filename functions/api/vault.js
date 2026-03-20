@@ -157,7 +157,7 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, pendingSignatureCount, pendingApprovalCount] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, marketLockedPacks, tradeLockedPacks, pendingSignatureCount, pendingApprovalCount] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -216,6 +216,12 @@ async function handleLoad(sql, user) {
       SELECT tc.card_id FROM cc_trade_cards tc
       JOIN cc_trades t ON tc.trade_id = t.id
       WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active')
+    `,
+    sql`SELECT pack_inventory_id FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active' AND item_type = 'pack'`,
+    sql`
+      SELECT tc.pack_inventory_id FROM cc_trade_cards tc
+      JOIN cc_trades t ON tc.trade_id = t.id
+      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND tc.item_type = 'pack'
     `,
     user.linked_player_id
       ? sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests WHERE signer_player_id = ${user.linked_player_id} AND status = 'pending'`
@@ -293,6 +299,10 @@ async function handleLoad(sql, user) {
         ...marketLockedCards.map(r => r.card_id),
         ...tradeLockedCards.map(r => r.card_id),
       ],
+      lockedPackIds: [
+        ...marketLockedPacks.map(r => r.pack_inventory_id),
+        ...tradeLockedPacks.map(r => r.pack_inventory_id),
+      ],
       vendingCooldown: (() => {
         if (!lastVend[0]) return 0
         const elapsed = (Date.now() - new Date(lastVend[0].created_at).getTime()) / 1000
@@ -307,14 +317,34 @@ async function handleOpenInventoryPack(sql, user, body) {
   const { inventoryId } = body
   if (!inventoryId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'inventoryId required' }) }
 
-  const [item] = await sql`
-    DELETE FROM cc_pack_inventory
+  // Verify ownership
+  const [pack] = await sql`
+    SELECT id, pack_type_id, user_id FROM cc_pack_inventory
     WHERE id = ${inventoryId} AND user_id = ${user.id}
-    RETURNING pack_type_id
   `
-  if (!item) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found in inventory' }) }
+  if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found in inventory' }) }
 
-  const result = await openPack(sql, user.id, item.pack_type_id, { skipPayment: true })
+  // Check not listed on marketplace
+  const [marketLock] = await sql`
+    SELECT id FROM cc_market_listings
+    WHERE pack_inventory_id = ${inventoryId} AND status = 'active'
+    LIMIT 1
+  `
+  if (marketLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack is listed on the market — cancel the listing first' }) }
+
+  // Check not in active trade
+  const [tradeLock] = await sql`
+    SELECT tc.id FROM cc_trade_cards tc
+    JOIN cc_trades t ON tc.trade_id = t.id
+    WHERE tc.pack_inventory_id = ${inventoryId} AND t.status IN ('waiting', 'active')
+    LIMIT 1
+  `
+  if (tradeLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack is in an active trade — cancel the trade first' }) }
+
+  // Delete from inventory and open
+  await sql`DELETE FROM cc_pack_inventory WHERE id = ${inventoryId}`
+
+  const result = await openPack(sql, user.id, pack.pack_type_id, { skipPayment: true })
   const cards = result.cards.map((c) => {
     const formatted = formatCard(c)
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
@@ -330,7 +360,7 @@ async function handleOpenInventoryPack(sql, user, body) {
 
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
-    packType: item.pack_type_id,
+    packType: pack.pack_type_id,
     cards,
   }) }
 }
