@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Search, ArrowLeft, ChevronDown } from 'lucide-react'
+import { Search, ArrowLeft, ChevronDown, Zap } from 'lucide-react'
 import PageTitle from '../../components/PageTitle'
 import Navbar from '../../components/layout/Navbar'
 import { patchNotesService } from '../../services/database'
@@ -167,6 +167,7 @@ export default function PatchNotesDetail() {
     const [searchQuery, setSearchQuery] = useState('')
     const [activeSection, setActiveSection] = useState(null)
     const [collapsedSections, setCollapsedSections] = useState({})
+    const [tldrMode, setTldrMode] = useState(false)
     const sectionRefs = useRef({})
 
     const toggleSection = useCallback((id) => {
@@ -288,8 +289,56 @@ export default function PatchNotesDetail() {
                 </h1>
                 <p className="text-white/50 mt-2 text-sm tracking-wider">{patchNote.version} &middot; {formatDate(patchNote.patch_date)}</p>
                 {patchNote.subtitle && <p className="text-(--color-accent)/70 text-xs mt-1 uppercase tracking-[0.2em]">{patchNote.subtitle}</p>}
+                <button
+                    onClick={() => setTldrMode(prev => !prev)}
+                    className={`mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                        tldrMode
+                            ? 'bg-(--color-accent) text-(--color-primary)'
+                            : 'bg-white/5 border border-white/10 text-white/70 hover:border-(--color-accent)/40 hover:text-(--color-accent)'
+                    }`}
+                >
+                    <Zap size={14} />
+                    {tldrMode ? 'Show Full Notes' : 'TL;DR'}
+                </button>
             </div>
 
+            {tldrMode ? (
+                <div className="max-w-4xl mx-auto px-4 pb-16">
+                    {sections.map(s => {
+                        const si = SECTION_ICONS[s.id] || SECTION_ICONS.item_balance
+                        return (
+                            <div key={s.id} className="mb-8">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <span className={`text-lg ${si.color}`}>{si.icon}</span>
+                                    <h2 className="text-lg font-bold text-white uppercase tracking-wider" style={{ fontFamily: "'Cinzel', serif" }}>
+                                        {s.label}
+                                    </h2>
+                                    <span className="text-white/20 text-xs">({s.items.length})</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {s.items.map((item, i) => {
+                                        const name = s.type === 'gods' ? item.god_name : item.item_name
+                                        const imgUrl = s.type === 'gods' ? item.god_image_url : getItemImage(name)
+                                        const badge = CHANGE_BADGE[item.change_type] || CHANGE_BADGE.adjustment
+                                        return (
+                                            <div
+                                                key={item.id || i}
+                                                className="flex items-center gap-2 bg-(--color-secondary) border border-white/10 rounded-lg px-3 py-2"
+                                            >
+                                                {imgUrl && <img src={imgUrl} alt={name} className="w-7 h-7 rounded object-cover" />}
+                                                <span className="text-sm text-white font-medium">{name}</span>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badge.bg} ${badge.text}`}>
+                                                    {badge.label}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : (
             <div className="max-w-7xl mx-auto px-4">
 
                 <div className="flex gap-6 pb-16">
@@ -411,6 +460,7 @@ export default function PatchNotesDetail() {
                     </div>
                 </div>
             </div>
+            )}
         </div>
     )
 }
