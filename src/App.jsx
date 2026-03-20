@@ -91,6 +91,8 @@ import PackCreator from "./pages/admin/PackCreator.jsx";
 import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
 import TournamentManager from "./pages/admin/TournamentManager.jsx";
 import Features from "./pages/Features.jsx";
+import PatchNotes from "./pages/PatchNotes.jsx";
+import PatchNotesDetail from "./pages/patchnotes/PatchNotesDetail.jsx";
 const AnniversaryPage = lazy(() => import("./pages/AnniversaryPage.jsx"));
 import Players from "./pages/Players.jsx";
 import TournamentSignup from "./pages/TournamentSignup.jsx";
@@ -245,6 +247,8 @@ function App() {
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
+                            <Route path="patchnotes" element={<PatchNotes />} />
+                            <Route path="patchnotes/:slug" element={<PatchNotesDetail />} />
                             <Route path="anniversary" element={<Suspense fallback={null}><AnniversaryPage /></Suspense>} />
                             <Route path="players" element={<Players />} />
                             <Route path="transactions" element={<Transactions />} />

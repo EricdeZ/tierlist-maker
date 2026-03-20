@@ -1446,6 +1446,21 @@ export const vaultDashboardService = {
     },
 }
 
+export const patchNotesService = {
+    async getAll() {
+        return apiCall('patchnotes')
+    },
+    async getDetail(slug) {
+        return apiCall('patchnotes', { action: 'detail', slug })
+    },
+    async importFromSource(sourceUrl) {
+        return apiPost('patchnotes-import', {}, { action: 'import', sourceUrl })
+    },
+    async deletePatch(slug) {
+        return apiPost('patchnotes-import', {}, { action: 'delete', slug })
+    },
+}
+
 export const tournamentService = {
     async getAll() {
         return apiCall('tournaments')
