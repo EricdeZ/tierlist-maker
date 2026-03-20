@@ -683,6 +683,9 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
                       <div className={`pack-opening__holo-shimmer${tier <= 1 ? ' holo-intense' : tier <= 2 ? ' holo-medium' : ''}`}
                         style={{ '--holo-color': cardColor }} />
                     )}
+                    {isTop && topFlipPhase === 'revealed' && card.isNew && (
+                      <div className="pack-opening__flip-new">NEW</div>
+                    )}
                   </div>
                 </div>
                 {/* Expanding ring burst (epic+) */}

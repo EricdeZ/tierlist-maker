@@ -125,28 +125,28 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
     const godBonus = getAttachmentBonus(card._godCard, 'god', playerHasFlat, playerHasMult, synergy)
     const itemBonus = getAttachmentBonus(card._itemCard, 'item', playerHasFlat, playerHasMult)
 
+    // Per-card team synergy (bench now included in team counts)
+    const cardTeamBonus = 1 + (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
+
     // Attachment flat boosts — effectiveness already in contrib.cores/passion
     if (playerHasFlat) {
       const godFlatMult = 1 + godBonus.flatBoost
       const itemFlatMult = 1 + itemBonus.flatBoost
-      totalFlatCores += contrib.cores * godFlatMult * itemFlatMult
-      totalFlatPassion += contrib.passion * godFlatMult * itemFlatMult
+      totalFlatCores += contrib.cores * godFlatMult * itemFlatMult * cardTeamBonus
+      totalFlatPassion += contrib.passion * godFlatMult * itemFlatMult * cardTeamBonus
     }
 
     // Attachment mult additions — scaled by effectiveness
     if (playerHasMult) {
       const slotMult = contrib.multiplier + godBonus.multAdd * effectiveness + itemBonus.multAdd * effectiveness
-      totalMult *= slotMult
+      const boostedMult = 1 + (slotMult - 1) * cardTeamBonus
+      totalMult *= boostedMult
     }
   }
 
-  // Team synergy as global multiplier (starters only counted)
-  const maxTeamCount = Math.max(...Object.values(teamCounts), 0)
-  const teamBonus = 1 + (TEAM_SYNERGY_BONUS[maxTeamCount] || 0)
-
   return {
-    coresPerDay: totalFlatCores * totalMult * teamBonus,
-    passionPerDay: totalFlatPassion * totalMult * teamBonus,
+    coresPerDay: totalFlatCores * totalMult,
+    passionPerDay: totalFlatPassion * totalMult,
   }
 }
 
@@ -259,7 +259,7 @@ export async function tick(sql, userId) {
   function getTeamCounts(lineupCards) {
     const counts = {}
     for (const card of lineupCards) {
-      if (card.isBench || isRoleMismatch(card)) continue
+      if (isRoleMismatch(card)) continue
       if (card.team_id) counts[card.team_id] = (counts[card.team_id] || 0) + 1
     }
     return counts

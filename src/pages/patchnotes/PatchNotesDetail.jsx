@@ -66,10 +66,15 @@ const Badge = ({ type }) => {
     return <span className={`px-2 py-0.5 rounded text-xs font-bold ${b.bg} ${b.text}`}>{b.label}</span>
 }
 
+const LOWER_IS_BETTER = /cooldown|cost|mana\s*cost/i
 const ChangeLine = ({ stat, oldVal, newVal, isNewItem }) => {
     if (isNewItem) return <div className="text-green-400 text-sm">{stat}: {newVal || oldVal}</div>
-    const isBuffDir = newVal && oldVal && parseFloat(newVal) > parseFloat(oldVal)
-    const valColor = isBuffDir ? 'text-green-400' : 'text-red-400'
+    const oldNum = parseFloat(oldVal)
+    const newNum = parseFloat(newVal)
+    const increased = newNum > oldNum
+    const inverted = LOWER_IS_BETTER.test(stat)
+    const isBuffDir = inverted ? !increased : increased
+    const valColor = isNaN(oldNum) || isNaN(newNum) ? 'text-white/80' : isBuffDir ? 'text-green-400' : 'text-red-400'
     return (
         <div className="flex items-center gap-2 text-sm">
             <span className="text-white/50">{stat}</span>

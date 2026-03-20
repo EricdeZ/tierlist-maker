@@ -203,28 +203,34 @@ export default function CCStartingFive() {
   const slots = useMemo(() => lineupData?.slots || {}, [lineupData?.slots])
   const combinedOutput = startingFive?.combined || { coresPerDay: 0, passionPerDay: 0 }
 
-  // Compute flat total and mult total from active lineup's slots
+  // Compute flat total and mult total from active lineup's slots (team bonus per-card)
   const lineupBreakdown = useMemo(() => {
-    let flatCores = 0, totalMult = 1, teamSynergy = 0
+    let flatCores = 0, flatCoresBase = 0, totalMult = 1, totalMultBase = 1
     for (const slotData of Object.values(slots)) {
       if (!slotData?.contribution) continue
       if (slotData.roleMismatch) continue
       const c = slotData.contribution
       const hasFlat = c.type === 'flat' || c.type === 'full'
       const hasMult = c.type === 'mult' || c.type === 'full'
+      const cardTeamBonus = 1 + (slotData.teamSynergyBonus || 0)
       if (hasFlat) {
         const godFlatMult = 1 + (slotData.godBonus?.flatBoost || 0)
         const itemFlatMult = 1 + (slotData.itemBonus?.flatBoost || 0)
-        flatCores += (c.cores || 0) * godFlatMult * itemFlatMult
+        const base = (c.cores || 0) * godFlatMult * itemFlatMult
+        flatCoresBase += base
+        flatCores += base * cardTeamBonus
       }
       if (hasMult) {
         const eff = slotData.isBench ? 0.5 : 1.0
         const slotMult = (c.multiplier || 1) + (slotData.godBonus?.multAdd || 0) * eff + (slotData.itemBonus?.multAdd || 0) * eff
-        totalMult *= slotMult
+        totalMultBase *= slotMult
+        totalMult *= (1 + (slotMult - 1) * cardTeamBonus)
       }
-      if (slotData.teamSynergyBonus > teamSynergy) teamSynergy = slotData.teamSynergyBonus
     }
-    return { flatCores, totalMult, teamSynergy }
+    const withBonus = flatCores * totalMult
+    const withoutBonus = flatCoresBase * totalMultBase
+    const teamSynergyPct = withoutBonus > 0 ? (withBonus / withoutBonus - 1) : 0
+    return { flatCores, totalMult, teamSynergyPct }
   }, [slots])
   const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
@@ -601,9 +607,7 @@ export default function CCStartingFive() {
 
       {/* Lineup Flat × Mult Breakdown (scoped to active lineup) */}
       {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (() => {
-        const baseOutput = lineupBreakdown.flatCores * lineupBreakdown.totalMult
-        const teamBonus = 1 + lineupBreakdown.teamSynergy
-        const output = baseOutput * teamBonus
+        const output = lineupBreakdown.flatCores * lineupBreakdown.totalMult
         const isAllStar = activeLineup === 'allstar'
         const lineupContribution = isAllStar ? output * S5_ALLSTAR_MODIFIER : output
         const consumablePct = startingFive?.consumableCard?.coresBoostPct || 0
@@ -639,12 +643,12 @@ export default function CCStartingFive() {
           </div>
           {/* Modifiers + combined breakdown */}
           <div className="flex items-center justify-center gap-2 flex-wrap mt-2 pt-2 border-t border-white/[0.06] text-xs">
-            {lineupBreakdown.teamSynergy > 0 && (
-              <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergy * 100)}% team</span>
+            {lineupBreakdown.teamSynergyPct > 0.005 && (
+              <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergyPct * 100)}% team</span>
             )}
             {isAllStar && (
               <>
-                {lineupBreakdown.teamSynergy > 0 && <span className="text-white/20">·</span>}
+                {lineupBreakdown.teamSynergyPct > 0.005 && <span className="text-white/20">·</span>}
                 <span className="text-purple-400">×0.615 all-star</span>
                 <span className="text-white/20">→</span>
                 <span className="text-white/50">{lineupContribution.toFixed(1)}/day</span>
@@ -1048,7 +1052,7 @@ function TutorialModal({ onClose }) {
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">TEAM SYNERGY</h4>
-            <p>Slot multiple players from the same team (starters only) for a stacking bonus: <span className="text-white/80">+20%</span> at 2 teammates, up to <span className="text-white/80">+60%</span> with a full team of 5.</p>
+            <p>Slot multiple players from the same team (including bench) for a stacking bonus that only buffs same-team players: <span className="text-white/80">+20%</span> at 2 teammates, up to <span className="text-white/80">+60%</span> with 5.</p>
           </div>
 
           <div>

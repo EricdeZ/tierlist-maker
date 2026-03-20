@@ -7,10 +7,10 @@ const RARITIES = {
   common:    { name: 'Common',    dropRate: 0.60, color: '#9ca3af', holoEffects: ['common'] },
   uncommon:  { name: 'Uncommon',  dropRate: 0.30, color: '#22c55e', holoEffects: ['holo', 'amazing', 'reverse'] },
   rare:      { name: 'Rare',      dropRate: 0.06, color: '#3b82f6', holoEffects: ['galaxy', 'vstar', 'shiny', 'ultra'] },
-  epic:      { name: 'Epic',      dropRate: 0.025, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
-  legendary: { name: 'Legendary', dropRate: 0.003, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
-  mythic:    { name: 'Mythic',    dropRate: 0.0005, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
-  unique:    { name: 'Unique',    dropRate: 0.0001, color: '#e8e8ff', holoEffects: ['secret'] },
+  epic:      { name: 'Epic',      dropRate: 0.035, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
+  legendary: { name: 'Legendary', dropRate: 0.006, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
+  mythic:    { name: 'Mythic',    dropRate: 0.0007, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  unique:    { name: 'Unique',    dropRate: 0.0003, color: '#e8e8ff', holoEffects: ['secret'] },
   full_art:  { name: 'Full Art',  dropRate: 0, color: '#d4af37', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'] },
 }
 

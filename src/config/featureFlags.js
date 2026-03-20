@@ -9,6 +9,7 @@ export const FEATURE_FLAGS = {
     BYOT_RELEASED: true,                  // Bring Your Own Team self-service team creation
     CARD_CLASH_RELEASED: true,             // Card Clash mini-game
     VAULT_OPEN: true,                      // The Vault open to all authenticated users
+    VAULT_MAINTENANCE: true,              // The Vault maintenance mode (admins bypass)
 }
 
 /**
