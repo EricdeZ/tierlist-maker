@@ -1119,6 +1119,37 @@ function VaultSection() {
                     accent="#ff2d78"
                 />
             </div>
+
+            {/* Enforcement */}
+            <div className="mt-6 rounded-xl border p-5"
+                style={{
+                    background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(239,68,68,0.02))',
+                    borderColor: 'rgba(239,68,68,0.2)',
+                }}
+            >
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-lg"
+                        style={{ background: 'rgba(239,68,68,0.15)' }}>
+                        🛡️
+                    </div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#ef4444' }}>
+                        Vault Integrity
+                    </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(239,68,68,0.08)' }}>
+                        <div className="text-2xl font-black font-heading text-red-400">1</div>
+                        <div className="text-xs text-white/50">Account Banned</div>
+                    </div>
+                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(245,158,11,0.08)' }}>
+                        <div className="text-2xl font-black font-heading text-amber-400">19</div>
+                        <div className="text-xs text-white/50">Flagged as Suspicious</div>
+                    </div>
+                </div>
+                <p className="text-xs text-red-400/80 leading-relaxed">
+                    Exploiting, alt abuse, or any form of manipulation in The Vault will result in an immediate and permanent ban. No warnings, no appeals. We've been lenient up to this point — that ends now.
+                </p>
+            </div>
         </section>
     )
 }
