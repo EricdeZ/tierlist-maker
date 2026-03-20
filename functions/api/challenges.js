@@ -3,7 +3,8 @@ import { getDB, headers } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import { grantPassion, getRank, getNextRank, formatRank } from '../lib/passion.js'
 import { grantEmber } from '../lib/ember.js'
-import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, DISCORD_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, recalcDiscordChallenges, recalcVaultChallenges, pushChallengeProgress } from '../lib/challenges.js'
+import { PERF_KEYS, SCRIM_KEYS, REFERRAL_KEYS, FORGE_KEYS, DISCORD_KEYS, recalcSingleUserChallenges, recalcScrimChallenges, recalcReferralChallenges, recalcForgeChallenges, recalcDiscordChallenges, recalcVaultChallenges, pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
+import { rollAssignments, getRotatingChallenges, claimRotatingChallenge, updateRotatingProgress } from '../lib/rotating-challenges.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -15,6 +16,13 @@ const handler = async (event) => {
 
     try {
         if (event.httpMethod === 'GET') {
+            if (action === 'rotating') {
+                const user = await requireAuth(event)
+                if (!user) {
+                    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
+                }
+                return await handleGetRotating(sql, user)
+            }
             // Auth is optional for GET — unauthenticated users see challenges without progress
             const user = await requireAuth(event)
             return await listChallenges(sql, user)
@@ -30,6 +38,8 @@ const handler = async (event) => {
             switch (action) {
                 case 'claim':
                     return await claimChallenge(sql, user, event)
+                case 'claim-rotating':
+                    return await handleClaimRotating(sql, user, event)
                 default:
                     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
             }
@@ -254,6 +264,58 @@ async function getUniqueHolders(sql) {
         })
     }
     return map
+}
+
+
+// ═══════════════════════════════════════════════════
+// GET: Rotating challenges — roll if needed, return current
+// ═══════════════════════════════════════════════════
+async function handleGetRotating(sql, user) {
+    // Get current vault stats for baseline snapshots when rolling new assignments
+    let vaultStats = {}
+    try {
+        vaultStats = await getVaultStats(sql, user.id)
+    } catch (err) {
+        console.error('Failed to get vault stats for rotating baseline:', err)
+    }
+
+    // Roll new assignments for any cadence missing in current period
+    await rollAssignments(sql, user.id, vaultStats)
+
+    // Refresh progress with latest stats
+    await updateRotatingProgress(sql, user.id, vaultStats)
+
+    // Get all current assignments
+    const rotating = await getRotatingChallenges(sql, user.id)
+
+    return { statusCode: 200, headers, body: JSON.stringify(rotating) }
+}
+
+
+// ═══════════════════════════════════════════════════
+// POST: Claim a completed rotating challenge
+// ═══════════════════════════════════════════════════
+async function handleClaimRotating(sql, user, event) {
+    const body = event.body ? JSON.parse(event.body) : {}
+    const { assignmentId } = body
+
+    if (!assignmentId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'assignmentId is required' }) }
+    }
+
+    try {
+        const result = await claimRotatingChallenge(user.id, assignmentId)
+        return { statusCode: 200, headers, body: JSON.stringify(result) }
+    } catch (err) {
+        const msg = err.message
+        if (msg === 'Assignment not found') {
+            return { statusCode: 404, headers, body: JSON.stringify({ error: msg }) }
+        }
+        if (msg === 'Already claimed' || msg === 'Challenge not yet complete' || msg === 'Challenge expired') {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: msg }) }
+        }
+        throw err
+    }
 }
 
 
