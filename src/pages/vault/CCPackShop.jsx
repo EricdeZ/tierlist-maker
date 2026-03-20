@@ -169,9 +169,10 @@ function GetCoresHint({ claimableCount }) {
 // My Packs — inventory + unopened gifts
 // ═══════════════════════════════════════════════
 function MyPacks() {
-  const { inventory, openInventoryPack, giftData, openGift, packTypesMap } = useVault();
+  const { inventory, openInventoryPack, giftData, openGift, packTypesMap, lockedPackIds } = useVault();
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(null);
+  const lockedSet = useMemo(() => new Set(lockedPackIds || []), [lockedPackIds]);
 
   const unopenedGifts = (giftData?.received || []).filter(g => !g.opened);
   const hasAny = (inventory?.length || 0) + unopenedGifts.length > 0;
@@ -225,12 +226,15 @@ function MyPacks() {
               const pack = packTypesMap[item.packTypeId];
               if (!pack) return null;
               const isOpening = loading === `inv-${item.id}`;
+              const isLocked = lockedSet.has(item.id);
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleOpenInventory(item)}
-                  disabled={!!loading}
-                  className="cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-white/[0.03] transition-all disabled:opacity-50 group"
+                  onClick={() => !isLocked && handleOpenInventory(item)}
+                  disabled={!!loading || isLocked}
+                  className={`cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 transition-all group ${
+                    isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-white/[0.03] disabled:opacity-50'
+                  }`}
                   style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
                 >
                   <div className="relative group-hover:scale-105 transition-transform">
@@ -249,7 +253,11 @@ function MyPacks() {
                     </div>
                     <div className="text-[10px] text-white/30">{pack.cards} cards</div>
                   </div>
-                  {isOpening ? (
+                  {isLocked ? (
+                    <span className="text-[10px] text-amber-400/70 cd-head tracking-wider font-bold">
+                      LISTED
+                    </span>
+                  ) : isOpening ? (
                     <div className="cd-spinner w-4 h-4" />
                   ) : (
                     <span className="text-[10px] text-emerald-400/70 cd-head tracking-wider font-bold group-hover:text-emerald-400 transition-colors">
@@ -594,14 +602,180 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
 }
 
 // ═══════════════════════════════════════════════
+// Rotation Countdown — time until midnight UTC
+// ═══════════════════════════════════════════════
+function RotationCountdown() {
+  const [countdown, setCountdown] = useState('');
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      const diff = tomorrow - now;
+      if (diff <= 0) { setCountdown('0h 0m 0s'); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setCountdown(`${h}h ${m}m ${s}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <span className="text-[var(--cd-cyan)] font-mono font-medium tabular-nums">{countdown}</span>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Special Rotation Section
+// ═══════════════════════════════════════════════
+function RotationSection({ packs, packTypesMap, emberBalance, onBuy, loading, quantity, setQuantity }) {
+  const [selectedPack, setSelectedPack] = useState(null);
+
+  // Reset quantity when changing selected rotation pack
+  useEffect(() => { setQuantity(1); }, [selectedPack, setQuantity]);
+
+  const selected = selectedPack ? packTypesMap[selectedPack] : null;
+  const totalCost = selected ? selected.cost * quantity : 0;
+  const canAfford = selected ? emberBalance >= totalCost : false;
+
+  return (
+    <div className="max-w-4xl mx-auto mb-10">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h3 className="cd-head text-sm text-amber-400 tracking-widest uppercase font-bold">Special Rotation</h3>
+          <p className="text-[10px] text-white/30 mt-0.5">Refreshes daily at midnight UTC</p>
+        </div>
+        <div className="text-xs text-white/40">
+          Next rotation: <RotationCountdown />
+        </div>
+      </div>
+
+      {/* Pack Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {packs.map((packId) => {
+          const pack = packTypesMap[packId];
+          if (!pack) return null;
+          const isSelected = selectedPack === packId;
+          const afford = emberBalance >= pack.cost;
+
+          return (
+            <button
+              key={packId}
+              onClick={() => setSelectedPack(isSelected ? null : packId)}
+              className={`cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer transition-all group ${
+                isSelected
+                  ? 'ring-2 bg-white/[0.05]'
+                  : 'hover:bg-white/[0.03]'
+              } ${!afford && !isSelected ? 'opacity-40' : ''}`}
+              style={isSelected ? { ringColor: pack.color || 'var(--cd-cyan)' } : undefined}
+            >
+              <div className="relative group-hover:scale-105 transition-transform">
+                <PackArt
+                  tier={packId}
+                  name={pack.name}
+                  subtitle={pack.leagueName || ''}
+                  cardCount={pack.cards}
+                  seed={pack.sortOrder ?? 0}
+                  compact
+                />
+              </div>
+              <div className="text-center">
+                <div className="text-xs font-bold cd-head tracking-wider truncate max-w-[100px]" style={{ color: pack.color || 'var(--cd-cyan)' }}>
+                  {pack.name}
+                </div>
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  <img src={emberIcon} alt="" className="h-3 w-auto object-contain" />
+                  <span className="text-xs font-bold text-[var(--cd-cyan)] cd-num">{pack.cost}</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected Pack Details */}
+      {selected && (
+        <div className="mt-4 cd-panel cd-corners rounded-xl p-5 max-w-md mx-auto" style={{ animation: 'vault-card-enter 0.3s ease-out' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="cd-head text-lg font-bold" style={{ color: selected.color || 'var(--cd-cyan)', letterSpacing: '0.1em' }}>
+                {selected.name}
+              </h4>
+              {selected.leagueName && (
+                <p className="text-[10px] text-white/30 cd-head tracking-widest">{selected.leagueName}</p>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedPack(null)}
+              className="text-xs text-white/30 hover:text-white/60 transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="space-y-1.5 mb-4 text-xs text-white/50">
+            <div className="flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-[var(--cd-cyan-dim)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12l4 6-10 13L2 9z" /></svg>
+              <span><span className="text-white font-bold">{selected.cards}</span> cards per pack</span>
+            </div>
+            {selected.description && (
+              <p className="text-white/40 text-[11px] pl-5.5">{selected.description}</p>
+            )}
+          </div>
+
+          {/* Price + Quantity */}
+          <div className="flex items-center gap-2 mb-3">
+            <img src={emberIcon} alt="" className="h-5 w-auto object-contain cd-icon-glow" />
+            <span className="text-2xl font-black text-[var(--cd-cyan)] cd-text-glow-strong cd-num">{totalCost}</span>
+            <span className="text-xs text-white/40 cd-head tracking-wider">Cores</span>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <button
+              onClick={() => setQuantity(q => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
+            >−</button>
+            <span className="text-lg font-bold text-white cd-num w-6 text-center">{quantity}</span>
+            <button
+              onClick={() => setQuantity(q => q + 1)}
+              disabled={emberBalance < selected.cost * (quantity + 1)}
+              className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
+            >+</button>
+          </div>
+
+          <CDChargeButton
+            label={!canAfford
+              ? `Need ${totalCost} Cores`
+              : quantity > 1
+                ? `Add to Inventory for ${totalCost}`
+                : `Open for ${selected.cost}`}
+            onFire={() => onBuy(selectedPack)}
+            disabled={!canAfford || loading}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // Main Pack Shop (original)
 // ═══════════════════════════════════════════════
 function PackShop() {
-  const { ember, buyPack, buyPacksToInventory, packTypes, packTypesMap } = useVault();
+  const { ember, buyPack, buyPacksToInventory, packTypes, packTypesMap, rotationPacks } = useVault();
   const { claimEmberDaily, claimableCount } = usePassion();
   const leaguePacks = useMemo(() =>
-    packTypes.filter(p => p.leagueId).map(p => p.id),
+    packTypes.filter(p => p.leagueId && !p.rotationOnly).map(p => p.id),
     [packTypes]
+  );
+  const activeRotationPacks = useMemo(() =>
+    (rotationPacks || []).filter(id => packTypesMap[id]),
+    [rotationPacks, packTypesMap]
   );
   const [openResult, setOpenResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -850,6 +1024,19 @@ function PackShop() {
 
         {/* ═══ Divider ═══ */}
         <div className="cd-divider max-w-lg mx-auto mb-8 hidden sm:block" />
+
+        {/* ═══ Special Rotation Section ═══ */}
+        {activeRotationPacks.length > 0 && (
+          <RotationSection
+            packs={activeRotationPacks}
+            packTypesMap={packTypesMap}
+            emberBalance={emberBalance}
+            onBuy={handleBuyPack}
+            loading={loading}
+            quantity={quantity}
+            setQuantity={setQuantity}
+          />
+        )}
 
         {/* ═══ Core Economy Panel ═══ */}
         <div className="max-w-3xl mx-auto mb-8 hidden sm:block">
