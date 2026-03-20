@@ -12,6 +12,7 @@ import { CONSUMABLES } from '../../data/vault/buffs'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
+import PackArt from './components/PackArt'
 import CardZoomModal from './components/CardZoomModal'
 import emberIcon from '../../assets/ember.png'
 import { Search, X, Handshake, Loader2, Check, Plus, History, ChevronLeft, ChevronRight, Filter, Wifi, WifiOff, Timer, ArrowLeftRight, Package, RefreshCw } from 'lucide-react'
@@ -55,7 +56,7 @@ function useIsMobile() {
 export default function CCTrading() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, pendingTradeCount, setPendingTradeCount, startingFive, binderCards, refreshCollection } = useVault()
+  const { collection, pendingTradeCount, setPendingTradeCount, startingFive, binderCards, refreshCollection, inventory, lockedPackIds } = useVault()
 
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
@@ -286,6 +287,8 @@ export default function CCTrading() {
           setError={setError}
           setSuccess={setSuccess}
           lockedCardIds={lockedCardIds}
+          inventory={inventory}
+          lockedPackIds={lockedPackIds}
         />
       )}
 
@@ -553,11 +556,12 @@ function UserSearchModal({ onClose, onSelect, currentUserId }) {
 // ═══════════════════════════════════════
 // Trade Room
 // ═══════════════════════════════════════
-function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess, lockedCardIds }) {
+function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, setSuccess, lockedCardIds, inventory, lockedPackIds }) {
   const { getDefOverride } = useVault()
   const isMobile = useIsMobile()
   const [trade, setTrade] = useState(null)
   const [tradeCards, setTradeCards] = useState([])
+  const [tradePacks, setTradePacks] = useState([])
   const [actionLoading, setActionLoading] = useState(false)
   const [coreInput, setCoreInput] = useState('')
   const [connected, setConnected] = useState(true)
@@ -570,6 +574,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
   const [mobileOfferTab, setMobileOfferTab] = useState('mine') // 'mine' | 'theirs'
   // Mobile: bottom sheet collection picker
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [packPickerOpen, setPackPickerOpen] = useState(false)
 
   // Collection filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -582,6 +587,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
       const data = await tradingService.poll(tradeId)
       setTrade(data.trade)
       setTradeCards(data.cards || [])
+      setTradePacks(data.packs || [])
       setConnected(true)
       setLastPollTime(Date.now())
       pollCountRef.current++
@@ -624,6 +630,20 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
     new Set(myCards.map(tc => tc.cardId)),
   [myCards])
 
+  const myPacks = useMemo(() =>
+    tradePacks.filter(tp => tp.offeredBy === userId),
+  [tradePacks, userId])
+
+  const theirPacks = useMemo(() =>
+    tradePacks.filter(tp => tp.offeredBy !== userId),
+  [tradePacks, userId])
+
+  const availablePacks = useMemo(() => {
+    const lockedSet = new Set(lockedPackIds || [])
+    const inTradeSet = new Set(myPacks.map(p => p.packInventoryId))
+    return (inventory || []).filter(p => !lockedSet.has(p.id) && !inTradeSet.has(p.id))
+  }, [inventory, lockedPackIds, myPacks])
+
   const availableCards = useMemo(() => {
     let cards = collection.filter(c => !myCardIds.has(c.id) && !lockedCardIds.has(c.id))
 
@@ -663,6 +683,30 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
     setActionLoading(true)
     try {
       await tradingService.removeCard(tradeId, cardId)
+      await poll()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleAddPack = async (packInventoryId) => {
+    setActionLoading(true)
+    try {
+      await tradingService.addPack(tradeId, packInventoryId)
+      await poll()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleRemovePack = async (packInventoryId) => {
+    setActionLoading(true)
+    try {
+      await tradingService.removePack(tradeId, packInventoryId)
       await poll()
     } catch (err) {
       setError(err.message)
@@ -827,7 +871,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
                 : 'text-white/30 border-transparent'
             }`}
           >
-            Your Offer ({myCards.length}/10)
+            Your Offer ({myCards.length + myPacks.length})
             {trade.myReady && <Check className="w-3 h-3 inline ml-1 text-emerald-400" />}
           </button>
           <button
@@ -838,7 +882,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
                 : 'text-white/30 border-transparent'
             }`}
           >
-            Their Offer ({theirCards.length}/10)
+            Their Offer ({theirCards.length + theirPacks.length})
             {trade.theirReady && <Check className="w-3 h-3 inline ml-1 text-emerald-400" />}
           </button>
         </div>
@@ -846,19 +890,55 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
         {/* Single active panel */}
         <div className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-3 mb-3" style={{ minHeight: 160 }}>
           {mobileOfferTab === 'mine' ? (
-            <MobileCardSlideshow
-              cards={myCards}
-              onRemoveCard={handleRemoveCard}
-              onZoomCard={handleZoomCard}
-              canRemove={!trade.myReady && !actionLoading}
-              emptyText="Tap + below to add cards"
-            />
+            <>
+              <MobileCardSlideshow
+                cards={myCards}
+                onRemoveCard={handleRemoveCard}
+                onZoomCard={handleZoomCard}
+                canRemove={!trade.myReady && !actionLoading}
+                emptyText={myPacks.length === 0 ? 'Tap + below to add cards or packs' : undefined}
+              />
+              {myPacks.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-[var(--cd-border)]">
+                  <div className="text-[9px] text-white/30 cd-head uppercase tracking-wider mb-1.5">Packs</div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 cd-scrollbar-hide">
+                    {myPacks.map(tp => (
+                      <div key={tp.id} className="relative shrink-0" style={{ width: 80 }}>
+                        <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                        {!trade.myReady && !actionLoading && (
+                          <button
+                            onClick={() => handleRemovePack(tp.packInventoryId)}
+                            className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center cursor-pointer z-10 shadow-lg"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
-            <MobileCardSlideshow
-              cards={theirCards}
-              onZoomCard={handleZoomCard}
-              emptyText="Partner hasn't added cards yet"
-            />
+            <>
+              <MobileCardSlideshow
+                cards={theirCards}
+                onZoomCard={handleZoomCard}
+                emptyText={theirPacks.length === 0 ? "Partner hasn't added items yet" : undefined}
+              />
+              {theirPacks.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-[var(--cd-border)]">
+                  <div className="text-[9px] text-white/30 cd-head uppercase tracking-wider mb-1.5">Packs</div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 cd-scrollbar-hide">
+                    {theirPacks.map(tp => (
+                      <div key={tp.id} className="shrink-0" style={{ width: 80 }}>
+                        <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -933,15 +1013,25 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           )}
         </div>
 
-        {/* Add cards button (mobile) */}
+        {/* Add cards/packs buttons (mobile) */}
         {!trade.myReady && mobileOfferTab === 'mine' && (
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-[var(--cd-cyan)]/30 text-[var(--cd-cyan)]/60 active:bg-[var(--cd-cyan)]/5 transition-all cursor-pointer mb-3"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="cd-head text-xs font-bold uppercase tracking-wider">Add Cards</span>
-          </button>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-[var(--cd-cyan)]/30 text-[var(--cd-cyan)]/60 active:bg-[var(--cd-cyan)]/5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="cd-head text-xs font-bold uppercase tracking-wider">Add Cards</span>
+            </button>
+            <button
+              onClick={() => setPackPickerOpen(true)}
+              disabled={availablePacks.length === 0}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-[var(--cd-magenta)]/30 text-[var(--cd-magenta)]/60 active:bg-[var(--cd-magenta)]/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default"
+            >
+              <Package className="w-4 h-4" />
+              <span className="cd-head text-xs font-bold uppercase tracking-wider">Add Packs</span>
+            </button>
+          </div>
         )}
 
         {/* Sticky action bar */}
@@ -997,6 +1087,16 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
             setTypeFilter={setTypeFilter}
             showFilters={showFilters}
             setShowFilters={setShowFilters}
+          />
+        )}
+
+        {/* Mobile pack picker bottom sheet */}
+        {packPickerOpen && (
+          <PackPickerSheet
+            packs={availablePacks}
+            onAdd={(id) => { handleAddPack(id) }}
+            onClose={() => setPackPickerOpen(false)}
+            disabled={actionLoading || trade.myReady}
           />
         )}
 
@@ -1056,10 +1156,12 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           title="Your Offer"
           titleColor="var(--cd-cyan)"
           cards={myCards}
+          packs={myPacks}
           coreAmount={trade.myCore}
           isReady={trade.myReady}
-          cardCount={myCards.length}
+          itemCount={myCards.length + myPacks.length}
           onRemoveCard={handleRemoveCard}
+          onRemovePack={handleRemovePack}
           onZoomCard={handleZoomCard}
           canRemove={!trade.myReady && !actionLoading}
         />
@@ -1067,9 +1169,10 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
           title="Their Offer"
           titleColor="var(--cd-magenta)"
           cards={theirCards}
+          packs={theirPacks}
           coreAmount={trade.theirCore}
           isReady={trade.theirReady}
-          cardCount={theirCards.length}
+          itemCount={theirCards.length + theirPacks.length}
           onZoomCard={handleZoomCard}
         />
       </div>
@@ -1226,6 +1329,32 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
               </div>
             )}
           </div>
+
+          {/* Desktop pack inventory */}
+          {availablePacks.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-[var(--cd-border)]">
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <h3 className="cd-head text-sm text-white/40 tracking-wider">
+                  Your Packs
+                </h3>
+                <span className="text-[10px] text-white/20 cd-num">{availablePacks.length} packs</span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {availablePacks.map(pack => (
+                  <button
+                    key={pack.id}
+                    onClick={() => handleAddPack(pack.id)}
+                    disabled={actionLoading || trade.myReady}
+                    className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded p-1.5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default hover:border-[var(--cd-cyan)]/30 group"
+                    style={{ width: 110 }}
+                  >
+                    <PackArt tier={pack.category || pack.packType?.category || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
+                    <div className="text-[8px] font-bold text-white truncate mt-0.5 px-0.5 group-hover:text-[var(--cd-cyan)] transition-colors">{pack.name || pack.packType?.name || 'Pack'}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1482,6 +1611,69 @@ function MobileCollectionSheet({ cards, onAdd, onClose, disabled, searchQuery, s
 }
 
 // ═══════════════════════════════════════
+// Pack Picker Sheet (mobile)
+// ═══════════════════════════════════════
+function PackPickerSheet({ packs, onAdd, onClose, disabled }) {
+  const [closing, setClosing] = useState(false)
+
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(onClose, 200)
+  }
+
+  return (
+    <div
+      className={`fixed inset-0 z-40 flex items-end bg-black/60 backdrop-blur-sm ${closing ? 'cd-overlay-exit' : 'cd-overlay-enter'}`}
+      onClick={handleClose}
+    >
+      <div
+        className={`w-full bg-[var(--cd-bg)] border-t border-[var(--cd-border)] rounded-t-2xl max-h-[70vh] flex flex-col ${
+          closing ? 'cd-sheet-exit' : 'cd-sheet-enter'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 rounded-full bg-white/15" />
+        </div>
+
+        <div className="flex items-center justify-between px-4 pb-2">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-[var(--cd-magenta)]" />
+            <span className="cd-head text-sm text-white/60 tracking-wider">Add Packs</span>
+            <span className="text-[10px] text-white/20 cd-num">({packs.length})</span>
+          </div>
+          <button onClick={handleClose} className="p-1.5 text-white/40 active:text-white/70 cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 pb-4">
+          <div className="flex flex-wrap gap-3 justify-center">
+            {packs.map(pack => (
+              <button
+                key={pack.id}
+                onClick={() => onAdd(pack.id)}
+                disabled={disabled}
+                className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded p-1.5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default active:border-[var(--cd-cyan)]/30 active:bg-[var(--cd-cyan)]/5"
+                style={{ width: 100 }}
+              >
+                <PackArt tier={pack.category || pack.packType?.category || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
+                <div className="text-[8px] font-bold text-white truncate mt-0.5 px-0.5">{pack.name || pack.packType?.name || 'Pack'}</div>
+              </button>
+            ))}
+            {packs.length === 0 && (
+              <div className="col-span-full text-center py-12 text-white/20 text-xs">
+                No available packs
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
 // Collection Filters (shared)
 // ═══════════════════════════════════════
 function CollectionFilters({ searchQuery, setSearchQuery, rarityFilter, setRarityFilter, typeFilter, setTypeFilter, compact }) {
@@ -1558,7 +1750,7 @@ function CollectionFilters({ searchQuery, setSearchQuery, rarityFilter, setRarit
 // ═══════════════════════════════════════
 // Desktop Trade Offer Panel
 // ═══════════════════════════════════════
-function TradeOfferPanel({ title, titleColor, cards, coreAmount, isReady, cardCount, onRemoveCard, onZoomCard, canRemove }) {
+function TradeOfferPanel({ title, titleColor, cards, packs = [], coreAmount, isReady, itemCount, onRemoveCard, onRemovePack, onZoomCard, canRemove }) {
   return (
     <div className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg p-4 flex flex-col" style={{ minHeight: 220 }}>
       <div className="flex items-center justify-between mb-2">
@@ -1566,26 +1758,51 @@ function TradeOfferPanel({ title, titleColor, cards, coreAmount, isReady, cardCo
           <h3 className="cd-head text-sm tracking-wider" style={{ color: titleColor }}>{title}</h3>
           {isReady && <Check className="w-3.5 h-3.5 text-emerald-400" />}
         </div>
-        <span className="cd-num text-[10px] text-white/30">{cardCount}/10</span>
+        <span className="cd-num text-[10px] text-white/30">{itemCount} items</span>
       </div>
 
       <div className="flex-1 min-h-0">
-        {cards.length === 0 ? (
+        {cards.length === 0 && packs.length === 0 ? (
           <div className="flex items-center justify-center h-full min-h-[120px] text-white/10 text-xs cd-head">
-            No cards added
+            No items added
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {cards.map(tc => (
-              <DesktopTradeCardSlot
-                key={tc.cardId}
-                tradeCard={tc}
-                onRemove={onRemoveCard ? () => onRemoveCard(tc.cardId) : undefined}
-                onZoom={() => onZoomCard?.(tc.card)}
-                canRemove={canRemove}
-              />
-            ))}
-          </div>
+          <>
+            {cards.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {cards.map(tc => (
+                  <DesktopTradeCardSlot
+                    key={tc.cardId}
+                    tradeCard={tc}
+                    onRemove={onRemoveCard ? () => onRemoveCard(tc.cardId) : undefined}
+                    onZoom={() => onZoomCard?.(tc.card)}
+                    canRemove={canRemove}
+                  />
+                ))}
+              </div>
+            )}
+            {packs.length > 0 && (
+              <div className={cards.length > 0 ? 'mt-2 pt-2 border-t border-[var(--cd-border)]' : ''}>
+                <div className="text-[9px] text-white/30 cd-head uppercase tracking-wider mb-1.5">Packs</div>
+                <div className="flex flex-wrap gap-2">
+                  {packs.map(tp => (
+                    <div key={tp.id} className="relative group" style={{ width: 90 }}>
+                      <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                      {canRemove && onRemovePack && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRemovePack(tp.packInventoryId) }}
+                          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center
+                            opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
