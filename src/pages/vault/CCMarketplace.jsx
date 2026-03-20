@@ -11,8 +11,9 @@ import GameCard from './components/GameCard'
 import CardEffectDisplay from './components/CardEffectDisplay'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
+import PackArt from './components/PackArt'
 import CardZoomModal from './components/CardZoomModal'
-import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react'
+import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3, Package } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player']
@@ -30,7 +31,6 @@ const SORT_OPTIONS = [
 
 const FEE_RATE = 0.02
 const MIN_FEE = 1
-const MAX_LISTINGS = 15
 const BROWSE_CARD_SIZE = 140
 const CREATE_CARD_SIZE = 120
 
@@ -87,7 +87,7 @@ function MarketCard({ card, size }) {
 export default function CCMarketplace() {
   const { user } = useAuth()
   const passionCtx = usePassion()
-  const { collection, refreshCollection, startingFive, binderCards, getDefOverride } = useVault()
+  const { collection, refreshCollection, startingFive, binderCards, getDefOverride, inventory, lockedPackIds, packTypesMap } = useVault()
 
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
@@ -120,7 +120,12 @@ export default function CCMarketplace() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
   const [myListings, setMyListings] = useState(null)
-  const [myActiveCount, setMyActiveCount] = useState(0)
+  const [myActiveCardCount, setMyActiveCardCount] = useState(0)
+  const [myActivePackCount, setMyActivePackCount] = useState(0)
+  const [maxCardListings, setMaxCardListings] = useState(15)
+  const [maxPackListings, setMaxPackListings] = useState(5)
+
+  const [itemTypeFilter, setItemTypeFilter] = useState('all')
 
   // Filters
   const [search, setSearch] = useState('')
@@ -148,6 +153,7 @@ export default function CCMarketplace() {
     setError('')
     try {
       const params = { page: String(page), limit: String(limit), sort }
+      if (itemTypeFilter !== 'all') params.itemType = itemTypeFilter
       if (rarity.length) params.rarity = rarity.join(',')
       if (cardType.length) params.cardType = cardType.join(',')
       if (holoType.length) params.holoType = holoType.join(',')
@@ -161,13 +167,16 @@ export default function CCMarketplace() {
     } finally {
       setLoading(false)
     }
-  }, [page, sort, rarity, cardType, holoType, role, search])
+  }, [page, sort, itemTypeFilter, rarity, cardType, holoType, role, search])
 
   const fetchMyListings = useCallback(async () => {
     try {
       const data = await marketplaceService.getMyListings()
       setMyListings(data.listings || [])
-      setMyActiveCount(data.activeCount || 0)
+      setMyActiveCardCount(data.activeCardCount || 0)
+      setMyActivePackCount(data.activePackCount || 0)
+      setMaxCardListings(data.maxCardListings || 15)
+      setMaxPackListings(data.maxPackListings || 5)
     } catch (err) {
       console.error('Failed to fetch my listings:', err)
     }
@@ -210,12 +219,22 @@ export default function CCMarketplace() {
 
   const listedCardIds = useMemo(() => {
     if (!myListings) return new Set()
-    return new Set(myListings.filter(l => l.status === 'active').map(l => l.cardId))
+    return new Set(myListings.filter(l => l.status === 'active' && l.itemType !== 'pack').map(l => l.cardId))
+  }, [myListings])
+
+  const listedPackIds = useMemo(() => {
+    if (!myListings) return new Set()
+    return new Set(myListings.filter(l => l.status === 'active' && l.itemType === 'pack').map(l => l.packInventoryId))
   }, [myListings])
 
   const listableCards = useMemo(() => {
     return collection.filter(c => !listedCardIds.has(c.id) && !lockedCardIds.has(c.id))
   }, [collection, listedCardIds, lockedCardIds])
+
+  const listablePacks = useMemo(() => {
+    const locked = new Set(lockedPackIds || [])
+    return (inventory || []).filter(p => !listedPackIds.has(p.id) && !locked.has(p.id))
+  }, [inventory, listedPackIds, lockedPackIds])
 
   const handleBuy = async (listingId) => {
     setActionLoading(true)
@@ -234,11 +253,15 @@ export default function CCMarketplace() {
     }
   }
 
-  const handleCreate = async (cardId, price) => {
+  const handleCreate = async (idOrData, price) => {
     setActionLoading(true)
     setError('')
     try {
-      await marketplaceService.create({ cardId, price })
+      if (typeof idOrData === 'object' && idOrData.packInventoryId) {
+        await marketplaceService.create({ packInventoryId: idOrData.packInventoryId, price })
+      } else {
+        await marketplaceService.create({ cardId: idOrData, price })
+      }
       setSuccess('Listing created!')
       setCreateModal(null)
       fetchMyListings()
@@ -332,8 +355,8 @@ export default function CCMarketplace() {
         >
           <Tag className="w-4 h-4" />
           <span className="hidden sm:inline">My </span>Listings
-          {myActiveCount > 0 && (
-            <span className="ml-1 text-xs bg-[var(--cd-cyan)]/20 px-1.5 py-0.5 rounded">{myActiveCount}/{MAX_LISTINGS}</span>
+          {(myActiveCardCount + myActivePackCount) > 0 && (
+            <span className="ml-1 text-xs bg-[var(--cd-cyan)]/20 px-1.5 py-0.5 rounded">{myActiveCardCount + myActivePackCount}</span>
           )}
         </button>
         <button
@@ -365,19 +388,35 @@ export default function CCMarketplace() {
           onRefresh={fetchListings}
           showStats={showStats}
           setShowStats={setShowStats}
+          itemTypeFilter={itemTypeFilter}
+          setItemTypeFilter={(v) => { setItemTypeFilter(v); setPage(0) }}
         />
       )}
 
       {view === 'my-listings' && (
-        <MyListingsView listings={myListings} onCancel={handleCancel} onZoom={handleCardZoom} actionLoading={actionLoading} />
+        <MyListingsView
+          listings={myListings}
+          onCancel={handleCancel}
+          onZoom={handleCardZoom}
+          actionLoading={actionLoading}
+          activeCardCount={myActiveCardCount}
+          activePackCount={myActivePackCount}
+          maxCardListings={maxCardListings}
+          maxPackListings={maxPackListings}
+        />
       )}
 
       {view === 'create' && (
         <CreateListingView
           cards={listableCards}
-          activeCount={myActiveCount}
+          packs={listablePacks}
+          packTypesMap={packTypesMap}
+          activeCardCount={myActiveCardCount}
+          activePackCount={myActivePackCount}
+          maxCardListings={maxCardListings}
+          maxPackListings={maxPackListings}
           onCreate={(cardId) => setCreateModal(collection.find(c => c.id === cardId))}
-          onZoom={handleCardZoom}
+          onCreatePack={(pack) => setCreateModal({ _isPack: true, pack })}
         />
       )}
 
@@ -393,7 +432,9 @@ export default function CCMarketplace() {
 
       {createModal && (
         <CreateModal
-          card={createModal}
+          card={createModal._isPack ? null : createModal}
+          pack={createModal._isPack ? createModal.pack : null}
+          packTypesMap={packTypesMap}
           onClose={() => setCreateModal(null)}
           onCreate={handleCreate}
           loading={actionLoading}
@@ -426,7 +467,14 @@ function BrowseView({
   sort, setSort,
   setPage, onBuy, onZoom, userId, onRefresh,
   showStats, setShowStats,
+  itemTypeFilter, setItemTypeFilter,
 }) {
+  const ITEM_TYPE_OPTIONS = [
+    { value: 'all', label: 'All' },
+    { value: 'card', label: 'Cards' },
+    { value: 'pack', label: 'Packs' },
+  ]
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -437,7 +485,7 @@ function BrowseView({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-              placeholder="Search cards..."
+              placeholder="Search listings..."
               className="w-full bg-[var(--cd-surface)] border border-[var(--cd-border)] text-white text-sm px-3 py-2 pr-8 rounded placeholder-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/50"
             />
             <button onClick={onSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 cursor-pointer">
@@ -455,6 +503,22 @@ function BrowseView({
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+      </div>
+
+      <div className="flex items-center gap-1.5 mb-4">
+        {ITEM_TYPE_OPTIONS.map(o => (
+          <button
+            key={o.value}
+            onClick={() => setItemTypeFilter(o.value)}
+            className={`text-[10px] sm:text-xs px-3 py-1.5 rounded border transition-all cursor-pointer cd-head font-bold uppercase tracking-wider ${
+              itemTypeFilter === o.value
+                ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
+                : 'border-white/10 text-white/30 hover:text-white/50'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
@@ -574,7 +638,7 @@ function BrowseView({
               key={listing.id}
               listing={listing}
               onBuy={() => onBuy(listing)}
-              onZoom={() => onZoom(listing.card)}
+              onZoom={listing.itemType === 'pack' ? undefined : () => onZoom(listing.card)}
               isSelf={listing.sellerId === userId}
               showStats={showStats}
             />
@@ -611,15 +675,25 @@ function BrowseView({
 // Listing Card
 // ═══════════════════════════════════════
 function ListingCard({ listing, onBuy, onZoom, isSelf, showStats }) {
-  const { card } = listing
+  const isPack = listing.itemType === 'pack'
 
   return (
     <div className="flex flex-col items-center" style={{ width: BROWSE_CARD_SIZE }}>
-      <div className="card-zoomable" onClick={onZoom}>
-        <MarketCard card={card} size={BROWSE_CARD_SIZE} />
-      </div>
+      {isPack ? (
+        <PackArt
+          tier={listing.pack.category}
+          name={listing.pack.name}
+          cardCount={listing.pack.cardsPerPack}
+          seed={listing.id % 5}
+          compact
+        />
+      ) : (
+        <div className="card-zoomable" onClick={onZoom}>
+          <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
+        </div>
+      )}
 
-      {showStats && <div className="mt-1"><CardEffectDisplay card={card} /></div>}
+      {showStats && !isPack && listing.card && <div className="mt-1"><CardEffectDisplay card={listing.card} /></div>}
 
       <div className="w-full mt-2 space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -654,7 +728,7 @@ function ListingCard({ listing, onBuy, onZoom, isSelf, showStats }) {
 // ═══════════════════════════════════════
 // My Listings View
 // ═══════════════════════════════════════
-function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
+function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardCount, activePackCount, maxCardListings, maxPackListings }) {
   if (!listings) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -668,7 +742,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
       <div className="text-center py-20 text-white/30">
         <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
         <p className="cd-head text-lg">No listings yet</p>
-        <p className="text-sm mt-1">Sell a card to get started</p>
+        <p className="text-sm mt-1">Sell a card or pack to get started</p>
       </div>
     )
   }
@@ -680,13 +754,32 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
     <div>
       {active.length > 0 && (
         <>
-          <h3 className="cd-head text-sm text-[var(--cd-cyan)] mb-3 tracking-wider">Active Listings ({active.length}/{MAX_LISTINGS})</h3>
+          <div className="flex items-center gap-4 mb-3">
+            <h3 className="cd-head text-sm text-[var(--cd-cyan)] tracking-wider">
+              Active Listings
+            </h3>
+            <span className="text-[10px] text-white/30 cd-head">
+              Cards: {activeCardCount}/{maxCardListings} &middot; Packs: {activePackCount}/{maxPackListings}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-4 mb-8 justify-center sm:justify-start">
-            {active.map(listing => (
+            {active.map(listing => {
+              const isPack = listing.itemType === 'pack'
+              return (
                 <div key={listing.id} className="flex flex-col items-center" style={{ width: BROWSE_CARD_SIZE }}>
-                  <div className="card-zoomable" onClick={() => onZoom(listing.card)}>
-                    <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
-                  </div>
+                  {isPack ? (
+                    <PackArt
+                      tier={listing.pack.category}
+                      name={listing.pack.name}
+                      cardCount={listing.pack.cardsPerPack}
+                      seed={listing.id % 5}
+                      compact
+                    />
+                  ) : (
+                    <div className="card-zoomable" onClick={() => onZoom(listing.card)}>
+                      <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
+                    </div>
+                  )}
                   <div className="w-full mt-2 space-y-1.5">
                     <div className="text-sm font-bold text-orange-400 cd-num">
                       {listing.price} <span className="text-[10px] text-orange-400/60">Core</span>
@@ -703,7 +796,8 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
                     </button>
                   </div>
                 </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
@@ -712,9 +806,21 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
         <>
           <h3 className="cd-head text-sm text-white/40 mb-3 tracking-wider">History</h3>
           <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-            {past.map(listing => (
+            {past.map(listing => {
+              const isPack = listing.itemType === 'pack'
+              return (
                 <div key={listing.id} className="flex flex-col items-center opacity-50" style={{ width: BROWSE_CARD_SIZE }}>
-                  <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
+                  {isPack ? (
+                    <PackArt
+                      tier={listing.pack?.category || 'standard'}
+                      name={listing.pack?.name || 'Pack'}
+                      cardCount={listing.pack?.cardsPerPack}
+                      seed={listing.id % 5}
+                      compact
+                    />
+                  ) : (
+                    <MarketCard card={listing.card} size={BROWSE_CARD_SIZE} />
+                  )}
                   <div className="w-full mt-2 space-y-1">
                     <div className="text-sm font-bold text-orange-400/60 cd-num">
                       {listing.price} <span className="text-[10px]">Core</span>
@@ -726,7 +832,8 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
                     </div>
                   </div>
                 </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
@@ -737,7 +844,8 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading }) {
 // ═══════════════════════════════════════
 // Create Listing View
 // ═══════════════════════════════════════
-function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
+function CreateListingView({ cards, packs, packTypesMap, activeCardCount, activePackCount, maxCardListings, maxPackListings, onCreate, onCreatePack }) {
+  const [sellTab, setSellTab] = useState('card')
   const [filter, setFilter] = useState('')
   const [rarity, setRarity] = useState([])
   const [cardType, setCardType] = useState([])
@@ -769,123 +877,216 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
     })
   }, [cards, filter, rarity, cardType, holoType, role])
 
-  if (activeCount >= MAX_LISTINGS) {
-    return (
-      <div className="text-center py-20 text-amber-400">
-        <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-50" />
-        <p className="cd-head text-lg">Listing Limit Reached</p>
-        <p className="text-sm mt-1 text-white/40">Cancel an existing listing to create a new one</p>
-      </div>
-    )
-  }
+  const isCardLimitReached = activeCardCount >= maxCardListings
+  const isPackLimitReached = activePackCount >= maxPackListings
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <span className="cd-head text-sm text-[var(--cd-cyan)] tracking-wider">Select a card to sell</span>
-        <span className="text-xs text-white/30">({activeCount}/{MAX_LISTINGS} slots used)</span>
+        <button
+          onClick={() => setSellTab('card')}
+          className={`text-xs px-3 py-1.5 rounded border transition-all cursor-pointer cd-head font-bold uppercase tracking-wider ${
+            sellTab === 'card'
+              ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
+              : 'border-white/10 text-white/30 hover:text-white/50'
+          }`}
+        >
+          Cards
+        </button>
+        <button
+          onClick={() => setSellTab('pack')}
+          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border transition-all cursor-pointer cd-head font-bold uppercase tracking-wider ${
+            sellTab === 'pack'
+              ? 'border-[var(--cd-magenta)]/50 text-[var(--cd-magenta)] bg-[var(--cd-magenta)]/10'
+              : 'border-white/10 text-white/30 hover:text-white/50'
+          }`}
+        >
+          <Package className="w-3.5 h-3.5" />
+          Packs
+        </button>
       </div>
 
-      <div className="relative mb-4 max-w-sm">
-        <input
-          type="text"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter your cards..."
-          className="w-full bg-[var(--cd-surface)] border border-[var(--cd-border)] text-white text-sm px-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/50"
-        />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
-        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head">Rarity:</span>
-        {RARITY_ORDER.map(r => (
-          <button
-            key={r}
-            onClick={() => toggleRarity(r)}
-            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
-              rarity.includes(r)
-                ? 'border-current bg-current/10'
-                : 'border-white/10 text-white/30 hover:text-white/50'
-            }`}
-            style={rarity.includes(r) ? { color: RARITIES[r].color } : {}}
-          >
-            {r}
-          </button>
-        ))}
-
-        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Type:</span>
-        {CARD_TYPES.map(t => (
-          <button
-            key={t}
-            onClick={() => toggleCardType(t)}
-            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
-              cardType.includes(t)
-                ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
-                : 'border-white/10 text-white/30 hover:text-white/50'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-
-        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Holo:</span>
-        {HOLO_TYPES.map(h => (
-          <button
-            key={h}
-            onClick={() => toggleHoloType(h)}
-            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
-              holoType.includes(h)
-                ? 'border-[var(--cd-magenta)]/50 text-[var(--cd-magenta)] bg-[var(--cd-magenta)]/10'
-                : 'border-white/10 text-white/30 hover:text-white/50'
-            }`}
-          >
-            {HOLO_TYPE_LABELS[h]}
-          </button>
-        ))}
-
-        <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Role:</span>
-        {ROLES.map(r => (
-          <button
-            key={r}
-            onClick={() => toggleRole(r)}
-            className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
-              role.includes(r)
-                ? 'border-amber-400/50 text-amber-400 bg-amber-400/10'
-                : 'border-white/10 text-white/30 hover:text-white/50'
-            }`}
-          >
-            {r}
-          </button>
-        ))}
-
-        {hasFilters && (
-          <button
-            onClick={() => { setRarity([]); setCardType([]); setHoloType([]); setRole([]) }}
-            className="text-xs text-white/30 hover:text-white/50 ml-2 cursor-pointer"
-          >
-            Clear all
-          </button>
-        )}
-      </div>
-
-      <div className="text-xs text-white/30 mb-3 cd-head">{filtered.length} card{filtered.length !== 1 ? 's' : ''}</div>
-
-      {filtered.length === 0 ? (
-        <div className="text-center py-12 text-white/30">
-          <p className="text-sm">{hasFilters || filter ? 'No cards match your filters' : 'No cards available to sell'}</p>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
-          {filtered.map(card => (
-              <div
-                key={card.id}
-                className="cursor-pointer card-zoomable"
-                onClick={() => onCreate(card.id)}
-              >
-                <MarketCard card={card} size={CREATE_CARD_SIZE} />
+      {sellTab === 'card' && (
+        <>
+          {isCardLimitReached ? (
+            <div className="text-center py-20 text-amber-400">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p className="cd-head text-lg">Card Listing Limit Reached</p>
+              <p className="text-sm mt-1 text-white/40">Cancel an existing card listing to create a new one</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="cd-head text-sm text-[var(--cd-cyan)] tracking-wider">Select a card to sell</span>
+                <span className="text-xs text-white/30">({activeCardCount}/{maxCardListings} slots used)</span>
               </div>
-          ))}
-        </div>
+
+              <div className="relative mb-4 max-w-sm">
+                <input
+                  type="text"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Filter your cards..."
+                  className="w-full bg-[var(--cd-surface)] border border-[var(--cd-border)] text-white text-sm px-3 py-2 rounded placeholder-white/20 focus:outline-none focus:border-[var(--cd-cyan)]/50"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head">Rarity:</span>
+                {RARITY_ORDER.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => toggleRarity(r)}
+                    className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+                      rarity.includes(r)
+                        ? 'border-current bg-current/10'
+                        : 'border-white/10 text-white/30 hover:text-white/50'
+                    }`}
+                    style={rarity.includes(r) ? { color: RARITIES[r].color } : {}}
+                  >
+                    {r}
+                  </button>
+                ))}
+
+                <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Type:</span>
+                {CARD_TYPES.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => toggleCardType(t)}
+                    className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+                      cardType.includes(t)
+                        ? 'border-[var(--cd-cyan)]/50 text-[var(--cd-cyan)] bg-[var(--cd-cyan)]/10'
+                        : 'border-white/10 text-white/30 hover:text-white/50'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+
+                <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Holo:</span>
+                {HOLO_TYPES.map(h => (
+                  <button
+                    key={h}
+                    onClick={() => toggleHoloType(h)}
+                    className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+                      holoType.includes(h)
+                        ? 'border-[var(--cd-magenta)]/50 text-[var(--cd-magenta)] bg-[var(--cd-magenta)]/10'
+                        : 'border-white/10 text-white/30 hover:text-white/50'
+                    }`}
+                  >
+                    {HOLO_TYPE_LABELS[h]}
+                  </button>
+                ))}
+
+                <span className="text-[10px] text-white/30 uppercase tracking-wider cd-head sm:ml-3">Role:</span>
+                {ROLES.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => toggleRole(r)}
+                    className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded border transition-all cursor-pointer cd-head ${
+                      role.includes(r)
+                        ? 'border-amber-400/50 text-amber-400 bg-amber-400/10'
+                        : 'border-white/10 text-white/30 hover:text-white/50'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+
+                {hasFilters && (
+                  <button
+                    onClick={() => { setRarity([]); setCardType([]); setHoloType([]); setRole([]) }}
+                    className="text-xs text-white/30 hover:text-white/50 ml-2 cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs text-white/30 mb-3 cd-head">{filtered.length} card{filtered.length !== 1 ? 's' : ''}</div>
+
+              {filtered.length === 0 ? (
+                <div className="text-center py-12 text-white/30">
+                  <p className="text-sm">{hasFilters || filter ? 'No cards match your filters' : 'No cards available to sell'}</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+                  {filtered.map(card => (
+                      <div
+                        key={card.id}
+                        className="cursor-pointer card-zoomable"
+                        onClick={() => onCreate(card.id)}
+                      >
+                        <MarketCard card={card} size={CREATE_CARD_SIZE} />
+                      </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {sellTab === 'pack' && (
+        <>
+          {isPackLimitReached ? (
+            <div className="text-center py-20 text-amber-400">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p className="cd-head text-lg">Pack Listing Limit Reached</p>
+              <p className="text-sm mt-1 text-white/40">Cancel an existing pack listing to create a new one</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="cd-head text-sm text-[var(--cd-magenta)] tracking-wider">Select a pack to sell</span>
+                <span className="text-xs text-white/30">({activePackCount}/{maxPackListings} slots used)</span>
+              </div>
+
+              {(!packs || packs.length === 0) ? (
+                <div className="text-center py-12 text-white/30">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No packs available to sell</p>
+                  <p className="text-[10px] mt-1 text-white/20">Packs in Starting Five or pending trades cannot be listed</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {packs.map((item, i) => {
+                    const pack = packTypesMap[item.packTypeId]
+                    if (!pack) return null
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => onCreatePack(item)}
+                        className="cd-panel cd-corners rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer hover:bg-white/[0.03] transition-all group"
+                        style={{ animation: `vault-card-enter 0.4s ease-out ${i * 0.08}s both` }}
+                      >
+                        <div className="relative group-hover:scale-105 transition-transform">
+                          <PackArt
+                            tier={item.packTypeId}
+                            name={pack.name}
+                            subtitle={pack.leagueName || ''}
+                            cardCount={pack.cards}
+                            seed={pack.sortOrder ?? 5}
+                            compact
+                          />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-cyan)' }}>
+                            {pack.name}
+                          </div>
+                          <div className="text-[10px] text-white/30">{pack.cards} cards</div>
+                        </div>
+                        <span className="text-[10px] text-[var(--cd-magenta)]/70 cd-head tracking-wider font-bold group-hover:text-[var(--cd-magenta)] transition-colors">
+                          TAP TO SELL
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   )
@@ -895,7 +1096,7 @@ function CreateListingView({ cards, activeCount, onCreate, onZoom }) {
 // Buy Modal
 // ═══════════════════════════════════════
 function BuyModal({ listing, onClose, onConfirm, loading, coreBalance }) {
-  const { card } = listing
+  const isPack = listing.itemType === 'pack'
   const price = listing.price
   const fee = calcFee(price)
   const totalCost = price + fee
@@ -907,7 +1108,16 @@ function BuyModal({ listing, onClose, onConfirm, loading, coreBalance }) {
         <h3 className="cd-head text-lg text-[var(--cd-cyan)] tracking-wider mb-4">Confirm Purchase</h3>
 
         <div className="flex justify-center mb-4">
-          <MarketCard card={card} size={160} />
+          {isPack ? (
+            <PackArt
+              tier={listing.pack.category}
+              name={listing.pack.name}
+              cardCount={listing.pack.cardsPerPack}
+              seed={listing.id % 5}
+            />
+          ) : (
+            <MarketCard card={listing.card} size={160} />
+          )}
         </div>
 
         <div className="space-y-1.5 text-sm mb-4">
@@ -963,11 +1173,14 @@ function BuyModal({ listing, onClose, onConfirm, loading, coreBalance }) {
 // ═══════════════════════════════════════
 // Create Listing Modal
 // ═══════════════════════════════════════
-function CreateModal({ card, onClose, onCreate, loading }) {
+function CreateModal({ card, pack, packTypesMap, onClose, onCreate, loading }) {
   const [price, setPrice] = useState('')
   const priceNum = parseInt(price) || 0
   const fee = priceNum > 0 ? calcFee(priceNum) : 0
   const canSubmit = priceNum >= 1
+  const isPack = !!pack
+
+  const packMeta = isPack ? packTypesMap[pack.packTypeId] : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -975,7 +1188,17 @@ function CreateModal({ card, onClose, onCreate, loading }) {
         <h3 className="cd-head text-lg text-[var(--cd-magenta)] tracking-wider mb-4">Create Listing</h3>
 
         <div className="flex justify-center mb-4">
-          <MarketCard card={card} size={160} />
+          {isPack ? (
+            <PackArt
+              tier={pack.packTypeId}
+              name={packMeta?.name || 'Pack'}
+              subtitle={packMeta?.leagueName || ''}
+              cardCount={packMeta?.cards}
+              seed={packMeta?.sortOrder ?? 5}
+            />
+          ) : (
+            <MarketCard card={card} size={160} />
+          )}
         </div>
 
         <div className="mb-3">
@@ -1005,7 +1228,7 @@ function CreateModal({ card, onClose, onCreate, loading }) {
             Cancel
           </button>
           <button
-            onClick={() => onCreate(card.id, priceNum)}
+            onClick={() => isPack ? onCreate({ packInventoryId: pack.id }, priceNum) : onCreate(card.id, priceNum)}
             disabled={loading || !canSubmit}
             className="flex-1 text-sm font-bold uppercase py-2 rounded
               bg-[var(--cd-magenta)]/10 text-[var(--cd-magenta)] border border-[var(--cd-magenta)]/30
