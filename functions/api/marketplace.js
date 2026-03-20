@@ -68,7 +68,7 @@ async function handleList(sql, params) {
            u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
            COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
-           pt.name AS pack_name, pt.cards_per_pack, pt.category AS pack_category,
+           pt.name AS pack_name, pt.cards_per_pack, pt.category AS pack_category, pt.color AS pack_color,
            pi.pack_type_id
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
@@ -149,7 +149,7 @@ async function handleMyListings(sql, user) {
            bu.discord_username AS buyer_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
            COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
-           pt.name AS pack_name, pt.cards_per_pack, pt.category AS pack_category,
+           pt.name AS pack_name, pt.cards_per_pack, pt.category AS pack_category, pt.color AS pack_color,
            pi.pack_type_id
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
@@ -275,6 +275,7 @@ function formatListing(row) {
         name: row.pack_name,
         cardsPerPack: row.cards_per_pack,
         category: row.pack_category,
+        color: row.pack_color || null,
       },
     }
   }

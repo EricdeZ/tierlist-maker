@@ -487,7 +487,7 @@ export async function pollTrade(sql, userId, tradeId) {
   // Get pack items in trade
   const packItems = await sql`
     SELECT tc.id, tc.pack_inventory_id, tc.offered_by, tc.item_type,
-           pi.pack_type_id, pt.name AS pack_name, pt.cards_per_pack, pt.category
+           pi.pack_type_id, pt.name AS pack_name, pt.cards_per_pack, pt.category, pt.color AS pack_color
     FROM cc_trade_cards tc
     JOIN cc_pack_inventory pi ON tc.pack_inventory_id = pi.id
     JOIN cc_pack_types pt ON pi.pack_type_id = pt.id

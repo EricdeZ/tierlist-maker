@@ -313,6 +313,7 @@ function formatTradePack(row) {
       name: row.pack_name,
       cardsPerPack: row.cards_per_pack,
       category: row.category,
+      color: row.pack_color || null,
     },
   }
 }
