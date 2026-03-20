@@ -1,0 +1,273 @@
+import { grantEmber } from './ember.js'
+import { transaction } from './db.js'
+
+const CADENCE_SLOTS = {
+    daily:   { cores: 1, pack: 1, mixed: 1 },  // 3 total
+    weekly:  { cores: 2, pack: 1, mixed: 1 },  // 4 total
+    monthly: { cores: 1, pack: 1, mixed: 1 },  // 3 total
+}
+
+const CADENCES = ['daily', 'weekly', 'monthly']
+
+// 1-hour grace period for claiming after period ends
+const GRACE_MS = 60 * 60 * 1000
+
+export function getPeriod(cadence, now = new Date()) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+
+    if (cadence === 'daily') {
+        const start = d
+        const end = new Date(start.getTime() + 86400000)
+        return { start, end }
+    }
+
+    if (cadence === 'weekly') {
+        // Monday 00:00 UTC
+        const day = d.getUTCDay()
+        const diff = day === 0 ? 6 : day - 1 // Monday = 0
+        const start = new Date(d.getTime() - diff * 86400000)
+        const end = new Date(start.getTime() + 7 * 86400000)
+        return { start, end }
+    }
+
+    if (cadence === 'monthly') {
+        const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+        const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+        return { start, end }
+    }
+
+    throw new Error(`Invalid cadence: ${cadence}`)
+}
+
+export { CADENCE_SLOTS, CADENCES, GRACE_MS }
+
+export async function rollAssignments(sql, userId, currentStats) {
+    for (const cadence of CADENCES) {
+        const { start, end } = getPeriod(cadence)
+
+        // Check if assignments already exist for this period
+        const existing = await sql`
+            SELECT 1 FROM cc_challenge_assignments
+            WHERE user_id = ${userId} AND cadence = ${cadence}
+              AND period_start = ${start}
+            LIMIT 1
+        `
+        if (existing.length > 0) continue
+
+        const slots = CADENCE_SLOTS[cadence]
+
+        // Get available templates grouped by reward_type
+        const templates = await sql`
+            SELECT id, stat_key, reward_type
+            FROM cc_challenge_templates
+            WHERE cadence = ${cadence} AND is_active = true
+        `
+
+        const byType = { cores: [], pack: [], mixed: [] }
+        for (const t of templates) {
+            if (byType[t.reward_type]) byType[t.reward_type].push(t)
+        }
+
+        // Random selection per reward_type
+        const selected = []
+        for (const [type, count] of Object.entries(slots)) {
+            const pool = byType[type] || []
+            const shuffled = pool.sort(() => Math.random() - 0.5)
+            selected.push(...shuffled.slice(0, count))
+        }
+
+        if (selected.length === 0) continue
+
+        // Batch insert assignments with baseline values
+        const userIds = selected.map(() => userId)
+        const templateIds = selected.map(t => t.id)
+        const cadences = selected.map(() => cadence)
+        const starts = selected.map(() => start)
+        const ends = selected.map(() => end)
+        const baselines = selected.map(t => Number(currentStats[t.stat_key] || 0))
+
+        await sql`
+            INSERT INTO cc_challenge_assignments
+                (user_id, template_id, cadence, period_start, period_end, baseline_value)
+            SELECT
+                unnest(${userIds}::int[]),
+                unnest(${templateIds}::int[]),
+                unnest(${cadences}::text[]),
+                unnest(${starts}::timestamptz[]),
+                unnest(${ends}::timestamptz[]),
+                unnest(${baselines}::int[])
+            ON CONFLICT (user_id, template_id, period_start) DO NOTHING
+        `
+    }
+}
+
+export async function getRotatingChallenges(sql, userId) {
+    const now = new Date()
+
+    const rows = await sql`
+        SELECT a.id as assignment_id, a.cadence, a.period_end,
+               a.baseline_value, a.current_value, a.completed, a.claimed,
+               t.title, t.description, t.reward_type, t.reward_cores,
+               t.reward_packs, t.stat_key, t.target_value
+        FROM cc_challenge_assignments a
+        JOIN cc_challenge_templates t ON t.id = a.template_id
+        WHERE a.user_id = ${userId}
+          AND a.period_end > ${new Date(now.getTime() - GRACE_MS)}
+          AND a.period_start <= ${now}
+        ORDER BY a.cadence, a.id
+    `
+
+    const result = {}
+    for (const cadence of CADENCES) {
+        const { end } = getPeriod(cadence, now)
+        const challenges = rows
+            .filter(r => r.cadence === cadence)
+            .map(r => ({
+                assignmentId: r.assignment_id,
+                title: r.title,
+                description: r.description,
+                rewardType: r.reward_type,
+                rewardCores: r.reward_cores,
+                rewardPacks: r.reward_packs,
+                statKey: r.stat_key,
+                targetValue: r.target_value,
+                currentValue: r.current_value,
+                completed: r.completed,
+                claimed: r.claimed,
+                progress: Math.min(r.current_value / r.target_value, 1),
+                expired: new Date(r.period_end) <= now,
+            }))
+        result[cadence] = { challenges, resetsAt: end.toISOString() }
+    }
+
+    return result
+}
+
+export async function updateRotatingProgress(sql, userId, currentStats) {
+    const statKeys = Object.keys(currentStats)
+    if (statKeys.length === 0) return []
+
+    const now = new Date()
+
+    // Get active, unclaimed assignments matching incoming stat keys
+    const assignments = await sql`
+        SELECT a.id, a.baseline_value, a.current_value, a.completed,
+               t.stat_key, t.target_value, t.title
+        FROM cc_challenge_assignments a
+        JOIN cc_challenge_templates t ON t.id = a.template_id
+        WHERE a.user_id = ${userId}
+          AND a.period_end > ${now}
+          AND a.claimed = false
+          AND t.stat_key = ANY(${statKeys})
+    `
+
+    if (assignments.length === 0) return []
+
+    const newlyClaimable = []
+    const updateIds = []
+    const updateValues = []
+    const completeIds = []
+
+    for (const a of assignments) {
+        const currentStat = Number(currentStats[a.stat_key] || 0)
+        const delta = Math.max(0, currentStat - a.baseline_value)
+
+        if (delta !== a.current_value) {
+            updateIds.push(a.id)
+            updateValues.push(delta)
+        }
+
+        if (delta >= a.target_value && !a.completed) {
+            completeIds.push(a.id)
+            newlyClaimable.push({
+                id: a.id,
+                title: a.title,
+                category: 'vault',
+                isRotating: true,
+            })
+        }
+    }
+
+    // Batch update current_value
+    if (updateIds.length > 0) {
+        await sql`
+            UPDATE cc_challenge_assignments
+            SET current_value = data.val
+            FROM (SELECT unnest(${updateIds}::int[]) AS id, unnest(${updateValues}::int[]) AS val) data
+            WHERE cc_challenge_assignments.id = data.id
+        `
+    }
+
+    // Batch mark completed
+    if (completeIds.length > 0) {
+        await sql`
+            UPDATE cc_challenge_assignments
+            SET completed = true
+            WHERE id = ANY(${completeIds})
+        `
+    }
+
+    return newlyClaimable
+}
+
+export async function claimRotatingChallenge(userId, assignmentId) {
+    const now = new Date()
+
+    return await transaction(async (sql) => {
+        // Lock and validate the assignment
+        const [assignment] = await sql`
+            SELECT a.id, a.completed, a.claimed, a.period_end,
+                   t.title, t.reward_type, t.reward_cores, t.reward_packs
+            FROM cc_challenge_assignments a
+            JOIN cc_challenge_templates t ON t.id = a.template_id
+            WHERE a.id = ${assignmentId} AND a.user_id = ${userId}
+            FOR UPDATE
+        `
+
+        if (!assignment) throw new Error('Assignment not found')
+        if (!assignment.completed) throw new Error('Challenge not yet complete')
+        if (assignment.claimed) throw new Error('Already claimed')
+
+        // Check expiry with grace period
+        const expiry = new Date(new Date(assignment.period_end).getTime() + GRACE_MS)
+        if (now > expiry) throw new Error('Challenge expired')
+
+        // Mark claimed
+        await sql`
+            UPDATE cc_challenge_assignments SET claimed = true
+            WHERE id = ${assignmentId}
+        `
+
+        let coresEarned = 0
+        let packsEarned = 0
+
+        // Grant Cores
+        if ((assignment.reward_type === 'cores' || assignment.reward_type === 'mixed') && assignment.reward_cores > 0) {
+            await grantEmber(sql, userId, 'rotating_challenge', assignment.reward_cores,
+                `Rotating: ${assignment.title}`, String(assignmentId))
+            coresEarned = assignment.reward_cores
+        }
+
+        // Grant packs
+        if ((assignment.reward_type === 'pack' || assignment.reward_type === 'mixed') && assignment.reward_packs > 0) {
+            await sql`
+                INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
+                SELECT ${userId}, 'challenge-pack', 'challenge'
+                FROM generate_series(1, ${assignment.reward_packs})
+            `
+            packsEarned = assignment.reward_packs
+        }
+
+        // Get updated ember balance
+        const [balanceRow] = await sql`
+            SELECT balance FROM ember_balances WHERE user_id = ${userId}
+        `
+
+        return {
+            success: true,
+            coresEarned,
+            packsEarned,
+            emberBalance: balanceRow?.balance || 0,
+        }
+    })
+}
