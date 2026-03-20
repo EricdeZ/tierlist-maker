@@ -72,7 +72,7 @@ export async function rollAssignments(sql, userId, currentStats) {
         const selected = []
         for (const [type, count] of Object.entries(slots)) {
             const pool = byType[type] || []
-            const shuffled = pool.sort(() => Math.random() - 0.5)
+            const shuffled = [...pool].sort(() => Math.random() - 0.5)
             selected.push(...shuffled.slice(0, count))
         }
 
@@ -135,7 +135,7 @@ export async function getRotatingChallenges(sql, userId) {
                 completed: r.completed,
                 claimed: r.claimed,
                 progress: Math.min(r.current_value / r.target_value, 1),
-                expired: new Date(r.period_end) <= now,
+                expired: new Date(r.period_end).getTime() + GRACE_MS <= now.getTime(),
             }))
         result[cadence] = { challenges, resetsAt: end.toISOString() }
     }

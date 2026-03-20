@@ -473,6 +473,21 @@ const tools = [
         btnClass: 'bg-orange-600 hover:bg-orange-700',
     },
     {
+        title: 'Pack Rotation',
+        description: 'Schedule which packs appear in the Special Rotation shop section. Assign packs to specific dates with daily rotation at midnight UTC.',
+        path: '/admin/rotation',
+        permission: 'permission_manage',
+        icon: (
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+            </svg>
+        ),
+        accent: 'from-cyan-500/20 to-cyan-600/5',
+        border: 'border-cyan-500/20 hover:border-cyan-500/40',
+        iconColor: 'text-cyan-400',
+        btnClass: 'bg-cyan-600 hover:bg-cyan-700',
+    },
+    {
         title: 'Redeem Codes',
         description: 'Create and manage pack redeem codes. Generate single-use or per-person codes that grant specific packs when redeemed by players.',
         path: '/admin/redeem-codes',

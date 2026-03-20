@@ -88,6 +88,7 @@ import CardPreview from "./pages/admin/CardPreview.jsx";
 import VaultAdmin from "./pages/admin/VaultAdmin.jsx";
 import VendingRestock from "./pages/admin/VendingRestock.jsx";
 import PackCreator from "./pages/admin/PackCreator.jsx";
+import RotationManager from "./pages/admin/RotationManager.jsx";
 import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
 import TournamentManager from "./pages/admin/TournamentManager.jsx";
 import Features from "./pages/Features.jsx";
@@ -190,6 +191,7 @@ function App() {
                                 <Route path="vault" element={<ProtectedRoute requiredPermission="cardclash_manage"><VaultAdmin /></ProtectedRoute>} />
                                 <Route path="vending-restock" element={<ProtectedRoute requiredPermission="permission_manage"><VendingRestock /></ProtectedRoute>} />
                                 <Route path="pack-creator" element={<ProtectedRoute requiredPermission="permission_manage"><PackCreator /></ProtectedRoute>} />
+                                <Route path="rotation" element={<ProtectedRoute requiredPermission="permission_manage"><RotationManager /></ProtectedRoute>} />
                                 <Route path="redeem-codes" element={<ProtectedRoute requiredPermission="permission_manage"><RedeemCodes /></ProtectedRoute>} />
                                 <Route path="gods" element={<ProtectedRoute requiredPermission="league_manage"><GodManager /></ProtectedRoute>} />
                                 <Route path="settings" element={<StaffSettings />} />

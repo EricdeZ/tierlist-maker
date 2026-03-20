@@ -1286,6 +1286,18 @@ export const packCreatorService = {
     },
 }
 
+export const rotationService = {
+    async load() {
+        return apiCall('rotation-manage', { action: 'load' })
+    },
+    async setDate(date, packTypeIds) {
+        return apiPost('rotation-manage', { action: 'set-date' }, { date, packTypeIds })
+    },
+    async removeDate(date) {
+        return apiPost('rotation-manage', { action: 'remove-date' }, { date })
+    },
+}
+
 export const vendingRestockService = {
     async load() {
         return apiCall('vending-restock', { action: 'load' })

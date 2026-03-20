@@ -48,6 +48,7 @@ export function VaultProvider({ children }) {
   }, [])
   const [lockedCardIds, setLockedCardIds] = useState([])
   const [lockedPackIds, setLockedPackIds] = useState([])
+  const [rotationPacks, setRotationPacks] = useState([])
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
   const passionCtxRef = useRef(passionCtx)
@@ -86,6 +87,7 @@ export function VaultProvider({ children }) {
       setInventory(ccData.inventory || [])
       setLockedCardIds(ccData.lockedCardIds || [])
       setLockedPackIds(ccData.lockedPackIds || [])
+      setRotationPacks(ccData.rotationPacks || [])
       if (ccData.vendingCooldown > 0) {
         setVendingCooldownEnd(Date.now() + ccData.vendingCooldown * 1000)
       }
@@ -131,6 +133,15 @@ export function VaultProvider({ children }) {
       setCollection(ccData.collection || [])
     } catch (err) {
       console.error('Failed to refresh collection:', err)
+    }
+  }, [])
+
+  const refreshInventory = useCallback(async () => {
+    try {
+      const ccData = await vaultService.load()
+      setInventory(ccData.inventory || [])
+    } catch (err) {
+      console.error('Failed to refresh inventory:', err)
     }
   }, [])
 
@@ -444,9 +455,10 @@ export function VaultProvider({ children }) {
     pendingTradeCount, setPendingTradeCount,
     pendingSignatureCount, setPendingSignatureCount,
     pendingApprovalCount, setPendingApprovalCount,
-    inventory, openInventoryPack,
+    inventory, openInventoryPack, refreshInventory,
     vendingCooldownEnd, setVendingCooldownEnd,
     lockedCardIds, lockedPackIds,
+    rotationPacks,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
@@ -454,8 +466,8 @@ export function VaultProvider({ children }) {
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
-    pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack,
-    vendingCooldownEnd, lockedCardIds, lockedPackIds,
+    pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
+    vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks,
   ])
 
   return (

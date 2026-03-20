@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { challengeService } from '../../services/database'
 import { usePassion } from '../../context/PassionContext'
 import { useAuth } from '../../context/AuthContext'
+import { useVault } from './VaultContext'
 import { getTierColor } from '../../config/challengeTiers'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
@@ -28,6 +29,7 @@ function getCategoryForStatKey(statKey) {
 export default function CCChallenges() {
   const { user } = useAuth()
   const { updateFromClaim, challengeNotifications, updateEmber } = usePassion()
+  const { refreshInventory } = useVault()
   const [challengeData, setChallengeData] = useState({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -35,7 +37,7 @@ export default function CCChallenges() {
   const [justClaimed, setJustClaimed] = useState({})
   const [activeCategory, setActiveCategory] = useState('all')
   const [rotatingData, setRotatingData] = useState(null)
-  const [rotatingLoading, setRotatingLoading] = useState(true)
+
   const [rotatingClaimingId, setRotatingClaimingId] = useState(null)
   const [rotatingJustClaimed, setRotatingJustClaimed] = useState({})
 
@@ -47,14 +49,10 @@ export default function CCChallenges() {
   }, [])
 
   const loadRotating = useCallback(() => {
-    if (!user) {
-      setRotatingLoading(false)
-      return Promise.resolve()
-    }
+    if (!user) return Promise.resolve()
     return challengeService.getRotating()
       .then(data => setRotatingData(data))
       .catch(err => console.error('Failed to load rotating challenges:', err))
-      .finally(() => setRotatingLoading(false))
   }, [user])
 
   useEffect(() => { loadChallenges(); loadRotating() }, [loadChallenges, loadRotating])
@@ -141,6 +139,7 @@ export default function CCChallenges() {
           ...prev,
           [assignmentId]: { cores: result.coresEarned, packs: result.packsEarned }
         }))
+        if (result.packsEarned > 0) refreshInventory()
         setTimeout(() => {
           const scrollY = window.scrollY
           loadRotating().then(() => {

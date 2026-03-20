@@ -44,36 +44,36 @@ ON CONFLICT (id) DO NOTHING;
 -- Seed daily templates (4 cores, 3 pack, 3 mixed — pool to pick from)
 INSERT INTO cc_challenge_templates (title, description, cadence, reward_type, reward_cores, reward_packs, stat_key, target_value) VALUES
 -- Daily cores
-('Quick Opener', 'Open 2 packs today', 'daily', 'cores', 15, NULL, 'packs_opened', 2),
-('Daily Dismantler', 'Dismantle 5 cards today', 'daily', 'cores', 10, NULL, 'cards_dismantled', 5),
-('Core Collector', 'Claim your daily Cores', 'daily', 'cores', 10, NULL, 'daily_cores_claimed', 1),
-('Converter', 'Convert Passion to Cores twice', 'daily', 'cores', 20, NULL, 'cores_converted', 2),
+('Quick Opener', 'Open 3 packs today', 'daily', 'cores', 20, NULL, 'packs_opened', 3),
+('Daily Dismantler', 'Dismantle 8 cards today', 'daily', 'cores', 15, NULL, 'cards_dismantled', 8),
+('Core Collector', 'Claim your daily Cores', 'daily', 'cores', 15, NULL, 'daily_cores_claimed', 1),
+('Converter', 'Convert Passion to Cores 3 times', 'daily', 'cores', 25, NULL, 'cores_converted', 3),
 -- Daily pack
-('Pack Prize', 'Open 3 packs today', 'daily', 'pack', NULL, 1, 'packs_opened', 3),
-('Trade for Packs', 'Complete a trade today', 'daily', 'pack', NULL, 1, 'trades_completed', 1),
-('Market Seller', 'Sell 2 cards on the marketplace', 'daily', 'pack', NULL, 1, 'marketplace_sold', 2),
+('Pack Prize', 'Open 5 packs today', 'daily', 'pack', NULL, 1, 'packs_opened', 5),
+('Trade for Packs', 'Complete 2 trades today', 'daily', 'pack', NULL, 1, 'trades_completed', 2),
+('Market Seller', 'Sell 3 cards on the marketplace', 'daily', 'pack', NULL, 1, 'marketplace_sold', 3),
 -- Daily mixed
-('Lucky Opener', 'Open 4 packs today', 'daily', 'mixed', 10, 1, 'packs_opened', 4),
-('Generous Trader', 'Send a gift pack', 'daily', 'mixed', 10, 1, 'gifts_sent', 1),
-('Salvage & Earn', 'Dismantle 8 cards today', 'daily', 'mixed', 15, 1, 'cards_dismantled', 8),
+('Lucky Opener', 'Open 6 packs today', 'daily', 'mixed', 15, 1, 'packs_opened', 6),
+('Generous Trader', 'Send 2 gift packs', 'daily', 'mixed', 15, 1, 'gifts_sent', 2),
+('Salvage & Earn', 'Dismantle 12 cards today', 'daily', 'mixed', 20, 1, 'cards_dismantled', 12),
 -- Weekly cores
-('Weekly Opener', 'Open 10 packs this week', 'weekly', 'cores', 40, NULL, 'packs_opened', 10),
-('Marketplace Regular', 'Sell 8 cards this week', 'weekly', 'cores', 35, NULL, 'marketplace_sold', 8),
-('Dismantle Spree', 'Dismantle 25 cards this week', 'weekly', 'cores', 30, NULL, 'cards_dismantled', 25),
-('Core Hoarder', 'Claim daily Cores 5 times', 'weekly', 'cores', 50, NULL, 'daily_cores_claimed', 5),
+('Weekly Opener', 'Open 15 packs this week', 'weekly', 'cores', 55, NULL, 'packs_opened', 15),
+('Marketplace Regular', 'Sell 12 cards this week', 'weekly', 'cores', 50, NULL, 'marketplace_sold', 12),
+('Dismantle Spree', 'Dismantle 35 cards this week', 'weekly', 'cores', 40, NULL, 'cards_dismantled', 35),
+('Core Hoarder', 'Claim daily Cores 6 times', 'weekly', 'cores', 65, NULL, 'daily_cores_claimed', 6),
 -- Weekly pack
-('Trade Master', 'Complete 3 trades this week', 'weekly', 'pack', NULL, 2, 'trades_completed', 3),
-('Gift Giver', 'Send 3 gift packs this week', 'weekly', 'pack', NULL, 2, 'gifts_sent', 3),
+('Trade Master', 'Complete 5 trades this week', 'weekly', 'pack', NULL, 3, 'trades_completed', 5),
+('Gift Giver', 'Send 5 gift packs this week', 'weekly', 'pack', NULL, 3, 'gifts_sent', 5),
 -- Weekly mixed
-('Big Spender', 'Open 15 packs this week', 'weekly', 'mixed', 30, 2, 'packs_opened', 15),
-('Social Butterfly', 'Send 2 gift packs this week', 'weekly', 'mixed', 25, 1, 'gifts_sent', 2),
+('Big Spender', 'Open 20 packs this week', 'weekly', 'mixed', 40, 2, 'packs_opened', 20),
+('Social Butterfly', 'Send 3 gift packs this week', 'weekly', 'mixed', 35, 1, 'gifts_sent', 3),
 -- Monthly cores
-('Monthly Marathon', 'Open 40 packs this month', 'monthly', 'cores', 100, NULL, 'packs_opened', 40),
-('Market Mogul', 'Sell 30 cards this month', 'monthly', 'cores', 80, NULL, 'marketplace_sold', 30),
+('Monthly Marathon', 'Open 55 packs this month', 'monthly', 'cores', 135, NULL, 'packs_opened', 55),
+('Market Mogul', 'Sell 40 cards this month', 'monthly', 'cores', 110, NULL, 'marketplace_sold', 40),
 -- Monthly pack
-('Salvage King', 'Dismantle 80 cards this month', 'monthly', 'pack', NULL, 3, 'cards_dismantled', 80),
-('Bounty Hunter', 'Earn 200 Cores from bounties', 'monthly', 'pack', NULL, 3, 'bounty_cores_earned', 200),
+('Salvage King', 'Dismantle 110 cards this month', 'monthly', 'pack', NULL, 4, 'cards_dismantled', 110),
+('Bounty Hunter', 'Earn 300 Cores from bounties', 'monthly', 'pack', NULL, 4, 'bounty_cores_earned', 300),
 -- Monthly mixed
-('Pack Legend', 'Open 60 packs this month', 'monthly', 'mixed', 75, 3, 'packs_opened', 60),
-('Trading Empire', 'Complete 10 trades this month', 'monthly', 'mixed', 60, 2, 'trades_completed', 10),
-('Core Machine', 'Convert Passion 20 times this month', 'monthly', 'mixed', 50, 2, 'cores_converted', 20);
+('Pack Legend', 'Open 80 packs this month', 'monthly', 'mixed', 100, 4, 'packs_opened', 80),
+('Trading Empire', 'Complete 15 trades this month', 'monthly', 'mixed', 80, 3, 'trades_completed', 15),
+('Core Machine', 'Convert Passion 30 times this month', 'monthly', 'mixed', 70, 3, 'cores_converted', 30);

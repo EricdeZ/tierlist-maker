@@ -35,6 +35,7 @@ export default function PackArt({
   godImageUrl,
   className = '',
   onClick,
+  color,
 }) {
   const cardRef = useRef(null)
   const imgUrl = godImageUrl || getFeaturedGodUrl(tier, seed)
@@ -62,6 +63,16 @@ export default function PackArt({
 
   const hasBadges = leagueLogo || divisionIcon
 
+  // Build inline color overrides for packs without a CSS data-tier rule
+  const CSS_TIERS = new Set(['standard', 'premium', 'elite', 'legendary', 'mixed', 'osl-mixed', 'bsl-mixed', 'gift'])
+  const colorStyle = {}
+  if (color && !CSS_TIERS.has(tier)) {
+    colorStyle['--pack-accent'] = color
+    colorStyle['--pack-accent-light'] = `color-mix(in srgb, ${color} 70%, white)`
+    colorStyle['--pack-accent-dark'] = `color-mix(in srgb, ${color} 60%, black)`
+  }
+  if (onClick) colorStyle.cursor = 'pointer'
+
   return (
     <div className="pack-art-wrap">
       <div
@@ -71,7 +82,7 @@ export default function PackArt({
         onClick={onClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        style={onClick ? { cursor: 'pointer' } : undefined}
+        style={Object.keys(colorStyle).length ? colorStyle : undefined}
       >
         {/* Crimped / serrated seal edges */}
         <div className="pack-art__crimp-top" />

@@ -246,7 +246,8 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
 }
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, packTypesMap } = useVault()
+  const packColor = packTypesMap?.[packType]?.color
   const [phase, setPhase] = useState(skipToStack ? 'stack' : skipTear ? 'ripping' : 'enter')
   const [tearProgress, setTearProgress] = useState(0)
   const [tearSide, setTearSide] = useState(null)
@@ -581,13 +582,13 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
         <>
           <div className="pack-opening__pack-area">
             <div className="pack-opening__pack-inner" ref={packRef}>
-              <PackArt tier={packType} name={result.packName} cardCount={cards.length} />
+              <PackArt tier={packType} name={result.packName} cardCount={cards.length} color={packColor} />
             </div>
 
             {(phase === 'ripping' || phase === 'emerging') && (
               <>
                 <div className="pack-opening__torn-top">
-                  <PackArt tier={packType} name={result.packName} cardCount={cards.length} />
+                  <PackArt tier={packType} name={result.packName} cardCount={cards.length} color={packColor} />
                 </div>
                 <div className="pack-opening__rarity-glow" style={{ '--rc': rarestColor }} />
                 <div className="pack-opening__shine" style={{ '--rc': rarestColor }} />

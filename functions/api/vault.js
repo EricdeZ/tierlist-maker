@@ -20,10 +20,11 @@ async function tagNewCards(sql, userId, formattedCards) {
   const [countRow] = await sql`SELECT COUNT(DISTINCT god_id)::int AS cnt FROM cc_cards WHERE owner_id = ${userId}`
   if (countRow.cnt < NEW_CARD_THRESHOLD) return
   // Check which of the new cards' god_ids the user already owned (excluding cards from this pack)
+  const excludeIds = formattedCards.map(c => c.id)
   const existing = await sql`
     SELECT DISTINCT god_id FROM cc_cards
     WHERE owner_id = ${userId} AND god_id = ANY(${newGodIds})
-    AND id NOT IN (${sql(formattedCards.map(c => c.id))})
+    AND id != ALL(${excludeIds})
   `
   const existingSet = new Set(existing.map(r => r.god_id))
   for (const card of formattedCards) {
@@ -157,7 +158,7 @@ async function handleLoad(sql, user) {
   await ensureEmberBalance(sql, user.id)
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, marketLockedPacks, tradeLockedPacks, pendingSignatureCount, pendingApprovalCount] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, marketLockedPacks, tradeLockedPacks, pendingSignatureCount, pendingApprovalCount, rotationPacks] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -227,6 +228,10 @@ async function handleLoad(sql, user) {
       ? sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests WHERE signer_player_id = ${user.linked_player_id} AND status = 'pending'`
       : Promise.resolve([{ count: 0 }]),
     sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests sr JOIN cc_cards c ON sr.card_id = c.id WHERE c.owner_id = ${user.id} AND sr.status = 'awaiting_approval'`,
+    sql`
+      SELECT pack_type_id FROM cc_pack_rotation_schedule
+      WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
+    `,
   ])
 
   // Build template cache for collection cards
@@ -268,7 +273,9 @@ async function handleLoad(sql, user) {
         leagueName: p.league_name,
         color: p.resolved_color,
         sortOrder: p.sort_order,
+        rotationOnly: p.rotation_only || false,
       })),
+      rotationPacks: rotationPacks.map(r => r.pack_type_id),
       salePacks: salePacks.map(s => ({
         id: s.id,
         packTypeId: s.pack_type_id,
@@ -375,6 +382,16 @@ async function handleBuyPacksToInventory(sql, user, body) {
   const [pack] = await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
   if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found' }) }
 
+  // Rotation-only packs can only be purchased when in the current rotation
+  if (pack.rotation_only) {
+    const [inRotation] = await sql`
+      SELECT 1 FROM cc_pack_rotation_schedule
+      WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
+        AND pack_type_id = ${packType}
+    `
+    if (!inRotation) return { statusCode: 400, headers, body: JSON.stringify({ error: 'This pack is not currently in rotation' }) }
+  }
+
   const totalCost = pack.cost * qty
 
   try {
@@ -416,6 +433,17 @@ async function handleOpenPack(sql, user, body) {
   // Sale purchase — atomic stock decrement + payment in transaction
   if (saleId) {
     return await handleSalePurchase(sql, user, saleId)
+  }
+
+  // Rotation-only packs can only be purchased when in the current rotation
+  const [rotCheck] = await sql`SELECT rotation_only FROM cc_pack_types WHERE id = ${packType}`
+  if (rotCheck?.rotation_only) {
+    const [inRotation] = await sql`
+      SELECT 1 FROM cc_pack_rotation_schedule
+      WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
+        AND pack_type_id = ${packType}
+    `
+    if (!inRotation) return { statusCode: 400, headers, body: JSON.stringify({ error: 'This pack is not currently in rotation' }) }
   }
 
   const result = await openPack(sql, user.id, packType)

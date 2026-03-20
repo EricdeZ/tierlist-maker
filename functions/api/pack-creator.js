@@ -178,6 +178,7 @@ function formatPackType(row) {
     groupConstraints: row.group_constraints || {},
     sortOrder: row.sort_order,
     enabled: row.enabled,
+    rotationOnly: row.rotation_only || false,
     createdAt: row.created_at,
   }
 }

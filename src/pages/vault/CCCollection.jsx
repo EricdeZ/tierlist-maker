@@ -10,10 +10,19 @@ import TradingCard from '../../components/TradingCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock, ArrowUpDown } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const BATCH_SIZE = 50
+
+const SORT_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'alpha-asc', label: 'A → Z' },
+  { value: 'alpha-desc', label: 'Z → A' },
+  { value: 'rarity-desc', label: 'Rarity (Highest)' },
+  { value: 'rarity-asc', label: 'Rarity (Lowest)' },
+  { value: 'duplicates', label: 'Most Duplicates' },
+]
 
 // Only types acquirable in packs
 const COLLECTION_TYPES = ['god', 'item', 'consumable']
@@ -83,6 +92,7 @@ export default function CCCollection() {
   const [viewMode, setViewMode] = useState('all') // 'all' | 'owned'
   const [rarityFilter, setRarityFilter] = useState(null)
   const [displayLimit, setDisplayLimit] = useState(BATCH_SIZE)
+  const [sortMode, setSortMode] = useState('default')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -157,7 +167,7 @@ export default function CCCollection() {
   // Reset display limit when switching sections or filters
   useEffect(() => {
     setDisplayLimit(BATCH_SIZE)
-  }, [activeSection, viewMode, rarityFilter])
+  }, [activeSection, viewMode, rarityFilter, sortMode])
 
   // Debounced player card search
   useEffect(() => {
@@ -300,8 +310,28 @@ export default function CCCollection() {
     }
     if (viewMode === 'owned') entries = entries.filter(e => e.collected)
     if (rarityFilter) entries = entries.filter(e => e.ownedRarities?.includes(rarityFilter))
+
+    if (sortMode !== 'default') {
+      entries = [...entries]
+      const getName = e => (e.name || e.playerName || '').toLowerCase()
+      const getHighestRarityIndex = e => {
+        if (!e.ownedRarities?.length) return -1
+        return Math.max(...e.ownedRarities.map(r => RARITY_ORDER.indexOf(r)))
+      }
+      entries.sort((a, b) => {
+        switch (sortMode) {
+          case 'alpha-asc': return getName(a).localeCompare(getName(b))
+          case 'alpha-desc': return getName(b).localeCompare(getName(a))
+          case 'rarity-desc': return getHighestRarityIndex(b) - getHighestRarityIndex(a)
+          case 'rarity-asc': return getHighestRarityIndex(a) - getHighestRarityIndex(b)
+          case 'duplicates': return (b.ownedRarities?.length || 0) - (a.ownedRarities?.length || 0)
+          default: return 0
+        }
+      })
+    }
+
     return entries
-  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter])
+  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode])
 
   const hasMore = displayLimit < filteredEntries.length
   const remaining = filteredEntries.length - displayLimit
@@ -567,7 +597,10 @@ export default function CCCollection() {
             </div>
           ) : (
           <>
-          <RarityFilterBar rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
+          <div className="flex items-center gap-3 mb-4">
+            <RarityFilterBar rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
+            <SortDropdown sortMode={sortMode} setSortMode={setSortMode} />
+          </div>
 
           {COLLECTION_TYPES.includes(activeSection) && (
             <GameCardGrid
@@ -701,9 +734,27 @@ function RarityPips({ ownedRarities }) {
   )
 }
 
+function SortDropdown({ sortMode, setSortMode }) {
+  return (
+    <div className="relative shrink-0 ml-auto">
+      <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--cd-text-dim)] pointer-events-none" />
+      <select
+        value={sortMode}
+        onChange={e => setSortMode(e.target.value)}
+        className="appearance-none pl-7 pr-6 py-1 rounded-full text-[11px] font-bold bg-white/[0.03] text-[var(--cd-text-mid)] border border-transparent hover:bg-white/[0.06] cursor-pointer cd-head focus:outline-none focus:border-[var(--cd-cyan)]/40"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+      >
+        {SORT_OPTIONS.map(o => (
+          <option key={o.value} value={o.value} className="bg-[#1a1a2e] text-white">{o.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function RarityFilterBar({ rarityFilter, setRarityFilter }) {
   return (
-    <div className="flex flex-wrap gap-1.5 mb-4">
+    <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
       <button
         onClick={() => setRarityFilter(null)}
         className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer cd-head ${

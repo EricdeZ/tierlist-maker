@@ -244,6 +244,7 @@ function MyPacks() {
                       subtitle={pack.leagueName || ''}
                       cardCount={pack.cards}
                       seed={pack.sortOrder ?? 5}
+                      color={pack.color}
                       compact
                     />
                   </div>
@@ -296,6 +297,7 @@ function MyPacks() {
                       name={pack?.name || 'Gift Pack'}
                       subtitle="Gift"
                       cardCount={pack?.cards || 5}
+                      color={pack?.color}
                       seed={i + 10}
                       compact
                     />
@@ -546,7 +548,7 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
                     background: `radial-gradient(ellipse at ${50 + tilt.x * 3}% ${40 + tilt.y * 3}%, rgba(255,255,255,0.15) 0%, transparent 55%)`,
                   }}
                 />
-                <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} />
+                <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} color={pack.color} />
               </div>
 
               {/* Pack info — slim frosted glass overlay */}
@@ -680,6 +682,7 @@ function RotationSection({ packs, packTypesMap, emberBalance, onBuy, loading, qu
                   subtitle={pack.leagueName || ''}
                   cardCount={pack.cards}
                   seed={pack.sortOrder ?? 0}
+                  color={pack.color}
                   compact
                 />
               </div>
@@ -888,7 +891,7 @@ function PackShop() {
                   />
                   <div className={`transition-all duration-500 ease-out ${!canAfford && !isSelected ? 'opacity-40' : ''} ${!focusedPack ? 'group-hover:scale-110' : ''}`}
                   >
-                    <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} />
+                    <PackArt tier={key} name={pack.name} subtitle={pack.leagueName || ''} cardCount={pack.cards} seed={pack.sortOrder ?? 0} color={pack.color} />
                   </div>
                 </div>
                 {/* Label */}
