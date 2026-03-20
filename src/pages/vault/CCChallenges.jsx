@@ -27,13 +27,17 @@ function getCategoryForStatKey(statKey) {
 
 export default function CCChallenges() {
   const { user } = useAuth()
-  const { updateFromClaim, challengeNotifications } = usePassion()
+  const { updateFromClaim, challengeNotifications, updateEmber } = usePassion()
   const [challengeData, setChallengeData] = useState({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [claimingId, setClaimingId] = useState(null)
   const [justClaimed, setJustClaimed] = useState({})
   const [activeCategory, setActiveCategory] = useState('all')
+  const [rotatingData, setRotatingData] = useState(null)
+  const [rotatingLoading, setRotatingLoading] = useState(true)
+  const [rotatingClaimingId, setRotatingClaimingId] = useState(null)
+  const [rotatingJustClaimed, setRotatingJustClaimed] = useState({})
 
   const loadChallenges = useCallback(() => {
     return challengeService.getAll()
@@ -42,24 +46,35 @@ export default function CCChallenges() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { loadChallenges() }, [loadChallenges])
+  const loadRotating = useCallback(() => {
+    if (!user) {
+      setRotatingLoading(false)
+      return Promise.resolve()
+    }
+    return challengeService.getRotating()
+      .then(data => setRotatingData(data))
+      .catch(err => console.error('Failed to load rotating challenges:', err))
+      .finally(() => setRotatingLoading(false))
+  }, [user])
+
+  useEffect(() => { loadChallenges(); loadRotating() }, [loadChallenges, loadRotating])
 
   // Poll every 60s while visible
   useEffect(() => {
     const id = setInterval(() => {
-      if (document.visibilityState === 'visible') loadChallenges()
+      if (document.visibilityState === 'visible') { loadChallenges(); loadRotating() }
     }, 60_000)
     return () => clearInterval(id)
-  }, [loadChallenges])
+  }, [loadChallenges, loadRotating])
 
   const handleRefresh = () => {
     setRefreshing(true)
-    loadChallenges().finally(() => setRefreshing(false))
+    Promise.all([loadChallenges(), loadRotating()]).finally(() => setRefreshing(false))
   }
 
   useEffect(() => {
-    if (challengeNotifications.length > 0) loadChallenges()
-  }, [challengeNotifications.length, loadChallenges])
+    if (challengeNotifications.length > 0) { loadChallenges(); loadRotating() }
+  }, [challengeNotifications.length, loadChallenges, loadRotating])
 
   // Filter to vault category only, sorted by progress
   const vaultChallenges = useMemo(() => {
@@ -113,6 +128,33 @@ export default function CCChallenges() {
     }
   }
 
+  const handleClaimRotating = async (assignmentId, buttonEl) => {
+    setRotatingClaimingId(assignmentId)
+    try {
+      const result = await challengeService.claimRotating(assignmentId)
+      if (result.success) {
+        spawnFlyingEmber(buttonEl)
+        if (result.coresEarned > 0) {
+          setTimeout(() => updateEmber({ balance: result.emberBalance }), 700)
+        }
+        setRotatingJustClaimed(prev => ({
+          ...prev,
+          [assignmentId]: { cores: result.coresEarned, packs: result.packsEarned }
+        }))
+        setTimeout(() => {
+          const scrollY = window.scrollY
+          loadRotating().then(() => {
+            requestAnimationFrame(() => window.scrollTo(0, scrollY))
+          })
+        }, 900)
+      }
+    } catch (err) {
+      console.error('Failed to claim rotating challenge:', err)
+    } finally {
+      setRotatingClaimingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -133,6 +175,15 @@ export default function CCChallenges() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {user && (
+        <RotatingSection
+          data={rotatingData}
+          claimingId={rotatingClaimingId}
+          justClaimed={rotatingJustClaimed}
+          onClaim={handleClaimRotating}
+          isLoggedIn={!!user}
+        />
+      )}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="cd-head text-lg font-bold text-[var(--cd-cyan)] cd-text-glow tracking-wider">Core Challenges</h2>
@@ -372,4 +423,260 @@ function spawnFlyingEmber(sourceEl) {
 
     anim.onfinish = () => dot.remove()
   }
+}
+
+
+function useCountdown(targetIso) {
+  const [timeLeft, setTimeLeft] = useState('')
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(targetIso) - Date.now()
+      if (diff <= 0) { setTimeLeft('Resetting...'); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      if (h >= 24) {
+        const d = Math.floor(h / 24)
+        setTimeLeft(`${d}d ${h % 24}h`)
+      } else {
+        setTimeLeft(`${h}h ${m}m`)
+      }
+    }
+    update()
+    const id = setInterval(update, 60000)
+    return () => clearInterval(id)
+  }, [targetIso])
+  return timeLeft
+}
+
+
+function RotatingSection({ data, claimingId, justClaimed, onClaim, isLoggedIn }) {
+  const [activeTab, setActiveTab] = useState('daily')
+  if (!data) return null
+
+  const tabs = [
+    { key: 'daily', label: 'Daily' },
+    { key: 'weekly', label: 'Weekly' },
+    { key: 'monthly', label: 'Monthly' },
+  ]
+
+  const current = data[activeTab]
+  if (!current) return null
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="cd-head text-lg font-bold text-[var(--cd-gold)] tracking-wider">
+          Rotating Challenges
+        </h2>
+      </div>
+
+      {/* Cadence tabs */}
+      <div className="flex gap-1.5 mb-4">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.key
+          const tabData = data[tab.key]
+          const claimableCount = tabData?.challenges?.filter(c => c.completed && !c.claimed && !c.expired).length || 0
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`
+                px-3 py-1.5 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer
+                ${isActive
+                  ? 'bg-[var(--cd-gold)]/20 text-[var(--cd-gold)] border border-[var(--cd-gold)]/40'
+                  : 'bg-white/[0.04] text-white/40 border border-white/[0.06] hover:text-white/60 hover:bg-white/[0.06]'
+                }
+              `}
+            >
+              {tab.label}
+              {claimableCount > 0 && (
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${isActive ? 'bg-[var(--cd-gold)]/30' : 'bg-white/10'}`}>
+                  {claimableCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Timer */}
+      <RotatingTimer resetsAt={current.resetsAt} />
+
+      {/* Challenge cards */}
+      {current.challenges.length === 0 ? (
+        <div className="text-center py-8 text-white/30 cd-head tracking-wider text-sm">
+          No rotating challenges available yet.
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {current.challenges.map((ch, i) => (
+            <RotatingChallengeCard
+              key={ch.assignmentId}
+              challenge={ch}
+              index={i}
+              claimingId={claimingId}
+              justClaimed={justClaimed[ch.assignmentId]}
+              onClaim={onClaim}
+              isLoggedIn={isLoggedIn}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function RotatingTimer({ resetsAt }) {
+  const timeLeft = useCountdown(resetsAt)
+  return (
+    <div className="flex items-center gap-1.5 mb-3 text-[11px] text-white/40">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span>Resets in {timeLeft}</span>
+    </div>
+  )
+}
+
+
+function RotatingChallengeCard({ challenge: ch, index, claimingId, justClaimed, onClaim, isLoggedIn }) {
+  const pct = Math.round(ch.progress * 100)
+  const isClaiming = claimingId === ch.assignmentId
+  const isClaimable = isLoggedIn && ch.completed && !ch.claimed && !ch.expired && !justClaimed
+
+  // Color based on reward type
+  const accentColor = ch.rewardType === 'cores' ? 'var(--cd-cyan)'
+    : ch.rewardType === 'pack' ? 'var(--cd-gold)'
+    : '#a78bfa' // purple for mixed
+
+  return (
+    <div
+      className={`
+        relative cd-panel cd-corners rounded-xl overflow-hidden transition-all duration-300
+        ${ch.claimed ? 'opacity-50' : ''}
+        ${ch.expired && !ch.claimed ? 'opacity-40' : ''}
+      `}
+      style={{
+        borderLeftWidth: '3px',
+        borderLeftColor: accentColor,
+        animation: `vault-card-enter 0.4s ease-out ${index * 0.08}s both`,
+        ...(justClaimed ? { animation: 'vault-claim-glow 1.2s ease-out' } : {}),
+      }}
+    >
+      {isClaimable && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 w-1/3"
+            style={{
+              background: `linear-gradient(90deg, transparent, ${accentColor}10, transparent)`,
+              animation: 'vault-shimmer 4s ease-in-out infinite',
+            }}
+          />
+        </div>
+      )}
+
+      <div className="relative p-4">
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm cd-head text-[var(--cd-text)] leading-tight">{ch.title}</h3>
+            <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{ch.description}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
+            <RotatingRewardDisplay challenge={ch} />
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-3">
+          <div className="flex justify-between items-baseline text-[10px] mb-1">
+            <span className="text-white/40 tabular-nums">
+              {ch.currentValue?.toLocaleString()} / {ch.targetValue?.toLocaleString()}
+            </span>
+            <span className={`font-bold tabular-nums ${pct >= 100 ? 'text-[var(--cd-cyan)]' : 'text-white/40'}`}>
+              {pct}%
+            </span>
+          </div>
+          <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${pct}%`,
+                background: ch.claimed
+                  ? 'rgba(74, 222, 128, 0.5)'
+                  : `linear-gradient(90deg, ${accentColor}99, ${accentColor})`,
+                animation: 'vault-progress-fill 0.8s ease-out',
+              }}
+            />
+          </div>
+        </div>
+
+        {isClaimable && (
+          <button
+            onClick={(e) => onClaim(ch.assignmentId, e.currentTarget)}
+            disabled={isClaiming}
+            className="mt-3 w-full py-2 rounded-lg font-bold text-xs cd-head tracking-wider transition-all disabled:opacity-50 cursor-pointer cd-btn-solid cd-btn-action"
+          >
+            {isClaiming ? 'Claiming...' : 'Claim Reward'}
+          </button>
+        )}
+
+        {justClaimed && (
+          <div className="mt-3 flex items-center justify-center gap-3 py-2 rounded-lg bg-[var(--cd-cyan)]/[0.06] border border-[var(--cd-cyan)]/20">
+            {justClaimed.cores > 0 && (
+              <div className="flex items-center gap-1">
+                <img src={emberIcon} alt="" className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold text-[var(--cd-cyan)]">+{justClaimed.cores}</span>
+              </div>
+            )}
+            {justClaimed.packs > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs">📦</span>
+                <span className="text-xs font-bold text-[var(--cd-gold)]">+{justClaimed.packs} pack{justClaimed.packs > 1 ? 's' : ''}</span>
+              </div>
+            )}
+            <span className="text-xs text-white/50">Claimed!</span>
+          </div>
+        )}
+
+        {ch.claimed && !justClaimed && (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400/60">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span>Claimed</span>
+          </div>
+        )}
+
+        {ch.expired && !ch.claimed && (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-red-400/60">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span>Expired</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+function RotatingRewardDisplay({ challenge: ch }) {
+  return (
+    <>
+      {ch.rewardCores > 0 && (
+        <div className="flex items-center gap-0.5">
+          <span className="text-xs font-bold text-[var(--cd-cyan)] cd-text-glow">+{ch.rewardCores}</span>
+          <img src={emberIcon} alt="" className="w-3.5 h-3.5 cd-icon-glow" />
+        </div>
+      )}
+      {ch.rewardPacks > 0 && (
+        <div className="flex items-center gap-0.5">
+          <span className="text-xs font-bold text-[var(--cd-gold)]">+{ch.rewardPacks}</span>
+          <span className="text-xs">📦</span>
+        </div>
+      )}
+    </>
+  )
 }
