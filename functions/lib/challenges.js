@@ -2,6 +2,7 @@
 // Called from endpoints when underlying stats change.
 
 import { revokePassion } from './passion.js'
+import { updateRotatingProgress } from './rotating-challenges.js'
 
 // Performance stat keys that map to challenges
 export const PERF_KEYS = [
@@ -90,6 +91,14 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
             ON CONFLICT (user_id, challenge_id)
             DO UPDATE SET current_value = EXCLUDED.current_value
         `
+    }
+
+    // Also update rotating challenge progress
+    try {
+        const rotatingClaimable = await updateRotatingProgress(sql, userId, currentStats)
+        newlyClaimable.push(...rotatingClaimable)
+    } catch (err) {
+        console.error('Rotating challenge progress update failed:', err)
     }
 
     return newlyClaimable
