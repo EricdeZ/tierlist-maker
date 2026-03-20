@@ -1113,6 +1113,9 @@ export const vaultService = {
     async requestSignature(cardId) {
         return apiPost('vault', { action: 'request-signature' }, { cardId })
     },
+    async changeHoloType(cardId, holoType) {
+        return apiPost('vault', { action: 'change-holo-type' }, { cardId, holoType })
+    },
     async getPendingSignatures() {
         return apiCall('vault', { action: 'pending-signatures' })
     },

@@ -12,6 +12,25 @@ import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsum
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
+const NEW_CARD_THRESHOLD = 1 // TODO: restore to 400
+
+async function tagNewCards(sql, userId, formattedCards) {
+  if (!formattedCards.length) return
+  const newGodIds = formattedCards.map(c => c.godId)
+  const [countRow] = await sql`SELECT COUNT(DISTINCT god_id)::int AS cnt FROM cc_cards WHERE owner_id = ${userId}`
+  if (countRow.cnt < NEW_CARD_THRESHOLD) return
+  // Check which of the new cards' god_ids the user already owned (excluding cards from this pack)
+  const existing = await sql`
+    SELECT DISTINCT god_id FROM cc_cards
+    WHERE owner_id = ${userId} AND god_id = ANY(${newGodIds})
+    AND id NOT IN (${sql(formattedCards.map(c => c.id))})
+  `
+  const existingSet = new Set(existing.map(r => r.god_id))
+  for (const card of formattedCards) {
+    if (!existingSet.has(card.godId)) card.isNew = true
+  }
+}
+
 async function inlineTemplateData(sql, formattedCards) {
   const collectionCards = formattedCards.filter(c => c.cardType === 'collection' && c.templateId)
   if (collectionCards.length === 0) return
@@ -113,6 +132,7 @@ const handler = async (event) => {
         case 'binder-unslot': return await handleBinderUnslot(sql, user, body)
         case 'binder-generate-share': return await handleBinderGenerateShare(sql, user, event)
         case 'request-signature': return await handleRequestSignature(sql, user, body)
+        case 'change-holo-type': return await handleChangeHoloType(sql, user, body)
         case 'decline-signature': return await handleDeclineSignature(sql, user, body)
         case 'approve-signature': return await handleApproveSignature(sql, user, body)
         case 'reject-signature': return await handleRejectSignature(sql, user, body)
@@ -301,6 +321,7 @@ async function handleOpenInventoryPack(sql, user, body) {
     return formatted
   })
   await inlineTemplateData(sql, cards)
+  await tagNewCards(sql, user.id, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -374,6 +395,7 @@ async function handleOpenPack(sql, user, body) {
     return formatted
   })
   await inlineTemplateData(sql, cards)
+  await tagNewCards(sql, user.id, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -456,6 +478,7 @@ async function handleSalePurchase(sql, user, saleId) {
     return formatted
   })
   await inlineTemplateData(sql, cards)
+  await tagNewCards(sql, user.id, cards)
 
   // Push vault challenge progress (fire-and-forget)
   getVaultStats(sql, user.id)
@@ -1114,17 +1137,16 @@ async function handleOpenGift(sql, user, body) {
     .then(stats => pushChallengeProgress(sql, user.id, stats))
     .catch(err => console.error('Vault challenge push (gift open) failed:', err))
 
+  const cards = newCards.map(c => {
+    const formatted = formatCard(c)
+    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+    return formatted
+  })
+  await tagNewCards(sql, user.id, cards)
+
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({
-      packName,
-      packType: gift.pack_type,
-      cards: newCards.map(c => {
-        const formatted = formatCard(c)
-        if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
-        return formatted
-      }),
-    }),
+    body: JSON.stringify({ packName, packType: gift.pack_type, cards }),
   }
 }
 
@@ -1499,14 +1521,12 @@ function formatS5Response(state, extra = {}) {
   const { csCards = [], asCards = [], csOutput, asOutput, consumableCard } = state
 
   function formatLineup(lineupCards, output) {
-    // Compute team synergy (starters only, excluding role mismatches)
+    // Compute team synergy (bench now included, role mismatches excluded)
     const teamCounts = {}
     for (const card of lineupCards) {
-      if (card.isBench || isRoleMismatch(card)) continue
+      if (isRoleMismatch(card)) continue
       if (card.team_id) teamCounts[card.team_id] = (teamCounts[card.team_id] || 0) + 1
     }
-    const maxTeamCount = Math.max(...Object.values(teamCounts), 0)
-    const teamSynergyBonus = TEAM_SYNERGY_BONUS[maxTeamCount] || 0
 
     const slots = {}
     for (const card of lineupCards) {
@@ -1515,6 +1535,11 @@ function formatS5Response(state, extra = {}) {
       const godBonusInfo = getAttachmentBonusInfo(card._godCard, 'god', card.holo_type, synergy)
       const itemBonusInfo = getAttachmentBonusInfo(card._itemCard, 'item', card.holo_type)
       const roleMismatch = isRoleMismatch(card)
+
+      // Per-card team bonus — only for cards whose team has 2+ members
+      const cardTeamBonus = (!roleMismatch && card.team_id)
+        ? (TEAM_SYNERGY_BONUS[teamCounts[card.team_id]] || 0)
+        : 0
 
       slots[card.slot_role] = {
         card: formatCard(card),
@@ -1525,7 +1550,7 @@ function formatS5Response(state, extra = {}) {
         itemBonus: itemBonusInfo,
         synergy,
         isBench: card.isBench || false,
-        teamSynergyBonus: card.isBench ? 0 : teamSynergyBonus,
+        teamSynergyBonus: cardTeamBonus,
         roleMismatch,
       }
     }
@@ -2244,6 +2269,26 @@ async function handleBinderGenerateShare(sql, user, event) {
   `
 
   return { statusCode: 200, headers, body: JSON.stringify({ shareToken: token }) }
+}
+
+// ═══ Unique Cards: Holo Type ═══
+
+async function handleChangeHoloType(sql, user, body) {
+  const { cardId, holoType } = body
+  if (!cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+  const validTypes = ['holo', 'reverse', 'full']
+  if (!validTypes.includes(holoType)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'holoType must be holo, reverse, or full' }) }
+
+  const [card] = await sql`
+    SELECT id, owner_id, rarity, holo_type FROM cc_cards WHERE id = ${cardId}
+  `
+  if (!card) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Card not found' }) }
+  if (card.owner_id !== user.id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'You do not own this card' }) }
+  if (card.rarity !== 'unique') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only unique cards can change holo type' }) }
+
+  await sql`UPDATE cc_cards SET holo_type = ${holoType} WHERE id = ${cardId}`
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true, holoType }) }
 }
 
 // ═══ Formatters ═══
