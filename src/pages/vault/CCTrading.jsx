@@ -904,7 +904,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
                   <div className="flex gap-2 overflow-x-auto pb-1 cd-scrollbar-hide">
                     {myPacks.map(tp => (
                       <div key={tp.id} className="relative shrink-0" style={{ width: 80 }}>
-                        <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                        <PackArt tier={tp.pack.packTypeId} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
                         {!trade.myReady && !actionLoading && (
                           <button
                             onClick={() => handleRemovePack(tp.packInventoryId)}
@@ -932,7 +932,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
                   <div className="flex gap-2 overflow-x-auto pb-1 cd-scrollbar-hide">
                     {theirPacks.map(tp => (
                       <div key={tp.id} className="shrink-0" style={{ width: 80 }}>
-                        <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                        <PackArt tier={tp.pack.packTypeId} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
                       </div>
                     ))}
                   </div>
@@ -1348,7 +1348,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
                     className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded p-1.5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default hover:border-[var(--cd-cyan)]/30 group"
                     style={{ width: 110 }}
                   >
-                    <PackArt tier={pack.category || pack.packType?.category || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
+                    <PackArt tier={pack.packTypeId || pack.packType?.packTypeId || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
                     <div className="text-[8px] font-bold text-white truncate mt-0.5 px-0.5 group-hover:text-[var(--cd-cyan)] transition-colors">{pack.name || pack.packType?.name || 'Pack'}</div>
                   </button>
                 ))}
@@ -1657,7 +1657,7 @@ function PackPickerSheet({ packs, onAdd, onClose, disabled }) {
                 className="bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded p-1.5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-default active:border-[var(--cd-cyan)]/30 active:bg-[var(--cd-cyan)]/5"
                 style={{ width: 100 }}
               >
-                <PackArt tier={pack.category || pack.packType?.category || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
+                <PackArt tier={pack.packTypeId || pack.packType?.packTypeId || 'standard'} name={pack.name || pack.packType?.name} cardCount={pack.cardsPerPack || pack.packType?.cardsPerPack} seed={pack.id} compact />
                 <div className="text-[8px] font-bold text-white truncate mt-0.5 px-0.5">{pack.name || pack.packType?.name || 'Pack'}</div>
               </button>
             ))}
@@ -1787,7 +1787,7 @@ function TradeOfferPanel({ title, titleColor, cards, packs = [], coreAmount, isR
                 <div className="flex flex-wrap gap-2">
                   {packs.map(tp => (
                     <div key={tp.id} className="relative group" style={{ width: 90 }}>
-                      <PackArt tier={tp.pack.category} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
+                      <PackArt tier={tp.pack.packTypeId} name={tp.pack.name} cardCount={tp.pack.cardsPerPack} seed={tp.packInventoryId} compact />
                       {canRemove && onRemovePack && (
                         <button
                           onClick={(e) => { e.stopPropagation(); onRemovePack(tp.packInventoryId) }}

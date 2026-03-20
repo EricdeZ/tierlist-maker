@@ -681,7 +681,7 @@ function ListingCard({ listing, onBuy, onZoom, isSelf, showStats }) {
     <div className="flex flex-col items-center" style={{ width: BROWSE_CARD_SIZE }}>
       {isPack ? (
         <PackArt
-          tier={listing.pack.category}
+          tier={listing.pack.packTypeId}
           name={listing.pack.name}
           cardCount={listing.pack.cardsPerPack}
           seed={listing.id % 5}
@@ -769,7 +769,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardC
                 <div key={listing.id} className="flex flex-col items-center" style={{ width: BROWSE_CARD_SIZE }}>
                   {isPack ? (
                     <PackArt
-                      tier={listing.pack.category}
+                      tier={listing.pack.packTypeId}
                       name={listing.pack.name}
                       cardCount={listing.pack.cardsPerPack}
                       seed={listing.id % 5}
@@ -812,7 +812,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardC
                 <div key={listing.id} className="flex flex-col items-center opacity-50" style={{ width: BROWSE_CARD_SIZE }}>
                   {isPack ? (
                     <PackArt
-                      tier={listing.pack?.category || 'standard'}
+                      tier={listing.pack?.packTypeId || 'standard'}
                       name={listing.pack?.name || 'Pack'}
                       cardCount={listing.pack?.cardsPerPack}
                       seed={listing.id % 5}
@@ -1110,7 +1110,7 @@ function BuyModal({ listing, onClose, onConfirm, loading, coreBalance }) {
         <div className="flex justify-center mb-4">
           {isPack ? (
             <PackArt
-              tier={listing.pack.category}
+              tier={listing.pack.packTypeId}
               name={listing.pack.name}
               cardCount={listing.pack.cardsPerPack}
               seed={listing.id % 5}
