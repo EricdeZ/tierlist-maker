@@ -209,6 +209,20 @@ const STATS = {
     peakDay: { date: 'March 12', views: 19630, visits: 5490 },
     deviceSplit: { desktop: 97860, mobile: 39920 },
 
+    // Match Reporters
+    topReporters: [
+        { name: 'caesarbama', matches_reported: 196 },
+        { name: 'saintzaps', matches_reported: 37 },
+        { name: 'crux7897', matches_reported: 29 },
+        { name: 'asinus', matches_reported: 23 },
+        { name: 'celestewish', matches_reported: 16 },
+        { name: 'bdubz__', matches_reported: 14 },
+        { name: 'akuma007', matches_reported: 12 },
+        { name: 'rigz011', matches_reported: 9 },
+        { name: 'alias711', matches_reported: 2 },
+        { name: 'brian.codex', matches_reported: 1 },
+    ],
+
     // Community
     totalTierlistPosts: 25,
     totalTierlistLikes: 21,
@@ -1084,6 +1098,28 @@ function CommunitySection() {
                         <div className="text-xs text-white/50">{s.label}</div>
                     </div>
                 ))}
+            </div>
+
+            <div className="mt-6 rounded-xl border p-5"
+                style={{
+                    background: 'linear-gradient(135deg, rgba(34,197,94,0.04), rgba(34,197,94,0.01))',
+                    borderColor: 'rgba(34,197,94,0.12)',
+                }}
+            >
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: '#22c55e' }}>
+                    Match Reporters
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {STATS.topReporters.map((p, i) => (
+                        <div key={p.name} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                            style={{ background: 'rgba(34,197,94,0.04)' }}
+                        >
+                            <span className="text-sm text-white/50 w-5">{i + 1}.</span>
+                            <span className="text-sm font-semibold text-white truncate flex-1">{p.name}</span>
+                            <span className="text-sm font-bold text-white/70">{p.matches_reported}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </section>
     )
