@@ -91,6 +91,7 @@ import PackCreator from "./pages/admin/PackCreator.jsx";
 import RedeemCodes from "./pages/admin/RedeemCodes.jsx";
 import TournamentManager from "./pages/admin/TournamentManager.jsx";
 import Features from "./pages/Features.jsx";
+const AnniversaryPage = lazy(() => import("./pages/AnniversaryPage.jsx"));
 import Players from "./pages/Players.jsx";
 import TournamentSignup from "./pages/TournamentSignup.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
@@ -244,6 +245,7 @@ function App() {
                             <Route path="feedback" element={<Feedback />} />
                             <Route path="support" element={<Support />} />
                             <Route path="features" element={<Features />} />
+                            <Route path="anniversary" element={<Suspense fallback={null}><AnniversaryPage /></Suspense>} />
                             <Route path="players" element={<Players />} />
                             <Route path="transactions" element={<Transactions />} />
                             <Route path="bg-remove" element={<BgRemover />} />
