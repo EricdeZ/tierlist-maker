@@ -1090,6 +1090,30 @@ function VaultSection() {
                 ))}
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <RecordCard
+                    label="Most Loved Collector"
+                    value="36"
+                    detail="chaotichydra"
+                    sub="Gifted by 36 different people"
+                    accent="#ff2d78"
+                />
+                <RecordCard
+                    label="2nd Most Loved"
+                    value="29"
+                    detail="cafekatart"
+                    sub="Gifted by 29 different people"
+                    accent="#b44aff"
+                />
+                <RecordCard
+                    label="3rd Most Loved"
+                    value="27"
+                    detail="zapzy"
+                    sub="Gifted by 27 different people"
+                    accent="#00e5ff"
+                />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Top5Card
                     title="Top Collectors"
