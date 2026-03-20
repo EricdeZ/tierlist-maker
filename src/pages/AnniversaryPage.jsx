@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import passionCoin from '../assets/passion/passion.png'
 import sparkImg from '../assets/spark.png'
 import diamondsImg from '../assets/diamonds.png'
+import smiteLogo from '../assets/smite2.png'
 
 // ─── Hardcoded snapshot stats (queried 2026-03-19) ───────────────
 
@@ -275,6 +276,7 @@ export default function AnniversaryPage() {
                 <SiteTrafficSection />
                 <CompetitiveSection />
                 <PassionSection />
+                <TeamSection />
                 <CoinFlipSection />
                 <ForgeSection />
                 <VaultSection />
@@ -826,6 +828,40 @@ function PassionSection() {
                         </div>
                     </div>
                 </div>
+            </div>
+        </section>
+    )
+}
+
+// ─── SmiteComp Team Section ──────────────────────────────
+
+const TEAM_MEMBERS = [
+    'Akuma007', 'Alias', 'Asinus', 'BDubz', 'Brian.codex', 'brudif',
+    'CaesarBama', 'celestewish', 'Chasbo', 'MTR', 'rigz011', 'SaintPassion', 'Wilgy',
+]
+
+function TeamSection() {
+    return (
+        <section>
+            <SectionHeader
+                title="The SmiteComp Team"
+                subtitle="The people who made it all happen"
+                accent="#f59e0b"
+                icon={<img src={smiteLogo} alt="" className="w-6 h-6" />}
+            />
+            <div className="flex flex-wrap gap-2">
+                {TEAM_MEMBERS.map(name => (
+                    <div key={name}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(245,158,11,0.02))',
+                            borderColor: 'rgba(245,158,11,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                        }}
+                    >
+                        {name}
+                    </div>
+                ))}
             </div>
         </section>
     )
