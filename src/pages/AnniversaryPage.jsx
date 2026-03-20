@@ -863,6 +863,28 @@ function TeamSection() {
                     </div>
                 ))}
             </div>
+
+            <div className="mt-6 rounded-xl border p-5"
+                style={{
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.04), rgba(245,158,11,0.01))',
+                    borderColor: 'rgba(245,158,11,0.12)',
+                }}
+            >
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: '#f59e0b' }}>
+                    Match Reporters
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {STATS.topReporters.map((p, i) => (
+                        <div key={p.name} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                            style={{ background: 'rgba(245,158,11,0.04)' }}
+                        >
+                            <span className="text-sm text-white/50 w-5">{i + 1}.</span>
+                            <span className="text-sm font-semibold text-white truncate flex-1">{p.name}</span>
+                            <span className="text-sm font-bold text-white/70">{p.matches_reported}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </section>
     )
 }
@@ -1136,27 +1158,6 @@ function CommunitySection() {
                 ))}
             </div>
 
-            <div className="mt-6 rounded-xl border p-5"
-                style={{
-                    background: 'linear-gradient(135deg, rgba(34,197,94,0.04), rgba(34,197,94,0.01))',
-                    borderColor: 'rgba(34,197,94,0.12)',
-                }}
-            >
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: '#22c55e' }}>
-                    Match Reporters
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    {STATS.topReporters.map((p, i) => (
-                        <div key={p.name} className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                            style={{ background: 'rgba(34,197,94,0.04)' }}
-                        >
-                            <span className="text-sm text-white/50 w-5">{i + 1}.</span>
-                            <span className="text-sm font-semibold text-white truncate flex-1">{p.name}</span>
-                            <span className="text-sm font-bold text-white/70">{p.matches_reported}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </section>
     )
 }
