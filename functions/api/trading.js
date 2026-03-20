@@ -4,7 +4,8 @@ import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import {
   createTrade, joinTrade, cancelTrade,
-  addCard, removeCard, setCore, setReady,
+  addCard, removeCard, addPack, removePack,
+  setCore, setReady,
   confirmTrade, pollTrade, expireStale,
 } from '../lib/trading.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
@@ -40,6 +41,8 @@ const handler = async (event) => {
         case 'join': return await handleJoin(sql, user, body)
         case 'add-card': return await handleAddCard(user, body)
         case 'remove-card': return await handleRemoveCard(sql, user, body)
+        case 'add-pack': return await handleAddPack(user, body)
+        case 'remove-pack': return await handleRemovePack(sql, user, body)
         case 'set-core': return await handleSetCore(sql, user, body)
         case 'ready': return await handleReady(sql, user, body)
         case 'confirm': return await handleConfirm(user, body)
@@ -60,11 +63,15 @@ async function handlePoll(sql, user, params) {
   const { tradeId } = params
   if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
 
-  const { trade, cards } = await pollTrade(sql, user.id, parseInt(tradeId))
+  const { trade, cards, packs } = await pollTrade(sql, user.id, parseInt(tradeId))
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ trade: formatTrade(trade, user.id), cards: cards.map(formatTradeCard) }),
+    body: JSON.stringify({
+      trade: formatTrade(trade, user.id),
+      cards: cards.map(formatTradeCard),
+      packs: packs.map(formatTradePack),
+    }),
   }
 }
 
@@ -156,6 +163,26 @@ async function handleRemoveCard(sql, user, body) {
   if (!tradeId || !cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and cardId required' }) }
 
   await removeCard(sql, user.id, parseInt(tradeId), parseInt(cardId))
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ POST: Add pack to trade ═══
+async function handleAddPack(user, body) {
+  const { tradeId, packInventoryId } = body
+  if (!tradeId || !packInventoryId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and packInventoryId required' }) }
+
+  await transaction(async (tx) => {
+    await addPack(tx, user.id, parseInt(tradeId), parseInt(packInventoryId))
+  })
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ POST: Remove pack from trade ═══
+async function handleRemovePack(sql, user, body) {
+  const { tradeId, packInventoryId } = body
+  if (!tradeId || !packInventoryId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and packInventoryId required' }) }
+
+  await removePack(sql, user.id, parseInt(tradeId), parseInt(packInventoryId))
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
 
@@ -271,6 +298,21 @@ function formatTradeCard(row) {
       isConnected: row.card_data?.isConnected ?? null,
       bestGodName: row.best_god_name || null,
       signatureUrl: row.signature_url || null,
+    },
+  }
+}
+
+function formatTradePack(row) {
+  return {
+    id: row.id,
+    packInventoryId: row.pack_inventory_id,
+    offeredBy: row.offered_by,
+    itemType: 'pack',
+    pack: {
+      packTypeId: row.pack_type_id,
+      name: row.pack_name,
+      cardsPerPack: row.cards_per_pack,
+      category: row.category,
     },
   }
 }
