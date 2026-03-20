@@ -101,17 +101,17 @@ export const MARKETPLACE = {
 
 // Starting 5 — flat income per day per holo card (Cores)
 export const S5_FLAT_CORES = {
-  uncommon: 0.80, rare: 1.90, epic: 3.50, legendary: 7.60, mythic: 8.75, unique: 10.10,
+  uncommon: 0.80, rare: 1.90, epic: 4.20, legendary: 8.10, mythic: 8.50, unique: 9.40,
 };
 
 // Starting 5 — flat income per day per holo card (Passion)
 export const S5_FLAT_PASSION = {
-  uncommon: 0.05, rare: 0.12, epic: 0.22, legendary: 0.47, mythic: 0.54, unique: 0.63,
+  uncommon: 0.05, rare: 0.12, epic: 0.26, legendary: 0.50, mythic: 0.52, unique: 0.58,
 };
 
 // Starting 5 — reverse card multiplier (multiplicative stacking)
 export const S5_REVERSE_MULT = {
-  uncommon: 1.15, rare: 1.25, epic: 1.40, legendary: 1.50, mythic: 1.65, unique: 1.85,
+  uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
 };
 
 // Full cards get 44% of both flat and mult
@@ -125,21 +125,21 @@ export const S5_ALLSTAR_MODIFIER = 0.615;
 
 // Attachment bonuses — holo attachments: % boost to flat values
 export const S5_ATT_FLAT = {
-  god:  { uncommon: 0.06, rare: 0.10, epic: 0.16, legendary: 0.25, mythic: 0.35, unique: 0.48 },
-  item: { uncommon: 0.04, rare: 0.06, epic: 0.10, legendary: 0.15, mythic: 0.22, unique: 0.30 },
+  god:  { uncommon: 0.06, rare: 0.10, epic: 0.20, legendary: 0.29, mythic: 0.33, unique: 0.44 },
+  item: { uncommon: 0.04, rare: 0.06, epic: 0.13, legendary: 0.18, mythic: 0.20, unique: 0.27 },
 };
 
 // Attachment bonuses — reverse attachments: additive to multiplier
 export const S5_ATT_MULT = {
-  god:  { uncommon: 0.030, rare: 0.050, epic: 0.080, legendary: 0.125, mythic: 0.175, unique: 0.240 },
-  item: { uncommon: 0.015, rare: 0.025, epic: 0.040, legendary: 0.060, mythic: 0.085, unique: 0.120 },
+  god:  { uncommon: 0.030, rare: 0.050, epic: 0.100, legendary: 0.145, mythic: 0.160, unique: 0.215 },
+  item: { uncommon: 0.015, rare: 0.025, epic: 0.050, legendary: 0.070, mythic: 0.078, unique: 0.108 },
 };
 
 // Full attachment ratio (60% of pure type's bonus)
 export const S5_FULL_ATT_RATIO = 0.6;
 
-export const GOD_SYNERGY_BONUS = 0.30;
-export const TEAM_SYNERGY_BONUS = { 2: 0.10, 3: 0.20, 4: 0.35, 5: 0.50 };
+export const GOD_SYNERGY_BONUS = 0.40;
+export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
 

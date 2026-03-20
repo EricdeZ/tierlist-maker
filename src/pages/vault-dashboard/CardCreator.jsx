@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers } from 'lucide-react'
+import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers, FilePlus, FolderOpen } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultDashboardService } from '../../services/database'
 import CardCanvas from './preview/CardCanvas'
@@ -444,6 +444,22 @@ export default function CardCreator() {
         setStatus('pending_review')
     }, [saveTarget])
 
+    const handleNew = useCallback(() => {
+        if (dirty && !window.confirm('You have unsaved changes. Start a new card?')) return
+        setName('')
+        setCardType('player')
+        setRarity('full_art')
+        setElements([])
+        setSelectedId(null)
+        setBorder({ enabled: true, color: '#d4af37', width: 3, radius: 12 })
+        setSaveTarget(null)
+        setStatus('draft')
+        setCardData({ name: '', imageUrl: '', serialNumber: '001', role: 'mid', class: 'Mage', subtitle: '', topStatLabel: '', topStatValue: '', blocks: [] })
+        setDirty(false)
+        setError(null)
+        localStorage.removeItem(STORAGE_KEY)
+    }, [dirty])
+
     const handleExport = useCallback(async () => {
         const el = document.querySelector('[data-card-preview]')
         if (!el) return
@@ -455,6 +471,19 @@ export default function CardCreator() {
         <div className="flex flex-col h-[calc(100vh-80px)]">
             {/* Top Bar */}
             <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-700/50 flex-wrap bg-gray-900/50">
+                <button onClick={handleNew}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                    title="New card">
+                    <FilePlus size={14} /> New
+                </button>
+                <button onClick={() => navigate('/vault-dashboard/drafts')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                    title="Load draft or template">
+                    <FolderOpen size={14} /> Load
+                </button>
+
+                <div className="w-px h-6 bg-gray-700/50" />
+
                 <input
                     type="text" value={name} onChange={e => { setName(e.target.value); setDirty(true) }}
                     placeholder="Card name..."

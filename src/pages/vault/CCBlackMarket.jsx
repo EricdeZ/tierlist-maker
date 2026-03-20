@@ -178,6 +178,7 @@ function MythicSelectionModal({ onSelect, onClose }) {
             cardType: 'player',
             godId: 'player-' + p.player_name,
             godName: p.player_name,
+            role: p.role || '',
             label: p.player_name,
             sublabel: [p.role, p.team_name].filter(Boolean).join(' · ') || 'Player',
             avatarUrl: p.avatar_url || null,

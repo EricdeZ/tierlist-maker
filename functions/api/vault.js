@@ -1654,7 +1654,7 @@ async function handleS5Leaderboard(sql, user) {
     })
   }
 
-  entries.sort((a, b) => b.coresPerDay - a.coresPerDay)
+  entries.sort((a, b) => b.totalCap - a.totalCap)
   const top = entries.slice(0, 20).map((e, i) => ({ ...e, position: i + 1 }))
   const myEntry = entries.find(e => e.userId === user.id)
   const myPosition = myEntry ? entries.indexOf(myEntry) + 1 : null

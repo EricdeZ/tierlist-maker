@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
-  S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO,
+  S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, S5_ALLSTAR_MODIFIER,
   STARTING_FIVE_CAP_DAYS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
@@ -547,67 +547,6 @@ export default function CCStartingFive() {
 
       </div>
 
-      {/* Lineup Flat × Mult Breakdown */}
-      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (() => {
-        const baseOutput = lineupBreakdown.flatCores * lineupBreakdown.totalMult
-        const teamBonus = 1 + lineupBreakdown.teamSynergy
-        const output = baseOutput * teamBonus
-        const consumablePct = startingFive?.consumableCard?.coresBoostPct || 0
-        const finalOutput = output * (1 + consumablePct / 100)
-        return (
-        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-6 cd-num">
-          {/* Hero numbers */}
-          <div className="flex items-center justify-center gap-3 sm:gap-4">
-            <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-black text-amber-400 leading-none">
-                {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)}
-              </div>
-              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat/day</div>
-            </div>
-            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">×</span>
-            <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400 leading-none">
-                {lineupBreakdown.totalMult.toFixed(2)}x
-              </div>
-              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Multiplier</div>
-            </div>
-            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">=</span>
-            <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-black text-[var(--cd-cyan)] leading-none">
-                {output.toFixed(1)}
-              </div>
-              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Cores/day</div>
-            </div>
-          </div>
-          {/* Team synergy & consumable modifiers */}
-          {(lineupBreakdown.teamSynergy > 0 || consumablePct > 0 || startingFive?.consumableCard?.passionBoostPct > 0) && (
-            <div className="flex items-center justify-center gap-2 flex-wrap mt-2 pt-2 border-t border-white/[0.06] text-xs">
-              {lineupBreakdown.teamSynergy > 0 && (
-                <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergy * 100)}% team</span>
-              )}
-              {lineupBreakdown.teamSynergy > 0 && consumablePct > 0 && (
-                <span className="text-white/20">·</span>
-              )}
-              {consumablePct > 0 && (
-                <span className="text-purple-400">+{consumablePct}% consumable</span>
-              )}
-              {startingFive?.consumableCard?.passionBoostPct > 0 && (
-                <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}%</span>
-              )}
-              {consumablePct > 0 && (
-                <>
-                  <span className="text-white/20">→</span>
-                  <span className="text-purple-400 font-bold">
-                    {finalOutput.toFixed(1)}/day
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-        )
-      })()}
-
       {/* Lineup Tabs */}
       <div className="flex gap-3 mb-4">
         <button
@@ -659,6 +598,79 @@ export default function CCStartingFive() {
           All-Star
         </button>
       </div>
+
+      {/* Lineup Flat × Mult Breakdown (scoped to active lineup) */}
+      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (() => {
+        const baseOutput = lineupBreakdown.flatCores * lineupBreakdown.totalMult
+        const teamBonus = 1 + lineupBreakdown.teamSynergy
+        const output = baseOutput * teamBonus
+        const isAllStar = activeLineup === 'allstar'
+        const lineupContribution = isAllStar ? output * S5_ALLSTAR_MODIFIER : output
+        const consumablePct = startingFive?.consumableCard?.coresBoostPct || 0
+        const otherLineupOutput = isAllStar
+          ? (startingFive?.currentSeason?.output?.coresPerDay || 0)
+          : (startingFive?.allStar?.output?.coresPerDay || 0) * S5_ALLSTAR_MODIFIER
+        const combinedRate = lineupContribution + otherLineupOutput
+        const boostedCombined = combinedRate * (1 + consumablePct / 100)
+        return (
+        <div className="cd-panel rounded-xl p-3 sm:p-4 mb-4 cd-num">
+          {/* Hero numbers */}
+          <div className="flex items-center justify-center gap-3 sm:gap-4">
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-amber-400 leading-none">
+                {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)}
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat/day</div>
+            </div>
+            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">×</span>
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-emerald-400 leading-none">
+                {lineupBreakdown.totalMult.toFixed(2)}x
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Multiplier</div>
+            </div>
+            <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">=</span>
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-black text-[var(--cd-cyan)] leading-none">
+                {output.toFixed(1)}
+              </div>
+              <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Cores/day</div>
+            </div>
+          </div>
+          {/* Modifiers + combined breakdown */}
+          <div className="flex items-center justify-center gap-2 flex-wrap mt-2 pt-2 border-t border-white/[0.06] text-xs">
+            {lineupBreakdown.teamSynergy > 0 && (
+              <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergy * 100)}% team</span>
+            )}
+            {isAllStar && (
+              <>
+                {lineupBreakdown.teamSynergy > 0 && <span className="text-white/20">·</span>}
+                <span className="text-purple-400">×0.615 all-star</span>
+                <span className="text-white/20">→</span>
+                <span className="text-white/50">{lineupContribution.toFixed(1)}/day</span>
+              </>
+            )}
+            {consumablePct > 0 && (
+              <>
+                <span className="text-white/20">·</span>
+                <span className="text-purple-400">+{consumablePct}% consumable</span>
+              </>
+            )}
+            {startingFive?.consumableCard?.passionBoostPct > 0 && (
+              <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}% passion</span>
+            )}
+          </div>
+          {/* Combined total from both lineups */}
+          {otherLineupOutput > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-1.5 text-[10px] text-white/30">
+              <span>{isAllStar ? 'Current Season' : 'All-Star'}: +{otherLineupOutput.toFixed(1)}/day</span>
+              <span className="text-white/15">→</span>
+              <span className="text-white/50 font-bold">Combined: {(consumablePct > 0 ? boostedCombined : combinedRate).toFixed(1)} Cores/day</span>
+            </div>
+          )}
+        </div>
+        )
+      })()}
 
       {/* 5 Role Slots */}
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
@@ -1031,12 +1043,12 @@ function TutorialModal({ onClose }) {
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">GOD SYNERGY</h4>
-            <p>When an attached god card matches the player's most played god, the god bonus is increased by 30%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator on the attachment.</p>
+            <p>When an attached god card matches the player's most played god, the god bonus is increased by 40%. Look for the <span className="text-emerald-400 font-bold">SYNERGY</span> indicator on the attachment.</p>
           </div>
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">TEAM SYNERGY</h4>
-            <p>Slot multiple players from the same team for a stacking bonus: <span className="text-white/80">+10%</span> at 2 teammates, up to <span className="text-white/80">+50%</span> with a full team of 5.</p>
+            <p>Slot multiple players from the same team (starters only) for a stacking bonus: <span className="text-white/80">+20%</span> at 2 teammates, up to <span className="text-white/80">+60%</span> with a full team of 5.</p>
           </div>
 
           <div>
@@ -1090,7 +1102,7 @@ function S5Leaderboard({ data, loading, currentUserId }) {
     <div className="mt-8 cd-panel cd-corners rounded-xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-4">
         <Trophy size={16} className="text-amber-400" />
-        <h2 className="text-sm font-bold cd-head tracking-wider text-white/60">TOP 20 — 2-DAY CAP</h2>
+        <h2 className="text-sm font-bold cd-head tracking-wider text-white/60">TOP 20 — TOTAL INCOME</h2>
       </div>
       <div className="space-y-[2px]">
         {entries.map(entry => {
@@ -1130,16 +1142,19 @@ function S5Leaderboard({ data, loading, currentUserId }) {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-sm font-bold cd-num text-white/70">{entry.totalCap}</div>
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="text-sm font-bold cd-num text-white/70">{(entry.coresPerDay + entry.passionPerDay).toFixed(1)}</span>
+                  <span className="text-[10px] text-white/25 cd-num">/day</span>
+                </div>
                 <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
-                  {entry.passionCap > 0 && (
+                  {entry.passionPerDay > 0 && (
                     <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
-                      {entry.passionCap}
+                      {entry.passionPerDay} P
                     </span>
                   )}
-                  {entry.coresCap > 0 && (
+                  {entry.coresPerDay > 0 && (
                     <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
-                      {entry.coresCap}
+                      {entry.coresPerDay} C
                     </span>
                   )}
                 </div>
@@ -1175,16 +1190,19 @@ function S5Leaderboard({ data, loading, currentUserId }) {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-sm font-bold cd-num text-white/70">{myEntry.totalCap}</div>
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="text-sm font-bold cd-num text-white/70">{(myEntry.coresPerDay + myEntry.passionPerDay).toFixed(1)}</span>
+                  <span className="text-[10px] text-white/25 cd-num">/day</span>
+                </div>
                 <div className="flex items-center justify-end gap-2 text-[10px] cd-num">
-                  {myEntry.passionCap > 0 && (
+                  {myEntry.passionPerDay > 0 && (
                     <span className="flex items-center gap-0.5" style={{ color: '#f8c56a88' }}>
-                      {myEntry.passionCap}
+                      {myEntry.passionPerDay} P
                     </span>
                   )}
                   {myEntry.coresCap > 0 && (
                     <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]/50">
-                      {myEntry.coresCap}
+                      {myEntry.coresPerDay} C
                     </span>
                   )}
                 </div>
