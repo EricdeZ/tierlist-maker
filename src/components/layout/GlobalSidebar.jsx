@@ -10,7 +10,7 @@ import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
 import passionCoin from '../../assets/passion/passion.png'
 import {
-    X, User, Trophy, Flame, Wrench, Shield,
+    X, User, Trophy, Flame, Wrench, Shield, ScrollText,
     ChevronDown, UserCheck, LogOut, Sparkles, Tv, MessageSquare, Heart, UserPlus, Swords, Users, Mail, Check, ArrowLeftRight
 } from 'lucide-react'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
@@ -395,6 +395,12 @@ export default function GlobalSidebar() {
                                     <span className="flex items-center gap-3">
                                         <Trophy className="w-4 h-4 shrink-0 text-yellow-400" />
                                         Browse All Leagues
+                                    </span>
+                                </SidebarLink>
+                                <SidebarLink to="/patchnotes" active={isActive('/patchnotes')}>
+                                    <span className="flex items-center gap-3">
+                                        <ScrollText className="w-4 h-4 shrink-0 text-cyan-400" />
+                                        Smite Patchnotes
                                     </span>
                                 </SidebarLink>
                                 {user && teamInviteCount > 0 && (
