@@ -1094,11 +1094,27 @@ async function handleGiftLeaderboard(sql, user) {
 }
 
 // ═══ GET: Pack opening leaderboard (daily/weekly/monthly) ═══
+function getLeaderboardCutoff(period) {
+  const now = new Date()
+  if (period === 'daily') {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  } else if (period === 'weekly') {
+    const day = now.getUTCDay()
+    const diff = day === 0 ? 6 : day - 1 // Monday = 0 offset
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff))
+    return d
+  } else {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  }
+}
+
 async function handlePackLeaderboard(sql, user, qs) {
   const period = qs?.period || 'daily'
   if (!['daily', 'weekly', 'monthly'].includes(period)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid period' }) }
   }
+
+  const cutoff = getLeaderboardCutoff(period)
 
   const rows = await sql`
     SELECT po.user_id, COUNT(*)::int AS packs_opened,
@@ -1107,11 +1123,7 @@ async function handlePackLeaderboard(sql, user, qs) {
     FROM cc_pack_opens po
     JOIN users u ON po.user_id = u.id
     LEFT JOIN players pl ON u.linked_player_id = pl.id
-    WHERE po.created_at >= ${period === 'daily'
-      ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
-      : period === 'weekly'
-        ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
-        : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+    WHERE po.created_at >= ${cutoff.toISOString()}
     GROUP BY po.user_id, u.discord_username, u.discord_avatar, u.discord_id, pl.slug
     ORDER BY packs_opened DESC
     LIMIT 20
@@ -1135,12 +1147,7 @@ async function handlePackLeaderboard(sql, user, qs) {
       const [myRow] = await sql`
         SELECT COUNT(*)::int AS packs_opened
         FROM cc_pack_opens
-        WHERE user_id = ${user.id}
-          AND created_at >= ${period === 'daily'
-            ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
-            : period === 'weekly'
-              ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
-              : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+        WHERE user_id = ${user.id} AND created_at >= ${cutoff.toISOString()}
       `
       if (myRow && myRow.packs_opened > 0) {
         const [rank] = await sql`
@@ -1148,11 +1155,7 @@ async function handlePackLeaderboard(sql, user, qs) {
           FROM (
             SELECT user_id, COUNT(*) AS cnt
             FROM cc_pack_opens
-            WHERE created_at >= ${period === 'daily'
-              ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
-              : period === 'weekly'
-                ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
-                : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+            WHERE created_at >= ${cutoff.toISOString()}
             GROUP BY user_id
           ) sub
           WHERE cnt > ${myRow.packs_opened}
