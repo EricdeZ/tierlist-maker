@@ -12,7 +12,7 @@ export default function PlayerHeader({
     player, team, basePath, totalEarned,
     discordId, discordAvatar, isConnected, allowDiscordAvatar, mostPlayedGod,
     profileData, passionBalance, isOwnProfile,
-    user, linkedPlayer, authLoading,
+    user, linkedPlayer, authLoading, login,
 }) {
     const roleImg = player.role ? roleImages[player.role.toUpperCase()] : null
 
