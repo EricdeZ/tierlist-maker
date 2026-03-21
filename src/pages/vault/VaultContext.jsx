@@ -15,6 +15,7 @@ export function VaultProvider({ children }) {
   const [packTypes, setPackTypes] = useState([])
   const [salePacks, setSalePacks] = useState([])
   const [pendingTradeCount, setPendingTradeCount] = useState(0)
+  const [matchTradeCount, setMatchTradeCount] = useState(0)
   const [pendingSignatureCount, setPendingSignatureCount] = useState(0)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [inventory, setInventory] = useState([])
@@ -82,6 +83,7 @@ export function VaultProvider({ children }) {
       setPackTypes(ccData.packTypes || [])
       setSalePacks(ccData.salePacks || [])
       setPendingTradeCount(ccData.pendingTradeCount || 0)
+      setMatchTradeCount(ccData.matchTradeCount || 0)
       setPendingSignatureCount(ccData.pendingSignatureCount || 0)
       setPendingApprovalCount(ccData.pendingApprovalCount || 0)
       setInventory(ccData.inventory || [])
@@ -453,6 +455,7 @@ export function VaultProvider({ children }) {
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, setPendingTradeCount,
+    matchTradeCount, setMatchTradeCount,
     pendingSignatureCount, setPendingSignatureCount,
     pendingApprovalCount, setPendingApprovalCount,
     inventory, openInventoryPack, refreshInventory,
@@ -466,7 +469,7 @@ export function VaultProvider({ children }) {
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
-    pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
+    pendingTradeCount, matchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
     vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks,
   ])
 

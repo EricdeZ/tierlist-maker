@@ -265,7 +265,7 @@ async function handleFulfillable(sql, user) {
       AND NOT EXISTS (
         SELECT 1 FROM cc_trade_cards tc
         JOIN cc_trades t ON tc.trade_id = t.id
-        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
+        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
       )
       AND NOT EXISTS (
         SELECT 1 FROM cc_lineups

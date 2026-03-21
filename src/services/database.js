@@ -1271,6 +1271,36 @@ export const tradingService = {
     },
 }
 
+export const tradematchService = {
+    async tradePile() {
+        return apiCall('tradematch', { action: 'trade-pile' })
+    },
+    async tradePileView(userId) {
+        return apiCall('tradematch', { action: 'trade-pile-view', userId: String(userId) })
+    },
+    async tradePileAdd(cardId) {
+        return apiPost('tradematch', { action: 'trade-pile-add' }, { cardId })
+    },
+    async tradePileRemove(cardId) {
+        return apiPost('tradematch', { action: 'trade-pile-remove' }, { cardId })
+    },
+    async swipeFeed(offset = 0) {
+        return apiCall('tradematch', { action: 'swipe-feed', offset: String(offset) })
+    },
+    async swipe(cardId) {
+        return apiPost('tradematch', { action: 'swipe' }, { cardId })
+    },
+    async likes() {
+        return apiCall('tradematch', { action: 'likes' })
+    },
+    async likesTrade(likerId, cardId) {
+        return apiPost('tradematch', { action: 'likes-trade' }, { likerId, cardId })
+    },
+    async matches() {
+        return apiCall('tradematch', { action: 'matches' })
+    },
+}
+
 export const packCreatorService = {
     async load() {
         return apiCall('pack-creator', { action: 'load' })

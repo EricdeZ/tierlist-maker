@@ -10,7 +10,7 @@ const PRIMARY_TABS = [
 
 const PRIMARY_KEYS = new Set(PRIMARY_TABS.map(t => t.key))
 
-export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, vaultClaimableCount, packMode, onPackModeChange, myPacksCount }) {
+export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts, pendingTradeCount, matchTradeCount, vaultClaimableCount, packMode, onPackModeChange, myPacksCount }) {
   const [moreOpen, setMoreOpen] = useState(false)
 
   const secondaryTabs = tabs.filter(t => !PRIMARY_KEYS.has(t.key))
@@ -18,7 +18,8 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
 
   const moreBadge = secondaryTabs.some(t =>
     (t.key === 'gifts' && unseenGifts > 0) ||
-    (t.key === 'trade' && pendingTradeCount > 0)
+    (t.key === 'trade' && pendingTradeCount > 0) ||
+    (t.key === 'tradematch' && matchTradeCount > 0)
   )
 
   return (
@@ -69,6 +70,9 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
                     <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-500 text-[8px] font-bold text-black flex items-center justify-center animate-pulse">
                       {vaultClaimableCount}
                     </span>
+                  )}
+                  {tab.key === 'tradematch' && matchTradeCount > 0 && (
+                    <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
                   )}
                 </button>
               )

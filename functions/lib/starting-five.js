@@ -471,6 +471,9 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
     }
   }
 
+  // Auto-remove from trade pile when slotted
+  await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
+
   return await tick(sql, userId)
 }
 
@@ -520,7 +523,7 @@ export async function slotConsumable(sql, userId, cardId) {
 
   const [inTrade] = await sql`
     SELECT tc.id FROM cc_trade_cards tc JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') LIMIT 1
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct' LIMIT 1
   `
   if (inTrade) throw new Error('Card is in an active trade — cancel the trade first')
 
@@ -547,6 +550,9 @@ export async function slotConsumable(sql, userId, cardId) {
     SET consumable_card_id = ${cardId}
     WHERE user_id = ${userId}
   `
+
+  // Auto-remove from trade pile when slotted
+  await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
 
   return await tick(sql, userId)
 }

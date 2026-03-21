@@ -31,7 +31,7 @@ export async function createListing(sql, userId, { cardId, packInventoryId, pric
   const [tradeLock] = await sql`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active')
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
     LIMIT 1
   `
   if (tradeLock) throw new Error('Card is locked in an active trade')
@@ -82,6 +82,9 @@ export async function createListing(sql, userId, { cardId, packInventoryId, pric
     VALUES (${userId}, ${cardId}, 'core', ${price})
     RETURNING *
   `
+
+  // Auto-remove from trade pile when listed on marketplace
+  await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
 
   return listing
 }

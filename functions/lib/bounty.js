@@ -95,7 +95,7 @@ export async function fulfillBounty(tx, fulfillerId, { bountyId, cardId }) {
   const [tradeLock] = await tx`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active')
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
     LIMIT 1
   `
   if (tradeLock) throw new Error('Card is locked in an active trade')
