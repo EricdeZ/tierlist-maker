@@ -1,0 +1,248 @@
+OB31 BALANCE OVERVIEW
+20 Mar 2026, 05:25 pm
+BALANCE OVERVIEW
+OB31 Balance Overview
+
+These are NOT final update notes. Stats are subjected to change
+
+Final Notes will be released Next week (Tuesday March 24th) on smite2.com
+
+Items
+
+Plated Metal
+Tier 2 Plating Component
+900g
++9 Plating
+Runic Hide
+Tier 2 Dampening Component
+850g
++10 Dampening
+Bowl Drum
+Tier 2 Echo Component
+750g
++10 Echo
+Combat Boots (!!)
+Tier 2 Pathfinding Component
+900g
++8 Pathfinding
+Cleric's Cloak
+Tier 2 Tenacity Component
+800g
++15 Tenacity
+Kinetic Cuirass
+2400g
+Builds from : Veve Charm + Plated Metal + 700g
++15 Plating
++300 Health
+Passive: After being damaged by 5 Attacks from gods, your next Attack unleashes a shockwave, even if it misses. Dealing 40 (+4% of your Health) damage.
+Radiant Bulwark
+2750g
+Builds from: Engraved Guard + Plated Metal + 1050g
++15 Plating
++20 Physical Protection
++20 Magical Protection
+Active: Create a wall of light that protects allies behind you for 6s. Grants them all your Plating, Dampening, and half of your protections from enemies on the other side of the wall. You are slowed, silenced, disarmed, and cannot turn while channeling the bulwark.
+Doublet of Binding
+2550g
+Builds from: Veve Charm + Runic Hide + 900g
++15 Dampening
++400 Health
+Active: Protective Link - Link to a target, redirecting 20% of damage they take, up to 600 health. This damage is mitigated further by your dampening stat.
+Wyrmskin Hide
+2600g
+Builds from Battle Axe + Runic Hide + 850g
++40 Strength
++10 Dampening
++250 Health
+Passive: When you hit a god (once every 8s) you gain 20 dampening against them.
+Alchemist Coat
+2350g
+Builds from Mana Tome + Runic Hide + 1000g
++15 Dampening
++400 Mana
++ 2.5 Mana Per Second
+Passive: When you use a consumable, gain 10 Dampening for 8s. If you have an open inventory slot, gain a Multipotion once every 60s.
+Mercury's Talaria
+2500g
+Builds from Survivor's Sash + Combat Boots + 600g
+Adaptive: 40 Strength or 70 Intelligence
++12 Pathfinding
+Passive: As you move out of combat, store energy. Your next non-ultimate ability deals up to 20% more damage based on the stored energy. If it was a Movement Ability, deal up to 30% more damage instead.
+Resolute Mantle
+2750g
+Builds from Veve Charm + Cleric's Cloak + Xg
++550 Health
++20 Tenacity
+Passive - When Hard Crowd Controlled by an ability, gain 25 Health Regen and 10 Tenacity for 4s. This effect can stack. When these stacks fall off, gain 0.5 Health Regen and 1 Tenacity permanently. These can stack up to 20 times.
+Shroud Of Vengeance
++2500g
+Builds from Engraved Guard + Cleric's Cloak + 900g
++20 Physical Protection
++20 Magical Protection
++20 Tenacity
+Passive - When Hard Crowd Controlled, trigger a shockwave around yourself dealing 50 (+40% of your Protections, up to 650) Physical Damage.
+Damaru
++2750g
+Builds from Kopesh + Bowl Drum + 750g
++40 Strength
++20% Critical Strike
++20% Echo
+Passive - When you Critically Strike, increase your Ability's damage by 10% for 5s. When you Echo, increase your Attack's damage by 10% for 5s. Each can stack 3 times.
+Omen Drum
++2800g
+Builds from Survivor's Sash + Bowl Drum + 1050g
+Adaptive: +55 Strength or +90 Intelligence
++30% Echo
+Active - For 5 seconds, all enemy gods and jungle monsters you hit with an ability are marked. After the duration expires 15% of all ability damage you dealt to marked targets is echoed to all marked targets.
+Tekko-Kagi (Stat Change)
+Now builds from Skeggox and Hunter's Bow, cost remains the same.
+No longer grants Movement Speed: 4% -> 0%
+Now grants Pathfinding: 0% -> 7%
+Increased Stack Duration: 6s -> 10s
+No longer provides Cooldown Reduction: 10% -> 0%
+Now grants Attack Speed: 25%
+Decreased Strength: 60 -> 50
+Gem of Focus (Stat Change)
+No longer grants Movement Speed: 4% -> 0%
+Now grants Pathfinding: 0% -> 7%
+Increased Stack Duration: 6s -> 10s
+Increased Intelligence: 50 -> 75
+Increased Cost: 2350 -> 2550
+The Crusher (Stat Change)
+Now built from Lucerne Hammer and Bowl Drum. Cost remains unchanged.
+No longer grants Cooldown Rate: 15 -> 0
+Now grants Echo: 0% -> 25%
+The Cosmic Horror (Rework)
+Now build from Ring of Dispel and Bowl Drum
+No longer grants Mana: 200 -> 0
+No longer grants Mana Regen: 3 -> 0
+Now grants Echo: 0 -> 20%
+New Passive: While your Echo chance is higher than Cooldown Rate, grain +20% Echo Damage. While your Cooldown Rate is higher than your Echo chance, gain +35 Intelligence. If they are equal, gain both effects.
+Spectral Armor (Rework)
+Now builds from Plated Metal + Veve Charm + 600 Gold
+Cost should be the same 2300 it has been.
+No longer grants Physical Protection: 30 -> 0
+Now provides Plating: 0 -> 20
+New Passive: You take -25% Damage from Critical Strikes. Ability Critical Strikes are mitigated by your Plating.
+Spectral Visage (Removed)
+Spectral Armor's rework has focused it on being a more all-in-one counter to Critical Strikes. Spectral Visage was always a band-aid solution for Magical Critical Strikes; but the combination of Plating and mitigating ability Critical hits should cover all cases.
+Leviathan's Hide (Stat Change)
+Removed Physical Protection: 40 -> 0
+Added Plating: 0 -> 15
+Increased Health: 250 -> 300
+Mantle of Discord (Stat Change)
+Removed Physical Protection: 30 -> 0
+Removed Magical Protection: 20 -> 0
+Added Dampening: 0 -> 15
+Added Tenacity: 0 -> 20
+Increased Cooldown Rate: 10 -> 15
+Shogun's Ofuda (Stat Change)
+Removed Magical Protection: 30 -> 0
+Added Dampening: 0 -> 15
+Spirit Robe (Stat Change)
+Decreased Physical Protection: 25 -> 20
+Decreased Magical Protection: 25 -> 20
+Added Tenacity: 0 -> 20
+Pharaoh's Curse (Stat Change)
+Removed Physical Protection: 35 -> 0
+Removed Magical Protection: 25 -> 0
+Added Plating: 0 -> 20
+Increased Attack Speed: 15% -> 20%
+
+Standard Item Balance
+
+Vampiric Shroud (Shift)
+Now provides Lifesteal: 0% -> 4%
+God Ability Hits no longer provide triple the Health Heal and Mana Recovery effects.
+Blood-Soaked Shroud (Shift)
+Now provides Lifesteal: 0% -> 8%
+God Ability Hits no longer provide double the Health Heal and Mana Recovery effects.
+
+Gods
+
+Amaterasu (Buff)
+Divine Presence (1)
+Increased Shield Health: 4/5/6/7/8% -> 8% of Max Health
+Increased Attack Speed: 8/11/14/17/20% -> 12/14/16/18/20%
+Dazzling Offensive (4)
+Decreased Cooldown: 110/105/100/95/90s -> 90s
+Charon (Buff)
+Spectral Surge (1)
+Reduced cooldown from 15s to 13s
+Damnation (2)
+Fixed Attack Speed Slow not applying correctly
+Aspect of the Tollkeeper
+Spectral Surge (1)
+Deals 40% bonus damage to minions
+Da Ji (Nerf)
+One Thousand Cuts (2)
+Decreased Movement Speed: 40% -> 30%
+Trickster Spirit (3)
+Decreased Damage Scaling: 80% -> 70% Strength
+Discordia (Nerf)
+Erratic Behavior (3)
+Increased Cooldown: 14s -> 16/15.5/15/14.5/14s
+Geb (Aspect Nerf)
+Aspect of Calamity
+Base Health and Base Health Per Level decreased by 7.5%
+Base Physical Protection and Protection Per Level decreased by 5%
+Base Magical Protection and Protection Per Level decreased by 5%
+Hercules (Base Nerf)
+General
+Decreased Base Health: 567 -> 525
+Decreased Health Per Level: 101.5 -> 94
+Decreased Health at level 20: 2597 -> 2405
+Aspect of Preservation
+Gains +7.5% Base Health and Health Per Level
+This puts him very close to his previous health values.
+Khepri (Base Buff, Aspect Nerf)
+Abduct (1)
+Increased Protections: 20/28/36/44/52 -> 25/35/45/55/65
+Scarab's Blessing (4)
+Increased Strength and Intelligence: 10/20/30/40/50 -> 25/32.5/40/47.5/55
+Aspect of Laceration
+Abduct (1)
+Removed: Protections
+Morgan Le Fay (Nerf)
+Consuming Power (4)
+Decreased Projectile Damage Scaling: 45% -> 40% Intelligence
+Ne Zha (Aspect Nerf)
+Aspect of Righteous Flame
+Flaming Spear (2)
+Decreased Base Heal: 30/45/60/75/90 -> 20/30/40/50/60
+Decreased stored Righteous Spirit Heal: 50% -> 35%
+Nut (Nerf)
+Aspect of the Cosmos
+Gains -12.5% Base Attack Damage and Attack Damage Per Level
+Pele (Base Buff)
+Pyroclast (1)
+Increased Damage: 60/100/140/180/220 -> 70/110/150/190/230
+Increased Damage Scaling: 60% -> 65% Strength
+Magma Rush (3)
+Increased Damage: 10/15/20/25/30 -> 15/20/25/30/35
+Increased Amped Damage: 20/35/50/65/80 -> 30/45/60/75/90
+Aspect of Obsidian
+The above buffs do not apply to this aspect.
+Ra (Buff)
+Divine Light (2)
+Increased Solar Ray Duration: 2/2.5/3/3.5/4s -> 4s
+Solar Blessing (3)
+Increased Heal Per Tick: 10/17/24/31/38 -> 16/22/28/34/40
+Scylla (Buff)
+Quick Learner (P)
+Increased Mana Regen: 1 -> 2 Per Max Ability
+Crush (2)
+New: This ability does 20% bonus damage to Minions and Jungle Monsters.
+The Morrigan (Buff)
+Dark Omen (2)
+Increased Damage: 40/70/100/130/160 -> 55/85/115/145/175
+Thor (Aspect Nerf)
+Aspect of Thunderstruck
+Warrior's Madness (P)
+Decreased Protections per stack: 8 -> 5
+Decreased Heal: 2% -> 1.5% of Max Health
+Xbalanque (Buff)
+Poison Darts (2)
+Decreased Cooldown: 15s -> 13s
+Rising Jaguar (3)
+Decreased Cooldown: 16s -> 16/15.5/15/14.5/14s

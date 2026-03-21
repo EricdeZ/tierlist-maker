@@ -1,0 +1,41 @@
+# SmiteComp Update — March 2026
+
+## Patch Notes Viewer
+Browse SMITE 2 balance updates right on the site. Each patch has a detailed breakdown of every god and item change — stat diffs are color-coded (green = buff, red = nerf), and there's a TL;DR mode if you just want the highlights. Find it in the sidebar or head to https://smitecomp.com/patchnotes
+
+## Tradeable Packs
+Packs can now be traded and listed on the marketplace.
+- List packs for sale on the marketplace (2% fee, same as cards)
+- Separate listing cap of 5 active pack listings per user
+
+## Rotating Special Packs
+Completing rotating challenges now awards **Challenge Packs** — a special pack type exclusive to this system. Your challenge pool rotates on a schedule, so the packs you can earn change with each period. The harder the challenge, the more packs you get.
+
+## Unique Cards
+A new **Unique Cards** section has been added to the Vault under the More dropdown.
+- View all your unique-rarity cards with full-size renders
+- **Holo Switcher** — freely swap between Holo, Reverse, and Full Art effects
+- **Signatures** — request a signature on player cards and track their status
+- https://smitecomp.com/vault?tab=unique
+
+## Daily Challenges
+The Vault now has **daily, weekly, and monthly rotating challenges**. Each period you get a random set of objectives — open packs, complete trades, dismantle cards, and more.
+- **Daily:** 3 challenges, resets at midnight UTC
+- **Weekly:** 4 challenges, resets Monday
+- **Monthly:** 3 challenges, resets 1st of the month
+- Rewards include Cores, Challenge Packs, or both
+- Countdown timers show when challenges reset
+- 1-hour grace period to claim after a period ends
+- https://smitecomp.com/vault?tab=challenges
+
+## Drop Rate Tuning
+Rare pulls have been buffed across the board. Epic, Legendary, Mythic, and Unique cards are all more likely to appear in packs.
+
+## NEW Badge
+When opening packs, cards you're seeing for the first time now show a **NEW** badge on the flip reveal.
+
+## Collection & Marketplace Filters
+The collection and marketplace have been updated with better filtering and sorting options.
+- **Collection:** filter by rarity, sort by name/rarity/duplicates, toggle owned vs all, and a new Recent Pulls section showing your last 8 cards
+- **Marketplace:** filter by item type (cards/packs), rarity, card type, holo type, and role. Sort by price, rarity, or date. New "Show Stats" toggle to preview card effects before buying
+- https://smitecomp.com/vault?tab=marketplace

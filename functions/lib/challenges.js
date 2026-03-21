@@ -958,205 +958,148 @@ export async function recalcDiscordChallenges(sql, userId) {
  * Returns all vault-related stats for challenge tracking.
  */
 export async function getVaultStats(sql, userId) {
-    const [
-        [statsRow], [claimRow], [convRow],
-        [tradeRow], [soldRow], [boughtRow], [bestSaleRow],
-        [giftsSentRow], [giftsOpenedRow],
-        [lineupRow], [lineupRareRow], [lineupEpicRow],
-        [maxConvRow], [rarityRow],
-        [totalCardsRow], [uniqueGodsRow], [uniqueCardsRow], [totalCoresRow],
-        [legendaryOwnedRow], [epicOwnedRow], [marketVolumeRow], [coresSpentRow],
-        [bEarnedRow], [bBestRow],
-        selfCardRows,
-    ] = await Promise.all([
-        // cc_stats: packs_opened, cards_dismantled, legendary_cards_dismantled, income_collections
-        sql`
-            SELECT COALESCE(packs_opened, 0)::integer as packs_opened,
-                   COALESCE(cards_dismantled, 0)::integer as cards_dismantled,
-                   COALESCE(legendary_cards_dismantled, 0)::integer as legendary_cards_dismantled,
-                   COALESCE(income_collections, 0)::integer as income_collections
-            FROM cc_stats WHERE user_id = ${userId}
-        `,
-        sql`
-            SELECT COUNT(*)::integer as count
-            FROM ember_transactions
-            WHERE user_id = ${userId} AND type = 'daily_claim'
-        `,
-        sql`
-            SELECT COUNT(*)::integer as count
+    const [row] = await sql`
+      WITH
+        stats AS (
+          SELECT COALESCE(packs_opened, 0)::int AS packs_opened,
+                 COALESCE(cards_dismantled, 0)::int AS cards_dismantled,
+                 COALESCE(legendary_cards_dismantled, 0)::int AS legendary_cards_dismantled,
+                 COALESCE(income_collections, 0)::int AS income_collections
+          FROM cc_stats WHERE user_id = ${userId}
+        ),
+        ember_agg AS (
+          SELECT
+            COUNT(*) FILTER (WHERE type = 'daily_claim')::int AS daily_cores_claimed,
+            COUNT(*) FILTER (WHERE type = 'passion_convert')::int AS cores_converted,
+            COALESCE(SUM(amount) FILTER (WHERE amount > 0), 0)::int AS total_cores_earned,
+            COALESCE(SUM(ABS(amount)) FILTER (WHERE amount < 0), 0)::int AS total_cores_spent,
+            COALESCE(SUM(amount) FILTER (WHERE type = 'bounty_reward'), 0)::int AS bounty_cores_earned
+          FROM ember_transactions WHERE user_id = ${userId}
+        ),
+        max_conv AS (
+          SELECT COALESCE(MAX(cnt), 0)::int AS max_conversions_day FROM (
+            SELECT COUNT(*)::int AS cnt
             FROM ember_transactions
             WHERE user_id = ${userId} AND type = 'passion_convert'
-        `,
-        // Trades completed (either side)
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_trades
-            WHERE (player_a_id = ${userId} OR player_b_id = ${userId}) AND status = 'completed'
-        `,
-        // Marketplace sold
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_market_listings
-            WHERE seller_id = ${userId} AND status = 'sold'
-        `,
-        // Marketplace bought
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_market_listings
-            WHERE buyer_id = ${userId} AND status = 'sold'
-        `,
-        // Best marketplace sale price
-        sql`
-            SELECT COALESCE(MAX(core_price), 0)::integer as max_price FROM cc_market_listings
-            WHERE seller_id = ${userId} AND status = 'sold'
-        `,
-        // Gifts sent
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_gifts
-            WHERE sender_id = ${userId}
-        `,
-        // Gifts opened (as recipient)
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_gifts
-            WHERE recipient_id = ${userId} AND opened = true
-        `,
-        // Starting Five slots filled
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_lineups
-            WHERE user_id = ${userId} AND card_id IS NOT NULL
-        `,
-        // Starting Five rare+ count (rare, epic, legendary, mythic)
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_lineups l
-            JOIN cc_cards c ON l.card_id = c.id
-            WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
-              AND c.rarity IN ('rare', 'epic', 'legendary', 'mythic')
-        `,
-        // Starting Five epic+ count
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_lineups l
-            JOIN cc_cards c ON l.card_id = c.id
-            WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
-              AND c.rarity IN ('epic', 'legendary', 'mythic')
-        `,
-        // Max conversions in a single day
-        sql`
-            SELECT COALESCE(MAX(daily_count), 0)::integer as max_conv FROM (
-                SELECT COUNT(*)::integer as daily_count
-                FROM ember_transactions
-                WHERE user_id = ${userId} AND type = 'passion_convert'
-                GROUP BY DATE(created_at)
-            ) sub
-        `,
-        // Max distinct rarities of any single card (god_id)
-        sql`
-            SELECT COALESCE(MAX(rarity_count), 0)::integer as max_rarities FROM (
-                SELECT COUNT(DISTINCT rarity)::integer as rarity_count
-                FROM cc_cards WHERE owner_id = ${userId}
-                GROUP BY god_id
-            ) sub
-        `,
-        // Total cards owned
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId}
-        `,
-        // Unique gods owned
-        sql`
-            SELECT COUNT(DISTINCT god_id)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId} AND card_type = 'god'
-        `,
-        // Unique cards owned (all types)
-        sql`
-            SELECT COUNT(DISTINCT god_id)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId}
-        `,
-        // Total lifetime Cores earned (all positive ember transactions)
-        sql`
-            SELECT COALESCE(SUM(amount), 0)::integer as total FROM ember_transactions
-            WHERE user_id = ${userId} AND amount > 0
-        `,
-        // Legendary cards currently owned
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId} AND rarity = 'legendary'
-        `,
-        // Epic+ cards currently owned
-        sql`
-            SELECT COUNT(*)::integer as count FROM cc_cards
-            WHERE owner_id = ${userId} AND rarity IN ('epic', 'legendary', 'mythic')
-        `,
-        // Marketplace sales volume (total Cores earned from selling)
-        sql`
-            SELECT COALESCE(SUM(core_price), 0)::integer as total FROM cc_market_listings
-            WHERE seller_id = ${userId} AND status = 'sold'
-        `,
-        // Total Cores spent (all negative ember transactions)
-        sql`
-            SELECT COALESCE(SUM(ABS(amount)), 0)::integer as total FROM ember_transactions
-            WHERE user_id = ${userId} AND amount < 0
-        `,
-        // Total Cores earned from fulfilling bounties
-        sql`
-            SELECT COALESCE(SUM(amount), 0)::integer as total FROM ember_transactions
-            WHERE user_id = ${userId} AND type = 'bounty_reward'
-        `,
-        // Best single bounty reward earned
-        sql`
-            SELECT COALESCE(MAX(core_reward), 0)::integer as best FROM cc_bounties
-            WHERE fulfilled_by = ${userId} AND status = 'completed'
-        `,
-        // Self-cards owned by rarity (player cards of yourself)
-        sql`
-            SELECT c.rarity, COUNT(*)::integer as count
+            GROUP BY DATE(created_at)
+          ) sub
+        ),
+        trades_agg AS (
+          SELECT COUNT(*)::int AS trades_completed FROM cc_trades
+          WHERE (player_a_id = ${userId} OR player_b_id = ${userId}) AND status = 'completed'
+        ),
+        market_agg AS (
+          SELECT
+            COUNT(*) FILTER (WHERE seller_id = ${userId})::int AS marketplace_sold,
+            COUNT(*) FILTER (WHERE buyer_id = ${userId})::int AS marketplace_bought,
+            COALESCE(MAX(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS best_marketplace_sale,
+            COALESCE(SUM(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS marketplace_volume
+          FROM cc_market_listings
+          WHERE status = 'sold' AND (seller_id = ${userId} OR buyer_id = ${userId})
+        ),
+        gifts_agg AS (
+          SELECT
+            COUNT(*) FILTER (WHERE sender_id = ${userId})::int AS gifts_sent,
+            COUNT(*) FILTER (WHERE recipient_id = ${userId} AND opened = true)::int AS gifts_opened
+          FROM cc_gifts
+          WHERE sender_id = ${userId} OR (recipient_id = ${userId} AND opened = true)
+        ),
+        lineup_agg AS (
+          SELECT
+            COUNT(*)::int AS starting_five_filled,
+            COUNT(*) FILTER (WHERE c.rarity IN ('rare','epic','legendary','mythic'))::int AS starting_five_rare_count,
+            COUNT(*) FILTER (WHERE c.rarity IN ('epic','legendary','mythic'))::int AS starting_five_epic_count
+          FROM cc_lineups l
+          JOIN cc_cards c ON l.card_id = c.id
+          WHERE l.user_id = ${userId} AND l.card_id IS NOT NULL
+        ),
+        cards_agg AS (
+          SELECT
+            COUNT(*)::int AS total_cards_owned,
+            COUNT(DISTINCT god_id) FILTER (WHERE card_type = 'god')::int AS unique_gods_owned,
+            COUNT(DISTINCT god_id)::int AS unique_cards_owned,
+            COUNT(*) FILTER (WHERE rarity = 'legendary')::int AS legendary_cards_owned,
+            COUNT(*) FILTER (WHERE rarity IN ('epic','legendary','mythic'))::int AS epic_cards_owned
+          FROM cc_cards WHERE owner_id = ${userId}
+        ),
+        rarity_depth AS (
+          SELECT COALESCE(MAX(cnt), 0)::int AS max_card_rarities FROM (
+            SELECT COUNT(DISTINCT rarity)::int AS cnt
+            FROM cc_cards WHERE owner_id = ${userId}
+            GROUP BY god_id
+          ) sub
+        ),
+        bounty_agg AS (
+          SELECT COALESCE(MAX(core_reward), 0)::int AS best_bounty_reward
+          FROM cc_bounties WHERE fulfilled_by = ${userId} AND status = 'completed'
+        ),
+        self_cards AS (
+          SELECT COALESCE(json_object_agg(sub.rarity, sub.cnt), '{}'::json) AS self_rarity_map
+          FROM (
+            SELECT c.rarity, COUNT(*)::int AS cnt
             FROM cc_cards c
             JOIN cc_player_defs pd ON c.def_id = pd.id
             JOIN users u ON u.linked_player_id = pd.player_id AND u.id = ${userId}
             WHERE c.owner_id = ${userId} AND c.card_type = 'player'
             GROUP BY c.rarity
-        `,
-    ])
+          ) sub
+        )
+      SELECT
+        s.packs_opened, s.cards_dismantled, s.legendary_cards_dismantled, s.income_collections,
+        e.daily_cores_claimed, e.cores_converted, e.total_cores_earned, e.total_cores_spent, e.bounty_cores_earned,
+        mc.max_conversions_day,
+        t.trades_completed,
+        m.marketplace_sold, m.marketplace_bought, m.best_marketplace_sale, m.marketplace_volume,
+        g.gifts_sent, g.gifts_opened,
+        l.starting_five_filled, l.starting_five_rare_count, l.starting_five_epic_count,
+        ca.total_cards_owned, ca.unique_gods_owned, ca.unique_cards_owned, ca.legendary_cards_owned, ca.epic_cards_owned,
+        r.max_card_rarities,
+        b.best_bounty_reward,
+        sc.self_rarity_map
+      FROM ember_agg e, max_conv mc, trades_agg t, market_agg m, gifts_agg g,
+           lineup_agg l, cards_agg ca, rarity_depth r, bounty_agg b, self_cards sc
+      LEFT JOIN stats s ON true
+    `
+
+    const selfMap = typeof row?.self_rarity_map === 'string'
+      ? JSON.parse(row.self_rarity_map)
+      : (row?.self_rarity_map || {})
 
     return {
-        packs_opened: statsRow?.packs_opened ?? 0,
-        daily_cores_claimed: claimRow?.count ?? 0,
-        cores_converted: convRow?.count ?? 0,
-        cards_dismantled: statsRow?.cards_dismantled ?? 0,
-        legendary_cards_dismantled: statsRow?.legendary_cards_dismantled ?? 0,
-        trades_completed: tradeRow?.count ?? 0,
-        marketplace_sold: soldRow?.count ?? 0,
-        marketplace_bought: boughtRow?.count ?? 0,
-        best_marketplace_sale: bestSaleRow?.max_price ?? 0,
-        gifts_sent: giftsSentRow?.count ?? 0,
-        gifts_opened: giftsOpenedRow?.count ?? 0,
-        starting_five_filled: lineupRow?.count ?? 0,
-        starting_five_rare_count: lineupRareRow?.count ?? 0,
-        starting_five_epic_count: lineupEpicRow?.count ?? 0,
-        income_collected: statsRow?.income_collections ?? 0,
-        max_conversions_day: maxConvRow?.max_conv ?? 0,
-        max_card_rarities: rarityRow?.max_rarities ?? 0,
-        total_cards_owned: totalCardsRow?.count ?? 0,
-        unique_gods_owned: uniqueGodsRow?.count ?? 0,
-        unique_cards_owned: uniqueCardsRow?.count ?? 0,
-        total_cores_earned: totalCoresRow?.total ?? 0,
-        legendary_cards_owned: legendaryOwnedRow?.count ?? 0,
-        epic_cards_owned: epicOwnedRow?.count ?? 0,
-        marketplace_volume: marketVolumeRow?.total ?? 0,
-        total_cores_spent: coresSpentRow?.total ?? 0,
-        bounty_cores_earned: bEarnedRow?.total ?? 0,
-        best_bounty_reward: bBestRow?.best ?? 0,
-        ...selfCardStatsByRarity(selfCardRows),
-    }
-}
-
-function selfCardStatsByRarity(rows) {
-    const byRarity = {}
-    for (const r of rows) byRarity[r.rarity] = r.count
-    return {
-        self_common_owned: byRarity.common ?? 0,
-        self_uncommon_owned: byRarity.uncommon ?? 0,
-        self_rare_owned: byRarity.rare ?? 0,
-        self_epic_owned: byRarity.epic ?? 0,
-        self_legendary_owned: byRarity.legendary ?? 0,
-        self_mythic_owned: byRarity.mythic ?? 0,
-        self_rarities_owned: Object.keys(byRarity).length,
+        packs_opened: row?.packs_opened ?? 0,
+        daily_cores_claimed: row?.daily_cores_claimed ?? 0,
+        cores_converted: row?.cores_converted ?? 0,
+        cards_dismantled: row?.cards_dismantled ?? 0,
+        legendary_cards_dismantled: row?.legendary_cards_dismantled ?? 0,
+        trades_completed: row?.trades_completed ?? 0,
+        marketplace_sold: row?.marketplace_sold ?? 0,
+        marketplace_bought: row?.marketplace_bought ?? 0,
+        best_marketplace_sale: row?.best_marketplace_sale ?? 0,
+        gifts_sent: row?.gifts_sent ?? 0,
+        gifts_opened: row?.gifts_opened ?? 0,
+        starting_five_filled: row?.starting_five_filled ?? 0,
+        starting_five_rare_count: row?.starting_five_rare_count ?? 0,
+        starting_five_epic_count: row?.starting_five_epic_count ?? 0,
+        income_collected: row?.income_collections ?? 0,
+        max_conversions_day: row?.max_conversions_day ?? 0,
+        max_card_rarities: row?.max_card_rarities ?? 0,
+        total_cards_owned: row?.total_cards_owned ?? 0,
+        unique_gods_owned: row?.unique_gods_owned ?? 0,
+        unique_cards_owned: row?.unique_cards_owned ?? 0,
+        total_cores_earned: row?.total_cores_earned ?? 0,
+        legendary_cards_owned: row?.legendary_cards_owned ?? 0,
+        epic_cards_owned: row?.epic_cards_owned ?? 0,
+        marketplace_volume: row?.marketplace_volume ?? 0,
+        total_cores_spent: row?.total_cores_spent ?? 0,
+        bounty_cores_earned: row?.bounty_cores_earned ?? 0,
+        best_bounty_reward: row?.best_bounty_reward ?? 0,
+        self_common_owned: selfMap.common ?? 0,
+        self_uncommon_owned: selfMap.uncommon ?? 0,
+        self_rare_owned: selfMap.rare ?? 0,
+        self_epic_owned: selfMap.epic ?? 0,
+        self_legendary_owned: selfMap.legendary ?? 0,
+        self_mythic_owned: selfMap.mythic ?? 0,
+        self_rarities_owned: Object.keys(selfMap).length,
     }
 }
 

@@ -48,99 +48,120 @@ export { CADENCE_SLOTS, CADENCES, GRACE_MS }
 // and fall back to currentStats — off by at most 1 action, acceptable since their
 // targets are always > 1.
 async function getBaselineStats(sql, userId, periodStart) {
-    const [
-        [dailyCores], [coresConverted], [trades],
-        [marketSold], [giftsSent], [bountyEarned]
-    ] = await Promise.all([
-        sql`SELECT COUNT(*)::integer as c FROM ember_transactions
-            WHERE user_id = ${userId} AND type = 'daily_claim' AND created_at < ${periodStart}`,
-        sql`SELECT COUNT(*)::integer as c FROM ember_transactions
-            WHERE user_id = ${userId} AND type = 'passion_convert' AND created_at < ${periodStart}`,
-        sql`SELECT COUNT(*)::integer as c FROM cc_trades
-            WHERE (player_a_id = ${userId} OR player_b_id = ${userId})
-              AND status = 'completed' AND completed_at < ${periodStart}`,
-        sql`SELECT COUNT(*)::integer as c FROM cc_market_listings
-            WHERE seller_id = ${userId} AND status = 'sold' AND sold_at < ${periodStart}`,
-        sql`SELECT COUNT(*)::integer as c FROM cc_gifts
-            WHERE sender_id = ${userId} AND created_at < ${periodStart}`,
-        sql`SELECT COALESCE(SUM(amount), 0)::integer as c FROM ember_transactions
-            WHERE user_id = ${userId} AND type = 'bounty_reward' AND created_at < ${periodStart}`,
-    ])
+    const [row] = await sql`
+      WITH
+        ember_base AS (
+          SELECT
+            COUNT(*) FILTER (WHERE type = 'daily_claim')::int AS daily_cores_claimed,
+            COUNT(*) FILTER (WHERE type = 'passion_convert')::int AS cores_converted,
+            COALESCE(SUM(amount) FILTER (WHERE type = 'bounty_reward'), 0)::int AS bounty_cores_earned
+          FROM ember_transactions
+          WHERE user_id = ${userId} AND created_at < ${periodStart}
+        ),
+        trades_base AS (
+          SELECT COUNT(*)::int AS trades_completed FROM cc_trades
+          WHERE (player_a_id = ${userId} OR player_b_id = ${userId})
+            AND status = 'completed' AND completed_at < ${periodStart}
+        ),
+        market_base AS (
+          SELECT COUNT(*)::int AS marketplace_sold FROM cc_market_listings
+          WHERE seller_id = ${userId} AND status = 'sold' AND sold_at < ${periodStart}
+        ),
+        gifts_base AS (
+          SELECT COUNT(*)::int AS gifts_sent FROM cc_gifts
+          WHERE sender_id = ${userId} AND created_at < ${periodStart}
+        )
+      SELECT e.*, t.trades_completed, m.marketplace_sold, g.gifts_sent
+      FROM ember_base e, trades_base t, market_base m, gifts_base g
+    `
 
     return {
-        daily_cores_claimed: dailyCores.c,
-        cores_converted: coresConverted.c,
-        trades_completed: trades.c,
-        marketplace_sold: marketSold.c,
-        gifts_sent: giftsSent.c,
-        bounty_cores_earned: bountyEarned.c,
+        daily_cores_claimed: row?.daily_cores_claimed ?? 0,
+        cores_converted: row?.cores_converted ?? 0,
+        trades_completed: row?.trades_completed ?? 0,
+        marketplace_sold: row?.marketplace_sold ?? 0,
+        gifts_sent: row?.gifts_sent ?? 0,
+        bounty_cores_earned: row?.bounty_cores_earned ?? 0,
     }
 }
 
 export async function rollAssignments(sql, userId, currentStats) {
-    for (const cadence of CADENCES) {
-        const { start, end } = getPeriod(cadence)
+    const periods = CADENCES.map(c => ({ cadence: c, ...getPeriod(c) }))
+    const periodStarts = periods.map(p => p.start)
 
-        // Check if assignments already exist for this period
-        const existing = await sql`
-            SELECT 1 FROM cc_challenge_assignments
-            WHERE user_id = ${userId} AND cadence = ${cadence}
-              AND period_start = ${start}
-            LIMIT 1
-        `
-        if (existing.length > 0) continue
+    // Batch check: which cadences already have assignments for this period?
+    const existing = await sql`
+        SELECT DISTINCT cadence FROM cc_challenge_assignments
+        WHERE user_id = ${userId}
+          AND (cadence, period_start) IN (
+            SELECT unnest(${CADENCES}::text[]), unnest(${periodStarts}::timestamptz[])
+          )
+    `
+    const existingSet = new Set(existing.map(r => r.cadence))
+    const needed = periods.filter(p => !existingSet.has(p.cadence))
+    if (needed.length === 0) return
 
+    // Batch fetch: all templates for needed cadences
+    const neededCadences = needed.map(p => p.cadence)
+    const templates = await sql`
+        SELECT id, stat_key, reward_type, cadence
+        FROM cc_challenge_templates
+        WHERE cadence = ANY(${neededCadences}) AND is_active = true
+    `
+
+    // Group templates by cadence → reward_type, select per cadence
+    const allUserIds = [], allTemplateIds = [], allCadences = [], allStarts = [], allEnds = [], allBaselines = []
+    const baselineCache = {}
+
+    for (const { cadence, start, end } of needed) {
         const slots = CADENCE_SLOTS[cadence]
-
-        // Get available templates grouped by reward_type
-        const templates = await sql`
-            SELECT id, stat_key, reward_type
-            FROM cc_challenge_templates
-            WHERE cadence = ${cadence} AND is_active = true
-        `
-
         const byType = { cores: [], pack: [], mixed: [] }
         for (const t of templates) {
-            if (byType[t.reward_type]) byType[t.reward_type].push(t)
+            if (t.cadence === cadence && byType[t.reward_type]) byType[t.reward_type].push(t)
         }
 
-        // Random selection per reward_type
         const selected = []
         for (const [type, count] of Object.entries(slots)) {
             const pool = byType[type] || []
             const shuffled = [...pool].sort(() => Math.random() - 0.5)
             selected.push(...shuffled.slice(0, count))
         }
-
         if (selected.length === 0) continue
 
-        // Compute time-aware baselines for transaction-based stats,
-        // falling back to currentStats for counter-based stats
-        const timeBaselines = await getBaselineStats(sql, userId, start)
+        // Get baselines (1 CTE query per distinct period start)
+        const startKey = start.toISOString()
+        if (!baselineCache[startKey]) {
+            baselineCache[startKey] = await getBaselineStats(sql, userId, start)
+        }
+        const timeBaselines = baselineCache[startKey]
 
-        // Batch insert assignments with baseline values
-        const userIds = selected.map(() => userId)
-        const templateIds = selected.map(t => t.id)
-        const cadences = selected.map(() => cadence)
-        const starts = selected.map(() => start)
-        const ends = selected.map(() => end)
-        const baselines = selected.map(t =>
-            t.stat_key in timeBaselines ? timeBaselines[t.stat_key] : Number(currentStats[t.stat_key] || 0)
-        )
-
-        await sql`
-            INSERT INTO cc_challenge_assignments
-                (user_id, template_id, cadence, period_start, period_end, baseline_value)
-            SELECT
-                unnest(${userIds}::int[]),
-                unnest(${templateIds}::int[]),
-                unnest(${cadences}::text[]),
-                unnest(${starts}::timestamptz[]),
-                unnest(${ends}::timestamptz[]),
-                unnest(${baselines}::int[])
-            ON CONFLICT (user_id, template_id, period_start) DO NOTHING
-        `
+        for (const t of selected) {
+            allUserIds.push(userId)
+            allTemplateIds.push(t.id)
+            allCadences.push(cadence)
+            allStarts.push(start)
+            allEnds.push(end)
+            allBaselines.push(
+                t.stat_key in timeBaselines ? timeBaselines[t.stat_key] : Number(currentStats[t.stat_key] || 0)
+            )
+        }
     }
+
+    if (allTemplateIds.length === 0) return
+
+    // Single batch insert for all cadences
+    await sql`
+        INSERT INTO cc_challenge_assignments
+            (user_id, template_id, cadence, period_start, period_end, baseline_value)
+        SELECT
+            unnest(${allUserIds}::int[]),
+            unnest(${allTemplateIds}::int[]),
+            unnest(${allCadences}::text[]),
+            unnest(${allStarts}::timestamptz[]),
+            unnest(${allEnds}::timestamptz[]),
+            unnest(${allBaselines}::int[])
+        ON CONFLICT (user_id, template_id, period_start) DO NOTHING
+    `
 }
 
 export async function getRotatingChallenges(sql, userId) {

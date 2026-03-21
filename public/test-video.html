@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Card Opening — Video Glow Test</title>
+  <style>
+    * { margin: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0a0a12;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    .scene {
+      perspective: 1200px;
+      width: 340px;
+      height: 476px;
+      position: relative;
+    }
+
+    /* The card wrapper — handles the flip */
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .card.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    /* Back of card (shown first) */
+    .card-back {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      border: 3px solid #c9a227;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-back::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border: 2px solid rgba(201, 162, 39, 0.3);
+      border-radius: 12px;
+    }
+
+    .card-back-logo {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #c9a227 0%, #8b6914 60%, #1a1a2e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #1a1a2e;
+      font-weight: 900;
+      box-shadow: 0 0 40px rgba(201, 162, 39, 0.3);
+    }
+
+    .card-back-text {
+      color: #c9a227;
+      font-size: 14px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    /* Front of card */
+    .card-front {
+      transform: rotateY(180deg);
+      background: linear-gradient(180deg, #1a1028 0%, #0d0d1a 100%);
+      border: 3px solid #c9a227;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      padding: 12px 16px 8px;
+      text-align: center;
+    }
+
+    .card-name {
+      color: #f0d060;
+      font-size: 22px;
+      font-weight: 800;
+      text-shadow: 0 0 12px rgba(240, 208, 96, 0.5);
+    }
+
+    .card-role {
+      color: #9b7ebd;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .card-image {
+      flex: 1;
+      margin: 0 12px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #2a1f3d 0%, #1a1028 100%);
+      border: 2px solid rgba(201, 162, 39, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card-image-placeholder {
+      font-size: 80px;
+      opacity: 0.3;
+    }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px 16px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      color: #f0d060;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .card-footer {
+      padding: 8px 16px 12px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.25);
+      font-size: 10px;
+      font-style: italic;
+    }
+
+    /* Video glow overlay — sits on top of the card */
+    .video-glow {
+      position: absolute;
+      inset: -40%;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-glow video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      mix-blend-mode: screen;
+    }
+
+    /* Anticipation — shake before flip */
+    .card.anticipating {
+      animation: anticipate-shake 0.06s infinite alternate;
+    }
+
+    @keyframes anticipate-shake {
+      0% { transform: translateX(-2px) rotate(-0.5deg); }
+      100% { transform: translateX(2px) rotate(0.5deg); }
+    }
+
+    /* Screen flash on reveal */
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: white;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 100;
+      transition: opacity 0.1s;
+    }
+
+    .flash-overlay.active {
+      opacity: 0.7;
+      transition: opacity 0.05s;
+    }
+
+    /* Glow pulse behind card */
+    .card-glow {
+      position: absolute;
+      inset: -20px;
+      border-radius: 30px;
+      opacity: 0;
+      transition: opacity 0.5s, box-shadow 0.5s;
+      z-index: -1;
+    }
+
+    .card-glow.active {
+      opacity: 1;
+      box-shadow: 0 0 80px 20px rgba(201, 162, 39, 0.5),
+                  0 0 160px 60px rgba(201, 162, 39, 0.2);
+    }
+
+    /* Ring burst */
+    .ring-burst {
+      position: absolute;
+      inset: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      border: 3px solid rgba(201, 162, 39, 0.8);
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+    }
+
+    .ring-burst.active {
+      animation: ring-expand 0.8s cubic-bezier(0, 0.5, 0.3, 1) forwards;
+    }
+
+    @keyframes ring-expand {
+      0% {
+        inset: 50%;
+        width: 0; height: 0;
+        opacity: 1;
+        border-width: 4px;
+      }
+      100% {
+        inset: -200px;
+        width: calc(100% + 400px);
+        height: calc(100% + 400px);
+        opacity: 0;
+        border-width: 1px;
+      }
+    }
+
+    /* Sparkle particles */
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #f0d060;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 15;
+      box-shadow: 0 0 8px #f0d060;
+    }
+
+    /* Prompt text */
+    .prompt {
+      position: absolute;
+      bottom: -50px;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 14px;
+      letter-spacing: 2px;
+      animation: pulse-text 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-text {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.7; }
+    }
+
+    .prompt.hidden { display: none; }
+
+    /* Holo sweep on card front */
+    .holo-sweep {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.15) 45%,
+        rgba(200, 170, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.15) 55%,
+        transparent 70%
+      );
+      transform: translateX(-150%);
+      pointer-events: none;
+      z-index: 5;
+      border-radius: 16px;
+    }
+
+    .holo-sweep.active {
+      animation: sweep-across 1s 0.3s ease-out forwards;
+    }
+
+    @keyframes sweep-across {
+      to { transform: translateX(150%); }
+    }
+
+    /* Reset button */
+    .reset-btn {
+      position: fixed;
+      bottom: 30px;
+      padding: 10px 28px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+      z-index: 200;
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+
+    /* Rarity selector */
+    .controls {
+      position: fixed;
+      top: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 200;
+    }
+
+    .controls button {
+      padding: 6px 16px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.5);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+
+    .controls button:hover, .controls button.active {
+      background: rgba(255,255,255,0.15);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+<div class="controls">
+  <button onclick="setVideo(1)" id="v1">Test 1 (VP9)</button>
+  <button onclick="setVideo(2)" id="v2">Test 2 (AV1)</button>
+  <button onclick="setVideo(3)" id="v3" class="active">Test 3 (VP9+Audio)</button>
+</div>
+
+<div class="flash-overlay" id="flash"></div>
+
+<div class="scene" id="scene">
+  <div class="card-glow" id="glow"></div>
+  <div class="ring-burst" id="ring"></div>
+
+  <div class="card" id="card" onclick="openCard()">
+    <!-- Back -->
+    <div class="card-face card-back">
+      <div class="card-back-logo">S2</div>
+      <div class="card-back-text">SMITE II</div>
+    </div>
+
+    <!-- Front -->
+    <div class="card-face card-front">
+      <div class="holo-sweep" id="holoSweep"></div>
+      <div class="card-header">
+        <div class="card-name">Yemoja</div>
+        <div class="card-role">Support</div>
+      </div>
+      <div class="card-image">
+        <div class="card-image-placeholder">🌊</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat">
+          <div class="stat-value">8.2</div>
+          <div class="stat-label">KDA</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">74%</div>
+          <div class="stat-label">W/R</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">42</div>
+          <div class="stat-label">Games</div>
+        </div>
+      </div>
+      <div class="card-footer">"The waters rise for those who believe."</div>
+    </div>
+
+    <!-- Video Glow Overlay -->
+    <div class="video-glow" id="videoGlow">
+      <video id="glowVideo" muted loop playsinline>
+        <source src="/OSLpacktest3_IA.webm" type="video/webm">
+      </video>
+    </div>
+  </div>
+
+  <div class="prompt" id="prompt">CLICK TO REVEAL</div>
+</div>
+
+<button class="reset-btn" onclick="resetCard()">Reset</button>
+
+<script>
+  const card = document.getElementById('card');
+  const flash = document.getElementById('flash');
+  const glow = document.getElementById('glow');
+  const ring = document.getElementById('ring');
+  const prompt = document.getElementById('prompt');
+  const videoGlow = document.getElementById('videoGlow');
+  const glowVideo = document.getElementById('glowVideo');
+  const holoSweep = document.getElementById('holoSweep');
+  const scene = document.getElementById('scene');
+
+  const videos = {
+    1: '/OSLPackTest1.webm',
+    2: '/OSLPacktest2_EM_T.webm',
+    3: '/OSLpacktest3_IA.webm'
+  };
+
+  let opened = false;
+
+  function setVideo(n) {
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    document.getElementById('v' + n).classList.add('active');
+    glowVideo.src = videos[n];
+    if (opened) {
+      glowVideo.currentTime = 0;
+      glowVideo.play();
+    }
+  }
+
+  function openCard() {
+    if (opened) return;
+    opened = true;
+    prompt.classList.add('hidden');
+
+    // Phase 1: Anticipation shake
+    card.classList.add('anticipating');
+    glow.classList.add('active');
+
+    setTimeout(() => {
+      // Phase 2: Flash + Flip
+      card.classList.remove('anticipating');
+      flash.classList.add('active');
+      card.classList.add('flipped');
+
+      // Start video
+      glowVideo.currentTime = 0;
+      glowVideo.play();
+      videoGlow.style.opacity = '1';
+
+      // Ring burst
+      ring.classList.add('active');
+
+      // Spawn particles
+      spawnParticles(20);
+
+      // Holo sweep
+      holoSweep.classList.add('active');
+
+      setTimeout(() => {
+        flash.classList.remove('active');
+      }, 150);
+
+      // Fade video glow after a few seconds
+      setTimeout(() => {
+        videoGlow.style.transition = 'opacity 2s ease';
+        videoGlow.style.opacity = '0.5';
+      }, 4000);
+
+    }, 800); // anticipation duration
+  }
+
+  function spawnParticles(count) {
+    const rect = scene.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+      const dist = 150 + Math.random() * 200;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const size = 3 + Math.random() * 5;
+
+      p.style.left = '50%';
+      p.style.top = '50%';
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+
+      scene.appendChild(p);
+
+      p.animate([
+        { transform: 'translate(-50%, -50%) translate(0, 0)', opacity: 1 },
+        { transform: `translate(-50%, -50%) translate(${tx}px, ${ty}px)`, opacity: 0 }
+      ], {
+        duration: 600 + Math.random() * 600,
+        easing: 'cubic-bezier(0, 0.6, 0.3, 1)',
+        fill: 'forwards'
+      }).onfinish = () => p.remove();
+    }
+  }
+
+  function resetCard() {
+    opened = false;
+    card.classList.remove('flipped', 'anticipating');
+    flash.classList.remove('active');
+    glow.classList.remove('active');
+    ring.classList.remove('active');
+    holoSweep.classList.remove('active');
+    prompt.classList.remove('hidden');
+    videoGlow.style.transition = 'opacity 0.3s ease';
+    videoGlow.style.opacity = '0';
+    glowVideo.pause();
+
+    // Reset ring animation
+    void ring.offsetWidth;
+  }
+</script>
+
+</body>
+</html>

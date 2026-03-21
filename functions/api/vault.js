@@ -155,11 +155,15 @@ const handler = async (event) => {
 
 // ═══ GET: Load state ═══
 async function handleLoad(sql, user) {
-  await ensureStats(sql, user.id)
-  await ensureEmberBalance(sql, user.id)
+  // Ensure stats + ember balance rows exist in a single CTE
+  await sql`
+    WITH s AS (INSERT INTO cc_stats (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING),
+         e AS (INSERT INTO ember_balances (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING)
+    SELECT 1
+  `
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, marketLockedCards, tradeLockedCards, marketLockedPacks, tradeLockedPacks, pendingSignatureCount, pendingApprovalCount, rotationPacks] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -216,22 +220,36 @@ async function handleLoad(sql, user) {
       WHERE user_id = ${user.id} AND type = 'cc_pack' AND amount <= 0
       ORDER BY created_at DESC LIMIT 1
     `,
-    sql`SELECT card_id FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active'`,
+    // Locked cards: market listings + active trades (merged)
     sql`
-      SELECT tc.card_id FROM cc_trade_cards tc
+      SELECT card_id, 'market' AS source FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active' AND card_id IS NOT NULL
+      UNION ALL
+      SELECT tc.card_id, 'trade' FROM cc_trade_cards tc
       JOIN cc_trades t ON tc.trade_id = t.id
-      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active')
+      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND tc.card_id IS NOT NULL
     `,
-    sql`SELECT pack_inventory_id FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active' AND item_type = 'pack'`,
+    // Locked packs: market listings + active trades (merged)
     sql`
+      SELECT pack_inventory_id FROM cc_market_listings WHERE seller_id = ${user.id} AND status = 'active' AND item_type = 'pack'
+      UNION ALL
       SELECT tc.pack_inventory_id FROM cc_trade_cards tc
       JOIN cc_trades t ON tc.trade_id = t.id
       WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND tc.item_type = 'pack'
     `,
-    user.linked_player_id
-      ? sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests WHERE signer_player_id = ${user.linked_player_id} AND status = 'pending'`
-      : Promise.resolve([{ count: 0 }]),
-    sql`SELECT COUNT(*)::int AS count FROM cc_signature_requests sr JOIN cc_cards c ON sr.card_id = c.id WHERE c.owner_id = ${user.id} AND sr.status = 'awaiting_approval'`,
+    // Pending signatures: own requests + approval requests (merged via CTE)
+    sql`
+      WITH signer AS (
+        SELECT COUNT(*)::int AS count FROM cc_signature_requests
+        WHERE signer_player_id = ${user.linked_player_id || 0} AND status = 'pending'
+      ),
+      approver AS (
+        SELECT COUNT(*)::int AS count FROM cc_signature_requests sr
+        JOIN cc_cards c ON sr.card_id = c.id
+        WHERE c.owner_id = ${user.id} AND sr.status = 'awaiting_approval'
+      )
+      SELECT signer.count AS signer_count, approver.count AS approver_count
+      FROM signer, approver
+    `,
     sql`
       SELECT pack_type_id FROM cc_pack_rotation_schedule
       WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
@@ -297,8 +315,8 @@ async function handleLoad(sql, user) {
         endsAt: s.ends_at,
       })),
       pendingTradeCount: tradeCount[0]?.count || 0,
-      pendingSignatureCount: pendingSignatureCount[0]?.count || 0,
-      pendingApprovalCount: pendingApprovalCount[0]?.count || 0,
+      pendingSignatureCount: pendingSignatures[0]?.signer_count || 0,
+      pendingApprovalCount: pendingSignatures[0]?.approver_count || 0,
       inventory: inventory.map(i => ({
         id: i.id,
         packTypeId: i.pack_type_id,
@@ -306,14 +324,8 @@ async function handleLoad(sql, user) {
         source: i.source,
         createdAt: i.created_at,
       })),
-      lockedCardIds: [
-        ...marketLockedCards.map(r => r.card_id),
-        ...tradeLockedCards.map(r => r.card_id),
-      ],
-      lockedPackIds: [
-        ...marketLockedPacks.map(r => r.pack_inventory_id),
-        ...tradeLockedPacks.map(r => r.pack_inventory_id),
-      ],
+      lockedCardIds: lockedCards.map(r => r.card_id),
+      lockedPackIds: lockedPacks.map(r => r.pack_inventory_id),
       vendingCooldown: (() => {
         if (!lastVend[0]) return 0
         const elapsed = (Date.now() - new Date(lastVend[0].created_at).getTime()) / 1000
