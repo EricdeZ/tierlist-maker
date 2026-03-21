@@ -164,7 +164,7 @@ async function handleLoad(sql, user) {
   await grantStarterPacks(sql, user.id)
 
   const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks] = await Promise.all([
-    sql`SELECT c.*, d.best_god_name, d.player_id AS def_player_id,
+    sql`SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
          FROM cc_cards c
@@ -2507,6 +2507,7 @@ function formatCard(row) {
     isFirstEdition: row.is_first_edition || false,
     isConnected: row.card_data?.isConnected ?? null,
     bestGodName: row.best_god_name || null,
+    teamId: row.team_id || row.card_data?.teamId || null,
     defPlayerId: row.def_player_id || null,
     signatureUrl: row.signature_url || null,
     templateId: row.template_id || null,
