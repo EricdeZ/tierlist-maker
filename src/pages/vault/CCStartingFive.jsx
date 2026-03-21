@@ -1741,7 +1741,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
       synergyCards: eligible.filter(c => c._isSynergy).sort(sortFn),
       otherCards: eligible.filter(c => !c._isSynergy).sort(sortFn),
     }
-  }, [collection, allSlottedIds, role, slotType, playerTier, playerHoloType, bestGodName])
+  }, [collection, allSlottedIds, role, slotType, playerTier, playerRarity, playerHoloType, bestGodName])
 
   return (
     <div
