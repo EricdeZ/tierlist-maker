@@ -792,6 +792,7 @@ export default function CCStartingFive() {
           allSlottedIds={allSlottedIds}
           playerRarity={slottedCards[attachPickerState.role]?.rarity}
           playerHoloType={slottedCards[attachPickerState.role]?.holoType}
+          bestGodName={slottedCards[attachPickerState.role]?.bestGodName}
           onSelect={handleAttachSlot}
           onClose={() => setAttachPickerState(null)}
           slotting={slotting}
@@ -1698,13 +1699,13 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, activeSlots
 }
 
 
-function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, playerHoloType, onSelect, onClose, slotting, getDefOverride }) {
+function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRarity, playerHoloType, bestGodName, onSelect, onClose, slotting, getDefOverride }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const roleIcon = roleInfo?.icon
   const playerTier = RARITY_TIER[playerRarity] || 0
 
-  const eligibleCards = useMemo(() => {
-    return collection
+  const { synergyCards, otherCards } = useMemo(() => {
+    const eligible = collection
       .filter(card => {
         const type = getCardType(card)
         if (type !== slotType) return false
@@ -1720,15 +1721,24 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
       .map(card => ({
         ...card,
         _holoMismatch: !isHoloMatch(playerHoloType, card.holoType),
+        _isSynergy: slotType === 'god' && isGodSynergy(card.godName, bestGodName),
       }))
-      .sort((a, b) => {
-        // Sort mismatched cards to the bottom
-        if (a._holoMismatch !== b._holoMismatch) return a._holoMismatch ? 1 : -1
-        const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
-        if (rDiff !== 0) return rDiff
-        return (a.godName || '').localeCompare(b.godName || '')
-      })
-  }, [collection, allSlottedIds, role, slotType, playerTier, playerHoloType])
+
+    const sortFn = (a, b) => {
+      if (a._holoMismatch !== b._holoMismatch) return a._holoMismatch ? 1 : -1
+      const rDiff = (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+      if (rDiff !== 0) return rDiff
+      return (a.godName || '').localeCompare(b.godName || '')
+    }
+
+    if (slotType !== 'god' || !bestGodName) {
+      return { synergyCards: [], otherCards: eligible.sort(sortFn) }
+    }
+    return {
+      synergyCards: eligible.filter(c => c._isSynergy).sort(sortFn),
+      otherCards: eligible.filter(c => !c._isSynergy).sort(sortFn),
+    }
+  }, [collection, allSlottedIds, role, slotType, playerTier, playerHoloType, bestGodName])
 
   return (
     <div
@@ -1753,7 +1763,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
         </div>
 
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
-          {eligibleCards.length === 0 ? (
+          {synergyCards.length === 0 && otherCards.length === 0 ? (
             <div className="text-center py-12 text-white/30">
               {roleIcon && <img src={roleIcon} alt="" className="w-10 h-10 mx-auto mb-3 opacity-20 object-contain" />}
               <p className="text-sm cd-head tracking-wider">No eligible {slotType} cards</p>
@@ -1765,18 +1775,52 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              {eligibleCards.map(card => (
-                <PickerCard
-                  key={card.id}
-                  card={card}
-                  onSelect={() => onSelect(card.id, role, slotType)}
-                  disabled={slotting}
-                  override={getDefOverride(card)}
-                  holoMismatch={card._holoMismatch}
-                />
-              ))}
-            </div>
+            <>
+              {synergyCards.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[11px] font-bold cd-head text-emerald-400 tracking-wider">SYNERGY MATCHES</span>
+                    <span className="text-[10px] text-emerald-400/50 cd-head">+40% bonus</span>
+                    <div className="flex-1 h-px bg-emerald-400/10" />
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-5">
+                    {synergyCards.map(card => (
+                      <PickerCard
+                        key={card.id}
+                        card={card}
+                        onSelect={() => onSelect(card.id, role, slotType)}
+                        disabled={slotting}
+                        override={getDefOverride(card)}
+                        holoMismatch={card._holoMismatch}
+                        isSynergy
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {otherCards.length > 0 && (
+                <>
+                  {synergyCards.length > 0 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[11px] font-bold cd-head text-white/30 tracking-wider">OTHER GODS</span>
+                      <div className="flex-1 h-px bg-white/[0.06]" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                    {otherCards.map(card => (
+                      <PickerCard
+                        key={card.id}
+                        card={card}
+                        onSelect={() => onSelect(card.id, role, slotType)}
+                        disabled={slotting}
+                        override={getDefOverride(card)}
+                        holoMismatch={card._holoMismatch}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
