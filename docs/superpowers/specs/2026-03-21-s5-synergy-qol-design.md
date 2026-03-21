@@ -20,7 +20,8 @@ Two complementary improvements:
 
 ### Player Card Picker
 
-**Team filter bar** — horizontal scrollable row of team badges at the top of the picker modal.
+**Team filter bar** — horizontal scrollable row of team color swatches + names at the top of the picker modal.
+- Uses `cardData.teamColor` for swatches (team logos not available on collection cards)
 - Only shows teams that have eligible cards in the filtered list
 - Count badge per team (e.g. "Leviathans (4)")
 - "All" option selected by default
@@ -29,12 +30,15 @@ Two complementary improvements:
 **Team synergy preview** — on each card in the picker grid, below existing income stats:
 - If slotting this player would create or improve a team synergy in the current lineup, show an indicator
 - Format: "+20% team" (new synergy) or "20%→30% team" (upgrade existing)
-- Calculated by counting how many cards from that player's team are already slotted in the active lineup
+- Calculated by counting how many cards from that player's team (by `teamId`) are already slotted in the active lineup, including the bench slot
+- Role-mismatch cards (already slotted but flagged `roleMismatch`) are excluded from team synergy count, matching server-side logic
 - No indicator if no team synergy would result (< 2 teammates after slotting)
 
 ### God Attachment Picker
 
-**Synergy-first sorting** — god cards matching the player's `bestGodName` sort above all other eligible cards, regardless of rarity.
+**New prop required:** `AttachmentPicker` needs the slotted player's `bestGodName` threaded in (available from `slottedCards[role].bestGodName`).
+
+**Synergy-first sorting** — god cards matching the player's `bestGodName` (case-insensitive, matching `checkSynergy` in `starting-five.js`) sort above all other eligible cards, regardless of rarity.
 
 **Synergy section divider** — visual separator splitting the grid:
 - Top section: "Synergy Matches" header — god cards that trigger the +40% synergy bonus
@@ -52,6 +56,7 @@ No changes (no synergy mechanic for items).
 
 ### Placement & Behavior
 
+- New component: `src/pages/vault/starting-five/SynergyPlanner.jsx` (extracted from main file to follow project split pattern)
 - Collapsible panel within the Starting 5 view, above the lineup slots (below the income summary)
 - Collapsed by default, header: "Synergy Planner" with an icon
 - Expands inline (not a modal)
@@ -63,14 +68,18 @@ A list of teams sorted by opportunity (most actionable first). Each entry shows:
 
 | Field | Description |
 |-------|-------------|
-| Team name + color | Team badge/swatch |
+| Team name + color | Team color swatch + name (from `cardData.teamColor`/`teamName`) |
 | Eligible cards owned | Count of holo player cards for this team in collection |
 | Currently slotted | Count slotted, with lineup noted (e.g. "2 in Current, 1 in All-Star") |
 | Bonus tier | Current bonus and next tier (e.g. "2 slotted → +20%, slot 1 more → +30%") |
 | Unavailable cards | Cards locked in the other lineup shown dimmed/noted |
 
+**Team matching:** Uses integer `teamId` (not string `teamName`) to avoid cross-league name collisions. Requires exposing `team_id` through `formatCard()` in vault.js (see Backend section).
+
 **Filtering rules:**
 - Only shows teams where user owns 2+ eligible holo player cards (below that, synergy is impossible)
+- "Eligible" = any holo player card owned (has `holoType`), regardless of binder/marketplace lock state — planner shows potential, not just immediately actionable moves
+- Role-mismatch slotted cards excluded from synergy counts
 - Sorted by: teams with the most actionable slots first (have unslotted cards that could improve a bonus tier)
 
 ### God Synergy Section
@@ -82,13 +91,16 @@ A list of god synergy opportunities across all slotted players in both lineups. 
 | Player name | The slotted player card |
 | Lineup | Which lineup they're in (Current Season / All-Star) |
 | Best god | The player's `bestGodName` |
-| Status | One of: "Matched" (checkmark, god card attached), "Available" (god card in collection, not attached), "Not Owned" (no matching god card) |
+| Status | One of: "Matched" (checkmark), "Available" (in collection, not attached), "Available (ineligible)" (exists but can't attach due to rarity/role/holo mismatch), "Not Owned" |
 | Card details | For "Available" status: the god card's rarity and holo type |
 
+**God name matching:** Case-insensitive comparison of `godName` to `bestGodName`, matching the server-side `checkSynergy` function.
+
 **Sorting:**
-1. Available but unattached (actionable opportunities) — first
-2. Already matched — second
-3. Not owned — last (grayed out)
+1. Available and attachable (actionable opportunities) — first
+2. Available but ineligible (awareness) — second
+3. Already matched — third
+4. Not owned — last (grayed out)
 
 ### Behavior
 
@@ -101,10 +113,13 @@ A list of god synergy opportunities across all slotted players in both lineups. 
 ## Files Affected
 
 ### Frontend (modify)
-- `src/pages/vault/CCStartingFive.jsx` — Add team filter bar + synergy preview to `CardPicker`, add synergy sorting + divider to `AttachmentPicker`, add `SynergyPlanner` panel
+- `src/pages/vault/CCStartingFive.jsx` — Add team filter bar + synergy preview to `CardPicker`, add `bestGodName` prop + synergy sorting/divider to `AttachmentPicker`
 
-### Backend
-- No backend changes required — all synergy data (team names, bestGodName, collection contents) is already available client-side from the existing Starting 5 and collection payloads
+### Frontend (new)
+- `src/pages/vault/starting-five/SynergyPlanner.jsx` — Synergy Planner panel component
+
+### Backend (modify)
+- `functions/api/vault.js` — Add `teamId` to `formatCard()` output (one-line: `teamId: row.team_id || row.card_data?.teamId || null`)
 
 ### Data
 - No database changes
@@ -120,3 +135,4 @@ A list of god synergy opportunities across all slotted players in both lineups. 
 - Synergy notifications or push alerts
 - Changes to synergy mechanics themselves (bonus values, stacking rules)
 - Leaderboard changes
+- Collapsed/expanded state persistence (can add later if needed)
