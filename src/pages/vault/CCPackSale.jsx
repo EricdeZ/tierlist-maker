@@ -171,6 +171,7 @@ function PackZoomModal({ slot, onClose, packTypesMap }) {
             tier={packTypeId}
             name={pack.name}
             cardCount={pack.cards}
+            color={packColor}
             seed={basePack?.sortOrder ?? 0}
           />
         </div>
@@ -424,6 +425,7 @@ export default function SaleVendingMachine() {
                               tier={packTypeId}
                               name={pack.name}
                               cardCount={pack.cards}
+                              color={pack.color}
                               seed={packTypesMap[packTypeId]?.sortOrder ?? idx}
                               compact
                             />
@@ -526,6 +528,7 @@ export default function SaleVendingMachine() {
                       tier={dispensedSlot.pack.packTypeId || dispensedSlot.pack.id}
                       name={dispensedSlot.pack.name}
                       cardCount={dispensedSlot.pack.cards}
+                      color={dispensedSlot.pack.color || packTypesMap[dispensedSlot.pack.packTypeId]?.color}
                       seed={packTypesMap[dispensedSlot.pack.packTypeId]?.sortOrder ?? 0}
                       compact
                     />

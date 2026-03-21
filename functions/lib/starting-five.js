@@ -11,6 +11,8 @@ const S5_FLAT_PASSION = {
 const S5_REVERSE_MULT = {
   uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
 }
+const S5_FLAT_SCALE = 1.4
+const S5_REVERSE_FLAT_RATIO = 0.25
 const S5_FULL_RATIO = 0.44
 const S5_BENCH_EFFECTIVENESS = 0.50
 export const S5_ALLSTAR_MODIFIER = 0.615
@@ -25,7 +27,7 @@ const S5_ATT_MULT = {
 }
 const S5_FULL_ATT_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.40
-export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60 }
+export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 }
 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
@@ -56,21 +58,25 @@ const HOURS_PER_DAY = 24
 export function getCardContribution(holoType, rarity, effectiveness = 1.0) {
   if (!holoType) return { type: 'none' }
 
+  const baseFlat = (S5_FLAT_CORES[rarity] || 0) * S5_FLAT_SCALE * effectiveness
+  const baseFlatP = (S5_FLAT_PASSION[rarity] || 0) * S5_FLAT_SCALE * effectiveness
+
   if (holoType === 'holo') {
-    return {
-      type: 'flat',
-      cores: (S5_FLAT_CORES[rarity] || 0) * effectiveness,
-      passion: (S5_FLAT_PASSION[rarity] || 0) * effectiveness,
-    }
+    return { type: 'flat', cores: baseFlat, passion: baseFlatP }
   }
   if (holoType === 'reverse') {
     const baseMult = S5_REVERSE_MULT[rarity] || 1
     const multBonus = (baseMult - 1) * effectiveness
-    return { type: 'mult', multiplier: 1 + multBonus }
+    return {
+      type: 'reverse',
+      cores: baseFlat * S5_REVERSE_FLAT_RATIO,
+      passion: baseFlatP * S5_REVERSE_FLAT_RATIO,
+      multiplier: 1 + multBonus,
+    }
   }
   if (holoType === 'full') {
-    const cores = (S5_FLAT_CORES[rarity] || 0) * S5_FULL_RATIO * effectiveness
-    const passion = (S5_FLAT_PASSION[rarity] || 0) * S5_FULL_RATIO * effectiveness
+    const cores = baseFlat * S5_FULL_RATIO
+    const passion = baseFlatP * S5_FULL_RATIO
     const baseMult = S5_REVERSE_MULT[rarity] || 1
     const multBonus = (baseMult - 1) * S5_FULL_RATIO * effectiveness
     return { type: 'full', cores, passion, multiplier: 1 + multBonus }
@@ -119,8 +125,8 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
     const effectiveness = card.isBench ? S5_BENCH_EFFECTIVENESS : 1.0
     const contrib = getCardContribution(card.holo_type, card.rarity, effectiveness)
     const synergy = checkSynergy(card, card._godCard)
-    const playerHasFlat = contrib.type === 'flat' || contrib.type === 'full'
-    const playerHasMult = contrib.type === 'mult' || contrib.type === 'full'
+    const playerHasFlat = (contrib.cores || 0) > 0
+    const playerHasMult = (contrib.multiplier || 1) > 1
 
     const godBonus = getAttachmentBonus(card._godCard, 'god', playerHasFlat, playerHasMult, synergy)
     const itemBonus = getAttachmentBonus(card._itemCard, 'item', playerHasFlat, playerHasMult)
@@ -139,8 +145,8 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
     // Attachment mult additions — scaled by effectiveness
     if (playerHasMult) {
       const slotMult = contrib.multiplier + godBonus.multAdd * effectiveness + itemBonus.multAdd * effectiveness
-      const boostedMult = 1 + (slotMult - 1) * cardTeamBonus
-      totalMult *= boostedMult
+      const boostedMult = (slotMult - 1) * cardTeamBonus
+      totalMult += boostedMult
     }
   }
 
@@ -152,7 +158,7 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
 
 export function getAttachmentBonusInfo(attachment, type, playerHoloType, synergy = false) {
   if (!attachment?.holo_type) return { flatBoost: 0, multAdd: 0, effectiveType: 'none' }
-  const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full'
+  const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full' || playerHoloType === 'reverse'
   const playerHasMult = playerHoloType === 'reverse' || playerHoloType === 'full'
   const bonus = getAttachmentBonus(attachment, type, playerHasFlat, playerHasMult, synergy)
   return { ...bonus, effectiveType: bonus.flatBoost > 0 ? 'flat' : bonus.multAdd > 0 ? 'mult' : 'none' }
@@ -209,7 +215,10 @@ export async function tick(sql, userId) {
     FROM cc_lineups l
     JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs pd ON c.def_id = pd.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = pd.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = pd.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     LEFT JOIN cc_cards g ON l.god_card_id = g.id
     LEFT JOIN cc_cards i ON l.item_card_id = i.id

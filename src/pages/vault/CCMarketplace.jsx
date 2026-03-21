@@ -684,6 +684,7 @@ function ListingCard({ listing, onBuy, onZoom, isSelf, showStats }) {
           tier={listing.pack.packTypeId}
           name={listing.pack.name}
           cardCount={listing.pack.cardsPerPack}
+          color={listing.pack.color}
           seed={listing.id % 5}
           compact
         />
@@ -772,6 +773,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardC
                       tier={listing.pack.packTypeId}
                       name={listing.pack.name}
                       cardCount={listing.pack.cardsPerPack}
+                      color={listing.pack.color}
                       seed={listing.id % 5}
                       compact
                     />
@@ -815,6 +817,7 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardC
                       tier={listing.pack?.packTypeId || 'standard'}
                       name={listing.pack?.name || 'Pack'}
                       cardCount={listing.pack?.cardsPerPack}
+                      color={listing.pack?.color}
                       seed={listing.id % 5}
                       compact
                     />
@@ -1066,6 +1069,7 @@ function CreateListingView({ cards, packs, packTypesMap, activeCardCount, active
                             name={pack.name}
                             subtitle={pack.leagueName || ''}
                             cardCount={pack.cards}
+                            color={pack.color}
                             seed={pack.sortOrder ?? 5}
                             compact
                           />
@@ -1113,6 +1117,7 @@ function BuyModal({ listing, onClose, onConfirm, loading, coreBalance }) {
               tier={listing.pack.packTypeId}
               name={listing.pack.name}
               cardCount={listing.pack.cardsPerPack}
+              color={listing.pack.color}
               seed={listing.id % 5}
             />
           ) : (
@@ -1194,6 +1199,7 @@ function CreateModal({ card, pack, packTypesMap, onClose, onCreate, loading }) {
               name={packMeta?.name || 'Pack'}
               subtitle={packMeta?.leagueName || ''}
               cardCount={packMeta?.cards}
+              color={packMeta?.color}
               seed={packMeta?.sortOrder ?? 5}
             />
           ) : (

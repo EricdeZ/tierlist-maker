@@ -1,4 +1,5 @@
 import { S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
+  S5_FLAT_SCALE, S5_REVERSE_FLAT_RATIO,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO,
   CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../../data/vault/economy'
 import passionCoin from '../../../assets/passion/passion.png'
@@ -11,14 +12,18 @@ export function getCardEffect(card) {
 
   if (type === 'player') {
     let flatCores = 0, flatPassion = 0, multiplier = 0
+    const scaledCores = (S5_FLAT_CORES[r] || 0) * S5_FLAT_SCALE
+    const scaledPassion = (S5_FLAT_PASSION[r] || 0) * S5_FLAT_SCALE
     if (ht === 'holo') {
-      flatCores = S5_FLAT_CORES[r] || 0
-      flatPassion = S5_FLAT_PASSION[r] || 0
+      flatCores = scaledCores
+      flatPassion = scaledPassion
     } else if (ht === 'reverse') {
+      flatCores = scaledCores * S5_REVERSE_FLAT_RATIO
+      flatPassion = scaledPassion * S5_REVERSE_FLAT_RATIO
       multiplier = S5_REVERSE_MULT[r] || 0
     } else if (ht === 'full') {
-      flatCores = (S5_FLAT_CORES[r] || 0) * S5_FULL_RATIO
-      flatPassion = (S5_FLAT_PASSION[r] || 0) * S5_FULL_RATIO
+      flatCores = scaledCores * S5_FULL_RATIO
+      flatPassion = scaledPassion * S5_FULL_RATIO
       const baseMult = S5_REVERSE_MULT[r] || 1
       multiplier = 1 + (baseMult - 1) * S5_FULL_RATIO
     }

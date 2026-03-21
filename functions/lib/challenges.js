@@ -2,7 +2,7 @@
 // Called from endpoints when underlying stats change.
 
 import { revokePassion } from './passion.js'
-import { updateRotatingProgress } from './rotating-challenges.js'
+import { updateRotatingProgress, rollAssignments } from './rotating-challenges.js'
 
 // Performance stat keys that map to challenges
 export const PERF_KEYS = [
@@ -93,7 +93,15 @@ export async function pushChallengeProgress(sql, userId, currentStats) {
         `
     }
 
-    // Also update rotating challenge progress
+    // Ensure rotating assignments exist (lazily rolls on first stat change of each period).
+    // Time-aware baselines inside rollAssignments mean this is safe to call with post-action stats.
+    try {
+        await rollAssignments(sql, userId, currentStats)
+    } catch (err) {
+        console.error('Lazy rotating assignment roll failed:', err)
+    }
+
+    // Update rotating challenge progress
     try {
         const rotatingClaimable = await updateRotatingProgress(sql, userId, currentStats)
         newlyClaimable.push(...rotatingClaimable)

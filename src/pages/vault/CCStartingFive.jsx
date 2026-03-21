@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
+  S5_FLAT_SCALE, S5_REVERSE_FLAT_RATIO,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, S5_ALLSTAR_MODIFIER,
   STARTING_FIVE_CAP_DAYS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
@@ -74,10 +75,10 @@ function getBaseIncomeEstimate(card) {
   if (!card) return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
   const ht = card.holoType
   const r = card.rarity
-  const flatC = S5_FLAT_CORES[r] || 0
+  const flatC = (S5_FLAT_CORES[r] || 0) * S5_FLAT_SCALE
   const mult = S5_REVERSE_MULT[r] || 1
   if (ht === 'holo') return { flatCores: flatC, multiplier: 0, type: 'flat', sortValue: flatC }
-  if (ht === 'reverse') return { flatCores: 0, multiplier: mult, type: 'mult', sortValue: mult * 10 }
+  if (ht === 'reverse') return { flatCores: flatC * S5_REVERSE_FLAT_RATIO, multiplier: mult, type: 'reverse', sortValue: flatC * S5_REVERSE_FLAT_RATIO + mult * 10 }
   if (ht === 'full') return { flatCores: flatC * S5_FULL_RATIO, multiplier: 1 + (mult - 1) * S5_FULL_RATIO, type: 'full', sortValue: flatC * S5_FULL_RATIO + mult }
   return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
 }
@@ -86,8 +87,8 @@ function getBaseIncomeEstimate(card) {
 function getSlotContribution(slot) {
   if (!slot?.contribution) return { passion: 0, cores: 0, multiplier: 0, type: 'none' }
   const c = slot.contribution
-  const playerHasFlat = c.type === 'flat' || c.type === 'full'
-  const playerHasMult = c.type === 'mult' || c.type === 'full'
+  const playerHasFlat = (c.cores || 0) > 0
+  const playerHasMult = (c.multiplier || 1) > 1
 
   let cores = c.cores || 0, passion = c.passion || 0, multiplier = c.multiplier || 0
 
@@ -210,8 +211,8 @@ export default function CCStartingFive() {
       if (!slotData?.contribution) continue
       if (slotData.roleMismatch) continue
       const c = slotData.contribution
-      const hasFlat = c.type === 'flat' || c.type === 'full'
-      const hasMult = c.type === 'mult' || c.type === 'full'
+      const hasFlat = (c.cores || 0) > 0
+      const hasMult = (c.multiplier || 1) > 1
       const cardTeamBonus = 1 + (slotData.teamSynergyBonus || 0)
       if (hasFlat) {
         const godFlatMult = 1 + (slotData.godBonus?.flatBoost || 0)
@@ -223,8 +224,8 @@ export default function CCStartingFive() {
       if (hasMult) {
         const eff = slotData.isBench ? 0.5 : 1.0
         const slotMult = (c.multiplier || 1) + (slotData.godBonus?.multAdd || 0) * eff + (slotData.itemBonus?.multAdd || 0) * eff
-        totalMultBase *= slotMult
-        totalMult *= (1 + (slotMult - 1) * cardTeamBonus)
+        totalMultBase += (slotMult - 1)
+        totalMult += (slotMult - 1) * cardTeamBonus
       }
     }
     const withBonus = flatCores * totalMult
@@ -1331,12 +1332,12 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
         ) : (
           <>
             <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
-              {(income.type === 'flat' || income.type === 'full') && income.cores > 0 && (
+              {(income.cores || 0) > 0 && (
                 <span className="flex items-center gap-0.5 text-amber-400">
                   {income.cores < 1 ? income.cores.toFixed(2) : income.cores.toFixed(1)}/d
                 </span>
               )}
-              {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
+              {(income.multiplier || 1) > 1 && (
                 <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
                   {income.multiplier.toFixed(2)}x
                 </span>
@@ -1791,12 +1792,12 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           </div>
         ) : !isAttachment ? (
           <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
-            {(income.type === 'flat' || income.type === 'full') && income.flatCores > 0 && (
+            {(income.flatCores || 0) > 0 && (
               <span className="flex items-center gap-0.5 text-amber-400">
                 {income.flatCores < 1 ? income.flatCores.toFixed(2) : income.flatCores.toFixed(1)}/d
               </span>
             )}
-            {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
+            {(income.multiplier || 1) > 1 && (
               <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
                 {income.multiplier.toFixed(2)}x
               </span>

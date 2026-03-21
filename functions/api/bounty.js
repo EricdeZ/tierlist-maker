@@ -304,7 +304,10 @@ async function handleSearchPlayers(sql, params) {
     FROM cc_player_defs pd
     LEFT JOIN divisions d ON d.id = pd.division_id
     LEFT JOIN players p ON p.slug = pd.player_slug
-    LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT lu.id, lu.discord_id, lu.discord_avatar
+      FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+    ) u ON true
     WHERE pd.player_name ILIKE ${term}
     ORDER BY pd.player_name, pd.season_slug DESC, pd.team_name
     LIMIT 30

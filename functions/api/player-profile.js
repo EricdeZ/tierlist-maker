@@ -27,7 +27,10 @@ const handler = async (event) => {
                 CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed,
                 COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar
             FROM players p
-            LEFT JOIN users u ON u.linked_player_id = p.id
+            LEFT JOIN LATERAL (
+              SELECT lu.id, lu.discord_id, lu.discord_username, lu.discord_avatar
+              FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+            ) u ON true
             LEFT JOIN user_preferences up ON up.user_id = u.id
             WHERE p.slug = ${slug}
         `

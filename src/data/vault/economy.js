@@ -109,10 +109,16 @@ export const S5_FLAT_PASSION = {
   uncommon: 0.05, rare: 0.12, epic: 0.26, legendary: 0.50, mythic: 0.52, unique: 0.58,
 };
 
-// Starting 5 — reverse card multiplier (multiplicative stacking)
+// Starting 5 — reverse card multiplier (additive stacking)
 export const S5_REVERSE_MULT = {
   uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
 };
+
+// Flat income scale factor (compensates for additive stacking)
+export const S5_FLAT_SCALE = 1.4;
+
+// Reverse cards get 25% of holo's flat income (balances optimal split to 2.5H/2.5R)
+export const S5_REVERSE_FLAT_RATIO = 0.25;
 
 // Full cards get 44% of both flat and mult
 export const S5_FULL_RATIO = 0.44;
@@ -139,7 +145,7 @@ export const S5_ATT_MULT = {
 export const S5_FULL_ATT_RATIO = 0.6;
 
 export const GOD_SYNERGY_BONUS = 0.40;
-export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60 };
+export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
 

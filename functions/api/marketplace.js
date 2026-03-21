@@ -68,7 +68,10 @@ async function handleList(sql, params) {
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     LEFT JOIN cc_pack_inventory pi ON l.pack_inventory_id = pi.id
     LEFT JOIN cc_pack_types pt ON pi.pack_type_id = pt.id
@@ -151,7 +154,10 @@ async function handleMyListings(sql, user) {
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     LEFT JOIN cc_pack_inventory pi ON l.pack_inventory_id = pi.id
     LEFT JOIN cc_pack_types pt ON pi.pack_type_id = pt.id

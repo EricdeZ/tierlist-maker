@@ -164,7 +164,10 @@ async function handleLoad(sql, user) {
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
          FROM cc_cards c
          LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-         LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+         LEFT JOIN LATERAL (
+           SELECT u.id, u.discord_id, u.discord_avatar
+           FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+         ) pu ON true
          LEFT JOIN user_preferences pup ON pup.user_id = pu.id
          WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
@@ -347,6 +350,9 @@ async function handleOpenInventoryPack(sql, user, body) {
     LIMIT 1
   `
   if (tradeLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack is in an active trade — cancel the trade first' }) }
+
+  // Clean up any cancelled/expired listings referencing this pack before deleting
+  await sql`DELETE FROM cc_market_listings WHERE pack_inventory_id = ${inventoryId} AND status != 'active'`
 
   // Delete from inventory and open
   await sql`DELETE FROM cc_pack_inventory WHERE id = ${inventoryId}`
@@ -574,7 +580,10 @@ async function handleSharedCard(sql, params) {
              COALESCE(up.allow_discord_avatar, true) AS allow_discord_avatar,
              CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
       FROM players p
-      LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT lu.id, lu.discord_id, lu.discord_avatar
+        FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+      ) u ON true
       LEFT JOIN user_preferences up ON up.user_id = u.id
       WHERE p.slug = ${playerSlug}
     `
@@ -742,7 +751,10 @@ async function handleCollectionOwned(sql, user) {
       FROM cc_cards c
       LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
       LEFT JOIN players p ON p.slug = d.player_slug
-      LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT lu.id, lu.discord_id, lu.discord_avatar
+        FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+      ) u ON true
       LEFT JOIN user_preferences up ON up.user_id = u.id
       WHERE c.owner_id = ${user.id}
       ORDER BY c.created_at DESC
@@ -804,7 +816,10 @@ async function handleCollectionSet(sql, params) {
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM cc_player_defs d
     LEFT JOIN players p ON p.slug = d.player_slug
-    LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT lu.id, lu.discord_id, lu.discord_avatar
+      FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+    ) u ON true
     LEFT JOIN user_preferences up ON up.user_id = u.id
     WHERE d.league_slug || '-d' || d.division_tier || '-' || d.season_slug = ${setKey}
     ORDER BY d.card_index
@@ -848,7 +863,10 @@ async function handleCollectionSearch(sql, params) {
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM cc_player_defs d
     LEFT JOIN players p ON p.slug = d.player_slug
-    LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT lu.id, lu.discord_id, lu.discord_avatar
+      FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+    ) u ON true
     LEFT JOIN user_preferences up ON up.user_id = u.id
     JOIN divisions div ON d.division_id = div.id
     JOIN seasons s ON d.season_id = s.id
@@ -900,7 +918,9 @@ async function handleCardDetail(sql, params) {
     SELECT p.id,
            CASE WHEN u.id IS NOT NULL THEN true ELSE false END AS is_claimed
     FROM players p
-    LEFT JOIN users u ON u.linked_player_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT lu.id FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+    ) u ON true
     WHERE p.slug = ${def.player_slug}
   `
   if (!player) return { statusCode: 200, headers, body: JSON.stringify({ stats: null }) }
@@ -1705,8 +1725,8 @@ async function handleS5Leaderboard(sql, user) {
     function getTeamCounts(lineupCards) {
       const counts = {}
       for (const c of lineupCards) {
-        const mismatch = c.slot_role && c.role && c.role !== c.slot_role && c.role !== 'fill'
-        if (!c.isBench && !mismatch && c.team_id) counts[c.team_id] = (counts[c.team_id] || 0) + 1
+        if (isRoleMismatch(c)) continue
+        if (c.team_id) counts[c.team_id] = (counts[c.team_id] || 0) + 1
       }
       return counts
     }
@@ -2149,7 +2169,10 @@ async function handleLoadBinder(sql, user) {
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE bc.user_id = ${user.id}
     ORDER BY bc.page, bc.slot
@@ -2192,7 +2215,10 @@ async function handleBinderView(sql, params) {
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE bc.user_id = ${binder.user_id}
     ORDER BY bc.page, bc.slot

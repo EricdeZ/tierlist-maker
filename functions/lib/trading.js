@@ -479,7 +479,10 @@ export async function pollTrade(sql, userId, tradeId) {
     FROM cc_trade_cards tc
     JOIN cc_cards c ON tc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
-    LEFT JOIN users pu ON pu.linked_player_id = d.player_id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
     WHERE tc.trade_id = ${tradeId} AND tc.item_type = 'card'
   `

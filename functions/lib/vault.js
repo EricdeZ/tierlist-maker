@@ -214,7 +214,10 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
       JOIN divisions d ON s.division_id = d.id
       JOIN leagues l ON s.league_id = l.id
       LEFT JOIN teams t ON t.id = lp.team_id
-      LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT lu.id, lu.discord_id, lu.discord_avatar
+        FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+      ) u ON true
       WHERE lp.team_id IS NOT NULL
       ORDER BY RANDOM() LIMIT 1
     `
@@ -229,7 +232,10 @@ async function generatePlayerCardLegacy(sql, rarity, leagueId) {
       JOIN divisions d ON s.division_id = d.id
       JOIN leagues l ON s.league_id = l.id
       LEFT JOIN teams t ON t.id = lp.team_id
-      LEFT JOIN users u ON u.linked_player_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT lu.id, lu.discord_id, lu.discord_avatar
+        FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+      ) u ON true
       WHERE lp.team_id IS NOT NULL
       ORDER BY RANDOM() LIMIT 1
     `

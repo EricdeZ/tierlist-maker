@@ -41,6 +41,42 @@ export function getPeriod(cadence, now = new Date()) {
 
 export { CADENCE_SLOTS, CADENCES, GRACE_MS }
 
+// Compute period-start baselines for transaction-based stats.
+// These use timestamp-filtered queries so the baseline reflects the stat value
+// at the START of the period, regardless of when rollAssignments is called.
+// Counter-based stats (packs_opened, cards_dismantled) have no per-event timestamps
+// and fall back to currentStats — off by at most 1 action, acceptable since their
+// targets are always > 1.
+async function getBaselineStats(sql, userId, periodStart) {
+    const [
+        [dailyCores], [coresConverted], [trades],
+        [marketSold], [giftsSent], [bountyEarned]
+    ] = await Promise.all([
+        sql`SELECT COUNT(*)::integer as c FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'daily_claim' AND created_at < ${periodStart}`,
+        sql`SELECT COUNT(*)::integer as c FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'passion_convert' AND created_at < ${periodStart}`,
+        sql`SELECT COUNT(*)::integer as c FROM cc_trades
+            WHERE (player_a_id = ${userId} OR player_b_id = ${userId})
+              AND status = 'completed' AND completed_at < ${periodStart}`,
+        sql`SELECT COUNT(*)::integer as c FROM cc_market_listings
+            WHERE seller_id = ${userId} AND status = 'sold' AND sold_at < ${periodStart}`,
+        sql`SELECT COUNT(*)::integer as c FROM cc_gifts
+            WHERE sender_id = ${userId} AND created_at < ${periodStart}`,
+        sql`SELECT COALESCE(SUM(amount), 0)::integer as c FROM ember_transactions
+            WHERE user_id = ${userId} AND type = 'bounty_reward' AND created_at < ${periodStart}`,
+    ])
+
+    return {
+        daily_cores_claimed: dailyCores.c,
+        cores_converted: coresConverted.c,
+        trades_completed: trades.c,
+        marketplace_sold: marketSold.c,
+        gifts_sent: giftsSent.c,
+        bounty_cores_earned: bountyEarned.c,
+    }
+}
+
 export async function rollAssignments(sql, userId, currentStats) {
     for (const cadence of CADENCES) {
         const { start, end } = getPeriod(cadence)
@@ -78,13 +114,19 @@ export async function rollAssignments(sql, userId, currentStats) {
 
         if (selected.length === 0) continue
 
+        // Compute time-aware baselines for transaction-based stats,
+        // falling back to currentStats for counter-based stats
+        const timeBaselines = await getBaselineStats(sql, userId, start)
+
         // Batch insert assignments with baseline values
         const userIds = selected.map(() => userId)
         const templateIds = selected.map(t => t.id)
         const cadences = selected.map(() => cadence)
         const starts = selected.map(() => start)
         const ends = selected.map(() => end)
-        const baselines = selected.map(t => Number(currentStats[t.stat_key] || 0))
+        const baselines = selected.map(t =>
+            t.stat_key in timeBaselines ? timeBaselines[t.stat_key] : Number(currentStats[t.stat_key] || 0)
+        )
 
         await sql`
             INSERT INTO cc_challenge_assignments

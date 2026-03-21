@@ -646,7 +646,10 @@ async function handleListSignatureRequests(sql, params) {
     JOIN cc_cards c ON sr.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id
     LEFT JOIN users u_req ON sr.requester_id = u_req.id
-    LEFT JOIN users u_sign ON u_sign.linked_player_id = sr.signer_player_id
+    LEFT JOIN LATERAL (
+      SELECT lu.id, lu.discord_username
+      FROM users lu WHERE lu.linked_player_id = sr.signer_player_id LIMIT 1
+    ) u_sign ON true
     WHERE 1=1 ${where}
     ORDER BY sr.created_at DESC
     LIMIT 100

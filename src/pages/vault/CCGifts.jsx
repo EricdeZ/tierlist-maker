@@ -339,7 +339,7 @@ function SendGiftSection({ giftsRemaining, giftInventory, sent, emberBalance, on
                   style={{ animation: 'vault-card-enter 0.4s ease-out' }}
                 >
                   <div className="shrink-0">
-                    <PackArt tier={item.packType} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} seed={7} compact />
+                    <PackArt tier={item.packType} name={pack.name} subtitle={`${pack.cards} Cards`} cardCount={pack.cards} color={pack.color} seed={7} compact />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold cd-head tracking-wider" style={{ color: pack.color || 'var(--cd-text)' }}>{pack.name}</div>

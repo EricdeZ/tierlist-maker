@@ -375,7 +375,10 @@ async function handleLeagueTeams(sql, event) {
                    u.discord_username, u.discord_avatar, u.discord_id
             FROM league_players lp
             JOIN players p ON p.id = lp.player_id
-            LEFT JOIN users u ON u.linked_player_id = p.id
+            LEFT JOIN LATERAL (
+              SELECT lu.id, lu.discord_id, lu.discord_username, lu.discord_avatar
+              FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+            ) u ON true
             WHERE lp.team_id = ANY(${teamIds}) AND lp.is_active = true
               AND lp.roster_status IN ('captain', 'co_captain', 'member')
             ORDER BY lp.roster_status = 'captain' DESC, lp.roster_status = 'co_captain' DESC, p.name

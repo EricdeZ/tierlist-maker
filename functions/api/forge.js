@@ -145,7 +145,10 @@ async function getMarket(sql, user, params, event) {
             JOIN matches m ON g.match_id = m.id
             WHERE pgs.league_player_id = lp.id
         ) pstats ON true
-        LEFT JOIN users u_avatar ON u_avatar.linked_player_id = p.id
+        LEFT JOIN LATERAL (
+          SELECT lu.id, lu.discord_id, lu.discord_avatar
+          FROM users lu WHERE lu.linked_player_id = p.id LIMIT 1
+        ) u_avatar ON true
         LEFT JOIN coinflip_streaks cs ON cs.user_id = u_avatar.id
         WHERE ps.market_id = ${market.id}
           AND lp.roster_status != 'sub'
