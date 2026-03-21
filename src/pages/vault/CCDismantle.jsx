@@ -519,11 +519,7 @@ function DismantleSlot({ card, isSelected, onToggle, override }) {
 
   return (
     <div
-      className={`relative cursor-pointer transition-all duration-150 rounded-lg ${
-        isSelected
-          ? 'ring-2 ring-[var(--cd-cyan)] shadow-[0_0_12px_rgba(34,211,238,0.2)] scale-[0.97]'
-          : 'hover:scale-[1.02] opacity-80 hover:opacity-100'
-      }`}
+      className={`relative isolate cursor-pointer rounded-lg ${isSelected ? '' : 'opacity-80 hover:opacity-100'}`}
       onClick={() => onToggle(card.id)}
     >
       {type === 'collection' ? (
@@ -534,16 +530,18 @@ function DismantleSlot({ card, isSelected, onToggle, override }) {
         <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={CARD_SIZE} />
       )}
 
-      {/* Selection checkmark */}
+      {/* Selection overlay */}
       {isSelected && (
-        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--cd-cyan)] flex items-center justify-center shadow-lg">
-          <Check className="w-3 h-3 text-black" strokeWidth={3} />
+        <div className="absolute inset-0 z-10 rounded-lg bg-[var(--cd-cyan)]/15 border-2 border-[var(--cd-cyan)]/60 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-[var(--cd-cyan)] flex items-center justify-center shadow-lg">
+            <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />
+          </div>
         </div>
       )}
 
       {/* Value badge */}
       <div
-        className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold cd-num flex items-center gap-0.5"
+        className="absolute z-10 bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold cd-num flex items-center gap-0.5"
         style={{ backgroundColor: rarityInfo.color + '20', color: rarityInfo.color }}
       >
         {rarityInfo.dismantleValue}

@@ -85,6 +85,7 @@ async function handlePending(sql, user) {
     JOIN users u ON u.id = CASE WHEN t.player_a_id = ${user.id} THEN t.player_b_id ELSE t.player_a_id END
     WHERE (t.player_a_id = ${user.id} OR t.player_b_id = ${user.id})
       AND t.status IN ('waiting', 'active')
+      AND t.mode = 'direct'
     ORDER BY t.created_at DESC
   `
 
@@ -102,6 +103,7 @@ async function handleHistory(sql, user) {
     JOIN users u ON u.id = CASE WHEN t.player_a_id = ${user.id} THEN t.player_b_id ELSE t.player_a_id END
     WHERE (t.player_a_id = ${user.id} OR t.player_b_id = ${user.id})
       AND t.status IN ('completed', 'cancelled', 'expired')
+      AND t.mode = 'direct'
     ORDER BY t.updated_at DESC
     LIMIT 20
   `
@@ -242,6 +244,7 @@ function formatTrade(trade, userId) {
   return {
     id: trade.id,
     status: trade.status,
+    mode: trade.mode || 'direct',
     myCore: isA ? trade.player_a_core : trade.player_b_core,
     theirCore: isA ? trade.player_b_core : trade.player_a_core,
     myReady: isA ? trade.player_a_ready : trade.player_b_ready,

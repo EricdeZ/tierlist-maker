@@ -422,6 +422,64 @@ export default function AdminNavbar() {
                                 Home
                             </Link>
                         </div>
+
+                        {/* Mobile impersonate */}
+                        {canImpersonate && (
+                            <div className="border-t border-white/5 mt-1 pt-1 px-3 pb-2">
+                                {impersonating ? (
+                                    <div className="flex items-center justify-between gap-2 px-1 py-2">
+                                        <span className="text-xs text-amber-400 font-bold truncate">
+                                            <UserRoundCog className="w-3.5 h-3.5 inline mr-1" />
+                                            {user?.discord_username}
+                                        </span>
+                                        <button
+                                            onClick={() => { stopImpersonation(); setMobileOpen(false) }}
+                                            className="px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-amber-500/30"
+                                        >
+                                            Stop
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="relative mt-1">
+                                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+                                            <input
+                                                type="text"
+                                                value={impQuery}
+                                                onChange={(e) => setImpQuery(e.target.value)}
+                                                placeholder="Impersonate user..."
+                                                className="w-full pl-8 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-(--color-text) placeholder:text-white/30 focus:outline-none focus:border-amber-400/50"
+                                            />
+                                        </div>
+                                        {impLoading && <div className="py-2 text-xs text-white/50 text-center">Searching...</div>}
+                                        {!impLoading && impResults.length > 0 && (
+                                            <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-white/5 bg-white/[0.02]">
+                                                {impResults.map((u) => (
+                                                    <button
+                                                        key={u.id}
+                                                        onClick={() => { handleSelectUser(u); setMobileOpen(false) }}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-(--color-text) hover:bg-white/5 cursor-pointer text-left"
+                                                    >
+                                                        {u.discord_avatar ? (
+                                                            <img src={`https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.png?size=32`} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0" />
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <div className="truncate font-medium">{u.discord_username}</div>
+                                                            <div className="text-xs text-white/40">ID: {u.id}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {!impLoading && impQuery.length >= 2 && impResults.length === 0 && (
+                                            <div className="py-2 text-xs text-white/50 text-center">No users found</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

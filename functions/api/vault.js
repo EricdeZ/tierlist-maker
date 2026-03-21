@@ -163,7 +163,7 @@ async function handleLoad(sql, user) {
   `
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -200,8 +200,14 @@ async function handleLoad(sql, user) {
     `,
     sql`
       SELECT COUNT(*)::int AS count FROM cc_trades
-      WHERE (player_b_id = ${user.id} AND status = 'waiting')
-         OR ((player_a_id = ${user.id} OR player_b_id = ${user.id}) AND status = 'active')
+      WHERE ((player_b_id = ${user.id} AND status = 'waiting')
+         OR ((player_a_id = ${user.id} OR player_b_id = ${user.id}) AND status = 'active'))
+        AND mode = 'direct'
+    `,
+    sql`
+      SELECT COUNT(*)::int AS count FROM cc_trades
+      WHERE (player_a_id = ${user.id} OR player_b_id = ${user.id})
+        AND mode = 'match' AND status = 'active'
     `,
     sql`
       SELECT i.id, i.pack_type_id, i.source, i.created_at, pt.name
@@ -212,8 +218,10 @@ async function handleLoad(sql, user) {
     `,
     sql`
       UPDATE cc_trades SET status = 'expired', updated_at = NOW()
-      WHERE status IN ('waiting', 'active')
-        AND last_polled_at < NOW() - make_interval(mins => 2)
+      WHERE (status IN ('waiting', 'active') AND mode = 'direct'
+             AND last_polled_at < NOW() - make_interval(mins => 2))
+         OR (status = 'active' AND mode = 'match'
+             AND created_at < NOW() - interval '24 hours')
     `,
     sql`
       SELECT created_at FROM ember_transactions
@@ -226,7 +234,7 @@ async function handleLoad(sql, user) {
       UNION ALL
       SELECT tc.card_id, 'trade' FROM cc_trade_cards tc
       JOIN cc_trades t ON tc.trade_id = t.id
-      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND tc.card_id IS NOT NULL
+      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND t.mode = 'direct' AND tc.card_id IS NOT NULL
     `,
     // Locked packs: market listings + active trades (merged)
     sql`
@@ -234,7 +242,7 @@ async function handleLoad(sql, user) {
       UNION ALL
       SELECT tc.pack_inventory_id FROM cc_trade_cards tc
       JOIN cc_trades t ON tc.trade_id = t.id
-      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND tc.item_type = 'pack'
+      WHERE tc.offered_by = ${user.id} AND t.status IN ('waiting', 'active') AND t.mode = 'direct' AND tc.item_type = 'pack'
     `,
     // Pending signatures: own requests + approval requests (merged via CTE)
     sql`
@@ -315,6 +323,7 @@ async function handleLoad(sql, user) {
         endsAt: s.ends_at,
       })),
       pendingTradeCount: tradeCount[0]?.count || 0,
+      matchTradeCount: matchTradeCount[0]?.count || 0,
       pendingSignatureCount: pendingSignatures[0]?.signer_count || 0,
       pendingApprovalCount: pendingSignatures[0]?.approver_count || 0,
       inventory: inventory.map(i => ({
@@ -359,13 +368,22 @@ async function handleOpenInventoryPack(sql, user, body) {
   const [tradeLock] = await sql`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.pack_inventory_id = ${inventoryId} AND t.status IN ('waiting', 'active')
+    WHERE tc.pack_inventory_id = ${inventoryId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
     LIMIT 1
   `
   if (tradeLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack is in an active trade — cancel the trade first' }) }
 
   // Clean up any cancelled/expired listings referencing this pack before deleting
   await sql`DELETE FROM cc_market_listings WHERE pack_inventory_id = ${inventoryId} AND status != 'active'`
+
+  // Clean up trade_cards references from completed/cancelled/expired trades
+  await sql`
+    DELETE FROM cc_trade_cards tc
+    USING cc_trades t
+    WHERE tc.trade_id = t.id
+      AND tc.pack_inventory_id = ${inventoryId}
+      AND t.status NOT IN ('waiting', 'active')
+  `
 
   // Delete from inventory and open
   await sql`DELETE FROM cc_pack_inventory WHERE id = ${inventoryId}`
@@ -1408,7 +1426,7 @@ async function handleDismantle(sql, user, body) {
       AND NOT EXISTS (
         SELECT 1 FROM cc_trade_cards tc
         JOIN cc_trades t ON tc.trade_id = t.id
-        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
+        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
       )
       AND NOT EXISTS (
         SELECT 1 FROM cc_lineups l
@@ -1530,7 +1548,7 @@ async function handleBlackMarketTurnIn(sql, user, body) {
         AND NOT EXISTS (
           SELECT 1 FROM cc_trade_cards tc
           JOIN cc_trades t ON tc.trade_id = t.id
-          WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
+          WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
         )
         AND NOT EXISTS (
           SELECT 1 FROM cc_lineups ln
@@ -2389,7 +2407,7 @@ async function handleBinderSlot(sql, user, body) {
   // Check card not locked elsewhere
   const [tradeLock] = await sql`
     SELECT tc.id FROM cc_trade_cards tc JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') LIMIT 1
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct' LIMIT 1
   `
   if (tradeLock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is in an active trade' }) }
 
@@ -2425,6 +2443,9 @@ async function handleBinderSlot(sql, user, body) {
     ON CONFLICT (user_id, page, slot)
     DO UPDATE SET card_id = ${cardId}, slotted_at = NOW()
   `
+
+  // Auto-remove from trade pile when slotted into binder
+  await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
 
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }

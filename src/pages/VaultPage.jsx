@@ -6,7 +6,7 @@ import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
-import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem } from 'lucide-react'
+import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem, Heart } from 'lucide-react'
 import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
@@ -29,6 +29,7 @@ const CCBountyBoard = lazy(() => import('./vault/CCBountyBoard'))
 const CCSignatureRequests = lazy(() => import('./vault/CCSignatureRequests'))
 const CCSignatureApprovals = lazy(() => import('./vault/CCSignatureApprovals'))
 const CCUniqueCards = lazy(() => import('./vault/CCUniqueCards'))
+const CCTradematch = lazy(() => import('./vault/CCTradematch'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },
@@ -39,6 +40,7 @@ const TABS = [
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
     { key: 'bounty', label: 'Bounties', icon: Crosshair, authOnly: true },
+    { key: 'tradematch', label: 'Tradematch', icon: Heart, authOnly: true },
     { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
     { key: 'binder', label: 'Binder', icon: BookMarked },
@@ -58,6 +60,7 @@ const TAB_COMPONENTS = {
     binder: CCBinder,
     gifts: CCGifts,
     trade: CCTrading,
+    tradematch: CCTradematch,
     market: CCMarketplace,
     bounty: CCBountyBoard,
     dismantle: CCDismantle,
@@ -156,7 +159,7 @@ function VaultInner() {
     const { user } = useAuth()
     const { vaultClaimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
@@ -277,6 +280,9 @@ function VaultInner() {
                                 {tab.key === 'trade' && pendingTradeCount > 0 && (
                                     <span className="w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
                                 )}
+                                {tab.key === 'tradematch' && matchTradeCount > 0 && (
+                                    <span className="w-2 h-2 rounded-full bg-[var(--cd-magenta)] animate-pulse" />
+                                )}
                                 {tab.key === 'challenges' && vaultClaimableCount > 0 && (
                                     <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black flex items-center justify-center animate-pulse">
                                         {vaultClaimableCount}
@@ -386,6 +392,7 @@ function VaultInner() {
                     onTabChange={setTab}
                     unseenGifts={unseenGifts}
                     pendingTradeCount={pendingTradeCount}
+                    matchTradeCount={matchTradeCount}
                     vaultClaimableCount={vaultClaimableCount}
                     packMode={packMode}
                     onPackModeChange={setPackMode}

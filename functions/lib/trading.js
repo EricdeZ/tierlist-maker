@@ -12,7 +12,7 @@ export async function isCardInTrade(sql, cardId) {
   const [row] = await sql`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active')
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
     LIMIT 1
   `
   return !!row
@@ -23,7 +23,7 @@ export async function isPackInTrade(sql, packInventoryId) {
   const [row] = await sql`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active')
+    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
     LIMIT 1
   `
   return !!row
@@ -35,8 +35,10 @@ export async function expireStale(sql) {
   await sql`
     UPDATE cc_trades
     SET status = 'expired', updated_at = NOW()
-    WHERE status IN ('waiting', 'active')
-      AND last_polled_at < NOW() - make_interval(mins => ${mins})
+    WHERE (status IN ('waiting', 'active') AND mode = 'direct'
+           AND last_polled_at < NOW() - make_interval(mins => ${mins}))
+       OR (status = 'active' AND mode = 'match'
+           AND created_at < NOW() - interval '24 hours')
   `
 }
 
@@ -46,7 +48,7 @@ export async function createTrade(sql, userId, targetUserId) {
   // Check neither user has an active/waiting trade
   const [existing] = await sql`
     SELECT id FROM cc_trades
-    WHERE status IN ('waiting', 'active')
+    WHERE status IN ('waiting', 'active') AND mode = 'direct'
       AND (player_a_id = ${userId} OR player_b_id = ${userId}
            OR player_a_id = ${targetUserId} OR player_b_id = ${targetUserId})
     LIMIT 1
@@ -116,7 +118,7 @@ export async function addCard(tx, userId, tradeId, cardId) {
   const [locked] = await tx`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.id != ${tradeId}
+    WHERE tc.card_id = ${cardId} AND t.status IN ('waiting', 'active') AND t.id != ${tradeId} AND t.mode = 'direct'
     LIMIT 1
   `
   if (locked) throw new Error('Card is locked in another trade')
@@ -195,7 +197,7 @@ export async function addPack(tx, userId, tradeId, packInventoryId) {
   const [locked] = await tx`
     SELECT tc.id FROM cc_trade_cards tc
     JOIN cc_trades t ON tc.trade_id = t.id
-    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active') AND t.id != ${tradeId}
+    WHERE tc.pack_inventory_id = ${packInventoryId} AND t.status IN ('waiting', 'active') AND t.id != ${tradeId} AND t.mode = 'direct'
     LIMIT 1
   `
   if (locked) throw new Error('Pack is locked in another trade')
@@ -409,6 +411,12 @@ export async function confirmTrade(tx, userId, tradeId) {
     await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${bCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }
 
+  // Clean up trade pile for traded cards
+  const allTradedCardIds = [...aCards, ...bCards].map(c => c.card_id)
+  if (allTradedCardIds.length > 0) {
+    await tx`DELETE FROM cc_trade_pile WHERE card_id = ANY(${allTradedCardIds})`
+  }
+
   // Transfer packs: A's packs → B, B's packs → A
   for (const tp of aPacks) {
     await tx`UPDATE cc_pack_inventory SET user_id = ${trade.player_b_id} WHERE id = ${tp.pack_inventory_id}`
@@ -445,14 +453,6 @@ export async function confirmTrade(tx, userId, tradeId) {
 }
 
 export async function pollTrade(sql, userId, tradeId) {
-  // Update heartbeat
-  await sql`
-    UPDATE cc_trades SET last_polled_at = NOW()
-    WHERE id = ${tradeId}
-      AND (player_a_id = ${userId} OR player_b_id = ${userId})
-      AND status IN ('waiting', 'active')
-  `
-
   // Check for expiry
   await expireStale(sql)
 
@@ -495,6 +495,35 @@ export async function pollTrade(sql, userId, tradeId) {
     JOIN cc_pack_inventory pi ON tc.pack_inventory_id = pi.id
     JOIN cc_pack_types pt ON pi.pack_type_id = pt.id
     WHERE tc.trade_id = ${tradeId} AND tc.item_type = 'pack'
+  `
+
+  // Match-mode conflict detection
+  if (trade.mode === 'match') {
+    // Check 24h expiry
+    const created = new Date(trade.created_at).getTime()
+    if (Date.now() - created > 24 * 60 * 60 * 1000) {
+      await sql`UPDATE cc_trades SET status = 'expired', updated_at = NOW() WHERE id = ${tradeId}`
+      trade.status = 'expired'
+      return { trade, cards: [], packs: [] }
+    }
+
+    // Check for card conflicts (ownership changed, card slotted elsewhere)
+    for (const card of cardItems) {
+      const [current] = await sql`SELECT owner_id FROM cc_cards WHERE id = ${card.card_id}`
+      if (!current || current.owner_id !== card.offered_by) {
+        await sql`UPDATE cc_trades SET status = 'cancelled', updated_at = NOW() WHERE id = ${tradeId}`
+        trade.status = 'cancelled'
+        return { trade, cards: [], packs: [] }
+      }
+    }
+  }
+
+  // Update heartbeat (after match-mode checks so expired/cancelled trades don't get refreshed)
+  await sql`
+    UPDATE cc_trades SET last_polled_at = NOW()
+    WHERE id = ${tradeId}
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+      AND status IN ('waiting', 'active')
   `
 
   return { trade, cards: cardItems, packs: packItems }
