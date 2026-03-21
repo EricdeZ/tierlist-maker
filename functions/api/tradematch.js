@@ -1,12 +1,13 @@
 // Tradematch API — Tinder-style card trading matchmaker
 import { adapt } from '../lib/adapter.js'
-import { getDB, headers } from '../lib/db.js'
+import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
 import {
   getTradePile, addToTradePile, removeFromTradePile, getTradePileCount,
   getSwipeFeed, recordSwipe,
   getLikes, createTradeFromLike,
-  getMatches,
+  getMatches, getOfferDetail,
+  offerAddCard, offerRemoveCard, offerSetCore, offerSend, offerAccept, offerCancel,
   TRADEMATCH_RULES,
 } from '../lib/tradematch.js'
 
@@ -42,6 +43,7 @@ const handler = async (event) => {
         case 'swipe-feed': return await handleSwipeFeed(sql, user, event.queryStringParameters)
         case 'likes': return await handleLikes(sql, user)
         case 'matches': return await handleMatches(sql, user)
+        case 'offer-detail': return await handleOfferDetail(sql, user, event.queryStringParameters)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
       }
     }
@@ -53,6 +55,12 @@ const handler = async (event) => {
         case 'trade-pile-remove': return await handleTradePileRemove(sql, user, body)
         case 'swipe': return await handleSwipe(sql, user, body)
         case 'likes-trade': return await handleLikesTrade(sql, user, body)
+        case 'offer-add-card': return await handleOfferAddCard(sql, user, body)
+        case 'offer-remove-card': return await handleOfferRemoveCard(sql, user, body)
+        case 'offer-set-core': return await handleOfferSetCore(sql, user, body)
+        case 'offer-send': return await handleOfferSend(sql, user, body)
+        case 'offer-accept': return await handleOfferAcceptRoute(user, body)
+        case 'offer-cancel': return await handleOfferCancel(sql, user, body)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
       }
     }
@@ -157,6 +165,57 @@ async function handleLikesTrade(sql, user, body) {
 async function handleMatches(sql, user) {
   const matches = await getMatches(sql, user.id)
   return { statusCode: 200, headers, body: JSON.stringify({ matches }) }
+}
+
+async function handleOfferDetail(sql, user, params) {
+  const tradeId = parseInt(params.tradeId)
+  if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
+  const result = await getOfferDetail(sql, user.id, tradeId)
+  return { statusCode: 200, headers, body: JSON.stringify(result) }
+}
+
+async function handleOfferAddCard(sql, user, body) {
+  const { tradeId, cardId } = body
+  if (!tradeId || !cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and cardId required' }) }
+  await offerAddCard(sql, user.id, parseInt(tradeId), parseInt(cardId))
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+}
+
+async function handleOfferRemoveCard(sql, user, body) {
+  const { tradeId, cardId } = body
+  if (!tradeId || !cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and cardId required' }) }
+  await offerRemoveCard(sql, user.id, parseInt(tradeId), parseInt(cardId))
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+}
+
+async function handleOfferSetCore(sql, user, body) {
+  const { tradeId, amount } = body
+  if (!tradeId || amount === undefined) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and amount required' }) }
+  await offerSetCore(sql, user.id, parseInt(tradeId), parseInt(amount))
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+}
+
+async function handleOfferSend(sql, user, body) {
+  const { tradeId } = body
+  if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
+  await offerSend(sql, user.id, parseInt(tradeId))
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+}
+
+async function handleOfferAcceptRoute(user, body) {
+  const { tradeId, version } = body
+  if (!tradeId || version === undefined) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and version required' }) }
+  const result = await transaction(async (tx) => {
+    return offerAccept(tx, user.id, parseInt(tradeId), parseInt(version))
+  })
+  return { statusCode: 200, headers, body: JSON.stringify(result) }
+}
+
+async function handleOfferCancel(sql, user, body) {
+  const { tradeId } = body
+  if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
+  await offerCancel(sql, user.id, parseInt(tradeId))
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
 }
 
 export const onRequest = adapt(handler)
