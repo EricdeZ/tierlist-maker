@@ -115,10 +115,10 @@ export const S5_REVERSE_MULT = {
 };
 
 // Flat income scale factor (compensates for additive stacking)
-export const S5_FLAT_SCALE = 1.4;
+export const S5_FLAT_SCALE = 0.7;
 
-// Reverse cards get 25% of holo's flat income (balances optimal split to 2.5H/2.5R)
-export const S5_REVERSE_FLAT_RATIO = 0.25;
+// Multiplier scale factor (amplifies reverse card mult bonuses under additive stacking)
+export const S5_MULT_SCALE = 4.5;
 
 // Full cards get 44% of both flat and mult
 export const S5_FULL_RATIO = 0.44;

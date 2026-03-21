@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
-  S5_FLAT_SCALE, S5_REVERSE_FLAT_RATIO,
+  S5_FLAT_SCALE, S5_MULT_SCALE,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, S5_ALLSTAR_MODIFIER,
   STARTING_FIVE_CAP_DAYS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
@@ -77,9 +77,10 @@ function getBaseIncomeEstimate(card) {
   const r = card.rarity
   const flatC = (S5_FLAT_CORES[r] || 0) * S5_FLAT_SCALE
   const mult = S5_REVERSE_MULT[r] || 1
+  const multScaled = 1 + (mult - 1) * S5_MULT_SCALE
   if (ht === 'holo') return { flatCores: flatC, multiplier: 0, type: 'flat', sortValue: flatC }
-  if (ht === 'reverse') return { flatCores: flatC * S5_REVERSE_FLAT_RATIO, multiplier: mult, type: 'reverse', sortValue: flatC * S5_REVERSE_FLAT_RATIO + mult * 10 }
-  if (ht === 'full') return { flatCores: flatC * S5_FULL_RATIO, multiplier: 1 + (mult - 1) * S5_FULL_RATIO, type: 'full', sortValue: flatC * S5_FULL_RATIO + mult }
+  if (ht === 'reverse') return { flatCores: 0, multiplier: multScaled, type: 'mult', sortValue: multScaled * 10 }
+  if (ht === 'full') return { flatCores: flatC * S5_FULL_RATIO, multiplier: 1 + (mult - 1) * S5_MULT_SCALE * S5_FULL_RATIO, type: 'full', sortValue: flatC * S5_FULL_RATIO + multScaled }
   return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
 }
 
@@ -87,8 +88,8 @@ function getBaseIncomeEstimate(card) {
 function getSlotContribution(slot) {
   if (!slot?.contribution) return { passion: 0, cores: 0, multiplier: 0, type: 'none' }
   const c = slot.contribution
-  const playerHasFlat = (c.cores || 0) > 0
-  const playerHasMult = (c.multiplier || 1) > 1
+  const playerHasFlat = c.type === 'flat' || c.type === 'full'
+  const playerHasMult = c.type === 'mult' || c.type === 'full'
 
   let cores = c.cores || 0, passion = c.passion || 0, multiplier = c.multiplier || 0
 
@@ -211,8 +212,8 @@ export default function CCStartingFive() {
       if (!slotData?.contribution) continue
       if (slotData.roleMismatch) continue
       const c = slotData.contribution
-      const hasFlat = (c.cores || 0) > 0
-      const hasMult = (c.multiplier || 1) > 1
+      const hasFlat = c.type === 'flat' || c.type === 'full'
+      const hasMult = c.type === 'mult' || c.type === 'full'
       const cardTeamBonus = 1 + (slotData.teamSynergyBonus || 0)
       if (hasFlat) {
         const godFlatMult = 1 + (slotData.godBonus?.flatBoost || 0)
@@ -231,7 +232,7 @@ export default function CCStartingFive() {
     const withBonus = flatCores * totalMult
     const withoutBonus = flatCoresBase * totalMultBase
     const teamSynergyPct = withoutBonus > 0 ? (withBonus / withoutBonus - 1) : 0
-    return { flatCores, totalMult, teamSynergyPct }
+    return { flatCores, flatCoresBase, totalMult, totalMultBase, teamSynergyPct }
   }, [slots])
   const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
@@ -395,10 +396,10 @@ export default function CCStartingFive() {
   const passionPct = passionCap > 0 ? Math.min((displayPassion / passionCap) * 100, 100) : 0
   const coresPct = coresCap > 0 ? Math.min((displayCores / coresCap) * 100, 100) : 0
   const canCollect = displayPassion >= 1 || displayCores >= 1
-  const totalPpd = boostedPassionPerDay
-  const totalCpd = boostedCoresPerDay
-  const totalPph = totalPpd / 24
-  const totalCph = totalCpd / 24
+  const basePph = combinedOutput.passionPerDay / 24
+  const baseCph = combinedOutput.coresPerDay / 24
+  const consumablePassionPph = boostedPassionPerDay / 24 - basePph
+  const consumableCoresCph = boostedCoresPerDay / 24 - baseCph
 
   if (!startingFive) {
     return (
@@ -451,7 +452,10 @@ export default function CCStartingFive() {
                   }}
                 />
               </div>
-              <span className="text-xs text-white/30 cd-num">+{totalPph.toFixed(2)}/hr</span>
+              <span className="text-xs text-white/30 cd-num">
+                +{basePph.toFixed(2)}/hr
+                {consumablePassionPph > 0.005 && <span className="text-purple-400/60"> +{consumablePassionPph.toFixed(2)} consumable</span>}
+              </span>
             </div>
 
             {/* Cores income */}
@@ -475,7 +479,10 @@ export default function CCStartingFive() {
                   }}
                 />
               </div>
-              <span className="text-xs text-white/30 cd-num">+{totalCph.toFixed(2)}/hr</span>
+              <span className="text-xs text-white/30 cd-num">
+                +{baseCph.toFixed(2)}/hr
+                {consumableCoresCph > 0.005 && <span className="text-purple-400/60"> +{consumableCoresCph.toFixed(2)} consumable</span>}
+              </span>
             </div>
           </div>
           <div className="text-[10px] text-white/20">
@@ -607,37 +614,36 @@ export default function CCStartingFive() {
       </div>
 
       {/* Lineup Flat × Mult Breakdown (scoped to active lineup) */}
-      {(lineupBreakdown.flatCores > 0 || lineupBreakdown.totalMult > 1) && (() => {
+      {(lineupBreakdown.flatCoresBase > 0 || lineupBreakdown.totalMultBase > 1) && (() => {
+        const baseOutput = lineupBreakdown.flatCoresBase * lineupBreakdown.totalMultBase
         const output = lineupBreakdown.flatCores * lineupBreakdown.totalMult
         const isAllStar = activeLineup === 'allstar'
         const lineupContribution = isAllStar ? output * S5_ALLSTAR_MODIFIER : output
-        const consumablePct = startingFive?.consumableCard?.coresBoostPct || 0
         const otherLineupOutput = isAllStar
           ? (startingFive?.currentSeason?.output?.coresPerDay || 0)
           : (startingFive?.allStar?.output?.coresPerDay || 0) * S5_ALLSTAR_MODIFIER
         const combinedRate = lineupContribution + otherLineupOutput
-        const boostedCombined = combinedRate * (1 + consumablePct / 100)
         return (
         <div className="cd-panel rounded-xl p-3 sm:p-4 mb-4 cd-num">
-          {/* Hero numbers */}
+          {/* Hero numbers — base values (before team synergy) so card values add up */}
           <div className="flex items-center justify-center gap-3 sm:gap-4">
             <div className="text-center">
               <div className="text-2xl sm:text-3xl font-black text-amber-400 leading-none">
-                {lineupBreakdown.flatCores < 1 ? lineupBreakdown.flatCores.toFixed(2) : lineupBreakdown.flatCores.toFixed(1)}
+                {lineupBreakdown.flatCoresBase < 1 ? lineupBreakdown.flatCoresBase.toFixed(2) : lineupBreakdown.flatCoresBase.toFixed(1)}
               </div>
               <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Flat/day</div>
             </div>
             <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">×</span>
             <div className="text-center">
               <div className="text-2xl sm:text-3xl font-black text-emerald-400 leading-none">
-                {lineupBreakdown.totalMult.toFixed(2)}x
+                {lineupBreakdown.totalMultBase.toFixed(2)}x
               </div>
               <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Multiplier</div>
             </div>
             <span className="text-xl sm:text-2xl text-white/20 font-light select-none pb-3">=</span>
             <div className="text-center">
               <div className="text-2xl sm:text-3xl font-black text-[var(--cd-cyan)] leading-none">
-                {output.toFixed(1)}
+                {baseOutput.toFixed(1)}
               </div>
               <div className="text-[10px] sm:text-xs text-white/40 mt-1 uppercase tracking-wider">Cores/day</div>
             </div>
@@ -645,7 +651,11 @@ export default function CCStartingFive() {
           {/* Modifiers + combined breakdown */}
           <div className="flex items-center justify-center gap-2 flex-wrap mt-2 pt-2 border-t border-white/[0.06] text-xs">
             {lineupBreakdown.teamSynergyPct > 0.005 && (
-              <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergyPct * 100)}% team</span>
+              <>
+                <span className="text-sky-400">+{Math.round(lineupBreakdown.teamSynergyPct * 100)}% team</span>
+                <span className="text-white/20">→</span>
+                <span className="text-white/50">{output.toFixed(1)}/day</span>
+              </>
             )}
             {isAllStar && (
               <>
@@ -655,22 +665,13 @@ export default function CCStartingFive() {
                 <span className="text-white/50">{lineupContribution.toFixed(1)}/day</span>
               </>
             )}
-            {consumablePct > 0 && (
-              <>
-                <span className="text-white/20">·</span>
-                <span className="text-purple-400">+{consumablePct}% consumable</span>
-              </>
-            )}
-            {startingFive?.consumableCard?.passionBoostPct > 0 && (
-              <span className="text-purple-400">+{startingFive.consumableCard.passionBoostPct}% passion</span>
-            )}
           </div>
           {/* Combined total from both lineups */}
           {otherLineupOutput > 0 && (
             <div className="flex items-center justify-center gap-2 mt-1.5 text-[10px] text-white/30">
               <span>{isAllStar ? 'Current Season' : 'All-Star'}: +{otherLineupOutput.toFixed(1)}/day</span>
               <span className="text-white/15">→</span>
-              <span className="text-white/50 font-bold">Combined: {(consumablePct > 0 ? boostedCombined : combinedRate).toFixed(1)} Cores/day</span>
+              <span className="text-white/50 font-bold">Combined: {combinedRate.toFixed(1)} Cores/day</span>
             </div>
           )}
         </div>
@@ -1332,12 +1333,12 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
         ) : (
           <>
             <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
-              {(income.cores || 0) > 0 && (
+              {(income.type === 'flat' || income.type === 'full') && income.cores > 0 && (
                 <span className="flex items-center gap-0.5 text-amber-400">
                   {income.cores < 1 ? income.cores.toFixed(2) : income.cores.toFixed(1)}/d
                 </span>
               )}
-              {(income.multiplier || 1) > 1 && (
+              {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
                 <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
                   {income.multiplier.toFixed(2)}x
                 </span>
@@ -1792,12 +1793,12 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
           </div>
         ) : !isAttachment ? (
           <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] cd-num text-white/35">
-            {(income.flatCores || 0) > 0 && (
+            {(income.type === 'flat' || income.type === 'full') && income.flatCores > 0 && (
               <span className="flex items-center gap-0.5 text-amber-400">
                 {income.flatCores < 1 ? income.flatCores.toFixed(2) : income.flatCores.toFixed(1)}/d
               </span>
             )}
-            {(income.multiplier || 1) > 1 && (
+            {(income.type === 'mult' || income.type === 'full') && income.multiplier > 1 && (
               <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
                 {income.multiplier.toFixed(2)}x
               </span>

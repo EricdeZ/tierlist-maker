@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import { useVault } from './VaultContext'
+import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
 import { getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
@@ -7,6 +8,8 @@ import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import { PenLine, Check, Clock, Loader2 } from 'lucide-react'
+
+const DirectSignModal = lazy(() => import('./components/DirectSignModal'))
 
 const HOLO_TYPES = [
   { key: 'holo', label: 'Holo', desc: 'Flat Cores' },
@@ -45,10 +48,11 @@ function toPlayerCardProps(card) {
   }
 }
 
-function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged }) {
+function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged, linkedPlayer }) {
   const [changingHolo, setChangingHolo] = useState(false)
   const [requestingSig, setRequestingSig] = useState(false)
   const [sigStatus, setSigStatus] = useState(null) // 'requested' after success
+  const [directSignMode, setDirectSignMode] = useState(false)
   const [error, setError] = useState(null)
   const [localHoloType, setLocalHoloType] = useState(card.holoType)
 
@@ -56,7 +60,10 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged 
   const holoEffect = card.holoEffect || getHoloEffect(card.rarity)
   const type = card.cardType || 'god'
 
-  const canRequestSignature = type === 'player' && card.defId && !card.signatureUrl && sigStatus !== 'requested'
+  const cardPlayerId = card.defPlayerId || card.cardData?._testPlayerId
+  const isUnsigned = !card.signatureUrl && sigStatus !== 'requested'
+  const canDirectSign = isUnsigned && cardPlayerId && linkedPlayer && linkedPlayer.id === cardPlayerId
+  const canRequestSignature = type === 'player' && card.defId && isUnsigned && !canDirectSign
 
   const handleHoloChange = async (newType) => {
     if (newType === localHoloType || changingHolo) return
@@ -136,6 +143,26 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged 
           <Check size={14} />
           Signed
         </div>
+      ) : canDirectSign ? (
+        <>
+          <button
+            onClick={() => setDirectSignMode(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/25 transition-all cursor-pointer cd-head"
+          >
+            <PenLine size={14} />
+            Sign Your Card
+          </button>
+          {directSignMode && (
+            <Suspense fallback={null}>
+              <DirectSignModal
+                cardId={card.id}
+                playerCard={type === 'player' ? toPlayerCardProps(card) : null}
+                gameCard={type !== 'player' ? { type, data: toGameCardData(card, override) } : null}
+                onClose={() => setDirectSignMode(false)}
+              />
+            </Suspense>
+          )}
+        </>
       ) : sigStatus === 'requested' ? (
         <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold cd-head">
           <Clock size={14} />
@@ -159,6 +186,7 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged 
 
 export default function CCUniqueCards() {
   const { collection, loaded, getDefOverride, getTemplate, updateCardHoloType } = useVault()
+  const { linkedPlayer } = useAuth()
 
   const uniqueCards = useMemo(
     () => collection.filter(c => c.rarity === 'unique'),
@@ -205,6 +233,7 @@ export default function CCUniqueCards() {
             getDefOverride={getDefOverride}
             getTemplate={getTemplate}
             onHoloTypeChanged={handleHoloTypeChanged}
+            linkedPlayer={linkedPlayer}
           />
         ))}
       </div>

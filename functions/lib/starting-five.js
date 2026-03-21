@@ -11,8 +11,8 @@ const S5_FLAT_PASSION = {
 const S5_REVERSE_MULT = {
   uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
 }
-const S5_FLAT_SCALE = 1.4
-const S5_REVERSE_FLAT_RATIO = 0.25
+const S5_FLAT_SCALE = 0.7
+const S5_MULT_SCALE = 4.5
 const S5_FULL_RATIO = 0.44
 const S5_BENCH_EFFECTIVENESS = 0.50
 export const S5_ALLSTAR_MODIFIER = 0.615
@@ -66,19 +66,14 @@ export function getCardContribution(holoType, rarity, effectiveness = 1.0) {
   }
   if (holoType === 'reverse') {
     const baseMult = S5_REVERSE_MULT[rarity] || 1
-    const multBonus = (baseMult - 1) * effectiveness
-    return {
-      type: 'reverse',
-      cores: baseFlat * S5_REVERSE_FLAT_RATIO,
-      passion: baseFlatP * S5_REVERSE_FLAT_RATIO,
-      multiplier: 1 + multBonus,
-    }
+    const multBonus = (baseMult - 1) * S5_MULT_SCALE * effectiveness
+    return { type: 'mult', multiplier: 1 + multBonus }
   }
   if (holoType === 'full') {
     const cores = baseFlat * S5_FULL_RATIO
     const passion = baseFlatP * S5_FULL_RATIO
     const baseMult = S5_REVERSE_MULT[rarity] || 1
-    const multBonus = (baseMult - 1) * S5_FULL_RATIO * effectiveness
+    const multBonus = (baseMult - 1) * S5_MULT_SCALE * S5_FULL_RATIO * effectiveness
     return { type: 'full', cores, passion, multiplier: 1 + multBonus }
   }
   return { type: 'none' }
@@ -125,8 +120,8 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
     const effectiveness = card.isBench ? S5_BENCH_EFFECTIVENESS : 1.0
     const contrib = getCardContribution(card.holo_type, card.rarity, effectiveness)
     const synergy = checkSynergy(card, card._godCard)
-    const playerHasFlat = (contrib.cores || 0) > 0
-    const playerHasMult = (contrib.multiplier || 1) > 1
+    const playerHasFlat = contrib.type === 'flat' || contrib.type === 'full'
+    const playerHasMult = contrib.type === 'mult' || contrib.type === 'full'
 
     const godBonus = getAttachmentBonus(card._godCard, 'god', playerHasFlat, playerHasMult, synergy)
     const itemBonus = getAttachmentBonus(card._itemCard, 'item', playerHasFlat, playerHasMult)
@@ -158,7 +153,7 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
 
 export function getAttachmentBonusInfo(attachment, type, playerHoloType, synergy = false) {
   if (!attachment?.holo_type) return { flatBoost: 0, multAdd: 0, effectiveType: 'none' }
-  const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full' || playerHoloType === 'reverse'
+  const playerHasFlat = playerHoloType === 'holo' || playerHoloType === 'full'
   const playerHasMult = playerHoloType === 'reverse' || playerHoloType === 'full'
   const bonus = getAttachmentBonus(attachment, type, playerHasFlat, playerHasMult, synergy)
   return { ...bonus, effectiveType: bonus.flatBoost > 0 ? 'flat' : bonus.multAdd > 0 ? 'mult' : 'none' }
