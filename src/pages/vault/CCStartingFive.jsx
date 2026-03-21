@@ -10,6 +10,7 @@ import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
 import { getTeamCounts, getTeamSynergyPreview, isGodSynergy } from './starting-five/synergyHelpers'
+import SynergyPlanner from './starting-five/SynergyPlanner'
 import soloIcon from '../../assets/roles/solo.webp'
 import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
@@ -678,6 +679,8 @@ export default function CCStartingFive() {
         </div>
         )
       })()}
+
+      <SynergyPlanner collection={collection} startingFive={startingFive} />
 
       {/* 5 Role Slots */}
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
