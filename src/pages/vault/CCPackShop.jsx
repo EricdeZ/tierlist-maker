@@ -7,6 +7,7 @@ import PackOpening from './components/PackOpening';
 import CDChargeButton from './components/CDChargeButton';
 import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
+import PackLeaderboard from './components/PackLeaderboard';
 
 const CCPackSale = lazy(() => import('./CCPackSale'));
 const CCBlackMarket = lazy(() => import('./CCBlackMarket'));
@@ -205,10 +206,13 @@ function MyPacks() {
 
   if (!hasAny && !openResult) {
     return (
-      <div className="text-center py-16">
-        <Package className="w-10 h-10 text-white/15 mx-auto mb-3" />
-        <p className="text-white/30 cd-head tracking-wider text-sm">No packs in your inventory</p>
-        <p className="text-white/20 text-xs mt-1">Buy packs from the Shop or receive gifts from friends</p>
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center py-16">
+          <Package className="w-10 h-10 text-white/15 mx-auto mb-3" />
+          <p className="text-white/30 cd-head tracking-wider text-sm">No packs in your inventory</p>
+          <p className="text-white/20 text-xs mt-1">Buy packs from the Shop or receive gifts from friends</p>
+        </div>
+        <PackLeaderboard />
       </div>
     );
   }
@@ -333,6 +337,8 @@ function MyPacks() {
           onOpenMore={() => setOpenResult(null)}
         />
       )}
+
+      <PackLeaderboard />
     </div>
   );
 }

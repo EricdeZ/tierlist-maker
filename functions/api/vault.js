@@ -98,6 +98,7 @@ const handler = async (event) => {
         case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
         case 'gifts': return await handleLoadGifts(sql, user)
         case 'gift-leaderboard': return await handleGiftLeaderboard(sql, user)
+        case 'pack-leaderboard': return await handlePackLeaderboard(sql, user, event.queryStringParameters)
         case 'search-users': return await handleSearchUsers(sql, user, event.queryStringParameters)
         case 'starting-five': return await handleStartingFive(sql, user)
         case 'starting-five-leaderboard': return await handleS5Leaderboard(sql, user)
@@ -1092,6 +1093,89 @@ async function handleGiftLeaderboard(sql, user) {
   }
 }
 
+// ═══ GET: Pack opening leaderboard (daily/weekly/monthly) ═══
+async function handlePackLeaderboard(sql, user, qs) {
+  const period = qs?.period || 'daily'
+  if (!['daily', 'weekly', 'monthly'].includes(period)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid period' }) }
+  }
+
+  const rows = await sql`
+    SELECT po.user_id, COUNT(*)::int AS packs_opened,
+           u.discord_username, u.discord_avatar, u.discord_id,
+           pl.slug AS player_slug
+    FROM cc_pack_opens po
+    JOIN users u ON po.user_id = u.id
+    LEFT JOIN players pl ON u.linked_player_id = pl.id
+    WHERE po.created_at >= ${period === 'daily'
+      ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
+      : period === 'weekly'
+        ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
+        : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+    GROUP BY po.user_id, u.discord_username, u.discord_avatar, u.discord_id, pl.slug
+    ORDER BY packs_opened DESC
+    LIMIT 20
+  `
+
+  const leaderboard = rows.map((r, i) => ({
+    position: i + 1,
+    userId: r.user_id,
+    username: r.discord_username,
+    avatar: r.discord_avatar,
+    discordId: r.discord_id,
+    playerSlug: r.player_slug,
+    packsOpened: r.packs_opened,
+  }))
+
+  let myPosition = null
+  let myEntry = null
+  if (user) {
+    const inTop = leaderboard.find(e => e.userId === user.id)
+    if (!inTop) {
+      const [myRow] = await sql`
+        SELECT COUNT(*)::int AS packs_opened
+        FROM cc_pack_opens
+        WHERE user_id = ${user.id}
+          AND created_at >= ${period === 'daily'
+            ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
+            : period === 'weekly'
+              ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
+              : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+      `
+      if (myRow && myRow.packs_opened > 0) {
+        const [rank] = await sql`
+          SELECT COUNT(*)::int + 1 AS rank
+          FROM (
+            SELECT user_id, COUNT(*) AS cnt
+            FROM cc_pack_opens
+            WHERE created_at >= ${period === 'daily'
+              ? sql`date_trunc('day', now() AT TIME ZONE 'UTC')`
+              : period === 'weekly'
+                ? sql`date_trunc('week', now() AT TIME ZONE 'UTC')`
+                : sql`date_trunc('month', now() AT TIME ZONE 'UTC')`}
+            GROUP BY user_id
+          ) sub
+          WHERE cnt > ${myRow.packs_opened}
+        `
+        myPosition = rank?.rank || null
+        myEntry = {
+          position: myPosition,
+          userId: user.id,
+          username: user.discord_username,
+          avatar: user.discord_avatar,
+          discordId: user.discord_id,
+          packsOpened: myRow.packs_opened,
+        }
+      }
+    }
+  }
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ leaderboard, myPosition, myEntry }),
+  }
+}
+
 // ═══ POST: Send a gift pack ═══
 async function handleSendGift(sql, user, body, event) {
   const { recipientId, message, packType = 'gift' } = body
@@ -1199,6 +1283,7 @@ async function handleOpenGift(sql, user, body) {
     }
     await ensureStats(sql, user.id)
     await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${user.id}`
+    await sql`INSERT INTO cc_pack_opens (user_id, pack_type_id) VALUES (${user.id}, NULL)`
     packName = 'Gift Pack'
   } else {
     // Purchased pack gift — use standard pack opener (skip payment, already paid)

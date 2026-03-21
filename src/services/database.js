@@ -1043,6 +1043,9 @@ export const vaultService = {
     loadGiftLeaderboard() {
         return apiCall('vault', { action: 'gift-leaderboard' })
     },
+    loadPackLeaderboard(period = 'daily') {
+        return apiCall('vault', { action: 'pack-leaderboard', period })
+    },
     async searchUsers(q) {
         return apiCall('vault', { action: 'search-users', q })
     },

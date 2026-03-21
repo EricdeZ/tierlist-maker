@@ -477,6 +477,7 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
 
   await ensureStats(sql, userId)
   await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${userId}`
+  await sql`INSERT INTO cc_pack_opens (user_id, pack_type_id) VALUES (${userId}, ${pack.id})`
 
   return { packName: pack.name, cards: newCards }
 }
