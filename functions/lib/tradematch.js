@@ -1,9 +1,12 @@
+import { grantEmber, ensureEmberBalance } from './ember.js'
+
 // Tradematch — Tinder-style card trading matchmaker
 // Discovery layer: trade pile, swipe feed, match detection, likes
 
 export const TRADEMATCH_RULES = {
   min_trade_pile: 20,
-  max_outgoing_matches: 5,
+  max_outgoing_matches: 15,
+  max_cards_per_side: 10,
   match_expiry_hours: 24,
   feed_page_size: 50,
 }
@@ -275,13 +278,285 @@ export async function createTradeFromLike(sql, initiatorId, likerId, cardId) {
 
 export async function getMatches(sql, userId) {
   return sql`
-    SELECT t.*,
+    SELECT t.id, t.player_a_id, t.player_b_id, t.status, t.mode,
+           t.player_a_core, t.player_b_core,
+           t.offer_by, t.offer_status, t.offer_version,
+           t.created_at, t.updated_at,
            u.discord_username AS partner_name, u.discord_avatar AS partner_avatar, u.discord_id AS partner_discord_id
     FROM cc_trades t
     JOIN users u ON u.id = CASE WHEN t.player_a_id = ${userId} THEN t.player_b_id ELSE t.player_a_id END
     WHERE (t.player_a_id = ${userId} OR t.player_b_id = ${userId})
       AND t.mode = 'match'
       AND t.status = 'active'
-    ORDER BY t.created_at DESC
+    ORDER BY t.updated_at DESC
   `
+}
+
+// ══════════════════════════════════════════════
+// Offer Negotiation
+// ══════════════════════════════════════════════
+
+export async function getOfferDetail(sql, userId, tradeId) {
+  const [trade] = await sql`
+    SELECT t.id, t.player_a_id, t.player_b_id, t.status, t.mode,
+           t.player_a_core, t.player_b_core,
+           t.offer_by, t.offer_status, t.offer_version,
+           t.created_at, t.updated_at,
+           ua.discord_username AS player_a_name, ua.discord_avatar AS player_a_avatar, ua.discord_id AS player_a_discord_id,
+           ub.discord_username AS player_b_name, ub.discord_avatar AS player_b_avatar, ub.discord_id AS player_b_discord_id
+    FROM cc_trades t
+    JOIN users ua ON t.player_a_id = ua.id
+    JOIN users ub ON t.player_b_id = ub.id
+    WHERE t.id = ${tradeId}
+      AND t.mode = 'match'
+      AND (t.player_a_id = ${userId} OR t.player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+  if (trade.status !== 'active') throw new Error('Trade is no longer active')
+
+  const cards = await sql`
+    SELECT tc.id, tc.card_id, tc.offered_by,
+           c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
+           c.holo_effect, c.holo_type, c.power, c.level,
+           c.card_data, c.def_id, c.card_type, c.owner_id,
+           c.template_id
+    FROM cc_trade_cards tc
+    JOIN cc_cards c ON tc.card_id = c.id
+    WHERE tc.trade_id = ${tradeId}
+  `
+
+  const cardIds = cards.map(c => c.card_id)
+
+  const lockedInTrade = cardIds.length > 0 ? await sql`
+    SELECT DISTINCT tc2.card_id FROM cc_trade_cards tc2
+    JOIN cc_trades t2 ON tc2.trade_id = t2.id
+    WHERE tc2.card_id = ANY(${cardIds}) AND t2.status IN ('waiting', 'active') AND t2.mode = 'direct'
+  ` : []
+  const tradeLockedSet = new Set(lockedInTrade.map(r => r.card_id))
+
+  const onMarketplace = cardIds.length > 0 ? await sql`
+    SELECT DISTINCT card_id FROM cc_market_listings
+    WHERE card_id = ANY(${cardIds}) AND status = 'active'
+  ` : []
+  const marketLockedSet = new Set(onMarketplace.map(r => r.card_id))
+
+  const enrichedCards = cards.map(card => ({
+    ...card,
+    available: card.owner_id === card.offered_by
+      && !tradeLockedSet.has(card.card_id)
+      && !marketLockedSet.has(card.card_id),
+  }))
+
+  return { trade, cards: enrichedCards }
+}
+
+export async function offerAddCard(sql, userId, tradeId, cardId) {
+  const [trade] = await sql`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND mode = 'match' AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+
+  if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+  }
+
+  const [card] = await sql`SELECT id, owner_id FROM cc_cards WHERE id = ${cardId}`
+  if (!card) throw new Error('Card not found')
+
+  const offeredBy = card.owner_id
+  if (offeredBy !== trade.player_a_id && offeredBy !== trade.player_b_id) {
+    throw new Error('Card does not belong to either trader')
+  }
+
+  const [inPile] = await sql`
+    SELECT 1 FROM cc_trade_pile WHERE user_id = ${offeredBy} AND card_id = ${cardId}
+  `
+  if (!inPile) throw new Error('Card is not in trade pile')
+
+  const [{ count }] = await sql`
+    SELECT COUNT(*)::int AS count FROM cc_trade_cards
+    WHERE trade_id = ${tradeId} AND offered_by = ${offeredBy}
+  `
+  if (count >= TRADEMATCH_RULES.max_cards_per_side) {
+    throw new Error(`Maximum ${TRADEMATCH_RULES.max_cards_per_side} cards per side`)
+  }
+
+  await sql`
+    INSERT INTO cc_trade_cards (trade_id, card_id, offered_by)
+    VALUES (${tradeId}, ${cardId}, ${offeredBy})
+    ON CONFLICT (trade_id, card_id) DO NOTHING
+  `
+}
+
+export async function offerRemoveCard(sql, userId, tradeId, cardId) {
+  const [trade] = await sql`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND mode = 'match' AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+
+  if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+  }
+
+  await sql`DELETE FROM cc_trade_cards WHERE trade_id = ${tradeId} AND card_id = ${cardId}`
+}
+
+export async function offerSetCore(sql, userId, tradeId, amount) {
+  const amt = Math.max(0, Math.floor(amount))
+
+  const [trade] = await sql`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND mode = 'match' AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+
+  if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+  }
+
+  const isA = trade.player_a_id === userId
+  if (isA) {
+    await sql`UPDATE cc_trades SET player_a_core = ${amt}, updated_at = NOW() WHERE id = ${tradeId}`
+  } else {
+    await sql`UPDATE cc_trades SET player_b_core = ${amt}, updated_at = NOW() WHERE id = ${tradeId}`
+  }
+}
+
+export async function offerSend(sql, userId, tradeId) {
+  const [trade] = await sql`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND mode = 'match' AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+
+  const isA = trade.player_a_id === userId
+  const myCore = isA ? trade.player_a_core : trade.player_b_core
+
+  const [{ count: myCardCount }] = await sql`
+    SELECT COUNT(*)::int AS count FROM cc_trade_cards
+    WHERE trade_id = ${tradeId} AND offered_by = ${userId}
+  `
+  if (myCardCount === 0 && myCore === 0) {
+    throw new Error('You must offer at least one card or some Cores')
+  }
+
+  await sql`
+    UPDATE cc_trades
+    SET offer_by = ${userId}, offer_status = 'pending', offer_version = offer_version + 1, updated_at = NOW()
+    WHERE id = ${tradeId}
+  `
+}
+
+export async function offerAccept(tx, userId, tradeId, version) {
+  const [trade] = await tx`
+    SELECT * FROM cc_trades WHERE id = ${tradeId} AND mode = 'match' AND status = 'active' FOR UPDATE
+  `
+  if (!trade) throw new Error('Trade not found or not active')
+
+  const isA = trade.player_a_id === userId
+  const isB = trade.player_b_id === userId
+  if (!isA && !isB) throw new Error('You are not in this trade')
+
+  if (trade.offer_status !== 'pending') throw new Error('No pending offer to accept')
+  if (trade.offer_by === userId) throw new Error('You cannot accept your own offer')
+
+  if (trade.offer_version !== version) throw new Error('Offer has changed — please review the updated offer')
+
+  const items = await tx`SELECT * FROM cc_trade_cards WHERE trade_id = ${tradeId}`
+  const aCards = items.filter(c => c.offered_by === trade.player_a_id)
+  const bCards = items.filter(c => c.offered_by === trade.player_b_id)
+
+  if (items.length === 0 && trade.player_a_core === 0 && trade.player_b_core === 0) {
+    throw new Error('Trade is empty')
+  }
+
+  for (const tc of items) {
+    const [card] = await tx`SELECT owner_id FROM cc_cards WHERE id = ${tc.card_id} FOR UPDATE`
+    if (!card || card.owner_id !== tc.offered_by) {
+      throw new Error('A card in the trade is no longer owned by the trader')
+    }
+    const [locked] = await tx`
+      SELECT 1 FROM cc_trade_cards tc2
+      JOIN cc_trades t2 ON tc2.trade_id = t2.id
+      WHERE tc2.card_id = ${tc.card_id} AND t2.status IN ('waiting', 'active') AND t2.mode = 'direct'
+      LIMIT 1
+    `
+    if (locked) throw new Error('A card is locked in a direct trade')
+
+    const [onMarket] = await tx`
+      SELECT 1 FROM cc_market_listings WHERE card_id = ${tc.card_id} AND status = 'active' LIMIT 1
+    `
+    if (onMarket) throw new Error('A card is listed on the marketplace')
+  }
+
+  if (trade.player_a_core > 0) {
+    await ensureEmberBalance(tx, trade.player_a_id)
+    const [balA] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${trade.player_a_id} FOR UPDATE`
+    if (!balA || balA.balance < trade.player_a_core) throw new Error('Player cannot afford their Core offer')
+  }
+  if (trade.player_b_core > 0) {
+    await ensureEmberBalance(tx, trade.player_b_id)
+    const [balB] = await tx`SELECT balance FROM ember_balances WHERE user_id = ${trade.player_b_id} FOR UPDATE`
+    if (!balB || balB.balance < trade.player_b_core) throw new Error('Player cannot afford their Core offer')
+  }
+
+  if (aCards.length > 0) {
+    const aCardIds = aCards.map(c => c.card_id)
+    await tx`UPDATE cc_cards SET owner_id = ${trade.player_b_id} WHERE id = ANY(${aCardIds})`
+    await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${aCardIds})`
+    await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${aCardIds})`
+    await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${aCardIds})`
+    await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${aCardIds})`
+    await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${aCardIds})`
+    await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${aCardIds}) AND status IN ('pending', 'awaiting_approval')`
+  }
+  if (bCards.length > 0) {
+    const bCardIds = bCards.map(c => c.card_id)
+    await tx`UPDATE cc_cards SET owner_id = ${trade.player_a_id} WHERE id = ANY(${bCardIds})`
+    await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${bCardIds})`
+    await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${bCardIds})`
+    await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${bCardIds})`
+    await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${bCardIds})`
+    await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${bCardIds})`
+    await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${bCardIds}) AND status IN ('pending', 'awaiting_approval')`
+  }
+
+  const allCardIds = items.map(c => c.card_id)
+  if (allCardIds.length > 0) {
+    await tx`DELETE FROM cc_trade_pile WHERE card_id = ANY(${allCardIds})`
+  }
+
+  if (trade.player_a_core > 0) {
+    await grantEmber(tx, trade.player_a_id, 'cc_trade', -trade.player_a_core, `Match Trade #${tradeId}: sent Core`, tradeId)
+    await grantEmber(tx, trade.player_b_id, 'cc_trade', trade.player_a_core, `Match Trade #${tradeId}: received Core`, tradeId)
+  }
+  if (trade.player_b_core > 0) {
+    await grantEmber(tx, trade.player_b_id, 'cc_trade', -trade.player_b_core, `Match Trade #${tradeId}: sent Core`, tradeId)
+    await grantEmber(tx, trade.player_a_id, 'cc_trade', trade.player_b_core, `Match Trade #${tradeId}: received Core`, tradeId)
+  }
+
+  await tx`
+    UPDATE cc_trades
+    SET status = 'completed', offer_status = 'accepted', completed_at = NOW(), updated_at = NOW()
+    WHERE id = ${tradeId}
+  `
+
+  return { status: 'completed' }
+}
+
+export async function offerCancel(sql, userId, tradeId) {
+  const [trade] = await sql`
+    SELECT * FROM cc_trades
+    WHERE id = ${tradeId} AND mode = 'match' AND status = 'active'
+      AND (player_a_id = ${userId} OR player_b_id = ${userId})
+  `
+  if (!trade) throw new Error('Trade not found')
+
+  await sql`UPDATE cc_trades SET status = 'cancelled', updated_at = NOW() WHERE id = ${tradeId}`
 }
