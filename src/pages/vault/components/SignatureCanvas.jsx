@@ -81,8 +81,12 @@ export default function SignatureCanvas({ onConfirm, onCancel, onRedo, cardBackg
   const drawingRef = useRef(false)
   const penColorRef = useRef(penColor)
   const pathsRef = useRef(paths)
+  const currentPathRef = useRef(currentPath)
+  const emitPreviewRef = useRef(emitPreview)
   penColorRef.current = penColor
   pathsRef.current = paths
+  currentPathRef.current = currentPath
+  emitPreviewRef.current = emitPreview
 
   const startDraw = (e) => {
     e.preventDefault()
@@ -101,12 +105,12 @@ export default function SignatureCanvas({ onConfirm, onCancel, onRedo, cardBackg
     if (!drawingRef.current) return
     drawingRef.current = false
     setDrawing(false)
-    if (currentPath.length > 1) {
-      const newPaths = [...paths, { points: currentPath, color: penColor }]
+    if (currentPathRef.current.length > 1) {
+      const newPaths = [...pathsRef.current, { points: currentPathRef.current, color: penColorRef.current }]
       setPaths(newPaths)
       setCurrentPath([])
       // Emit after next redraw
-      requestAnimationFrame(() => emitPreview(newPaths))
+      requestAnimationFrame(() => emitPreviewRef.current(newPaths))
     } else {
       setCurrentPath([])
     }
