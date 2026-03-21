@@ -9,6 +9,7 @@ import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import CardZoomModal from './components/CardZoomModal'
+import { getTeamCounts, getTeamSynergyPreview, isGodSynergy } from './starting-five/synergyHelpers'
 import soloIcon from '../../assets/roles/solo.webp'
 import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
@@ -774,6 +775,7 @@ export default function CCStartingFive() {
           collection={collection}
           slottedCards={slottedCards}
           allSlottedIds={allSlottedIds}
+          activeSlots={slots}
           onSelect={handleSlot}
           onClose={() => setPickerRole(null)}
           slotting={slotting}
@@ -1561,9 +1563,10 @@ function SlotAnimationOverlay({ config, rarity }) {
 }
 
 
-function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, onClose, slotting, getDefOverride, isBench }) {
+function CardPicker({ role, collection, slottedCards, allSlottedIds, activeSlots, onSelect, onClose, slotting, getDefOverride, isBench }) {
   const roleInfo = ROLES.find(r => r.key === role)
   const roleIcon = roleInfo?.icon
+  const [teamFilter, setTeamFilter] = useState(null)
 
   // Filter eligible cards — bench slot accepts any player role
   const eligibleCards = useMemo(() => {
@@ -1589,6 +1592,31 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
       })
   }, [collection, slottedCards, allSlottedIds, role, isBench])
 
+  // Build team options from eligible cards
+  const teamOptions = useMemo(() => {
+    const teams = new Map()
+    for (const card of eligibleCards) {
+      const tid = card.teamId || card.cardData?.teamId
+      const name = card.cardData?.teamName || ''
+      const color = card.cardData?.teamColor || '#6366f1'
+      if (!tid || !name) continue
+      if (!teams.has(tid)) teams.set(tid, { teamId: tid, teamName: name, teamColor: color, count: 0 })
+      teams.get(tid).count++
+    }
+    return [...teams.values()].sort((a, b) => b.count - a.count)
+  }, [eligibleCards])
+
+  // Filter by selected team
+  const displayCards = useMemo(() => {
+    if (!teamFilter) return eligibleCards
+    return eligibleCards.filter(c => (c.teamId || c.cardData?.teamId) === teamFilter)
+  }, [eligibleCards, teamFilter])
+
+  // Team counts in active lineup for synergy preview
+  const activeTeamCounts = useMemo(() => {
+    return getTeamCounts(activeSlots)
+  }, [activeSlots])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
@@ -1612,9 +1640,35 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
           </button>
         </div>
 
+        {/* Team filter bar */}
+        {teamOptions.length > 1 && (
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--cd-border)] overflow-x-auto">
+            <button
+              onClick={() => setTeamFilter(null)}
+              className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-bold cd-head tracking-wider transition-colors cursor-pointer ${
+                !teamFilter ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/50'
+              }`}
+            >
+              All ({eligibleCards.length})
+            </button>
+            {teamOptions.map(t => (
+              <button
+                key={t.teamId}
+                onClick={() => setTeamFilter(teamFilter === t.teamId ? null : t.teamId)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold cd-head tracking-wider transition-colors cursor-pointer ${
+                  teamFilter === t.teamId ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/50'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.teamColor }} />
+                {t.teamName} ({t.count})
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Card grid */}
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 70px)' }}>
-          {eligibleCards.length === 0 ? (
+          {displayCards.length === 0 ? (
             <div className="text-center py-12 text-white/30">
               {roleIcon && <img src={roleIcon} alt="" className="w-10 h-10 mx-auto mb-3 opacity-20 object-contain" />}
               <p className="text-sm cd-head tracking-wider">No eligible cards</p>
@@ -1622,13 +1676,17 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, onSelect, o
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              {eligibleCards.map(card => (
+              {displayCards.map(card => (
                 <PickerCard
                   key={card.id}
                   card={card}
                   onSelect={() => onSelect(card.id, role)}
                   disabled={slotting}
                   override={getDefOverride(card)}
+                  teamSynergyPreview={getTeamSynergyPreview(
+                    card.teamId || card.cardData?.teamId,
+                    activeTeamCounts
+                  )}
                 />
               ))}
             </div>
@@ -1727,7 +1785,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
 }
 
 
-function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
+function PickerCard({ card, onSelect, disabled, override, holoMismatch, teamSynergyPreview, isSynergy }) {
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getBaseIncomeEstimate(card)
   const type = getCardType(card)
@@ -1805,6 +1863,14 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch }) {
             )}
           </div>
         ) : null}
+        {teamSynergyPreview && !holoMismatch && (
+          <div className="text-[9px] font-bold cd-head text-sky-400 mt-0.5">
+            {teamSynergyPreview.label}
+          </div>
+        )}
+        {isSynergy && !holoMismatch && (
+          <div className="text-[8px] font-bold cd-head text-emerald-400 tracking-wider mt-0.5">SYNERGY</div>
+        )}
       </div>
     </button>
   )
