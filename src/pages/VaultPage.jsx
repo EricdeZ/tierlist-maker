@@ -176,7 +176,7 @@ function VaultInner() {
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
-    const [showTradematchPromo, setShowTradematchPromo] = useState(() => !sessionStorage.getItem('tradematch-promo-dismissed'))
+    const [showTradematchPromo, setShowTradematchPromo] = useState(() => !localStorage.getItem('tradematch-promo-dismissed'))
 
     // Poll vaultClaimableCount every 60s while vault is visible
     useEffect(() => {
@@ -437,7 +437,7 @@ function VaultInner() {
         </div>
 
         {showTradematchPromo && user && activeTab !== 'tradematch' && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1') }}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTradematchPromo(false); localStorage.setItem('tradematch-promo-dismissed', '1') }}>
                 <div
                     className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden p-6 text-center"
                     style={{ background: 'var(--cd-surface)', border: '1px solid rgba(236,72,153,0.3)', boxShadow: '0 0 40px rgba(236,72,153,0.15)', animation: 'cd-fade-in 0.3s ease-out' }}
@@ -452,14 +452,14 @@ function VaultInner() {
                     </p>
                     <div className="flex flex-col gap-2">
                         <button
-                            onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1'); setTab('tradematch') }}
+                            onClick={() => { setShowTradematchPromo(false); localStorage.setItem('tradematch-promo-dismissed', '1'); setTab('tradematch') }}
                             className="w-full py-2.5 rounded-xl text-sm font-bold cd-head tracking-wider text-white transition-all active:scale-95 cursor-pointer"
                             style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', boxShadow: '0 0 20px rgba(236,72,153,0.3)' }}
                         >
                             Start Swiping
                         </button>
                         <button
-                            onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1') }}
+                            onClick={() => { setShowTradematchPromo(false); localStorage.setItem('tradematch-promo-dismissed', '1') }}
                             className="w-full py-2 text-xs font-bold cd-head tracking-wider transition-all cursor-pointer"
                             style={{ color: 'var(--cd-text-dim)' }}
                         >
