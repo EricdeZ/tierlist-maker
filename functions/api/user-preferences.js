@@ -15,7 +15,7 @@ const handler = async (event) => {
 
     if (event.httpMethod === 'GET') {
         const [prefs] = await sql`
-            SELECT allow_discord_avatar
+            SELECT allow_discord_avatar, reduce_flash
             FROM user_preferences
             WHERE user_id = ${user.id}
         `
@@ -24,6 +24,7 @@ const handler = async (event) => {
             headers: getHeaders(event),
             body: JSON.stringify({
                 allow_discord_avatar: prefs?.allow_discord_avatar ?? true,
+                reduce_flash: prefs?.reduce_flash ?? false,
             }),
         }
     }
@@ -40,25 +41,36 @@ const handler = async (event) => {
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) }
         }
 
-        const { allow_discord_avatar } = body
-        if (typeof allow_discord_avatar !== 'boolean') {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: 'allow_discord_avatar must be a boolean' }) }
+        const { allow_discord_avatar, reduce_flash } = body
+
+        const updates = {}
+        if (typeof allow_discord_avatar === 'boolean') updates.allow_discord_avatar = allow_discord_avatar
+        if (typeof reduce_flash === 'boolean') updates.reduce_flash = reduce_flash
+
+        if (Object.keys(updates).length === 0) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid preferences provided' }) }
         }
 
         await sql`
-            INSERT INTO user_preferences (user_id, allow_discord_avatar)
-            VALUES (${user.id}, ${allow_discord_avatar})
+            INSERT INTO user_preferences (user_id, allow_discord_avatar, reduce_flash)
+            VALUES (${user.id}, ${updates.allow_discord_avatar ?? true}, ${updates.reduce_flash ?? false})
             ON CONFLICT (user_id)
-            DO UPDATE SET allow_discord_avatar = ${allow_discord_avatar}, updated_at = NOW()
+            DO UPDATE SET
+                allow_discord_avatar = COALESCE(${updates.allow_discord_avatar ?? null}, user_preferences.allow_discord_avatar),
+                reduce_flash = COALESCE(${updates.reduce_flash ?? null}, user_preferences.reduce_flash),
+                updated_at = NOW()
         `
 
-        // Propagate to card system: update cc_player_defs and cc_cards
+        // Propagate avatar change to card system
+        if (updates.allow_discord_avatar === undefined) {
+            // No avatar change — skip propagation
+        } else {
         const [linked] = await sql`
             SELECT linked_player_id FROM users WHERE id = ${user.id}
         `
         if (linked?.linked_player_id) {
             const playerId = linked.linked_player_id
-            if (allow_discord_avatar) {
+            if (updates.allow_discord_avatar) {
                 // Re-enable: set avatar_url from current Discord info
                 await sql`
                     UPDATE cc_player_defs SET avatar_url = (
@@ -92,11 +104,18 @@ const handler = async (event) => {
                 `
             }
         }
+        }
 
+        const [updated] = await sql`
+            SELECT allow_discord_avatar, reduce_flash FROM user_preferences WHERE user_id = ${user.id}
+        `
         return {
             statusCode: 200,
             headers: getHeaders(event),
-            body: JSON.stringify({ allow_discord_avatar }),
+            body: JSON.stringify({
+                allow_discord_avatar: updated?.allow_discord_avatar ?? true,
+                reduce_flash: updated?.reduce_flash ?? false,
+            }),
         }
     }
 

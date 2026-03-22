@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { Settings, Shield, Loader2 } from 'lucide-react'
+import { Settings, Shield, Loader2, Zap } from 'lucide-react'
 
 const apiCall = async (endpoint, params = {}) => {
     const qs = new URLSearchParams(params).toString()
@@ -27,13 +27,18 @@ const apiPost = async (endpoint, body) => {
 export default function CCSettings() {
     const { user } = useAuth()
     const [allowAvatar, setAllowAvatar] = useState(true)
+    const [reduceFlash, setReduceFlash] = useState(() => localStorage.getItem('cc_reduce_flash') === 'true')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [savingFlash, setSavingFlash] = useState(false)
 
     useEffect(() => {
         if (!user) return
         apiCall('user-preferences').then((data) => {
             setAllowAvatar(data.allow_discord_avatar ?? true)
+            const rf = data.reduce_flash ?? false
+            setReduceFlash(rf)
+            localStorage.setItem('cc_reduce_flash', String(rf))
             setLoading(false)
         }).catch(() => setLoading(false))
     }, [user])
@@ -44,6 +49,15 @@ export default function CCSettings() {
         setAllowAvatar(newValue)
         await apiPost('user-preferences', { allow_discord_avatar: newValue })
         setSaving(false)
+    }
+
+    const toggleReduceFlash = async () => {
+        const newValue = !reduceFlash
+        setSavingFlash(true)
+        setReduceFlash(newValue)
+        localStorage.setItem('cc_reduce_flash', String(newValue))
+        await apiPost('user-preferences', { reduce_flash: newValue })
+        setSavingFlash(false)
     }
 
     if (!user) {
@@ -100,6 +114,39 @@ export default function CCSettings() {
                             Allow my Discord profile picture on my card
                         </span>
                         {saving && <Loader2 className="w-3.5 h-3.5 text-[var(--cd-cyan)] animate-spin ml-auto" />}
+                    </label>
+                </div>
+            </div>
+
+            <div className="cd-panel cd-corners rounded-xl p-5 relative overflow-hidden mt-4">
+                <div className="cd-data-overlay" />
+                <div className="relative z-1">
+                    <div className="flex items-start gap-3 mb-4">
+                        <Zap className="w-5 h-5 text-[var(--cd-cyan)] mt-0.5 shrink-0" />
+                        <div>
+                            <h3 className="text-sm font-bold text-[var(--cd-text)] cd-head">Accessibility</h3>
+                            <p className="text-xs text-[var(--cd-text-mid)] mt-1 leading-relaxed">
+                                Reduce intense visual effects during pack openings. This disables the full-screen flash that plays when revealing rare or higher cards.
+                            </p>
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer group mt-4 p-3 rounded-lg hover:bg-white/[0.02] transition-colors">
+                        <div className="relative">
+                            <input
+                                type="checkbox"
+                                checked={reduceFlash}
+                                onChange={toggleReduceFlash}
+                                disabled={savingFlash}
+                                className="sr-only peer"
+                            />
+                            <div className="w-10 h-5 rounded-full bg-[var(--cd-edge)] border border-[var(--cd-border)] peer-checked:bg-[var(--cd-cyan)]/20 peer-checked:border-[var(--cd-cyan)]/50 transition-all" />
+                            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-[var(--cd-text-dim)] peer-checked:bg-[var(--cd-cyan)] peer-checked:translate-x-5 transition-all shadow-sm" />
+                        </div>
+                        <span className="text-sm text-[var(--cd-text)] font-medium">
+                            Reduce flashing lights
+                        </span>
+                        {savingFlash && <Loader2 className="w-3.5 h-3.5 text-[var(--cd-cyan)] animate-spin ml-auto" />}
                     </label>
                 </div>
             </div>
