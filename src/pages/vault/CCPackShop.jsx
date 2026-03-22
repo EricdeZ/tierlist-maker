@@ -4,6 +4,7 @@ import { useVault } from './VaultContext';
 import { usePassion } from '../../context/PassionContext';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
+import usePendingPackOpen from './components/usePendingPackOpen';
 import CDChargeButton from './components/CDChargeButton';
 import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
@@ -171,7 +172,7 @@ function GetCoresHint({ claimableCount }) {
 // ═══════════════════════════════════════════════
 function MyPacks() {
   const { inventory, openInventoryPack, giftData, openGift, packTypesMap, lockedPackIds } = useVault();
-  const [openResult, setOpenResult] = useState(null);
+  const { openResult, setOpenResult, closeResult } = usePendingPackOpen();
   const [loading, setLoading] = useState(null);
   const lockedSet = useMemo(() => new Set(lockedPackIds || []), [lockedPackIds]);
 
@@ -333,8 +334,8 @@ function MyPacks() {
         <PackOpening
           result={openResult}
           packType={openResult.packType}
-          onClose={() => setOpenResult(null)}
-          onOpenMore={() => setOpenResult(null)}
+          onClose={closeResult}
+          onOpenMore={closeResult}
         />
       )}
 
@@ -786,7 +787,7 @@ function PackShop() {
     (rotationPacks || []).filter(id => packTypesMap[id]),
     [rotationPacks, packTypesMap]
   );
-  const [openResult, setOpenResult] = useState(null);
+  const { openResult, setOpenResult, closeResult } = usePendingPackOpen();
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -808,8 +809,6 @@ function PackShop() {
       alert(err.message || 'Failed to open pack');
     }
   }, [buyPack, buyPacksToInventory, quantity]);
-
-  const closeResult = () => setOpenResult(null);
 
   const emberBalance = ember?.balance ?? 0;
   const [focusedPack, setFocusedPack] = useState(null);

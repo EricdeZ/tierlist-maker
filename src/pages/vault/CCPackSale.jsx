@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useVault } from './VaultContext';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
+import usePendingPackOpen from './components/usePendingPackOpen';
 import emberIcon from '../../assets/ember.png';
 import './vendingmachine.css';
 
@@ -254,7 +255,7 @@ export default function SaleVendingMachine() {
   const [phase, setPhase] = useState('idle');
   const [dispensedSlot, setDispensedSlot] = useState(null);
   const [pendingResult, setPendingResult] = useState(null);
-  const [openResult, setOpenResult] = useState(null);
+  const { openResult, setOpenResult, closeResult: closePendingResult } = usePendingPackOpen();
   const [error, setError] = useState('');
   const [zoomedSlot, setZoomedSlot] = useState(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
@@ -358,7 +359,7 @@ export default function SaleVendingMachine() {
     setDispensedSlot(null);
   }, [phase, pendingResult]);
 
-  const closeResult = () => setOpenResult(null);
+  const closeResult = () => closePendingResult();
 
   const getDisplay = () => {
     if (!hasPacks) return { line1: 'SOLD OUT!', line2: 'CHECK BACK LATER', isError: true };
