@@ -544,8 +544,6 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
   let veilClass = '', veilDim = ''
   if (flipPhase === 'anticipation' || flipPhase === 'flipping') {
     veilDim = topTier <= 0 ? 'mythic' : topTier <= 1 ? 'legendary' : topTier <= 2 ? 'epic' : topTier <= 3 ? 'rare' : ''
-  } else if (flipPhase === 'revealed') {
-    veilClass = topTier <= 0 ? 'flash-mythic' : topTier <= 1 ? 'flash-legendary' : topTier <= 2 ? 'flash-epic' : topTier <= 3 ? 'flash' : ''
   }
 
   const fanOffsets = useMemo(() => {

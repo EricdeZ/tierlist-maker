@@ -41,6 +41,8 @@ async function handler(event) {
             case 'approve': return approveItem(sql, body, user, canApprove)
             case 'reject': return rejectItem(sql, body, user, canApprove)
             case 'archive-template': return archiveTemplate(sql, body, canApprove)
+            case 'delete-item': return deleteItem(sql, body, user, canApprove)
+            case 'rename-item': return renameItem(sql, body, user, canApprove)
             case 'delete-asset': return deleteAsset(sql, body, canApprove, event)
             case 'save-collection': return saveCollection(sql, body, user, canApprove)
             case 'add-collection-entries': return addCollectionEntries(sql, body, user, canApprove)
@@ -297,6 +299,39 @@ async function archiveTemplate(sql, body, canApprove) {
     const { id } = body
     if (!id) return err('id required')
     await sql`UPDATE cc_card_templates SET status = 'archived', updated_at = NOW() WHERE id = ${id}`
+    return ok({ success: true })
+}
+
+async function deleteItem(sql, body, user, canApprove) {
+    const { type, id } = body
+    if (!type || !id) return err('type and id required')
+    if (type !== 'template' && type !== 'draft') return err('type must be template or draft')
+    const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
+
+    const [row] = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    if (!row) return err('Not found', 404)
+    if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
+
+    await sql`DELETE FROM ${sql(table)} WHERE id = ${id}`
+    return ok({ success: true })
+}
+
+async function renameItem(sql, body, user, canApprove) {
+    const { type, id, name } = body
+    if (!type || !id) return err('type and id required')
+    if (!name?.trim()) return err('name required')
+    if (type !== 'template' && type !== 'draft') return err('type must be template or draft')
+    const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
+
+    const [row] = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    if (!row) return err('Not found', 404)
+    if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
+
+    if (type === 'template') {
+        await sql`UPDATE cc_card_templates SET name = ${name.trim()}, updated_at = NOW() WHERE id = ${id}`
+    } else {
+        await sql`UPDATE cc_card_drafts SET notes = ${name.trim()}, updated_at = NOW() WHERE id = ${id}`
+    }
     return ok({ success: true })
 }
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { RARITIES } from '../../data/vault/economy'
-import { FileText } from 'lucide-react'
+import { FileText, Pencil, Trash2 } from 'lucide-react'
 import MiniCardPreview from './preview/MiniCardPreview'
 
 const STATUS_OPTIONS = ['draft', 'pending_review', 'approved', 'rejected']
@@ -61,6 +61,21 @@ export default function DraftsPage() {
         e.stopPropagation()
         const reason = prompt('Rejection reason (optional):')
         await vaultDashboardService.reject('draft', id, reason)
+        fetchDrafts()
+    }
+
+    const handleRename = async (e, draft) => {
+        e.stopPropagation()
+        const newName = prompt('Rename draft:', draft.notes || `Draft #${draft.id}`)
+        if (newName === null) return
+        await vaultDashboardService.renameItem('draft', draft.id, newName)
+        fetchDrafts()
+    }
+
+    const handleDelete = async (e, id) => {
+        e.stopPropagation()
+        if (!confirm('Delete this draft? This cannot be undone.')) return
+        await vaultDashboardService.deleteItem('draft', id)
         fetchDrafts()
     }
 
@@ -122,7 +137,7 @@ export default function DraftsPage() {
                             {/* Info */}
                             <div className="flex-1 min-w-0">
                                 <p className="text-white font-medium truncate">
-                                    Card Draft #{d.id}
+                                    {d.notes || `Draft #${d.id}`}
                                     {d.card_type && (
                                         <span className="text-gray-400 font-normal">
                                             {' \u2014 '}{d.card_type.charAt(0).toUpperCase() + d.card_type.slice(1)}
@@ -142,9 +157,6 @@ export default function DraftsPage() {
                                         </>
                                     )}
                                 </p>
-                                {d.notes && (
-                                    <p className="text-xs text-gray-500 mt-1 truncate">{d.notes}</p>
-                                )}
                                 {d.rejection_reason && (
                                     <p className="text-xs text-red-400 mt-1 truncate">Rejected: {d.rejection_reason}</p>
                                 )}
@@ -156,22 +168,38 @@ export default function DraftsPage() {
                             </span>
 
                             {/* Actions */}
-                            {canApprove && d.status === 'pending_review' && (
-                                <div className="flex gap-2 flex-shrink-0">
-                                    <button
-                                        onClick={e => handleApprove(e, d.id)}
-                                        className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors"
-                                    >
-                                        Approve
-                                    </button>
-                                    <button
-                                        onClick={e => handleReject(e, d.id)}
-                                        className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs transition-colors"
-                                    >
-                                        Reject
-                                    </button>
-                                </div>
-                            )}
+                            <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                    onClick={e => handleRename(e, d)}
+                                    className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors"
+                                    title="Rename"
+                                >
+                                    <Pencil size={14} />
+                                </button>
+                                <button
+                                    onClick={e => handleDelete(e, d.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                                {canApprove && d.status === 'pending_review' && (
+                                    <>
+                                        <button
+                                            onClick={e => handleApprove(e, d.id)}
+                                            className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={e => handleReject(e, d.id)}
+                                            className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>

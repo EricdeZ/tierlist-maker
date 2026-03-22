@@ -1487,6 +1487,8 @@ export const vaultDashboardService = {
     async approve(type, id) { return apiPost('vault-dashboard', { action: 'approve' }, { type, id }) },
     async reject(type, id, reason) { return apiPost('vault-dashboard', { action: 'reject' }, { type, id, reason }) },
     async archiveTemplate(id) { return apiPost('vault-dashboard', { action: 'archive-template' }, { id }) },
+    async deleteItem(type, id) { return apiPost('vault-dashboard', { action: 'delete-item' }, { type, id }) },
+    async renameItem(type, id, name) { return apiPost('vault-dashboard', { action: 'rename-item' }, { type, id, name }) },
 
     // Assets
     async getAssets(params = {}) { return apiCall('vault-dashboard', { action: 'assets', ...params }) },

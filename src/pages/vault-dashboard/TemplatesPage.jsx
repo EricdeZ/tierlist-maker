@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { RARITIES } from '../../data/vault/economy'
-import { Search, FileText } from 'lucide-react'
+import { Search, FileText, Pencil, Trash2 } from 'lucide-react'
 import MiniCardPreview from './preview/MiniCardPreview'
 
 const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom']
@@ -73,6 +73,21 @@ export default function TemplatesPage() {
     const handleArchive = async (e, id) => {
         e.stopPropagation()
         await vaultDashboardService.archiveTemplate(id)
+        fetchTemplates()
+    }
+
+    const handleRename = async (e, template) => {
+        e.stopPropagation()
+        const newName = prompt('Rename template:', template.name)
+        if (newName === null || !newName.trim()) return
+        await vaultDashboardService.renameItem('template', template.id, newName)
+        fetchTemplates()
+    }
+
+    const handleDelete = async (e, id) => {
+        e.stopPropagation()
+        if (!confirm('Delete this template? This cannot be undone.')) return
+        await vaultDashboardService.deleteItem('template', id)
         fetchTemplates()
     }
 
@@ -183,34 +198,46 @@ export default function TemplatesPage() {
                             </span>
 
                             {/* Actions */}
-                            {canApprove && (
-                                <div className="flex gap-2 flex-shrink-0">
-                                    {t.status === 'pending_review' && (
-                                        <>
-                                            <button
-                                                onClick={e => handleApprove(e, t.id)}
-                                                className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors"
-                                            >
-                                                Approve
-                                            </button>
-                                            <button
-                                                onClick={e => handleReject(e, t.id)}
-                                                className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs transition-colors"
-                                            >
-                                                Reject
-                                            </button>
-                                        </>
-                                    )}
-                                    {t.status === 'approved' && (
+                            <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                    onClick={e => handleRename(e, t)}
+                                    className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors"
+                                    title="Rename"
+                                >
+                                    <Pencil size={14} />
+                                </button>
+                                <button
+                                    onClick={e => handleDelete(e, t.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                                {canApprove && t.status === 'pending_review' && (
+                                    <>
                                         <button
-                                            onClick={e => handleArchive(e, t.id)}
-                                            className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs transition-colors"
+                                            onClick={e => handleApprove(e, t.id)}
+                                            className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors"
                                         >
-                                            Archive
+                                            Approve
                                         </button>
-                                    )}
-                                </div>
-                            )}
+                                        <button
+                                            onClick={e => handleReject(e, t.id)}
+                                            className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                    </>
+                                )}
+                                {canApprove && t.status === 'approved' && (
+                                    <button
+                                        onClick={e => handleArchive(e, t.id)}
+                                        className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs transition-colors"
+                                    >
+                                        Archive
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
