@@ -53,7 +53,7 @@ const TABS = [
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
     { key: 'bounty', label: 'Bounties', icon: Crosshair, authOnly: true },
-    { key: 'tradematch', label: 'Tradematch', icon: Heart, hidden: true },
+    { key: 'tradematch', label: 'Tradematch', icon: Heart, authOnly: true },
     { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
     { key: 'binder', label: 'Binder', icon: BookMarked },
