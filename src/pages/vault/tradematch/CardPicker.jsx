@@ -4,8 +4,16 @@ import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { getHoloEffect } from '../../../data/vault/economy'
+import { GODS } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
+import { CONSUMABLES } from '../../../data/vault/buffs'
 import { useVault } from '../VaultContext'
 import { tradematchService } from '../../../services/database'
+
+const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
+const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
+const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
+const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
 const CARD_SIZE = 80
 
@@ -14,7 +22,6 @@ function PickerCard({ card, onSelect, disabled }) {
   const cd = card.card_data ? (typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data) : {}
   const type = card.card_type || cd.cardType || 'god'
   const isPlayer = type === 'player' || cd.teamName
-  const override = !isPlayer ? getDefOverride({ cardType: type, godId: card.god_id }) : null
   const holoType = card.holo_type || card.holoType || null
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
 
@@ -39,27 +46,19 @@ function PickerCard({ card, onSelect, disabled }) {
       />
     )
   } else {
+    const dataMap = DATA_MAPS[type]
+    const dataKey = card.god_id?.replace(/^(item|consumable)-/, '') || card.god_id
+    const rawData = dataMap?.get(dataKey)
+    const override = getDefOverride({ cardType: type, godId: card.god_id })
+    const resolvedData = rawData && override
+      ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
+      : rawData
+
     const gameCardEl = (
       <GameCard
         type={type}
         rarity={card.rarity}
-        data={{
-          name: card.god_name || card.player_name,
-          imageUrl: override?.custom_image_url || card.image_url,
-          id: card.god_id,
-          serialNumber: card.serial_number,
-          metadata: override || undefined,
-          role: cd.role,
-          ability: cd.ability,
-          class: cd.class,
-          category: cd.category,
-          manaCost: cd.manaCost,
-          effects: cd.effects,
-          passive: cd.passive,
-          color: cd.color,
-          description: cd.description,
-          imageKey: cd.imageKey,
-        }}
+        data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={CARD_SIZE}
       />
     )
@@ -81,7 +80,7 @@ function PickerCard({ card, onSelect, disabled }) {
   )
 }
 
-export default function CardPicker({ side, tradeId, partnerId, existingCardIds, onAdd, onClose }) {
+export default function CardPicker({ side, partnerId, existingCardIds, onAdd, onClose }) {
   const [cards, setCards] = useState(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

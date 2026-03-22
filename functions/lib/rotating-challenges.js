@@ -59,12 +59,12 @@ async function getBaselineStats(sql, userId, periodStart) {
           WHERE user_id = ${userId} AND created_at < ${periodStart}
         ),
         trades_base AS (
-          SELECT COUNT(*)::int AS trades_completed FROM cc_trades
+          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed FROM cc_trades
           WHERE (player_a_id = ${userId} OR player_b_id = ${userId})
             AND status = 'completed' AND completed_at < ${periodStart}
         ),
         market_base AS (
-          SELECT COUNT(*)::int AS marketplace_sold FROM cc_market_listings
+          SELECT COUNT(DISTINCT buyer_id)::int AS marketplace_sold FROM cc_market_listings
           WHERE seller_id = ${userId} AND status = 'sold' AND sold_at < ${periodStart}
         ),
         gifts_base AS (

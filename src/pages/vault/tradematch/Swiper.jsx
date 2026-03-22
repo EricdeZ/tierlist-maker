@@ -30,7 +30,7 @@ function avatarUrl(card) {
   return null
 }
 
-export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, empty }) {
+export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, loading, empty }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swiping, setSwiping] = useState(false) // true during async swipe processing
 
@@ -242,8 +242,18 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
+  // ── Loading state ──
+  if (loading || (!empty && !feedCards?.length)) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6">
+        <div className="w-10 h-10 rounded-full border-2 animate-spin mb-4" style={{ borderColor: 'var(--cd-cyan)', borderTopColor: 'transparent' }} />
+        <p className="text-sm" style={{ color: 'var(--cd-text-mid)' }}>Finding cards...</p>
+      </div>
+    )
+  }
+
   // ── Empty state ──
-  if (empty || !feedCards?.length || currentIndex >= feedCards.length) {
+  if (empty || currentIndex >= feedCards.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
         <div

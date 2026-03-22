@@ -1,7 +1,7 @@
 -- Pack opening log for leaderboards (daily/weekly/monthly)
 CREATE TABLE cc_pack_opens (
   id SERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   pack_type_id TEXT REFERENCES cc_pack_types(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

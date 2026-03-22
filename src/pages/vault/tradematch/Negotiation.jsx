@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle, Gem } from 'lucide-react'
+import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle } from 'lucide-react'
+import emberIcon from '../../../assets/ember.png'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { getHoloEffect } from '../../../data/vault/economy'
+import { GODS } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
+import { CONSUMABLES } from '../../../data/vault/buffs'
 import { useVault } from '../VaultContext'
 import { tradematchService } from '../../../services/database'
 import CardPicker from './CardPicker'
+
+const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
+const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
+const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
+const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
 const CARD_SIZE = 90
 
@@ -15,7 +24,6 @@ function OfferCard({ card, onRemove, showRemove }) {
   const cd = card.card_data ? (typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data) : {}
   const type = card.card_type || cd.cardType || 'god'
   const isPlayer = type === 'player' || cd.teamName
-  const override = !isPlayer ? getDefOverride({ cardType: type, godId: card.god_id }) : null
   const holoType = card.holo_type || card.holoType || null
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
   const unavailable = card.available === false
@@ -41,21 +49,19 @@ function OfferCard({ card, onRemove, showRemove }) {
       />
     )
   } else {
+    const dataMap = DATA_MAPS[type]
+    const dataKey = card.god_id?.replace(/^(item|consumable)-/, '') || card.god_id
+    const rawData = dataMap?.get(dataKey)
+    const override = getDefOverride({ cardType: type, godId: card.god_id })
+    const resolvedData = rawData && override
+      ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
+      : rawData
+
     const gameCardEl = (
       <GameCard
         type={type}
         rarity={card.rarity}
-        data={{
-          name: card.god_name,
-          imageUrl: override?.custom_image_url || card.image_url,
-          id: card.god_id,
-          serialNumber: card.serial_number,
-          metadata: override || undefined,
-          role: cd.role, ability: cd.ability, class: cd.class,
-          category: cd.category, manaCost: cd.manaCost,
-          effects: cd.effects, passive: cd.passive,
-          color: cd.color, description: cd.description, imageKey: cd.imageKey,
-        }}
+        data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={CARD_SIZE}
       />
     )
@@ -281,7 +287,7 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
             {canEdit && <AddCardSlot onClick={() => setPickerSide('mine')} />}
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <Gem className="w-3.5 h-3.5 text-amber-400" />
+            <img src={emberIcon} alt="" className="h-3.5 w-auto object-contain" />
             {canEdit ? (
               <div className="flex items-center gap-1.5">
                 <input
@@ -312,7 +318,7 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
             {canEdit && <AddCardSlot onClick={() => setPickerSide('theirs')} />}
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <Gem className="w-3.5 h-3.5 text-amber-400" />
+            <img src={emberIcon} alt="" className="h-3.5 w-auto object-contain" />
             <span className="text-xs font-semibold" style={{ color: 'var(--cd-text)' }}>{theirCore} Cores</span>
           </div>
         </div>
@@ -373,7 +379,6 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
       {pickerSide && (
         <CardPicker
           side={pickerSide === 'mine' ? 'mine' : 'theirs'}
-          tradeId={tradeId}
           partnerId={partnerId}
           existingCardIds={allCardIds}
           onAdd={handleAddCard}

@@ -86,7 +86,10 @@ export default function CCTrading() {
   }, [setSearchParams])
   const [pending, setPending] = useState([])
   const [historyTrades, setHistoryTrades] = useState([])
-  const [activeTrade, setActiveTrade] = useState(null)
+  const [activeTrade, setActiveTrade] = useState(() => {
+    const tid = new URLSearchParams(window.location.search).get('tradeId')
+    return tid ? parseInt(tid) : null
+  })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [searchModal, setSearchModal] = useState(false)

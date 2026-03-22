@@ -2,8 +2,18 @@ import { useState, useCallback } from 'react'
 import { Heart, Clock, MessageCircle, ChevronDown, ChevronUp, Check } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
+import TradingCardHolo from '../../../components/TradingCardHolo'
+import { getHoloEffect } from '../../../data/vault/economy'
+import { GODS } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
+import { CONSUMABLES } from '../../../data/vault/buffs'
 import { useVault } from '../VaultContext'
 import { tradematchService } from '../../../services/database'
+
+const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
+const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
+const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
+const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
 function timeRemaining(createdAt) {
   const ms = 24 * 60 * 60 * 1000 - (Date.now() - new Date(createdAt).getTime())
@@ -49,7 +59,8 @@ function CardThumb({ card }) {
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
   const isPlayer = type === 'player' || cd.teamName
-  const override = !isPlayer ? getDefOverride({ cardType: type, godId: card.god_id }) : null
+  const holoType = card.holo_type || card.holoType || null
+  const holoEffect = holoType ? getHoloEffect(card.rarity) : null
   const size = 70
 
   if (isPlayer) {
@@ -68,39 +79,44 @@ function CardThumb({ card }) {
         isFirstEdition={card.serial_number === 1}
         signatureUrl={cd.signatureUrl}
         size={size}
+        holo={holoEffect ? { rarity: holoEffect, holoType: holoType || 'reverse' } : undefined}
       />
     )
   }
 
-  return (
+  const dataMap = DATA_MAPS[type]
+  const dataKey = card.god_id?.replace(/^(item|consumable)-/, '') || card.god_id
+  const rawData = dataMap?.get(dataKey)
+  const override = getDefOverride({ cardType: type, godId: card.god_id })
+  const resolvedData = rawData && override
+    ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
+    : rawData
+
+  const gameCardEl = (
     <GameCard
       type={type}
       rarity={card.rarity}
-      data={{
-        name: card.god_name || card.player_name,
-        imageUrl: override?.custom_image_url || card.image_url,
-        id: card.god_id,
-        serialNumber: card.serial_number,
-        metadata: override || undefined,
-        role: cd.role,
-        ability: cd.ability,
-        class: cd.class,
-        category: cd.category,
-        manaCost: cd.manaCost,
-        effects: cd.effects,
-        passive: cd.passive,
-        color: cd.color,
-        description: cd.description,
-        imageKey: cd.imageKey,
-      }}
+      data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
       size={size}
     />
   )
+
+  if (holoEffect) {
+    return (
+      <TradingCardHolo rarity={holoEffect} holoType={holoType || 'reverse'} size={size}>
+        {gameCardEl}
+      </TradingCardHolo>
+    )
+  }
+
+  return gameCardEl
 }
 
-function MatchItem({ match, onOpenTrade }) {
+function MatchItem({ match, onOpenTrade, userId }) {
   const remaining = timeRemaining(match.created_at)
   const expiringSoon = remaining !== 'Expired' && !remaining.includes('h')
+  const isPendingFromMe = match.offer_status === 'pending' && match.offer_by === userId
+  const isPendingFromThem = match.offer_status === 'pending' && match.offer_by !== userId
 
   return (
     <button
@@ -108,10 +124,10 @@ function MatchItem({ match, onOpenTrade }) {
       className="w-full text-left flex items-center gap-3 rounded-xl px-4 py-3 transition-all active:scale-[0.98] cursor-pointer"
       style={{
         background: 'var(--cd-surface)',
-        border: '1px solid var(--cd-border)',
+        border: `1px solid ${isPendingFromThem ? 'rgba(34,197,94,0.4)' : 'var(--cd-border)'}`,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--cd-cyan)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--cd-border)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = isPendingFromThem ? 'rgba(34,197,94,0.4)' : 'var(--cd-border)' }}
     >
       <Avatar discord_id={match.partner_discord_id} avatar={match.partner_avatar} username={match.partner_name} size={44} />
 
@@ -121,20 +137,29 @@ function MatchItem({ match, onOpenTrade }) {
         </p>
         <div className="flex items-center gap-1 mt-0.5">
           <Clock className="w-3 h-3 flex-shrink-0" style={{ color: expiringSoon ? '#f59e0b' : 'var(--cd-text-dim)' }} />
-          <span
-            className="text-xs"
-            style={{ color: expiringSoon ? '#f59e0b' : 'var(--cd-text-dim)' }}
-          >
+          <span className="text-xs" style={{ color: expiringSoon ? '#f59e0b' : 'var(--cd-text-dim)' }}>
             {remaining}
           </span>
         </div>
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
-        <MessageCircle className="w-4 h-4" style={{ color: 'var(--cd-cyan)' }} />
-        <span className="text-xs font-semibold cd-head tracking-wider" style={{ color: 'var(--cd-cyan)' }}>
-          TRADE
-        </span>
+        {isPendingFromThem ? (
+          <>
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold cd-head tracking-wider text-emerald-400">REVIEW</span>
+          </>
+        ) : isPendingFromMe ? (
+          <>
+            <Clock className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold cd-head tracking-wider text-amber-400">SENT</span>
+          </>
+        ) : (
+          <>
+            <MessageCircle className="w-4 h-4" style={{ color: 'var(--cd-cyan)' }} />
+            <span className="text-xs font-semibold cd-head tracking-wider" style={{ color: 'var(--cd-cyan)' }}>TRADE</span>
+          </>
+        )}
       </div>
     </button>
   )
@@ -262,7 +287,7 @@ function LikeGroup({ like, onLikesTrade }) {
   )
 }
 
-export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTrade, loading }) {
+export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTrade, loading, userId }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -296,7 +321,7 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTr
         ) : (
           <div className="flex flex-col gap-2">
             {matches.map((match) => (
-              <MatchItem key={match.id} match={match} onOpenTrade={onOpenTrade} />
+              <MatchItem key={match.id} match={match} onOpenTrade={onOpenTrade} userId={userId} />
             ))}
           </div>
         )}

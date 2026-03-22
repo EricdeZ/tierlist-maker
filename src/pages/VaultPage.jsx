@@ -40,7 +40,7 @@ const TABS = [
     { key: 'trade', label: 'Trade', icon: Handshake },
     { key: 'market', label: 'Market', icon: Store },
     { key: 'bounty', label: 'Bounties', icon: Crosshair, authOnly: true },
-    { key: 'tradematch', label: 'Tradematch', icon: Heart, authOnly: true },
+    { key: 'tradematch', label: 'Tradematch', icon: Heart, adminOnly: true },
     { key: 'dismantle', label: 'Dismantle', icon: Hammer },
     { key: 'convert', label: 'Convert', icon: ArrowRightLeft },
     { key: 'binder', label: 'Binder', icon: BookMarked },
@@ -72,7 +72,7 @@ const TAB_COMPONENTS = {
 }
 
 export default function VaultPage() {
-    const { user, login, loading, hasPermission, vaultBanned } = useAuth()
+    const { user, login, loading, hasPermission, hasAnyPermission, vaultBanned } = useAuth()
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -176,7 +176,11 @@ function VaultInner() {
     const pageTitle = activeTabLabel && activeTab !== 'packs'
         ? `${activeTabLabel} - The Vault`
         : 'The Vault'
-    const visibleTabs = TABS.filter(tab => !tab.authOnly || user)
+    const visibleTabs = TABS.filter(tab => {
+        if (tab.adminOnly) return hasAnyPermission
+        if (tab.authOnly) return !!user
+        return true
+    })
     const desktopPrimaryTabs = visibleTabs.filter(t => !DESKTOP_MORE_KEYS.has(t.key))
     const desktopSecondaryTabs = visibleTabs.filter(t => DESKTOP_MORE_KEYS.has(t.key))
     const activeIsDesktopSecondary = DESKTOP_MORE_KEYS.has(activeTab)

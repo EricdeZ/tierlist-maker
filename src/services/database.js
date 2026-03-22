@@ -1299,6 +1299,27 @@ export const tradematchService = {
     async matches() {
         return apiCall('tradematch', { action: 'matches' })
     },
+    async offerDetail(tradeId) {
+        return apiCall('tradematch', { action: 'offer-detail', tradeId: String(tradeId) })
+    },
+    async offerAddCard(tradeId, cardId) {
+        return apiPost('tradematch', { action: 'offer-add-card' }, { tradeId, cardId })
+    },
+    async offerRemoveCard(tradeId, cardId) {
+        return apiPost('tradematch', { action: 'offer-remove-card' }, { tradeId, cardId })
+    },
+    async offerSetCore(tradeId, amount) {
+        return apiPost('tradematch', { action: 'offer-set-core' }, { tradeId, amount })
+    },
+    async offerSend(tradeId) {
+        return apiPost('tradematch', { action: 'offer-send' }, { tradeId })
+    },
+    async offerAccept(tradeId, version) {
+        return apiPost('tradematch', { action: 'offer-accept' }, { tradeId, version })
+    },
+    async offerCancel(tradeId) {
+        return apiPost('tradematch', { action: 'offer-cancel' }, { tradeId })
+    },
 }
 
 export const packCreatorService = {

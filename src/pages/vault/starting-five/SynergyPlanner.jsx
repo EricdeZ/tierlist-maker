@@ -115,9 +115,14 @@ export default function SynergyPlanner({ collection, startingFive }) {
                       </div>
                       <div className="shrink-0">
                         {g.status === 'matched' && (
-                          <div className="flex items-center gap-1 text-emerald-400">
-                            <Check size={12} />
-                            <span className="text-[10px] font-bold cd-head">MATCHED</span>
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-1 text-emerald-400">
+                              <Check size={12} />
+                              <span className="text-[10px] font-bold cd-head">MATCHED</span>
+                            </div>
+                            {!g.holoMatch && (
+                              <span className="text-[9px] cd-head text-amber-400/70">holo mismatch</span>
+                            )}
                           </div>
                         )}
                         {g.status === 'available' && (
@@ -126,12 +131,17 @@ export default function SynergyPlanner({ collection, startingFive }) {
                             <span className="text-[9px] cd-head" style={{ color: rarityColor }}>
                               {g.godCard.rarity} {g.godCard.holoType}
                             </span>
+                            {!g.holoMatch && (
+                              <span className="text-[9px] cd-head text-amber-400/70">holo mismatch</span>
+                            )}
                           </div>
                         )}
                         {g.status === 'available-ineligible' && (
                           <div className="flex flex-col items-end">
                             <span className="text-[10px] font-bold cd-head text-white/30">OWNED</span>
-                            <span className="text-[9px] cd-head text-white/20">rarity too low</span>
+                            <span className="text-[9px] cd-head" style={{ color: rarityColor }}>
+                              {g.godCard.rarity} {g.godCard.holoType} — too low
+                            </span>
                           </div>
                         )}
                         {g.status === 'not-owned' && (

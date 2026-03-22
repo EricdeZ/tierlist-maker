@@ -38,7 +38,7 @@ export async function expireStale(sql) {
     WHERE (status IN ('waiting', 'active') AND mode = 'direct'
            AND last_polled_at < NOW() - make_interval(mins => ${mins}))
        OR (status = 'active' AND mode = 'match'
-           AND created_at < NOW() - interval '24 hours')
+           AND updated_at < NOW() - interval '24 hours')
   `
 }
 

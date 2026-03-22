@@ -48,6 +48,18 @@ export function isGodSynergy(godName, bestGodName) {
 }
 
 /**
+ * Check if an attachment's holo type is compatible with a player's holo type.
+ * Holo attachments boost flat income (only useful on holo/full players).
+ * Reverse attachments boost mult (only useful on reverse/full players).
+ * Full attachments provide both (useful on any player).
+ */
+export function isHoloCompatible(playerHoloType, attachHoloType) {
+  if (attachHoloType === 'full') return true
+  if (playerHoloType === 'full') return true
+  return playerHoloType === attachHoloType
+}
+
+/**
  * Build team synergy opportunities for the Synergy Planner.
  * Scans the full collection + both lineups.
  *
@@ -82,6 +94,7 @@ export function buildTeamOpportunities(collection, csSlots, asSlots) {
     const as = asCounts.get(tid) || 0
     const maxSlotted = Math.max(cs, as)
     const currentBonus = TEAM_SYNERGY_BONUS[maxSlotted] || 0
+    if (currentBonus === 0) continue
     const nextCount = maxSlotted + 1
     const nextBonus = TEAM_SYNERGY_BONUS[nextCount] || TEAM_SYNERGY_BONUS[6] || 0
     results.push({
@@ -122,10 +135,12 @@ export function buildGodOpportunities(csSlots, asSlots, collection) {
       const bestGod = slotData.card.bestGodName
       if (!bestGod) continue
       const playerRarity = slotData.card.rarity
+      const playerHolo = slotData.card.holoType
 
       // Check if god card is already attached and is a synergy match
       if (slotData.godCard && isGodSynergy(slotData.godCard.godName, bestGod)) {
-        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status: 'matched', godCard: slotData.godCard })
+        const holoMatch = isHoloCompatible(playerHolo, slotData.godCard.holoType)
+        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status: 'matched', godCard: slotData.godCard, holoMatch })
         continue
       }
 
@@ -135,17 +150,23 @@ export function buildGodOpportunities(csSlots, asSlots, collection) {
       )
 
       if (matchingGods.length === 0) {
-        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status: 'not-owned', godCard: null })
+        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status: 'not-owned', godCard: null, holoMatch: false })
       } else {
-        // Sort by rarity descending to pick the best card
-        matchingGods.sort((a, b) => (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0))
+        // Sort by holo compatibility first, then rarity descending
+        matchingGods.sort((a, b) => {
+          const aCompat = isHoloCompatible(playerHolo, a.holoType) ? 1 : 0
+          const bCompat = isHoloCompatible(playerHolo, b.holoType) ? 1 : 0
+          if (bCompat !== aCompat) return bCompat - aCompat
+          return (RARITY_TIER[b.rarity] || 0) - (RARITY_TIER[a.rarity] || 0)
+        })
         const best = matchingGods[0]
+        const holoMatch = isHoloCompatible(playerHolo, best.holoType)
         // Check if the best card is actually attachable (rarity floor check)
         const playerTier = RARITY_TIER[playerRarity] || 0
         const godTier = RARITY_TIER[best.rarity] || 0
         const meetsRarity = godTier >= playerTier || (playerRarity === 'unique' && best.rarity === 'mythic')
         const status = meetsRarity ? 'available' : 'available-ineligible'
-        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status, godCard: best })
+        results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status, godCard: best, holoMatch })
       }
     }
   }

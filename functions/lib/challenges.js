@@ -971,8 +971,8 @@ export async function getVaultStats(sql, userId) {
           SELECT
             COUNT(*) FILTER (WHERE type = 'daily_claim')::int AS daily_cores_claimed,
             COUNT(*) FILTER (WHERE type = 'passion_convert')::int AS cores_converted,
-            COALESCE(SUM(amount) FILTER (WHERE amount > 0), 0)::int AS total_cores_earned,
-            COALESCE(SUM(ABS(amount)) FILTER (WHERE amount < 0), 0)::int AS total_cores_spent,
+            COALESCE(SUM(amount) FILTER (WHERE amount > 0 AND type != 'cc_trade'), 0)::int AS total_cores_earned,
+            COALESCE(SUM(ABS(amount)) FILTER (WHERE amount < 0 AND type != 'cc_trade'), 0)::int AS total_cores_spent,
             COALESCE(SUM(amount) FILTER (WHERE type = 'bounty_reward'), 0)::int AS bounty_cores_earned
           FROM ember_transactions WHERE user_id = ${userId}
         ),
@@ -985,13 +985,13 @@ export async function getVaultStats(sql, userId) {
           ) sub
         ),
         trades_agg AS (
-          SELECT COUNT(*)::int AS trades_completed FROM cc_trades
+          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed FROM cc_trades
           WHERE (player_a_id = ${userId} OR player_b_id = ${userId}) AND status = 'completed'
         ),
         market_agg AS (
           SELECT
-            COUNT(*) FILTER (WHERE seller_id = ${userId})::int AS marketplace_sold,
-            COUNT(*) FILTER (WHERE buyer_id = ${userId})::int AS marketplace_bought,
+            COUNT(DISTINCT buyer_id) FILTER (WHERE seller_id = ${userId})::int AS marketplace_sold,
+            COUNT(DISTINCT seller_id) FILTER (WHERE buyer_id = ${userId})::int AS marketplace_bought,
             COALESCE(MAX(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS best_marketplace_sale,
             COALESCE(SUM(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS marketplace_volume
           FROM cc_market_listings

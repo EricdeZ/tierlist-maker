@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Heart, Layers, Users } from 'lucide-react'
 import { useVault } from './VaultContext'
+import { useAuth } from '../../context/AuthContext'
 
 import { tradematchService } from '../../services/database'
 import TradePileManager from './tradematch/TradePileManager'
 import Swiper from './tradematch/Swiper'
 import MatchSplash from './tradematch/MatchSplash'
 import MatchesAndLikes from './tradematch/MatchesAndLikes'
+import Negotiation from './tradematch/Negotiation'
 
 const SUB_VIEWS = [
   { key: 'pile', label: 'Trade Pile', icon: Layers },
@@ -16,6 +18,7 @@ const SUB_VIEWS = [
 ]
 
 export default function CCTradematch() {
+  const { user } = useAuth()
   const { collection, lockedCardIds: apiLockedCardIds, startingFive, binderCards, setMatchTradeCount } = useVault()
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
@@ -51,6 +54,7 @@ export default function CCTradematch() {
   const [matches, setMatches] = useState([])
   const [likes, setLikes] = useState([])
   const [loading, setLoading] = useState(false)
+  const [activeTradeId, setActiveTradeId] = useState(null)
 
   // Load trade pile on mount
   useEffect(() => {
@@ -101,6 +105,23 @@ export default function CCTradematch() {
       if (!cancelled) { console.error('Failed to load matches:', err); setLoading(false) }
     })
     return () => { cancelled = true }
+  }, [subView])
+
+  // Refetch matches on tab visibility change
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && subView === 'matches') {
+        Promise.all([
+          tradematchService.matches(),
+          tradematchService.likes(),
+        ]).then(([matchData, likeData]) => {
+          setMatches(matchData.matches || [])
+          setLikes(likeData.likes || [])
+        }).catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [subView])
 
   const handleToggleTradePile = useCallback(async (cardId) => {
@@ -177,14 +198,48 @@ export default function CCTradematch() {
   }, [setMatchTradeCount])
 
   const handleOpenTrade = useCallback((tradeId) => {
-    window.location.search = `?tab=trade&tradeId=${tradeId}`
+    setActiveTradeId(tradeId)
   }, [])
+
+  const refetchMatches = useCallback(() => {
+    Promise.all([
+      tradematchService.matches(),
+      tradematchService.likes(),
+    ]).then(([matchData, likeData]) => {
+      setMatches(matchData.matches || [])
+      setLikes(likeData.likes || [])
+      setMatchTradeCount(matchData.matches?.length || 0)
+    }).catch(() => {})
+  }, [setMatchTradeCount])
+
+  const handleNegotiationBack = useCallback(() => {
+    setActiveTradeId(null)
+    refetchMatches()
+  }, [refetchMatches])
+
+  const handleNegotiationComplete = useCallback(() => {
+    setActiveTradeId(null)
+    refetchMatches()
+  }, [refetchMatches])
 
   const handleDismissMatch = useCallback(() => {
     setMatchResult(null)
   }, [])
 
   const pileIsLocked = tradePileCount < 20
+
+  if (activeTradeId) {
+    return (
+      <div>
+        <Negotiation
+          tradeId={activeTradeId}
+          userId={user?.id}
+          onBack={handleNegotiationBack}
+          onComplete={handleNegotiationComplete}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -240,6 +295,7 @@ export default function CCTradematch() {
           onMatch={handleMatch}
           onLoadMore={handleLoadMoreFeed}
           locked={pileIsLocked}
+          loading={loading}
           empty={!loading && feedCards.length === 0}
         />
       )}
@@ -251,6 +307,7 @@ export default function CCTradematch() {
           onOpenTrade={handleOpenTrade}
           onLikesTrade={handleLikesTrade}
           loading={loading}
+          userId={user?.id}
         />
       )}
     </div>

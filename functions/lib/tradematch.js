@@ -20,7 +20,7 @@ export async function getTradePile(sql, userId) {
     SELECT tp.id, tp.card_id, tp.created_at,
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
            c.holo_effect, c.holo_type, c.power, c.level,
-           c.card_data, c.def_id
+           c.card_data, c.def_id, c.card_type
     FROM cc_trade_pile tp
     JOIN cc_cards c ON tp.card_id = c.id
     WHERE tp.user_id = ${userId}
