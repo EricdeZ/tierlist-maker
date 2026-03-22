@@ -478,6 +478,20 @@ export default function SingleMatchReport() {
         }))
     }, [updateReport])
 
+    const swapTeams = useCallback(() => {
+        setMatchInfo(prev => prev ? {
+            ...prev,
+            team1_id: prev.team2_id, team2_id: prev.team1_id,
+            team1_name: prev.team2_name, team2_name: prev.team1_name,
+            team1_color: prev.team2_color, team2_color: prev.team1_color,
+        } : prev)
+        handleUpdateEditData(prev => ({
+            ...prev,
+            team1_id: prev.team2_id, team2_id: prev.team1_id,
+            team1_name: prev.team2_name, team2_name: prev.team1_name,
+        }))
+    }, [handleUpdateEditData])
+
     const selectedSeason = adminData?.seasons?.find(s => String(s.season_id) === String(matchInfo?.season_id)) || null
 
     // ─── Render ───
@@ -588,6 +602,7 @@ export default function SingleMatchReport() {
                     matchInfo={matchInfo}
                     editData={matchReport.editData}
                     onUpdateEditData={handleUpdateEditData}
+                    onSwapTeams={swapTeams}
                     adminData={adminData}
                     queueItems={discordItems}
                     onExtract={extractFromScreenshots}

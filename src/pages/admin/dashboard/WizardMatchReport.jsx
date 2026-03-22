@@ -15,7 +15,7 @@ const SUBSTEP_LABELS = {
 // ═══════════════════════════════════════════════════
 
 export default function WizardMatchReport({
-    matchInfo, editData, onUpdateEditData, adminData,
+    matchInfo, editData, onUpdateEditData, onSwapTeams, adminData,
     queueItems, onExtract, onAddImages, onExtractPasted, status, error,
     onSubmit, isSubmitting, submitResult,
 }) {
@@ -207,7 +207,7 @@ export default function WizardMatchReport({
     // ─── Render current step content ───
     const renderStep = () => {
         if (step.id === 'confirm') {
-            return <ConfirmStep matchInfo={matchInfo} onConfirm={next} />
+            return <ConfirmStep matchInfo={matchInfo} onSwapTeams={onSwapTeams} onConfirm={next} />
         }
 
         if (step.id === 'screenshots') {
@@ -372,7 +372,7 @@ export default function WizardMatchReport({
 // STEP: CONFIRM MATCH
 // ═══════════════════════════════════════════════════
 
-function ConfirmStep({ matchInfo, onConfirm }) {
+function ConfirmStep({ matchInfo, onSwapTeams, onConfirm }) {
     return (
         <div className="py-8 text-center">
             <div className="flex items-center justify-center gap-4 mb-6">
@@ -380,7 +380,13 @@ function ConfirmStep({ matchInfo, onConfirm }) {
                     <span className="inline-block w-4 h-4 rounded-full mr-2 align-middle" style={{ backgroundColor: matchInfo.team1_color }} />
                     <span className="text-xl font-bold text-[var(--color-text)]">{matchInfo.team1_name}</span>
                 </div>
-                <span className="text-lg text-[var(--color-text-secondary)]">vs</span>
+                <button
+                    onClick={onSwapTeams}
+                    className="px-2 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition"
+                    title="Swap team sides"
+                >
+                    &#8644;
+                </button>
                 <div className="text-left">
                     <span className="inline-block w-4 h-4 rounded-full mr-2 align-middle" style={{ backgroundColor: matchInfo.team2_color }} />
                     <span className="text-xl font-bold text-[var(--color-text)]">{matchInfo.team2_name}</span>

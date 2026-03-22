@@ -111,6 +111,16 @@ function PickerCard({ card, onSelect, disabled }) {
       className={`relative rounded-lg transition-all cursor-pointer ${disabled ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
     >
       {inner}
+      {holoType && (
+        <div className="mt-0.5 text-center">
+          <span className="text-[8px] font-bold cd-head tracking-wider px-1.5 py-0.5 rounded" style={{
+            color: holoType === 'full' ? '#a855f7' : holoType === 'reverse' ? 'var(--cd-cyan)' : '#f8c56a',
+            background: holoType === 'full' ? 'rgba(168,85,247,0.12)' : holoType === 'reverse' ? 'rgba(0,229,255,0.1)' : 'rgba(248,197,106,0.12)',
+          }}>
+            {holoType === 'full' ? 'FULL ART' : holoType === 'reverse' ? 'REVERSE' : 'HOLO'}
+          </span>
+        </div>
+      )}
     </button>
   )
 }

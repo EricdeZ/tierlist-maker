@@ -106,6 +106,16 @@ function OfferCard({ card, onRemove, showRemove }) {
           <X className="w-3 h-3" strokeWidth={3} />
         </button>
       )}
+      {holoType && (
+        <div className="mt-0.5 text-center">
+          <span className="text-[8px] font-bold cd-head tracking-wider px-1.5 py-0.5 rounded" style={{
+            color: holoType === 'full' ? '#a855f7' : holoType === 'reverse' ? 'var(--cd-cyan)' : '#f8c56a',
+            background: holoType === 'full' ? 'rgba(168,85,247,0.12)' : holoType === 'reverse' ? 'rgba(0,229,255,0.1)' : 'rgba(248,197,106,0.12)',
+          }}>
+            {holoType === 'full' ? 'FULL ART' : holoType === 'reverse' ? 'REVERSE' : 'HOLO'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -125,12 +135,52 @@ function AddCardSlot({ onClick }) {
   )
 }
 
+function TradeCelebration({ partnerName, partnerAvatar, partnerDiscordId, onDone }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm" style={{ animation: 'cd-fade-in 0.3s ease-out' }}>
+      <div className="flex flex-col items-center gap-6 px-6 text-center">
+        <h2 className="text-2xl font-bold cd-head tracking-wider" style={{ color: 'var(--cd-magenta)', textShadow: '0 0 30px rgba(236,72,153,0.5)', animation: 'pulse 2s ease-in-out infinite' }}>
+          Trade Complete!
+        </h2>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--cd-magenta)]" style={{ animation: 'cd-fade-in 0.5s ease-out 0.2s both' }}>
+            {partnerDiscordId && partnerAvatar ? (
+              <img src={`https://cdn.discordapp.com/avatars/${partnerDiscordId}/${partnerAvatar}.webp?size=128`} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xl font-bold text-white cd-head" style={{ background: 'var(--cd-magenta)' }}>
+                {partnerName?.[0]?.toUpperCase() || '?'}
+              </div>
+            )}
+          </div>
+          <Heart className="w-8 h-8" style={{ color: 'var(--cd-magenta)', fill: 'var(--cd-magenta)', animation: 'pulse 1s ease-in-out infinite' }} />
+          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--cd-cyan)]" style={{ animation: 'cd-fade-in 0.5s ease-out 0.4s both' }}>
+            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-black" style={{ background: 'var(--cd-cyan)' }}>
+              You
+            </div>
+          </div>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--cd-text-dim)' }}>
+          Cards have been swapped with <span style={{ color: 'var(--cd-magenta)' }}>@{partnerName}</span>
+        </p>
+        <button
+          onClick={onDone}
+          className="px-6 py-2.5 rounded-xl text-xs font-bold cd-head tracking-wider text-white transition-all active:scale-95 cursor-pointer"
+          style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', boxShadow: '0 0 20px rgba(236,72,153,0.4)' }}
+        >
+          Back to Matches
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
   const [offer, setOffer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [completed, setCompleted] = useState(false)
   const [pickerSide, setPickerSide] = useState(null)
   const [coreInput, setCoreInput] = useState('')
 
@@ -143,7 +193,12 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
       setCoreInput(myCore > 0 ? String(myCore) : '')
       setError(null)
     } catch (err) {
-      setError(err.message)
+      // If trade is completed or no longer active, show celebration instead of error
+      if (err.message?.includes('no longer active') || err.message?.includes('not found')) {
+        setCompleted(true)
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -228,8 +283,7 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
     setError(null)
     try {
       await tradematchService.offerAccept(tradeId, trade.offer_version)
-      setSuccess('Trade completed!')
-      setTimeout(() => onComplete(), 2000)
+      setCompleted(true)
     } catch (err) {
       setError(err.message)
       await fetchOffer()
@@ -250,6 +304,17 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--cd-cyan)' }} />
       </div>
+    )
+  }
+
+  if (completed) {
+    return (
+      <TradeCelebration
+        partnerName={partnerName || offer?.trade?.player_b_name || offer?.trade?.player_a_name}
+        partnerAvatar={isA ? offer?.trade?.player_b_avatar : offer?.trade?.player_a_avatar}
+        partnerDiscordId={isA ? offer?.trade?.player_b_discord_id : offer?.trade?.player_a_discord_id}
+        onDone={onComplete}
+      />
     )
   }
 
@@ -357,6 +422,39 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
             <span className="text-xs font-semibold" style={{ color: 'var(--cd-text)' }}>{theirCore} Cores</span>
           </div>
         </div>
+      </div>
+
+      {/* Activity log */}
+      <div className="mb-6 px-3 py-2.5 rounded-xl text-xs space-y-1.5" style={{ background: 'var(--cd-surface)', border: '1px solid var(--cd-border)' }}>
+        <p className="font-bold cd-head tracking-wider text-[10px] uppercase mb-2" style={{ color: 'var(--cd-text-dim)' }}>Activity</p>
+        <p style={{ color: 'var(--cd-text-dim)' }}>
+          Match created {new Date(trade.created_at).toLocaleDateString()}
+        </p>
+        {trade.offer_version > 0 && (
+          <p style={{ color: 'var(--cd-text-dim)' }}>
+            {trade.offer_version} offer{trade.offer_version > 1 ? 's' : ''} exchanged
+          </p>
+        )}
+        {isPendingFromMe && (
+          <p className="font-semibold" style={{ color: '#f59e0b' }}>
+            You sent an offer — waiting for @{partnerName}
+          </p>
+        )}
+        {isPendingFromThem && (
+          <p className="font-semibold" style={{ color: '#22c55e' }}>
+            @{partnerName} sent you an offer — review it!
+          </p>
+        )}
+        {isNegotiating && trade.offer_version === 0 && (
+          <p style={{ color: 'var(--cd-text-dim)' }}>
+            No offers sent yet — make the first move!
+          </p>
+        )}
+        {isNegotiating && trade.offer_version > 0 && (
+          <p style={{ color: 'var(--cd-text-dim)' }}>
+            Offer returned — make your changes and send
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-center gap-3">

@@ -80,8 +80,9 @@ function CardThumb({ card }) {
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
   const size = 70
 
+  let inner
   if (isPlayer) {
-    return (
+    inner = (
       <TradingCard
         playerName={card.god_name || card.player_name}
         teamName={cd.teamName || ''}
@@ -99,32 +100,43 @@ function CardThumb({ card }) {
         holo={holoEffect ? { rarity: holoEffect, holoType: holoType || 'reverse' } : undefined}
       />
     )
-  }
+  } else {
+    const rawData = resolveDataMap(type, card.god_id)
+    const override = getDefOverride({ cardType: type, godId: card.god_id })
+    const resolvedData = rawData && override
+      ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
+      : rawData
 
-  const rawData = resolveDataMap(type, card.god_id)
-  const override = getDefOverride({ cardType: type, godId: card.god_id })
-  const resolvedData = rawData && override
-    ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
-    : rawData
-
-  const gameCardEl = (
-    <GameCard
-      type={type}
-      rarity={card.rarity}
-      data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
-      size={size}
-    />
-  )
-
-  if (holoEffect) {
-    return (
+    const gameCardEl = (
+      <GameCard
+        type={type}
+        rarity={card.rarity}
+        data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
+        size={size}
+      />
+    )
+    inner = holoEffect ? (
       <TradingCardHolo rarity={holoEffect} holoType={holoType || 'reverse'} size={size}>
         {gameCardEl}
       </TradingCardHolo>
-    )
+    ) : gameCardEl
   }
 
-  return gameCardEl
+  return (
+    <div>
+      {inner}
+      {holoType && (
+        <div className="mt-0.5 text-center">
+          <span className="text-[8px] font-bold cd-head tracking-wider px-1.5 py-0.5 rounded" style={{
+            color: holoType === 'full' ? '#a855f7' : holoType === 'reverse' ? 'var(--cd-cyan)' : '#f8c56a',
+            background: holoType === 'full' ? 'rgba(168,85,247,0.12)' : holoType === 'reverse' ? 'rgba(0,229,255,0.1)' : 'rgba(248,197,106,0.12)',
+          }}>
+            {holoType === 'full' ? 'FULL ART' : holoType === 'reverse' ? 'REVERSE' : 'HOLO'}
+          </span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function MatchItem({ match, onOpenTrade, userId }) {
@@ -133,18 +145,21 @@ function MatchItem({ match, onOpenTrade, userId }) {
   const isPendingFromMe = match.offer_status === 'pending' && match.offer_by === userId
   const isPendingFromThem = match.offer_status === 'pending' && match.offer_by !== userId
 
+  const borderColor = isPendingFromThem ? 'rgba(236,72,153,0.5)' : 'rgba(236,72,153,0.2)'
+  const bgGlow = isPendingFromThem ? 'rgba(236,72,153,0.08)' : 'rgba(236,72,153,0.03)'
+
   return (
     <button
       onClick={() => onOpenTrade(match.id)}
       className="w-full text-left flex items-center gap-3 rounded-xl px-4 py-3 transition-all active:scale-[0.98] cursor-pointer"
-      style={{
-        background: 'var(--cd-surface)',
-        border: `1px solid ${isPendingFromThem ? 'rgba(34,197,94,0.4)' : 'var(--cd-border)'}`,
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--cd-cyan)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = isPendingFromThem ? 'rgba(34,197,94,0.4)' : 'var(--cd-border)' }}
+      style={{ background: bgGlow, border: `1px solid ${borderColor}` }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--cd-magenta)'; e.currentTarget.style.background = 'rgba(236,72,153,0.1)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.background = bgGlow }}
     >
-      <Avatar discord_id={match.partner_discord_id} avatar={match.partner_avatar} username={match.partner_name} size={44} />
+      <div className="relative">
+        <Avatar discord_id={match.partner_discord_id} avatar={match.partner_avatar} username={match.partner_name} size={48} />
+        <Heart className="absolute -bottom-1 -right-1 w-4 h-4 text-[var(--cd-magenta)] fill-[var(--cd-magenta)]" />
+      </div>
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm truncate" style={{ color: 'var(--cd-text)' }}>
@@ -158,22 +173,21 @@ function MatchItem({ match, onOpenTrade, userId }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         {isPendingFromThem ? (
-          <>
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold cd-head tracking-wider text-emerald-400">REVIEW</span>
-          </>
+          <span className="px-3 py-1 rounded-lg text-xs font-bold cd-head tracking-wider text-white"
+            style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
+            REVIEW
+          </span>
         ) : isPendingFromMe ? (
-          <>
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold cd-head tracking-wider text-amber-400">SENT</span>
-          </>
+          <span className="px-3 py-1 rounded-lg text-xs font-bold cd-head tracking-wider text-amber-400 border border-amber-500/30">
+            SENT
+          </span>
         ) : (
-          <>
-            <MessageCircle className="w-4 h-4" style={{ color: 'var(--cd-cyan)' }} />
-            <span className="text-xs font-semibold cd-head tracking-wider" style={{ color: 'var(--cd-cyan)' }}>TRADE</span>
-          </>
+          <span className="px-3 py-1 rounded-lg text-xs font-bold cd-head tracking-wider text-white"
+            style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)' }}>
+            OPEN
+          </span>
         )}
       </div>
     </button>
@@ -313,16 +327,17 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTr
 
   return (
     <div className="flex flex-col gap-8 pb-8">
-      {/* Active Matches */}
+      {/* Active Matches — dominant section */}
       <section>
         <div className="flex items-center gap-3 mb-4">
-          <h2 className="cd-head text-base font-bold tracking-wider uppercase" style={{ color: 'var(--cd-text)' }}>
-            Active Matches
+          <Heart className="w-5 h-5" style={{ color: 'var(--cd-magenta)', fill: 'var(--cd-magenta)' }} />
+          <h2 className="cd-head text-lg font-bold tracking-wider uppercase" style={{ color: 'var(--cd-magenta)' }}>
+            Your Matches
           </h2>
           {matches?.length > 0 && (
             <span
-              className="px-2 py-0.5 rounded-full text-xs font-bold cd-head"
-              style={{ background: 'var(--cd-cyan)', color: '#000' }}
+              className="px-2.5 py-0.5 rounded-full text-xs font-bold cd-head text-white"
+              style={{ background: 'var(--cd-magenta)' }}
             >
               {matches.length}
             </span>
@@ -330,9 +345,11 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTr
         </div>
 
         {!matches?.length ? (
-          <p className="text-sm py-8 text-center" style={{ color: 'var(--cd-text-dim)' }}>
-            No active matches yet
-          </p>
+          <div className="text-center py-10 rounded-xl" style={{ background: 'rgba(236,72,153,0.04)', border: '1px dashed rgba(236,72,153,0.2)' }}>
+            <Heart className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--cd-magenta)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--cd-text-dim)' }}>No matches yet</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--cd-text-dim)' }}>Keep swiping to find your next trade partner!</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {matches.map((match) => (
@@ -342,12 +359,11 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTr
         )}
       </section>
 
-      {/* Likes */}
+      {/* Likes — secondary section */}
       <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Heart className="w-4 h-4" style={{ color: 'var(--cd-magenta)', fill: 'var(--cd-magenta)' }} />
-          <h2 className="cd-head text-base font-bold tracking-wider uppercase" style={{ color: 'var(--cd-text)' }}>
-            Someone has their eye on your cards...
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="cd-head text-sm font-bold tracking-wider uppercase" style={{ color: 'var(--cd-text-dim)' }}>
+            Interested in your cards
           </h2>
         </div>
 

@@ -207,6 +207,7 @@ export default function CCTradematch() {
   }, [setMatchTradeCount])
 
   const handleOpenTrade = useCallback((tradeId) => {
+    setMatchResult(null) // clear any lingering match splash
     setActiveTradeId(tradeId)
   }, [])
 
