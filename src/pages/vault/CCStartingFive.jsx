@@ -1350,13 +1350,15 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
                 </span>
               )}
             </div>
-            {card.teamSynergyBonus > 0 && (
-              <div className="flex items-center justify-center gap-1 mt-0.5">
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              {card.teamSynergyBonus > 0 ? (
                 <span className="text-[9px] font-bold cd-head text-emerald-400">
                   +{Math.round(card.teamSynergyBonus * 100)}% Team
                 </span>
-              </div>
-            )}
+              ) : (
+                <span className="text-[9px] invisible">placeholder</span>
+              )}
+            </div>
           </>
         )}
       </div>
