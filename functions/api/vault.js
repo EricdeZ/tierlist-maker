@@ -105,6 +105,7 @@ const handler = async (event) => {
         case 'binder': return await handleLoadBinder(sql, user)
         case 'pending-signatures': return await handlePendingSignatures(sql, user)
         case 'pending-approval-signatures': return await handlePendingApprovalSignatures(sql, user)
+        case 'pending-reveal': return await handlePendingReveal(sql, user)
         case 'admin-redeem-codes': return await handleAdminRedeemCodes(sql, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
@@ -120,6 +121,7 @@ const handler = async (event) => {
         case 'buy-packs-to-inventory': return await handleBuyPacksToInventory(sql, user, body)
         case 'buy-gift-pack': return await handleBuyGiftPack(sql, user, body)
         case 'mark-gifts-seen': return await handleMarkGiftsSeen(sql, user)
+        case 'mark-revealed': return await handleMarkRevealed(sql, user)
         case 'dismantle': return await handleDismantle(sql, user, body)
         case 'black-market-turn-in': return await handleBlackMarketTurnIn(sql, user, body)
         case 'black-market-claim-mythic': return await handleBlackMarketClaimMythic(sql, user, body)
@@ -410,6 +412,7 @@ async function handleOpenInventoryPack(sql, user, body) {
     packName: result.packName,
     packType: pack.pack_type_id,
     cards,
+    packOpenId: result.packOpenId,
   }) }
 }
 
@@ -505,6 +508,7 @@ async function handleOpenPack(sql, user, body) {
     packName: result.packName,
     packType,
     cards,
+    packOpenId: result.packOpenId,
   }) }
 }
 
@@ -589,6 +593,7 @@ async function handleSalePurchase(sql, user, saleId) {
     packType: result.packType,
     cards,
     stock: result.stock,
+    packOpenId: result.packOpenId,
   }) }
 }
 
@@ -1303,7 +1308,7 @@ async function handleOpenGift(sql, user, body) {
   `
   if (!gift) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already opened' }) }
 
-  let packName, newCards
+  let packName, newCards, packOpenId
 
   if (gift.pack_type === 'gift') {
     // Free gift pack — use dedicated generator
@@ -1320,13 +1325,20 @@ async function handleOpenGift(sql, user, body) {
     }
     await ensureStats(sql, user.id)
     await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${user.id}`
-    await sql`INSERT INTO cc_pack_opens (user_id, pack_type_id) VALUES (${user.id}, NULL)`
+    const giftCardIds = newCards.map(c => c.id)
+    const [giftPackOpen] = await sql`
+      INSERT INTO cc_pack_opens (user_id, pack_type_id, card_ids)
+      VALUES (${user.id}, NULL, ${JSON.stringify(giftCardIds)}::jsonb)
+      RETURNING id
+    `
+    packOpenId = giftPackOpen.id
     packName = 'Gift Pack'
   } else {
     // Purchased pack gift — use standard pack opener (skip payment, already paid)
     const result = await openPack(sql, user.id, gift.pack_type, { skipPayment: true })
     packName = result.packName
     newCards = result.cards
+    packOpenId = result.packOpenId
   }
 
   // Mark gift as opened
@@ -1346,8 +1358,62 @@ async function handleOpenGift(sql, user, body) {
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ packName, packType: gift.pack_type, cards }),
+    body: JSON.stringify({ packName, packType: gift.pack_type, cards, packOpenId }),
   }
+}
+
+// ═══ GET: Pending pack reveal (unrevealed pack open) ═══
+async function handlePendingReveal(sql, user) {
+  const [pending] = await sql`
+    SELECT id, pack_type_id, card_ids, created_at
+    FROM cc_pack_opens
+    WHERE user_id = ${user.id} AND revealed_at IS NULL AND card_ids IS NOT NULL
+    ORDER BY created_at DESC LIMIT 1
+  `
+  if (!pending || !pending.card_ids || !pending.card_ids.length) {
+    return { statusCode: 200, headers, body: JSON.stringify({ pending: null }) }
+  }
+
+  const cardIds = pending.card_ids
+  const cards = await sql`SELECT * FROM cc_cards WHERE id = ANY(${cardIds}) AND owner_id = ${user.id}`
+  if (!cards.length) {
+    // Cards gone (dismantled/traded) — auto-reveal stale record
+    await sql`UPDATE cc_pack_opens SET revealed_at = NOW() WHERE user_id = ${user.id} AND revealed_at IS NULL`
+    return { statusCode: 200, headers, body: JSON.stringify({ pending: null }) }
+  }
+
+  const formatted = cards.map(c => formatCard(c))
+  await inlineTemplateData(sql, formatted)
+  await tagNewCards(sql, user.id, formatted)
+
+  // Restore reveal order for mixed packs
+  for (const c of formatted) {
+    const orig = cards.find(r => r.id === c.id)
+    if (orig?.card_data?._revealOrder != null) c._revealOrder = orig.card_data._revealOrder
+  }
+
+  let packName = 'Pack'
+  if (pending.pack_type_id) {
+    const [pt] = await sql`SELECT name FROM cc_pack_types WHERE id = ${pending.pack_type_id}`
+    if (pt) packName = pt.name
+  } else {
+    packName = 'Gift Pack'
+  }
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    pending: {
+      packOpenId: pending.id,
+      packName,
+      packType: pending.pack_type_id,
+      cards: formatted,
+    }
+  }) }
+}
+
+// ═══ POST: Mark pack opens as revealed ═══
+async function handleMarkRevealed(sql, user) {
+  await sql`UPDATE cc_pack_opens SET revealed_at = NOW() WHERE user_id = ${user.id} AND revealed_at IS NULL`
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
 
 // ═══ POST: Mark all gifts as seen ═══

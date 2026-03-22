@@ -51,6 +51,7 @@ export function VaultProvider({ children }) {
   const [lockedCardIds, setLockedCardIds] = useState([])
   const [lockedPackIds, setLockedPackIds] = useState([])
   const [rotationPacks, setRotationPacks] = useState([])
+  const [pendingReveal, setPendingReveal] = useState(null)
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
   const passionCtxRef = useRef(passionCtx)
@@ -174,6 +175,23 @@ export function VaultProvider({ children }) {
   useEffect(() => {
     if (loaded) refreshGifts()
   }, [loaded, refreshGifts])
+
+  // Check for unrevealed pack opens (anti-refresh-skip)
+  useEffect(() => {
+    if (!loaded) return
+    vaultService.pendingReveal().then(data => {
+      if (!data?.pending) return
+      // Skip if a child component is already handling this opening (wrote to sessionStorage)
+      try { if (sessionStorage.getItem('cc_pending_pack_open')) return } catch {}
+      setPendingReveal(data.pending)
+    }).catch(() => {})
+  }, [loaded])
+
+  const markRevealed = useCallback(async () => {
+    setPendingReveal(null)
+    try { sessionStorage.removeItem('cc_pending_pack_open') } catch {}
+    try { await vaultService.markRevealed() } catch {}
+  }, [])
 
   const sendGift = useCallback(async (recipientId, message, packType = 'gift') => {
     const result = await vaultService.sendGift(recipientId, message, packType)
@@ -465,6 +483,7 @@ export function VaultProvider({ children }) {
     vendingCooldownEnd, setVendingCooldownEnd,
     lockedCardIds, lockedPackIds,
     rotationPacks,
+    pendingReveal, markRevealed,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
@@ -473,7 +492,7 @@ export function VaultProvider({ children }) {
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
-    vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks,
+    vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks, pendingReveal, markRevealed,
   ])
 
   return (

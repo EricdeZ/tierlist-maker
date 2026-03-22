@@ -1,13 +1,7 @@
 import { useState, useCallback } from 'react'
+import { vaultService } from '../../../services/database'
 
 const STORAGE_KEY = 'cc_pending_pack_open'
-
-function load() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
-}
 
 function save(result) {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(result)) } catch {}
@@ -18,7 +12,7 @@ function clear() {
 }
 
 export default function usePendingPackOpen() {
-  const [openResult, setOpenResultRaw] = useState(() => load())
+  const [openResult, setOpenResultRaw] = useState(null)
 
   const setOpenResult = useCallback((result) => {
     if (result) {
@@ -32,6 +26,8 @@ export default function usePendingPackOpen() {
   const closeResult = useCallback(() => {
     clear()
     setOpenResultRaw(null)
+    // Mark server-side as revealed (fire-and-forget)
+    vaultService.markRevealed().catch(() => {})
   }, [])
 
   return { openResult, setOpenResult, closeResult }

@@ -477,9 +477,14 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
 
   await ensureStats(sql, userId)
   await sql`UPDATE cc_stats SET packs_opened = packs_opened + 1 WHERE user_id = ${userId}`
-  await sql`INSERT INTO cc_pack_opens (user_id, pack_type_id) VALUES (${userId}, ${pack.id})`
+  const cardIds = newCards.map(c => c.id)
+  const [packOpen] = await sql`
+    INSERT INTO cc_pack_opens (user_id, pack_type_id, card_ids)
+    VALUES (${userId}, ${pack.id}, ${JSON.stringify(cardIds)}::jsonb)
+    RETURNING id
+  `
 
-  return { packName: pack.name, cards: newCards }
+  return { packName: pack.name, cards: newCards, packOpenId: packOpen.id }
 }
 
 function generateRarityPack(pack) {

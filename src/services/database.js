@@ -1091,6 +1091,12 @@ export const vaultService = {
     buyPacksToInventory(packType, quantity) {
         return apiPost('vault', { action: 'buy-packs-to-inventory' }, { packType, quantity })
     },
+    pendingReveal() {
+        return apiCall('vault', { action: 'pending-reveal' })
+    },
+    markRevealed() {
+        return apiPost('vault', { action: 'mark-revealed' }, {})
+    },
     redeemCode(code) {
         return apiPost('vault', { action: 'redeem-code' }, { code })
     },

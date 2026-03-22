@@ -348,7 +348,7 @@ function MyPacks() {
 // Top-level toggle — MY PACKS / SHOP / LIMITED SALE
 // ═══════════════════════════════════════════════
 export default function PackShopRouter() {
-  const { inventory, giftData } = useVault();
+  const { inventory, giftData, pendingReveal, markRevealed } = useVault();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const unopenedGifts = (giftData?.received || []).filter(g => !g.opened).length;
@@ -434,6 +434,16 @@ export default function PackShopRouter() {
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="cd-spinner w-8 h-8" /></div>}>
           <CCPackSale />
         </Suspense>
+      )}
+
+      {/* Force replay of unrevealed pack opening (anti-refresh-skip) */}
+      {pendingReveal && (
+        <PackOpening
+          result={pendingReveal}
+          packType={pendingReveal.packType}
+          onClose={markRevealed}
+          onOpenMore={markRevealed}
+        />
       )}
     </>
   );
