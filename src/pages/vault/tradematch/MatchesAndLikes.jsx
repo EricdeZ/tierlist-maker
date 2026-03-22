@@ -71,13 +71,13 @@ function Avatar({ discord_id, avatar, username, size = 40 }) {
   )
 }
 
-function CardThumb({ card }) {
+function CardThumb({ card, showHolo = true }) {
   const { getDefOverride } = useVault()
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
   const isPlayer = type === 'player' || cd.teamName
   const holoType = card.holo_type || card.holoType || null
-  const holoEffect = holoType ? getHoloEffect(card.rarity) : null
+  const holoEffect = showHolo && holoType ? getHoloEffect(card.rarity) : null
   const size = 70
 
   let inner
@@ -297,7 +297,7 @@ function LikeGroup({ like, onLikesTrade }) {
                     className={`relative isolate cursor-pointer rounded-lg ${isSelected ? '' : 'opacity-70 hover:opacity-100'}`}
                     onClick={() => setSelectedCard(isSelected ? null : card.card_id)}
                   >
-                    <CardThumb card={card} />
+                    <CardThumb card={card} showHolo={false} />
                     {isSelected && (
                       <div className="absolute inset-0 z-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,229,255,0.15)', border: '2px solid rgba(0,229,255,0.6)' }}>
                         <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'var(--cd-cyan)' }}>

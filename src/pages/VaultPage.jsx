@@ -176,6 +176,7 @@ function VaultInner() {
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
+    const [showTradematchPromo, setShowTradematchPromo] = useState(() => !sessionStorage.getItem('tradematch-promo-dismissed'))
 
     // Poll vaultClaimableCount every 60s while vault is visible
     useEffect(() => {
@@ -267,6 +268,7 @@ function VaultInner() {
     }
 
     return (
+        <>
         <div className="compdeck">
             <PageTitle title={pageTitle} />
             <Navbar branding={branding} />
@@ -433,5 +435,40 @@ function VaultInner() {
             </div>
 
         </div>
+
+        {showTradematchPromo && user && activeTab !== 'tradematch' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1') }}>
+                <div
+                    className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden p-6 text-center"
+                    style={{ background: 'var(--cd-surface)', border: '1px solid rgba(236,72,153,0.3)', boxShadow: '0 0 40px rgba(236,72,153,0.15)', animation: 'cd-fade-in 0.3s ease-out' }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="text-4xl mb-3">🔥</div>
+                    <h2 className="text-lg font-bold cd-head tracking-wider mb-2" style={{ color: 'var(--cd-magenta)' }}>
+                        Hot new cards in your area
+                    </h2>
+                    <p className="text-sm mb-5" style={{ color: 'var(--cd-text-dim)' }}>
+                        Swipe through cards other players want to trade. Match, negotiate, and swap — no awkward DMs required.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                        <button
+                            onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1'); setTab('tradematch') }}
+                            className="w-full py-2.5 rounded-xl text-sm font-bold cd-head tracking-wider text-white transition-all active:scale-95 cursor-pointer"
+                            style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', boxShadow: '0 0 20px rgba(236,72,153,0.3)' }}
+                        >
+                            Start Swiping
+                        </button>
+                        <button
+                            onClick={() => { setShowTradematchPromo(false); sessionStorage.setItem('tradematch-promo-dismissed', '1') }}
+                            className="w-full py-2 text-xs font-bold cd-head tracking-wider transition-all cursor-pointer"
+                            style={{ color: 'var(--cd-text-dim)' }}
+                        >
+                            Maybe Later
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     )
 }

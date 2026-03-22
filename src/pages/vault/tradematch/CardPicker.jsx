@@ -54,13 +54,13 @@ function apiCardSort(a, b) {
 
 const CARD_SIZE = 80
 
-function PickerCard({ card, onSelect, disabled }) {
+function PickerCard({ card, onSelect, disabled, showHolo }) {
   const { getDefOverride } = useVault()
   const cd = card.card_data ? (typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data) : {}
   const type = card.card_type || cd.cardType || 'god'
   const isPlayer = type === 'player' || cd.teamName
   const holoType = card.holo_type || card.holoType || null
-  const holoEffect = holoType ? getHoloEffect(card.rarity) : null
+  const holoEffect = showHolo && holoType ? getHoloEffect(card.rarity) : null
 
   let inner
   if (isPlayer) {
@@ -212,6 +212,7 @@ export default function CardPicker({ side, partnerId, existingCardIds, onAdd, on
                   card={card}
                   onSelect={handleSelect}
                   disabled={existingCardIds.has(card.card_id)}
+                  showHolo={side === 'mine'}
                 />
               ))}
             </div>
