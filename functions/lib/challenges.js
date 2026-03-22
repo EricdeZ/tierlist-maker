@@ -985,12 +985,15 @@ export async function getVaultStats(sql, userId) {
           ) sub
         ),
         trades_agg AS (
-          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed FROM cc_trades
+          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed,
+                 COUNT(*)::int AS trades_count
+          FROM cc_trades
           WHERE (player_a_id = ${userId} OR player_b_id = ${userId}) AND status = 'completed'
         ),
         market_agg AS (
           SELECT
             COUNT(DISTINCT buyer_id) FILTER (WHERE seller_id = ${userId})::int AS marketplace_sold,
+            COUNT(*) FILTER (WHERE seller_id = ${userId})::int AS marketplace_sold_count,
             COUNT(DISTINCT seller_id) FILTER (WHERE buyer_id = ${userId})::int AS marketplace_bought,
             COALESCE(MAX(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS best_marketplace_sale,
             COALESCE(SUM(core_price) FILTER (WHERE seller_id = ${userId}), 0)::int AS marketplace_volume
@@ -1072,7 +1075,9 @@ export async function getVaultStats(sql, userId) {
         cards_dismantled: row?.cards_dismantled ?? 0,
         legendary_cards_dismantled: row?.legendary_cards_dismantled ?? 0,
         trades_completed: row?.trades_completed ?? 0,
+        trades_count: row?.trades_count ?? 0,
         marketplace_sold: row?.marketplace_sold ?? 0,
+        marketplace_sold_count: row?.marketplace_sold_count ?? 0,
         marketplace_bought: row?.marketplace_bought ?? 0,
         best_marketplace_sale: row?.best_marketplace_sale ?? 0,
         gifts_sent: row?.gifts_sent ?? 0,

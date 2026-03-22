@@ -59,19 +59,23 @@ async function getBaselineStats(sql, userId, periodStart) {
           WHERE user_id = ${userId} AND created_at < ${periodStart}
         ),
         trades_base AS (
-          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed FROM cc_trades
+          SELECT COUNT(DISTINCT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END)::int AS trades_completed,
+                 COUNT(*)::int AS trades_count
+          FROM cc_trades
           WHERE (player_a_id = ${userId} OR player_b_id = ${userId})
             AND status = 'completed' AND completed_at < ${periodStart}
         ),
         market_base AS (
-          SELECT COUNT(DISTINCT buyer_id)::int AS marketplace_sold FROM cc_market_listings
+          SELECT COUNT(DISTINCT buyer_id)::int AS marketplace_sold,
+                 COUNT(*)::int AS marketplace_sold_count
+          FROM cc_market_listings
           WHERE seller_id = ${userId} AND status = 'sold' AND sold_at < ${periodStart}
         ),
         gifts_base AS (
           SELECT COUNT(*)::int AS gifts_sent FROM cc_gifts
           WHERE sender_id = ${userId} AND created_at < ${periodStart}
         )
-      SELECT e.*, t.trades_completed, m.marketplace_sold, g.gifts_sent
+      SELECT e.*, t.trades_completed, t.trades_count, m.marketplace_sold, m.marketplace_sold_count, g.gifts_sent
       FROM ember_base e, trades_base t, market_base m, gifts_base g
     `
 
@@ -79,7 +83,9 @@ async function getBaselineStats(sql, userId, periodStart) {
         daily_cores_claimed: row?.daily_cores_claimed ?? 0,
         cores_converted: row?.cores_converted ?? 0,
         trades_completed: row?.trades_completed ?? 0,
+        trades_count: row?.trades_count ?? 0,
         marketplace_sold: row?.marketplace_sold ?? 0,
+        marketplace_sold_count: row?.marketplace_sold_count ?? 0,
         gifts_sent: row?.gifts_sent ?? 0,
         bounty_cores_earned: row?.bounty_cores_earned ?? 0,
     }
