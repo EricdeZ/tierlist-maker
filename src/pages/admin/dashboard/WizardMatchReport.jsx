@@ -207,7 +207,7 @@ export default function WizardMatchReport({
     // ─── Render current step content ───
     const renderStep = () => {
         if (step.id === 'confirm') {
-            return <ConfirmStep matchInfo={matchInfo} onSwapTeams={onSwapTeams} onConfirm={next} />
+            return <ConfirmStep matchInfo={matchInfo} onConfirm={next} />
         }
 
         if (step.id === 'screenshots') {
@@ -389,7 +389,7 @@ export default function WizardMatchReport({
 // STEP: CONFIRM MATCH
 // ═══════════════════════════════════════════════════
 
-function ConfirmStep({ matchInfo, onSwapTeams, onConfirm }) {
+function ConfirmStep({ matchInfo, onConfirm }) {
     return (
         <div className="py-8 text-center">
             <div className="flex items-center justify-center gap-4 mb-6">
@@ -397,13 +397,7 @@ function ConfirmStep({ matchInfo, onSwapTeams, onConfirm }) {
                     <span className="inline-block w-4 h-4 rounded-full mr-2 align-middle" style={{ backgroundColor: matchInfo.team1_color }} />
                     <span className="text-xl font-bold text-[var(--color-text)]">{matchInfo.team1_name}</span>
                 </div>
-                <button
-                    onClick={onSwapTeams}
-                    className="px-2 py-1.5 rounded-lg text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition"
-                    title="Swap team sides"
-                >
-                    &#8644;
-                </button>
+                <span className="text-xl font-bold text-[var(--color-text-secondary)]">vs</span>
                 <div className="text-left">
                     <span className="inline-block w-4 h-4 rounded-full mr-2 align-middle" style={{ backgroundColor: matchInfo.team2_color }} />
                     <span className="text-xl font-bold text-[var(--color-text)]">{matchInfo.team2_name}</span>
