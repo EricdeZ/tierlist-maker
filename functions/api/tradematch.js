@@ -2,6 +2,7 @@
 import { adapt } from '../lib/adapter.js'
 import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth } from '../lib/auth.js'
+import { getVaultStats, pushChallengeProgress } from '../lib/challenges.js'
 import {
   getTradePile, addToTradePile, removeFromTradePile, getTradePileCount,
   getSwipeFeed, recordSwipe,
@@ -130,7 +131,7 @@ async function handleSwipe(sql, user, body) {
 
   const count = await getTradePileCount(sql, user.id)
   if (count < TRADEMATCH_RULES.min_trade_pile) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Need at least 20 cards in trade pile' }) }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Need at least 10 cards in trade pile' }) }
   }
 
   const result = await recordSwipe(sql, user.id, parseInt(cardId))
@@ -224,9 +225,21 @@ async function handleOfferSend(sql, user, body) {
 async function handleOfferAcceptRoute(user, body) {
   const { tradeId, version } = body
   if (!tradeId || version === undefined) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId and version required' }) }
+  const sql = getDB()
   const result = await transaction(async (tx) => {
     return offerAccept(tx, user.id, parseInt(tradeId), parseInt(version))
   })
+
+  // Push vault challenge progress for both traders (fire-and-forget)
+  if (result.status === 'completed' && result.trade) {
+    const pushForUser = (uid) =>
+      getVaultStats(sql, uid)
+        .then(stats => pushChallengeProgress(sql, uid, stats))
+        .catch(err => console.error('Vault challenge push (tradematch) failed:', err))
+    pushForUser(result.trade.player_a_id)
+    pushForUser(result.trade.player_b_id)
+  }
+
   return { statusCode: 200, headers, body: JSON.stringify(result) }
 }
 

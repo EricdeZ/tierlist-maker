@@ -4,7 +4,7 @@ import { grantEmber, ensureEmberBalance } from './ember.js'
 // Discovery layer: trade pile, swipe feed, match detection, likes
 
 export const TRADEMATCH_RULES = {
-  min_trade_pile: 20,
+  min_trade_pile: 10,
   max_outgoing_matches: 15,
   max_cards_per_side: 10,
   match_expiry_hours: 24,
@@ -562,7 +562,7 @@ export async function offerAccept(tx, userId, tradeId, version) {
     WHERE id = ${tradeId}
   `
 
-  return { status: 'completed' }
+  return { status: 'completed', trade }
 }
 
 export async function offerCancel(sql, userId, tradeId) {

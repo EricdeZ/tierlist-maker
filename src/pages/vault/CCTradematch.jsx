@@ -12,7 +12,7 @@ import MatchesAndLikes from './tradematch/MatchesAndLikes'
 import Negotiation from './tradematch/Negotiation'
 
 const SUB_VIEWS = [
-  { key: 'pile', label: 'Trade Pile', icon: Layers, desc: 'Pick cards you\'re willing to trade. Need at least 20 to start swiping.' },
+  { key: 'pile', label: 'Trade Pile', icon: Layers, desc: 'Pick cards you\'re willing to trade. Need at least 10 to start swiping.' },
   { key: 'swiper', label: 'Swipe', icon: Heart, desc: 'Swipe right on cards you want. If they like yours too, it\'s a match!' },
   { key: 'matches', label: 'Matches', icon: Users, desc: 'Negotiate trades with your matches. Send offers, counter, or accept.' },
 ]
@@ -233,7 +233,7 @@ export default function CCTradematch() {
     setMatchResult(null)
   }, [])
 
-  const pileIsLocked = tradePileCount < 20
+  const pileIsLocked = tradePileCount < 10
 
   if (activeTradeId) {
     return (
@@ -319,6 +319,7 @@ export default function CCTradematch() {
           onToggle={handleToggleTradePile}
           tradePileCount={tradePileCount}
           loading={loading}
+          onStartSwiping={() => setSubView('swiper')}
         />
       )}
 
@@ -332,6 +333,7 @@ export default function CCTradematch() {
           locked={pileIsLocked}
           loading={loading}
           empty={!loading && feedCards.length === 0}
+          onGoToPile={() => setSubView('pile')}
         />
       )}
 
@@ -379,7 +381,7 @@ function TradeMatchTutorial({ onClose }) {
             <h4 className="font-bold text-[var(--cd-magenta)] cd-head tracking-wider text-xs mb-1 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5" /> TRADE PILE
             </h4>
-            <p>Start by building your trade pile — select cards from your collection that you're willing to trade. Only <span className="text-white/80 font-semibold">rare or higher</span> cards are eligible. You need at least <span className="text-white/80 font-semibold">20 cards</span> in your pile before you can start swiping. Locked cards (Starting 5, binder, marketplace listings) can't be added. Use the <span className="text-[var(--cd-cyan)]">Duplicates</span> filter to quickly find spare cards.</p>
+            <p>Start by building your trade pile — select cards from your collection that you're willing to trade. Only <span className="text-white/80 font-semibold">rare or higher</span> cards are eligible. You need at least <span className="text-white/80 font-semibold">10 cards</span> in your pile before you can start swiping. Locked cards (Starting 5, binder, marketplace listings) can't be added. Use the <span className="text-[var(--cd-cyan)]">Duplicates</span> filter to quickly find spare cards.</p>
           </div>
 
           <div>

@@ -30,7 +30,7 @@ function avatarUrl(card) {
   return null
 }
 
-export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, loading, empty }) {
+export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, loading, empty, onGoToPile }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swiping, setSwiping] = useState(false) // true during async swipe processing
 
@@ -46,10 +46,11 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
   const lastMovePos = useRef({ x: 0, y: 0 })
   const animating = useRef(false)
 
-  const card = feedCards?.[currentIndex]
-  const remaining = feedCards ? feedCards.length - currentIndex : 0
+  const activeIndex = feedCards?.length > 0 ? currentIndex % feedCards.length : 0
+  const card = feedCards?.[activeIndex]
 
-  // Trigger load more when running low
+  // Trigger load more when nearing end of first pass
+  const remaining = feedCards ? feedCards.length - currentIndex : 0
   useEffect(() => {
     if (remaining <= LOAD_MORE_BUFFER && remaining > 0 && onLoadMore) {
       onLoadMore()
@@ -219,7 +220,7 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     executeSwipe(direction)
   }, [executeSwipe])
 
-  // ── Locked state ──
+  // ── Locked state (trade pile too small) ──
   if (locked) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
@@ -227,17 +228,26 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
           className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
           style={{ background: 'var(--cd-surface)', border: '2px solid var(--cd-border)' }}
         >
-          <Lock className="w-9 h-9" style={{ color: 'var(--cd-text-dim)' }} />
+          <Heart className="w-9 h-9" style={{ color: 'var(--cd-text-dim)' }} />
         </div>
         <h3
           className="text-xl font-bold cd-head tracking-wider mb-2"
           style={{ color: 'var(--cd-text)' }}
         >
-          Match Queue Full
+          Not Enough Cards
         </h3>
-        <p className="text-sm max-w-xs" style={{ color: 'var(--cd-text-mid)' }}>
-          You have 5 pending matches. Complete or cancel a trade to keep swiping.
+        <p className="text-sm max-w-xs mb-4" style={{ color: 'var(--cd-text-mid)' }}>
+          You need at least 10 cards in your trade pile before you can start swiping. Add more cards to get going!
         </p>
+        {onGoToPile && (
+          <button
+            onClick={onGoToPile}
+            className="px-4 py-2 rounded-lg text-xs font-bold cd-head tracking-wider text-white transition-all active:scale-95 cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', boxShadow: '0 0 12px rgba(236,72,153,0.3)' }}
+          >
+            Go to Trade Pile
+          </button>
+        )}
       </div>
     )
   }
@@ -252,8 +262,8 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
-  // ── Empty state ──
-  if (empty || currentIndex >= feedCards.length) {
+  // ── Empty state (truly no cards) ──
+  if (empty && !feedCards?.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
         <div
@@ -275,8 +285,14 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
+  // Loop back to start when all cards have been swiped through
+  const loopedIndex = feedCards.length > 0 ? currentIndex % feedCards.length : 0
+
   // ── Card stack ──
-  const visibleCards = feedCards.slice(currentIndex, currentIndex + STACK_SIZE)
+  const visibleCards = []
+  for (let i = 0; i < STACK_SIZE && i < feedCards.length; i++) {
+    visibleCards.push(feedCards[(loopedIndex + i) % feedCards.length])
+  }
 
   return (
     <div className="flex flex-col items-center gap-6 py-4 select-none overflow-hidden">

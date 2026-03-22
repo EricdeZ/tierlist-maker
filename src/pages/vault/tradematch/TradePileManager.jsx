@@ -6,7 +6,7 @@ import VaultCard from '../components/VaultCard'
 import TradingCard from '../../../components/TradingCard'
 
 const CARD_SIZE = 130
-const MIN_TRADE_PILE = 20
+const MIN_TRADE_PILE = 10
 const PAGE_SIZE = 40
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
@@ -67,7 +67,7 @@ function toPlayerCardProps(card) {
   }
 }
 
-export default function TradePileManager({ collection, lockedCardIds, tradePile, onToggle, tradePileCount }) {
+export default function TradePileManager({ collection, lockedCardIds, tradePile, onToggle, tradePileCount, onStartSwiping }) {
   const { getDefOverride, getTemplate } = useVault()
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
@@ -192,10 +192,23 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
             }}
           />
         </div>
-        {!meetsMinimum && (
+        {!meetsMinimum ? (
           <p className="text-[11px] mt-1" style={{ color: 'var(--cd-text-dim)' }}>
             Add {MIN_TRADE_PILE - tradePileCount} more card{MIN_TRADE_PILE - tradePileCount !== 1 ? 's' : ''} to start matching
           </p>
+        ) : (
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-[11px]" style={{ color: 'var(--cd-text-dim)' }}>
+              Ready to match! Add more cards to improve your chances, or start swiping.
+            </p>
+            <button
+              onClick={onStartSwiping}
+              className="flex-shrink-0 ml-3 px-3 py-1 rounded-lg text-xs font-bold cd-head tracking-wider text-white transition-all active:scale-95 cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', boxShadow: '0 0 12px rgba(236,72,153,0.3)' }}
+            >
+              Start Swiping
+            </button>
+          </div>
         )}
       </div>
 
