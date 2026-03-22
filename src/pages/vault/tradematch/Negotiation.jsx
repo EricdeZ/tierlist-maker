@@ -245,7 +245,9 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
   const isPendingFromMe = trade?.offer_status === 'pending' && trade?.offer_by === userId
   const isPendingFromThem = trade?.offer_status === 'pending' && trade?.offer_by !== userId
   const isNegotiating = trade?.offer_status === 'negotiating'
-  const canEdit = isNegotiating || isPendingFromThem
+  const isMyTurn = isNegotiating && (!trade?.offer_by || trade?.offer_by === userId)
+  const isTheirTurn = isNegotiating && trade?.offer_by && trade?.offer_by !== userId
+  const canEdit = isMyTurn || isPendingFromThem
   const canSend = canEdit && !hasUnavailable && (myCards.length > 0 || myCore > 0)
 
   const doAction = useCallback(async (fn) => {
@@ -355,11 +357,11 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
             Update Status
           </button>
           <span className={`text-[10px] font-bold cd-head tracking-wider px-2 py-0.5 rounded-full ${
-            isPendingFromMe ? 'bg-amber-500/15 text-amber-400'
+            (isPendingFromMe || isTheirTurn) ? 'bg-amber-500/15 text-amber-400'
             : isPendingFromThem ? 'bg-emerald-500/15 text-emerald-400'
             : 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)]'
           }`}>
-            {isPendingFromMe ? 'WAITING...' : isPendingFromThem ? 'THEIR OFFER' : 'NEGOTIATING'}
+            {isPendingFromMe ? 'WAITING...' : isTheirTurn ? 'THEIR TURN' : isPendingFromThem ? 'THEIR OFFER' : 'YOUR TURN'}
           </span>
         </div>
       </div>
@@ -440,17 +442,22 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
             You sent an offer — waiting for @{partnerName}
           </p>
         )}
+        {isTheirTurn && (
+          <p className="font-semibold" style={{ color: '#f59e0b' }}>
+            @{partnerName} is working on a counter-offer...
+          </p>
+        )}
         {isPendingFromThem && (
           <p className="font-semibold" style={{ color: '#22c55e' }}>
             @{partnerName} sent you an offer — review it!
           </p>
         )}
-        {isNegotiating && trade.offer_version === 0 && (
+        {isMyTurn && trade.offer_version === 0 && (
           <p style={{ color: 'var(--cd-text-dim)' }}>
             No offers sent yet — make the first move!
           </p>
         )}
-        {isNegotiating && trade.offer_version > 0 && (
+        {isMyTurn && trade.offer_version > 0 && (
           <p style={{ color: 'var(--cd-text-dim)' }}>
             Offer returned — make your changes and send
           </p>
@@ -458,7 +465,7 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
       </div>
 
       <div className="flex items-center justify-center gap-3">
-        {isPendingFromMe && (
+        {(isPendingFromMe || isTheirTurn) && (
           <p className="text-xs" style={{ color: 'var(--cd-text-dim)' }}>
             Waiting for @{partnerName} to respond...
           </p>
@@ -487,7 +494,7 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
           </>
         )}
 
-        {isNegotiating && (
+        {isMyTurn && (
           <button
             onClick={handleSend}
             disabled={actionLoading || !canSend}

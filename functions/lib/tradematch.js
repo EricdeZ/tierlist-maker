@@ -363,8 +363,11 @@ export async function offerAddCard(sql, userId, tradeId, cardId) {
   if (trade.offer_status === 'pending' && trade.offer_by === userId) {
     throw new Error('Waiting for the other player to respond')
   }
+  if (trade.offer_status === 'negotiating' && trade.offer_by && trade.offer_by !== userId) {
+    throw new Error('Waiting for the other player to send their offer')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
-    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', offer_by = ${userId}, updated_at = NOW() WHERE id = ${tradeId}`
   }
 
   const [card] = await sql`SELECT id, owner_id FROM cc_cards WHERE id = ${cardId}`
@@ -406,8 +409,11 @@ export async function offerRemoveCard(sql, userId, tradeId, cardId) {
   if (trade.offer_status === 'pending' && trade.offer_by === userId) {
     throw new Error('Waiting for the other player to respond')
   }
+  if (trade.offer_status === 'negotiating' && trade.offer_by && trade.offer_by !== userId) {
+    throw new Error('Waiting for the other player to send their offer')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
-    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', offer_by = ${userId}, updated_at = NOW() WHERE id = ${tradeId}`
   }
 
   await sql`DELETE FROM cc_trade_cards WHERE trade_id = ${tradeId} AND card_id = ${cardId}`
@@ -426,8 +432,11 @@ export async function offerSetCore(sql, userId, tradeId, amount) {
   if (trade.offer_status === 'pending' && trade.offer_by === userId) {
     throw new Error('Waiting for the other player to respond')
   }
+  if (trade.offer_status === 'negotiating' && trade.offer_by && trade.offer_by !== userId) {
+    throw new Error('Waiting for the other player to send their offer')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
-    await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
+    await sql`UPDATE cc_trades SET offer_status = 'negotiating', offer_by = ${userId}, updated_at = NOW() WHERE id = ${tradeId}`
   }
 
   const isA = trade.player_a_id === userId
