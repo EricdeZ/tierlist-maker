@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { RARITIES } from '../../../data/vault/economy'
-import { GODS } from '../../../data/vault/gods'
+import { GODS, CLASS_ROLE } from '../../../data/vault/gods'
 import { ITEMS } from '../../../data/vault/items'
 import { CONSUMABLES } from '../../../data/vault/buffs'
 import { bountyService } from '../../../services/database'
@@ -14,7 +14,7 @@ const ROLE_LABELS = { solo: 'Solo', jungle: 'Jungle', mid: 'Mid', support: 'Supp
 const STATIC_CARD_DATA = {
   god: GODS.map(g => ({
     name: g.name,
-    detail: `${g.class} · ${ROLE_LABELS[g.role] || g.role}`,
+    detail: `${g.class} · ${ROLE_LABELS[g.role || CLASS_ROLE[g.class]] || g.role}`,
     avatar: null,
     godId: g.slug,
   })),

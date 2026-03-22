@@ -136,6 +136,14 @@ export default function SynergyPlanner({ collection, startingFive }) {
                             )}
                           </div>
                         )}
+                        {g.status === 'equipped-elsewhere' && (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-bold cd-head text-orange-400">EQUIPPED</span>
+                            <span className="text-[9px] cd-head" style={{ color: rarityColor }}>
+                              {g.godCard.rarity} {g.godCard.holoType}
+                            </span>
+                          </div>
+                        )}
                         {g.status === 'available-ineligible' && (
                           <div className="flex flex-col items-end">
                             <span className="text-[10px] font-bold cd-head text-white/30">OWNED</span>

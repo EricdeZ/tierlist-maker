@@ -19,7 +19,7 @@ const SUB_VIEWS = [
 
 export default function CCTradematch() {
   const { user } = useAuth()
-  const { collection, lockedCardIds: apiLockedCardIds, startingFive, binderCards, setMatchTradeCount } = useVault()
+  const { collection, lockedCardIds: apiLockedCardIds, startingFive, binderCards, setMatchTradeCount, setMatchTradePendingCount } = useVault()
   const lockedCardIds = useMemo(() => {
     const ids = new Set()
     for (const lineup of [startingFive?.currentSeason, startingFive?.allStar]) {
@@ -88,11 +88,15 @@ export default function CCTradematch() {
         tradematchService.matches(),
         tradematchService.likes(),
       ])
-      setMatches(matchData.matches || [])
+      const m = matchData.matches || []
+      setMatches(m)
       setLikes(likeData.likes || [])
+      setMatchTradeCount(m.length)
+      const pending = m.filter(t => (t.offer_status === 'pending' && t.offer_by !== user?.id) || (t.offer_status === 'negotiating' && !t.offer_by)).length
+      setMatchTradePendingCount(pending)
     } catch (err) { console.error('Failed to load matches:', err) }
     finally { setLoading(false); setRefreshing(false) }
-  }, [])
+  }, [user?.id, setMatchTradeCount, setMatchTradePendingCount])
 
   const handleRefresh = useCallback(() => {
     if (subView === 'pile') fetchPile(true)

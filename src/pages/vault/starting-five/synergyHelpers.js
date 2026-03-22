@@ -128,6 +128,15 @@ const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, my
 export function buildGodOpportunities(csSlots, asSlots, collection) {
   const results = []
 
+  // Collect all god card IDs currently equipped across both lineups
+  const equippedGodIds = new Set()
+  for (const slots of [csSlots, asSlots]) {
+    if (!slots) continue
+    for (const slotData of Object.values(slots)) {
+      if (slotData?.godCard?.id) equippedGodIds.add(slotData.godCard.id)
+    }
+  }
+
   const processSlots = (slots, lineupLabel) => {
     if (!slots) return
     for (const [role, slotData] of Object.entries(slots)) {
@@ -152,8 +161,11 @@ export function buildGodOpportunities(csSlots, asSlots, collection) {
       if (matchingGods.length === 0) {
         results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status: 'not-owned', godCard: null, holoMatch: false })
       } else {
-        // Sort by holo compatibility first, then rarity descending
+        // Prefer unequipped cards, then holo compatibility, then rarity descending
         matchingGods.sort((a, b) => {
+          const aFree = equippedGodIds.has(a.id) ? 0 : 1
+          const bFree = equippedGodIds.has(b.id) ? 0 : 1
+          if (bFree !== aFree) return bFree - aFree
           const aCompat = isHoloCompatible(playerHolo, a.holoType) ? 1 : 0
           const bCompat = isHoloCompatible(playerHolo, b.holoType) ? 1 : 0
           if (bCompat !== aCompat) return bCompat - aCompat
@@ -161,11 +173,12 @@ export function buildGodOpportunities(csSlots, asSlots, collection) {
         })
         const best = matchingGods[0]
         const holoMatch = isHoloCompatible(playerHolo, best.holoType)
+        const equipped = equippedGodIds.has(best.id)
         // Check if the best card is actually attachable (rarity floor check)
         const playerTier = RARITY_TIER[playerRarity] || 0
         const godTier = RARITY_TIER[best.rarity] || 0
         const meetsRarity = godTier >= playerTier || (playerRarity === 'unique' && best.rarity === 'mythic')
-        const status = meetsRarity ? 'available' : 'available-ineligible'
+        const status = equipped ? 'equipped-elsewhere' : meetsRarity ? 'available' : 'available-ineligible'
         results.push({ playerName: slotData.card.godName, lineup: lineupLabel, role, bestGodName: bestGod, status, godCard: best, holoMatch })
       }
     }
@@ -174,8 +187,8 @@ export function buildGodOpportunities(csSlots, asSlots, collection) {
   processSlots(csSlots, 'Current Season')
   processSlots(asSlots, 'All-Star')
 
-  // Sort: available > matched > not-owned
-  const order = { available: 0, 'available-ineligible': 1, matched: 2, 'not-owned': 3 }
+  // Sort: available > equipped-elsewhere > available-ineligible > matched > not-owned
+  const order = { available: 0, 'equipped-elsewhere': 1, 'available-ineligible': 2, matched: 3, 'not-owned': 4 }
   results.sort((a, b) => (order[a.status] || 9) - (order[b.status] || 9))
 
   return results

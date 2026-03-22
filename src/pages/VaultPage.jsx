@@ -159,7 +159,7 @@ function VaultInner() {
     const { user } = useAuth()
     const { vaultClaimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
@@ -349,6 +349,17 @@ function VaultInner() {
                     >
                         <Gift className="w-3.5 h-3.5" />
                         You have {unseenGifts} new gift{unseenGifts > 1 ? 's' : ''} waiting!
+                    </button>
+                )}
+
+                {matchTradePendingCount > 0 && activeTab !== 'tradematch' && (
+                    <button
+                        onClick={() => setTab('tradematch')}
+                        className="w-full mb-4 py-2 px-4 rounded-lg bg-[var(--cd-magenta)]/[0.06] border border-[var(--cd-magenta)]/20 flex items-center justify-center gap-2 text-xs font-bold text-[var(--cd-magenta)] cd-head tracking-wider hover:bg-[var(--cd-magenta)]/[0.12] transition-all cursor-pointer"
+                        style={{ animation: 'vault-shimmer-banner 3s ease-in-out infinite' }}
+                    >
+                        <Heart className="w-3.5 h-3.5" />
+                        {matchTradePendingCount} trade {matchTradePendingCount > 1 ? 'offers need' : 'offer needs'} your attention!
                     </button>
                 )}
 

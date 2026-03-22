@@ -205,7 +205,10 @@ async function handleLoad(sql, user) {
         AND mode = 'direct'
     `,
     sql`
-      SELECT COUNT(*)::int AS count FROM cc_trades
+      SELECT COUNT(*)::int AS count,
+             COUNT(*) FILTER (WHERE offer_status = 'pending' AND offer_by != ${user.id})::int AS pending_count,
+             COUNT(*) FILTER (WHERE offer_status = 'negotiating' AND offer_by IS NULL)::int AS new_count
+      FROM cc_trades
       WHERE (player_a_id = ${user.id} OR player_b_id = ${user.id})
         AND mode = 'match' AND status = 'active'
     `,
@@ -324,6 +327,7 @@ async function handleLoad(sql, user) {
       })),
       pendingTradeCount: tradeCount[0]?.count || 0,
       matchTradeCount: matchTradeCount[0]?.count || 0,
+      matchTradePendingCount: (matchTradeCount[0]?.pending_count || 0) + (matchTradeCount[0]?.new_count || 0),
       pendingSignatureCount: pendingSignatures[0]?.signer_count || 0,
       pendingApprovalCount: pendingSignatures[0]?.approver_count || 0,
       inventory: inventory.map(i => ({
