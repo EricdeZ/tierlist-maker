@@ -511,13 +511,7 @@ async function handleOpenPack(sql, user, body) {
 // ═══ POST: Sale purchase — transactional stock + payment ═══
 const VENDING_COOLDOWN_SECONDS = 45
 
-const VENDING_BLOCKED_DISCORD_IDS = ['605844290807267328', '1191722108166869086']
-
 async function handleSalePurchase(sql, user, saleId) {
-  if (VENDING_BLOCKED_DISCORD_IDS.includes(user.discord_id)) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'You are not eligible to purchase from the limited sale vending machine.' }) }
-  }
-
   const result = await transaction(async (tx) => {
     // Lock user's ember balance row to serialize per-user vending purchases
     await tx`SELECT 1 FROM ember_balances WHERE user_id = ${user.id} FOR UPDATE`
