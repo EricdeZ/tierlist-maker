@@ -19,7 +19,13 @@ function clear() {
 }
 
 export default function usePendingPackOpen() {
-  const [openResult, setOpenResultRaw] = useState(() => load())
+  const [openResult, setOpenResultRaw] = useState(() => {
+    const saved = load()
+    // If resuming from sessionStorage (page refresh mid-animation),
+    // mark revealed on server — setOpenResult won't be called for this load.
+    if (saved) vaultService.markRevealed().catch(() => {})
+    return saved
+  })
 
   const setOpenResult = useCallback((result) => {
     if (result) {
@@ -37,6 +43,8 @@ export default function usePendingPackOpen() {
   const closeResult = useCallback(() => {
     clear()
     setOpenResultRaw(null)
+    // Belt-and-suspenders: ensure server knows this pack is revealed
+    vaultService.markRevealed().catch(() => {})
   }, [])
 
   return { openResult, setOpenResult, closeResult }
