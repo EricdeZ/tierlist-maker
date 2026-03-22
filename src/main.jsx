@@ -3,17 +3,16 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-// Auto-reload when a deploy invalidates old chunk hashes
+// Auto-reload once when a deploy invalidates old chunk hashes.
+// The flag persists for the session tab — prevents infinite reload loops
+// while still allowing one retry per tab.
 window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault()
-  const reloaded = sessionStorage.getItem('chunk-reload')
-  if (!reloaded) {
+  if (!sessionStorage.getItem('chunk-reload')) {
     sessionStorage.setItem('chunk-reload', '1')
     window.location.reload()
   }
 })
-// Clear the flag on successful load so future deploys can also auto-reload
-sessionStorage.removeItem('chunk-reload')
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

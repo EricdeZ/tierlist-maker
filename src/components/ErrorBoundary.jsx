@@ -16,9 +16,9 @@ class ErrorBoundary extends Component {
         console.error('ErrorBoundary caught:', error, errorInfo)
         // Auto-reload once on chunk load failures (stale deploy)
         if (this.isChunkError(error)) {
-            const reloaded = sessionStorage.getItem('chunk-reload')
-            if (!reloaded) {
-                sessionStorage.setItem('chunk-reload', '1')
+            const reloadCount = parseInt(sessionStorage.getItem('chunk-reload') || '0', 10)
+            if (reloadCount < 1) {
+                sessionStorage.setItem('chunk-reload', String(reloadCount + 1))
                 window.location.reload()
                 return
             }
