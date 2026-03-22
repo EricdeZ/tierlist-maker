@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle, RefreshCw, Heart } from 'lucide-react'
 import emberIcon from '../../../assets/ember.png'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
