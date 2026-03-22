@@ -291,7 +291,7 @@ export default function WizardMatchReport({
         const gameProps = {
             game, gameIndex, substep,
             team1Name, team2Name, team1Color, team2Color, team1Id, team2Id,
-            adminData, updatePlayer, updateGame, onNext: next,
+            adminData, updatePlayer, updateGame, onNext: next, onSwapTeams,
         }
 
         const substepContent = (() => {
@@ -316,6 +316,23 @@ export default function WizardMatchReport({
                     queueItems={queueItems}
                     onViewScreenshot={openViewer}
                 />
+                <div className="flex items-center justify-center gap-3 mb-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team1Color }} />
+                        <span className="text-xs font-semibold text-[var(--color-text)]">{team1Name}</span>
+                    </div>
+                    <button
+                        onClick={onSwapTeams}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition"
+                        title="Swap team sides"
+                    >
+                        &#8644;
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team2Color }} />
+                        <span className="text-xs font-semibold text-[var(--color-text)]">{team2Name}</span>
+                    </div>
+                </div>
                 {substepContent}
             </div>
         )
