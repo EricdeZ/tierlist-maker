@@ -176,14 +176,15 @@ export function VaultProvider({ children }) {
     if (loaded) refreshGifts()
   }, [loaded, refreshGifts])
 
-  // Check for unrevealed pack opens (anti-refresh-skip)
+  // Check for unrevealed pack opens — safety net for the narrow window where
+  // the user refreshes after the server committed cards but before the client
+  // received the response (so sessionStorage was never written).
   useEffect(() => {
     if (!loaded) return
+    // If sessionStorage already has a pending open, the child component handles it
+    try { if (sessionStorage.getItem('cc_pending_pack_open')) return } catch {}
     vaultService.pendingReveal().then(data => {
-      if (!data?.pending) return
-      // Skip if a child component is already handling this opening (wrote to sessionStorage)
-      try { if (sessionStorage.getItem('cc_pending_pack_open')) return } catch {}
-      setPendingReveal(data.pending)
+      if (data?.pending) setPendingReveal(data.pending)
     }).catch(() => {})
   }, [loaded])
 
