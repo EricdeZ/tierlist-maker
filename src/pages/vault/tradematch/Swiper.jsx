@@ -2,8 +2,35 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Lock, Heart, X as XIcon, Sparkles } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
+import TradingCardHolo from '../../../components/TradingCardHolo'
+import { getHoloEffect } from '../../../data/vault/economy'
+import { GODS } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
+import { CONSUMABLES } from '../../../data/vault/buffs'
 import { getLeagueLogo } from '../../../utils/leagueImages'
 import { useVault } from '../VaultContext'
+
+const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
+const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
+const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
+const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
+const ROLE_SUFFIXES = ['-solo', '-jungle', '-mid', '-support', '-adc']
+
+function resolveDataMap(type, godId) {
+  const dataMap = DATA_MAPS[type]
+  if (!dataMap) return null
+  const key = godId?.replace(/^(item|consumable)-/, '') || godId
+  let data = dataMap.get(key)
+  if (!data && type === 'god') {
+    for (const suffix of ROLE_SUFFIXES) {
+      if (key.endsWith(suffix)) {
+        data = dataMap.get(key.slice(0, -suffix.length))
+        if (data) break
+      }
+    }
+  }
+  return data
+}
 
 const RARITY_COLORS = {
   common: '#9ca3af',
@@ -429,40 +456,61 @@ function SwipeCard({ card, containerWidth }) {
   const { getDefOverride } = useVault()
   const avatar = avatarUrl(card)
   const cd = card.card_data || {}
-  const isPlayer = card.card_type === 'player'
-  const holoLabel = card.holo_type ? HOLO_LABELS[card.holo_type] : null
+  const type = card.card_type || cd.cardType || 'god'
+  const isPlayer = type === 'player'
+  const holoType = card.holo_type || null
+  const holoEffect = holoType ? getHoloEffect(card.rarity) : null
+  const holoLabel = holoType ? HOLO_LABELS[holoType] : null
   const leagueLogo = cd.leagueSlug ? getLeagueLogo(cd.leagueSlug, cd.leagueImageUrl) : null
   const teamLogo = cd.teamLogoUrl || null
   const cardSize = containerWidth || 300
-  const override = getFeedCardOverride(getDefOverride, card, cd)
+
+  let cardEl
+  if (isPlayer) {
+    cardEl = (
+      <TradingCard
+        playerName={card.god_name}
+        teamName={cd.teamName || ''}
+        teamColor={cd.teamColor || '#6366f1'}
+        role={cd.role || 'ADC'}
+        avatarUrl={card.image_url || ''}
+        rarity={card.rarity}
+        leagueName={cd.leagueName || ''}
+        divisionName={cd.divisionName || ''}
+        bestGod={cd.bestGodName ? { name: cd.bestGodName } : null}
+        isConnected={cd.isConnected}
+        isFirstEdition={card.serial_number === 1}
+        signatureUrl={cd.signatureUrl}
+        size={cardSize}
+        holo={holoEffect ? { rarity: holoEffect, holoType: holoType || 'reverse' } : undefined}
+      />
+    )
+  } else {
+    const rawData = resolveDataMap(type, card.god_id)
+    const override = getDefOverride({ cardType: type, godId: card.god_id })
+    const resolvedData = rawData && override
+      ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
+      : rawData
+
+    const gameCardEl = (
+      <GameCard
+        type={type}
+        rarity={card.rarity}
+        data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
+        size={cardSize}
+      />
+    )
+    cardEl = holoEffect ? (
+      <TradingCardHolo rarity={holoEffect} holoType={holoType || 'reverse'} size={cardSize}>
+        {gameCardEl}
+      </TradingCardHolo>
+    ) : gameCardEl
+  }
 
   return (
     <div className="relative isolate swipe-card-content">
       {/* The actual card */}
-      {isPlayer ? (
-        <TradingCard
-          playerName={card.god_name}
-          teamName={cd.teamName || ''}
-          teamColor={cd.teamColor || '#6366f1'}
-          role={cd.role || 'ADC'}
-          avatarUrl={card.image_url || ''}
-          rarity={card.rarity}
-          leagueName={cd.leagueName || ''}
-          divisionName={cd.divisionName || ''}
-          bestGod={cd.bestGodName ? { name: cd.bestGodName } : null}
-          isConnected={cd.isConnected}
-          isFirstEdition={card.serial_number === 1}
-          signatureUrl={cd.signatureUrl}
-          size={cardSize}
-        />
-      ) : (
-        <GameCard
-          type={card.card_type || cd.cardType || 'god'}
-          rarity={card.rarity}
-          data={feedCardToGameData(card, cd, override)}
-          size={cardSize}
-        />
-      )}
+      {cardEl}
 
       {/* Info overlay — pinned to bottom */}
       <div className="absolute inset-x-0 bottom-0 z-20 rounded-b-lg overflow-hidden">
@@ -485,6 +533,13 @@ function SwipeCard({ card, containerWidth }) {
             {leagueLogo && <img src={leagueLogo} alt="" className="w-5 h-5 rounded-sm object-contain" />}
             {/* Team icon */}
             {teamLogo && <img src={teamLogo} alt="" className="w-5 h-5 rounded-sm object-contain" />}
+            {/* Rarity badge */}
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold cd-head uppercase" style={{
+              background: `${RARITY_COLORS[card.rarity] || '#9ca3af'}25`,
+              color: RARITY_COLORS[card.rarity] || '#9ca3af',
+            }}>
+              {card.rarity}
+            </span>
             {/* Holo badge */}
             {holoLabel && (
               <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold cd-head" style={{ background: '#ffd70025', color: '#ffd700' }}>
