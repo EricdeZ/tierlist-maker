@@ -90,12 +90,6 @@ export async function getSwipeFeed(sql, userId, offset = 0) {
     my_gods AS (
       SELECT DISTINCT god_id, rarity FROM cc_cards WHERE owner_id = ${userId}
     ),
-    active_match_partners AS (
-      SELECT CASE WHEN player_a_id = ${userId} THEN player_b_id ELSE player_a_id END AS partner_id
-      FROM cc_trades
-      WHERE mode = 'match' AND status = 'active'
-        AND (player_a_id = ${userId} OR player_b_id = ${userId})
-    ),
     boost_users AS (
       SELECT DISTINCT s.swiper_id AS user_id
       FROM cc_swipes s
@@ -113,12 +107,10 @@ export async function getSwipeFeed(sql, userId, offset = 0) {
     JOIN cc_cards c ON tp.card_id = c.id
     JOIN users u ON tp.user_id = u.id
     LEFT JOIN cc_swipes sw ON sw.swiper_id = ${userId} AND sw.card_id = tp.card_id
-    LEFT JOIN active_match_partners amp ON tp.user_id = amp.partner_id
     LEFT JOIN boost_users bu ON tp.user_id = bu.user_id
     LEFT JOIN my_gods mg ON c.god_id = mg.god_id AND c.rarity = mg.rarity
     WHERE tp.user_id != ${userId}
       AND sw.id IS NULL
-      AND amp.partner_id IS NULL
       AND c.rarity NOT IN ('common', 'uncommon')
     ORDER BY has_boost DESC, is_novel DESC, tp.created_at DESC, random()
     LIMIT ${limit} OFFSET ${offset}
