@@ -13,24 +13,36 @@ import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
 import './vault/compdeck.css'
 
-const CCPackShop = lazy(() => import('./vault/CCPackShop'))
-const CCCardCatalog = lazy(() => import('./vault/CCCardCatalog'))
-const CCPlayerCards = lazy(() => import('./vault/CCPlayerCards'))
-const CCSettings = lazy(() => import('./vault/CCSettings'))
-const CCCollection = lazy(() => import('./vault/CCCollection'))
-const CCConverter = lazy(() => import('./vault/CCConverter'))
-const CCChallenges = lazy(() => import('./vault/CCChallenges'))
-const CCMarketplace = lazy(() => import('./vault/CCMarketplace'))
-const CCGifts = lazy(() => import('./vault/CCGifts'))
-const CCTrading = lazy(() => import('./vault/CCTrading'))
-const CCDismantle = lazy(() => import('./vault/CCDismantle'))
-const CCStartingFive = lazy(() => import('./vault/CCStartingFive'))
-const CCBinder = lazy(() => import('./vault/CCBinder'))
-const CCBountyBoard = lazy(() => import('./vault/CCBountyBoard'))
-const CCSignatureRequests = lazy(() => import('./vault/CCSignatureRequests'))
-const CCSignatureApprovals = lazy(() => import('./vault/CCSignatureApprovals'))
-const CCUniqueCards = lazy(() => import('./vault/CCUniqueCards'))
-const CCTradematch = lazy(() => import('./vault/CCTradematch'))
+function lazyRetry(fn) {
+    return lazy(() => fn().catch(() => {
+        // Chunk likely stale after deploy — reload once
+        const key = 'chunk-reload'
+        if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1')
+            window.location.reload()
+        }
+        return fn()
+    }))
+}
+
+const CCPackShop = lazyRetry(() => import('./vault/CCPackShop'))
+const CCCardCatalog = lazyRetry(() => import('./vault/CCCardCatalog'))
+const CCPlayerCards = lazyRetry(() => import('./vault/CCPlayerCards'))
+const CCSettings = lazyRetry(() => import('./vault/CCSettings'))
+const CCCollection = lazyRetry(() => import('./vault/CCCollection'))
+const CCConverter = lazyRetry(() => import('./vault/CCConverter'))
+const CCChallenges = lazyRetry(() => import('./vault/CCChallenges'))
+const CCMarketplace = lazyRetry(() => import('./vault/CCMarketplace'))
+const CCGifts = lazyRetry(() => import('./vault/CCGifts'))
+const CCTrading = lazyRetry(() => import('./vault/CCTrading'))
+const CCDismantle = lazyRetry(() => import('./vault/CCDismantle'))
+const CCStartingFive = lazyRetry(() => import('./vault/CCStartingFive'))
+const CCBinder = lazyRetry(() => import('./vault/CCBinder'))
+const CCBountyBoard = lazyRetry(() => import('./vault/CCBountyBoard'))
+const CCSignatureRequests = lazyRetry(() => import('./vault/CCSignatureRequests'))
+const CCSignatureApprovals = lazyRetry(() => import('./vault/CCSignatureApprovals'))
+const CCUniqueCards = lazyRetry(() => import('./vault/CCUniqueCards'))
+const CCTradematch = lazyRetry(() => import('./vault/CCTradematch'))
 
 const TABS = [
     { key: 'packs', label: 'Packs', icon: Package },

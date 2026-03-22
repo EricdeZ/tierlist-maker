@@ -30,7 +30,8 @@ class ErrorBoundary extends Component {
         return msg.includes('Failed to fetch dynamically imported module') ||
             msg.includes('Loading chunk') ||
             msg.includes('Loading CSS chunk') ||
-            (error?.name === 'TypeError' && msg.includes('importing a module'))
+            (error?.name === 'TypeError' && msg.includes('importing a module')) ||
+            (error?.name === 'TypeError' && msg.includes("reading 'default'"))
     }
 
     render() {
