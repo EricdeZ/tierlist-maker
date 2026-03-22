@@ -19,18 +19,28 @@ class ErrorBoundary extends Component {
             const reloadCount = parseInt(sessionStorage.getItem('chunk-reload') || '0', 10)
             if (reloadCount < 1) {
                 sessionStorage.setItem('chunk-reload', String(reloadCount + 1))
-                // Cache-bust to ensure fresh index.html
-                const url = new URL(window.location.href)
-                url.searchParams.set('_cb', Date.now())
-                window.location.replace(url.toString())
+                this.cacheBustReload()
                 return
             }
+            // Even if first auto-reload failed, retry every 30s
+            this.retryTimer = setInterval(() => this.cacheBustReload(), 30000)
         }
     }
 
     componentDidMount() {
         // Reset reload counter on successful render
         sessionStorage.removeItem('chunk-reload')
+    }
+
+    componentWillUnmount() {
+        if (this.retryTimer) clearInterval(this.retryTimer)
+    }
+
+    cacheBustReload() {
+        sessionStorage.removeItem('chunk-reload')
+        const url = new URL(window.location.href)
+        url.searchParams.set('_cb', Date.now())
+        window.location.replace(url.toString())
     }
 
     isChunkError(error) {
@@ -62,12 +72,7 @@ class ErrorBoundary extends Component {
                         <div className="flex gap-3 justify-center">
                             {isChunk ? (
                                 <button
-                                    onClick={() => {
-                                        sessionStorage.removeItem('chunk-reload')
-                                        const url = new URL(window.location.href)
-                                        url.searchParams.set('_cb', Date.now())
-                                        window.location.replace(url.toString())
-                                    }}
+                                    onClick={() => this.cacheBustReload()}
                                     className="px-5 py-2.5 bg-(--color-accent) text-(--color-primary) rounded-lg font-semibold hover:opacity-90 transition-opacity"
                                 >
                                     Reload Page

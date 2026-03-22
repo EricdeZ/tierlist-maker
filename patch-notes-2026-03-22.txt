@@ -1,0 +1,24 @@
+Patch Notes — March 22, 2026
+=============================
+
+NEW FEATURES
+-------------
+
+TradeMatch — Tinder-Style Card Trading
+  - Brand new trading system: mark cards for trade, swipe through others'
+    trade piles, get matched on mutual interest, and negotiate async trades
+  - Match splash with romance-themed animations on mutual interest
+  - Async offer negotiation: propose cards, counter-offer, accept/decline
+  - Turn-based editing enforced — sender and receiver take turns,
+    with clear YOUR TURN / THEIR TURN / WAITING indicators
+  - Tutorial modal explaining all TradeMatch tabs and mechanics
+  - Pending trade banner on every vault tab with live count
+
+S5 Synergy Planner
+  - New synergy helper functions for pickers and planner
+  - Team filter bar + synergy preview in player picker
+  - God attachment picker sorted by synergy with divider
+  - Synergy Planner panel component wired into S5 view
+  - Track equipped-elsewhere status with orange badge
+  - Prefer unequipped god cards when suggesting synergy attachments
+  - Consistent card height (no layout shift when team synergy absent)
