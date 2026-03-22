@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Heart, Layers, Users, RefreshCw, HelpCircle, X } from 'lucide-react'
 import { useVault } from './VaultContext'
@@ -59,6 +59,7 @@ export default function CCTradematch() {
   const [showTutorial, setShowTutorial] = useState(false)
 
   // Reusable fetch callbacks
+  const initialLoadDone = useRef(false)
   const fetchPile = useCallback(async (silent) => {
     if (!silent) setLoading(true)
     else setRefreshing(true)
@@ -66,10 +67,16 @@ export default function CCTradematch() {
       const data = await tradematchService.tradePile()
       const ids = new Set((data.cards || []).map(c => c.card_id))
       setTradePile(ids)
-      setTradePileCount(data.count ?? ids.size)
+      const count = data.count ?? ids.size
+      setTradePileCount(count)
+      // Default to swiper if pile meets minimum and user hasn't picked a tab
+      if (!initialLoadDone.current && count >= 10 && !searchParams.get('sub')) {
+        setSubView('swiper')
+      }
+      initialLoadDone.current = true
     } catch (err) { console.error('Failed to load trade pile:', err) }
     finally { setLoading(false); setRefreshing(false) }
-  }, [])
+  }, [searchParams, setSubView])
 
   const fetchFeed = useCallback(async (silent) => {
     if (!silent) setLoading(true)
