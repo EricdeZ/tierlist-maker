@@ -76,7 +76,9 @@ export default function CCTradematch() {
     else setRefreshing(true)
     try {
       const data = await tradematchService.swipeFeed()
-      setFeedCards(data.cards || [])
+      const newCards = data.cards || []
+      // Only replace if we got cards — keep existing for looping if backend returns empty
+      if (newCards.length > 0) setFeedCards(newCards)
     } catch (err) { console.error('Failed to load swipe feed:', err) }
     finally { setLoading(false); setRefreshing(false) }
   }, [])

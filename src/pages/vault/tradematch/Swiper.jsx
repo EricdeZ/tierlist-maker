@@ -262,8 +262,8 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
-  // ── Empty state (truly no cards) ──
-  if (empty && !feedCards?.length) {
+  // ── Empty state (truly no cards available) ──
+  if (!feedCards?.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
         <div
