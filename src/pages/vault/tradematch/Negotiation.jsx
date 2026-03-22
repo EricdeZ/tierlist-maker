@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Send, Check, X, RotateCcw, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import emberIcon from '../../../assets/ember.png'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
@@ -136,12 +136,19 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
 
   useEffect(() => { fetchOffer() }, [fetchOffer])
 
+  // Poll every 10s for updates + refetch on tab focus
   useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchOffer()
+    }, 10000)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') fetchOffer()
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [fetchOffer])
 
   const trade = offer?.trade
@@ -255,13 +262,23 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
         <span className="text-sm font-semibold" style={{ color: 'var(--cd-text)' }}>
           Trading with <span style={{ color: 'var(--cd-cyan)' }}>@{partnerName}</span>
         </span>
-        <span className={`text-[10px] font-bold cd-head tracking-wider px-2 py-0.5 rounded-full ${
-          isPendingFromMe ? 'bg-amber-500/15 text-amber-400'
-          : isPendingFromThem ? 'bg-emerald-500/15 text-emerald-400'
-          : 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)]'
-        }`}>
-          {isPendingFromMe ? 'WAITING...' : isPendingFromThem ? 'THEIR OFFER' : 'NEGOTIATING'}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchOffer}
+            disabled={actionLoading}
+            className="p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} style={{ color: 'var(--cd-text-dim)' }} />
+          </button>
+          <span className={`text-[10px] font-bold cd-head tracking-wider px-2 py-0.5 rounded-full ${
+            isPendingFromMe ? 'bg-amber-500/15 text-amber-400'
+            : isPendingFromThem ? 'bg-emerald-500/15 text-emerald-400'
+            : 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)]'
+          }`}>
+            {isPendingFromMe ? 'WAITING...' : isPendingFromThem ? 'THEIR OFFER' : 'NEGOTIATING'}
+          </span>
+        </div>
       </div>
 
       {error && (

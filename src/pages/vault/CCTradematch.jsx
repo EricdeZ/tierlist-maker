@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Heart, Layers, Users } from 'lucide-react'
+import { Heart, Layers, Users, RefreshCw } from 'lucide-react'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
 
@@ -12,9 +12,9 @@ import MatchesAndLikes from './tradematch/MatchesAndLikes'
 import Negotiation from './tradematch/Negotiation'
 
 const SUB_VIEWS = [
-  { key: 'pile', label: 'Trade Pile', icon: Layers },
-  { key: 'swiper', label: 'Swipe', icon: Heart },
-  { key: 'matches', label: 'Matches', icon: Users },
+  { key: 'pile', label: 'Trade Pile', icon: Layers, desc: 'Pick cards you\'re willing to trade. Need at least 20 to start swiping.' },
+  { key: 'swiper', label: 'Swipe', icon: Heart, desc: 'Swipe right on cards you want. If they like yours too, it\'s a match!' },
+  { key: 'matches', label: 'Matches', icon: Users, desc: 'Negotiate trades with your matches. Send offers, counter, or accept.' },
 ]
 
 export default function CCTradematch() {
@@ -54,75 +54,77 @@ export default function CCTradematch() {
   const [matches, setMatches] = useState([])
   const [likes, setLikes] = useState([])
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeTradeId, setActiveTradeId] = useState(null)
 
-  // Load trade pile on mount
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    tradematchService.tradePile().then(data => {
-      if (cancelled) return
+  // Reusable fetch callbacks
+  const fetchPile = useCallback(async (silent) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const data = await tradematchService.tradePile()
       const ids = new Set((data.cards || []).map(c => c.card_id))
       setTradePile(ids)
-      
       setTradePileCount(data.count ?? ids.size)
-      setLoading(false)
-    }).catch(err => {
-      if (!cancelled) { console.error('Failed to load trade pile:', err); setLoading(false) }
-    })
-    return () => { cancelled = true }
+    } catch (err) { console.error('Failed to load trade pile:', err) }
+    finally { setLoading(false); setRefreshing(false) }
   }, [])
 
-  // Load feed when switching to swiper
-  useEffect(() => {
-    if (subView !== 'swiper') return
-    let cancelled = false
-    setLoading(true)
-    tradematchService.swipeFeed().then(data => {
-      if (cancelled) return
+  const fetchFeed = useCallback(async (silent) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const data = await tradematchService.swipeFeed()
       setFeedCards(data.cards || [])
-      setLoading(false)
-    }).catch(err => {
-      if (!cancelled) { console.error('Failed to load swipe feed:', err); setLoading(false) }
-    })
-    return () => { cancelled = true }
-  }, [subView])
+    } catch (err) { console.error('Failed to load swipe feed:', err) }
+    finally { setLoading(false); setRefreshing(false) }
+  }, [])
 
-  // Load matches + likes when switching to matches view
-  useEffect(() => {
-    if (subView !== 'matches') return
-    let cancelled = false
-    setLoading(true)
-    Promise.all([
-      tradematchService.matches(),
-      tradematchService.likes(),
-    ]).then(([matchData, likeData]) => {
-      if (cancelled) return
+  const fetchMatchesAndLikes = useCallback(async (silent) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const [matchData, likeData] = await Promise.all([
+        tradematchService.matches(),
+        tradematchService.likes(),
+      ])
       setMatches(matchData.matches || [])
       setLikes(likeData.likes || [])
-      setLoading(false)
-    }).catch(err => {
-      if (!cancelled) { console.error('Failed to load matches:', err); setLoading(false) }
-    })
-    return () => { cancelled = true }
-  }, [subView])
+    } catch (err) { console.error('Failed to load matches:', err) }
+    finally { setLoading(false); setRefreshing(false) }
+  }, [])
 
-  // Refetch matches on tab visibility change
+  const handleRefresh = useCallback(() => {
+    if (subView === 'pile') fetchPile(true)
+    else if (subView === 'swiper') fetchFeed(true)
+    else if (subView === 'matches') fetchMatchesAndLikes(true)
+  }, [subView, fetchPile, fetchFeed, fetchMatchesAndLikes])
+
+  // Load trade pile on mount
+  useEffect(() => { fetchPile() }, [fetchPile])
+
+  // Refetch on every tab switch
   useEffect(() => {
+    if (subView === 'swiper') fetchFeed()
+    else if (subView === 'matches') fetchMatchesAndLikes()
+    else if (subView === 'pile') fetchPile()
+  }, [subView]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll matches every 15s + refetch on tab focus
+  useEffect(() => {
+    if (subView !== 'matches') return
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchMatchesAndLikes(true)
+    }, 15000)
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && subView === 'matches') {
-        Promise.all([
-          tradematchService.matches(),
-          tradematchService.likes(),
-        ]).then(([matchData, likeData]) => {
-          setMatches(matchData.matches || [])
-          setLikes(likeData.likes || [])
-        }).catch(() => {})
-      }
+      if (document.visibilityState === 'visible') fetchMatchesAndLikes(true)
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [subView])
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [subView, fetchMatchesAndLikes])
 
   const handleToggleTradePile = useCallback(async (cardId) => {
     const inPile = tradePile.has(cardId)
@@ -263,6 +265,21 @@ export default function CCTradematch() {
             </button>
           )
         })}
+      </div>
+
+      {/* Tab description + refresh */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <p className="text-xs" style={{ color: 'var(--cd-text-dim)' }}>
+          {SUB_VIEWS.find(sv => sv.key === subView)?.desc}
+        </p>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="p-1.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer flex-shrink-0 ml-2"
+          title="Refresh"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} style={{ color: 'var(--cd-text-dim)' }} />
+        </button>
       </div>
 
       {/* Match splash overlay */}

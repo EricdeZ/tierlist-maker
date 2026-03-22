@@ -10,6 +10,17 @@ const MIN_TRADE_PILE = 20
 const PAGE_SIZE = 40
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const TYPE_ORDER = ['player', 'god', 'item', 'consumable', 'collection']
+
+function tiebreak(a, b) {
+  const ta = TYPE_ORDER.indexOf(getCardType(a))
+  const tb = TYPE_ORDER.indexOf(getCardType(b))
+  if (ta !== tb) return (ta === -1 ? 99 : ta) - (tb === -1 ? 99 : tb)
+  const ra = RARITY_ORDER.indexOf(a.rarity)
+  const rb = RARITY_ORDER.indexOf(b.rarity)
+  if (ra !== rb) return rb - ra // higher rarity first
+  return (a.godName || '').localeCompare(b.godName || '')
+}
 const HOLO_TYPE_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
 const SORT_OPTIONS = [
   { value: 'pile-first', label: 'Trade Pile First' },
@@ -94,22 +105,30 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
         if (aLocked !== bLocked) return aLocked - bLocked
       }
 
+      let primary = 0
       switch (sortBy) {
         case 'name-asc':
-          return (a.godName || '').localeCompare(b.godName || '')
+          primary = (a.godName || '').localeCompare(b.godName || '')
+          break
         case 'name-desc':
-          return (b.godName || '').localeCompare(a.godName || '')
+          primary = (b.godName || '').localeCompare(a.godName || '')
+          break
         case 'rarity-asc':
-          return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+          primary = RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
+          break
         case 'rarity-desc':
-          return RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)
+          primary = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)
+          break
         case 'newest':
-          return (b.id || 0) - (a.id || 0)
+          primary = (b.id || 0) - (a.id || 0)
+          break
         case 'power':
-          return (b.power || 0) - (a.power || 0)
+          primary = (b.power || 0) - (a.power || 0)
+          break
         default:
-          return (a.godName || '').localeCompare(b.godName || '')
+          primary = (a.godName || '').localeCompare(b.godName || '')
       }
+      return primary !== 0 ? primary : tiebreak(a, b)
     })
   }, [filtered, lockedCardIds, sortBy])
 

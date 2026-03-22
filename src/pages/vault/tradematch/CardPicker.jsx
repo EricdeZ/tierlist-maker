@@ -15,6 +15,26 @@ const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
 const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
 
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
+const TYPE_ORDER = ['player', 'god', 'item', 'consumable']
+
+function apiCardSort(a, b) {
+  const cdA = a.card_data ? (typeof a.card_data === 'string' ? JSON.parse(a.card_data) : a.card_data) : {}
+  const cdB = b.card_data ? (typeof b.card_data === 'string' ? JSON.parse(b.card_data) : b.card_data) : {}
+  const typeA = a.card_type || cdA.cardType || 'god'
+  const typeB = b.card_type || cdB.cardType || 'god'
+  // Sort by type first
+  const ta = TYPE_ORDER.indexOf(typeA)
+  const tb = TYPE_ORDER.indexOf(typeB)
+  if (ta !== tb) return (ta === -1 ? 99 : ta) - (tb === -1 ? 99 : tb)
+  // Then rarity (higher first)
+  const ra = RARITY_ORDER.indexOf(a.rarity)
+  const rb = RARITY_ORDER.indexOf(b.rarity)
+  if (ra !== rb) return rb - ra
+  // Then name
+  return (a.god_name || '').localeCompare(b.god_name || '')
+}
+
 const CARD_SIZE = 80
 
 function PickerCard({ card, onSelect, disabled }) {
@@ -113,7 +133,7 @@ export default function CardPicker({ side, partnerId, existingCardIds, onAdd, on
         (c.rarity || '').toLowerCase().includes(q)
       )
     }
-    return list
+    return list.sort(apiCardSort)
   }, [cards, existingCardIds, search])
 
   const handleSelect = useCallback((card) => {
