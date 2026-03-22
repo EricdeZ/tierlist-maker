@@ -41,12 +41,12 @@ export function getPeriod(cadence, now = new Date()) {
 
 export { CADENCE_SLOTS, CADENCES, GRACE_MS }
 
-// Compute period-start baselines for transaction-based stats.
-// These use timestamp-filtered queries so the baseline reflects the stat value
-// at the START of the period, regardless of when rollAssignments is called.
-// Counter-based stats (packs_opened, cards_dismantled) have no per-event timestamps
-// and fall back to currentStats — off by at most 1 action, acceptable since their
-// targets are always > 1.
+// Compute period-start baselines for all trackable stats.
+// Transaction-based stats use timestamp-filtered queries so the baseline reflects
+// the stat value at the START of the period, regardless of when rollAssignments is called.
+// packs_opened uses cc_pack_opens (has timestamps) for accurate period baselines.
+// Counter-only stats (cards_dismantled, income_collections) read current cc_stats values
+// as a fallback — off by at most 1 action, but never 0 from missing currentStats.
 async function getBaselineStats(sql, userId, periodStart) {
     const [row] = await sql`
       WITH
@@ -74,9 +74,21 @@ async function getBaselineStats(sql, userId, periodStart) {
         gifts_base AS (
           SELECT COUNT(*)::int AS gifts_sent FROM cc_gifts
           WHERE sender_id = ${userId} AND created_at < ${periodStart}
+        ),
+        packs_base AS (
+          SELECT COUNT(*)::int AS packs_opened FROM cc_pack_opens
+          WHERE user_id = ${userId} AND created_at < ${periodStart}
+        ),
+        counter_base AS (
+          SELECT COALESCE(cards_dismantled, 0)::int AS cards_dismantled,
+                 COALESCE(legendary_cards_dismantled, 0)::int AS legendary_cards_dismantled,
+                 COALESCE(income_collections, 0)::int AS income_collections
+          FROM cc_stats WHERE user_id = ${userId}
         )
-      SELECT e.*, t.trades_completed, t.trades_count, m.marketplace_sold, m.marketplace_sold_count, g.gifts_sent
-      FROM ember_base e, trades_base t, market_base m, gifts_base g
+      SELECT e.*, t.trades_completed, t.trades_count, m.marketplace_sold, m.marketplace_sold_count,
+             g.gifts_sent, p.packs_opened, c.cards_dismantled, c.legendary_cards_dismantled, c.income_collections
+      FROM ember_base e, trades_base t, market_base m, gifts_base g, packs_base p
+      LEFT JOIN counter_base c ON true
     `
 
     return {
@@ -88,6 +100,10 @@ async function getBaselineStats(sql, userId, periodStart) {
         marketplace_sold_count: row?.marketplace_sold_count ?? 0,
         gifts_sent: row?.gifts_sent ?? 0,
         bounty_cores_earned: row?.bounty_cores_earned ?? 0,
+        packs_opened: row?.packs_opened ?? 0,
+        cards_dismantled: row?.cards_dismantled ?? 0,
+        legendary_cards_dismantled: row?.legendary_cards_dismantled ?? 0,
+        income_collected: row?.income_collections ?? 0,
     }
 }
 
