@@ -14,6 +14,23 @@ const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
 const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
 const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
+const ROLE_SUFFIXES = ['-solo', '-jungle', '-mid', '-support', '-adc']
+
+function resolveDataMap(type, godId) {
+  const dataMap = DATA_MAPS[type]
+  if (!dataMap) return null
+  const key = godId?.replace(/^(item|consumable)-/, '') || godId
+  let data = dataMap.get(key)
+  if (!data && type === 'god') {
+    for (const suffix of ROLE_SUFFIXES) {
+      if (key.endsWith(suffix)) {
+        data = dataMap.get(key.slice(0, -suffix.length))
+        if (data) break
+      }
+    }
+  }
+  return data
+}
 
 function timeRemaining(createdAt) {
   const ms = 24 * 60 * 60 * 1000 - (Date.now() - new Date(createdAt).getTime())
@@ -84,9 +101,7 @@ function CardThumb({ card }) {
     )
   }
 
-  const dataMap = DATA_MAPS[type]
-  const dataKey = card.god_id?.replace(/^(item|consumable)-/, '') || card.god_id
-  const rawData = dataMap?.get(dataKey)
+  const rawData = resolveDataMap(type, card.god_id)
   const override = getDefOverride({ cardType: type, godId: card.god_id })
   const resolvedData = rawData && override
     ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }

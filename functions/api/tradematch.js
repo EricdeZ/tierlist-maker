@@ -44,6 +44,7 @@ const handler = async (event) => {
         case 'likes': return await handleLikes(sql, user)
         case 'matches': return await handleMatches(sql, user)
         case 'offer-detail': return await handleOfferDetail(sql, user, event.queryStringParameters)
+        case 'pending-count': return await handlePendingCount(sql, user)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
       }
     }
@@ -165,6 +166,24 @@ async function handleLikesTrade(sql, user, body) {
 async function handleMatches(sql, user) {
   const matches = await getMatches(sql, user.id)
   return { statusCode: 200, headers, body: JSON.stringify({ matches }) }
+}
+
+async function handlePendingCount(sql, user) {
+  const [row] = await sql`
+    SELECT COUNT(*) FILTER (WHERE offer_status = 'pending' AND offer_by != ${user.id})::int AS pending,
+           COUNT(*) FILTER (WHERE offer_status = 'negotiating' AND offer_by IS NULL)::int AS new_matches,
+           COUNT(*)::int AS total
+    FROM cc_trades
+    WHERE (player_a_id = ${user.id} OR player_b_id = ${user.id})
+      AND mode = 'match' AND status = 'active'
+  `
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      total: row?.total || 0,
+      pending: (row?.pending || 0) + (row?.new_matches || 0),
+    }),
+  }
 }
 
 async function handleOfferDetail(sql, user, params) {

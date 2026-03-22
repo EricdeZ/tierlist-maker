@@ -16,6 +16,23 @@ const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
 const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
 const CONSUMABLE_MAP = new Map(CONSUMABLES.map(c => [c.id, c]))
 const DATA_MAPS = { god: GOD_MAP, item: ITEM_MAP, consumable: CONSUMABLE_MAP }
+const ROLE_SUFFIXES = ['-solo', '-jungle', '-mid', '-support', '-adc']
+
+function resolveDataMap(type, godId) {
+  const dataMap = DATA_MAPS[type]
+  if (!dataMap) return null
+  const key = godId?.replace(/^(item|consumable)-/, '') || godId
+  let data = dataMap.get(key)
+  if (!data && type === 'god') {
+    for (const suffix of ROLE_SUFFIXES) {
+      if (key.endsWith(suffix)) {
+        data = dataMap.get(key.slice(0, -suffix.length))
+        if (data) break
+      }
+    }
+  }
+  return data
+}
 
 const CARD_SIZE = 90
 
@@ -49,9 +66,7 @@ function OfferCard({ card, onRemove, showRemove }) {
       />
     )
   } else {
-    const dataMap = DATA_MAPS[type]
-    const dataKey = card.god_id?.replace(/^(item|consumable)-/, '') || card.god_id
-    const rawData = dataMap?.get(dataKey)
+    const rawData = resolveDataMap(type, card.god_id)
     const override = getDefOverride({ cardType: type, godId: card.god_id })
     const resolvedData = rawData && override
       ? { ...rawData, metadata: override, imageUrl: override.custom_image_url || rawData.imageUrl }
@@ -266,10 +281,13 @@ export default function Negotiation({ tradeId, userId, onBack, onComplete }) {
           <button
             onClick={fetchOffer}
             disabled={actionLoading}
-            className="p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
-            title="Refresh"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer active:scale-95 ${
+              actionLoading ? 'opacity-50' : 'hover:bg-[var(--cd-cyan)]/10'
+            }`}
+            style={{ color: 'var(--cd-cyan)', border: '1px solid rgba(0,229,255,0.2)' }}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} style={{ color: 'var(--cd-text-dim)' }} />
+            <RefreshCw className={`w-3 h-3 ${actionLoading ? 'animate-spin' : ''}`} />
+            Update Status
           </button>
           <span className={`text-[10px] font-bold cd-head tracking-wider px-2 py-0.5 rounded-full ${
             isPendingFromMe ? 'bg-amber-500/15 text-amber-400'

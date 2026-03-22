@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
+import { tradematchService } from '../services/database'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem, Heart } from 'lucide-react'
@@ -159,7 +160,7 @@ function VaultInner() {
     const { user } = useAuth()
     const { vaultClaimableCount, refreshBalance } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, matchTradePendingCount, setMatchTradePendingCount, setMatchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
@@ -171,7 +172,15 @@ function VaultInner() {
         }, 60_000)
         return () => clearInterval(id)
     }, [refreshBalance])
+    // Refetch match trade pending count on every tab switch
     const activeTab = searchParams.get('tab') || 'packs'
+    useEffect(() => {
+        if (!user || activeTab === 'tradematch') return
+        tradematchService.pendingCount().then(data => {
+            setMatchTradeCount(data.total || 0)
+            setMatchTradePendingCount(data.pending || 0)
+        }).catch(() => {})
+    }, [activeTab, user, setMatchTradeCount, setMatchTradePendingCount])
     const activeTabLabel = TABS.find(t => t.key === activeTab)?.label
     const pageTitle = activeTabLabel && activeTab !== 'packs'
         ? `${activeTabLabel} - The Vault`

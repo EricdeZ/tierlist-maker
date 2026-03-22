@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Heart, Lock } from 'lucide-react'
+import { Heart, Lock, Copy } from 'lucide-react'
 import { useVault } from '../VaultContext'
 import GameCard from '../components/GameCard'
 import VaultCard from '../components/VaultCard'
@@ -72,14 +72,15 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterHolo, setFilterHolo] = useState('all')
+  const [filterDuplicates, setFilterDuplicates] = useState(false)
   const [sortBy, setSortBy] = useState('pile-first')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const sentinelRef = useRef(null)
 
   const filtered = useMemo(() => {
     if (!collection) return []
-    return collection.filter(card => {
-      if (card.rarity === 'unique') return false
+    let list = collection.filter(card => {
+      if (card.rarity === 'unique' || card.rarity === 'common' || card.rarity === 'uncommon') return false
       // Hide locked cards unless they're already in the trade pile
       if (lockedCardIds.has(card.id) && !tradePile.has(card.id)) return false
       if (filterRarity !== 'all' && card.rarity !== filterRarity) return false
@@ -87,11 +88,26 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
       if (filterHolo !== 'all' && card.holoType !== filterHolo) return false
       return true
     })
-  }, [collection, lockedCardIds, tradePile, filterRarity, filterType, filterHolo])
+    if (filterDuplicates) {
+      const groups = new Map()
+      for (const c of list) {
+        const key = `${c.godId}:${c.rarity}:${c.holoType || ''}`
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(c)
+      }
+      list = []
+      for (const group of groups.values()) {
+        if (group.length < 2) continue
+        group.sort((a, b) => (b.level || 1) - (a.level || 1) || (b.power || 0) - (a.power || 0) || a.id - b.id)
+        list.push(...group.slice(1))
+      }
+    }
+    return list
+  }, [collection, lockedCardIds, tradePile, filterRarity, filterType, filterHolo, filterDuplicates])
 
   // Snapshot tradePile at sort time so toggling doesn't re-sort
   const sortPileRef = useRef(tradePile)
-  useEffect(() => { sortPileRef.current = tradePile }, [sortBy, filterRarity, filterType, filterHolo]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { sortPileRef.current = tradePile }, [sortBy, filterRarity, filterType, filterHolo, filterDuplicates]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(() => {
     const pileSnap = sortPileRef.current
@@ -136,7 +152,7 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
   const hasMore = visibleCount < sorted.length
 
   // Reset visible count when filters/sort change
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterRarity, filterType, filterHolo, sortBy])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filterRarity, filterType, filterHolo, filterDuplicates, sortBy])
 
   // Intersection observer for infinite scroll
   useEffect(() => {
@@ -191,7 +207,7 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
           className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
         >
           <option value="all">All Rarities</option>
-          {RARITY_ORDER.map(r => (
+          {RARITY_ORDER.filter(r => r !== 'common' && r !== 'uncommon').map(r => (
             <option key={r} value={r}>{r[0].toUpperCase() + r.slice(1)}</option>
           ))}
         </select>
@@ -218,6 +234,18 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
+
+        <button
+          onClick={() => setFilterDuplicates(d => !d)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cd-head border transition-all cursor-pointer ${
+            filterDuplicates
+              ? 'border-[var(--cd-cyan)]/40 bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)]'
+              : 'border-[var(--cd-border)] text-[var(--cd-text-mid)] hover:bg-white/[0.03]'
+          }`}
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Duplicates
+        </button>
 
         <select
           value={sortBy}

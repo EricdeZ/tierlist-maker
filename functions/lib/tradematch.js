@@ -29,10 +29,11 @@ export async function getTradePile(sql, userId) {
 }
 
 export async function addToTradePile(sql, userId, cardId) {
-  // Verify ownership
-  const [card] = await sql`SELECT id, owner_id FROM cc_cards WHERE id = ${cardId}`
+  // Verify ownership + rarity
+  const [card] = await sql`SELECT id, owner_id, rarity FROM cc_cards WHERE id = ${cardId}`
   if (!card) throw new Error('Card not found')
   if (card.owner_id !== userId) throw new Error('You do not own this card')
+  if (card.rarity === 'common' || card.rarity === 'uncommon') throw new Error('Only rare or higher cards can be traded')
 
   // Check not in Starting 5
   const [inLineup] = await sql`
@@ -118,6 +119,7 @@ export async function getSwipeFeed(sql, userId, offset = 0) {
     WHERE tp.user_id != ${userId}
       AND sw.id IS NULL
       AND amp.partner_id IS NULL
+      AND c.rarity NOT IN ('common', 'uncommon')
     ORDER BY has_boost DESC, is_novel DESC, tp.created_at DESC, random()
     LIMIT ${limit} OFFSET ${offset}
   `
@@ -358,6 +360,9 @@ export async function offerAddCard(sql, userId, tradeId, cardId) {
   `
   if (!trade) throw new Error('Trade not found')
 
+  if (trade.offer_status === 'pending' && trade.offer_by === userId) {
+    throw new Error('Waiting for the other player to respond')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
     await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
   }
@@ -398,6 +403,9 @@ export async function offerRemoveCard(sql, userId, tradeId, cardId) {
   `
   if (!trade) throw new Error('Trade not found')
 
+  if (trade.offer_status === 'pending' && trade.offer_by === userId) {
+    throw new Error('Waiting for the other player to respond')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
     await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
   }
@@ -415,6 +423,9 @@ export async function offerSetCore(sql, userId, tradeId, amount) {
   `
   if (!trade) throw new Error('Trade not found')
 
+  if (trade.offer_status === 'pending' && trade.offer_by === userId) {
+    throw new Error('Waiting for the other player to respond')
+  }
   if (trade.offer_status === 'pending' && trade.offer_by !== userId) {
     await sql`UPDATE cc_trades SET offer_status = 'negotiating', updated_at = NOW() WHERE id = ${tradeId}`
   }
@@ -434,6 +445,10 @@ export async function offerSend(sql, userId, tradeId) {
       AND (player_a_id = ${userId} OR player_b_id = ${userId})
   `
   if (!trade) throw new Error('Trade not found')
+
+  if (trade.offer_status === 'pending' && trade.offer_by === userId) {
+    throw new Error('Already sent — waiting for the other player to respond')
+  }
 
   const isA = trade.player_a_id === userId
   const myCore = isA ? trade.player_a_core : trade.player_b_core

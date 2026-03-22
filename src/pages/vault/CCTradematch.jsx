@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Heart, Layers, Users, RefreshCw } from 'lucide-react'
+import { Heart, Layers, Users, RefreshCw, HelpCircle, X } from 'lucide-react'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
 
@@ -56,6 +56,7 @@ export default function CCTradematch() {
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTradeId, setActiveTradeId] = useState(null)
+  const [showTutorial, setShowTutorial] = useState(false)
 
   // Reusable fetch callbacks
   const fetchPile = useCallback(async (silent) => {
@@ -271,19 +272,32 @@ export default function CCTradematch() {
         })}
       </div>
 
-      {/* Tab description + refresh */}
+      {/* Tab description + actions */}
       <div className="flex items-center justify-between mb-4 px-1">
         <p className="text-xs" style={{ color: 'var(--cd-text-dim)' }}>
           {SUB_VIEWS.find(sv => sv.key === subView)?.desc}
         </p>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer flex-shrink-0 ml-2"
-          title="Refresh"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} style={{ color: 'var(--cd-text-dim)' }} />
-        </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer active:scale-95 hover:bg-white/5"
+            style={{ color: 'var(--cd-text-dim)' }}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden min-[480px]:inline">How It Works</span>
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold cd-head tracking-wider transition-all cursor-pointer active:scale-95 ${
+              refreshing ? 'opacity-50' : 'hover:bg-[var(--cd-cyan)]/10'
+            }`}
+            style={{ color: 'var(--cd-cyan)', border: '1px solid rgba(0,229,255,0.2)' }}
+          >
+            <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+            Update Status
+          </button>
+        </div>
       </div>
 
       {/* Match splash overlay */}
@@ -331,6 +345,89 @@ export default function CCTradematch() {
           userId={user?.id}
         />
       )}
+
+      {showTutorial && <TradeMatchTutorial onClose={() => setShowTutorial(false)} />}
+    </div>
+  )
+}
+
+function TradeMatchTutorial({ onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: 'cd-fade-in 0.2s ease-out' }}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[100dvh] sm:max-h-[80vh] bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl rounded-none overflow-hidden sm:mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+          <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">How TradeMatch Works</h3>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 text-sm text-white/60" style={{ maxHeight: 'calc(80vh - 70px)' }}>
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">WHAT IS TRADEMATCH?</h4>
+            <p>TradeMatch is a Tinder-style card trading system. Instead of searching for specific users to trade with, you swipe through cards other players have marked for trade. When two players like each other's cards, it's a match — and you can negotiate a trade.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-[var(--cd-magenta)] cd-head tracking-wider text-xs mb-1 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> TRADE PILE
+            </h4>
+            <p>Start by building your trade pile — select cards from your collection that you're willing to trade. Only <span className="text-white/80 font-semibold">rare or higher</span> cards are eligible. You need at least <span className="text-white/80 font-semibold">20 cards</span> in your pile before you can start swiping. Locked cards (Starting 5, binder, marketplace listings) can't be added. Use the <span className="text-[var(--cd-cyan)]">Duplicates</span> filter to quickly find spare cards.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-[var(--cd-magenta)] cd-head tracking-wider text-xs mb-1 flex items-center gap-1.5">
+              <Heart className="w-3.5 h-3.5" /> SWIPE
+            </h4>
+            <p>Browse cards from other players' trade piles. <span className="text-emerald-400 font-semibold">Swipe right</span> on cards you want, <span className="text-red-400 font-semibold">swipe left</span> to pass. If the other player has also swiped right on one of your cards, it's a match! Cards from players who already liked your cards appear first in the feed.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-[var(--cd-magenta)] cd-head tracking-wider text-xs mb-1 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" /> MATCHES
+            </h4>
+            <p>When you match, both cards are pre-loaded into a trade offer. Click on a match to open the negotiation screen where you can:</p>
+            <ul className="list-disc list-inside mt-1.5 space-y-1 text-white/50">
+              <li>Add or remove cards from either side</li>
+              <li>Add Cores to sweeten the deal</li>
+              <li>Send your offer and wait for a response</li>
+              <li>Accept, counter, or cancel incoming offers</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">NEGOTIATION FLOW</h4>
+            <p>Trades are <span className="text-white/80 font-semibold">asynchronous</span> — you don't need to be online at the same time. When you send an offer, the other player sees it next time they check. They can accept it instantly, or counter with changes. The offer goes back and forth until both sides agree or someone cancels.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CARD AVAILABILITY</h4>
+            <p>Cards are <span className="text-white/80 font-semibold">not locked</span> during negotiation — you can still trade or sell them elsewhere. If a card becomes unavailable (traded, sold, dismantled), it shows as <span className="text-red-400 font-semibold">unavailable</span> in the offer and must be removed before sending.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">LIKES</h4>
+            <p>In the Matches tab, you can also see who has swiped right on your cards — even before a mutual match. You can view their trade pile and start a trade directly from a like.</p>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">TIPS</h4>
+            <ul className="list-disc list-inside space-y-1 text-white/50">
+              <li>Add plenty of cards to your trade pile to get more matches</li>
+              <li>Use <span className="text-[var(--cd-cyan)]">Update Status</span> to check for new offers</li>
+              <li>You can have up to <span className="text-white/80 font-semibold">15</span> active negotiations at once</li>
+              <li>Inactive trades expire after 24 hours of no activity</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

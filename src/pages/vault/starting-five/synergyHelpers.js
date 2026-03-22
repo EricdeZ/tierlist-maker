@@ -48,14 +48,10 @@ export function isGodSynergy(godName, bestGodName) {
 }
 
 /**
- * Check if an attachment's holo type is compatible with a player's holo type.
- * Holo attachments boost flat income (only useful on holo/full players).
- * Reverse attachments boost mult (only useful on reverse/full players).
- * Full attachments provide both (useful on any player).
+ * Check if an attachment's holo type exactly matches a player's holo type.
+ * Holo for holo, reverse for reverse, full for full — no cross-compatibility.
  */
 export function isHoloCompatible(playerHoloType, attachHoloType) {
-  if (attachHoloType === 'full') return true
-  if (playerHoloType === 'full') return true
   return playerHoloType === attachHoloType
 }
 

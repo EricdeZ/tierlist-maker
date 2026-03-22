@@ -1299,6 +1299,9 @@ export const tradematchService = {
     async matches() {
         return apiCall('tradematch', { action: 'matches' })
     },
+    async pendingCount() {
+        return apiCall('tradematch', { action: 'pending-count' })
+    },
     async offerDetail(tradeId) {
         return apiCall('tradematch', { action: 'offer-detail', tradeId: String(tradeId) })
     },
