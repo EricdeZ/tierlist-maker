@@ -30,7 +30,6 @@ export default function CCTradematch() {
         if (slot.itemCard?.id) ids.add(slot.itemCard.id)
       }
     }
-    if (startingFive?.consumableCard?.id) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }

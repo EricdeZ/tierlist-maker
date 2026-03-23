@@ -173,7 +173,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable, getDefOverride } = useVault()
+  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable: applyS5Consumable, getDefOverride } = useVault()
   const [activeLineup, setActiveLineup] = useState('current')
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
@@ -384,14 +384,14 @@ export default function CCStartingFive() {
     if (slottingConsumable) return
     setSlottingConsumable(true)
     try {
-      await slotS5Consumable(cardId)
+      await applyS5Consumable(cardId)
       setShowConsumablePicker(false)
     } catch (err) {
       showError(err.message || 'Failed to slot consumable')
     } finally {
       setSlottingConsumable(false)
     }
-  }, [slottingConsumable, slotS5Consumable, showError])
+  }, [slottingConsumable, applyS5Consumable, showError])
 
   const passionCap = startingFive?.passionCap || 0
   const coresCap = startingFive?.coresCap || 0

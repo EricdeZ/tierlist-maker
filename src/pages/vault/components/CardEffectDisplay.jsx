@@ -1,8 +1,7 @@
 import { S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
   S5_FLAT_SCALE, S5_MULT_SCALE,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO,
-  CONSUMABLE_SLOT_SCALING, CONSUMABLE_SPREADS } from '../../../data/vault/economy'
-import passionCoin from '../../../assets/passion/passion.png'
+  CONSUMABLE_EFFECTS } from '../../../data/vault/economy'
 import emberIcon from '../../../assets/ember.png'
 
 export function getCardEffect(card) {
@@ -50,12 +49,18 @@ export function getCardEffect(card) {
 
   if (type === 'consumable') {
     const consumableId = card.cardData?.consumableId
-    const total = CONSUMABLE_SLOT_SCALING[r] || 0
-    const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 }
-    const passionPct = Math.round(total * spread.passion * 100)
-    const coresPct = Math.round(total * spread.cores * 100)
-    if (!passionPct && !coresPct) return null
-    return { effectType: 'consumable', passionPct, coresPct }
+    const def = CONSUMABLE_EFFECTS[consumableId]
+    if (!def) return null
+    const effect = def.effect
+    if (effect === 'rate-cap-boost') {
+      const rateVal = def.rateValues?.[r] || 0
+      const capVal = def.capValues?.[r] || 0
+      if (!rateVal && !capVal) return null
+      return { effectType: 'consumable', consumableEffect: effect, rateVal, capVal }
+    }
+    const value = def.values?.[r] || 0
+    if (!value) return null
+    return { effectType: 'consumable', consumableEffect: effect, value }
   }
 
   return null
@@ -97,20 +102,21 @@ export default function CardEffectDisplay({ card }) {
   }
 
   if (effect.effectType === 'consumable') {
+    const e = effect.consumableEffect
+    let label
+    if (e === 'cap-fill') label = `Fill ${(effect.value * 100).toFixed(0)}% cap`
+    else if (e === 'rate-boost') label = `+${(effect.value * 100).toFixed(0)}% rate`
+    else if (e === 'rate-cap-boost') label = `+${(effect.rateVal * 100).toFixed(0)}% rate / +${(effect.capVal * 100).toFixed(0)}% cap`
+    else if (e === 'collect-mult') label = `${effect.value}x collect`
+    else if (e === 'dismantle-boost') label = `\u00d7${effect.value} dismantle thresholds`
+    else if (e === 'cap-increase') label = `+${effect.value}d cap`
+    else if (e === 'jackpot') label = `1\u2013${effect.value} Cores`
+
     return (
       <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold cd-num">
-        {effect.passionPct > 0 && (
-          <span className="flex items-center gap-0.5 text-amber-400">
-            <img src={passionCoin} alt="" className="w-2.5 h-2.5" />
-            +{effect.passionPct}%
-          </span>
-        )}
-        {effect.coresPct > 0 && (
-          <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-            <img src={emberIcon} alt="" className="w-2.5 h-2.5" />
-            +{effect.coresPct}%
-          </span>
-        )}
+        <span className="flex items-center gap-0.5 text-emerald-400">
+          {label}
+        </span>
       </div>
     )
   }

@@ -332,14 +332,12 @@ export function VaultProvider({ children }) {
     return data
   }, [refreshBalanceWithRetry])
 
-  const slotS5Consumable = useCallback(async (cardId) => {
-    const prevConsumableId = startingFiveRef.current?.consumableCard?.id
-    const data = await vaultService.slotConsumable(cardId)
-    setStartingFive(data)
-    setCollection(prev => prev.filter(c => c.id !== cardId && c.id !== prevConsumableId))
-    refreshBalanceWithRetry()
-    return data
-  }, [refreshBalanceWithRetry])
+  const useS5Consumable = useCallback(async (cardId) => {
+    const res = await vaultService.useConsumable(cardId)
+    startingFiveRef.current = res
+    setStartingFive(res)
+    return res
+  }, [])
 
   useEffect(() => {
     if (loaded) {
@@ -473,7 +471,7 @@ export function VaultProvider({ children }) {
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
-    startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
+    startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, setPendingTradeCount,
     matchTradeCount, setMatchTradeCount,
@@ -490,7 +488,7 @@ export function VaultProvider({ children }) {
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
-    startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, slotS5Consumable,
+    startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
     vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks, pendingReveal, markRevealed,

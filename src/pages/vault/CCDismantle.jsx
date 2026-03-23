@@ -159,7 +159,6 @@ export default function CCDismantle() {
         if (slot.itemCard?.id) ids.add(slot.itemCard.id)
       }
     }
-    if (startingFive?.consumableCard?.id) ids.add(startingFive.consumableCard.id)
     for (const bc of (binderCards || [])) {
       if (bc.card?.id) ids.add(bc.card.id)
     }
@@ -226,6 +225,11 @@ export default function CCDismantle() {
     setResult(null)
   }, [])
 
+  const dismantleBoostMult = startingFive?.dismantleBoostMult || 1
+  const dismantleBoostDate = startingFive?.dismantleBoostDate || null
+  const dismantleBoostActive = dismantleBoostDate === new Date().toISOString().slice(0, 10)
+  const thresholdMult = dismantleBoostActive ? dismantleBoostMult : 1
+
   const currentMultiplier = getDismantleMultiplier(dismantledValueToday)
 
   const { fullValue, coresTotal, selectedCount, breakdown } = useMemo(() => {
@@ -238,9 +242,9 @@ export default function CCDismantle() {
       fullVal += RARITIES[card.rarity]?.dismantleValue || 0
       counts[card.rarity] = (counts[card.rarity] || 0) + 1
     }
-    const adjusted = calcDismantleTotal(selectedCards, dismantledValueToday)
+    const adjusted = calcDismantleTotal(selectedCards, dismantledValueToday, thresholdMult)
     return { fullValue: Math.floor(Math.round(fullVal * 10) / 10), coresTotal: adjusted, selectedCount: selectedCards.length, breakdown: counts }
-  }, [collection, selected, dismantledValueToday])
+  }, [collection, selected, dismantledValueToday, thresholdMult])
 
   const handleDismantle = async () => {
     if (coresTotal < 1 || dismantling) return
