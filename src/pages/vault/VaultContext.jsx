@@ -336,8 +336,9 @@ export function VaultProvider({ children }) {
     const res = await vaultService.useConsumable(cardId)
     startingFiveRef.current = res
     setStartingFive(res)
+    refreshCollection()
     return res
-  }, [])
+  }, [refreshCollection])
 
   useEffect(() => {
     if (loaded) {
