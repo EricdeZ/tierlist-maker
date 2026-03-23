@@ -3,7 +3,7 @@ import { useVault } from './VaultContext'
 import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
   S5_FLAT_SCALE, S5_MULT_SCALE,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, S5_ALLSTAR_MODIFIER,
-  STARTING_FIVE_CAP_DAYS, getConsumableBoost, getHoloEffect } from '../../data/vault/economy'
+  STARTING_FIVE_CAP_DAYS, CONSUMABLE_EFFECTS, getHoloEffect } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
@@ -185,6 +185,7 @@ export default function CCStartingFive() {
   const [showTutorial, setShowTutorial] = useState(false)
   const [showConsumablePicker, setShowConsumablePicker] = useState(false)
   const [slottingConsumable, setSlottingConsumable] = useState(false)
+  const [consumableResult, setConsumableResult] = useState(null)
   const [error, setError] = useState(null)
   const [s5Leaderboard, setS5Leaderboard] = useState(null)
   const [s5LbLoading, setS5LbLoading] = useState(false)
@@ -238,6 +239,12 @@ export default function CCStartingFive() {
   }, [slots])
   const boostedCoresPerDay = startingFive?.boostedCoresPerDay || combinedOutput.coresPerDay
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
+  const activeBuffs = startingFive?.activeBuffs || []
+  const consumableSlotsUsed = startingFive?.consumableSlotsUsed || 0
+  const effectiveRateBoost = startingFive?.effectiveRateBoost || 0
+  const effectiveCollectMult = startingFive?.effectiveCollectMult || 1
+  const dismantleBoostMult = startingFive?.dismantleBoostMult || 1
+  const dismantleBoostActive = startingFive?.dismantleBoostActive || false
 
   useEffect(() => {
     if (!startingFive) return
@@ -380,14 +387,18 @@ export default function CCStartingFive() {
     }
   }, [collecting, collectS5Income, displayPassion, displayCores, showError])
 
-  const handleSlotConsumable = useCallback(async (cardId) => {
+  const handleUseConsumable = useCallback(async (cardId) => {
     if (slottingConsumable) return
     setSlottingConsumable(true)
     try {
-      await applyS5Consumable(cardId)
+      const res = await applyS5Consumable(cardId)
+      if (res.consumableResult) {
+        setConsumableResult(res.consumableResult)
+        setTimeout(() => setConsumableResult(null), 3000)
+      }
       setShowConsumablePicker(false)
     } catch (err) {
-      showError(err.message || 'Failed to slot consumable')
+      showError(err.message || 'Failed to use consumable')
     } finally {
       setSlottingConsumable(false)
     }
@@ -400,8 +411,6 @@ export default function CCStartingFive() {
   const canCollect = displayPassion >= 1 || displayCores >= 1
   const basePph = combinedOutput.passionPerDay / 24
   const baseCph = combinedOutput.coresPerDay / 24
-  const consumablePassionPph = boostedPassionPerDay / 24 - basePph
-  const consumableCoresCph = boostedCoresPerDay / 24 - baseCph
 
   if (!startingFive) {
     return (
@@ -456,7 +465,9 @@ export default function CCStartingFive() {
               </div>
               <span className="text-xs text-white/30 cd-num">
                 +{basePph.toFixed(2)}/hr
-                {consumablePassionPph > 0.005 && <span className="text-purple-400/60"> +{consumablePassionPph.toFixed(2)} consumable</span>}
+                {effectiveRateBoost > 0 && (
+                  <span className="text-purple-400/60"> +{(effectiveRateBoost * 100).toFixed(0)}% rate buff</span>
+                )}
               </span>
             </div>
 
@@ -483,7 +494,9 @@ export default function CCStartingFive() {
               </div>
               <span className="text-xs text-white/30 cd-num">
                 +{baseCph.toFixed(2)}/hr
-                {consumableCoresCph > 0.005 && <span className="text-purple-400/60"> +{consumableCoresCph.toFixed(2)} consumable</span>}
+                {effectiveCollectMult > 1 && (
+                  <span className="text-orange-400/60"> {effectiveCollectMult.toFixed(1)}x next collect</span>
+                )}
               </span>
             </div>
           </div>
@@ -492,52 +505,60 @@ export default function CCStartingFive() {
           </div>
           </div>
 
-          {/* Consumable slot + Collect */}
+          {/* Consumable Slots + Collect */}
           <div className="relative flex items-center gap-3 shrink-0 flex-nowrap">
-            {startingFive?.consumableCard ? (
-              <div
-                className="flex flex-col items-center cursor-pointer group"
-                onClick={() => setShowConsumablePicker(true)}
-                title="Replace consumable (current one will be destroyed)"
-              >
-                <div className="relative transition-all group-hover:scale-[1.03]">
-                  <TradingCardHolo rarity={getHoloEffect(startingFive.consumableCard.rarity)} role="ADC" holoType={startingFive.consumableCard.holoType || 'reverse'} size={80}>
-                    <GameCard type="consumable" rarity={startingFive.consumableCard.rarity} data={toGameCardData(startingFive.consumableCard, getDefOverride?.(startingFive.consumableCard))} size={80} />
-                  </TradingCardHolo>
-                </div>
-                <div className="mt-1.5 text-center" style={{ maxWidth: 80 }}>
-                  <div className="text-[10px] font-bold text-white/70 truncate cd-head">
-                    {startingFive.consumableCard.godName}
-                  </div>
-                  <div className="flex items-center justify-center gap-1 mt-0.5">
-                    <span className="text-[9px] font-bold cd-head" style={{ color: RARITIES[startingFive.consumableCard.rarity]?.color }}>{RARITIES[startingFive.consumableCard.rarity]?.name}</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[10px] font-bold cd-num">
-                    {startingFive.consumableCard.passionBoostPct > 0 && (
-                      <span className="flex items-center gap-0.5 text-amber-400">
-                        +{startingFive.consumableCard.passionBoostPct}%
-                      </span>
-                    )}
-                    {startingFive.consumableCard.coresBoostPct > 0 && (
-                      <span className="flex items-center gap-0.5 text-[var(--cd-cyan)]">
-                        +{startingFive.consumableCard.coresBoostPct}%
-                      </span>
-                    )}
-                  </div>
-                </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="text-[10px] font-bold text-white/40 cd-head tracking-wider">
+                CONSUMABLES {consumableSlotsUsed}/3
               </div>
-            ) : (
-              <button
-                onClick={() => setShowConsumablePicker(true)}
-                disabled={Object.keys(slots).length === 0}
-                className="group flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
-                style={{ width: 58, aspectRatio: '63/88' }}
-                title="Slot a consumable to boost income rate"
-              >
-                <Plus size={14} className="text-white/20 group-hover:text-amber-400 transition-colors" />
-                <span className="text-[7px] text-white/20 group-hover:text-amber-400/60 font-bold cd-head tracking-wider mt-0.5 transition-colors">SLOT</span>
-              </button>
-            )}
+              <div className="flex gap-2 items-center">
+                {activeBuffs.map((buff, i) => (
+                  <div key={i} className="flex flex-col items-center">
+                    <div
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center"
+                      style={{ minWidth: 58 }}
+                    >
+                      <div className="text-[9px] font-bold cd-head text-white/60">{buff.type}</div>
+                      <div className="text-[10px] font-bold cd-num" style={{ color: RARITIES[buff.rarity]?.color }}>
+                        {buff.rateBoost && buff.capDays ? `+${(buff.rateBoost * 100).toFixed(0)}% +${buff.capDays}d` :
+                         buff.rateBoost ? `+${(buff.rateBoost * 100).toFixed(0)}%` :
+                         buff.capDays ? `+${buff.capDays}d` :
+                         buff.collectMult ? `${buff.collectMult}x` : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {consumableSlotsUsed < 3 && (
+                  <button
+                    onClick={() => setShowConsumablePicker(true)}
+                    className="group flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all cursor-pointer"
+                    style={{ width: 58, height: 58 }}
+                    title="Use a consumable"
+                  >
+                    <Plus size={14} className="text-white/20 group-hover:text-amber-400 transition-colors" />
+                    <span className="text-[7px] text-white/20 group-hover:text-amber-400/60 font-bold cd-head tracking-wider mt-0.5 transition-colors">USE</span>
+                  </button>
+                )}
+              </div>
+              {consumableResult && (
+                <div className="text-center text-sm font-bold cd-num" style={{ animation: 's5-fade-in 0.3s ease-out' }}>
+                  {consumableResult.effect === 'jackpot' && (
+                    <span className="text-amber-400">Jackpot! +{consumableResult.value} Cores</span>
+                  )}
+                  {consumableResult.effect === 'cap-fill' && (
+                    <span className="text-red-400">+{typeof consumableResult.value === 'number' ? consumableResult.value.toFixed(1) : consumableResult.value} Cores filled</span>
+                  )}
+                  {['rate-boost', 'rate-cap-boost', 'collect-mult', 'cap-increase', 'dismantle-boost'].includes(consumableResult.effect) && (
+                    <span className="text-purple-400">Buff active!</span>
+                  )}
+                </div>
+              )}
+              {dismantleBoostActive && dismantleBoostMult > 1 && (
+                <div className="text-[10px] text-purple-400/80 font-bold cd-head">
+                  Dismantle boost active: &times;{dismantleBoostMult.toFixed(1)} thresholds
+                </div>
+              )}
+            </div>
             <button
               onClick={handleCollect}
               disabled={!canCollect || collecting}
@@ -809,11 +830,11 @@ export default function CCStartingFive() {
         <ConsumablePicker
           collection={collection}
           allSlottedIds={allSlottedIds}
-          onSelect={handleSlotConsumable}
+          onSelect={handleUseConsumable}
           onClose={() => setShowConsumablePicker(false)}
           using={slottingConsumable}
           getDefOverride={getDefOverride}
-          currentConsumable={startingFive?.consumableCard}
+          consumableSlotsUsed={consumableSlotsUsed}
         />
       )}
 
@@ -886,8 +907,9 @@ export default function CCStartingFive() {
 }
 
 
-function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride, currentConsumable }) {
+function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using, getDefOverride, consumableSlotsUsed }) {
   const [confirmCardId, setConfirmCardId] = useState(null)
+  const slotsFull = consumableSlotsUsed >= 3
 
   const eligibleCards = useMemo(() => {
     return collection
@@ -895,7 +917,6 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         const type = getCardType(card)
         if (type !== 'consumable') return false
         if (allSlottedIds.has(card.id)) return false
-        if (currentConsumable && card.id === currentConsumable.id) return false
         return true
       })
       .sort((a, b) => {
@@ -903,15 +924,28 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         if (rDiff !== 0) return rDiff
         return (a.godName || '').localeCompare(b.godName || '')
       })
-  }, [collection, allSlottedIds, currentConsumable])
+  }, [collection, allSlottedIds])
 
   const handleSelect = useCallback((cardId) => {
-    if (currentConsumable) {
-      setConfirmCardId(cardId)
-    } else {
-      onSelect(cardId)
+    setConfirmCardId(cardId)
+  }, [])
+
+  function getEffectDescription(card) {
+    const consumableId = card.cardData?.consumableId
+    const effectDef = consumableId ? CONSUMABLE_EFFECTS[consumableId] : null
+    if (!effectDef) return ''
+    const rarity = card.rarity
+    switch (effectDef.effect) {
+      case 'cap-fill': return `Fill ${(effectDef.values[rarity] * 100).toFixed(0)}% cap`
+      case 'rate-boost': return `+${(effectDef.values[rarity] * 100).toFixed(0)}% rate`
+      case 'rate-cap-boost': return `+${(effectDef.rateValues[rarity] * 100).toFixed(0)}% rate, +${effectDef.capValues[rarity]}d cap`
+      case 'collect-mult': return `${effectDef.values[rarity]}x collect`
+      case 'dismantle-boost': return `\u00d7${effectDef.values[rarity]} dismantle`
+      case 'cap-increase': return `+${effectDef.values[rarity]}d cap`
+      case 'jackpot': return `1\u2013${effectDef.values[rarity]} Cores`
+      default: return ''
     }
-  }, [currentConsumable, onSelect])
+  }
 
   return (
     <div
@@ -927,7 +961,7 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
           <div className="flex items-center gap-2">
             <Zap size={18} className="text-amber-400" />
             <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
-              {currentConsumable ? 'Replace Consumable' : 'Slot Consumable'}
+              Use Consumable
             </h3>
           </div>
           <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
@@ -936,23 +970,23 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         </div>
 
         <div className="px-5 pt-3 pb-1 text-xs text-white/40">
-          {currentConsumable
-            ? 'Select a consumable to replace the current one. The current consumable will be destroyed.'
-            : 'Slot a consumable to boost your Starting 5 income rate. Once slotted, it can only be removed by replacing it.'}
+          {slotsFull
+            ? 'All 3 consumable slots are full. Wait for buffs to expire before using another.'
+            : 'Use a consumable to apply its effect. This card will be consumed.'}
         </div>
 
         {confirmCardId && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-xl">
-            <div className="bg-[var(--cd-surface)] border border-red-500/30 rounded-xl p-6 mx-4 max-w-sm text-center">
-              <Trash2 size={24} className="mx-auto mb-3 text-red-400" />
-              <p className="text-sm text-white/80 mb-1 cd-head">Replace consumable?</p>
+            <div className="bg-[var(--cd-surface)] border border-amber-500/30 rounded-xl p-6 mx-4 max-w-sm text-center">
+              <Zap size={24} className="mx-auto mb-3 text-amber-400" />
+              <p className="text-sm text-white/80 mb-1 cd-head">Use consumable?</p>
               <p className="text-xs text-white/40 mb-4">
-                Your <span className="font-bold" style={{ color: RARITIES[currentConsumable?.rarity]?.color }}>{RARITIES[currentConsumable?.rarity]?.name}</span> {currentConsumable?.godName} will be <span className="text-red-400 font-bold">destroyed</span>.
+                This card will be consumed.
               </p>
               <div className="flex gap-3 justify-center">
                 <button onClick={() => setConfirmCardId(null)} className="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white/70 border border-white/10 cursor-pointer">Cancel</button>
-                <button onClick={() => { onSelect(confirmCardId); setConfirmCardId(null) }} disabled={using} className="px-4 py-2 rounded-lg text-sm font-bold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 cursor-pointer disabled:opacity-50">
-                  {using ? 'Replacing...' : 'Destroy & Replace'}
+                <button onClick={() => { onSelect(confirmCardId); setConfirmCardId(null) }} disabled={using} className="px-4 py-2 rounded-lg text-sm font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 cursor-pointer disabled:opacity-50">
+                  {using ? 'Using...' : 'Use'}
                 </button>
               </div>
             </div>
@@ -960,7 +994,13 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
         )}
 
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 110px)' }}>
-          {eligibleCards.length === 0 ? (
+          {slotsFull ? (
+            <div className="text-center py-12 text-white/30">
+              <Zap size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm cd-head tracking-wider">All slots full</p>
+              <p className="text-xs text-white/20 mt-1">Wait for active buffs to expire</p>
+            </div>
+          ) : eligibleCards.length === 0 ? (
             <div className="text-center py-12 text-white/30">
               <Zap size={40} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm cd-head tracking-wider">No consumable cards</p>
@@ -970,8 +1010,7 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
               {eligibleCards.map(card => {
                 const color = RARITIES[card.rarity]?.color || '#9ca3af'
-                const consumableId = card.cardData?.consumableId
-                const boost = consumableId ? getConsumableBoost(consumableId, card.rarity) : { passionBoost: 0, coresBoost: 0 }
+                const effectDesc = getEffectDescription(card)
                 const override = getDefOverride?.(card)
                 return (
                   <button
@@ -988,14 +1027,11 @@ function ConsumablePicker({ collection, allSlottedIds, onSelect, onClose, using,
                       <div className="flex items-center justify-center gap-1 mt-0.5">
                         <span className="text-[9px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
                       </div>
-                      <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[10px] font-bold cd-num">
-                        {boost.passionBoost > 0 && (
-                          <span className="text-amber-400">+{Math.round(boost.passionBoost * 100)}%</span>
-                        )}
-                        {boost.coresBoost > 0 && (
-                          <span className="text-[var(--cd-cyan)]">+{Math.round(boost.coresBoost * 100)}%</span>
-                        )}
-                      </div>
+                      {effectDesc && (
+                        <div className="text-[10px] font-bold cd-num text-white/50 mt-0.5">
+                          {effectDesc}
+                        </div>
+                      )}
                     </div>
                   </button>
                 )
@@ -1064,9 +1100,9 @@ function TutorialModal({ onClose }) {
           </div>
 
           <div>
-            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLE SLOT</h4>
-            <p>Slot a consumable card to multiply all income rates. Different consumables favor different currencies — potions split between Passion and Cores, while elixirs focus on one. Higher rarity consumables give a bigger multiplier.</p>
-            <p className="mt-1 text-white/40">The consumable stays active permanently. Replacing it destroys the old one — choose carefully.</p>
+            <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLES</h4>
+            <p>Use consumable cards for instant effects or temporary buffs. You can have up to 3 active buff slots at once. Each consumable is destroyed on use.</p>
+            <p className="mt-1 text-white/40">Effects include rate boosts, cap increases, collect multipliers, dismantle boosts, cap fills, and jackpot Cores. Higher rarity consumables give stronger effects.</p>
           </div>
 
           <div>
