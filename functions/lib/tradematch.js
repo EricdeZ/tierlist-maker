@@ -43,10 +43,6 @@ export async function addToTradePile(sql, userId, cardId) {
   `
   if (inLineup) throw new Error('Card is in your Starting 5 lineup')
 
-  // Check not slotted as S5 consumable
-  const [inS5] = await sql`SELECT user_id FROM cc_starting_five_state WHERE consumable_card_id = ${cardId}`
-  if (inS5) throw new Error('Card is slotted in Starting 5')
-
   // Check not in binder
   const [inBinder] = await sql`SELECT id FROM cc_binder_cards WHERE card_id = ${cardId} LIMIT 1`
   if (inBinder) throw new Error('Card is in your binder')
@@ -112,7 +108,7 @@ export async function getSwipeFeed(sql, userId, offset = 0) {
     WHERE tp.user_id != ${userId}
       AND sw.id IS NULL
       AND c.rarity NOT IN ('common', 'uncommon')
-    ORDER BY has_boost DESC, is_novel DESC, tp.created_at DESC, random()
+    ORDER BY has_boost DESC, is_novel DESC, md5(${userId} || ':' || tp.card_id)
     LIMIT ${limit} OFFSET ${offset}
   `
 }
@@ -528,7 +524,6 @@ export async function offerAccept(tx, userId, tradeId, version) {
     await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${aCardIds})`
     await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${aCardIds})`
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${aCardIds})`
-    await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${aCardIds})`
     await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${aCardIds})`
     await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${aCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }
@@ -538,7 +533,6 @@ export async function offerAccept(tx, userId, tradeId, version) {
     await tx`UPDATE cc_lineups SET card_id = NULL, slotted_at = NULL, god_card_id = NULL, item_card_id = NULL WHERE card_id = ANY(${bCardIds})`
     await tx`UPDATE cc_lineups SET god_card_id = NULL WHERE god_card_id = ANY(${bCardIds})`
     await tx`UPDATE cc_lineups SET item_card_id = NULL WHERE item_card_id = ANY(${bCardIds})`
-    await tx`UPDATE cc_starting_five_state SET consumable_card_id = NULL WHERE consumable_card_id = ANY(${bCardIds})`
     await tx`DELETE FROM cc_binder_cards WHERE card_id = ANY(${bCardIds})`
     await tx`DELETE FROM cc_signature_requests WHERE card_id = ANY(${bCardIds}) AND status IN ('pending', 'awaiting_approval')`
   }

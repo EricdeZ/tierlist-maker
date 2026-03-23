@@ -1503,10 +1503,6 @@ async function handleDismantle(sql, user, body) {
         WHERE (l.card_id = c.id OR l.god_card_id = c.id OR l.item_card_id = c.id) AND l.user_id = ${user.id}
       )
       AND NOT EXISTS (
-        SELECT 1 FROM cc_starting_five_state s
-        WHERE s.consumable_card_id = c.id AND s.user_id = ${user.id}
-      )
-      AND NOT EXISTS (
         SELECT 1 FROM cc_binder_cards bc WHERE bc.card_id = c.id
       )
   `
@@ -2512,11 +2508,6 @@ async function handleBinderSlot(sql, user, body) {
     WHERE (card_id = ${cardId} OR god_card_id = ${cardId} OR item_card_id = ${cardId}) AND user_id = ${user.id}
   `
   if (s5Lock) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is in your Starting 5 lineup' }) }
-
-  const [s5Consumable] = await sql`
-    SELECT 1 FROM cc_starting_five_state WHERE consumable_card_id = ${cardId} AND user_id = ${user.id}
-  `
-  if (s5Consumable) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card is your Starting 5 consumable' }) }
 
   // Ensure binder exists
   await sql`
