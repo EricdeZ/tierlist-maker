@@ -48,19 +48,7 @@ export function getCardEffect(card) {
   }
 
   if (type === 'consumable') {
-    const consumableId = card.cardData?.consumableId
-    const def = CONSUMABLE_EFFECTS[consumableId]
-    if (!def) return null
-    const effect = def.effect
-    if (effect === 'rate-cap-boost') {
-      const rateVal = def.rateValues?.[r] || 0
-      const capVal = def.capValues?.[r] || 0
-      if (!rateVal && !capVal) return null
-      return { effectType: 'consumable', consumableEffect: effect, rateVal, capVal }
-    }
-    const value = def.values?.[r] || 0
-    if (!value) return null
-    return { effectType: 'consumable', consumableEffect: effect, value }
+    return null
   }
 
   return null
