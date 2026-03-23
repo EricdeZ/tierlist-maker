@@ -1,7 +1,7 @@
 import { Trash2, ChevronUp, ChevronDown, BarChart3, FileText, Zap } from 'lucide-react'
 
 const CLASSES = ['Guardian', 'Warrior', 'Assassin', 'Mage', 'Hunter']
-const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support']
+const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support', 'staff', 'cheerleader']
 const ABILITY_TYPES = ['damage', 'aoe_damage', 'heal', 'buff', 'debuff', 'cc', 'execute', 'shield', 'summon', 'global', 'stealth', 'mobility']
 
 const input = 'px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500'

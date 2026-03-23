@@ -351,7 +351,6 @@ export default function CardCreator() {
             font: "'Segoe UI', system-ui, sans-serif", fontSize: 10,
             rows: [
                 { label: 'KDA', value: '3.5', sub: '5/2/4' },
-                { label: 'Damage', value: '25k', sub: 'Avg per game' },
             ],
             record: { winRate: '70%', record: '7W-3L', games: '10' },
             x: 0, y: 280, w: 300, z: prev.length + 10, visible: true,

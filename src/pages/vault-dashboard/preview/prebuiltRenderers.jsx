@@ -1,11 +1,13 @@
-export const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support']
+export const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support', 'staff', 'cheerleader']
 
 export const ROLE_PALETTES = {
-    adc:     { accent: '#c4884a', accentLight: '#e0a866', accentDark: '#8a5c2a', bodyBg: '#1e1810', bodySurface: '#2a2018', bodyBorder: '#4a3828', textDim: '#9a8a70' },
-    solo:    { accent: '#4a8ec4', accentLight: '#66b0e0', accentDark: '#2a5c8a', bodyBg: '#10161e', bodySurface: '#182230', bodyBorder: '#283a50', textDim: '#708a9a' },
-    jungle:  { accent: '#4ab868', accentLight: '#66d884', accentDark: '#2a7a3e', bodyBg: '#101e14', bodySurface: '#18301e', bodyBorder: '#285038', textDim: '#709a7a' },
-    mid:     { accent: '#9a5cc4', accentLight: '#b878e0', accentDark: '#6a3a8a', bodyBg: '#1a101e', bodySurface: '#261830', bodyBorder: '#402850', textDim: '#8a709a' },
-    support: { accent: '#4aaab8', accentLight: '#66c8d4', accentDark: '#2a7a84', bodyBg: '#101c1e', bodySurface: '#182a30', bodyBorder: '#284a50', textDim: '#70949a' },
+    adc:         { accent: '#c4884a', accentLight: '#e0a866', accentDark: '#8a5c2a', bodyBg: '#1e1810', bodySurface: '#2a2018', bodyBorder: '#4a3828', textDim: '#9a8a70' },
+    solo:        { accent: '#4a8ec4', accentLight: '#66b0e0', accentDark: '#2a5c8a', bodyBg: '#10161e', bodySurface: '#182230', bodyBorder: '#283a50', textDim: '#708a9a' },
+    jungle:      { accent: '#4ab868', accentLight: '#66d884', accentDark: '#2a7a3e', bodyBg: '#101e14', bodySurface: '#18301e', bodyBorder: '#285038', textDim: '#709a7a' },
+    mid:         { accent: '#9a5cc4', accentLight: '#b878e0', accentDark: '#6a3a8a', bodyBg: '#1a101e', bodySurface: '#261830', bodyBorder: '#402850', textDim: '#8a709a' },
+    support:     { accent: '#4aaab8', accentLight: '#66c8d4', accentDark: '#2a7a84', bodyBg: '#101c1e', bodySurface: '#182a30', bodyBorder: '#284a50', textDim: '#70949a' },
+    staff:       { accent: '#c4a84a', accentLight: '#e0c866', accentDark: '#8a7a2a', bodyBg: '#1e1c10', bodySurface: '#2a2818', bodyBorder: '#4a4428', textDim: '#9a9470' },
+    cheerleader: { accent: '#c44a72', accentLight: '#e06690', accentDark: '#8a2a4e', bodyBg: '#1e1014', bodySurface: '#2a1820', bodyBorder: '#4a2838', textDim: '#9a7080' },
 }
 
 function hexToRgba(hex, opacity) {

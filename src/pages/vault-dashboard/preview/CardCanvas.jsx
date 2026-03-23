@@ -128,6 +128,9 @@ export default function CardCanvas({
         return () => window.removeEventListener('keydown', handleKey)
     }, [selectedId, onDeleteElement])
 
+    const firstImage = elements.find(el => el.type === 'image')
+    const cardBg = firstImage?.bgColor || '#111827'
+
     return (
         <div
             ref={canvasRef}
@@ -141,7 +144,7 @@ export default function CardCanvas({
                 height: CARD_H,
                 borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
                 border: 'none',
-                background: '#111827',
+                background: cardBg,
                 cursor: dragging ? (dragging.type === 'move' ? 'grabbing' : HANDLE_CURSORS[dragging.handle]) : 'default',
             }}
         >

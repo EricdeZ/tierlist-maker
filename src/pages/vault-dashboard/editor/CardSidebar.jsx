@@ -329,6 +329,17 @@ export default function CardSidebar({
                                 <Upload size={14} /> Replace Image
                             </button>
                             <div>
+                                <label className={label}>Background Color</label>
+                                <div className="flex gap-1">
+                                    <input type="color" value={sel.bgColor || '#111827'}
+                                        onChange={e => onUpdateElement(sel.id, { bgColor: e.target.value })}
+                                        className="w-8 h-8 bg-gray-800 border border-gray-700 rounded cursor-pointer" />
+                                    <input type="text" value={sel.bgColor || '#111827'}
+                                        onChange={e => onUpdateElement(sel.id, { bgColor: e.target.value })}
+                                        className={`${input} flex-1`} />
+                                </div>
+                            </div>
+                            <div>
                                 <label className={label}>Opacity: {Math.round((sel.opacity ?? 1) * 100)}%</label>
                                 <input type="range" min={0} max={1} step={0.05} value={sel.opacity ?? 1}
                                     onChange={e => onUpdateElement(sel.id, { opacity: parseFloat(e.target.value) })}
