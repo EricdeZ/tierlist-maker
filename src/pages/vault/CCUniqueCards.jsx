@@ -58,7 +58,7 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged,
   const [localHoloType, setLocalHoloType] = useState(card.holoType)
 
   const override = getDefOverride(card)
-  const holoEffect = card.holoEffect || getHoloEffect(card.rarity)
+  const holoEffect = card.rarity === 'unique' ? 'unique' : (card.holoEffect || getHoloEffect(card.rarity))
   const type = card.cardType || 'god'
 
   const cardPlayerId = card.defPlayerId || card.cardData?._testPlayerId
@@ -186,7 +186,7 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged,
 }
 
 function GalleryCardEntry({ card }) {
-  const holoEffect = card.holoEffect || getHoloEffect(card.rarity)
+  const holoEffect = card.rarity === 'unique' ? 'unique' : (card.holoEffect || getHoloEffect(card.rarity))
   const type = card.cardType || 'god'
 
   const renderCard = () => {
