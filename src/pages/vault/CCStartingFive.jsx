@@ -545,20 +545,44 @@ export default function CCStartingFive() {
           </div>
         </div>
 
-        {/* Active buff pills + consumable feedback */}
-        {activeBuffs.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-center">
-            {activeBuffs.map((buff, i) => (
-              <span key={i} className="px-2 py-0.5 rounded-full text-[9px] font-bold cd-num border border-white/10 bg-white/[0.03]"
-                style={{ color: RARITIES[buff.rarity]?.color }}>
-                {buff.rateBoost && buff.capDays ? `+${(buff.rateBoost * 100).toFixed(0)}% rate +${buff.capDays}d cap` :
-                 buff.rateBoost ? `+${(buff.rateBoost * 100).toFixed(0)}% rate` :
-                 buff.capDays ? `+${buff.capDays}d cap` :
-                 buff.collectMult ? `${buff.collectMult}x collect` : buff.type}
-              </span>
-            ))}
+        {/* Consumable Status Panel */}
+        {(consumableSlotsUsed > 0 || activeBuffs.length > 0 || (dismantleBoostActive && dismantleBoostMult > 1)) && (
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold cd-head text-white/40 tracking-wider">CONSUMABLES</span>
+              <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 used this cycle</span>
+            </div>
+
+            {activeBuffs.length > 0 && (
+              <div>
+                <div className="text-[9px] font-bold cd-head text-white/30 tracking-wider mb-1">ACTIVE BOOSTS</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeBuffs.map((buff, i) => {
+                    const def = CONSUMABLES.find(c => c.id === buff.type)
+                    return (
+                      <span key={i} className="px-2 py-1 rounded-lg text-[10px] font-bold cd-num border border-white/10 bg-white/[0.03] flex items-center gap-1.5"
+                        style={{ color: RARITIES[buff.rarity]?.color }}>
+                        {def && <img src={def.imageUrl} alt="" className="w-4 h-4 rounded" />}
+                        {buff.rateBoost && buff.capDays ? `+${(buff.rateBoost * 100).toFixed(0)}% rate +${buff.capDays}d cap` :
+                         buff.rateBoost ? `+${(buff.rateBoost * 100).toFixed(0)}% rate` :
+                         buff.capDays ? `+${buff.capDays}d cap` :
+                         buff.collectMult ? `${buff.collectMult}x collect` : buff.type}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {dismantleBoostActive && dismantleBoostMult > 1 && (
+              <div className="text-[10px] font-bold cd-num text-purple-400/80 flex items-center gap-1">
+                <Zap size={10} />
+                Dismantle boost: &times;{dismantleBoostMult.toFixed(1)} thresholds (until daily reset)
+              </div>
+            )}
           </div>
         )}
+
         {consumableResult && (
           <div className="text-center text-sm font-bold cd-num" style={{ animation: 's5-fade-in 0.3s ease-out' }}>
             {consumableResult.effect === 'jackpot' && (
@@ -570,11 +594,6 @@ export default function CCStartingFive() {
             {['rate-boost', 'rate-cap-boost', 'collect-mult', 'cap-increase', 'dismantle-boost'].includes(consumableResult.effect) && (
               <span className="text-purple-400">Buff active!</span>
             )}
-          </div>
-        )}
-        {dismantleBoostActive && dismantleBoostMult > 1 && (
-          <div className="text-[10px] text-purple-400/80 font-bold cd-head text-center">
-            Dismantle boost active: &times;{dismantleBoostMult.toFixed(1)} thresholds
           </div>
         )}
 
