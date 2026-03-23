@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, slotConsumable, checkSynergy, getCardContribution, getAttachmentBonusInfo, getConsumableBoost, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -129,7 +129,7 @@ const handler = async (event) => {
         case 'slot-card': return await handleSlotCard(sql, user, body)
         case 'unslot-card': return await handleUnslotCard(sql, user, body)
         case 'unslot-attachment': return await handleUnslotAttachment(sql, user, body)
-        case 'slot-consumable': return await handleSlotConsumable(sql, user, body)
+        case 'use-consumable': return await handleUseConsumable(sql, user, body)
         case 'collect-income': return await handleCollectIncome(sql, user)
         case 'binder-save': return await handleBinderSave(sql, user, body)
         case 'binder-slot': return await handleBinderSlot(sql, user, body)
@@ -1518,10 +1518,30 @@ async function handleDismantle(sql, user, body) {
   const legendaryCount = cards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length
   const validIds = cards.map(c => c.id)
 
+  // Check for active dismantle boost
+  const [s5State] = await sql`
+    SELECT dismantle_boost_mult, dismantle_boost_date
+    FROM cc_starting_five_state WHERE user_id = ${user.id}
+  `
+  const today = new Date().toISOString().slice(0, 10)
+  let dismantleThresholdMult = 1
+  if (String(s5State?.dismantle_boost_date || '').slice(0, 10) === today && Number(s5State.dismantle_boost_mult) > 1) {
+    dismantleThresholdMult = Number(s5State.dismantle_boost_mult)
+  } else if (s5State?.dismantle_boost_date && s5State.dismantle_boost_date < today) {
+    await sql`
+      UPDATE cc_starting_five_state
+      SET dismantle_boost_mult = 1.0, dismantle_boost_date = NULL
+      WHERE user_id = ${user.id}
+    `
+  }
+
+  const effectiveTiers = dismantleThresholdMult > 1
+    ? DISMANTLE_TIERS.map(t => ({ ...t, upTo: t.upTo === Infinity ? Infinity : t.upTo * dismantleThresholdMult }))
+    : DISMANTLE_TIERS
+
   // Fetch current daily dismantle stats (reset if new day)
   await ensureStats(sql, user.id)
   const [currentStats] = await sql`SELECT dismantled_today, dismantled_value_today, dismantle_reset_date FROM cc_stats WHERE user_id = ${user.id}`
-  const today = new Date().toISOString().slice(0, 10)
   const isToday = currentStats.dismantle_reset_date === today
   const dismantledToday = isToday ? (currentStats.dismantled_today || 0) : 0
   const dismantledValueToday = isToday ? (parseFloat(currentStats.dismantled_value_today) || 0) : 0
@@ -1537,7 +1557,7 @@ async function handleDismantle(sql, user, body) {
     const base = DISMANTLE_VALUES[card.rarity] || 0
     let remaining = base
     let pos = cumulativeBase
-    for (const tier of DISMANTLE_TIERS) {
+    for (const tier of effectiveTiers) {
       if (remaining <= 0) break
       if (pos >= tier.upTo) continue
       const chunk = tier.upTo === Infinity ? remaining : Math.min(tier.upTo - pos, remaining)
@@ -1784,7 +1804,7 @@ async function handleBlackMarketDebugPending(sql, user) {
 // ═══ Starting 5 ═══
 
 function formatS5Response(state, extra = {}) {
-  const { csCards = [], asCards = [], csOutput, asOutput, consumableCard } = state
+  const { csCards = [], asCards = [], csOutput, asOutput } = state
 
   function formatLineup(lineupCards, output) {
     // Compute team synergy (bench now included, role mismatches excluded)
@@ -1823,15 +1843,12 @@ function formatS5Response(state, extra = {}) {
     return { slots, output: output || { coresPerDay: 0, passionPerDay: 0 } }
   }
 
-  let consumableBoost = { passionBoost: 0, coresBoost: 0 }
-  if (consumableCard?.card_data?.consumableId) {
-    consumableBoost = getConsumableBoost(consumableCard.card_data.consumableId, consumableCard.rarity)
-  }
-
   const combined = {
     coresPerDay: (csOutput?.coresPerDay || 0) + (asOutput?.coresPerDay || 0) * S5_ALLSTAR_MODIFIER,
     passionPerDay: (csOutput?.passionPerDay || 0) + (asOutput?.passionPerDay || 0) * S5_ALLSTAR_MODIFIER,
   }
+
+  const buffTotals = getBuffTotals(state.activeBuffs || [])
 
   return {
     statusCode: 200, headers,
@@ -1839,19 +1856,20 @@ function formatS5Response(state, extra = {}) {
       currentSeason: formatLineup(csCards, csOutput),
       allStar: formatLineup(asCards, asOutput),
       combined,
-      boostedCoresPerDay: combined.coresPerDay * (1 + consumableBoost.coresBoost),
-      boostedPassionPerDay: combined.passionPerDay * (1 + consumableBoost.passionBoost),
       passionPending: state.passionPending,
       coresPending: state.coresPending,
       passionCap: state.passionCap,
       coresCap: state.coresCap,
-      consumableCard: consumableCard ? (() => {
-        const fc = formatCard(consumableCard)
-        const boost = consumableBoost
-        fc.passionBoostPct = Math.round(boost.passionBoost * 100)
-        fc.coresBoostPct = Math.round(boost.coresBoost * 100)
-        return fc
-      })() : null,
+      activeBuffs: state.activeBuffs || [],
+      consumableSlotsUsed: state.consumableSlotsUsed || 0,
+      dismantleBoostMult: state.dismantleBoostMult || 1,
+      dismantleBoostActive: (() => {
+        const today = new Date().toISOString().slice(0, 10)
+        return String(state.dismantleBoostDate || '').slice(0, 10) === today
+      })(),
+      effectiveRateBoost: buffTotals.totalRateBoost,
+      effectiveCapDays: buffTotals.totalCapDays,
+      effectiveCollectMult: buffTotals.totalCollectMult,
       ...extra,
     }),
   }
@@ -2003,18 +2021,21 @@ async function handleUnslotAttachment(sql, user, body) {
   return formatS5Response(state)
 }
 
-async function handleSlotConsumable(sql, user, body) {
+async function handleUseConsumable(sql, user, body) {
   const { cardId } = body
   if (!cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
-  const state = await slotConsumable(sql, user.id, cardId)
+  const state = await useConsumable(sql, user.id, cardId)
 
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (slot-consumable) failed:', err))
+    .catch(err => console.error('Vault challenge push (use-consumable) failed:', err))
 
-  return formatS5Response(state)
+  const response = formatS5Response(state)
+  const responseData = JSON.parse(response.body)
+  responseData.consumableResult = state.consumableResult
+  return { ...response, body: JSON.stringify(responseData) }
 }
 
 async function handleCollectIncome(sql, user) {
