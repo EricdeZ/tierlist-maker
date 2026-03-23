@@ -1082,8 +1082,8 @@ export const vaultService = {
     collectIncome() {
         return apiPost('vault', { action: 'collect-income' }, {})
     },
-    slotConsumable(cardId) {
-        return apiPost('vault', { action: 'slot-consumable' }, { cardId })
+    useConsumable(cardId) {
+        return apiPost('vault', { action: 'use-consumable' }, { cardId })
     },
     openInventoryPack(inventoryId) {
         return apiPost('vault', { action: 'open-inventory-pack' }, { inventoryId })
