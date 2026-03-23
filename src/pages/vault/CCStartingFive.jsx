@@ -1042,16 +1042,7 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
                       : 'border-white/[0.03] bg-white/[0.01] opacity-40 cursor-not-allowed'
                   }`}
                 >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0"
-                    style={{ backgroundColor: cons.color + '20', color: cons.color }}>
-                    {cons.icon === 'heart' ? '\u2764\uFE0F' :
-                     cons.icon === 'droplet' ? '\uD83D\uDCA7' :
-                     cons.icon === 'sparkles' ? '\u2728' :
-                     cons.icon === 'swords' ? '\u2694\uFE0F' :
-                     cons.icon === 'brain' ? '\uD83E\uDDE0' :
-                     cons.icon === 'eye' ? '\uD83D\uDC41\uFE0F' :
-                     cons.icon === 'eye-off' ? '\uD83D\uDD0D' : '?'}
-                  </div>
+                  <img src={cons.imageUrl} alt={cons.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
                   <div className="flex-1 text-left">
                     <div className="text-xs font-bold cd-head text-white/80">{cons.name}</div>
                     <div className="text-[10px] text-white/40">{cons.description}</div>
