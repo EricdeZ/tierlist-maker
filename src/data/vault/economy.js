@@ -65,11 +65,11 @@ export function getDismantleMultiplier(valueAccumulated) {
 }
 
 // Split a single card's base value across tier boundaries
-function applyTieredValue(base, cumulativeBase) {
+function applyTieredValue(base, cumulativeBase, tiers = DISMANTLE_TIERS) {
   let remaining = base;
   let value = 0;
   let pos = cumulativeBase;
-  for (const tier of DISMANTLE_TIERS) {
+  for (const tier of tiers) {
     if (remaining <= 0) break;
     if (pos >= tier.upTo) continue;
     const chunk = tier.upTo === Infinity ? remaining : Math.min(tier.upTo - pos, remaining);
@@ -80,13 +80,16 @@ function applyTieredValue(base, cumulativeBase) {
   return value;
 }
 
-export function calcDismantleTotal(cards, dismantledValueToday) {
+export function calcDismantleTotal(cards, dismantledValueToday, thresholdMult = 1) {
+  const tiers = thresholdMult > 1
+    ? DISMANTLE_TIERS.map(t => ({ ...t, upTo: t.upTo === Infinity ? Infinity : t.upTo * thresholdMult }))
+    : DISMANTLE_TIERS;
   const sorted = [...cards].sort((a, b) => (RARITIES[b.rarity]?.dismantleValue || 0) - (RARITIES[a.rarity]?.dismantleValue || 0));
   let total = 0;
   let cumulativeBase = dismantledValueToday;
   for (const card of sorted) {
     const base = RARITIES[card.rarity]?.dismantleValue || 0;
-    total += applyTieredValue(base, cumulativeBase);
+    total += applyTieredValue(base, cumulativeBase, tiers);
     cumulativeBase += base;
   }
   return Math.floor(Math.round(total * 10) / 10);
@@ -101,17 +104,17 @@ export const MARKETPLACE = {
 
 // Starting 5 — flat income per day per holo card (Cores)
 export const S5_FLAT_CORES = {
-  uncommon: 0.80, rare: 1.90, epic: 4.20, legendary: 8.10, mythic: 8.50, unique: 9.40,
+  uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 6.59, unique: 7.28,
 };
 
 // Starting 5 — flat income per day per holo card (Passion)
 export const S5_FLAT_PASSION = {
-  uncommon: 0.05, rare: 0.12, epic: 0.26, legendary: 0.50, mythic: 0.52, unique: 0.58,
+  uncommon: 0.039, rare: 0.093, epic: 0.201, legendary: 0.387, mythic: 0.403, unique: 0.449,
 };
 
 // Starting 5 — reverse card multiplier (additive stacking)
 export const S5_REVERSE_MULT = {
-  uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
+  uncommon: 1.116, rare: 1.194, epic: 1.356, legendary: 1.426, mythic: 1.465, unique: 1.589,
 };
 
 // Flat income scale factor (compensates for additive stacking)
@@ -149,27 +152,36 @@ export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 
 
 export const STARTING_FIVE_CAP_DAYS = 2;
 
-// Consumable slot — rarity-based total boost (non-linear scaling)
-export const CONSUMABLE_SLOT_SCALING = {
-  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,
+export const CONSUMABLE_EFFECTS = {
+  'health-pot': {
+    type: 'instant', effect: 'cap-fill',
+    values: { common: 0.08, uncommon: 0.14, rare: 0.25, epic: 0.42, legendary: 0.68, mythic: 1.00 },
+  },
+  'mana-pot': {
+    type: 'buff', effect: 'rate-boost',
+    values: { common: 0.10, uncommon: 0.22, rare: 0.48, epic: 1.00, legendary: 1.90, mythic: 3.00 },
+  },
+  'multi-pot': {
+    type: 'buff', effect: 'rate-cap-boost',
+    rateValues: { common: 0.03, uncommon: 0.06, rare: 0.12, epic: 0.20, legendary: 0.35, mythic: 0.60 },
+    capValues: { common: 0.15, uncommon: 0.25, rare: 0.50, epic: 0.90, legendary: 1.50, mythic: 2.50 },
+  },
+  'elixir-str': {
+    type: 'buff', effect: 'collect-mult',
+    values: { common: 1.10, uncommon: 1.20, rare: 1.35, epic: 1.55, legendary: 1.85, mythic: 2.30 },
+  },
+  'elixir-int': {
+    type: 'buff', effect: 'dismantle-boost',
+    values: { common: 1.25, uncommon: 1.45, rare: 1.80, epic: 2.40, legendary: 3.50, mythic: 5.30 },
+  },
+  'ward': {
+    type: 'buff', effect: 'cap-increase',
+    values: { common: 0.25, uncommon: 0.50, rare: 1.00, epic: 1.75, legendary: 3.00, mythic: 5.00 },
+  },
+  'sentry': {
+    type: 'instant', effect: 'jackpot',
+    values: { common: 10, uncommon: 25, rare: 60, epic: 130, legendary: 280, mythic: 500 },
+  },
 };
 
-// Per-consumable passion/cores spread (ratios sum to 1.0)
-export const CONSUMABLE_SPREADS = {
-  'health-pot':  { passion: 0.75, cores: 0.25 },
-  'mana-pot':    { passion: 0.25, cores: 0.75 },
-  'multi-pot':   { passion: 0.50, cores: 0.50 },
-  'elixir-str':  { passion: 1.00, cores: 0.00 },
-  'elixir-int':  { passion: 0.00, cores: 1.00 },
-  'ward':        { passion: 0.60, cores: 0.40 },
-  'sentry':      { passion: 0.40, cores: 0.60 },
-};
-
-export function getConsumableBoost(consumableId, rarity) {
-  const total = CONSUMABLE_SLOT_SCALING[rarity] || 0;
-  const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 };
-  return {
-    passionBoost: total * spread.passion,
-    coresBoost: total * spread.cores,
-  };
-}
+export const CONSUMABLE_MAX_SLOTS = 3;
