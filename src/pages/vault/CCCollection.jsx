@@ -311,6 +311,11 @@ export default function CCCollection() {
     if (viewMode === 'owned') entries = entries.filter(e => e.collected)
     if (rarityFilter) entries = entries.filter(e => e.ownedRarities?.includes(rarityFilter))
 
+    if (searchQuery.trim().length >= 2) {
+      const q = searchQuery.trim().toLowerCase()
+      entries = entries.filter(e => (e.name || e.playerName || '').toLowerCase().includes(q))
+    }
+
     if (sortMode !== 'default') {
       entries = [...entries]
       const getName = e => (e.name || e.playerName || '').toLowerCase()
@@ -331,7 +336,7 @@ export default function CCCollection() {
     }
 
     return entries
-  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode])
+  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode, searchQuery])
 
   const hasMore = displayLimit < filteredEntries.length
   const remaining = filteredEntries.length - displayLimit
@@ -376,7 +381,7 @@ export default function CCCollection() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search player cards..."
+            placeholder="Search cards..."
             className="w-full pl-9 pr-8 py-2 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] text-sm text-[var(--cd-text)] placeholder-[var(--cd-text-dim)] focus:outline-none focus:border-[var(--cd-cyan)]/40 transition-colors"
           />
           {searchQuery && (
@@ -552,8 +557,8 @@ export default function CCCollection() {
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          {/* Search results mode */}
-          {searchQuery.trim().length >= 2 ? (
+          {/* Search results mode — API search for player cards across all sets */}
+          {searchQuery.trim().length >= 2 && isPlayerSection ? (
             <div>
               <h2 className="text-lg font-bold cd-head text-[var(--cd-text)] mb-3">
                 Search: "{searchQuery.trim()}"

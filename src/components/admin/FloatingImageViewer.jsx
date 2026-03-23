@@ -130,9 +130,11 @@ export default function FloatingImageViewer({ images = [], queueItemIds = [], on
     const prevImg = () => setActiveIndex(i => (i - 1 + effectiveImages.length) % effectiveImages.length)
     const nextImg = () => setActiveIndex(i => (i + 1) % effectiveImages.length)
 
-    // Keyboard nav
+    // Keyboard nav — disabled when an input field is focused (match reporting data entry)
     useEffect(() => {
         const onKey = (e) => {
+            const tag = e.target.tagName
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return
             if (e.key === 'Escape') onClose()
             if (e.key === 'ArrowLeft') prevImg()
             if (e.key === 'ArrowRight') nextImg()

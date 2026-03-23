@@ -1,7 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { GodAutocomplete } from './GodAutocomplete'
 import { ROLE_IMAGES, ROLE_LIST, API } from './constants'
 import { getAuthHeaders } from '../../../services/adminApi.js'
+import { AliasLinkModal } from './AliasLinkModal'
 import FloatingImageViewer from '../../../components/admin/FloatingImageViewer'
 
 const GAME_SUBSTEPS = ['winner', 'names', 'gods', 'roles', 'kda', 'damage', 'mitigated']
@@ -292,6 +294,7 @@ export default function WizardMatchReport({
             game, gameIndex, substep,
             team1Name, team2Name, team1Color, team2Color, team1Id, team2Id,
             adminData, updatePlayer, updateGame, onNext: next, onSwapTeams,
+            seasonId: matchInfo?.season_id || editData?.season_id,
         }
 
         const substepContent = (() => {
@@ -796,9 +799,10 @@ function WinnerStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Co
 // GAME STEP: NAMES
 // ═══════════════════════════════════════════════════
 
-function PlayerNameInput({ player, onChange, rosterPlayers }) {
+function PlayerNameInput({ player, onChange, rosterPlayers, adminData, seasonId }) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
+    const [showAliasModal, setShowAliasModal] = useState(false)
     const containerRef = useRef(null)
 
     useEffect(() => {
@@ -851,6 +855,22 @@ function PlayerNameInput({ player, onChange, rosterPlayers }) {
                             )}
                         </div>
                     )}
+                    {!player.matched_lp_id && !open && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                            {player.is_sub && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">
+                                    {player.sub_type === 'new' ? 'NEW RULE 0-SUB' : 'RULE 0-SUB'}
+                                </span>
+                            )}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setShowAliasModal(true) }}
+                                className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors font-semibold"
+                                title={`Link "${player.original_name || player.player_name}" as alias for an existing player`}
+                            >
+                                Link Alias
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
             {open && filtered.length > 0 && (
@@ -879,11 +899,31 @@ function PlayerNameInput({ player, onChange, rosterPlayers }) {
                     ))}
                 </div>
             )}
+            {showAliasModal && ReactDOM.createPortal(
+                <AliasLinkModal
+                    extractedName={player.original_name || player.player_name}
+                    adminData={adminData}
+                    seasonId={seasonId}
+                    onSave={(selectedPlayer) => {
+                        onChange({
+                            player_name: selectedPlayer.name,
+                            matched_name: selectedPlayer.name,
+                            matched_lp_id: selectedPlayer.league_player_id || selectedPlayer.player_id,
+                            is_sub: false,
+                            sub_type: null,
+                            match_source: 'alias',
+                        })
+                        setShowAliasModal(false)
+                    }}
+                    onClose={() => setShowAliasModal(false)}
+                />,
+                document.body
+            )}
         </div>
     )
 }
 
-function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, updatePlayer, onNext }) {
+function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Color, adminData, seasonId, updatePlayer, onNext }) {
     const rosterPlayers = adminData?.players || []
     return (
         <div>
@@ -892,6 +932,7 @@ function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
                     {(game.left_players || []).map((p, i) => (
                         <PlayerNameInput
                             key={i} player={p} rosterPlayers={rosterPlayers}
+                            adminData={adminData} seasonId={seasonId}
                             onChange={updates => updatePlayer(gameIndex, 'left', i, updates)}
                         />
                     ))}
@@ -900,6 +941,7 @@ function NamesStep({ game, gameIndex, team1Name, team2Name, team1Color, team2Col
                     {(game.right_players || []).map((p, i) => (
                         <PlayerNameInput
                             key={i} player={p} rosterPlayers={rosterPlayers}
+                            adminData={adminData} seasonId={seasonId}
                             onChange={updates => updatePlayer(gameIndex, 'right', i, updates)}
                         />
                     ))}

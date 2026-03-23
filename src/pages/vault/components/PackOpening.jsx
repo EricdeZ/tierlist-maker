@@ -296,9 +296,9 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
   useEffect(() => {
     let t
     switch (phase) {
-      case 'enter': t = setTimeout(() => setPhase('ready'), 900); break
-      case 'ripping': t = setTimeout(() => setPhase('emerging'), 5500); break
-      case 'emerging': t = setTimeout(() => setPhase('stack'), 3500); break
+      case 'enter': t = setTimeout(() => setPhase('ready'), 600); break
+      case 'ripping': t = setTimeout(() => setPhase('emerging'), 3500); break
+      case 'emerging': t = setTimeout(() => setPhase('stack'), 2500); break
       /* collecting phase removed — go straight to summary */
     }
     return () => clearTimeout(t)
@@ -401,7 +401,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
         setSparks(prev => [...prev.slice(-150), ...batch])
       }, sparkInterval)
       sparkIntervalRef.current = interval
-    }, 3000)
+    }, 1800)
     const sparkIntervalRef = { current: null }
     return () => { clearTimeout(delay); if (sparkIntervalRef.current) clearInterval(sparkIntervalRef.current) }
   }, [phase, rarestTier])
@@ -459,15 +459,15 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
       const last = topIndex === cards.length - 1
 
       // Anticipation phase duration scales with rarity
-      // Common: 0ms, Uncommon: 0ms, Rare: 300ms, Epic: 600ms, Legendary: 1000ms, Mythic: 1400ms
+      // Common: 0ms, Uncommon: 0ms, Rare: 100ms, Epic: 600ms, Legendary: 1000ms, Mythic: 1400ms
       // Last card adds extra: +400ms for rare+, +800ms for legendary+
       const baseAnticipation = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0
-      const lastBonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0
+      const lastBonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 100) : 0
       const anticipationMs = baseAnticipation + lastBonus
 
-      // Flip duration: Common 400ms → Mythic 800ms, last card +200ms
-      const flipMs = tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 500 : 400
-      const totalFlipMs = flipMs + (last ? 200 : 0)
+      // Flip duration: Common 250ms → Mythic 800ms, last card +200ms (epic+) / +100ms (rare-)
+      const flipMs = tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 300 : 250
+      const totalFlipMs = flipMs + (last ? (tier <= 2 ? 200 : 100) : 0)
 
       // Hold time after reveal: let effects breathe
       const holdMs = tier <= 0 ? 1200 : tier <= 1 ? 800 : tier <= 2 ? 500 : 200
@@ -561,7 +561,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
   const getFlipTime = (card, idx) => {
     const tier = RARITY_TIER[card?.rarity] ?? 5
     const last = idx === cards.length - 1
-    const ms = (tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 500 : 400) + (last ? 200 : 0)
+    const ms = (tier <= 0 ? 800 : tier <= 1 ? 700 : tier <= 2 ? 600 : tier <= 3 ? 300 : 250) + (last ? (tier <= 2 ? 200 : 100) : 0)
     return `${ms}ms`
   }
 
@@ -569,7 +569,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
     const tier = RARITY_TIER[card?.rarity] ?? 5
     const last = idx === cards.length - 1
     const base = tier <= 0 ? 1400 : tier <= 1 ? 1000 : tier <= 2 ? 600 : tier <= 3 ? 300 : 0
-    const bonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 200) : 0
+    const bonus = last ? (tier <= 1 ? 800 : tier <= 3 ? 400 : 100) : 0
     return `${base + bonus}ms`
   }
 

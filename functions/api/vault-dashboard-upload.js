@@ -99,7 +99,7 @@ async function handleThumbnailExport(request, sql, bucket, user, url) {
     const publicUrl = await uploadToR2(bucket, key, bytes, file.type)
 
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
-    await sql`UPDATE ${sql(table)} SET thumbnail_url = ${publicUrl}, updated_at = NOW() WHERE id = ${id}`
+    await sql`UPDATE ${sql.unsafe(table)} SET thumbnail_url = ${publicUrl}, updated_at = NOW() WHERE id = ${id}`
 
     return json({ success: true, thumbnail_url: publicUrl })
 }

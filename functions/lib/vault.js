@@ -8,9 +8,9 @@ const RARITIES = {
   uncommon:  { name: 'Uncommon',  dropRate: 0.30, color: '#22c55e', holoEffects: ['holo', 'amazing', 'reverse'] },
   rare:      { name: 'Rare',      dropRate: 0.06, color: '#3b82f6', holoEffects: ['galaxy', 'vstar', 'shiny', 'ultra'] },
   epic:      { name: 'Epic',      dropRate: 0.035, color: '#a855f7', holoEffects: ['radiant', 'sparkle', 'rainbow-alt', 'cosmos'] },
-  legendary: { name: 'Legendary', dropRate: 0.006, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
-  mythic:    { name: 'Mythic',    dropRate: 0.0007, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
-  unique:    { name: 'Unique',    dropRate: 0.0003, color: '#e8e8ff', holoEffects: ['secret'] },
+  legendary: { name: 'Legendary', dropRate: 0.0065, color: '#ff8c00', holoEffects: ['rainbow', 'secret', 'gold'] },
+  mythic:    { name: 'Mythic',    dropRate: 0.00075, color: '#ef4444', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos'] },
+  unique:    { name: 'Unique',    dropRate: 0.00035, color: '#e8e8ff', holoEffects: ['secret'] },
   full_art:  { name: 'Full Art',  dropRate: 0, color: '#d4af37', holoEffects: ['rainbow', 'secret', 'gold', 'cosmos', 'galaxy', 'radiant'] },
 }
 
@@ -487,9 +487,16 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
   return { packName: pack.name, cards: newCards, packOpenId: packOpen.id }
 }
 
+function normalizeGuarantees(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  // Object format {"rare": 1, "epic": 2} → [{minRarity, count}]
+  return Object.entries(raw).map(([minRarity, count]) => ({ minRarity, count }))
+}
+
 function generateRarityPack(pack) {
   const cards = []
-  const guarantees = [...pack.guarantees]
+  const guarantees = normalizeGuarantees(pack.guarantees)
   for (const g of guarantees) {
     for (let i = 0; i < g.count; i++) {
       cards.push(generateCard(rollRarity(g.minRarity)))

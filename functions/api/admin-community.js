@@ -214,7 +214,6 @@ async function handleEditTeam(sql, body) {
     const { id, name, skill_tier, color } = body
     if (!id) return err('Missing team id')
 
-    const updates = []
     const vals = {}
 
     if (name !== undefined) {
@@ -233,13 +232,14 @@ async function handleEditTeam(sql, body) {
     if (Object.keys(vals).length === 0) return err('Nothing to update')
 
     // Build dynamic update
-    const setClauses = Object.entries(vals).map(([k, v]) => sql`${sql(k)} = ${v}`)
+    const entries = Object.entries(vals)
+    const setClause = entries.map(([k], i) => `${k} = $${i + 1}`).join(', ')
+    const params = [...entries.map(([, v]) => v), Number(id)]
 
-    await sql`
-        UPDATE community_teams
-        SET ${sql(vals)}, updated_at = NOW()
-        WHERE id = ${Number(id)}
-    `
+    await sql.query(
+        `UPDATE community_teams SET ${setClause}, updated_at = NOW() WHERE id = $${entries.length + 1}`,
+        params
+    )
 
     return ok({ success: true })
 }

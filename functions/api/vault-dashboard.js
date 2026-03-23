@@ -232,13 +232,13 @@ async function submitForReview(sql, body, user) {
     if (!type || !id) return err('type and id required')
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
 
-    const rows = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    const rows = await sql`SELECT * FROM ${sql.unsafe(table)} WHERE id = ${id}`
     const row = rows[0]
     if (!row) return err('Not found', 404)
     if (row.created_by !== user.id) return err('Not authorized', 403)
     if (row.status !== 'draft' && row.status !== 'rejected') return err('Only drafts or rejected items can be submitted')
 
-    await sql`UPDATE ${sql(table)} SET status = 'pending_review', rejection_reason = NULL, updated_at = NOW() WHERE id = ${id}`
+    await sql`UPDATE ${sql.unsafe(table)} SET status = 'pending_review', rejection_reason = NULL, updated_at = NOW() WHERE id = ${id}`
     return ok({ success: true })
 }
 
@@ -248,7 +248,7 @@ async function approveItem(sql, body, user, canApprove) {
     if (!type || !id) return err('type and id required')
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
 
-    const rows = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    const rows = await sql`SELECT * FROM ${sql.unsafe(table)} WHERE id = ${id}`
     if (!rows[0]) return err('Not found', 404)
     if (rows[0].status !== 'pending_review') return err('Only pending items can be approved')
 
@@ -271,12 +271,12 @@ async function approveItem(sql, body, user, canApprove) {
             changed = true
         }
         if (changed) {
-            await sql`UPDATE ${sql(table)} SET template_data = ${JSON.stringify(td)}, status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
+            await sql`UPDATE ${sql.unsafe(table)} SET template_data = ${JSON.stringify(td)}, status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
             return ok({ success: true })
         }
     }
 
-    await sql`UPDATE ${sql(table)} SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
+    await sql`UPDATE ${sql.unsafe(table)} SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${id}`
     return ok({ success: true })
 }
 
@@ -286,11 +286,11 @@ async function rejectItem(sql, body, user, canApprove) {
     if (!type || !id) return err('type and id required')
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
 
-    const rows = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    const rows = await sql`SELECT * FROM ${sql.unsafe(table)} WHERE id = ${id}`
     if (!rows[0]) return err('Not found', 404)
     if (rows[0].status !== 'pending_review') return err('Only pending items can be rejected')
 
-    await sql`UPDATE ${sql(table)} SET status = 'rejected', rejection_reason = ${reason || null}, updated_at = NOW() WHERE id = ${id}`
+    await sql`UPDATE ${sql.unsafe(table)} SET status = 'rejected', rejection_reason = ${reason || null}, updated_at = NOW() WHERE id = ${id}`
     return ok({ success: true })
 }
 
@@ -308,11 +308,11 @@ async function deleteItem(sql, body, user, canApprove) {
     if (type !== 'template' && type !== 'draft') return err('type must be template or draft')
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
 
-    const [row] = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    const [row] = await sql`SELECT * FROM ${sql.unsafe(table)} WHERE id = ${id}`
     if (!row) return err('Not found', 404)
     if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
 
-    await sql`DELETE FROM ${sql(table)} WHERE id = ${id}`
+    await sql`DELETE FROM ${sql.unsafe(table)} WHERE id = ${id}`
     return ok({ success: true })
 }
 
@@ -323,7 +323,7 @@ async function renameItem(sql, body, user, canApprove) {
     if (type !== 'template' && type !== 'draft') return err('type must be template or draft')
     const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
 
-    const [row] = await sql`SELECT * FROM ${sql(table)} WHERE id = ${id}`
+    const [row] = await sql`SELECT * FROM ${sql.unsafe(table)} WHERE id = ${id}`
     if (!row) return err('Not found', 404)
     if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
 

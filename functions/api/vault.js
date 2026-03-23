@@ -1496,7 +1496,7 @@ async function handleDismantle(sql, user, body) {
       AND NOT EXISTS (
         SELECT 1 FROM cc_trade_cards tc
         JOIN cc_trades t ON tc.trade_id = t.id
-        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active') AND t.mode = 'direct'
+        WHERE tc.card_id = c.id AND t.status IN ('waiting', 'active')
       )
       AND NOT EXISTS (
         SELECT 1 FROM cc_lineups l
@@ -1570,12 +1570,21 @@ async function handleDismantle(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Selected cards are worth less than 1 Ember' }) }
   }
 
-  // Delete the cards (clean up completed trade references first to avoid FK violation)
+  // Delete the cards (clean up trade references first to avoid FK violations)
   await sql`
     DELETE FROM cc_trade_cards tc
     USING cc_trades t
     WHERE tc.trade_id = t.id AND tc.card_id = ANY(${validIds})
       AND t.status NOT IN ('waiting', 'active')
+  `
+  // NULL out swipe references in cc_trades before card deletion cascades to cc_swipes
+  await sql`
+    UPDATE cc_trades SET match_swipe_a_id = NULL
+    WHERE match_swipe_a_id IN (SELECT id FROM cc_swipes WHERE card_id = ANY(${validIds}))
+  `
+  await sql`
+    UPDATE cc_trades SET match_swipe_b_id = NULL
+    WHERE match_swipe_b_id IN (SELECT id FROM cc_swipes WHERE card_id = ANY(${validIds}))
   `
   await sql`DELETE FROM cc_cards WHERE id = ANY(${validIds}) AND owner_id = ${user.id}`
 

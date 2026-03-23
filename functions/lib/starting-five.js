@@ -3,13 +3,13 @@ import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
 
 const S5_FLAT_CORES = {
-  uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 6.59, unique: 7.28,
+  uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 7.05, unique: 8.01,
 }
 const S5_FLAT_PASSION = {
-  uncommon: 0.039, rare: 0.093, epic: 0.201, legendary: 0.387, mythic: 0.403, unique: 0.449,
+  uncommon: 0.039, rare: 0.093, epic: 0.201, legendary: 0.387, mythic: 0.431, unique: 0.494,
 }
 const S5_REVERSE_MULT = {
-  uncommon: 1.116, rare: 1.194, epic: 1.356, legendary: 1.426, mythic: 1.465, unique: 1.589,
+  uncommon: 1.116, rare: 1.194, epic: 1.356, legendary: 1.426, mythic: 1.568, unique: 1.748,
 }
 const S5_FLAT_SCALE = 0.7
 const S5_MULT_SCALE = 4.5
@@ -18,12 +18,12 @@ const S5_BENCH_EFFECTIVENESS = 0.50
 export const S5_ALLSTAR_MODIFIER = 0.615
 
 const S5_ATT_FLAT = {
-  god:  { uncommon: 0.06, rare: 0.10, epic: 0.20, legendary: 0.29, mythic: 0.33, unique: 0.44 },
-  item: { uncommon: 0.04, rare: 0.06, epic: 0.13, legendary: 0.18, mythic: 0.20, unique: 0.27 },
+  god:  { uncommon: 0.06, rare: 0.10, epic: 0.20, legendary: 0.29, mythic: 0.35, unique: 0.48 },
+  item: { uncommon: 0.04, rare: 0.06, epic: 0.13, legendary: 0.18, mythic: 0.21, unique: 0.30 },
 }
 const S5_ATT_MULT = {
-  god:  { uncommon: 0.030, rare: 0.050, epic: 0.100, legendary: 0.145, mythic: 0.160, unique: 0.215 },
-  item: { uncommon: 0.015, rare: 0.025, epic: 0.050, legendary: 0.070, mythic: 0.078, unique: 0.108 },
+  god:  { uncommon: 0.030, rare: 0.050, epic: 0.100, legendary: 0.145, mythic: 0.171, unique: 0.237 },
+  item: { uncommon: 0.015, rare: 0.025, epic: 0.050, legendary: 0.070, mythic: 0.083, unique: 0.119 },
 }
 const S5_FULL_ATT_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.40

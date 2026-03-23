@@ -44,9 +44,9 @@ export { CADENCE_SLOTS, CADENCES, GRACE_MS }
 // Compute period-start baselines for all trackable stats.
 // Transaction-based stats use timestamp-filtered queries so the baseline reflects
 // the stat value at the START of the period, regardless of when rollAssignments is called.
-// packs_opened uses cc_pack_opens (has timestamps) for accurate period baselines.
-// Counter-only stats (cards_dismantled, income_collections) read current cc_stats values
-// as a fallback — off by at most 1 action, but never 0 from missing currentStats.
+// Counter-only stats (packs_opened, cards_dismantled, income_collections) read current
+// cc_stats values — off by at most 1 action, but never 0 from missing history.
+// (cc_pack_opens was added recently and lacks backfilled data, so cc_stats is more reliable.)
 async function getBaselineStats(sql, userId, periodStart) {
     const [row] = await sql`
       WITH
@@ -75,19 +75,16 @@ async function getBaselineStats(sql, userId, periodStart) {
           SELECT COUNT(*)::int AS gifts_sent FROM cc_gifts
           WHERE sender_id = ${userId} AND created_at < ${periodStart}
         ),
-        packs_base AS (
-          SELECT COUNT(*)::int AS packs_opened FROM cc_pack_opens
-          WHERE user_id = ${userId} AND created_at < ${periodStart}
-        ),
         counter_base AS (
-          SELECT COALESCE(cards_dismantled, 0)::int AS cards_dismantled,
+          SELECT COALESCE(packs_opened, 0)::int AS packs_opened,
+                 COALESCE(cards_dismantled, 0)::int AS cards_dismantled,
                  COALESCE(legendary_cards_dismantled, 0)::int AS legendary_cards_dismantled,
                  COALESCE(income_collections, 0)::int AS income_collections
           FROM cc_stats WHERE user_id = ${userId}
         )
       SELECT e.*, t.trades_completed, t.trades_count, m.marketplace_sold, m.marketplace_sold_count,
-             g.gifts_sent, p.packs_opened, c.cards_dismantled, c.legendary_cards_dismantled, c.income_collections
-      FROM ember_base e, trades_base t, market_base m, gifts_base g, packs_base p
+             g.gifts_sent, c.packs_opened, c.cards_dismantled, c.legendary_cards_dismantled, c.income_collections
+      FROM ember_base e, trades_base t, market_base m, gifts_base g
       LEFT JOIN counter_base c ON true
     `
 

@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Lock, Heart, X as XIcon, Sparkles } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { Lock, Heart, X as XIcon, Sparkles, Filter } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
@@ -43,6 +43,12 @@ const RARITY_COLORS = {
 }
 
 const HOLO_LABELS = { holo: 'Holo', reverse: 'Reverse Holo', full: 'Full Art' }
+const RARITY_FILTER_OPTIONS = ['rare', 'epic', 'legendary', 'mythic', 'unique']
+const HOLO_FILTER_OPTIONS = [
+  { value: 'holo', label: 'Holo' },
+  { value: 'reverse', label: 'Reverse' },
+  { value: 'full', label: 'Full Art' },
+]
 
 const SWIPE_THRESHOLD = 0.3 // fraction of screen width
 const VELOCITY_THRESHOLD = 0.6 // px/ms — fast flick bypasses distance threshold
@@ -60,6 +66,24 @@ function avatarUrl(card) {
 export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, loading, empty, onGoToPile }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swiping, setSwiping] = useState(false) // true during async swipe processing
+  const [filterRarity, setFilterRarity] = useState('all')
+  const [filterHolo, setFilterHolo] = useState('all')
+
+  const filteredCards = useMemo(() => {
+    if (!feedCards?.length) return feedCards
+    if (filterRarity === 'all' && filterHolo === 'all') return feedCards
+    return feedCards.filter(c => {
+      if (filterRarity !== 'all' && c.rarity !== filterRarity) return false
+      if (filterHolo !== 'all') {
+        if (filterHolo === 'none' && c.holo_type) return false
+        if (filterHolo !== 'none' && c.holo_type !== filterHolo) return false
+      }
+      return true
+    })
+  }, [feedCards, filterRarity, filterHolo])
+
+  // Reset index when filters change
+  useEffect(() => { setCurrentIndex(0) }, [filterRarity, filterHolo])
 
   // Refs for 60fps drag — no re-renders during gesture
   const cardRef = useRef(null)
@@ -73,10 +97,10 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
   const lastMovePos = useRef({ x: 0, y: 0 })
   const animating = useRef(false)
 
-  const activeIndex = feedCards?.length > 0 ? currentIndex % feedCards.length : 0
-  const card = feedCards?.[activeIndex]
+  const activeIndex = filteredCards?.length > 0 ? currentIndex % filteredCards.length : 0
+  const card = filteredCards?.[activeIndex]
 
-  // Trigger load more when nearing end of first pass
+  // Trigger load more when nearing end of first pass (use unfiltered count)
   const remaining = feedCards ? feedCards.length - currentIndex : 0
   useEffect(() => {
     if (remaining <= LOAD_MORE_BUFFER && remaining > 0 && onLoadMore) {
@@ -312,18 +336,44 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
+  const hasActiveFilters = filterRarity !== 'all' || filterHolo !== 'all'
+
+  // ── Filter empty state ──
+  if (hasActiveFilters && !filteredCards?.length) {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        <SwipeFilters
+          filterRarity={filterRarity} setFilterRarity={setFilterRarity}
+          filterHolo={filterHolo} setFilterHolo={setFilterHolo}
+        />
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <Filter className="w-8 h-8 mb-3 opacity-20" style={{ color: 'var(--cd-text-dim)' }} />
+          <p className="text-sm font-bold cd-head mb-1" style={{ color: 'var(--cd-text-mid)' }}>No cards match filters</p>
+          <p className="text-xs" style={{ color: 'var(--cd-text-dim)' }}>Try adjusting your rarity or holo filters.</p>
+        </div>
+      </div>
+    )
+  }
+
   // Loop back to start when all cards have been swiped through
-  const loopedIndex = feedCards.length > 0 ? currentIndex % feedCards.length : 0
+  const loopedIndex = filteredCards.length > 0 ? currentIndex % filteredCards.length : 0
 
   // ── Card stack ──
   const visibleCards = []
-  for (let i = 0; i < STACK_SIZE && i < feedCards.length; i++) {
-    visibleCards.push(feedCards[(loopedIndex + i) % feedCards.length])
+  for (let i = 0; i < STACK_SIZE && i < filteredCards.length; i++) {
+    visibleCards.push(filteredCards[(loopedIndex + i) % filteredCards.length])
   }
 
   return (
     <div className="flex flex-col items-center gap-6 py-4 select-none overflow-hidden">
       <style>{`.swipe-card-content, .swipe-card-content * { user-select: none !important; -webkit-user-select: none !important; } .swipe-card-content img { -webkit-user-drag: none !important; user-drag: none !important; pointer-events: none !important; }`}</style>
+
+      {/* Filters */}
+      <SwipeFilters
+        filterRarity={filterRarity} setFilterRarity={setFilterRarity}
+        filterHolo={filterHolo} setFilterHolo={setFilterHolo}
+      />
+
       {/* Stack container — sized by the card component */}
       <div
         className="relative"
@@ -422,6 +472,35 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
           <Heart className="w-6 h-6" style={{ color: '#22c55e' }} />
         </button>
       </div>
+    </div>
+  )
+}
+
+function SwipeFilters({ filterRarity, setFilterRarity, filterHolo, setFilterHolo }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap justify-center w-full px-2">
+      <select
+        value={filterRarity}
+        onChange={e => setFilterRarity(e.target.value)}
+        className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
+      >
+        <option value="all">All Rarities</option>
+        {RARITY_FILTER_OPTIONS.map(r => (
+          <option key={r} value={r}>{r[0].toUpperCase() + r.slice(1)}</option>
+        ))}
+      </select>
+
+      <select
+        value={filterHolo}
+        onChange={e => setFilterHolo(e.target.value)}
+        className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head bg-[var(--cd-surface)] border border-[var(--cd-border)] text-[var(--cd-text)] cursor-pointer"
+      >
+        <option value="all">All Holos</option>
+        {HOLO_FILTER_OPTIONS.map(h => (
+          <option key={h.value} value={h.value}>{h.label}</option>
+        ))}
+        <option value="none">Non-Holo Only</option>
+      </select>
     </div>
   )
 }
