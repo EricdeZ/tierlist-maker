@@ -2627,6 +2627,7 @@ function formatCard(row) {
     isFirstEdition: row.is_first_edition || false,
     isConnected: row.card_data?.isConnected ?? null,
     bestGodName: row.best_god_name || null,
+    topGods: row.topGods || null,
     teamId: row.team_id || row.card_data?.teamId || null,
     defPlayerId: row.def_player_id || null,
     signatureUrl: row.signature_url || null,

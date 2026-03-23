@@ -64,6 +64,7 @@ function toPlayerCardProps(card) {
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     seasonName: cd.seasonName || '',
     bestGod: card.bestGodName ? { name: card.bestGodName } : null,
+    topGods: card.topGods || null,
     stats: cd.stats || null,
     isFirstEdition: card.isFirstEdition || false,
     isConnected: card.isConnected,

@@ -15,13 +15,9 @@ import './vault/compdeck.css'
 
 function lazyRetry(fn) {
     return lazy(() => fn().catch(() => {
-        // Chunk likely stale after deploy — reload once
-        const key = 'chunk-reload'
-        if (!sessionStorage.getItem(key)) {
-            sessionStorage.setItem(key, '1')
-            window.location.reload()
-        }
-        return fn()
+        // Retry once after a brief delay (transient network failure).
+        // Persistent chunk failures (stale deploy) are handled by ErrorBoundary.
+        return new Promise(resolve => setTimeout(resolve, 1000)).then(fn)
     }))
 }
 

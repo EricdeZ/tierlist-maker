@@ -238,6 +238,48 @@ export async function tick(sql, userId) {
     card._itemCard = itemCard
   }
 
+  // Fetch top 3 most-played gods for each player card
+  const playerDefIds = [...new Set(cards.filter(c => c.card_type === 'player' && c.def_id).map(c => c.def_id))]
+  if (playerDefIds.length > 0) {
+    const topGodsRows = await sql`
+      SELECT x.def_id, x.god_played, x.games, x.wins
+      FROM (
+        SELECT pd.id AS def_id, pgs.god_played,
+               COUNT(*)::int AS games,
+               COUNT(*) FILTER (
+                 WHERE g.winner_team_id = CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END
+               )::int AS wins,
+               ROW_NUMBER() OVER (PARTITION BY pd.id ORDER BY COUNT(*) DESC, pgs.god_played ASC) AS rn
+        FROM cc_player_defs pd
+        JOIN league_players lp ON lp.player_id = pd.player_id AND lp.season_id = pd.season_id
+        JOIN player_game_stats pgs ON pgs.league_player_id = lp.id AND pgs.god_played IS NOT NULL
+        JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+        JOIN matches m ON g.match_id = m.id
+        WHERE pd.id = ANY(${playerDefIds})
+          AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = pd.team_id
+        GROUP BY pd.id, pgs.god_played
+      ) x
+      WHERE x.rn <= 3
+      ORDER BY x.def_id, x.games DESC
+    `
+    const topGodsMap = {}
+    for (const row of topGodsRows) {
+      if (!topGodsMap[row.def_id]) topGodsMap[row.def_id] = []
+      const slug = row.god_played.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+      topGodsMap[row.def_id].push({
+        name: row.god_played,
+        imageUrl: `https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`,
+        games: row.games,
+        winRate: row.games > 0 ? Math.round((row.wins / row.games) * 1000) / 10 : 0,
+      })
+    }
+    for (const card of cards) {
+      if (card.card_type === 'player' && card.def_id) {
+        card.topGods = topGodsMap[card.def_id] || []
+      }
+    }
+  }
+
   const csCards = cards.filter(c => c.lineup_type === 'current')
   const asCards = cards.filter(c => c.lineup_type === 'allstar')
 

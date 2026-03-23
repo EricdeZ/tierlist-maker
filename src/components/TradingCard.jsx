@@ -49,6 +49,7 @@ export default function TradingCard({
     avatarUrl,
     stats: statsProp,
     bestGod: bestGodProp,
+    topGods: topGodsProp,
     leagueName,
     divisionName,
     rarity,
@@ -258,20 +259,35 @@ export default function TradingCard({
                         </div>
                     </div>
 
-                    {/* Flavor text */}
-                    <div className="card-flavor">
-                        {bestGod?.imageUrl && (
-                            <img src={bestGod.imageUrl} alt={bestGod.name} className="card-flavor-img" />
-                        )}
-                        <span className="card-flavor-text">
-                            {bestGod
-                                ? bestGod.games != null
-                                    ? `${playerName}'s most played god is ${bestGod.name} with ${bestGod.games} game${bestGod.games !== 1 ? 's' : ''} and a ${bestGod.winRate?.toFixed(0)}% win rate.`
-                                    : `${playerName}'s most played god is ${bestGod.name}.`
-                                : 'No games recorded this season.'
-                            }
-                        </span>
-                    </div>
+                    {/* Flavor text / Top gods */}
+                    {topGodsProp?.length > 0 ? (
+                        <div className="card-flavor" style={{ flexDirection: 'column', gap: '0.6cqi', padding: '1.2cqi 2.44cqi' }}>
+                            <span style={{ fontSize: '1.7cqi', color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Most Played</span>
+                            <div style={{ display: 'flex', gap: '1.5cqi', justifyContent: 'center' }}>
+                                {topGodsProp.map((god, i) => (
+                                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3cqi', minWidth: 0, flex: '1 1 0' }}>
+                                        <img src={god.imageUrl} alt={god.name} style={{ width: '7cqi', height: '7cqi', borderRadius: '1cqi', objectFit: 'cover', border: '1px solid var(--gold-dark)' }} />
+                                        <span style={{ fontSize: '1.6cqi', color: 'var(--text-main, #e8dcc8)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center' }}>{god.name}</span>
+                                        <span style={{ fontSize: '1.4cqi', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{god.games}g &middot; {god.winRate?.toFixed(0)}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="card-flavor">
+                            {bestGod?.imageUrl && (
+                                <img src={bestGod.imageUrl} alt={bestGod.name} className="card-flavor-img" />
+                            )}
+                            <span className="card-flavor-text">
+                                {bestGod
+                                    ? bestGod.games != null
+                                        ? `${playerName}'s most played god is ${bestGod.name} with ${bestGod.games} game${bestGod.games !== 1 ? 's' : ''} and a ${bestGod.winRate?.toFixed(0)}% win rate.`
+                                        : `${playerName}'s most played god is ${bestGod.name}.`
+                                    : 'No games recorded this season.'
+                                }
+                            </span>
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div className="card-footer">
