@@ -107,13 +107,14 @@ export default function HoloPreview({ elements, border }) {
 
     const visible = elements.filter(el => el.visible !== false)
     const sorted = [...visible].sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
+    const firstImage = elements.find(el => el.type === 'image')
 
     const cardStyle = {
         width: CARD_W,
         height: CARD_H,
         borderRadius: border?.enabled ? (border.radius ?? 12) : 12,
         border: 'none',
-        background: '#111827',
+        background: firstImage?.bgColor || '#111827',
         position: 'relative',
         overflow: 'hidden',
     }

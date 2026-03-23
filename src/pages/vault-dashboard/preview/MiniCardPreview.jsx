@@ -11,6 +11,7 @@ export default function MiniCardPreview({ templateData }) {
 
     const visible = elements.filter(el => el.visible !== false)
     const sorted = [...visible].sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
+    const firstImage = elements.find(el => el.type === 'image')
 
     return (
         <div
@@ -19,7 +20,7 @@ export default function MiniCardPreview({ templateData }) {
                 width: W,
                 height: H,
                 borderRadius: border?.enabled ? (border.radius ?? 12) * SCALE : 5,
-                background: '#111827',
+                background: firstImage?.bgColor || '#111827',
             }}
         >
             <div style={{ transform: `scale(${SCALE})`, transformOrigin: 'top left', width: 300, height: 420 }}>
