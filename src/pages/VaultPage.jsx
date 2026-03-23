@@ -63,7 +63,7 @@ const TABS = [
     { key: 'settings', label: 'Settings', icon: Settings, authOnly: true },
 ]
 
-const DESKTOP_MORE_KEYS = new Set(['settings', 'binder', 'catalog', 'unique'])
+const DESKTOP_MORE_KEYS = new Set(['settings', 'binder', 'catalog', 'unique', 'convert'])
 
 const TAB_COMPONENTS = {
     packs: CCPackShop,
