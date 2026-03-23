@@ -3,13 +3,13 @@ import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
 
 const S5_FLAT_CORES = {
-  uncommon: 0.80, rare: 1.90, epic: 4.20, legendary: 8.10, mythic: 8.50, unique: 9.40,
+  uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 6.59, unique: 7.28,
 }
 const S5_FLAT_PASSION = {
-  uncommon: 0.05, rare: 0.12, epic: 0.26, legendary: 0.50, mythic: 0.52, unique: 0.58,
+  uncommon: 0.039, rare: 0.093, epic: 0.201, legendary: 0.387, mythic: 0.403, unique: 0.449,
 }
 const S5_REVERSE_MULT = {
-  uncommon: 1.15, rare: 1.25, epic: 1.46, legendary: 1.55, mythic: 1.60, unique: 1.76,
+  uncommon: 1.116, rare: 1.194, epic: 1.356, legendary: 1.426, mythic: 1.465, unique: 1.589,
 }
 const S5_FLAT_SCALE = 0.7
 const S5_MULT_SCALE = 4.5
@@ -32,23 +32,27 @@ export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
 
-const CONSUMABLE_SLOT_SCALING = {
-  common: 0.50, uncommon: 0.60, rare: 0.80, epic: 1.00, legendary: 1.40, mythic: 2.00, unique: 2.80,
+const CONSUMABLE_EFFECTS = {
+  'health-pot': { type: 'instant', effect: 'cap-fill', values: { common: 0.08, uncommon: 0.14, rare: 0.25, epic: 0.42, legendary: 0.68, mythic: 1.00 } },
+  'mana-pot': { type: 'buff', effect: 'rate-boost', values: { common: 0.10, uncommon: 0.22, rare: 0.48, epic: 1.00, legendary: 1.90, mythic: 3.00 } },
+  'multi-pot': { type: 'buff', effect: 'rate-cap-boost', rateValues: { common: 0.03, uncommon: 0.06, rare: 0.12, epic: 0.20, legendary: 0.35, mythic: 0.60 }, capValues: { common: 0.15, uncommon: 0.25, rare: 0.50, epic: 0.90, legendary: 1.50, mythic: 2.50 } },
+  'elixir-str': { type: 'buff', effect: 'collect-mult', values: { common: 1.10, uncommon: 1.20, rare: 1.35, epic: 1.55, legendary: 1.85, mythic: 2.30 } },
+  'elixir-int': { type: 'buff', effect: 'dismantle-boost', values: { common: 1.25, uncommon: 1.45, rare: 1.80, epic: 2.40, legendary: 3.50, mythic: 5.30 } },
+  'ward': { type: 'buff', effect: 'cap-increase', values: { common: 0.25, uncommon: 0.50, rare: 1.00, epic: 1.75, legendary: 3.00, mythic: 5.00 } },
+  'sentry': { type: 'instant', effect: 'jackpot', values: { common: 10, uncommon: 25, rare: 60, epic: 130, legendary: 280, mythic: 500 } },
 }
-const CONSUMABLE_SPREADS = {
-  'health-pot':  { passion: 0.75, cores: 0.25 },
-  'mana-pot':    { passion: 0.25, cores: 0.75 },
-  'multi-pot':   { passion: 0.50, cores: 0.50 },
-  'elixir-str':  { passion: 1.00, cores: 0.00 },
-  'elixir-int':  { passion: 0.00, cores: 1.00 },
-  'ward':        { passion: 0.60, cores: 0.40 },
-  'sentry':      { passion: 0.40, cores: 0.60 },
-}
+const CONSUMABLE_MAX_SLOTS = 3
 
-export function getConsumableBoost(consumableId, rarity) {
-  const total = CONSUMABLE_SLOT_SCALING[rarity] || 0
-  const spread = CONSUMABLE_SPREADS[consumableId] || { passion: 0.5, cores: 0.5 }
-  return { passionBoost: total * spread.passion, coresBoost: total * spread.cores }
+export function getBuffTotals(activeBuffs) {
+  let totalRateBoost = 0
+  let totalCapDays = 0
+  let totalCollectMult = 1
+  for (const buff of (activeBuffs || [])) {
+    if (buff.rateBoost) totalRateBoost += buff.rateBoost
+    if (buff.capDays) totalCapDays += buff.capDays
+    if (buff.collectMult) totalCollectMult += (buff.collectMult - 1)
+  }
+  return { totalRateBoost, totalCapDays, totalCollectMult }
 }
 
 const CAP_DAYS = 2
@@ -234,10 +238,8 @@ export async function tick(sql, userId) {
     SELECT * FROM cc_starting_five_state WHERE user_id = ${userId}
   `
 
-  // Fetch slotted consumable (if any)
-  const [consumableCard] = state?.consumable_card_id ? await sql`
-    SELECT * FROM cc_cards WHERE id = ${state.consumable_card_id}
-  ` : [null]
+  const activeBuffs = state?.active_buffs || []
+  const { totalRateBoost, totalCapDays } = getBuffTotals(activeBuffs)
 
   const emptyOutput = { coresPerDay: 0, passionPerDay: 0 }
 
@@ -256,7 +258,10 @@ export async function tick(sql, userId) {
       passionCap: 0,
       coresCap: 0,
       lastTick: new Date().toISOString(),
-      consumableCard: consumableCard || null,
+      activeBuffs: state?.active_buffs || [],
+      consumableSlotsUsed: state?.consumable_slots_used || 0,
+      dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
+      dismantleBoostDate: state?.dismantle_boost_date || null,
     }
   }
 
@@ -278,8 +283,8 @@ export async function tick(sql, userId) {
   const combinedCoresPerDay = csOutput.coresPerDay + asOutput.coresPerDay * S5_ALLSTAR_MODIFIER
   const combinedPassionPerDay = csOutput.passionPerDay + asOutput.passionPerDay * S5_ALLSTAR_MODIFIER
 
-  const coresCap = combinedCoresPerDay * CAP_DAYS
-  const passionCap = combinedPassionPerDay * CAP_DAYS
+  const coresCap = combinedCoresPerDay * (CAP_DAYS + totalCapDays)
+  const passionCap = combinedPassionPerDay * (CAP_DAYS + totalCapDays)
 
   const now = new Date()
   const lastTick = new Date(state.last_tick)
@@ -295,18 +300,18 @@ export async function tick(sql, userId) {
       passionCap,
       coresCap,
       lastTick: state.last_tick,
-      consumableCard: consumableCard || null,
+      activeBuffs: state?.active_buffs || [],
+      consumableSlotsUsed: state?.consumable_slots_used || 0,
+      dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
+      dismantleBoostDate: state?.dismantle_boost_date || null,
     }
   }
 
   let coresAccrued = (combinedCoresPerDay / HOURS_PER_DAY) * elapsedHours
   let passionAccrued = (combinedPassionPerDay / HOURS_PER_DAY) * elapsedHours
 
-  // Apply consumable boost to accrued amounts (not cap)
-  if (consumableCard?.card_data?.consumableId) {
-    const boost = getConsumableBoost(consumableCard.card_data.consumableId, consumableCard.rarity)
-    passionAccrued *= (1 + boost.passionBoost)
-    coresAccrued *= (1 + boost.coresBoost)
+  if (totalRateBoost > 0) {
+    coresAccrued *= (1 + totalRateBoost)
   }
 
   let newPassion = Math.min((Number(state.passion_pending) || 0) + passionAccrued, passionCap)
@@ -329,15 +334,19 @@ export async function tick(sql, userId) {
     lastTick: now.toISOString(),
     passionCap,
     coresCap,
-    consumableCard: consumableCard || null,
+    activeBuffs: state?.active_buffs || [],
+    consumableSlotsUsed: state?.consumable_slots_used || 0,
+    dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
+    dismantleBoostDate: state?.dismantle_boost_date || null,
   }
 }
 
 export async function collectIncome(sql, userId) {
   const state = await tick(sql, userId)
 
+  const { totalCollectMult } = getBuffTotals(state.activeBuffs)
   const passionToGrant = Math.floor(state.passionPending)
-  const coresToGrant = Math.floor(state.coresPending)
+  const coresToGrant = Math.floor(state.coresPending * totalCollectMult)
   const passionRemainder = state.passionPending - passionToGrant
   const coresRemainder = state.coresPending - coresToGrant
 
@@ -351,7 +360,9 @@ export async function collectIncome(sql, userId) {
   await sql`
     UPDATE cc_starting_five_state
     SET passion_pending = ${passionRemainder},
-        cores_pending = ${coresRemainder}
+        cores_pending = ${coresRemainder},
+        active_buffs = '[]',
+        consumable_slots_used = 0
     WHERE user_id = ${userId}
   `
 
@@ -508,13 +519,13 @@ export async function unslotAttachment(sql, userId, role, slotType, lineupType =
   return await tick(sql, userId)
 }
 
-export async function slotConsumable(sql, userId, cardId) {
+export async function useConsumable(sql, userId, cardId) {
   const [card] = await sql`
     SELECT id, rarity, card_type, card_data FROM cc_cards
     WHERE id = ${cardId} AND owner_id = ${userId}
   `
   if (!card) throw new Error('Card not found')
-  if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be slotted')
+  if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be used')
 
   const [listing] = await sql`
     SELECT id FROM cc_market_listings WHERE card_id = ${cardId} AND status = 'active'
@@ -532,27 +543,111 @@ export async function slotConsumable(sql, userId, cardId) {
   `
   if (inBinder) throw new Error('Card is in your binder — remove it first')
 
-  // Collect pending income before changing rates
-  await collectIncome(sql, userId)
   await ensureState(sql, userId)
 
-  // Destroy current consumable (if any)
-  const [state] = await sql`
-    SELECT consumable_card_id FROM cc_starting_five_state WHERE user_id = ${userId}
+  const [s5State] = await sql`
+    SELECT consumable_slots_used, active_buffs, dismantle_boost_mult, dismantle_boost_date
+    FROM cc_starting_five_state WHERE user_id = ${userId}
   `
-  if (state?.consumable_card_id) {
-    await sql`DELETE FROM cc_cards WHERE id = ${state.consumable_card_id}`
+  if ((s5State?.consumable_slots_used || 0) >= CONSUMABLE_MAX_SLOTS) {
+    throw new Error('All 3 consumable slots are used this cycle — collect income first')
   }
 
-  // Slot new consumable
-  await sql`
-    UPDATE cc_starting_five_state
-    SET consumable_card_id = ${cardId}
-    WHERE user_id = ${userId}
-  `
+  const consumableId = card.card_data?.consumableId
+  const config = CONSUMABLE_EFFECTS[consumableId]
+  if (!config) throw new Error('Unknown consumable type')
 
-  // Auto-remove from trade pile when slotted
+  let result = { type: consumableId, effect: config.effect }
+
+  if (config.effect === 'cap-fill') {
+    const currentState = await tick(sql, userId)
+    const fillPct = config.values[card.rarity] || 0
+    const fillAmount = currentState.coresCap * fillPct
+    const newPending = Math.min((Number(currentState.coresPending) || 0) + fillAmount, currentState.coresCap)
+    await sql`
+      UPDATE cc_starting_five_state
+      SET cores_pending = ${newPending},
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = Math.round(fillAmount * 100) / 100
+
+  } else if (config.effect === 'jackpot') {
+    const maxValue = config.values[card.rarity] || 10
+    const jackpotAmount = Math.floor(Math.random() * maxValue) + 1
+    await grantEmber(sql, userId, 'consumable_jackpot', jackpotAmount, `Sentry Ward jackpot (${card.rarity})`)
+    await sql`
+      UPDATE cc_starting_five_state
+      SET consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = jackpotAmount
+
+  } else if (config.effect === 'rate-boost') {
+    const rateBoost = config.values[card.rarity] || 0
+    const buff = { type: consumableId, rarity: card.rarity, rateBoost }
+    await sql`
+      UPDATE cc_starting_five_state
+      SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = rateBoost
+
+  } else if (config.effect === 'rate-cap-boost') {
+    const rateBoost = config.rateValues[card.rarity] || 0
+    const capDays = config.capValues[card.rarity] || 0
+    const buff = { type: consumableId, rarity: card.rarity, rateBoost, capDays }
+    await sql`
+      UPDATE cc_starting_five_state
+      SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = { rateBoost, capDays }
+
+  } else if (config.effect === 'collect-mult') {
+    const collectMult = config.values[card.rarity] || 1
+    const buff = { type: consumableId, rarity: card.rarity, collectMult }
+    await sql`
+      UPDATE cc_starting_five_state
+      SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = collectMult
+
+  } else if (config.effect === 'cap-increase') {
+    const capDays = config.values[card.rarity] || 0
+    const buff = { type: consumableId, rarity: card.rarity, capDays }
+    await sql`
+      UPDATE cc_starting_five_state
+      SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = capDays
+
+  } else if (config.effect === 'dismantle-boost') {
+    const boostValue = config.values[card.rarity] || 1
+    const currentMult = Number(s5State?.dismantle_boost_mult) || 1
+    const today = new Date().toISOString().slice(0, 10)
+    const isToday = String(s5State?.dismantle_boost_date || '').slice(0, 10) === today
+    const newMult = isToday ? currentMult + (boostValue - 1) : boostValue
+    await sql`
+      UPDATE cc_starting_five_state
+      SET dismantle_boost_mult = ${newMult},
+          dismantle_boost_date = ${today},
+          consumable_slots_used = consumable_slots_used + 1
+      WHERE user_id = ${userId}
+    `
+    result.value = newMult
+  }
+
+  // Remove from trade pile before destroying
   await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
+  // Destroy the card
+  await sql`DELETE FROM cc_cards WHERE id = ${cardId}`
 
-  return await tick(sql, userId)
+  return { ...(await tick(sql, userId)), consumableResult: result }
 }
