@@ -466,9 +466,6 @@ export default function CCStartingFive() {
               </div>
               <span className="text-xs text-white/30 cd-num">
                 +{basePph.toFixed(2)}/hr
-                {effectiveRateBoost > 0 && (
-                  <span className="text-purple-400/60"> +{(effectiveRateBoost * 100).toFixed(0)}% rate buff</span>
-                )}
               </span>
             </div>
 
@@ -495,6 +492,9 @@ export default function CCStartingFive() {
               </div>
               <span className="text-xs text-white/30 cd-num">
                 +{baseCph.toFixed(2)}/hr
+                {effectiveRateBoost > 0 && (
+                  <span className="text-purple-400/60"> +{(effectiveRateBoost * 100).toFixed(0)}% rate buff</span>
+                )}
                 {effectiveCollectMult > 1 && (
                   <span className="text-orange-400/60"> {effectiveCollectMult.toFixed(1)}x next collect</span>
                 )}
