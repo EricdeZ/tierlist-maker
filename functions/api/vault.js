@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -2022,7 +2022,7 @@ async function handleUseConsumable(sql, user, body) {
   if (!cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
-  const state = await useConsumable(sql, user.id, cardId)
+  const state = await applyConsumable(sql, user.id, cardId)
 
   getVaultStats(sql, user.id)
     .then(stats => pushChallengeProgress(sql, user.id, stats))
