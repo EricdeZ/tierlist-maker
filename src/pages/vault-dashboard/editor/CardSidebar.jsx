@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom, FileText, Plus, Minus, X } from 'lucide-react'
-import { ROLES } from '../preview/prebuiltRenderers'
+import { ROLES, STAFF_THEMES } from '../preview/prebuiltRenderers'
+
+const STAFF_THEME_KEYS = Object.keys(STAFF_THEMES)
 
 const FONTS = ['Cinzel', 'Bebas Neue', 'Inter', 'Georgia', 'monospace', "'Segoe UI', system-ui, sans-serif"]
 const HOLO_EFFECTS = [
@@ -125,10 +127,16 @@ function FooterProperties({ sel, onUpdateElement }) {
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className={label}>Role Colors</label>
-                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value, theme: e.target.value === 'staff' ? (sel.theme || 'gold') : undefined })}
                         className={`${input} w-full capitalize`}>
                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
+                    {sel.role === 'staff' && (
+                        <select value={sel.theme || 'gold'} onChange={e => onUpdateElement(sel.id, { theme: e.target.value })}
+                            className={`${input} w-full capitalize mt-1`}>
+                            {STAFF_THEME_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    )}
                 </div>
                 <div>
                     <label className={label}>Size: {sel.fontSize ?? 9}px</label>
@@ -507,10 +515,16 @@ export default function CardSidebar({
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className={label}>Role Colors</label>
-                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value, theme: e.target.value === 'staff' ? (sel.theme || 'gold') : undefined })}
                                         className={`${input} w-full capitalize`}>
                                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
+                                    {sel.role === 'staff' && (
+                                        <select value={sel.theme || 'gold'} onChange={e => onUpdateElement(sel.id, { theme: e.target.value })}
+                                            className={`${input} w-full capitalize mt-1`}>
+                                            {STAFF_THEME_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    )}
                                 </div>
                                 <div>
                                     <label className={label}>Font</label>
@@ -527,6 +541,17 @@ export default function CardSidebar({
                                     className="w-full accent-amber-500" />
                             </div>
                             <div>
+                                <label className={label}>Name Color</label>
+                                <div className="flex gap-1">
+                                    <input type="color" value={sel.nameColor || '#ffffff'}
+                                        onChange={e => onUpdateElement(sel.id, { nameColor: e.target.value })}
+                                        className="w-8 h-8 bg-gray-800 border border-gray-700 rounded cursor-pointer" />
+                                    <input type="text" value={sel.nameColor || ''} placeholder="auto"
+                                        onChange={e => onUpdateElement(sel.id, { nameColor: e.target.value })}
+                                        className={`${input} flex-1`} />
+                                </div>
+                            </div>
+                            <div>
                                 <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
                                 <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
                                     onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}
@@ -540,10 +565,16 @@ export default function CardSidebar({
                         <div className="space-y-3">
                             <div>
                                 <label className={label}>Role Colors</label>
-                                <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value, theme: e.target.value === 'staff' ? (sel.theme || 'gold') : undefined })}
                                     className={`${input} w-full capitalize`}>
                                     {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                 </select>
+                                {sel.role === 'staff' && (
+                                    <select value={sel.theme || 'gold'} onChange={e => onUpdateElement(sel.id, { theme: e.target.value })}
+                                        className={`${input} w-full capitalize mt-1`}>
+                                        {STAFF_THEME_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
@@ -654,10 +685,16 @@ export default function CardSidebar({
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className={label}>Role Colors</label>
-                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value, theme: e.target.value === 'staff' ? (sel.theme || 'gold') : undefined })}
                                         className={`${input} w-full capitalize`}>
                                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
+                                    {sel.role === 'staff' && (
+                                        <select value={sel.theme || 'gold'} onChange={e => onUpdateElement(sel.id, { theme: e.target.value })}
+                                            className={`${input} w-full capitalize mt-1`}>
+                                            {STAFF_THEME_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    )}
                                 </div>
                                 <div>
                                     <label className={label}>Color</label>
@@ -704,10 +741,16 @@ export default function CardSidebar({
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className={label}>Role Colors</label>
-                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value })}
+                                    <select value={sel.role || 'adc'} onChange={e => onUpdateElement(sel.id, { role: e.target.value, theme: e.target.value === 'staff' ? (sel.theme || 'gold') : undefined })}
                                         className={`${input} w-full capitalize`}>
                                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
+                                    {sel.role === 'staff' && (
+                                        <select value={sel.theme || 'gold'} onChange={e => onUpdateElement(sel.id, { theme: e.target.value })}
+                                            className={`${input} w-full capitalize mt-1`}>
+                                            {STAFF_THEME_KEYS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    )}
                                 </div>
                                 <div>
                                     <label className={label}>Color</label>

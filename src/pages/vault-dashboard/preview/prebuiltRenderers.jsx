@@ -1,13 +1,32 @@
 export const ROLES = ['adc', 'solo', 'jungle', 'mid', 'support', 'staff', 'cheerleader']
 
 export const ROLE_PALETTES = {
-    adc:         { accent: '#c4884a', accentLight: '#e0a866', accentDark: '#8a5c2a', bodyBg: '#1e1810', bodySurface: '#2a2018', bodyBorder: '#4a3828', textDim: '#9a8a70' },
-    solo:        { accent: '#4a8ec4', accentLight: '#66b0e0', accentDark: '#2a5c8a', bodyBg: '#10161e', bodySurface: '#182230', bodyBorder: '#283a50', textDim: '#708a9a' },
-    jungle:      { accent: '#4ab868', accentLight: '#66d884', accentDark: '#2a7a3e', bodyBg: '#101e14', bodySurface: '#18301e', bodyBorder: '#285038', textDim: '#709a7a' },
-    mid:         { accent: '#9a5cc4', accentLight: '#b878e0', accentDark: '#6a3a8a', bodyBg: '#1a101e', bodySurface: '#261830', bodyBorder: '#402850', textDim: '#8a709a' },
-    support:     { accent: '#4aaab8', accentLight: '#66c8d4', accentDark: '#2a7a84', bodyBg: '#101c1e', bodySurface: '#182a30', bodyBorder: '#284a50', textDim: '#70949a' },
-    staff:       { accent: '#c4a84a', accentLight: '#e0c866', accentDark: '#8a7a2a', bodyBg: '#1e1c10', bodySurface: '#2a2818', bodyBorder: '#4a4428', textDim: '#9a9470' },
-    cheerleader: { accent: '#c44a72', accentLight: '#e06690', accentDark: '#8a2a4e', bodyBg: '#1e1014', bodySurface: '#2a1820', bodyBorder: '#4a2838', textDim: '#9a7080' },
+    adc:         { accent: '#c4884a', accentLight: '#e0a866', accentDark: '#8a5c2a', bodyBg: '#1e1810', bodySurface: '#2a2018', bodyBorder: '#4a3828', textBright: '#fff', textDim: '#9a8a70' },
+    solo:        { accent: '#4a8ec4', accentLight: '#66b0e0', accentDark: '#2a5c8a', bodyBg: '#10161e', bodySurface: '#182230', bodyBorder: '#283a50', textBright: '#fff', textDim: '#708a9a' },
+    jungle:      { accent: '#4ab868', accentLight: '#66d884', accentDark: '#2a7a3e', bodyBg: '#101e14', bodySurface: '#18301e', bodyBorder: '#285038', textBright: '#fff', textDim: '#709a7a' },
+    mid:         { accent: '#9a5cc4', accentLight: '#b878e0', accentDark: '#6a3a8a', bodyBg: '#1a101e', bodySurface: '#261830', bodyBorder: '#402850', textBright: '#fff', textDim: '#8a709a' },
+    support:     { accent: '#4aaab8', accentLight: '#66c8d4', accentDark: '#2a7a84', bodyBg: '#101c1e', bodySurface: '#182a30', bodyBorder: '#284a50', textBright: '#fff', textDim: '#70949a' },
+    staff:       { accent: '#c4a84a', accentLight: '#e0c866', accentDark: '#8a7a2a', bodyBg: '#1e1c10', bodySurface: '#2a2818', bodyBorder: '#4a4428', textBright: '#fff', textDim: '#9a9470' },
+    cheerleader: { accent: '#c44a72', accentLight: '#e06690', accentDark: '#8a2a4e', bodyBg: '#1e1014', bodySurface: '#2a1820', bodyBorder: '#4a2838', textBright: '#fff', textDim: '#9a7080' },
+}
+
+// Staff theme variants — keyed by theme name, same shape as ROLE_PALETTES entries
+export const STAFF_THEMES = {
+    gold:     ROLE_PALETTES.staff,
+    silver:   { accent: '#8a8a9a', accentLight: '#b0b0c0', accentDark: '#5a5a6a', bodyBg: '#141418', bodySurface: '#1e1e24', bodyBorder: '#38384a', textBright: '#fff', textDim: '#808090' },
+    crimson:  { accent: '#c44a4a', accentLight: '#e06666', accentDark: '#8a2a2a', bodyBg: '#1e1010', bodySurface: '#2a1818', bodyBorder: '#4a2828', textBright: '#fff', textDim: '#9a7070' },
+    navy:     { accent: '#4a5cc4', accentLight: '#6678e0', accentDark: '#2a3a8a', bodyBg: '#10101e', bodySurface: '#181830', bodyBorder: '#283050', textBright: '#fff', textDim: '#70709a' },
+    emerald:  { accent: '#2a8a5c', accentLight: '#40b878', accentDark: '#1a6a40', bodyBg: '#0e1a14', bodySurface: '#16261e', bodyBorder: '#264a38', textBright: '#fff', textDim: '#6a9a80' },
+    cream:    { accent: '#8a6a30', accentLight: '#6a5020', accentDark: '#b08840', bodyBg: '#f5f0e8', bodySurface: '#ece4d8', bodyBorder: '#d0c4a8', textBright: '#2a2418', textDim: '#6a6050' },
+    slate:    { accent: '#4a6080', accentLight: '#344868', accentDark: '#6080a0', bodyBg: '#e8ecf0', bodySurface: '#dce2e8', bodyBorder: '#b0bcc8', textBright: '#1a2030', textDim: '#5a6878' },
+    blush:    { accent: '#a05070', accentLight: '#804060', accentDark: '#c06888', bodyBg: '#f8f0f2', bodySurface: '#f0e4e8', bodyBorder: '#d8c0c8', textBright: '#2a1820', textDim: '#7a5a68' },
+}
+
+export function getResolvedPalette(el) {
+    if (el.role === 'staff' && el.theme && STAFF_THEMES[el.theme]) {
+        return STAFF_THEMES[el.theme]
+    }
+    return ROLE_PALETTES[el.role] || ROLE_PALETTES.adc
 }
 
 function hexToRgba(hex, opacity) {
@@ -24,7 +43,7 @@ export function isPrebuiltType(type) {
 }
 
 export function renderPrebuiltContent(el) {
-    const p = ROLE_PALETTES[el.role] || ROLE_PALETTES.adc
+    const p = getResolvedPalette(el)
     const font = el.font || "'Segoe UI', system-ui, sans-serif"
     const bgO = el.bgOpacity ?? 1
 
@@ -44,7 +63,7 @@ export function renderPrebuiltContent(el) {
                         minWidth: 0,
                         fontSize: el.fontSize ?? 16,
                         fontWeight: 800,
-                        color: '#fff',
+                        color: el.nameColor || p.textBright,
                         letterSpacing: 0.4,
                         textShadow: '0 1px 4px rgba(0,0,0,0.6)',
                         whiteSpace: 'nowrap',
@@ -96,7 +115,7 @@ export function renderPrebuiltContent(el) {
                             <span style={{
                                 fontSize: (el.fontSize ?? 10) + 2,
                                 fontWeight: 900,
-                                color: '#fff',
+                                color: p.textBright,
                                 textShadow: `0 0 8px ${p.accent}40`,
                             }}>
                                 {row.value}
@@ -113,19 +132,19 @@ export function renderPrebuiltContent(el) {
                         }}>
                             {record.winRate && (
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: '#fff' }}>{record.winRate}</div>
+                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: p.textBright }}>{record.winRate}</div>
                                     <div style={{ fontSize: 7, color: p.textDim, textTransform: 'uppercase', letterSpacing: 0.5 }}>WR</div>
                                 </div>
                             )}
                             {record.record && (
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: '#fff' }}>{record.record}</div>
+                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: p.textBright }}>{record.record}</div>
                                     <div style={{ fontSize: 7, color: p.textDim, textTransform: 'uppercase', letterSpacing: 0.5 }}>Record</div>
                                 </div>
                             )}
                             {record.games && (
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: '#fff' }}>{record.games}</div>
+                                    <div style={{ fontSize: (el.fontSize ?? 10) + 1, fontWeight: 800, color: p.textBright }}>{record.games}</div>
                                     <div style={{ fontSize: 7, color: p.textDim, textTransform: 'uppercase', letterSpacing: 0.5 }}>Games</div>
                                 </div>
                             )}
