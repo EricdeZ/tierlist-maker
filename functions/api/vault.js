@@ -8,7 +8,7 @@ import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
-import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, isRoleMismatch } from '../lib/starting-five.js'
+import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, CONSUMABLE_DAILY_CAP, isRoleMismatch } from '../lib/starting-five.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -66,6 +66,9 @@ const handler = async (event) => {
   }
   if (event.httpMethod === 'GET' && action === 'binder-view') {
     return await handleBinderView(sql, event.queryStringParameters)
+  }
+  if (event.httpMethod === 'GET' && action === 'signed-unique-gallery') {
+    return await handleSignedUniqueGallery(sql)
   }
 
   const user = await requireAuth(event)
@@ -967,7 +970,7 @@ async function handleCardDetail(sql, params) {
 
   const games = await sql`
     SELECT pgs.kills, pgs.deaths, pgs.assists, pgs.damage, pgs.mitigated,
-           pgs.team_side, g.winner_team_id,
+           pgs.god_played, pgs.team_side, g.winner_team_id,
            CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END AS player_team_id
     FROM player_game_stats pgs
     JOIN league_players lp ON pgs.league_player_id = lp.id
@@ -978,19 +981,36 @@ async function handleCardDetail(sql, params) {
   `
 
   let gamesPlayed = 0, wins = 0, kills = 0, deaths = 0, assists = 0, totalDamage = 0, totalMitigated = 0
+  const godCounts = {}
   for (const g of games) {
     gamesPlayed++
-    if (g.winner_team_id === g.player_team_id) wins++
+    const isWin = g.winner_team_id === g.player_team_id
+    if (isWin) wins++
     kills += parseInt(g.kills) || 0
     deaths += parseInt(g.deaths) || 0
     assists += parseInt(g.assists) || 0
     totalDamage += parseInt(g.damage) || 0
     totalMitigated += parseInt(g.mitigated) || 0
+    if (g.god_played) {
+      if (!godCounts[g.god_played]) godCounts[g.god_played] = { games: 0, wins: 0 }
+      godCounts[g.god_played].games++
+      if (isWin) godCounts[g.god_played].wins++
+    }
   }
 
-  // Use def.best_god_name as authoritative card identity (not live-computed)
+  // Compute best god with full stats from game data
   let bestGod = null
-  if (def.best_god_name) {
+  const godEntries = Object.entries(godCounts).sort((a, b) => b[1].games - a[1].games || a[0].localeCompare(b[0]))
+  if (godEntries.length > 0) {
+    const [godName, godStats] = godEntries[0]
+    const slug = godName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+    bestGod = {
+      name: godName,
+      imageUrl: `https://smitebrain.com/cdn-cgi/image/width=80,height=80,f=auto,fit=cover/https://images.smitebrain.com/images/gods/icons/${slug}`,
+      games: godStats.games,
+      winRate: godStats.games > 0 ? Math.round((godStats.wins / godStats.games) * 1000) / 10 : 0,
+    }
+  } else if (def.best_god_name) {
     const slug = def.best_god_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     bestGod = {
       name: def.best_god_name,
@@ -1871,7 +1891,7 @@ function formatS5Response(state, extra = {}) {
       activeBuffs: state.activeBuffs || [],
       consumableSlotsUsed: state.consumableSlotsUsed || 0,
       consumablesUsedToday: state.consumablesUsedToday || 0,
-      consumableDailyCap: state.consumableDailyCap || 9,
+      consumableDailyCap: CONSUMABLE_DAILY_CAP,
       dismantleBoostMult: state.dismantleBoostMult || 1,
       dismantleBoostActive: (() => {
         const today = new Date().toISOString().slice(0, 10)
@@ -2234,6 +2254,57 @@ async function handleRejectSignature(sql, user, body) {
   await sql`UPDATE cc_signature_requests SET status = 'pending', pending_signature_url = NULL, signed_at = NULL WHERE id = ${requestId}`
 
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+}
+
+// ═══ Signed Unique Gallery (public) ═══
+
+async function handleSignedUniqueGallery(sql) {
+  const cards = await sql`
+    SELECT c.id, c.god_name, c.god_id, c.god_class, c.role, c.rarity, c.serial_number,
+           c.holo_effect, c.holo_type, c.image_url, c.card_data, c.card_type,
+           c.def_id, c.signature_url, c.ability, c.is_first_edition,
+           d.player_name, d.team_name, d.team_color, d.role AS def_role,
+           d.season_slug, d.league_slug, d.division_slug,
+           u.discord_username AS owner_name,
+           sr.signed_at
+    FROM cc_cards c
+    LEFT JOIN cc_player_defs d ON c.def_id = d.id
+    LEFT JOIN users u ON c.owner_id = u.id
+    LEFT JOIN cc_signature_requests sr ON sr.card_id = c.id AND sr.status = 'signed'
+    WHERE c.rarity = 'unique'
+      AND c.signature_url IS NOT NULL
+      AND c.god_id NOT LIKE 'test-sig-%'
+    ORDER BY sr.signed_at DESC NULLS LAST, c.id DESC
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      cards: cards.map(c => ({
+        id: c.id,
+        godName: c.god_name,
+        godId: c.god_id,
+        godClass: c.god_class,
+        role: c.def_role || c.role,
+        rarity: c.rarity,
+        serialNumber: c.serial_number,
+        holoEffect: c.holo_effect,
+        holoType: c.holo_type,
+        imageUrl: c.image_url,
+        cardData: c.card_data,
+        cardType: c.card_type,
+        defId: c.def_id,
+        signatureUrl: c.signature_url,
+        ability: c.ability,
+        isFirstEdition: c.is_first_edition,
+        playerName: c.player_name,
+        teamName: c.team_name,
+        teamColor: c.team_color,
+        ownerName: c.owner_name,
+        signedAt: c.signed_at,
+      })),
+    }),
+  }
 }
 
 // ═══ Redeem Codes ═══
@@ -2627,7 +2698,7 @@ function formatCard(row) {
     isFirstEdition: row.is_first_edition || false,
     isConnected: row.card_data?.isConnected ?? null,
     bestGodName: row.best_god_name || null,
-    topGods: row.topGods || null,
+    bestGodFull: row._bestGodFull || null,
     teamId: row.team_id || row.card_data?.teamId || null,
     defPlayerId: row.def_player_id || null,
     signatureUrl: row.signature_url || null,

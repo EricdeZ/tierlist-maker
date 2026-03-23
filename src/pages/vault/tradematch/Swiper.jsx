@@ -388,7 +388,7 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
             <div
               key={c.card_id}
               ref={isTop ? cardRef : undefined}
-              className={`${isTop ? 'relative' : 'absolute inset-0'} rounded-2xl overflow-hidden`}
+              className={`${isTop ? 'relative' : 'absolute inset-0'} rounded-2xl`}
               style={{
                 zIndex: STACK_SIZE - i,
                 transform: isTop ? 'translate(0px, 0px) rotate(0deg)' : `translateY(${stackOffset}px) scale(${stackScale})`,

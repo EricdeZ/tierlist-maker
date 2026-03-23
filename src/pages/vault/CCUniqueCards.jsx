@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
@@ -7,7 +7,7 @@ import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
-import { PenLine, Check, Clock, Loader2 } from 'lucide-react'
+import { PenLine, Check, Clock, Loader2, User } from 'lucide-react'
 
 const DirectSignModal = lazy(() => import('./components/DirectSignModal'))
 
@@ -184,14 +184,84 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged,
   )
 }
 
+function GalleryCardEntry({ card }) {
+  const holoEffect = card.holoEffect || getHoloEffect(card.rarity)
+  const type = card.cardType || 'god'
+
+  const renderCard = () => {
+    if (type === 'collection') {
+      return <VaultCard card={card} getTemplate={() => null} holo size={280} />
+    }
+    if (type === 'player') {
+      return (
+        <TradingCard
+          {...toPlayerCardProps(card)}
+          size={280}
+          holo={{ rarity: holoEffect, holoType: card.holoType }}
+        />
+      )
+    }
+    return (
+      <TradingCardHolo rarity={holoEffect} role={card.role || 'mid'} holoType={card.holoType} size={280}>
+        <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} size={280} />
+      </TradingCardHolo>
+    )
+  }
+
+  const signedDate = card.signedAt
+    ? new Date(card.signedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      {renderCard()}
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold cd-head">
+          <Check size={14} />
+          Signed
+        </div>
+        {card.ownerName && (
+          <div className="flex items-center gap-1.5 text-white/50 text-xs">
+            <User size={12} />
+            {card.ownerName}
+          </div>
+        )}
+        {signedDate && (
+          <div className="text-white/30 text-[10px]">
+            {signedDate}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const VIEWS = [
+  { key: 'mine', label: 'My Cards' },
+  { key: 'gallery', label: 'Signed Gallery' },
+]
+
 export default function CCUniqueCards() {
   const { collection, loaded, getDefOverride, getTemplate, updateCardHoloType } = useVault()
   const { linkedPlayer } = useAuth()
+  const [view, setView] = useState('mine')
+  const [galleryCards, setGalleryCards] = useState([])
+  const [galleryLoading, setGalleryLoading] = useState(false)
+  const [galleryLoaded, setGalleryLoaded] = useState(false)
 
   const uniqueCards = useMemo(
     () => collection.filter(c => c.rarity === 'unique'),
     [collection]
   )
+
+  useEffect(() => {
+    if (view !== 'gallery' || galleryLoaded) return
+    setGalleryLoading(true)
+    vaultService.getSignedUniqueGallery()
+      .then(data => setGalleryCards(data.cards || []))
+      .catch(() => {})
+      .finally(() => { setGalleryLoading(false); setGalleryLoaded(true) })
+  }, [view, galleryLoaded])
 
   const handleHoloTypeChanged = (cardId, newType) => {
     updateCardHoloType(cardId, newType)
@@ -205,38 +275,85 @@ export default function CCUniqueCards() {
     )
   }
 
-  if (uniqueCards.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-white/40 text-sm">You don't own any unique cards yet.</p>
-        <p className="text-white/20 text-xs mt-1">Unique cards are the rarest in the Vault — only one copy exists per card.</p>
-      </div>
-    )
-  }
-
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-black uppercase tracking-widest text-white cd-head">
-          Unique Cards
-        </h2>
-        <p className="text-white/30 text-xs mt-1">
-          {uniqueCards.length} unique card{uniqueCards.length !== 1 ? 's' : ''} in your collection
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
-        {uniqueCards.map(card => (
-          <UniqueCardEntry
-            key={card.id}
-            card={card}
-            getDefOverride={getDefOverride}
-            getTemplate={getTemplate}
-            onHoloTypeChanged={handleHoloTypeChanged}
-            linkedPlayer={linkedPlayer}
-          />
+      {/* View Toggle */}
+      <div className="flex items-center gap-1 mb-6">
+        {VIEWS.map(v => (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all cursor-pointer cd-head ${
+              view === v.key
+                ? 'bg-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/40'
+                : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60 hover:border-white/20'
+            }`}
+          >
+            {v.label}
+          </button>
         ))}
       </div>
+
+      {view === 'mine' ? (
+        <>
+          <div className="mb-6">
+            <h2 className="text-lg font-black uppercase tracking-widest text-white cd-head">
+              Unique Cards
+            </h2>
+            <p className="text-white/30 text-xs mt-1">
+              {uniqueCards.length} unique card{uniqueCards.length !== 1 ? 's' : ''} in your collection
+            </p>
+          </div>
+
+          {uniqueCards.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p className="text-white/40 text-sm">You don't own any unique cards yet.</p>
+              <p className="text-white/20 text-xs mt-1">Unique cards are the rarest in the Vault — only one copy exists per card.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+              {uniqueCards.map(card => (
+                <UniqueCardEntry
+                  key={card.id}
+                  card={card}
+                  getDefOverride={getDefOverride}
+                  getTemplate={getTemplate}
+                  onHoloTypeChanged={handleHoloTypeChanged}
+                  linkedPlayer={linkedPlayer}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mb-6">
+            <h2 className="text-lg font-black uppercase tracking-widest text-white cd-head">
+              Signed Gallery
+            </h2>
+            <p className="text-white/30 text-xs mt-1">
+              All signed unique cards across the Vault
+            </p>
+          </div>
+
+          {galleryLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-6 h-6 animate-spin text-white/30" />
+            </div>
+          ) : galleryCards.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p className="text-white/40 text-sm">No signed unique cards yet.</p>
+              <p className="text-white/20 text-xs mt-1">When unique cards get signed by their depicted player, they'll appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+              {galleryCards.map(card => (
+                <GalleryCardEntry key={card.id} card={card} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

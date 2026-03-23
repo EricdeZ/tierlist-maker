@@ -255,7 +255,7 @@ function LikeGroup({ like, onLikesTrade }) {
           </p>
           <div className="flex gap-2 flex-wrap">
             {like.cards.map((card) => (
-              <CardThumb key={card.card_id} card={card} />
+              <CardThumb key={card.card_id} card={card} showHolo={false} />
             ))}
           </div>
         </div>

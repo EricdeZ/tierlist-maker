@@ -63,8 +63,7 @@ function toPlayerCardProps(card) {
     role: card.role || cd.role || 'ADC', avatarUrl: card.imageUrl || '',
     leagueName: cd.leagueName || '', divisionName: cd.divisionName || '',
     seasonName: cd.seasonName || '',
-    bestGod: card.bestGodName ? { name: card.bestGodName } : null,
-    topGods: card.topGods || null,
+    bestGod: card.bestGodFull || (card.bestGodName ? { name: card.bestGodName } : null),
     stats: cd.stats || null,
     isFirstEdition: card.isFirstEdition || false,
     isConnected: card.isConnected,
@@ -413,14 +412,18 @@ export default function CCStartingFive() {
   const handleUseConsumable = useCallback(async (cardId) => {
     if (slottingConsumable) return
     setSlottingConsumable(true)
+    setShowConsumablePicker(false)
+    setConsumableResult({ loading: true })
     try {
       const res = await applyS5Consumable(cardId)
       if (res.consumableResult) {
         setConsumableResult(res.consumableResult)
         setTimeout(() => setConsumableResult(null), 3000)
+      } else {
+        setConsumableResult(null)
       }
-      setShowConsumablePicker(false)
     } catch (err) {
+      setConsumableResult(null)
       showError(err.message || 'Failed to use consumable')
     } finally {
       setSlottingConsumable(false)
@@ -604,15 +607,15 @@ export default function CCStartingFive() {
 
         {consumableResult && (
           <div className="text-center text-sm font-bold cd-num" style={{ animation: 's5-fade-in 0.3s ease-out' }}>
-            {consumableResult.effect === 'jackpot' && (
+            {consumableResult.loading ? (
+              <span className="text-white/40"><span className="cd-spinner inline-block w-3 h-3 mr-1.5 align-middle" />Applying...</span>
+            ) : consumableResult.effect === 'jackpot' ? (
               <span className="text-amber-400">Jackpot! +{consumableResult.value} Cores</span>
-            )}
-            {consumableResult.effect === 'cap-fill' && (
+            ) : consumableResult.effect === 'cap-fill' ? (
               <span className="text-red-400">+{typeof consumableResult.value === 'number' ? consumableResult.value.toFixed(1) : consumableResult.value} Cores filled</span>
-            )}
-            {['rate-boost', 'rate-cap-boost', 'collect-mult', 'cap-increase', 'dismantle-boost'].includes(consumableResult.effect) && (
+            ) : ['rate-boost', 'rate-cap-boost', 'collect-mult', 'cap-increase', 'dismantle-boost'].includes(consumableResult.effect) ? (
               <span className="text-purple-400">Buff active!</span>
-            )}
+            ) : null}
           </div>
         )}
 

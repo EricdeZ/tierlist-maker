@@ -1148,6 +1148,9 @@ export const vaultService = {
     async rejectSignature(requestId) {
         return apiPost('vault', { action: 'reject-signature' }, { requestId })
     },
+    async getSignedUniqueGallery() {
+        return apiCall('vault', { action: 'signed-unique-gallery' })
+    },
     async submitSignature(requestId, file) {
         const formData = new FormData()
         formData.append('file', file)
