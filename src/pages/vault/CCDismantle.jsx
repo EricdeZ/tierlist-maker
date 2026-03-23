@@ -226,8 +226,7 @@ export default function CCDismantle() {
   }, [])
 
   const dismantleBoostMult = startingFive?.dismantleBoostMult || 1
-  const dismantleBoostDate = startingFive?.dismantleBoostDate || null
-  const dismantleBoostActive = dismantleBoostDate === new Date().toISOString().slice(0, 10)
+  const dismantleBoostActive = startingFive?.dismantleBoostActive || false
   const thresholdMult = dismantleBoostActive ? dismantleBoostMult : 1
 
   const currentMultiplier = getDismantleMultiplier(dismantledValueToday)
@@ -314,12 +313,21 @@ export default function CCDismantle() {
                 })}
               </div>
               <div className="mt-3 pt-3 border-t border-[var(--cd-border)]">
-                <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Daily Diminishing Returns</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] uppercase tracking-wider">Daily Diminishing Returns</div>
+                  {dismantleBoostActive && dismantleBoostMult > 1 && (
+                    <span className="text-[9px] font-bold cd-num text-violet-400 px-1.5 py-0.5 rounded bg-violet-400/10 border border-violet-400/20">
+                      &times;{dismantleBoostMult.toFixed(1)} boosted
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {DISMANTLE_TIERS.map((tier, i) => {
-                    const prevUpTo = i === 0 ? 0 : DISMANTLE_TIERS[i - 1].upTo
-                    const label = tier.upTo === Infinity ? `${prevUpTo}+` : `${prevUpTo}–${tier.upTo}`
-                    const isActive = dismantledValueToday >= prevUpTo && dismantledValueToday < tier.upTo
+                    const basePrev = i === 0 ? 0 : DISMANTLE_TIERS[i - 1].upTo
+                    const effectivePrev = basePrev === Infinity ? Infinity : Math.round(basePrev * thresholdMult)
+                    const effectiveUpTo = tier.upTo === Infinity ? Infinity : Math.round(tier.upTo * thresholdMult)
+                    const label = effectiveUpTo === Infinity ? `${effectivePrev}+` : `${effectivePrev}–${effectiveUpTo}`
+                    const isActive = dismantledValueToday >= effectivePrev && dismantledValueToday < effectiveUpTo
                     return (
                       <div key={i} className={`p-2 rounded-lg ${isActive ? 'bg-[var(--cd-cyan)]/10 border border-[var(--cd-cyan)]/30' : 'bg-black/20'}`}>
                         <div className="text-[var(--cd-text-dim)] cd-head">Cores {label}</div>

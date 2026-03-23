@@ -569,7 +569,7 @@ export default function CCStartingFive() {
               <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 until claim &middot; {consumablesUsedToday}/{consumableDailyCap} today</span>
             </div>
 
-            {activeBuffs.length > 0 && (
+            {(activeBuffs.length > 0 || (dismantleBoostActive && dismantleBoostMult > 1)) && (
               <div>
                 <div className="text-[9px] font-bold cd-head text-white/30 tracking-wider mb-1">ACTIVE BOOSTS</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -586,14 +586,16 @@ export default function CCStartingFive() {
                       </span>
                     )
                   })}
+                  {dismantleBoostActive && dismantleBoostMult > 1 && (() => {
+                    const def = CONSUMABLES.find(c => c.id === 'elixir-int')
+                    return (
+                      <span className="px-2 py-1 rounded-lg text-[10px] font-bold cd-num border border-white/10 bg-white/[0.03] flex items-center gap-1.5 text-violet-400">
+                        {def && <img src={def.imageUrl} alt="" className="w-4 h-4 rounded" />}
+                        &times;{dismantleBoostMult.toFixed(1)} dismantle (daily)
+                      </span>
+                    )
+                  })()}
                 </div>
-              </div>
-            )}
-
-            {dismantleBoostActive && dismantleBoostMult > 1 && (
-              <div className="text-[10px] font-bold cd-num text-purple-400/80 flex items-center gap-1">
-                <Zap size={10} />
-                Dismantle boost: &times;{dismantleBoostMult.toFixed(1)} thresholds (until daily reset)
               </div>
             )}
           </div>
