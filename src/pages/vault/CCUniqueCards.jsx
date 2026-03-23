@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
@@ -244,7 +245,15 @@ const VIEWS = [
 export default function CCUniqueCards() {
   const { collection, loaded, getDefOverride, getTemplate, updateCardHoloType } = useVault()
   const { linkedPlayer } = useAuth()
-  const [view, setView] = useState('mine')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('subtab') || 'mine'
+  const setView = useCallback((key) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (key === 'mine') next.delete('subtab'); else next.set('subtab', key)
+      return next
+    })
+  }, [setSearchParams])
   const [galleryCards, setGalleryCards] = useState([])
   const [galleryLoading, setGalleryLoading] = useState(false)
   const [galleryLoaded, setGalleryLoaded] = useState(false)
