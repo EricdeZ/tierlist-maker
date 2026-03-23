@@ -2260,16 +2260,19 @@ async function handleRejectSignature(sql, user, body) {
 
 async function handleSignedUniqueGallery(sql) {
   const cards = await sql`
-    SELECT c.id, c.god_name, c.god_id, c.god_class, c.role, c.rarity, c.serial_number,
-           c.holo_effect, c.holo_type, c.image_url, c.card_data, c.card_type,
-           c.def_id, c.signature_url, c.ability, c.is_first_edition,
-           d.player_name, d.team_name, d.team_color, d.role AS def_role,
-           d.season_slug, d.league_slug, d.division_slug,
-           u.discord_username AS owner_name,
+    SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
+           pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
+           ou.discord_username AS owner_name,
            sr.signed_at
     FROM cc_cards c
     LEFT JOIN cc_player_defs d ON c.def_id = d.id
-    LEFT JOIN users u ON c.owner_id = u.id
+    LEFT JOIN LATERAL (
+      SELECT u.id, u.discord_id, u.discord_avatar
+      FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
+    ) pu ON true
+    LEFT JOIN user_preferences pup ON pup.user_id = pu.id
+    LEFT JOIN users ou ON c.owner_id = ou.id
     LEFT JOIN cc_signature_requests sr ON sr.card_id = c.id AND sr.status = 'signed'
     WHERE c.rarity = 'unique'
       AND c.signature_url IS NOT NULL
@@ -2281,25 +2284,7 @@ async function handleSignedUniqueGallery(sql) {
     statusCode: 200, headers,
     body: JSON.stringify({
       cards: cards.map(c => ({
-        id: c.id,
-        godName: c.god_name,
-        godId: c.god_id,
-        godClass: c.god_class,
-        role: c.def_role || c.role,
-        rarity: c.rarity,
-        serialNumber: c.serial_number,
-        holoEffect: c.holo_effect,
-        holoType: c.holo_type,
-        imageUrl: c.image_url,
-        cardData: c.card_data,
-        cardType: c.card_type,
-        defId: c.def_id,
-        signatureUrl: c.signature_url,
-        ability: c.ability,
-        isFirstEdition: c.is_first_edition,
-        playerName: c.player_name,
-        teamName: c.team_name,
-        teamColor: c.team_color,
+        ...formatCard(c),
         ownerName: c.owner_name,
         signedAt: c.signed_at,
       })),
