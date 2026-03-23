@@ -979,7 +979,7 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
             </button>
           </div>
           <div className="p-4 overflow-y-auto space-y-2 flex-1">
-            <p className="text-xs text-white/40 mb-3">{def?.description}</p>
+            <p className="text-sm text-white/40 mb-3">{def?.description}</p>
             {typeCards.map(card => {
               const effectVal = effect?.values?.[card.rarity] || effect?.rateValues?.[card.rarity] || 0
               let valueLabel = ''
@@ -993,13 +993,13 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
 
               return (
                 <button key={card.id} onClick={() => setConfirmCard(card)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer">
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold cd-head" style={{ color: RARITIES[card.rarity]?.color }}>
+                    <span className="text-sm font-bold cd-head" style={{ color: RARITIES[card.rarity]?.color }}>
                       {RARITIES[card.rarity]?.name}
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold cd-num text-emerald-400">{valueLabel}</span>
+                  <span className="text-sm font-bold cd-num text-emerald-400">{valueLabel}</span>
                 </button>
               )
             })}
