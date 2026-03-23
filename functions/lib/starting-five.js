@@ -42,7 +42,7 @@ const CONSUMABLE_EFFECTS = {
   'sentry': { type: 'instant', effect: 'jackpot', values: { common: 10, uncommon: 25, rare: 60, epic: 130, legendary: 280, mythic: 500 } },
 }
 const CONSUMABLE_MAX_SLOTS = 3
-const CONSUMABLE_DAILY_CAP = 10
+const CONSUMABLE_DAILY_CAP = 9
 
 export function getBuffTotals(activeBuffs) {
   let totalRateBoost = 0

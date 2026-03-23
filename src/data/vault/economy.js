@@ -185,4 +185,4 @@ export const CONSUMABLE_EFFECTS = {
 };
 
 export const CONSUMABLE_MAX_SLOTS = 3;
-export const CONSUMABLE_DAILY_CAP = 10;
+export const CONSUMABLE_DAILY_CAP = 9;
