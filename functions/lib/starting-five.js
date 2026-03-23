@@ -42,6 +42,7 @@ const CONSUMABLE_EFFECTS = {
   'sentry': { type: 'instant', effect: 'jackpot', values: { common: 10, uncommon: 25, rare: 60, epic: 130, legendary: 280, mythic: 500 } },
 }
 const CONSUMABLE_MAX_SLOTS = 3
+const CONSUMABLE_DAILY_CAP = 10
 
 export function getBuffTotals(activeBuffs) {
   let totalRateBoost = 0
@@ -260,6 +261,8 @@ export async function tick(sql, userId) {
       lastTick: new Date().toISOString(),
       activeBuffs: state?.active_buffs || [],
       consumableSlotsUsed: state?.consumable_slots_used || 0,
+      consumablesUsedToday: String(state?.consumables_used_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
+      consumableDailyCap: CONSUMABLE_DAILY_CAP,
       dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
       dismantleBoostDate: state?.dismantle_boost_date || null,
     }
@@ -302,6 +305,8 @@ export async function tick(sql, userId) {
       lastTick: state.last_tick,
       activeBuffs: state?.active_buffs || [],
       consumableSlotsUsed: state?.consumable_slots_used || 0,
+      consumablesUsedToday: String(state?.consumables_used_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
+      consumableDailyCap: CONSUMABLE_DAILY_CAP,
       dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
       dismantleBoostDate: state?.dismantle_boost_date || null,
     }
@@ -546,11 +551,19 @@ export async function useConsumable(sql, userId, cardId) {
   await ensureState(sql, userId)
 
   const [s5State] = await sql`
-    SELECT consumable_slots_used, active_buffs, dismantle_boost_mult, dismantle_boost_date
+    SELECT consumable_slots_used, active_buffs, dismantle_boost_mult, dismantle_boost_date,
+           consumables_used_today, consumables_used_date
     FROM cc_starting_five_state WHERE user_id = ${userId}
   `
   if ((s5State?.consumable_slots_used || 0) >= CONSUMABLE_MAX_SLOTS) {
-    throw new Error('All 3 consumable slots are used this cycle — collect income first')
+    throw new Error('All 3 consumable slots are used — collect income first')
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const usedToday = String(s5State?.consumables_used_date || '').slice(0, 10) === today
+    ? (s5State?.consumables_used_today || 0) : 0
+  if (usedToday >= CONSUMABLE_DAILY_CAP) {
+    throw new Error(`Daily consumable limit reached (${CONSUMABLE_DAILY_CAP}/day)`)
   }
 
   const consumableId = card.card_data?.consumableId
@@ -567,7 +580,9 @@ export async function useConsumable(sql, userId, cardId) {
     await sql`
       UPDATE cc_starting_five_state
       SET cores_pending = ${newPending},
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = Math.round(fillAmount * 100) / 100
@@ -578,7 +593,9 @@ export async function useConsumable(sql, userId, cardId) {
     await grantEmber(sql, userId, 'consumable_jackpot', jackpotAmount, `Sentry Ward jackpot (${card.rarity})`)
     await sql`
       UPDATE cc_starting_five_state
-      SET consumable_slots_used = consumable_slots_used + 1
+      SET consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = jackpotAmount
@@ -589,7 +606,9 @@ export async function useConsumable(sql, userId, cardId) {
     await sql`
       UPDATE cc_starting_five_state
       SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = rateBoost
@@ -601,7 +620,9 @@ export async function useConsumable(sql, userId, cardId) {
     await sql`
       UPDATE cc_starting_five_state
       SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = { rateBoost, capDays }
@@ -612,7 +633,9 @@ export async function useConsumable(sql, userId, cardId) {
     await sql`
       UPDATE cc_starting_five_state
       SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = collectMult
@@ -623,7 +646,9 @@ export async function useConsumable(sql, userId, cardId) {
     await sql`
       UPDATE cc_starting_five_state
       SET active_buffs = active_buffs || ${JSON.stringify(buff)}::jsonb,
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = capDays
@@ -638,7 +663,9 @@ export async function useConsumable(sql, userId, cardId) {
       UPDATE cc_starting_five_state
       SET dismantle_boost_mult = ${newMult},
           dismantle_boost_date = ${today},
-          consumable_slots_used = consumable_slots_used + 1
+          consumable_slots_used = consumable_slots_used + 1,
+          consumables_used_today = ${usedToday + 1},
+          consumables_used_date = ${today}
       WHERE user_id = ${userId}
     `
     result.value = newMult

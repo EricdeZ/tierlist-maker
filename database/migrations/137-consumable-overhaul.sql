@@ -16,4 +16,6 @@ ALTER TABLE cc_starting_five_state
   ADD COLUMN IF NOT EXISTS active_buffs JSONB DEFAULT '[]',
   ADD COLUMN IF NOT EXISTS consumable_slots_used INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS dismantle_boost_mult NUMERIC(6,2) DEFAULT 1.0,
-  ADD COLUMN IF NOT EXISTS dismantle_boost_date DATE;
+  ADD COLUMN IF NOT EXISTS dismantle_boost_date DATE,
+  ADD COLUMN IF NOT EXISTS consumables_used_today INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS consumables_used_date DATE;

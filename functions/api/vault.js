@@ -1867,6 +1867,8 @@ function formatS5Response(state, extra = {}) {
       coresCap: state.coresCap,
       activeBuffs: state.activeBuffs || [],
       consumableSlotsUsed: state.consumableSlotsUsed || 0,
+      consumablesUsedToday: state.consumablesUsedToday || 0,
+      consumableDailyCap: state.consumableDailyCap || 10,
       dismantleBoostMult: state.dismantleBoostMult || 1,
       dismantleBoostActive: (() => {
         const today = new Date().toISOString().slice(0, 10)

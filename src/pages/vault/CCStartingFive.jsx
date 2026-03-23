@@ -243,6 +243,8 @@ export default function CCStartingFive() {
   const boostedPassionPerDay = startingFive?.boostedPassionPerDay || combinedOutput.passionPerDay
   const activeBuffs = startingFive?.activeBuffs || []
   const consumableSlotsUsed = startingFive?.consumableSlotsUsed || 0
+  const consumablesUsedToday = startingFive?.consumablesUsedToday || 0
+  const consumableDailyCap = startingFive?.consumableDailyCap || 10
   const effectiveRateBoost = startingFive?.effectiveRateBoost || 0
   const effectiveCollectMult = startingFive?.effectiveCollectMult || 1
   const dismantleBoostMult = startingFive?.dismantleBoostMult || 1
@@ -529,7 +531,7 @@ export default function CCStartingFive() {
           <div className="relative flex items-center gap-3 shrink-0 flex-nowrap">
             <button
               onClick={() => setShowConsumablePicker(true)}
-              disabled={consumableSlotsUsed >= 3}
+              disabled={consumableSlotsUsed >= 3 || consumablesUsedToday >= consumableDailyCap}
               className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 relative flex items-center gap-1.5"
               title="Use a consumable to boost income"
             >
@@ -564,7 +566,7 @@ export default function CCStartingFive() {
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold cd-head text-white/40 tracking-wider">CONSUMABLES</span>
-              <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 used until next claim</span>
+              <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 until claim &middot; {consumablesUsedToday}/{consumableDailyCap} today</span>
             </div>
 
             {activeBuffs.length > 0 && (
@@ -903,6 +905,8 @@ export default function CCStartingFive() {
           onUse={handleUseConsumable}
           cards={collection}
           slotsUsed={consumableSlotsUsed}
+          usedToday={consumablesUsedToday}
+          dailyCap={consumableDailyCap}
         />
       )}
 
@@ -975,7 +979,7 @@ export default function CCStartingFive() {
 }
 
 
-function BoostModal({ onClose, onUse, cards, slotsUsed }) {
+function BoostModal({ onClose, onUse, cards, slotsUsed, usedToday = 0, dailyCap = 10 }) {
   const [selectedType, setSelectedType] = useState(null)
   const [confirmCard, setConfirmCard] = useState(null)
 
@@ -1090,16 +1094,20 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)] shrink-0">
           <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">
-            Boost <span className="text-white/30 text-sm ml-1">{slotsUsed}/3</span>
+            Boost <span className="text-white/30 text-sm ml-1">{slotsUsed}/3 &middot; {usedToday}/{dailyCap} today</span>
           </h3>
           <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        {slotsUsed >= 3 ? (
+        {usedToday >= dailyCap ? (
           <div className="p-6 text-center text-sm text-white/40">
-            All slots used. Collect income to reset.
+            Daily limit reached ({dailyCap} consumables per day).
+          </div>
+        ) : slotsUsed >= 3 ? (
+          <div className="p-6 text-center text-sm text-white/40">
+            All 3 slots used. Collect income to reset.
           </div>
         ) : (
           <div className="p-4 overflow-y-auto space-y-1.5 flex-1">
