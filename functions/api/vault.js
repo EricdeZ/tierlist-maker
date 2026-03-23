@@ -513,7 +513,7 @@ async function handleOpenPack(sql, user, body) {
 }
 
 // ═══ POST: Sale purchase — transactional stock + payment ═══
-const VENDING_COOLDOWN_SECONDS = 45
+const VENDING_COOLDOWN_SECONDS = 28
 
 async function handleSalePurchase(sql, user, saleId) {
   const result = await transaction(async (tx) => {
