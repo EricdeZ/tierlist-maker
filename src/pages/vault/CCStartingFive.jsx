@@ -510,7 +510,7 @@ export default function CCStartingFive() {
           <div className="relative flex items-center gap-3 shrink-0 flex-nowrap">
             <button
               onClick={() => setShowConsumablePicker(true)}
-              disabled={consumableSlotsUsed >= 3 || !startingFive?.cards?.length}
+              disabled={consumableSlotsUsed >= 3}
               className="cd-btn-solid cd-btn-action cd-clip-btn px-6 py-2.5 text-sm font-bold cd-head tracking-wider cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 relative flex items-center gap-1.5"
               title="Use a consumable to boost income"
             >
