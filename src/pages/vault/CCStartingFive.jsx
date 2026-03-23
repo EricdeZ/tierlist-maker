@@ -535,11 +535,6 @@ export default function CCStartingFive() {
             >
               <Zap size={14} className="shrink-0" />
               Boost
-              {consumableSlotsUsed > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {consumableSlotsUsed}
-                </span>
-              )}
             </button>
             <button
               onClick={handleCollect}
