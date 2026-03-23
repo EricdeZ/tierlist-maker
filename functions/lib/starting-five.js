@@ -44,6 +44,12 @@ const CONSUMABLE_EFFECTS = {
 const CONSUMABLE_MAX_SLOTS = 3
 const CONSUMABLE_DAILY_CAP = 9
 
+function dateToStr(d) {
+  if (!d) return ''
+  if (d instanceof Date) return d.toISOString().slice(0, 10)
+  return String(d).slice(0, 10)
+}
+
 export function getBuffTotals(activeBuffs) {
   let totalRateBoost = 0
   let totalCapDays = 0
@@ -261,7 +267,7 @@ export async function tick(sql, userId) {
       lastTick: new Date().toISOString(),
       activeBuffs: state?.active_buffs || [],
       consumableSlotsUsed: state?.consumable_slots_used || 0,
-      consumablesUsedToday: String(state?.consumables_used_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
+      consumablesUsedToday: dateToStr(state?.consumables_used_date) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
       consumableDailyCap: CONSUMABLE_DAILY_CAP,
       dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
       dismantleBoostDate: state?.dismantle_boost_date || null,
@@ -305,7 +311,7 @@ export async function tick(sql, userId) {
       lastTick: state.last_tick,
       activeBuffs: state?.active_buffs || [],
       consumableSlotsUsed: state?.consumable_slots_used || 0,
-      consumablesUsedToday: String(state?.consumables_used_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
+      consumablesUsedToday: dateToStr(state?.consumables_used_date) === new Date().toISOString().slice(0, 10) ? (state?.consumables_used_today || 0) : 0,
       consumableDailyCap: CONSUMABLE_DAILY_CAP,
       dismantleBoostMult: Number(state?.dismantle_boost_mult) || 1,
       dismantleBoostDate: state?.dismantle_boost_date || null,
@@ -560,7 +566,7 @@ export async function useConsumable(sql, userId, cardId) {
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const usedToday = String(s5State?.consumables_used_date || '').slice(0, 10) === today
+  const usedToday = dateToStr(s5State?.consumables_used_date) === today
     ? (s5State?.consumables_used_today || 0) : 0
   if (usedToday >= CONSUMABLE_DAILY_CAP) {
     throw new Error(`Daily consumable limit reached (${CONSUMABLE_DAILY_CAP}/day)`)
@@ -657,7 +663,7 @@ export async function useConsumable(sql, userId, cardId) {
     const boostValue = config.values[card.rarity] || 1
     const currentMult = Number(s5State?.dismantle_boost_mult) || 1
     const today = new Date().toISOString().slice(0, 10)
-    const isToday = String(s5State?.dismantle_boost_date || '').slice(0, 10) === today
+    const isToday = dateToStr(s5State?.dismantle_boost_date) === today
     const newMult = isToday ? currentMult + (boostValue - 1) : boostValue
     await sql`
       UPDATE cc_starting_five_state

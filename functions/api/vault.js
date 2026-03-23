@@ -1521,9 +1521,12 @@ async function handleDismantle(sql, user, body) {
   `
   const today = new Date().toISOString().slice(0, 10)
   let dismantleThresholdMult = 1
-  if (String(s5State?.dismantle_boost_date || '').slice(0, 10) === today && Number(s5State.dismantle_boost_mult) > 1) {
+  const boostDateStr = s5State?.dismantle_boost_date instanceof Date
+    ? s5State.dismantle_boost_date.toISOString().slice(0, 10)
+    : String(s5State?.dismantle_boost_date || '').slice(0, 10)
+  if (boostDateStr === today && Number(s5State.dismantle_boost_mult) > 1) {
     dismantleThresholdMult = Number(s5State.dismantle_boost_mult)
-  } else if (s5State?.dismantle_boost_date && s5State.dismantle_boost_date < today) {
+  } else if (boostDateStr && boostDateStr < today) {
     await sql`
       UPDATE cc_starting_five_state
       SET dismantle_boost_mult = 1.0, dismantle_boost_date = NULL
@@ -1872,7 +1875,10 @@ function formatS5Response(state, extra = {}) {
       dismantleBoostMult: state.dismantleBoostMult || 1,
       dismantleBoostActive: (() => {
         const today = new Date().toISOString().slice(0, 10)
-        return String(state.dismantleBoostDate || '').slice(0, 10) === today
+        const d = state.dismantleBoostDate
+        if (!d) return false
+        const dateStr = d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10)
+        return dateStr === today
       })(),
       effectiveRateBoost: buffTotals.totalRateBoost,
       effectiveCapDays: buffTotals.totalCapDays,
