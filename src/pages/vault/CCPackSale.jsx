@@ -261,7 +261,7 @@ export default function SaleVendingMachine() {
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [cooldownProgress, setCooldownProgress] = useState(0);
 
-  const COOLDOWN_DURATION = 45;
+  const COOLDOWN_DURATION = 28;
 
   // Countdown timer for vending cooldown — driven by context
   useEffect(() => {
