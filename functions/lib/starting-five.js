@@ -383,6 +383,8 @@ export async function collectIncome(sql, userId) {
     coresPending: coresRemainder,
     passionGranted: passionToGrant,
     coresGranted: coresToGrant,
+    activeBuffs: [],
+    consumableSlotsUsed: 0,
   }
 }
 
