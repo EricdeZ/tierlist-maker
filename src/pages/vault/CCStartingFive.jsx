@@ -187,6 +187,7 @@ export default function CCStartingFive() {
   const [showConsumablePicker, setShowConsumablePicker] = useState(false)
   const [slottingConsumable, setSlottingConsumable] = useState(false)
   const [consumableResult, setConsumableResult] = useState(null)
+  const [pendingLineupAction, setPendingLineupAction] = useState(null)
   const [error, setError] = useState(null)
   const [s5Leaderboard, setS5Leaderboard] = useState(null)
   const [s5LbLoading, setS5LbLoading] = useState(false)
@@ -319,7 +320,7 @@ export default function CCStartingFive() {
     return ids
   }, [startingFive?.currentSeason?.slots, startingFive?.allStar?.slots])
 
-  const handleSlot = useCallback(async (cardId, role) => {
+  const executeSlot = useCallback(async (cardId, role) => {
     setSlotting(true)
     try {
       await slotS5Card(cardId, role, 'player', activeLineup)
@@ -337,7 +338,7 @@ export default function CCStartingFive() {
     }
   }, [slotS5Card, collection, showError, activeLineup])
 
-  const handleUnslot = useCallback(async (role) => {
+  const executeUnslot = useCallback(async (role) => {
     try {
       await unslotS5Card(role, activeLineup)
       setOptionsRole(null)
@@ -348,7 +349,7 @@ export default function CCStartingFive() {
 
   const [attachPickerState, setAttachPickerState] = useState(null)
 
-  const handleAttachSlot = useCallback(async (cardId, role, slotType) => {
+  const executeAttachSlot = useCallback(async (cardId, role, slotType) => {
     setSlotting(true)
     try {
       await slotS5Card(cardId, role, slotType, activeLineup)
@@ -365,13 +366,31 @@ export default function CCStartingFive() {
     }
   }, [slotS5Card, collection, showError, activeLineup])
 
-  const handleAttachUnslot = useCallback(async (role, slotType) => {
+  const executeAttachUnslot = useCallback(async (role, slotType) => {
     try {
       await unslotS5Attachment(role, slotType, activeLineup)
     } catch (err) {
       showError(err.message || 'Failed to remove attachment')
     }
   }, [unslotS5Attachment, showError, activeLineup])
+
+  const hasActiveBuffs = activeBuffs.length > 0
+  const handleSlot = useCallback((cardId, role) => {
+    if (hasActiveBuffs) { setPendingLineupAction(() => () => executeSlot(cardId, role)); return }
+    executeSlot(cardId, role)
+  }, [hasActiveBuffs, executeSlot])
+  const handleUnslot = useCallback((role) => {
+    if (hasActiveBuffs) { setPendingLineupAction(() => () => executeUnslot(role)); return }
+    executeUnslot(role)
+  }, [hasActiveBuffs, executeUnslot])
+  const handleAttachSlot = useCallback((cardId, role, slotType) => {
+    if (hasActiveBuffs) { setPendingLineupAction(() => () => executeAttachSlot(cardId, role, slotType)); return }
+    executeAttachSlot(cardId, role, slotType)
+  }, [hasActiveBuffs, executeAttachSlot])
+  const handleAttachUnslot = useCallback((role, slotType) => {
+    if (hasActiveBuffs) { setPendingLineupAction(() => () => executeAttachUnslot(role, slotType)); return }
+    executeAttachUnslot(role, slotType)
+  }, [hasActiveBuffs, executeAttachUnslot])
 
   const handleCollect = useCallback(async () => {
     if (collecting) return
@@ -840,6 +859,48 @@ export default function CCStartingFive() {
       )}
 
       {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+
+      {pendingLineupAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPendingLineupAction(null)}>
+          <div className="relative w-full max-w-sm bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl overflow-hidden sm:mx-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+              <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">Active Boosts</h3>
+              <button onClick={() => setPendingLineupAction(null)} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-white/60">Changing your lineup will collect your pending income and <span className="text-amber-400 font-bold">clear all active boosts</span>.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {activeBuffs.map((buff, i) => {
+                  const def = CONSUMABLES.find(c => c.id === buff.type)
+                  return (
+                    <span key={i} className="px-2 py-1 rounded-lg text-[10px] font-bold cd-num border border-white/10 bg-white/[0.03] flex items-center gap-1.5"
+                      style={{ color: RARITIES[buff.rarity]?.color }}>
+                      {def && <img src={def.imageUrl} alt="" className="w-4 h-4 rounded" />}
+                      {buff.rateBoost && buff.capDays ? `+${(buff.rateBoost * 100).toFixed(0)}% rate +${buff.capDays}d cap` :
+                       buff.rateBoost ? `+${(buff.rateBoost * 100).toFixed(0)}% rate` :
+                       buff.capDays ? `+${buff.capDays}d cap` :
+                       buff.collectMult ? `${buff.collectMult}x collect` : buff.type}
+                    </span>
+                  )
+                })}
+              </div>
+              <div className="flex gap-2 justify-center pt-2">
+                <button onClick={() => setPendingLineupAction(null)}
+                  className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer text-red-400">
+                  Cancel
+                </button>
+                <button onClick={() => { const action = pendingLineupAction; setPendingLineupAction(null); action(); }}
+                  className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer">
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConsumablePicker && (
         <BoostModal
