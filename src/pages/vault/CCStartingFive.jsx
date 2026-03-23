@@ -564,7 +564,7 @@ export default function CCStartingFive() {
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold cd-head text-white/40 tracking-wider">CONSUMABLES</span>
-              <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 used this cycle</span>
+              <span className="text-[10px] font-bold cd-num text-white/30">{consumableSlotsUsed}/3 used until next claim</span>
             </div>
 
             {activeBuffs.length > 0 && (
@@ -1099,7 +1099,7 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
 
         {slotsUsed >= 3 ? (
           <div className="p-6 text-center text-sm text-white/40">
-            All slots used this cycle. Collect income to reset.
+            All slots used. Collect income to reset.
           </div>
         ) : (
           <div className="p-4 overflow-y-auto space-y-1.5 flex-1">
@@ -1194,7 +1194,7 @@ function TutorialModal({ onClose }) {
 
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">CONSUMABLES</h4>
-            <p>Use consumable cards for instant effects or temporary buffs. You can use up to 3 per collect cycle. Each consumable is destroyed on use.</p>
+            <p>Use consumable cards for instant effects or temporary buffs. You can use up to 3 before your next claim. Each consumable is destroyed on use.</p>
             <ul className="mt-2 space-y-1 text-white/50">
               <li><span className="text-red-400">Health Potion</span> — Fill a percentage of your Cores cap instantly</li>
               <li><span className="text-blue-400">Mana Potion</span> — Boost your income rate until next collect</li>
