@@ -945,7 +945,7 @@ function BoostModal({ onClose, onUse, cards, slotsUsed }) {
             <p className="text-xs text-amber-400/80 font-bold">This card will be consumed.</p>
             <div className="flex gap-2 justify-center pt-2">
               <button onClick={() => setConfirmCard(null)}
-                className="px-4 py-2 text-xs font-bold cd-head rounded-lg border border-white/10 text-white/50 hover:text-white/80 cursor-pointer">
+                className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer text-red-400">
                 Cancel
               </button>
               <button onClick={() => { onUse(confirmCard.id); setConfirmCard(null); }}
