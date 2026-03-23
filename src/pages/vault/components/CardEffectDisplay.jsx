@@ -48,7 +48,19 @@ export function getCardEffect(card) {
   }
 
   if (type === 'consumable') {
-    return null
+    const consumableId = card.cardData?.consumableId
+    const def = CONSUMABLE_EFFECTS[consumableId]
+    if (!def) return null
+    const effect = def.effect
+    if (effect === 'rate-cap-boost') {
+      const rateVal = def.rateValues?.[r] || 0
+      const capVal = def.capValues?.[r] || 0
+      if (!rateVal && !capVal) return null
+      return { effectType: 'consumable', consumableEffect: effect, rateVal, capVal }
+    }
+    const value = def.values?.[r] || 0
+    if (!value) return null
+    return { effectType: 'consumable', consumableEffect: effect, value }
   }
 
   return null
@@ -92,13 +104,13 @@ export default function CardEffectDisplay({ card }) {
   if (effect.effectType === 'consumable') {
     const e = effect.consumableEffect
     let label
-    if (e === 'cap-fill') label = `Fill ${(effect.value * 100).toFixed(0)}% cap`
-    else if (e === 'rate-boost') label = `+${(effect.value * 100).toFixed(0)}% rate`
-    else if (e === 'rate-cap-boost') label = `+${(effect.rateVal * 100).toFixed(0)}% rate / +${(effect.capVal * 100).toFixed(0)}% cap`
-    else if (e === 'collect-mult') label = `${effect.value}x collect`
-    else if (e === 'dismantle-boost') label = `\u00d7${effect.value} dismantle thresholds`
-    else if (e === 'cap-increase') label = `+${effect.value}d cap`
-    else if (e === 'jackpot') label = `1\u2013${effect.value} Cores`
+    if (e === 'cap-fill') label = `${(effect.value * 100).toFixed(0)}%`
+    else if (e === 'rate-boost') label = `+${(effect.value * 100).toFixed(0)}%`
+    else if (e === 'rate-cap-boost') label = `+${(effect.rateVal * 100).toFixed(0)}% / +${(effect.capVal * 100).toFixed(0)}%`
+    else if (e === 'collect-mult') label = `${effect.value}x`
+    else if (e === 'dismantle-boost') label = `\u00d7${effect.value}`
+    else if (e === 'cap-increase') label = `+${effect.value}d`
+    else if (e === 'jackpot') label = `1\u2013${effect.value}`
 
     return (
       <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold cd-num">
