@@ -2,6 +2,11 @@
 UPDATE cc_starting_five_state SET consumable_card_id = NULL
 WHERE consumable_card_id IS NOT NULL;
 
+-- Remove all active consumable listings from marketplace
+UPDATE cc_market_listings SET status = 'cancelled'
+WHERE status = 'active'
+  AND card_id IN (SELECT id FROM cc_cards WHERE card_type = 'consumable');
+
 -- Drop old system
 DROP INDEX IF EXISTS cc_s5_consumable_uniq;
 ALTER TABLE cc_starting_five_state DROP COLUMN IF EXISTS consumable_card_id;
