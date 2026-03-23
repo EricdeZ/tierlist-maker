@@ -399,7 +399,7 @@ export async function collectIncome(sql, userId) {
   const passionToGrant = Math.floor(state.passionPending)
   const coresToGrant = Math.floor(state.coresPending * totalCollectMult)
   const passionRemainder = state.passionPending - passionToGrant
-  const coresRemainder = state.coresPending - coresToGrant
+  const coresRemainder = state.coresPending * totalCollectMult - coresToGrant
 
   if (passionToGrant > 0) {
     await grantPassion(sql, userId, 'starting_five', passionToGrant, 'Starting 5 passive income')
