@@ -326,7 +326,7 @@ export default function CCCollection() {
       entries = col.entries.map((e, i) => {
         const td = typeof e.templateData === 'string' ? JSON.parse(e.templateData) : e.templateData
         const banner = td?.elements?.find(el => el.type === 'name-banner' && el.visible !== false)
-        const cardName = td?.cardData?.name || banner?.playerName || e.name || 'Card'
+        const cardName = banner?.playerName || td?.cardData?.name || e.name || 'Card'
         return {
           templateId: e.templateId,
           name: cardName,
