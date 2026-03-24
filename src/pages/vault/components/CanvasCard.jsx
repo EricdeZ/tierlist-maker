@@ -183,13 +183,15 @@ export default function CanvasCard({ elements, border, rarity = 'common', size =
     if (!holo) return scaledContent
 
     // Holo mode: outer wrapper provides 3D tilt + CSS variables (--card-opacity, --pointer-x/y, etc.)
-    // If card has layered effect elements, they produce their own shine/glare (no generic ones needed).
+    // If card has layered effect elements, they produce their own shine/glare — the outer wrapper
+    // must NOT set data-rarity (that would add a second holo effect). Uses data-holo-type="full"
+    // matching HoloPreview exactly.
     // If no effect elements, fall back to generic shine/glare like TradingCardHolo.
     return (
         <div
             className={`holo-card ${interacting ? 'interacting' : ''} ${active ? 'active' : ''}`}
-            data-rarity={holo.rarity}
-            data-holo-type={holo.holoType}
+            data-rarity={hasEffects ? undefined : holo.rarity}
+            data-holo-type={hasEffects ? 'full' : holo.holoType}
             style={{ ...dynamicStyles, width: size, '--card-scale': size / 340 }}
             ref={cardRef}
         >
