@@ -885,7 +885,7 @@ async function handleCollectionCollections(sql, user) {
     `,
     sql`
       SELECT ce.collection_id, ce.template_id, ce.draft_id,
-             COALESCE(t.name, d.name) AS name,
+             COALESCE(t.name, d.notes, 'Draft') AS name,
              COALESCE(t.card_type, d.card_type) AS card_type,
              COALESCE(t.template_data, d.template_data) AS template_data
       FROM cc_collection_entries ce
