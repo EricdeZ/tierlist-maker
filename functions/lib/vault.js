@@ -455,7 +455,7 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
     )
 
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, template_id, is_first_edition)
+      INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, template_id, is_first_edition, depicted_user_id)
       SELECT ${userId}, ${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity},
              ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url},
              ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}::jsonb,
@@ -468,7 +468,8 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
                    (${card.card_type} = 'collection' AND template_id = ${card.template_id || 0})
                    OR (${card.card_type} != 'collection' AND def_id = ${card.def_id || 0})
                  )
-             )
+             ),
+             ${card.depicted_user_id || null}
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -739,7 +740,7 @@ async function generateConfiguredPack(sql, pack) {
 
 async function generateCollectionCard(sql, collectionId) {
   const entries = await sql`
-    SELECT t.id, t.name, t.card_type
+    SELECT t.id, t.name, t.card_type, t.depicted_user_id
     FROM cc_collection_entries e
     JOIN cc_card_templates t ON e.template_id = t.id
     JOIN cc_collections c ON e.collection_id = c.id
@@ -771,6 +772,7 @@ async function generateCollectionCard(sql, collectionId) {
     card_data: { collectionId, collectionName: col?.name || 'Collection' },
     def_id: null,
     template_id: template.id,
+    depicted_user_id: template.depicted_user_id || null,
   }
 }
 
