@@ -9,6 +9,7 @@ import { GODS } from '../../../data/vault/gods'
 import { ITEMS } from '../../../data/vault/items'
 import { CONSUMABLES } from '../../../data/vault/buffs'
 import { useVault } from '../VaultContext'
+import VaultCard from '../components/VaultCard'
 import { tradematchService } from '../../../services/database'
 import CardPicker from './CardPicker'
 
@@ -37,16 +38,26 @@ function resolveDataMap(type, godId) {
 const CARD_SIZE = 90
 
 function OfferCard({ card, onRemove, showRemove }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const cd = card.card_data ? (typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data) : {}
   const type = card.card_type || cd.cardType || 'god'
+  const isCollection = type === 'collection'
   const isPlayer = type === 'player' || cd.teamName
   const holoType = card.holo_type || card.holoType || null
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
   const unavailable = card.available === false
 
   let inner
-  if (isPlayer) {
+  if (isCollection) {
+    inner = (
+      <VaultCard
+        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
+        getTemplate={getTemplate}
+        size={CARD_SIZE}
+        holo={false}
+      />
+    )
+  } else if (isPlayer) {
     inner = (
       <TradingCard
         playerName={card.god_name}

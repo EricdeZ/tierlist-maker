@@ -9,6 +9,7 @@ import { ITEMS } from '../../../data/vault/items'
 import { CONSUMABLES } from '../../../data/vault/buffs'
 import { getLeagueLogo } from '../../../utils/leagueImages'
 import { useVault } from '../VaultContext'
+import VaultCard from '../components/VaultCard'
 
 const GOD_MAP = new Map(GODS.map(g => [g.slug, g]))
 const ITEM_MAP = new Map(ITEMS.map(i => [String(i.id), i]))
@@ -557,10 +558,11 @@ function getFeedCardOverride(getDefOverride, card, cd) {
 
 // ── Individual card visual ──
 function SwipeCard({ card, containerWidth }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const avatar = avatarUrl(card)
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
+  const isCollection = type === 'collection'
   const isPlayer = type === 'player'
   const holoType = card.holo_type || null
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
@@ -570,7 +572,18 @@ function SwipeCard({ card, containerWidth }) {
   const cardSize = containerWidth || 300
 
   let cardEl
-  if (isPlayer) {
+  if (isCollection) {
+    const holoType = card.holo_type || null
+    const holoEffect = holoType ? getHoloEffect(card.rarity) : null
+    cardEl = (
+      <VaultCard
+        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
+        getTemplate={getTemplate}
+        size={cardSize}
+        holo={!!holoEffect}
+      />
+    )
+  } else if (isPlayer) {
     cardEl = (
       <TradingCard
         playerName={card.god_name}

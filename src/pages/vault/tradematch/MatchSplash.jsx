@@ -3,6 +3,7 @@ import { Heart } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import { useVault } from '../VaultContext'
+import VaultCard from '../components/VaultCard'
 
 function feedCardToGameData(card, cd, override) {
   const type = card.card_type || cd.cardType || 'god'
@@ -21,15 +22,23 @@ function feedCardToGameData(card, cd, override) {
 }
 
 function MatchCard({ card, direction }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const cd = card.card_data || {}
+  const isCollection = card.card_type === 'collection'
   const isPlayer = card.card_type === 'player' || cd.teamName || cd.role
   const type = card.card_type || cd.cardType || 'god'
   const override = type !== 'player' ? getDefOverride({ cardType: type, godId: card.god_id }) : null
 
   return (
     <div style={{ animation: `slide-in-${direction} 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both 0.3s` }}>
-      {isPlayer ? (
+      {isCollection ? (
+        <VaultCard
+          card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: (card.card_data || {})._templateData }}
+          getTemplate={getTemplate}
+          size={120}
+          holo={false}
+        />
+      ) : isPlayer ? (
         <TradingCard
           playerName={card.god_name || card.player_name}
           teamName={cd.teamName || ''}
