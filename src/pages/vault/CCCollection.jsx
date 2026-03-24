@@ -323,14 +323,20 @@ export default function CCCollection() {
       const colId = parseInt(activeSection.replace('col:', ''), 10)
       const col = collectionSets?.collections?.find(c => c.id === colId)
       if (!col) return []
-      entries = col.entries.map(e => ({
-        templateId: e.templateId,
-        name: e.name,
-        cardType: e.cardType,
-        templateData: e.templateData,
-        collected: (collectionSets.owned[e.templateId]?.length || 0) > 0,
-        ownedRarities: collectionSets.owned[e.templateId] || [],
-      }))
+      entries = col.entries.map((e, i) => {
+        const td = typeof e.templateData === 'string' ? JSON.parse(e.templateData) : e.templateData
+        const banner = td?.elements?.find(el => el.type === 'name-banner' && el.visible !== false)
+        const cardName = td?.cardData?.name || banner?.playerName || e.name || 'Card'
+        return {
+          templateId: e.templateId,
+          name: cardName,
+          index: i + 1,
+          cardType: e.cardType,
+          templateData: e.templateData,
+          collected: (collectionSets.owned[e.templateId]?.length || 0) > 0,
+          ownedRarities: collectionSets.owned[e.templateId] || [],
+        }
+      })
     } else {
       return []
     }
@@ -518,7 +524,10 @@ export default function CCCollection() {
                       : 'bg-white/[0.04] text-[var(--cd-text-mid)] hover:bg-white/[0.06]'
                   }`}
                 >
-                  <Package className="w-3 h-3" />
+                  {col.coverImageUrl
+                    ? <img src={col.coverImageUrl} alt="" className="w-4 h-4 rounded-sm object-cover" />
+                    : <Package className="w-3 h-3" />
+                  }
                   <span>{col.name}</span>
                 </button>
               )
@@ -570,7 +579,10 @@ export default function CCCollection() {
                           : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
                       }`}
                     >
-                      <Package className="w-3.5 h-3.5 shrink-0" />
+                      {col.coverImageUrl
+                        ? <img src={col.coverImageUrl} alt="" className="w-4 h-4 rounded-sm object-cover shrink-0" />
+                        : <Package className="w-3.5 h-3.5 shrink-0" />
+                      }
                       <span className="flex-1 truncate">{col.name}</span>
                       <span className="text-xs cd-num text-[var(--cd-text)]">{col.collected}/{col.total}</span>
                     </button>
@@ -1240,9 +1252,9 @@ function CollectionEntrySlot({ entry, onZoom }) {
     <div className="flex flex-col items-center">
       <div
         className="rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/40 flex flex-col items-center justify-center"
-        style={{ width: CARD_SIZE, aspectRatio: '5/7' }}
+        style={{ width: CARD_SIZE, aspectRatio: '63/88' }}
       >
-        <Package className="w-6 h-6 text-[var(--cd-text-dim)]/30 mb-1" />
+        <div className="text-[9px] cd-num text-[var(--cd-text-dim)] mb-1">{entry.index}</div>
         <div className="text-[11px] font-bold text-[var(--cd-text-dim)] cd-head text-center px-2 leading-tight">{entry.name}</div>
         <div className="text-[10px] text-[var(--cd-text-dim)]/60 mt-0.5">???</div>
       </div>
