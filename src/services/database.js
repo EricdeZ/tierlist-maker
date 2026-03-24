@@ -1490,6 +1490,7 @@ export const vaultDashboardService = {
     async getDrafts(params = {}) { return apiCall('vault-dashboard', { action: 'drafts', ...params }) },
     async getDraft(id) { return apiCall('vault-dashboard', { action: 'draft', id }) },
     async saveDraft(data) { return apiPost('vault-dashboard', { action: 'save-draft' }, data) },
+    async searchUsers(q) { return apiCall('vault-dashboard', { action: 'search-users', q }) },
 
     // Review workflow
     async submitForReview(type, id) { return apiPost('vault-dashboard', { action: 'submit-for-review' }, { type, id }) },

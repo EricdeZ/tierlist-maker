@@ -24,6 +24,7 @@ async function handler(event) {
             case 'template': return getTemplate(sql, event, user, canApprove)
             case 'drafts': return getDrafts(sql, event, user, canApprove)
             case 'draft': return getDraft(sql, event, user, canApprove)
+            case 'search-users': return searchUsers(sql, event)
             case 'assets': return getAssets(sql, event)
             case 'asset': return getAsset(sql, event)
             case 'collections': return getCollections(sql, user, canApprove)
@@ -65,9 +66,13 @@ async function getTemplates(sql, event, user, canApprove) {
     let rows
     if (canApprove) {
         rows = await sql`
-            SELECT t.*, u.discord_username AS creator_name
+            SELECT t.*, u.discord_username AS creator_name,
+                   du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+                   du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
             FROM cc_card_templates t
             LEFT JOIN users u ON u.id = t.created_by
+            LEFT JOIN users du ON du.id = t.depicted_user_id
+            LEFT JOIN players dp ON dp.id = du.linked_player_id
             WHERE (${status || null}::text IS NULL OR t.status = ${status})
               AND (${rarity || null}::text IS NULL OR t.rarity = ${rarity})
               AND (${card_type || null}::text IS NULL OR t.card_type = ${card_type})
@@ -76,9 +81,13 @@ async function getTemplates(sql, event, user, canApprove) {
         `
     } else {
         rows = await sql`
-            SELECT t.*, u.discord_username AS creator_name
+            SELECT t.*, u.discord_username AS creator_name,
+                   du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+                   du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
             FROM cc_card_templates t
             LEFT JOIN users u ON u.id = t.created_by
+            LEFT JOIN users du ON du.id = t.depicted_user_id
+            LEFT JOIN players dp ON dp.id = du.linked_player_id
             WHERE t.created_by = ${user.id}
               AND (${status || null}::text IS NULL OR t.status = ${status})
               AND (${rarity || null}::text IS NULL OR t.rarity = ${rarity})
@@ -92,7 +101,14 @@ async function getTemplates(sql, event, user, canApprove) {
 async function getTemplate(sql, event, user, canApprove) {
     const id = parseInt(event.queryStringParameters?.id)
     if (!id) return err('id required')
-    const [row] = await sql`SELECT * FROM cc_card_templates WHERE id = ${id}`
+    const [row] = await sql`
+        SELECT t.*, du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+               du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
+        FROM cc_card_templates t
+        LEFT JOIN users du ON du.id = t.depicted_user_id
+        LEFT JOIN players dp ON dp.id = du.linked_player_id
+        WHERE t.id = ${id}
+    `
     if (!row) return err('Template not found', 404)
     if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
     return ok({ template: row })
@@ -103,9 +119,13 @@ async function getDrafts(sql, event, user, canApprove) {
     let rows
     if (canApprove) {
         rows = await sql`
-            SELECT d.*, u.discord_username AS creator_name
+            SELECT d.*, u.discord_username AS creator_name,
+                   du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+                   du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
             FROM cc_card_drafts d
             LEFT JOIN users u ON u.id = d.created_by
+            LEFT JOIN users du ON du.id = d.depicted_user_id
+            LEFT JOIN players dp ON dp.id = du.linked_player_id
             WHERE (${status || null}::text IS NULL OR d.status = ${status})
               AND (${rarity || null}::text IS NULL OR d.rarity = ${rarity})
               AND (${creator ? parseInt(creator) : null}::int IS NULL OR d.created_by = ${creator ? parseInt(creator) : 0})
@@ -113,9 +133,13 @@ async function getDrafts(sql, event, user, canApprove) {
         `
     } else {
         rows = await sql`
-            SELECT d.*, u.discord_username AS creator_name
+            SELECT d.*, u.discord_username AS creator_name,
+                   du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+                   du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
             FROM cc_card_drafts d
             LEFT JOIN users u ON u.id = d.created_by
+            LEFT JOIN users du ON du.id = d.depicted_user_id
+            LEFT JOIN players dp ON dp.id = du.linked_player_id
             WHERE d.created_by = ${user.id}
               AND (${status || null}::text IS NULL OR d.status = ${status})
               AND (${rarity || null}::text IS NULL OR d.rarity = ${rarity})
@@ -128,10 +152,33 @@ async function getDrafts(sql, event, user, canApprove) {
 async function getDraft(sql, event, user, canApprove) {
     const id = parseInt(event.queryStringParameters?.id)
     if (!id) return err('id required')
-    const [row] = await sql`SELECT * FROM cc_card_drafts WHERE id = ${id}`
+    const [row] = await sql`
+        SELECT d.*, du.discord_username AS depicted_username, du.discord_avatar AS depicted_avatar,
+               du.discord_id AS depicted_discord_id, dp.name AS depicted_player_name
+        FROM cc_card_drafts d
+        LEFT JOIN users du ON du.id = d.depicted_user_id
+        LEFT JOIN players dp ON dp.id = du.linked_player_id
+        WHERE d.id = ${id}
+    `
     if (!row) return err('Draft not found', 404)
     if (!canApprove && row.created_by !== user.id) return err('Not authorized', 403)
     return ok({ draft: row })
+}
+
+async function searchUsers(sql, event) {
+    const { q } = event.queryStringParameters || {}
+    if (!q || q.trim().length < 2) return ok({ users: [] })
+    const query = q.trim()
+    const results = await sql`
+        SELECT u.id, u.discord_username, u.discord_avatar, u.discord_id, p.name AS player_name
+        FROM users u
+        LEFT JOIN players p ON p.id = u.linked_player_id
+        WHERE u.discord_username ILIKE ${'%' + query + '%'}
+           OR p.name ILIKE ${'%' + query + '%'}
+        ORDER BY u.discord_username ASC
+        LIMIT 10
+    `
+    return ok({ users: results })
 }
 
 async function getAssets(sql, event) {
@@ -164,7 +211,7 @@ async function getAsset(sql, event) {
 // ─── POST Handlers ───
 
 async function saveTemplate(sql, body, user, canApprove) {
-    const { id, name, description, card_type, rarity, template_data } = body
+    const { id, name, description, card_type, rarity, template_data, depicted_user_id } = body
     if (!name || !card_type || !rarity || !template_data) return err('name, card_type, rarity, template_data required')
 
     if (id) {
@@ -179,6 +226,7 @@ async function saveTemplate(sql, body, user, canApprove) {
                 rarity = ${rarity}, template_data = ${JSON.stringify(template_data)},
                 status = ${existing.status === 'rejected' ? 'draft' : existing.status},
                 rejection_reason = ${existing.status === 'rejected' ? null : existing.rejection_reason},
+                depicted_user_id = ${depicted_user_id !== undefined ? (depicted_user_id || null) : existing.depicted_user_id},
                 updated_at = NOW()
             WHERE id = ${id}
             RETURNING *
@@ -186,8 +234,8 @@ async function saveTemplate(sql, body, user, canApprove) {
         return ok({ template: row })
     } else {
         const [row] = await sql`
-            INSERT INTO cc_card_templates (name, description, card_type, rarity, template_data, created_by)
-            VALUES (${name}, ${description || null}, ${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${user.id})
+            INSERT INTO cc_card_templates (name, description, card_type, rarity, template_data, created_by, depicted_user_id)
+            VALUES (${name}, ${description || null}, ${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${user.id}, ${depicted_user_id || null})
             RETURNING *
         `
         return ok({ template: row })
@@ -195,8 +243,14 @@ async function saveTemplate(sql, body, user, canApprove) {
 }
 
 async function saveDraft(sql, body, user, canApprove) {
-    const { id, card_type, rarity, template_data, target_player_id, notes } = body
+    const { id, card_type, rarity, template_data, target_player_id, notes, depicted_user_id } = body
     if (!card_type || !rarity || !template_data) return err('card_type, rarity, template_data required')
+
+    let resolvedTargetPlayerId = target_player_id || null
+    if (depicted_user_id && !target_player_id) {
+        const [depictedUser] = await sql`SELECT linked_player_id FROM users WHERE id = ${depicted_user_id}`
+        if (depictedUser?.linked_player_id) resolvedTargetPlayerId = depictedUser.linked_player_id
+    }
 
     if (id) {
         const [existing] = await sql`SELECT * FROM cc_card_drafts WHERE id = ${id}`
@@ -208,7 +262,8 @@ async function saveDraft(sql, body, user, canApprove) {
             UPDATE cc_card_drafts
             SET card_type = ${card_type}, rarity = ${rarity},
                 template_data = ${JSON.stringify(template_data)},
-                target_player_id = ${target_player_id || null},
+                target_player_id = ${resolvedTargetPlayerId},
+                depicted_user_id = ${depicted_user_id !== undefined ? (depicted_user_id || null) : existing.depicted_user_id},
                 notes = ${notes || null},
                 status = ${existing.status === 'rejected' ? 'draft' : existing.status},
                 rejection_reason = ${existing.status === 'rejected' ? null : existing.rejection_reason},
@@ -219,8 +274,8 @@ async function saveDraft(sql, body, user, canApprove) {
         return ok({ draft: row })
     } else {
         const [row] = await sql`
-            INSERT INTO cc_card_drafts (card_type, rarity, template_data, target_player_id, notes, created_by)
-            VALUES (${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${target_player_id || null}, ${notes || null}, ${user.id})
+            INSERT INTO cc_card_drafts (card_type, rarity, template_data, target_player_id, notes, created_by, depicted_user_id)
+            VALUES (${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${resolvedTargetPlayerId}, ${notes || null}, ${user.id}, ${depicted_user_id || null})
             RETURNING *
         `
         return ok({ draft: row })
