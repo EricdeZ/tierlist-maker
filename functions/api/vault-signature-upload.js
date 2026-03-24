@@ -14,7 +14,6 @@ export async function onRequest(context) {
     const { event } = buildUploadEvent(request)
     const user = await requireAuth(event)
     if (!user) return json({ error: 'Login required' }, 401)
-    if (!user.linked_player_id) return json({ error: 'Not a linked player' }, 403)
 
     const sql = getDB()
     const bucket = env.TEAM_ICONS
@@ -42,7 +41,8 @@ export async function onRequest(context) {
     // --- Direct sign: owner is the depicted player, skip request/approval ---
     if (directCardId) {
         const [card] = await sql`
-            SELECT c.id, c.owner_id, c.rarity, c.signature_url, c.card_data, d.player_id
+            SELECT c.id, c.owner_id, c.rarity, c.signature_url, c.card_data,
+                   c.depicted_user_id, d.player_id
             FROM cc_cards c
             LEFT JOIN cc_player_defs d ON c.def_id = d.id
             WHERE c.id = ${directCardId}
@@ -52,8 +52,14 @@ export async function onRequest(context) {
         if (card.rarity !== 'unique') return json({ error: 'Only unique cards' }, 400)
         if (card.signature_url) return json({ error: 'Already signed' }, 400)
 
+        // Path 1: depicted_user_id matches current user
+        const isDepictedUser = card.depicted_user_id && card.depicted_user_id === user.id
+
+        // Path 2: legacy — linked_player_id matches card's player def
         const playerId = card.player_id || card.card_data?._testPlayerId
-        if (!playerId || playerId !== user.linked_player_id) {
+        const isLinkedPlayer = user.linked_player_id && playerId && playerId === user.linked_player_id
+
+        if (!isDepictedUser && !isLinkedPlayer) {
             return json({ error: 'You must be the depicted player to direct-sign' }, 403)
         }
 
@@ -72,7 +78,14 @@ export async function onRequest(context) {
         WHERE sr.id = ${requestId}
     `
     if (!req) return json({ error: 'Request not found' }, 404)
-    if (req.signer_player_id !== user.linked_player_id) return json({ error: 'Not your request to sign' }, 403)
+    // Check depicted_user_id as alternative auth
+    const [reqCard] = await sql`SELECT depicted_user_id FROM cc_cards WHERE id = ${req.card_id}`
+    const isDepictedUser = reqCard?.depicted_user_id && reqCard.depicted_user_id === user.id
+    const isLinkedSigner = user.linked_player_id && req.signer_player_id === user.linked_player_id
+
+    if (!isDepictedUser && !isLinkedSigner) {
+        return json({ error: 'Not your request to sign' }, 403)
+    }
     if (req.status !== 'pending') return json({ error: 'Request is not pending' }, 400)
     if (req.signature_url) return json({ error: 'Card is already signed' }, 400)
 
