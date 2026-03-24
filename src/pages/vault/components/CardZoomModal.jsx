@@ -30,7 +30,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
   const [directSignMode, setDirectSignMode] = useState(false)
 
   // Rarity switcher
-  const ownedRarities = gameCard?.ownedRarities || playerCard?.ownedRarities || []
+  const ownedRarities = gameCard?.ownedRarities || playerCard?.ownedRarities || collectionCard?.ownedRarities || []
   const sortedOwned = useMemo(
     () => RARITY_ORDER.filter(r => ownedRarities.includes(r)),
     [ownedRarities]
@@ -40,7 +40,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
     for (const r of ownedRarities) counts[r] = (counts[r] || 0) + 1
     return counts
   }, [ownedRarities])
-  const [displayRarity, setDisplayRarity] = useState(gameCard?.rarity || playerCard?.rarity || 'common')
+  const [displayRarity, setDisplayRarity] = useState(gameCard?.rarity || playerCard?.rarity || collectionCard?.rarity || 'common')
 
   // Sell form state
   const [sellMode, setSellMode] = useState(false)

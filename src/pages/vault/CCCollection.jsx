@@ -1224,6 +1224,7 @@ function CollectionEntrySlot({ entry, onZoom }) {
         _templateData: td,
         rarity,
         cardType: 'collection',
+        ownedRarities: entry.ownedRarities,
       },
       canSell: true,
     })
