@@ -873,7 +873,7 @@ async function handleCollectionCollections(sql, user) {
     sql`
       SELECT id, name, description, cover_image_url
       FROM cc_collections
-      WHERE id = ANY(${cIds}) AND status = 'active'
+      WHERE id = ANY(${cIds}) AND status != 'archived'
     `,
     sql`
       SELECT ce.collection_id, ce.template_id, ce.draft_id,
