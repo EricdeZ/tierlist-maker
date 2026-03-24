@@ -145,6 +145,10 @@ export function VaultProvider({ children }) {
     }
   }, [])
 
+  const addToInventory = useCallback((packs) => {
+    setInventory(prev => [...prev, ...packs])
+  }, [])
+
   const updateCardHoloType = useCallback((cardId, newHoloType) => {
     setCollection(prev => prev.map(c => c.id === cardId ? { ...c, holoType: newHoloType } : c))
   }, [])
@@ -449,7 +453,7 @@ export function VaultProvider({ children }) {
       setSalePacks(prev => prev.map(s =>
         s.id === saleId ? { ...s, stock: result.stock ?? s.stock } : s
       ))
-      setVendingCooldownEnd(Date.now() + 45000)
+      setVendingCooldownEnd(Date.now() + 28000)
       refreshBalanceWithRetry()
       return result
     } catch (err) {
@@ -474,7 +478,7 @@ export function VaultProvider({ children }) {
     matchTradePendingCount, setMatchTradePendingCount,
     pendingSignatureCount, setPendingSignatureCount,
     pendingApprovalCount, setPendingApprovalCount,
-    inventory, openInventoryPack, refreshInventory,
+    inventory, openInventoryPack, refreshInventory, addToInventory,
     vendingCooldownEnd, setVendingCooldownEnd,
     lockedCardIds, lockedPackIds,
     rotationPacks,
@@ -486,7 +490,7 @@ export function VaultProvider({ children }) {
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
-    pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory,
+    pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory, addToInventory,
     vendingCooldownEnd, lockedCardIds, lockedPackIds, rotationPacks, pendingReveal, markRevealed,
   ])
 

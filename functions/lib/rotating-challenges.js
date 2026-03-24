@@ -331,11 +331,13 @@ export async function claimRotatingChallenge(userId, assignmentId) {
         }
 
         // Grant packs
+        let newPacks = []
         if ((assignment.reward_type === 'pack' || assignment.reward_type === 'mixed') && assignment.reward_packs > 0) {
-            await sql`
+            newPacks = await sql`
                 INSERT INTO cc_pack_inventory (user_id, pack_type_id, source)
                 SELECT ${userId}, 'challenge-pack', 'challenge'
                 FROM generate_series(1, ${assignment.reward_packs})
+                RETURNING id, pack_type_id AS "packTypeId", source
             `
             packsEarned = assignment.reward_packs
         }
@@ -349,6 +351,7 @@ export async function claimRotatingChallenge(userId, assignmentId) {
             success: true,
             coresEarned,
             packsEarned,
+            newPacks,
             emberBalance: balanceRow?.balance || 0,
         }
     })

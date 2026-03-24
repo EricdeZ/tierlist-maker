@@ -6,6 +6,7 @@ import { useVault } from './VaultContext'
 import { getTierColor } from '../../config/challengeTiers'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
+import challengePackIcon from '../../assets/challenge-pack.png'
 
 const VAULT_CATEGORIES = [
   { key: 'all', label: 'All' },
@@ -29,7 +30,7 @@ function getCategoryForStatKey(statKey) {
 export default function CCChallenges() {
   const { user } = useAuth()
   const { updateFromClaim, challengeNotifications, updateEmber } = usePassion()
-  const { refreshInventory } = useVault()
+  const { addToInventory } = useVault()
   const [challengeData, setChallengeData] = useState({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -139,7 +140,7 @@ export default function CCChallenges() {
           ...prev,
           [assignmentId]: { cores: result.coresEarned, packs: result.packsEarned }
         }))
-        if (result.packsEarned > 0) refreshInventory()
+        if (result.newPacks?.length > 0) addToInventory(result.newPacks)
         setTimeout(() => {
           const scrollY = window.scrollY
           loadRotating().then(() => {
@@ -630,7 +631,7 @@ function RotatingChallengeCard({ challenge: ch, index, claimingId, justClaimed, 
             )}
             {justClaimed.packs > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-xs">📦</span>
+                <img src={challengePackIcon} alt="" className="w-7 h-auto" />
                 <span className="text-xs font-bold text-[var(--cd-gold)]">+{justClaimed.packs} pack{justClaimed.packs > 1 ? 's' : ''}</span>
               </div>
             )}
@@ -673,7 +674,7 @@ function RotatingRewardDisplay({ challenge: ch }) {
       {ch.rewardPacks > 0 && (
         <div className="flex items-center gap-0.5">
           <span className="text-xs font-bold text-[var(--cd-gold)]">+{ch.rewardPacks}</span>
-          <span className="text-xs">📦</span>
+          <img src={challengePackIcon} alt="" className="w-7 h-auto" />
         </div>
       )}
     </>
