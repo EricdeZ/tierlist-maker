@@ -12,6 +12,23 @@ import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsuma
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
+async function maybePushChallenges(sql, userId) {
+    try {
+        const [claimed] = await sql`
+            UPDATE cc_stats
+            SET last_challenge_push = NOW()
+            WHERE user_id = ${userId}
+              AND (last_challenge_push IS NULL OR last_challenge_push < NOW() - INTERVAL '10 seconds')
+            RETURNING 1
+        `
+        if (!claimed) return
+        const stats = await getVaultStats(sql, userId)
+        return pushChallengeProgress(sql, userId, stats)
+    } catch (err) {
+        console.error('Challenge push failed:', err)
+    }
+}
+
 const NEW_CARD_THRESHOLD = 1 // TODO: restore to 400
 
 async function tagNewCards(sql, userId, formattedCards) {
@@ -410,10 +427,7 @@ async function handleOpenInventoryPack(sql, user, body) {
   await inlineTemplateData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
@@ -506,10 +520,7 @@ async function handleOpenPack(sql, user, body) {
   await inlineTemplateData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
@@ -590,10 +601,7 @@ async function handleSalePurchase(sql, user, saleId) {
   await inlineTemplateData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
@@ -1357,10 +1365,7 @@ async function handleSendGift(sql, user, body, event) {
     VALUES (${user.id}, ${recipientId}, ${trimmedMsg}, ${packType})
   `
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (gift send) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
 }
@@ -1446,10 +1451,7 @@ async function handleOpenGift(sql, user, body) {
   // Mark gift as opened
   await sql`UPDATE cc_gifts SET opened = true, seen = true, opened_at = NOW() WHERE id = ${giftId}`
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (gift open) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   const cards = newCards.map(c => {
     const formatted = formatCard(c)
@@ -1709,10 +1711,7 @@ async function handleDismantle(sql, user, body) {
     WHERE user_id = ${user.id}
   `
 
-  // Push vault challenge progress (fire-and-forget)
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (dismantle) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return {
     statusCode: 200, headers,
@@ -2100,9 +2099,7 @@ async function handleSlotCard(sql, user, body) {
   }
   const state = await slotCard(sql, user.id, cardId, role, slotType || 'player', lineupType || 'current')
 
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (slot) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return formatS5Response(state)
 }
@@ -2114,10 +2111,7 @@ async function handleUnslotCard(sql, user, body) {
   }
   const state = await unslotCard(sql, user.id, role, lineupType || 'current')
 
-  // Push vault challenge progress (fire-and-forget) — updates starting_five counts
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (unslot) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return formatS5Response(state)
 }
@@ -2129,9 +2123,7 @@ async function handleUnslotAttachment(sql, user, body) {
   }
   const state = await unslotAttachment(sql, user.id, role, slotType, lineupType || 'current')
 
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (unslot-attachment) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   return formatS5Response(state)
 }
@@ -2143,9 +2135,7 @@ async function handleUseConsumable(sql, user, body) {
   }
   const state = await applyConsumable(sql, user.id, cardId)
 
-  getVaultStats(sql, user.id)
-    .then(stats => pushChallengeProgress(sql, user.id, stats))
-    .catch(err => console.error('Vault challenge push (use-consumable) failed:', err))
+  maybePushChallenges(sql, user.id)
 
   const response = formatS5Response(state)
   const responseData = JSON.parse(response.body)
@@ -2167,10 +2157,7 @@ async function handleCollectIncome(sql, user) {
       await ensureStats(sql, user.id)
       await sql`UPDATE cc_stats SET income_collections = income_collections + 1 WHERE user_id = ${user.id}`
 
-      // Push vault challenge progress (fire-and-forget)
-      getVaultStats(sql, user.id)
-        .then(stats => pushChallengeProgress(sql, user.id, stats))
-        .catch(err => console.error('Vault challenge push (income) failed:', err))
+      maybePushChallenges(sql, user.id)
     }
   }
 
