@@ -85,13 +85,14 @@ export default function CardCreator() {
         name: '', imageUrl: '', serialNumber: '001', role: 'mid', class: 'Mage',
         subtitle: '', topStatLabel: '', topStatValue: '', blocks: [],
     })
+    const [depictedUser, setDepictedUser] = useState(() => saved.current?.depictedUser || null)
 
     // Persist to localStorage on changes
     useEffect(() => {
         if (!initialized.current) { initialized.current = true; return }
-        const draft = { name, cardType, rarity, elements, border, saveTarget, status, cardData }
+        const draft = { name, cardType, rarity, elements, border, saveTarget, status, cardData, depictedUser }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
-    }, [name, cardType, rarity, elements, border, saveTarget, status, cardData])
+    }, [name, cardType, rarity, elements, border, saveTarget, status, cardData, depictedUser])
 
     // Auto-sync card name and first image into cardData
     useEffect(() => {
@@ -133,6 +134,17 @@ export default function CardCreator() {
                 setSaveTarget({ type, id: data.id })
                 setStatus(data.status || 'draft')
                 if (td?.cardData) setCardData(td.cardData)
+                if (data.depicted_user_id) {
+                    setDepictedUser({
+                        id: data.depicted_user_id,
+                        discord_username: data.depicted_username,
+                        discord_avatar: data.depicted_avatar,
+                        discord_id: data.depicted_discord_id,
+                        player_name: data.depicted_player_name || null,
+                    })
+                } else {
+                    setDepictedUser(null)
+                }
                 setDirty(false)
                 seedNextId(td?.elements)
                 loadedRef.current = true
@@ -416,6 +428,7 @@ export default function CardCreator() {
                 card_type: cardType,
                 rarity,
                 template_data: templateData,
+                depicted_user_id: depictedUser?.id || null,
             }
             if (type === 'template') {
                 if (saveTarget?.type === 'template') payload.id = saveTarget.id
@@ -435,7 +448,7 @@ export default function CardCreator() {
         } finally {
             setSaving(false)
         }
-    }, [name, cardType, rarity, elements, border, saveTarget])
+    }, [name, cardType, rarity, elements, border, saveTarget, depictedUser])
 
     const handleSubmit = useCallback(async () => {
         if (!saveTarget) return
@@ -454,6 +467,7 @@ export default function CardCreator() {
         setSaveTarget(null)
         setStatus('draft')
         setCardData({ name: '', imageUrl: '', serialNumber: '001', role: 'mid', class: 'Mage', subtitle: '', topStatLabel: '', topStatValue: '', blocks: [] })
+        setDepictedUser(null)
         setDirty(false)
         setError(null)
         localStorage.removeItem(STORAGE_KEY)
@@ -539,6 +553,8 @@ export default function CardCreator() {
                         border={border}
                         onBorderChange={(b) => { setBorder(b); setDirty(true) }}
                         onUploadImage={handleUploadImage}
+                        depictedUser={depictedUser}
+                        onDepictedUserChange={(user) => { setDepictedUser(user); setDirty(true) }}
                     />
                 </div>
 

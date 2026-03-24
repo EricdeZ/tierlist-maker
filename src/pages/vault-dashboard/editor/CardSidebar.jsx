@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, Type, BarChart3, Sparkles, Trash2, Upload, GripVertical, CreditCard, Table2, AlignCenter, PanelBottom, FileText, Plus, Minus, X } from 'lucide-react'
 import { ROLES, STAFF_THEMES } from '../preview/prebuiltRenderers'
+import { vaultDashboardService } from '../../../services/database'
 
 const STAFF_THEME_KEYS = Object.keys(STAFF_THEMES)
 
@@ -160,6 +161,86 @@ function FooterProperties({ sel, onUpdateElement }) {
     )
 }
 
+function DepictedUserPicker({ user, onChange }) {
+    const [query, setQuery] = useState('')
+    const [results, setResults] = useState([])
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (query.trim().length < 2) { setResults([]); return }
+        const timeout = setTimeout(async () => {
+            setLoading(true)
+            try {
+                const res = await vaultDashboardService.searchUsers(query.trim())
+                setResults(res.users || [])
+            } catch { setResults([]) }
+            finally { setLoading(false) }
+        }, 300)
+        return () => clearTimeout(timeout)
+    }, [query])
+
+    const avatarUrl = (u) => u.discord_avatar && u.discord_id
+        ? `https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.png?size=32`
+        : null
+
+    if (user) {
+        return (
+            <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Depicted User</h3>
+                <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg">
+                    {avatarUrl(user) ? (
+                        <img src={avatarUrl(user)} alt="" className="w-5 h-5 rounded-full" />
+                    ) : (
+                        <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[10px] text-gray-300">
+                            {user.discord_username?.[0]?.toUpperCase() || '?'}
+                        </div>
+                    )}
+                    <span className="text-xs text-white truncate flex-1">{user.discord_username}</span>
+                    {user.player_name && <span className="text-[10px] text-gray-500 truncate">{user.player_name}</span>}
+                    <button onClick={() => onChange(null)} className="text-gray-500 hover:text-red-400 transition-colors">
+                        <X size={12} />
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="relative">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Depicted User</h3>
+            <input
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Link depicted user..."
+                className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500"
+            />
+            {results.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {results.map(u => (
+                        <button
+                            key={u.id}
+                            onClick={() => { onChange(u); setQuery(''); setResults([]) }}
+                            className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-gray-700 transition-colors text-left"
+                        >
+                            {avatarUrl(u) ? (
+                                <img src={avatarUrl(u)} alt="" className="w-4 h-4 rounded-full" />
+                            ) : (
+                                <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-[8px] text-gray-300">
+                                    {u.discord_username?.[0]?.toUpperCase() || '?'}
+                                </div>
+                            )}
+                            <span className="text-xs text-white truncate">{u.discord_username}</span>
+                            {u.player_name && <span className="text-[10px] text-gray-500 truncate">({u.player_name})</span>}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {loading && <div className="text-[10px] text-gray-500 mt-1">Searching...</div>}
+        </div>
+    )
+}
+
 export default function CardSidebar({
     elements,
     selectedId,
@@ -180,6 +261,8 @@ export default function CardSidebar({
     border,
     onBorderChange,
     onUploadImage,
+    depictedUser,
+    onDepictedUserChange,
 }) {
     const fileRef = useRef(null)
     const [dragId, setDragId] = useState(null)
@@ -293,6 +376,9 @@ export default function CardSidebar({
                     </div>
                 )}
             </div>
+
+            {/* Depicted User */}
+            <DepictedUserPicker user={depictedUser} onChange={onDepictedUserChange} />
 
             {/* Selected Element Properties */}
             {sel && (
