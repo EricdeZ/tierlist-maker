@@ -153,24 +153,44 @@ async function discoverPlayerTeamCombos(sql, seasonId) {
     })
   }
 
+  // Collect missing player-team combos from transactions, then bulk-fetch
+  const missingCombos = []
   for (const tx of transactions) {
     if (tx.from_team_id && tx.type !== 'pickup') {
       const key = `${tx.player_id}-${tx.from_team_id}`
       if (!playerTeamMap.has(key)) {
-        const [p] = await sql`SELECT p.name, p.slug FROM players p WHERE p.id = ${tx.player_id}`
-        const [t] = await sql`SELECT t.name, t.color FROM teams t WHERE t.id = ${tx.from_team_id}`
-        const [lp] = await sql`SELECT role FROM league_players WHERE player_id = ${tx.player_id} AND season_id = ${seasonId} LIMIT 1`
-        if (p && t) {
-          playerTeamMap.set(key, {
-            playerId: tx.player_id,
-            teamId: tx.from_team_id,
-            playerName: p.name,
-            playerSlug: p.slug,
-            teamName: t.name,
-            teamColor: t.color,
-            role: lp?.role || null,
-          })
-        }
+        missingCombos.push({ playerId: tx.player_id, teamId: tx.from_team_id })
+        playerTeamMap.set(key, null) // mark as seen to avoid duplicates
+      }
+    }
+  }
+  if (missingCombos.length) {
+    const missingPlayerIds = [...new Set(missingCombos.map(c => c.playerId))]
+    const missingTeamIds = [...new Set(missingCombos.map(c => c.teamId))]
+    const [players, teams, roles] = await Promise.all([
+      sql`SELECT id, name, slug FROM players WHERE id = ANY(${missingPlayerIds})`,
+      sql`SELECT id, name, color FROM teams WHERE id = ANY(${missingTeamIds})`,
+      sql`SELECT player_id, role FROM league_players WHERE season_id = ${seasonId} AND player_id = ANY(${missingPlayerIds})`,
+    ])
+    const pMap = new Map(players.map(p => [p.id, p]))
+    const tMap = new Map(teams.map(t => [t.id, t]))
+    const rMap = new Map(roles.map(r => [r.player_id, r.role]))
+    for (const c of missingCombos) {
+      const key = `${c.playerId}-${c.teamId}`
+      const p = pMap.get(c.playerId)
+      const t = tMap.get(c.teamId)
+      if (p && t) {
+        playerTeamMap.set(key, {
+          playerId: c.playerId,
+          teamId: c.teamId,
+          playerName: p.name,
+          playerSlug: p.slug,
+          teamName: t.name,
+          teamColor: t.color,
+          role: rMap.get(c.playerId) || null,
+        })
+      } else {
+        playerTeamMap.delete(key) // remove placeholder
       }
     }
   }
@@ -293,19 +313,19 @@ export async function previewPlayerDefs(sql, seasonIds) {
   for (const seasonId of seasonIds) {
     const { season, entries } = await discoverPlayerTeamCombos(sql, seasonId)
 
-    const existingDefs = await sql`
-      SELECT player_id, team_id FROM cc_player_defs WHERE season_id = ${seasonId}
-    `
-    const exclusions = await sql`
-      SELECT player_id, team_id FROM cc_player_def_exclusions WHERE season_id = ${seasonId}
-    `
+    const playerIds = [...new Set(entries.map(e => e.playerId))]
+    const [existingDefs, exclusions, bulk] = await Promise.all([
+      sql`SELECT player_id, team_id FROM cc_player_defs WHERE season_id = ${seasonId}`,
+      sql`SELECT player_id, team_id FROM cc_player_def_exclusions WHERE season_id = ${seasonId}`,
+      bulkPreFetch(sql, playerIds, seasonId),
+    ])
+    const { godTeamMap, godSeasonMap, godAllTimeMap } = bulk
     const defSet = new Set(existingDefs.map(d => `${d.player_id}-${d.team_id}`))
     const exclSet = new Set(exclusions.map(e => `${e.player_id}-${e.team_id}`))
 
     for (const e of entries) {
       const key = `${e.playerId}-${e.teamId}`
-
-      const bestGodName = await findBestGod(sql, e.playerId, e.teamId, seasonId)
+      const bestGodName = godTeamMap.get(key) || godSeasonMap.get(e.playerId) || godAllTimeMap.get(e.playerId) || null
 
       let status = 'new'
       if (exclSet.has(key)) status = 'excluded'
