@@ -272,7 +272,7 @@ function TierFilterBar({ availableTiers, activeTier, setActiveTier, completedCou
 // ═══════════════════════════════════════════════════
 export default function Challenges() {
     const { user, login, loading: authLoading } = useAuth()
-    const { updateFromClaim, challengeNotifications } = usePassion()
+    const { updateFromClaim, challengeNotifications, refreshBalance } = usePassion()
     const [challengeData, setChallengeData] = useState({})
     const [loading, setLoading] = useState(true)
     const [claimingId, setClaimingId] = useState(null)
@@ -287,6 +287,10 @@ export default function Challenges() {
     }, [])
 
     useEffect(() => { loadChallenges() }, [loadChallenges])
+
+    useEffect(() => {
+        refreshBalance(true)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (challengeNotifications.length > 0) loadChallenges()
