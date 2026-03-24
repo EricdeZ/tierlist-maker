@@ -7,10 +7,11 @@ import { ITEMS } from '../../data/vault/items'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
+import VaultCard from './components/VaultCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock, ArrowUpDown } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock, ArrowUpDown, Package } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const BATCH_SIZE = 50
@@ -98,6 +99,7 @@ export default function CCCollection() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [recentPulls, setRecentPulls] = useState([])
   const [recentOpen, setRecentOpen] = useState(false)
+  const [collectionSets, setCollectionSets] = useState(null)
   const searchTimerRef = useRef(null)
   const loadedSetsRef = useRef(new Set())
 
@@ -124,6 +126,7 @@ export default function CCCollection() {
         setOwned(ownedData)
         setRecentPulls(ownedData.recentPulls || [])
         setDefOverrides(overridesData.overrides || {})
+        vaultService.getOwnedCollections().then(data => setCollectionSets(data)).catch(() => {})
       } catch {}
       setLoading(false)
     }
@@ -258,6 +261,17 @@ export default function CCCollection() {
   const totalPlayerCards = playerSets.reduce((s, set) => s + set.total, 0)
   const totalPlayerCollected = playerSets.reduce((s, set) => s + set.collected, 0)
 
+  const collectionNavItems = useMemo(() => {
+    if (!collectionSets?.collections) return []
+    return collectionSets.collections.map(col => {
+      const collected = col.entries.filter(e => collectionSets.owned[e.templateId]?.length > 0).length
+      return { ...col, collected, total: col.entries.length }
+    })
+  }, [collectionSets])
+
+  const totalCollectionCards = collectionNavItems.reduce((s, c) => s + c.total, 0)
+  const totalCollectionCollected = collectionNavItems.reduce((s, c) => s + c.collected, 0)
+
   const isPlayerSection = activeSection.startsWith('player:')
   const activePlayerSetKey = isPlayerSection ? activeSection.replace('player:', '') : null
   const activePlayerSetMeta = activePlayerSetKey
@@ -305,6 +319,18 @@ export default function CCCollection() {
       entries = allPlayerCards
     } else if (activeSection.startsWith('player:')) {
       entries = activePlayerCards
+    } else if (activeSection.startsWith('col:')) {
+      const colId = parseInt(activeSection.replace('col:', ''), 10)
+      const col = collectionSets?.collections?.find(c => c.id === colId)
+      if (!col) return []
+      entries = col.entries.map(e => ({
+        templateId: e.templateId,
+        name: e.name,
+        cardType: e.cardType,
+        templateData: e.templateData,
+        collected: (collectionSets.owned[e.templateId]?.length || 0) > 0,
+        ownedRarities: collectionSets.owned[e.templateId] || [],
+      }))
     } else {
       return []
     }
@@ -336,7 +362,7 @@ export default function CCCollection() {
     }
 
     return entries
-  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode, searchQuery])
+  }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode, searchQuery, collectionSets])
 
   const hasMore = displayLimit < filteredEntries.length
   const remaining = filteredEntries.length - displayLimit
@@ -402,6 +428,12 @@ export default function CCCollection() {
             <div className="text-[var(--cd-text-mid)]">
               Player Cards: <span className="text-[var(--cd-cyan)] cd-num font-bold">{totalPlayerCollected}</span>
               <span className="text-[var(--cd-text-dim)]">/{totalPlayerCards}</span>
+            </div>
+          )}
+          {totalCollectionCards > 0 && (
+            <div className="text-[var(--cd-text-mid)]">
+              Collections: <span className="text-[var(--cd-cyan)] cd-num font-bold">{totalCollectionCollected}</span>
+              <span className="text-[var(--cd-text-dim)]">/{totalCollectionCards}</span>
             </div>
           )}
         </div>
@@ -474,6 +506,23 @@ export default function CCCollection() {
                 )
               })
             )}
+            {collectionNavItems.map(col => {
+              const active = activeSection === `col:${col.id}`
+              return (
+                <button
+                  key={`col-${col.id}`}
+                  onClick={() => switchSection(`col:${col.id}`)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer cd-head ${
+                    active
+                      ? 'bg-[var(--cd-cyan)]/15 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/25'
+                      : 'bg-white/[0.04] text-[var(--cd-text-mid)] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <Package className="w-3 h-3" />
+                  <span>{col.name}</span>
+                </button>
+              )
+            })}
           </div>
           {/* Scroll arrow hint */}
           <div className="absolute right-0 top-0 bottom-2 w-8 flex items-center justify-center pointer-events-none" style={{ background: 'linear-gradient(to right, transparent, var(--cd-edge))' }}>
@@ -505,6 +554,30 @@ export default function CCCollection() {
                 </button>
               )
             })}
+
+            {collectionNavItems.length > 0 && (
+              <>
+                <div className="text-[10px] text-[var(--cd-text-dim)] uppercase tracking-wider font-bold mt-4 mb-2 cd-head">Collections</div>
+                {collectionNavItems.map(col => {
+                  const active = activeSection === `col:${col.id}`
+                  return (
+                    <button
+                      key={`col-${col.id}`}
+                      onClick={() => switchSection(`col:${col.id}`)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer cd-head text-left ${
+                        active
+                          ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/20'
+                          : 'text-[var(--cd-text-mid)] hover:bg-white/[0.03] hover:text-[var(--cd-text)]'
+                      }`}
+                    >
+                      <Package className="w-3.5 h-3.5 shrink-0" />
+                      <span className="flex-1 truncate">{col.name}</span>
+                      <span className="text-xs cd-num text-[var(--cd-text)]">{col.collected}/{col.total}</span>
+                    </button>
+                  )
+                })}
+              </>
+            )}
 
             {leagueSeasonGroups.length > 0 && (
               <>
@@ -617,6 +690,16 @@ export default function CCCollection() {
             />
           )}
 
+          {activeSection.startsWith('col:') && collectionSets && (
+            <CollectionCardGrid
+              collection={collectionNavItems.find(c => `col:${c.id}` === activeSection)}
+              entries={filteredEntries.slice(0, displayLimit)}
+              owned={collectionSets.owned}
+              onZoom={setZoomedCard}
+              viewMode={viewMode}
+            />
+          )}
+
           {activeSection === 'player:all' && (
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -680,6 +763,7 @@ export default function CCCollection() {
       {zoomedCard && (
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
+          collectionCard={zoomedCard.collectionCard}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
           canSell={zoomedCard.canSell}
@@ -1077,6 +1161,89 @@ function PlayerSlot({ card, meta, onZoom }) {
       >
         <div className="text-[9px] cd-num text-[var(--cd-text-dim)] mb-1">{cardNumber}</div>
         <div className="text-[11px] font-bold text-[var(--cd-text-dim)] cd-head text-center px-2 leading-tight">{card.playerName}</div>
+        <div className="text-[10px] text-[var(--cd-text-dim)]/60 mt-0.5">???</div>
+      </div>
+    </div>
+  )
+}
+
+// ═══ Collection card grid ═══
+
+function CollectionCardGrid({ collection, entries, owned, onZoom, viewMode }) {
+  if (!collection) return null
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-2">
+        <h2 className="text-lg font-bold cd-head text-[var(--cd-text)]">{collection.name}</h2>
+        {collection.collected === collection.total && collection.total > 0 && (
+          <Trophy className="w-4 h-4 text-[var(--cd-gold)]" />
+        )}
+      </div>
+      {collection.description && (
+        <p className="text-sm text-[var(--cd-text-dim)] mb-2">{collection.description}</p>
+      )}
+      <ProgressBar collected={collection.collected} total={collection.total} />
+
+      {entries.length === 0 ? (
+        <div className="text-center py-12 text-[var(--cd-text-dim)]">
+          <Library className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          <p className="text-sm font-bold cd-head">No cards {viewMode === 'owned' ? 'owned' : 'found'}</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+          {entries.map(entry => (
+            <CollectionEntrySlot key={entry.templateId} entry={entry} onZoom={onZoom} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CollectionEntrySlot({ entry, onZoom }) {
+  if (entry.collected) {
+    const rarity = highestRarity(entry.ownedRarities)
+    const td = typeof entry.templateData === 'string' ? JSON.parse(entry.templateData) : entry.templateData
+
+    const handleZoom = () => onZoom({
+      collectionCard: {
+        templateId: entry.templateId,
+        _templateData: td,
+        rarity,
+        cardType: 'collection',
+      },
+      canSell: true,
+    })
+
+    return (
+      <div className="flex flex-col items-center card-zoomable" onClick={handleZoom}>
+        <div className="relative">
+          <VaultCard
+            card={{
+              templateId: entry.templateId,
+              _templateData: td,
+              rarity,
+              cardType: 'collection',
+            }}
+            size={CARD_SIZE}
+            holo={false}
+          />
+          <DuplicateCount ownedRarities={entry.ownedRarities} />
+        </div>
+        <RarityPips ownedRarities={entry.ownedRarities} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className="rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/40 flex flex-col items-center justify-center"
+        style={{ width: CARD_SIZE, aspectRatio: '5/7' }}
+      >
+        <Package className="w-6 h-6 text-[var(--cd-text-dim)]/30 mb-1" />
+        <div className="text-[11px] font-bold text-[var(--cd-text-dim)] cd-head text-center px-2 leading-tight">{entry.name}</div>
         <div className="text-[10px] text-[var(--cd-text-dim)]/60 mt-0.5">???</div>
       </div>
     </div>
