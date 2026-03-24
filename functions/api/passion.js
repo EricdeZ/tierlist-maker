@@ -10,7 +10,7 @@ import {
     EARNING_RULES,
 } from '../lib/passion.js'
 import { pushChallengeProgress } from '../lib/challenges.js'
-import { ensureEmberBalance, getConversionCost, EMBER_RULES } from '../lib/ember.js'
+import { getConversionCost, EMBER_RULES } from '../lib/ember.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -68,65 +68,68 @@ const handler = async (event) => {
 // GET: User balance + rank info
 // ═══════════════════════════════════════════════════
 async function getBalance(sql, user) {
-    // Ensure balance rows exist
-    await Promise.all([
-        sql`INSERT INTO passion_balances (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING`,
-        ensureEmberBalance(sql, user.id),
-    ])
-
-    const [[pb], [eb], [{ count: claimableCount }], [{ count: vaultClaimableCount }], [{ in_discord: inDiscord }]] = await Promise.all([
-        sql`
+    const [row] = await sql`
+        WITH ensure_passion AS (
+            INSERT INTO passion_balances (user_id) VALUES (${user.id})
+            ON CONFLICT (user_id) DO NOTHING RETURNING 1
+        ), ensure_ember AS (
+            INSERT INTO ember_balances (user_id) VALUES (${user.id})
+            ON CONFLICT (user_id) DO NOTHING RETURNING 1
+        ), pb AS (
             SELECT balance, total_earned, total_spent,
                    last_daily_claim, current_streak, longest_streak
             FROM passion_balances WHERE user_id = ${user.id}
-        `,
-        sql`
+        ), eb AS (
             SELECT balance, last_daily_claim, current_streak, longest_streak,
                    conversions_today, last_conversion_date::text
             FROM ember_balances WHERE user_id = ${user.id}
-        `,
-        sql`
-            SELECT COUNT(*) as count FROM user_challenges uc
+        ), claimable AS (
+            SELECT COUNT(*) as total_count,
+                   COUNT(*) FILTER (WHERE c.category = 'vault') as vault_count
+            FROM user_challenges uc
             JOIN challenges c ON c.id = uc.challenge_id
             WHERE uc.user_id = ${user.id}
               AND uc.completed = false
               AND uc.current_value >= c.target_value
               AND c.is_active = true
-        `,
-        sql`
-            SELECT COUNT(*) as count FROM user_challenges uc
-            JOIN challenges c ON c.id = uc.challenge_id
-            WHERE uc.user_id = ${user.id}
-              AND uc.completed = false
-              AND uc.current_value >= c.target_value
-              AND c.is_active = true
-              AND c.category = 'vault'
-        `,
-        sql`
+        ), discord AS (
             SELECT EXISTS(
                 SELECT 1 FROM discord_guild_members dgm
                 JOIN users u ON u.discord_id = dgm.discord_id
                 WHERE u.id = ${user.id}
             ) as in_discord
-        `,
-    ])
+        )
+        SELECT
+            pb.balance AS passion_balance,
+            pb.total_earned, pb.total_spent,
+            pb.last_daily_claim AS passion_last_claim,
+            pb.current_streak AS passion_streak,
+            pb.longest_streak AS passion_longest_streak,
+            eb.balance AS ember_balance,
+            eb.last_daily_claim AS ember_last_claim,
+            eb.current_streak AS ember_streak,
+            eb.longest_streak AS ember_longest_streak,
+            eb.conversions_today, eb.last_conversion_date,
+            claimable.total_count, claimable.vault_count,
+            discord.in_discord
+        FROM pb, eb, claimable, discord
+    `
 
-    const rank = getRank(pb.total_earned)
-    const nextRank = getNextRank(pb.total_earned)
+    const rank = getRank(row.total_earned)
+    const nextRank = getNextRank(row.total_earned)
 
     const now = new Date()
     const todayUTC = now.toISOString().slice(0, 10)
-    const lastClaimDate = pb.last_daily_claim
-        ? new Date(pb.last_daily_claim).toISOString().slice(0, 10)
+    const lastClaimDate = row.passion_last_claim
+        ? new Date(row.passion_last_claim).toISOString().slice(0, 10)
         : null
     const canClaimDaily = lastClaimDate !== todayUTC
 
-    // Ember daily claim check
-    const emberLastClaim = eb.last_daily_claim
-        ? new Date(eb.last_daily_claim).toISOString().slice(0, 10)
+    const emberLastClaim = row.ember_last_claim
+        ? new Date(row.ember_last_claim).toISOString().slice(0, 10)
         : null
-    const lastConvDate = eb.last_conversion_date || null
-    let emberConversionsToday = eb.conversions_today || 0
+    const lastConvDate = row.last_conversion_date || null
+    let emberConversionsToday = row.conversions_today || 0
     if (lastConvDate && lastConvDate !== todayUTC) {
         emberConversionsToday = 0
     }
@@ -135,26 +138,26 @@ async function getBalance(sql, user) {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-            balance: pb.balance,
-            totalEarned: pb.total_earned,
-            totalSpent: pb.total_spent,
-            currentStreak: pb.current_streak,
-            longestStreak: pb.longest_streak,
+            balance: row.passion_balance,
+            totalEarned: row.total_earned,
+            totalSpent: row.total_spent,
+            currentStreak: row.passion_streak,
+            longestStreak: row.passion_longest_streak,
             canClaimDaily,
-            claimableCount: parseInt(claimableCount),
-            vaultClaimableCount: parseInt(vaultClaimableCount),
-            inDiscord: inDiscord,
-            lastDailyClaim: pb.last_daily_claim,
+            claimableCount: parseInt(row.total_count),
+            vaultClaimableCount: parseInt(row.vault_count),
+            inDiscord: row.in_discord,
+            lastDailyClaim: row.passion_last_claim,
             rank: { name: rank.name, division: rank.division, display: formatRank(rank) },
             nextRank: nextRank
                 ? { name: nextRank.name, division: nextRank.division, display: formatRank(nextRank), passionNeeded: nextRank.passionNeeded }
                 : null,
             ember: {
-                balance: eb.balance,
-                currentStreak: eb.current_streak,
-                longestStreak: eb.longest_streak,
+                balance: row.ember_balance,
+                currentStreak: row.ember_streak,
+                longestStreak: row.ember_longest_streak,
                 canClaimDaily: emberLastClaim !== todayUTC,
-                lastDailyClaim: eb.last_daily_claim,
+                lastDailyClaim: row.ember_last_claim,
                 conversionsToday: emberConversionsToday,
                 nextConversionCost: getConversionCost(emberConversionsToday),
                 conversionEmberAmount: EMBER_RULES.conversion_ember_amount,
