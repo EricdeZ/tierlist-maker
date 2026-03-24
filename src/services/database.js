@@ -1022,6 +1022,9 @@ export const vaultService = {
     async getSharedCard(token) {
         return apiCall('vault', { action: 'shared-card', token })
     },
+    async getShowcaseCollection(slug) {
+        return apiCall('vault', { action: 'showcase-collection', slug })
+    },
     async getCollectionCatalog() {
         return apiCall('vault', { action: 'collection-catalog' })
     },
@@ -1030,6 +1033,9 @@ export const vaultService = {
     },
     async getCollectionSet(setKey) {
         return apiCall('vault', { action: 'collection-set', setKey })
+    },
+    async getOwnedCollections() {
+        return apiCall('vault', { action: 'collection-collections' })
     },
     async getCardDetail(defId) {
         return apiCall('vault', { action: 'card-detail', defId })
