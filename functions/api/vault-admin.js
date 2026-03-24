@@ -2,7 +2,7 @@
 // Permission: cardclash_manage (global only)
 
 import { adapt } from '../lib/adapter.js'
-import { getDB, adminHeaders } from '../lib/db.js'
+import { getDB, adminHeaders, transaction } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { SignJWT } from 'jose'
 import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs, previewPlayerDefs, generateSelectedDefs } from '../lib/vault-defs.js'
@@ -441,23 +441,27 @@ async function handleGeneratePlayerDefs(sql, body) {
     return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonId or leagueId required' }) }
   }
 
-  let results = []
+  // Use WebSocket transaction to avoid CF subrequest limit
+  const results = await transaction(async (tx) => {
+    const out = []
 
-  if (seasonId) {
-    const result = await generatePlayerDefs(sql, parseInt(seasonId))
-    results.push({ seasonId: parseInt(seasonId), ...result })
-  } else {
-    // Generate for all seasons in the league
-    const seasons = await sql`
-      SELECT s.id FROM seasons s
-      JOIN divisions d ON s.division_id = d.id
-      WHERE d.league_id = ${parseInt(leagueId)}
-    `
-    for (const s of seasons) {
-      const result = await generatePlayerDefs(sql, s.id)
-      results.push({ seasonId: s.id, ...result })
+    if (seasonId) {
+      const result = await generatePlayerDefs(tx, parseInt(seasonId))
+      out.push({ seasonId: parseInt(seasonId), ...result })
+    } else {
+      const seasons = await tx`
+        SELECT s.id FROM seasons s
+        JOIN divisions d ON s.division_id = d.id
+        WHERE d.league_id = ${parseInt(leagueId)}
+      `
+      for (const s of seasons) {
+        const result = await generatePlayerDefs(tx, s.id)
+        out.push({ seasonId: s.id, ...result })
+      }
     }
-  }
+
+    return out
+  })
 
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ results }) }
 }
@@ -468,7 +472,7 @@ async function handleFreezeSeasonStats(sql, body) {
   if (!seasonId) {
     return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonId required' }) }
   }
-  const result = await freezeSeasonStats(sql, parseInt(seasonId))
+  const result = await transaction(async (tx) => freezeSeasonStats(tx, parseInt(seasonId)))
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
 }
 
@@ -480,34 +484,38 @@ async function handleBackfillCardDefs(sql) {
 
 // ═══ POST: Refresh best_god_name for all player defs missing it ═══
 async function handleRefreshBestGods(sql) {
-  const defs = await sql`
-    SELECT d.id, d.player_id, d.team_id, d.season_id
-    FROM cc_player_defs d
-    WHERE d.best_god_name IS NULL
-  `
-
-  let updated = 0
-  for (const def of defs) {
-    const [row] = await sql`
-      SELECT pgs.god_played FROM player_game_stats pgs
-      JOIN league_players lp ON pgs.league_player_id = lp.id
-      JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
-      JOIN matches m ON g.match_id = m.id
-      WHERE lp.player_id = ${def.player_id} AND lp.season_id = ${def.season_id}
-        AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${def.team_id}
-        AND pgs.god_played IS NOT NULL
-      GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+  const result = await transaction(async (tx) => {
+    const defs = await tx`
+      SELECT d.id, d.player_id, d.team_id, d.season_id
+      FROM cc_player_defs d
+      WHERE d.best_god_name IS NULL
     `
-    if (row) {
-      await sql`
-        UPDATE cc_player_defs SET best_god_name = ${row.god_played}, updated_at = NOW()
-        WHERE id = ${def.id}
-      `
-      updated++
-    }
-  }
 
-  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ checked: defs.length, updated }) }
+    let updated = 0
+    for (const def of defs) {
+      const [row] = await tx`
+        SELECT pgs.god_played FROM player_game_stats pgs
+        JOIN league_players lp ON pgs.league_player_id = lp.id
+        JOIN games g ON g.id = pgs.game_id AND g.is_completed = true
+        JOIN matches m ON g.match_id = m.id
+        WHERE lp.player_id = ${def.player_id} AND lp.season_id = ${def.season_id}
+          AND CASE pgs.team_side WHEN 1 THEN m.team1_id WHEN 2 THEN m.team2_id END = ${def.team_id}
+          AND pgs.god_played IS NOT NULL
+        GROUP BY pgs.god_played ORDER BY COUNT(*) DESC, pgs.god_played ASC LIMIT 1
+      `
+      if (row) {
+        await tx`
+          UPDATE cc_player_defs SET best_god_name = ${row.god_played}, updated_at = NOW()
+          WHERE id = ${def.id}
+        `
+        updated++
+      }
+    }
+
+    return { checked: defs.length, updated }
+  })
+
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
 }
 
 // ═══ POST: Ban a user from the vault ═══
@@ -564,7 +572,8 @@ async function handlePreviewPlayerDefs(sql, params) {
     return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'seasonIds or allActive required' }) }
   }
 
-  const entries = await previewPlayerDefs(sql, ids)
+  // Use WebSocket transaction to avoid CF subrequest limit (read-only but needs single connection)
+  const entries = await transaction(async (tx) => previewPlayerDefs(tx, ids))
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ entries }) }
 }
 
@@ -574,7 +583,8 @@ async function handleGenerateSelectedDefs(sql, body) {
   if (!entries?.length) {
     return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'entries array required' }) }
   }
-  const result = await generateSelectedDefs(sql, entries)
+  // Use WebSocket transaction to avoid CF subrequest limit
+  const result = await transaction(async (tx) => generateSelectedDefs(tx, entries))
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
 }
 
