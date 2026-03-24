@@ -58,15 +58,10 @@ export function VaultProvider({ children }) {
   passionCtxRef.current = passionCtx
   const startingFiveRef = useRef(startingFive)
   startingFiveRef.current = startingFive
-  const delayedRefreshTimer = useRef(null)
-
-  // Refresh balance now + again after 3s to catch fire-and-forget challenge progress on the backend
+  // Refresh balance after vault actions
   const refreshBalanceWithRetry = useCallback(() => {
     passionCtxRef.current?.refreshBalance?.()
-    clearTimeout(delayedRefreshTimer.current)
-    delayedRefreshTimer.current = setTimeout(() => passionCtxRef.current?.refreshBalance?.(), 3000)
   }, [])
-  useEffect(() => () => clearTimeout(delayedRefreshTimer.current), [])
 
   useEffect(() => {
     if (!user) return
