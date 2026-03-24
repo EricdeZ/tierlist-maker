@@ -1509,8 +1509,8 @@ export const vaultDashboardService = {
     async getCollections() { return apiCall('vault-dashboard', { action: 'collections' }) },
     async getCollection(id) { return apiCall('vault-dashboard', { action: 'collection', id }) },
     async saveCollection(data) { return apiPost('vault-dashboard', { action: 'save-collection' }, data) },
-    async addCollectionEntries(collectionId, templateIds) {
-        return apiPost('vault-dashboard', { action: 'add-collection-entries' }, { collection_id: collectionId, template_ids: templateIds })
+    async addCollectionEntries(collectionId, templateIds, draftIds) {
+        return apiPost('vault-dashboard', { action: 'add-collection-entries' }, { collection_id: collectionId, template_ids: templateIds, draft_ids: draftIds })
     },
     async removeCollectionEntry(id) { return apiPost('vault-dashboard', { action: 'remove-collection-entry' }, { id }) },
     async setCollectionStatus(id, status) { return apiPost('vault-dashboard', { action: 'collection-status' }, { id, status }) },

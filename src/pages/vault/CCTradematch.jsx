@@ -11,6 +11,26 @@ import MatchSplash from './tradematch/MatchSplash'
 import MatchesAndLikes from './tradematch/MatchesAndLikes'
 import Negotiation from './tradematch/Negotiation'
 
+// localStorage helpers for tracking seen cards across sessions
+const SEEN_STORAGE_KEY = 'tradematch-seen'
+const MAX_SEEN_IDS = 5000
+
+function loadSeenCardIds(userId) {
+  if (!userId) return new Set()
+  try {
+    const raw = localStorage.getItem(`${SEEN_STORAGE_KEY}-${userId}`)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch { return new Set() }
+}
+
+function saveSeenCardIds(userId, ids) {
+  if (!userId) return
+  try {
+    const arr = [...ids]
+    localStorage.setItem(`${SEEN_STORAGE_KEY}-${userId}`, JSON.stringify(arr.length > MAX_SEEN_IDS ? arr.slice(-MAX_SEEN_IDS) : arr))
+  } catch {}
+}
+
 const SUB_VIEWS = [
   { key: 'pile', label: 'Trade Pile', icon: Layers, desc: 'Pick cards you\'re willing to trade. Need at least 10 to start swiping.' },
   { key: 'swiper', label: 'Swipe', icon: Heart, desc: 'Swipe right on cards you want. If they like yours too, it\'s a match!' },
@@ -56,6 +76,23 @@ export default function CCTradematch() {
   const [refreshing, setRefreshing] = useState(false)
   const [activeTradeId, setActiveTradeId] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
+
+  // Track seen cards in localStorage to prevent re-showing after tab switch / reload
+  const [seenCardIds, setSeenCardIds] = useState(() => loadSeenCardIds(user?.id))
+
+  const markCardSeen = useCallback((cardId) => {
+    setSeenCardIds(prev => {
+      const next = new Set(prev)
+      next.add(cardId)
+      saveSeenCardIds(user?.id, next)
+      return next
+    })
+  }, [user?.id])
+
+  const visibleFeedCards = useMemo(() =>
+    feedCards.filter(c => !seenCardIds.has(c.card_id)),
+    [feedCards, seenCardIds]
+  )
 
   // Reusable fetch callbacks
   const initialLoadDone = useRef(false)
@@ -334,14 +371,15 @@ export default function CCTradematch() {
 
       {subView === 'swiper' && (
         <Swiper
-          feedCards={feedCards}
+          feedCards={visibleFeedCards}
           onSwipeRight={handleSwipeRight}
           onSwipeLeft={handleSwipeLeft}
           onMatch={handleMatch}
           onLoadMore={handleLoadMoreFeed}
+          onCardSeen={markCardSeen}
           locked={pileIsLocked}
           loading={loading}
-          empty={!loading && feedCards.length === 0}
+          empty={!loading && visibleFeedCards.length === 0}
           onGoToPile={() => setSubView('pile')}
         />
       )}

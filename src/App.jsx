@@ -151,6 +151,7 @@ function App() {
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector, or PlayerDashboard for logged-in users */}
                             <Route index element={<HomeRoute />} />
+                            <Route path="landing" element={<Homepage />} />
 
                             {/* Admin pages (nested under AdminLayout with shared navbar) */}
                             <Route path="admin" element={<ProtectedRoute requireAdmin><AdminLayout /></ProtectedRoute>}>

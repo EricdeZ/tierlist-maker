@@ -430,10 +430,17 @@ async function getCollection(sql, event) {
     const [collection] = await sql`SELECT * FROM cc_collections WHERE id = ${id}`
     if (!collection) return err('Not found', 404)
     const entries = await sql`
-        SELECT e.*, t.name AS template_name, t.card_type, t.rarity, t.thumbnail_url,
-               t.template_data, u.discord_username AS added_by_name
+        SELECT e.*,
+               COALESCE(t.name, d.notes, 'Draft #' || d.id) AS template_name,
+               COALESCE(t.card_type, d.card_type) AS card_type,
+               COALESCE(t.rarity, d.rarity) AS rarity,
+               COALESCE(t.thumbnail_url, d.thumbnail_url) AS thumbnail_url,
+               COALESCE(t.template_data, d.template_data) AS template_data,
+               u.discord_username AS added_by_name,
+               CASE WHEN e.draft_id IS NOT NULL THEN 'draft' ELSE 'template' END AS source_type
         FROM cc_collection_entries e
-        JOIN cc_card_templates t ON e.template_id = t.id
+        LEFT JOIN cc_card_templates t ON e.template_id = t.id
+        LEFT JOIN cc_card_drafts d ON e.draft_id = d.id
         LEFT JOIN users u ON e.added_by = u.id
         WHERE e.collection_id = ${id}
         ORDER BY e.added_at DESC
@@ -463,21 +470,37 @@ async function saveCollection(sql, body, user, canApprove) {
 
 async function addCollectionEntries(sql, body, user, canApprove) {
     if (!canApprove) return err('Requires vault_approve', 403)
-    const { collection_id, template_ids } = body
-    if (!collection_id || !template_ids?.length) return err('Missing collection_id or template_ids')
-    const approved = await sql`
-        SELECT id FROM cc_card_templates WHERE id = ANY(${template_ids}) AND status = 'approved'
-    `
-    const approvedIds = approved.map(r => r.id)
-    if (approvedIds.length === 0) return err('No approved templates found')
-    for (const tid of approvedIds) {
-        await sql`
-            INSERT INTO cc_collection_entries (collection_id, template_id, added_by)
-            VALUES (${collection_id}, ${tid}, ${user.id})
-            ON CONFLICT (collection_id, template_id) DO NOTHING
+    const { collection_id, template_ids, draft_ids } = body
+    if (!collection_id || (!template_ids?.length && !draft_ids?.length)) return err('Missing collection_id or entry ids')
+    let added = 0
+    if (template_ids?.length) {
+        const approved = await sql`
+            SELECT id FROM cc_card_templates WHERE id = ANY(${template_ids}) AND status = 'approved'
         `
+        for (const { id } of approved) {
+            await sql`
+                INSERT INTO cc_collection_entries (collection_id, template_id, added_by)
+                VALUES (${collection_id}, ${id}, ${user.id})
+                ON CONFLICT (collection_id, template_id) DO NOTHING
+            `
+            added++
+        }
     }
-    return ok({ added: approvedIds.length })
+    if (draft_ids?.length) {
+        const approved = await sql`
+            SELECT id FROM cc_card_drafts WHERE id = ANY(${draft_ids}) AND status = 'approved'
+        `
+        for (const { id } of approved) {
+            await sql`
+                INSERT INTO cc_collection_entries (collection_id, draft_id, added_by)
+                VALUES (${collection_id}, ${id}, ${user.id})
+                ON CONFLICT DO NOTHING
+            `
+            added++
+        }
+    }
+    if (added === 0) return err('No approved entries found')
+    return ok({ added })
 }
 
 async function removeCollectionEntry(sql, body, canApprove) {

@@ -63,7 +63,7 @@ function avatarUrl(card) {
   return null
 }
 
-export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, locked, loading, empty, onGoToPile }) {
+export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onCardSeen, locked, loading, empty, onGoToPile }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swiping, setSwiping] = useState(false) // true during async swipe processing
   const [filterRarity, setFilterRarity] = useState('all')
@@ -97,11 +97,10 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
   const lastMovePos = useRef({ x: 0, y: 0 })
   const animating = useRef(false)
 
-  const activeIndex = filteredCards?.length > 0 ? currentIndex % filteredCards.length : 0
-  const card = filteredCards?.[activeIndex]
+  const card = filteredCards?.[currentIndex] || null
 
-  // Trigger load more when nearing end of first pass (use unfiltered count)
-  const remaining = feedCards ? feedCards.length - currentIndex : 0
+  // Trigger load more when nearing end
+  const remaining = filteredCards ? filteredCards.length - currentIndex : 0
   useEffect(() => {
     if (remaining <= LOAD_MORE_BUFFER && remaining > 0 && onLoadMore) {
       onLoadMore()
@@ -191,6 +190,7 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     throwCard(direction)
 
     const cardId = card.card_id
+    if (onCardSeen) onCardSeen(cardId)
 
     // Wait for throw animation, then advance immediately
     await new Promise(r => setTimeout(r, 450))
@@ -206,7 +206,7 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     } else {
       onSwipeLeft(cardId).catch(() => {})
     }
-  }, [card, swiping, throwCard, advanceCard, onSwipeRight, onSwipeLeft, onMatch])
+  }, [card, swiping, throwCard, advanceCard, onSwipeRight, onSwipeLeft, onMatch, onCardSeen])
 
   const handlePointerDown = useCallback((e) => {
     if (animating.current || swiping) return
@@ -355,13 +355,38 @@ export default function Swiper({ feedCards, onSwipeRight, onSwipeLeft, onMatch, 
     )
   }
 
-  // Loop back to start when all cards have been swiped through
-  const loopedIndex = filteredCards.length > 0 ? currentIndex % filteredCards.length : 0
+  // ── All cards swiped ──
+  if (currentIndex >= filteredCards.length) {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {hasActiveFilters && (
+          <SwipeFilters
+            filterRarity={filterRarity} setFilterRarity={setFilterRarity}
+            filterHolo={filterHolo} setFilterHolo={setFilterHolo}
+          />
+        )}
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+            style={{ background: 'var(--cd-surface)', border: '2px solid var(--cd-border)' }}
+          >
+            <Heart className="w-9 h-9" style={{ color: 'var(--cd-text-dim)' }} />
+          </div>
+          <h3 className="text-xl font-bold cd-head tracking-wider mb-2" style={{ color: 'var(--cd-text)' }}>
+            All Caught Up
+          </h3>
+          <p className="text-sm max-w-xs" style={{ color: 'var(--cd-text-mid)' }}>
+            You've seen all available cards. Check back later for new ones!
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // ── Card stack ──
   const visibleCards = []
-  for (let i = 0; i < STACK_SIZE && i < filteredCards.length; i++) {
-    visibleCards.push(filteredCards[(loopedIndex + i) % filteredCards.length])
+  for (let i = 0; i < STACK_SIZE && (currentIndex + i) < filteredCards.length; i++) {
+    visibleCards.push(filteredCards[currentIndex + i])
   }
 
   return (

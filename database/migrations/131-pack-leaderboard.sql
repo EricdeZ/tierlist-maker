@@ -3,6 +3,8 @@ CREATE TABLE cc_pack_opens (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   pack_type_id TEXT REFERENCES cc_pack_types(id),
+  card_ids JSONB,
+  revealed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_pack_opens_created ON cc_pack_opens (created_at, user_id);

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
-import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText } from 'lucide-react'
+import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText, Eye } from 'lucide-react'
 import MiniCardPreview from './preview/MiniCardPreview'
+import CollectionShowcase from './CollectionShowcase'
 
 const STATUS_COLORS = {
     draft: 'bg-gray-600/20 text-gray-400',
@@ -125,6 +126,7 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
     const [loading, setLoading] = useState(!isNew)
     const [saving, setSaving] = useState(false)
     const [showBrowser, setShowBrowser] = useState(false)
+    const [showShowcase, setShowShowcase] = useState(false)
 
     useEffect(() => {
         if (isNew) return
@@ -173,10 +175,12 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
         }
     }
 
-    const handleAddEntries = async (templateIds) => {
+    const handleAddEntries = async (selectedItems) => {
         if (!collection.id) return
         try {
-            await vaultDashboardService.addCollectionEntries(collection.id, templateIds)
+            const templateIds = selectedItems.filter(i => i.type === 'template').map(i => i.id)
+            const draftIds = selectedItems.filter(i => i.type === 'draft').map(i => i.id)
+            await vaultDashboardService.addCollectionEntries(collection.id, templateIds, draftIds)
             const data = await vaultDashboardService.getCollection(collection.id)
             setEntries(data.entries || [])
         } catch (err) {
@@ -315,7 +319,7 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
             {/* Template browser modal */}
             {showBrowser && (
                 <TemplateBrowser
-                    existingIds={entries.map(e => e.template_id)}
+                    existingEntries={entries.map(e => ({ id: e.template_id || e.draft_id, type: e.source_type || 'template' }))}
                     onAdd={handleAddEntries}
                     onClose={() => setShowBrowser(false)}
                 />
@@ -324,36 +328,46 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
     )
 }
 
-function TemplateBrowser({ existingIds, onAdd, onClose }) {
-    const [templates, setTemplates] = useState([])
+function TemplateBrowser({ existingEntries, onAdd, onClose }) {
+    const [items, setItems] = useState([])
     const [loading, setLoading] = useState(true)
-    const [selected, setSelected] = useState(new Set())
+    const [selected, setSelected] = useState(new Map())
     const [search, setSearch] = useState('')
     const [typeFilter, setTypeFilter] = useState('')
+    const [sourceFilter, setSourceFilter] = useState('')
 
     useEffect(() => {
-        vaultDashboardService.getTemplates({ status: 'approved' }).then(data => {
-            setTemplates(data.templates || [])
+        Promise.all([
+            vaultDashboardService.getTemplates({ status: 'approved' }),
+            vaultDashboardService.getDrafts({ status: 'approved' }),
+        ]).then(([tData, dData]) => {
+            const templates = (tData.templates || []).map(t => ({ ...t, _type: 'template', _key: `t-${t.id}` }))
+            const drafts = (dData.drafts || []).map(d => ({ ...d, name: d.notes || `Draft #${d.id}`, _type: 'draft', _key: `d-${d.id}` }))
+            setItems([...templates, ...drafts])
             setLoading(false)
         }).catch(() => setLoading(false))
     }, [])
 
+    const existingKeys = useMemo(() =>
+        new Set(existingEntries.map(e => e.type === 'draft' ? `d-${e.id}` : `t-${e.id}`)),
+        [existingEntries]
+    )
+
     const filtered = useMemo(() => {
-        let list = templates.filter(t => !existingIds.includes(t.id))
+        let list = items.filter(i => !existingKeys.has(i._key))
         if (search.trim()) {
             const q = search.toLowerCase()
-            list = list.filter(t => t.name?.toLowerCase().includes(q))
+            list = list.filter(i => i.name?.toLowerCase().includes(q))
         }
-        if (typeFilter) {
-            list = list.filter(t => t.card_type === typeFilter)
-        }
+        if (typeFilter) list = list.filter(i => i.card_type === typeFilter)
+        if (sourceFilter) list = list.filter(i => i._type === sourceFilter)
         return list
-    }, [templates, existingIds, search, typeFilter])
+    }, [items, existingKeys, search, typeFilter, sourceFilter])
 
-    const toggleSelect = (id) => {
+    const toggleSelect = (item) => {
         setSelected(prev => {
-            const next = new Set(prev)
-            next.has(id) ? next.delete(id) : next.add(id)
+            const next = new Map(prev)
+            next.has(item._key) ? next.delete(item._key) : next.set(item._key, { id: item.id, type: item._type })
             return next
         })
     }
@@ -362,7 +376,7 @@ function TemplateBrowser({ existingIds, onAdd, onClose }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-[#1a1a2e] rounded-xl border border-white/10 w-[90vw] max-w-3xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-4 border-b border-white/10">
-                    <h3 className="text-sm font-bold text-white">Add Approved Templates</h3>
+                    <h3 className="text-sm font-bold text-white">Add Approved Cards</h3>
                     <button onClick={onClose} className="text-white/40 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
                 </div>
 
@@ -372,10 +386,19 @@ function TemplateBrowser({ existingIds, onAdd, onClose }) {
                         <input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            placeholder="Search templates..."
+                            placeholder="Search cards..."
                             className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white placeholder-white/30"
                         />
                     </div>
+                    <select
+                        value={sourceFilter}
+                        onChange={e => setSourceFilter(e.target.value)}
+                        className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
+                    >
+                        <option value="">All sources</option>
+                        <option value="template">Templates</option>
+                        <option value="draft">Drafts</option>
+                    </select>
                     <select
                         value={typeFilter}
                         onChange={e => setTypeFilter(e.target.value)}
@@ -394,28 +417,31 @@ function TemplateBrowser({ existingIds, onAdd, onClose }) {
                             <div className="animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full" />
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div className="text-center py-12 text-white/20 text-sm">No templates available</div>
+                        <div className="text-center py-12 text-white/20 text-sm">No cards available</div>
                     ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                            {filtered.map(t => (
+                            {filtered.map(item => (
                                 <div
-                                    key={t.id}
-                                    onClick={() => toggleSelect(t.id)}
+                                    key={item._key}
+                                    onClick={() => toggleSelect(item)}
                                     className={`rounded-lg p-2 cursor-pointer transition-all border ${
-                                        selected.has(t.id)
+                                        selected.has(item._key)
                                             ? 'bg-amber-500/15 border-amber-500/40'
                                             : 'bg-white/[0.03] border-white/5 hover:border-white/15'
                                     }`}
                                 >
-                                    {t.thumbnail_url ? (
-                                        <img src={t.thumbnail_url} alt="" className="w-full aspect-[63/88] object-cover rounded" />
+                                    {item.thumbnail_url ? (
+                                        <img src={item.thumbnail_url} alt="" className="w-full aspect-[63/88] object-cover rounded" />
                                     ) : (
                                         <div className="w-full aspect-[63/88] bg-white/5 rounded flex items-center justify-center text-[10px] text-white/20">
                                             No preview
                                         </div>
                                     )}
-                                    <div className="mt-1 text-[10px] font-bold text-white truncate">{t.name}</div>
-                                    <div className="text-[9px] text-white/30">{t.card_type}</div>
+                                    <div className="mt-1 text-[10px] font-bold text-white truncate">{item.name}</div>
+                                    <div className="flex items-center gap-1 text-[9px] text-white/30">
+                                        <span>{item.card_type}</span>
+                                        {item._type === 'draft' && <span className="text-blue-400/60">draft</span>}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -425,7 +451,7 @@ function TemplateBrowser({ existingIds, onAdd, onClose }) {
                 <div className="flex items-center justify-between p-3 border-t border-white/10">
                     <span className="text-xs text-white/40">{selected.size} selected</span>
                     <button
-                        onClick={() => onAdd([...selected])}
+                        onClick={() => onAdd([...selected.values()])}
                         disabled={selected.size === 0}
                         className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-30 transition-colors cursor-pointer"
                     >

@@ -740,13 +740,18 @@ async function generateConfiguredPack(sql, pack) {
 
 async function generateCollectionCard(sql, collectionId) {
   const entries = await sql`
-    SELECT t.id, t.name, t.card_type, t.depicted_user_id
+    SELECT COALESCE(t.id, d.id) AS id,
+           COALESCE(t.name, d.notes, 'Draft') AS name,
+           COALESCE(t.card_type, d.card_type) AS card_type,
+           COALESCE(t.depicted_user_id, d.depicted_user_id) AS depicted_user_id,
+           CASE WHEN e.draft_id IS NOT NULL THEN 'draft' ELSE 'template' END AS source_type
     FROM cc_collection_entries e
-    JOIN cc_card_templates t ON e.template_id = t.id
+    LEFT JOIN cc_card_templates t ON e.template_id = t.id AND t.status = 'approved'
+    LEFT JOIN cc_card_drafts d ON e.draft_id = d.id AND d.status = 'approved'
     JOIN cc_collections c ON e.collection_id = c.id
     WHERE e.collection_id = ${collectionId}
       AND c.status = 'active'
-      AND t.status = 'approved'
+      AND (t.id IS NOT NULL OR d.id IS NOT NULL)
   `
   if (entries.length === 0) return null
 
