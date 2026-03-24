@@ -55,8 +55,6 @@ function CardElement({ el }) {
                 </div>
             )
         }
-        case 'effect':
-            return null
         default:
             if (isPrebuiltType(el.type)) {
                 return (
@@ -69,7 +67,39 @@ function CardElement({ el }) {
     }
 }
 
-function CardContent({ elements, border, rarity, signatureUrl }) {
+// Renders layered holo shine+glare for a single effect element.
+// Mirrors HoloPreview.EffectElement exactly — no stacking context on wrapper,
+// shine/glare get z-index directly so they interleave with content.
+function EffectElement({ el, parentOpacity }) {
+    const z = el.z ?? 0
+    const intensity = el.intensity ?? 1
+    const scaledOpacity = (parentOpacity ?? 0) * intensity
+    return (
+        <div
+            className="holo-card"
+            data-rarity={el.effectName}
+            data-holo-type="full"
+            style={{
+                position: 'absolute',
+                inset: 0,
+                width: 'auto',
+                height: 'auto',
+                aspectRatio: 'unset',
+                transform: 'none',
+                transformStyle: 'flat',
+                willChange: 'auto',
+                pointerEvents: 'none',
+                opacity: el.opacity ?? 1,
+                '--card-opacity': scaledOpacity,
+            }}
+        >
+            <div className="holo-card__shine" style={{ position: 'absolute', inset: 0, zIndex: z }} />
+            <div className="holo-card__glare" style={{ position: 'absolute', inset: 0, zIndex: z }} />
+        </div>
+    )
+}
+
+function CardContent({ elements, border, rarity, signatureUrl, parentOpacity }) {
     const visible = (elements || []).filter(el => el.visible !== false)
     const sorted = [...visible].sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
     const firstImage = elements?.find(el => el.type === 'image')
@@ -86,9 +116,13 @@ function CardContent({ elements, border, rarity, signatureUrl }) {
                 background: firstImage?.bgColor || '#111827',
             }}
         >
-            {sorted.map(el => <CardElement key={el.id} el={el} />)}
+            {sorted.map(el =>
+                el.type === 'effect'
+                    ? <EffectElement key={el.id} el={el} parentOpacity={parentOpacity} />
+                    : <CardElement key={el.id} el={el} />
+            )}
 
-            {/* Signature overlay — full-card transparent PNG, same as GameCard.css .game-card__signature */}
+            {/* Signature overlay */}
             {signatureUrl && (
                 <div style={{
                     position: 'absolute', inset: 0, zIndex: 800,
@@ -123,6 +157,9 @@ export default function CanvasCard({ elements, border, rarity = 'common', size =
     const { cardRef, dynamicStyles, interacting, active, handlers } = useHoloEffect()
     const scale = size / BASE_W
     const height = size * (BASE_H / BASE_W)
+    const parentOpacity = parseFloat(dynamicStyles['--card-opacity']) || 0
+
+    const hasEffects = (elements || []).some(el => el.type === 'effect' && el.visible !== false)
 
     const content = (
         <CardContent
@@ -130,6 +167,7 @@ export default function CanvasCard({ elements, border, rarity = 'common', size =
             border={border}
             rarity={rarity}
             signatureUrl={signatureUrl}
+            parentOpacity={parentOpacity}
         />
     )
 
@@ -141,8 +179,12 @@ export default function CanvasCard({ elements, border, rarity = 'common', size =
         </div>
     )
 
+    // No holo requested — flat render (effects still visible but static since parentOpacity = 0)
     if (!holo) return scaledContent
 
+    // Holo mode: outer wrapper provides 3D tilt + CSS variables (--card-opacity, --pointer-x/y, etc.)
+    // If card has layered effect elements, they produce their own shine/glare (no generic ones needed).
+    // If no effect elements, fall back to generic shine/glare like TradingCardHolo.
     return (
         <div
             className={`holo-card ${interacting ? 'interacting' : ''} ${active ? 'active' : ''}`}
@@ -153,11 +195,15 @@ export default function CanvasCard({ elements, border, rarity = 'common', size =
         >
             <div className="holo-card__translater">
                 <div className="holo-card__rotator" {...handlers}>
-                    <div className="holo-card__front">
+                    <div className="holo-card__front" style={hasEffects ? { display: 'block' } : undefined}>
                         {scaledContent}
-                        <div className="holo-card__shine" />
-                        {holo.rarity === 'unique' && <div className="holo-card__shine2" />}
-                        <div className="holo-card__glare" />
+                        {!hasEffects && (
+                            <>
+                                <div className="holo-card__shine" />
+                                {holo.rarity === 'unique' && <div className="holo-card__shine2" />}
+                                <div className="holo-card__glare" />
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
