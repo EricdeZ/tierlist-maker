@@ -774,7 +774,7 @@ async function handleCollectionCatalog(sql) {
     defIds: s.def_ids,
   }))
 
-  return { statusCode: 200, headers, body: JSON.stringify({ playerSets }) }
+  return { statusCode: 200, headers: { ...headers, 'Cache-Control': 'public, max-age=3600' }, body: JSON.stringify({ playerSets }) }
 }
 
 // ═══ GET: Collection owned (lightweight — only user's ownership data) ═══
@@ -971,7 +971,7 @@ async function handleCollectionSet(sql, params) {
     bestGodName: d.best_god_name,
   }))
 
-  return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
+  return { statusCode: 200, headers: { ...headers, 'Cache-Control': 'public, max-age=3600' }, body: JSON.stringify({ cards }) }
 }
 
 // ═══ GET: Collection search — find player cards by name/discord ═══
@@ -1565,7 +1565,7 @@ async function handleDefinitionOverrides(sql) {
   for (const o of overrides) {
     map[`${o.type}:${o.definition_id}`] = o.metadata || {}
   }
-  return { statusCode: 200, headers, body: JSON.stringify({ overrides: map }) }
+  return { statusCode: 200, headers: { ...headers, 'Cache-Control': 'public, max-age=1800' }, body: JSON.stringify({ overrides: map }) }
 }
 
 // ═══ POST: Dismantle cards for Ember ═══
