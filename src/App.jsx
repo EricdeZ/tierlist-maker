@@ -101,6 +101,7 @@ import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import VaultPage from "./pages/VaultPage.jsx";
 import CardSharePage from "./pages/vault/CardSharePage.jsx";
 const BinderSharePage = lazy(() => import("./pages/vault/BinderSharePage.jsx"));
+const CollectionShowcasePage = lazy(() => import("./pages/vault/CollectionShowcasePage.jsx"));
 import BgRemover from "./pages/BgRemover.jsx";
 import SketchPad from "./pages/SketchPad.jsx";
 // Codex
@@ -147,6 +148,7 @@ function App() {
                         {/* Card Clash share — standalone, no app chrome */}
                         <Route path="vault/share/:token" element={<CardSharePage />} />
                         <Route path="vault/binder/:token" element={<Suspense fallback={null}><BinderSharePage /></Suspense>} />
+                        <Route path="vault/showcase/:collectionSlug" element={<Suspense fallback={null}><CollectionShowcasePage /></Suspense>} />
 
                         <Route path="/" element={<AppLayout />}>
                             {/* Homepage — league & division selector, or PlayerDashboard for logged-in users */}

@@ -1,54 +1,51 @@
 import { Link } from 'react-router-dom'
-import { Trophy, ChevronRight, MessageCircle, ArrowRight, DollarSign, Gem, Heart, Shield } from 'lucide-react'
-import diamondsImg from '../../assets/diamonds.png'
-import { getDivisionImage, RANK_LABELS } from '../../utils/divisionImages'
+import { Trophy, ArrowRight } from 'lucide-react'
 import { getLeagueLogo } from '../../utils/leagueImages'
 
 const LeaguesSection = ({ leagues, canPreview }) => {
+    const classified = leagues.map(league => {
+        const divisions = league.divisions || []
+        const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))
+        const status = isActive ? 'live' : 'inactive'
+        return { league, status }
+    })
+
+    const groups = [
+        { key: 'live', label: 'Live Status', dotColor: '#22c55e', items: classified.filter(c => c.status === 'live') },
+        { key: 'inactive', label: 'Waiting on Next Season', dotColor: '#64748b', items: classified.filter(c => c.status === 'inactive') },
+    ]
+
     return (
         <section id="leagues" className="py-20 px-4">
             <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-14">
-                    <span className="text-sm font-bold text-(--color-accent) uppercase tracking-widest mb-3 block">Competition</span>
-                    <h2 className="font-heading text-3xl sm:text-4xl font-black text-(--color-text)">
+                    <h2
+                        className="font-heading text-3xl sm:text-4xl font-black uppercase tracking-tight"
+                        style={{
+                            background: 'linear-gradient(135deg, #f8c56a 0%, #fde68a 40%, #f8c56a 100%)',
+                            WebkitBackgroundClip: 'text',
+                            backgroundClip: 'text',
+                            color: 'transparent',
+                            filter: 'drop-shadow(0 0 30px rgba(248, 197, 106, 0.15))',
+                        }}
+                    >
                         Choose Your League
                     </h2>
+                    <p className="text-white/55 text-lg mt-2">
+                        Find your community and jump in.
+                    </p>
                 </div>
 
-                <div className="space-y-16">
-                    {leagues.map(league => {
-                        const divisions = league.divisions || []
-                        const logo = getLeagueLogo(league.slug, league.image_url)
-                        const leagueColor = league.color || 'var(--color-accent)'
-                        const isActive = divisions.some(d => d.seasons?.some(s => s.is_active || canPreview(league.id)))
-
+                <div className="space-y-12">
+                    {groups.map(group => {
+                        if (group.items.length === 0) return null
                         return (
-                            <div key={league.id} id={`league-${league.slug}`}>
-                                <LeagueHeader league={league} logo={logo} leagueColor={leagueColor} isActive={isActive} />
-
-                                {league.slug === 'agl' && (
-                                    <AGLPromoBanner />
-                                )}
-
-                                {league.slug === 'sal' && (
-                                    <SALPromoBanner />
-                                )}
-
-                                {divisions.length > 0 && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {divisions.map(division => (
-                                            <DivisionCard
-                                                key={division.id}
-                                                league={league}
-                                                division={division}
-                                                leagueColor={leagueColor}
-                                                canPreview={canPreview}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-
-                            </div>
+                            <SectionGroup
+                                key={group.key}
+                                label={group.label}
+                                dotColor={group.dotColor}
+                                items={group.items}
+                            />
                         )
                     })}
                 </div>
@@ -57,306 +54,97 @@ const LeaguesSection = ({ leagues, canPreview }) => {
     )
 }
 
-const SIGNUP_ROUTES = { agl: '/agl/signup', 'sal': '/sal/signup' }
+const SectionGroup = ({ label, dotColor, items }) => (
+    <div>
+        <div className="flex items-center gap-3 mb-4 pb-2 border-b border-white/10">
+            <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: dotColor || items[0]?.league.color || '#64748b' }}
+            />
+            <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">
+                {label}
+            </span>
+            <span className="text-xs text-white/30 ml-auto">
+                {items.length} {items.length === 1 ? 'league' : 'leagues'}
+            </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {items.map(({ league, status }) => (
+                <LeagueCard key={league.id} league={league} status={status} />
+            ))}
+        </div>
+    </div>
+)
 
-const LeagueHeader = ({ league, logo, leagueColor, isActive }) => {
-    const hasSignup = !!SIGNUP_ROUTES[league.slug]
-    const signupPath = SIGNUP_ROUTES[league.slug]
-    return (
-    <div className="flex items-center gap-4 mb-6">
-        {logo ? (
-            <img src={logo} alt="" className={`h-12 w-12 object-contain rounded-lg ${!isActive && !hasSignup ? 'opacity-40' : ''}`} />
-        ) : (
-            <div className={`h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center ${!isActive && !hasSignup ? 'opacity-40' : ''}`}>
-                <Trophy className="w-6 h-6" style={{ color: leagueColor }} />
-            </div>
-        )}
-        <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-                {isActive || hasSignup ? (
-                    <Link
-                        to={signupPath || `/${league.slug}`}
-                        className={`font-heading text-2xl font-bold transition-colors ${hasSignup ? 'text-white hover:text-white/80' : 'text-(--color-text) hover:text-(--color-accent)'}`}
-                    >
-                        {league.name}
-                    </Link>
+const LeagueCard = ({ league, status }) => {
+    const logo = getLeagueLogo(league.slug, league.image_url)
+    const color = league.color || 'var(--color-accent)'
+    const isInactive = status === 'inactive'
+
+    const card = (
+        <div
+            className={`group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col items-center text-center px-5 pt-6 pb-5 gap-3 h-full transition-all duration-300 ${
+                isInactive
+                    ? 'opacity-40 pointer-events-none'
+                    : 'hover:-translate-y-[3px] hover:border-white/15 hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] cursor-pointer'
+            }`}
+        >
+            {/* Accent bar */}
+            <div
+                className="absolute top-0 left-0 right-0 h-[3px]"
+                style={{ background: isInactive ? 'linear-gradient(90deg, rgba(255,255,255,0.15), transparent)' : `linear-gradient(90deg, ${color}, transparent)` }}
+            />
+
+            {/* Background glow */}
+            {!isInactive && (
+                <div
+                    className="absolute -top-5 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full opacity-[0.07] pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${color}, transparent 70%)` }}
+                />
+            )}
+
+            {/* Logo */}
+            <div className="relative w-[72px] h-[72px] flex items-center justify-center shrink-0">
+                {logo ? (
+                    <img src={logo} alt="" className="w-[72px] h-[72px] object-contain" />
                 ) : (
-                    <h3 className="font-heading text-2xl font-bold text-(--color-text)/40">
-                        {league.name}
-                    </h3>
-                )}
-                {hasSignup ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
-                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />
-                        Signups are now open
-                    </span>
-                ) : isActive ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}15`, color: leagueColor, border: `1px solid ${leagueColor}25` }}>
-                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: leagueColor }} />
-                        Live
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: `${leagueColor}10`, color: `${leagueColor}90`, border: `1px solid ${leagueColor}15` }}>
-                        Not Tracked
-                    </span>
+                    <Trophy className="w-9 h-9" style={{ color }} />
                 )}
             </div>
+
+            {/* Name */}
+            <h4 className="font-heading text-base font-extrabold text-white leading-tight">
+                {league.name}
+            </h4>
+
+            {/* Slogan */}
             {league.slogan && (
-                <p className={`text-sm ${isActive || hasSignup ? 'text-(--color-text-secondary)' : 'text-(--color-text-secondary)/40'}`}>
+                <p className="text-xs text-white/40 -mt-1 leading-snug">
                     {league.slogan}
                 </p>
             )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-            {league.discord_url && (
-                <a
-                    href={league.discord_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors ${isActive ? 'bg-[#5865F2] hover:bg-[#4752C4]' : 'bg-[#5865F2]/50 hover:bg-[#5865F2]/70'}`}
-                    onClick={e => e.stopPropagation()}
-                >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Discord</span>
-                </a>
-            )}
-            {isActive && (
-                <Link
-                    to={`/${league.slug}`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-(--color-text-secondary) hover:text-(--color-text) border border-white/10 hover:border-white/20 transition-colors"
-                >
-                    View League
-                    <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+
+            {/* Button */}
+            {status === 'live' && (
+                <span className="mt-auto relative inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold text-white/70 overflow-hidden transition-colors duration-300 group-hover:text-white">
+                    <span
+                        className="absolute inset-0 rounded-full bg-white/[0.06] transition-transform duration-500 ease-out origin-left scale-x-100"
+                    />
+                    <span
+                        className="absolute inset-0 rounded-full transition-transform duration-500 ease-out origin-left scale-x-0 group-hover:scale-x-100"
+                        style={{ backgroundColor: color }}
+                    />
+                    <span className="relative z-10 inline-flex items-center gap-1.5">
+                        View <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </span>
+                </span>
             )}
         </div>
-    </div>
     )
-}
 
-const AGLPromoBanner = () => (
-    <Link
-        to="/agl/signup"
-        className="group relative block mb-5 overflow-hidden rounded-2xl transition-all duration-500 hover:shadow-2xl hover:shadow-[#F57C20]/15 hover:-translate-y-0.5"
-        style={{ background: 'linear-gradient(135deg, #1a0a00 0%, #2a1200 40%, #1a0800 100%)' }}
-    >
-        <div className="absolute inset-0 rounded-2xl p-px" style={{
-            background: 'linear-gradient(135deg, #F57C20, #FFB347, #F57C20, #E8941A)',
-            mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            maskComposite: 'exclude',
-            WebkitMaskComposite: 'xor',
-            opacity: 0.4,
-        }} />
-        <div className="absolute top-0 right-0 w-72 h-72 opacity-15 blur-3xl pointer-events-none" style={{
-            background: 'radial-gradient(circle, #F57C20, transparent 70%)',
-        }} />
-        <div className="absolute bottom-0 left-0 w-56 h-56 opacity-10 blur-3xl pointer-events-none" style={{
-            background: 'radial-gradient(circle, #FFB347, transparent 70%)',
-        }} />
-        <div className="absolute top-0 left-0 right-0 h-px" style={{
-            background: 'linear-gradient(90deg, transparent 10%, #F57C20 50%, transparent 90%)',
-            opacity: 0.6,
-        }} />
+    if (isInactive) return card
 
-        <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center gap-4 sm:gap-5">
-            <div className="shrink-0 hidden sm:block">
-                <img
-                    src={diamondsImg}
-                    alt=""
-                    className="w-14 h-14 object-contain drop-shadow-lg group-hover:scale-110 transition-transform duration-500"
-                    style={{ filter: 'drop-shadow(0 0 12px rgba(245,124,32,0.3))' }}
-                />
-            </div>
-
-            <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F57C20]/70 mb-1 block">
-                    Albion Giants League
-                </span>
-                <h4 className="font-heading text-lg sm:text-xl font-black text-white mb-2 leading-tight">
-                    Season Signups
-                </h4>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05))',
-                            color: '#4ade80',
-                            border: '1px solid rgba(34,197,94,0.25)',
-                        }}
-                    >
-                        <DollarSign className="w-3 h-3" />
-                        Cash Prizes
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(147,197,253,0.15), rgba(147,197,253,0.05))',
-                            color: '#93c5fd',
-                            border: '1px solid rgba(147,197,253,0.25)',
-                        }}
-                    >
-                        <Gem className="w-3 h-3" />
-                        Diamond Prizes
-                    </span>
-                </div>
-            </div>
-
-            <div className="shrink-0 flex items-center gap-2">
-                <span className="text-white font-semibold text-sm whitespace-nowrap">Sign up now</span>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-                    style={{
-                        background: 'linear-gradient(135deg, #F57C20, #E8941A)',
-                        boxShadow: '0 4px 20px rgba(245,124,32,0.3)',
-                    }}
-                >
-                    <ArrowRight className="w-4.5 h-4.5 text-white group-hover:translate-x-0.5 transition-transform duration-300" />
-                </div>
-            </div>
-        </div>
-    </Link>
-)
-
-const SALPromoBanner = () => (
-    <Link
-        to="/sal/signup"
-        className="group relative block mb-5 overflow-hidden rounded-2xl transition-all duration-500 hover:shadow-2xl hover:shadow-[#719c3a]/15 hover:-translate-y-0.5"
-        style={{ background: 'linear-gradient(135deg, #0a1a04 0%, #152d08 40%, #0a1804 100%)' }}
-    >
-        <div className="absolute inset-0 rounded-2xl p-px" style={{
-            background: 'linear-gradient(135deg, #719c3a, #8fbf4a, #719c3a, #5a7d2e)',
-            mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            maskComposite: 'exclude',
-            WebkitMaskComposite: 'xor',
-            opacity: 0.4,
-        }} />
-        <div className="absolute top-0 right-0 w-72 h-72 opacity-15 blur-3xl pointer-events-none" style={{
-            background: 'radial-gradient(circle, #719c3a, transparent 70%)',
-        }} />
-        <div className="absolute bottom-0 left-0 w-56 h-56 opacity-10 blur-3xl pointer-events-none" style={{
-            background: 'radial-gradient(circle, #8fbf4a, transparent 70%)',
-        }} />
-        <div className="absolute top-0 left-0 right-0 h-px" style={{
-            background: 'linear-gradient(90deg, transparent 10%, #719c3a 50%, transparent 90%)',
-            opacity: 0.6,
-        }} />
-
-        <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center gap-4 sm:gap-5">
-            <div className="shrink-0 hidden sm:block">
-                <span
-                    className="text-5xl block group-hover:scale-110 transition-transform duration-500"
-                    style={{ filter: 'drop-shadow(0 0 12px rgba(113,156,58,0.3))' }}
-                >🐍</span>
-            </div>
-
-            <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#719c3a]/70 mb-1 block">
-                    Serpent Ascension League
-                </span>
-                <h4 className="font-heading text-lg sm:text-xl font-black text-white mb-2 leading-tight">
-                    Season Signups
-                </h4>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(113,156,58,0.15), rgba(113,156,58,0.05))',
-                            color: '#8fbf4a',
-                            border: '1px solid rgba(113,156,58,0.25)',
-                        }}
-                    >
-                        <Heart className="w-3 h-3" />
-                        Beginner Friendly
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(147,197,253,0.15), rgba(147,197,253,0.05))',
-                            color: '#93c5fd',
-                            border: '1px solid rgba(147,197,253,0.25)',
-                        }}
-                    >
-                        <Shield className="w-3 h-3" />
-                        Low Level
-                    </span>
-                </div>
-            </div>
-
-            <div className="shrink-0 flex items-center gap-2">
-                <span className="text-white font-semibold text-sm whitespace-nowrap">Sign up now</span>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-                    style={{
-                        background: 'linear-gradient(135deg, #719c3a, #5a7d2e)',
-                        boxShadow: '0 4px 20px rgba(113,156,58,0.3)',
-                    }}
-                >
-                    <ArrowRight className="w-4.5 h-4.5 text-white group-hover:translate-x-0.5 transition-transform duration-300" />
-                </div>
-            </div>
-        </div>
-    </Link>
-)
-
-const DivisionCard = ({ league, division, leagueColor, canPreview }) => {
-    const rankImg = getDivisionImage(league.slug, division.slug, division.tier)
-    const rankLabel = RANK_LABELS[division.tier]
-    const activeSeason = division.seasons?.find(s => s.is_active || canPreview(league.id))
-    const divActive = !!activeSeason
-
-    if (divActive) {
-        return (
-            <Link
-                to={`/${league.slug}/${division.slug}`}
-                className="group relative overflow-hidden rounded-xl border border-white/10 hover:border-white/20 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
-                style={{ background: 'linear-gradient(135deg, var(--color-secondary), var(--color-primary))' }}
-            >
-                <div
-                    className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ background: `linear-gradient(90deg, transparent, ${leagueColor}, transparent)` }}
-                />
-                <div className="p-5">
-                    <div className="flex items-center gap-3 mb-3">
-                        {rankImg && (
-                            <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <h4 className="font-heading text-lg font-bold text-(--color-text) group-hover:text-(--color-accent) transition-colors truncate">
-                                {division.name}
-                            </h4>
-                            {rankLabel && (
-                                <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
-                                    {rankLabel} Tier
-                                </span>
-                            )}
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-(--color-text-secondary) group-hover:translate-x-1 transition-all shrink-0" />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                        {activeSeason.name}
-                    </div>
-                </div>
-            </Link>
-        )
-    }
-
-    return (
-        <div
-            className="rounded-xl border border-white/5 bg-(--color-secondary)/50 p-5 opacity-35"
-        >
-            <div className="flex items-center gap-3">
-                {rankImg && (
-                    <img src={rankImg} alt={rankLabel} className="h-10 w-10 object-contain" />
-                )}
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-heading text-lg font-bold text-(--color-text) truncate">
-                        {division.name}
-                    </h4>
-                    {rankLabel && (
-                        <span className="text-xs text-(--color-text-secondary) uppercase tracking-wider">
-                            {rankLabel} Tier
-                        </span>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
+    return <Link to={`/${league.slug}`} className="no-underline h-full">{card}</Link>
 }
 
 export default LeaguesSection

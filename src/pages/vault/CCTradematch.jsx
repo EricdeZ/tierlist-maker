@@ -11,7 +11,7 @@ import MatchSplash from './tradematch/MatchSplash'
 import MatchesAndLikes from './tradematch/MatchesAndLikes'
 import Negotiation from './tradematch/Negotiation'
 
-// localStorage helpers for tracking seen cards across sessions
+// localStorage helpers for tracking seen cards across sessions (swipe mode only)
 const SEEN_STORAGE_KEY = 'tradematch-seen'
 const MAX_SEEN_IDS = 5000
 
@@ -77,8 +77,17 @@ export default function CCTradematch() {
   const [activeTradeId, setActiveTradeId] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
 
-  // Track seen cards in localStorage to prevent re-showing after tab switch / reload
+  // Track seen cards in localStorage to prevent re-showing in swipe mode
   const [seenCardIds, setSeenCardIds] = useState(() => loadSeenCardIds(user?.id))
+
+  // Reload seen IDs once user becomes available (may be null on initial mount)
+  const seenLoadedForUser = useRef(user?.id || null)
+  useEffect(() => {
+    if (user?.id && user.id !== seenLoadedForUser.current) {
+      seenLoadedForUser.current = user.id
+      setSeenCardIds(loadSeenCardIds(user.id))
+    }
+  }, [user?.id])
 
   const markCardSeen = useCallback((cardId) => {
     setSeenCardIds(prev => {
@@ -89,10 +98,16 @@ export default function CCTradematch() {
     })
   }, [user?.id])
 
-  const visibleFeedCards = useMemo(() =>
+  // swiperCards = filtered for swipe mode (excludes seen), feedCards = all (for browse grid)
+  const swiperCards = useMemo(() =>
     feedCards.filter(c => !seenCardIds.has(c.card_id)),
     [feedCards, seenCardIds]
   )
+
+  const resetSeenCards = useCallback(() => {
+    setSeenCardIds(new Set())
+    saveSeenCardIds(user?.id, new Set())
+  }, [user?.id])
 
   // Reusable fetch callbacks
   const initialLoadDone = useRef(false)
@@ -119,9 +134,7 @@ export default function CCTradematch() {
     else setRefreshing(true)
     try {
       const data = await tradematchService.swipeFeed()
-      const newCards = data.cards || []
-      // Only replace if we got cards — keep existing for looping if backend returns empty
-      if (newCards.length > 0) setFeedCards(newCards)
+      setFeedCards(data.cards || [])
     } catch (err) { console.error('Failed to load swipe feed:', err) }
     finally { setLoading(false); setRefreshing(false) }
   }, [])
@@ -215,7 +228,7 @@ export default function CCTradematch() {
     }
   }, [])
 
-  const handleSwipeLeft = useCallback(() => {
+  const handleSwipeLeft = useCallback(async () => {
     // No API call needed — just advance locally
   }, [])
 
@@ -371,15 +384,17 @@ export default function CCTradematch() {
 
       {subView === 'swiper' && (
         <Swiper
-          feedCards={visibleFeedCards}
+          feedCards={feedCards}
+          swiperCards={swiperCards}
           onSwipeRight={handleSwipeRight}
           onSwipeLeft={handleSwipeLeft}
           onMatch={handleMatch}
           onLoadMore={handleLoadMoreFeed}
           onCardSeen={markCardSeen}
+          onResetSeen={resetSeenCards}
           locked={pileIsLocked}
           loading={loading}
-          empty={!loading && visibleFeedCards.length === 0}
+          empty={!loading && feedCards.length === 0}
           onGoToPile={() => setSubView('pile')}
         />
       )}

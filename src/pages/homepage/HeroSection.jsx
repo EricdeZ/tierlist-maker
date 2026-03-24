@@ -1,41 +1,66 @@
-import { Link } from 'react-router-dom'
 import smiteLogo from '../../assets/smite2.png'
-import statsheetImg from '../../assets/statsheet.png'
+import SoftAurora from '../../components/SoftAurora'
+import CardSwap, { Card } from '../../components/CardSwap'
 
-const HeroSection = ({ heroRef, heroLight, handleHeroMove, handleHeroLeave, sheetRx, sheetRy }) => {
+import screenshotDraft from '../../assets/screenshots/draft.png'
+import screenshotForge from '../../assets/screenshots/forge.png'
+import screenshotVault from '../../assets/screenshots/vault.png'
+import screenshotLeague from '../../assets/screenshots/league.png'
+import screenshotSignup from '../../assets/screenshots/signup.png'
+import screenshotTierlist from '../../assets/screenshots/tierlist.png'
+import screenshotStandings from '../../assets/screenshots/standings.png'
+import screenshotStats from '../../assets/screenshots/stats.png'
+
+const SCREENSHOTS = [
+    { src: screenshotForge, alt: 'Fantasy Forge', label: 'Fantasy Forge', desc: 'Player investment market' },
+    { src: screenshotVault, alt: 'The Vault', label: 'The Vault', desc: 'Collect & trade cards' },
+    { src: screenshotDraft, alt: 'Draft Simulator', label: 'Draft Simulator', desc: 'Pick & ban practice' },
+    { src: screenshotStats, alt: 'Player Stats', label: 'Player Stats', desc: 'Detailed stat tables' },
+    { src: screenshotLeague, alt: 'League Homepage', label: 'Leagues', desc: 'Community competition' },
+    { src: screenshotStandings, alt: 'Division Overview', label: 'Stats & Standings', desc: 'Live season data' },
+    { src: screenshotTierlist, alt: 'God Tier List', label: 'Tier Lists', desc: 'Rank gods & players' },
+    { src: screenshotSignup, alt: 'Season Signup', label: 'Season Signups', desc: 'Join a league' },
+]
+
+const HeroSection = ({ heroRef, heroLight, handleHeroMove, handleHeroLeave }) => {
     return (
         <section
             ref={heroRef}
             onMouseMove={handleHeroMove}
             onMouseLeave={handleHeroLeave}
-            className="relative min-h-[85vh] flex items-center px-4 py-20 overflow-hidden"
+            className="relative min-h-[85vh] flex items-center px-4 py-20 overflow-hidden bg-(--color-primary)"
         >
-            {/* Background effects */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div
-                    className="absolute top-1/3 left-1/3 w-[800px] h-[800px] rounded-full opacity-15"
-                    style={{ background: 'radial-gradient(circle, var(--color-accent) 0%, transparent 70%)' }}
-                />
-                <div
-                    className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-8"
-                    style={{ background: 'radial-gradient(circle, var(--color-accent) 0%, transparent 60%)' }}
-                />
-                <div
-                    className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                        backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
-                        backgroundSize: '60px 60px'
-                    }}
-                />
-                <div
-                    className="absolute top-0 left-1/4 w-px h-full opacity-10 rotate-12 origin-top"
-                    style={{ background: 'linear-gradient(to bottom, transparent, var(--color-accent), transparent)' }}
-                />
-                <div
-                    className="absolute top-0 right-1/3 w-px h-full opacity-5 -rotate-6 origin-top"
-                    style={{ background: 'linear-gradient(to bottom, transparent, var(--color-accent), transparent)' }}
+            {/* Fallback gradient in case WebGL fails */}
+            <div
+                className="absolute inset-0 z-0"
+                style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(248,197,106,0.15) 0%, transparent 60%)' }}
+            />
+
+            {/* Aurora background — faded gold only */}
+            <div className="absolute inset-0 z-0 bg-(--color-primary)">
+                <SoftAurora
+                    speed={0.4}
+                    scale={1.5}
+                    brightness={2.0}
+                    color1="#f8c56a"
+                    color2="#f8c56a"
+                    noiseFrequency={2.5}
+                    noiseAmplitude={1.4}
+                    bandHeight={0.5}
+                    bandSpread={1.0}
+                    octaveDecay={0.12}
+                    layerOffset={0.5}
+                    colorSpeed={0.4}
+                    enableMouseInteraction={true}
+                    mouseInfluence={0.25}
                 />
             </div>
+
+            {/* Dark overlay so text stays readable */}
+            <div
+                className="absolute inset-0 z-[1]"
+                style={{ background: 'linear-gradient(to bottom, rgba(6,13,26,0.25) 0%, rgba(16,24,41,0.5) 60%, var(--color-primary) 100%)' }}
+            />
 
             <div className="relative z-10 max-w-7xl mx-auto w-full">
 
@@ -51,12 +76,12 @@ const HeroSection = ({ heroRef, heroLight, handleHeroMove, handleHeroLeave, shee
 
                     <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black mb-5 leading-[1.1] tracking-tight">
                         <span
-                            className="bg-clip-text text-transparent"
+                            className="bg-clip-text text-transparent transition-all duration-500"
                             style={{
                                 WebkitBackgroundClip: 'text',
                                 backgroundImage: heroLight.active
                                     ? `radial-gradient(circle 300px at ${heroLight.x}% ${heroLight.y}%, rgba(255,255,255,1), rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.55))`
-                                    : 'linear-gradient(to right, rgba(255,255,255,0.55), rgba(255,255,255,0.55))',
+                                    : 'linear-gradient(to right, rgba(255,255,255,0.88), rgba(255,255,255,0.88))',
                             }}
                         >
                             The Battleground{' '}
@@ -101,50 +126,77 @@ const HeroSection = ({ heroRef, heroLight, handleHeroMove, handleHeroLeave, shee
                     </div>
                 </div>
 
-                {/* Screenshot */}
-                <div
-                    className="relative mt-10 lg:mt-0 lg:absolute lg:right-[-8%] lg:top-1/2 lg:-translate-y-[46%] lg:w-[60%] z-10"
-                    style={{ perspective: '1200px' }}
-                >
-                    <div
-                        className="absolute -inset-8 rounded-3xl opacity-25 blur-3xl"
-                        style={{ background: 'radial-gradient(ellipse at 60% 40%, var(--color-accent), transparent 65%)' }}
-                    />
-                    <div
-                        className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60 lg:rounded-xl"
-                        style={{
-                            transform: `rotateY(${sheetRy}deg) rotateX(${sheetRx}deg)`,
-                            transition: 'transform 0.4s ease-out',
-                        }}
-                    >
-                        <img
-                            src={statsheetImg}
-                            alt="Player stats dashboard"
-                            className="w-full h-auto block"
-                        />
-                        <div
-                            className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-                            style={{
-                                background: `radial-gradient(circle at ${heroLight.x}% ${heroLight.y}%, rgba(255,255,255,0.04), transparent 50%)`,
-                                opacity: heroLight.active ? 1 : 0,
-                            }}
-                        />
-                        <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{ background: 'linear-gradient(to bottom, transparent 55%, var(--color-primary) 100%)' }}
-                        />
-                        <div
-                            className="absolute inset-0 pointer-events-none hidden lg:block"
-                            style={{ background: 'linear-gradient(to right, var(--color-primary), transparent 20%)' }}
-                        />
-                        <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{ background: 'linear-gradient(to left, var(--color-primary), transparent 3%)' }}
-                        />
-                        <div
-                            className="absolute top-0 left-0 right-0 h-px"
-                            style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)' }}
-                        />
+                {/* Card Swap screenshots */}
+                <div className="hidden lg:block lg:absolute lg:right-[-6%] lg:top-1/2 lg:-translate-y-[50%] lg:w-[55%] z-10">
+                    <div className="relative w-full" style={{ paddingBottom: '70%' }}>
+                        <CardSwap
+                            width={620}
+                            height={410}
+                            cardDistance={50}
+                            verticalDistance={55}
+                            delay={4000}
+                            pauseOnHover={true}
+                            skewAmount={5}
+                            easing="elastic"
+                        >
+                            {SCREENSHOTS.map((shot) => (
+                                <Card key={shot.alt}>
+                                    <div className="flex flex-col w-full h-full">
+                                        {/* Browser bar */}
+                                        <div className="flex items-center justify-center px-3 h-9 bg-[#0c1220] border-b border-white/8 shrink-0 select-none">
+                                            <span className="font-heading font-bold text-xs text-(--color-accent) truncate">{shot.label}</span>
+                                            <span className="text-[10px] text-white/30 mx-2">—</span>
+                                            <span className="text-[10px] text-white/40 truncate">{shot.desc}</span>
+                                        </div>
+                                        {/* Screenshot */}
+                                        <div className="flex-1 overflow-hidden">
+                                            <img
+                                                src={shot.src}
+                                                alt={shot.alt}
+                                                className="w-full h-full object-cover object-top"
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </CardSwap>
+                    </div>
+                </div>
+
+                {/* Mobile: card swap stack */}
+                <div className="lg:hidden mt-10 relative flex justify-center">
+                    <div className="relative" style={{ width: 320, height: 230 }}>
+                        <CardSwap
+                            width={300}
+                            height={200}
+                            cardDistance={25}
+                            verticalDistance={28}
+                            delay={4000}
+                            pauseOnHover={false}
+                            skewAmount={4}
+                            easing="elastic"
+                        >
+                            {SCREENSHOTS.map((shot) => (
+                                <Card key={shot.alt}>
+                                    <div className="flex flex-col w-full h-full">
+                                        <div className="flex items-center justify-center px-2 h-7 bg-[#0c1220] border-b border-white/8 shrink-0 select-none">
+                                            <span className="font-heading font-bold text-[10px] text-(--color-accent) truncate">{shot.label}</span>
+                                            <span className="text-[8px] text-white/30 mx-1.5">—</span>
+                                            <span className="text-[8px] text-white/40 truncate">{shot.desc}</span>
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <img
+                                                src={shot.src}
+                                                alt={shot.alt}
+                                                className="w-full h-full object-cover object-top"
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </CardSwap>
                     </div>
                 </div>
 

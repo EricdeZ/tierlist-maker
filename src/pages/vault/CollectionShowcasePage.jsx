@@ -7,7 +7,6 @@ import VaultCard from './components/VaultCard'
 import Navbar from '../../components/layout/Navbar'
 import PageTitle from '../../components/PageTitle'
 import { ArrowLeft, X } from 'lucide-react'
-import vaultLogo from '../../assets/vault_square.png'
 import './compdeck.css'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
@@ -32,12 +31,9 @@ export default function CollectionShowcasePage() {
     }, [collectionSlug])
 
     const branding = (
-        <Link to="/vault" className="hidden sm:flex items-center gap-2 no-underline">
-            <img src={vaultLogo} alt="" className="h-6 cd-icon-glow" />
-            <span className="cd-head text-sm font-black" style={{ letterSpacing: '0.15em' }}>
-                <span className="text-[var(--cd-cyan)] cd-text-glow">THE</span>
-                <span className="text-white">{'\u00A0'}VAULT</span>
-            </span>
+        <Link to="/vault" className="hidden sm:flex items-center gap-1.5 no-underline">
+            <span className="cd-head text-[0.6rem] tracking-[0.4em] text-[var(--cd-cyan)] opacity-55">THE</span>
+            <span className="cd-head text-sm font-bold tracking-[0.12em]" style={{ background: 'linear-gradient(180deg, #e0e8f0 20%, #00e5ff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>VAULT</span>
         </Link>
     )
 

@@ -1,37 +1,16 @@
-# The Vault — Patch Notes
+# The Vault — OB31 Patch Notes
 
-## Pack Opening Speed
-Pack opening animations are **~35% faster** across the board:
+## New Homepage
+The site has a brand new landing page. Check it out at [smitecomp.com/landing](https://smitecomp.com/landing).
 
-## Starting Five Income Rebalance
-S5 income has been reduced across the board. Both flat income rates and reverse multiplier bonuses are scaled down to reach the intended target income.
+## SMITE 2 OB31 Patch Notes
+OB31 is almost live — read the full breakdown with god and item changes at [smitecomp.com/patchnotes/ob31](https://smitecomp.com/patchnotes/ob31).
 
-Mythic and Unique S5 rates were **buffed** to compensate — these tiers now generate more relative value than before.
+## Swiper Bug Fixes
+- Swiper now shows **all cards on other players' trade piles**
+- Fixed a bug where swiping could skip cards when the feed updated mid-swipe
+- Fixed feed not refreshing properly when returning to the swiper tab
 
-Bench effectiveness, allstar modifier, attachment bonuses, and team synergy are unchanged.
-
-## Pack Pull Rate Buff
-Odds to pull **Epic, Legendary, Mythic, and Unique** cards have been increased across all packs.
-
-## Consumable Rework
-The permanent passive consumable slot has been replaced with a **3-slot use-and-destroy system**. Consumables are now single-use items that are consumed on activation.
-
-**7 Consumable Types:**
-- **Health Potion** — Fill X% of Cores cap instantly
-- **Mana Potion** — +X% income rate until collect
-- **Multi Potion** — +X% rate AND +X days cap bonus until collect
-- **Elixir of Strength** — Multiply next claim payout by X
-- **Elixir of Intelligence** — Expand dismantle thresholds
-- **Vision Ward** — Add X days to cap until collect
-- **Sentry Ward** — Random 1–X Cores (instant)
-
-All consumables scale by rarity and give instant effects or temporary buffs (last until next claim). At Mythic: Mana Potion gives +300% rate, Elixir of Strength gives 2.30x payout, Sentry Ward rolls 1–500 Cores.
-
-## Rarity Guarantee Fix
-Special packs with rarity guarantees could silently fail due to a format mismatch. A normalization step now handles both formats correctly, so all pack guarantees are properly enforced.
-
-## Challenge Pack Odds Buff
-
-## Swiper Filters
-TradeMatch Swiper now has **rarity and holo filters** at the top and bottom of the card feed. Filter by rarity tier (Rare through Unique) or holo type (Holo, Reverse, Full Art, Non-Holo).
+## Coming Soon
+The groundwork for **special cards and collections** is now in place. More details soon — might be a good time to save some Cores.
 

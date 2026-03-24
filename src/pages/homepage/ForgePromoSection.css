@@ -1,0 +1,366 @@
+/* ═══ Forge Promo Banner ═══ */
+
+.forge-promo {
+    position: relative;
+    background: #080402;
+    overflow: hidden;
+    border-top: 1px solid rgba(232, 101, 32, 0.15);
+    border-bottom: 1px solid rgba(232, 101, 32, 0.15);
+}
+
+/* Flowing lava gradient background */
+.forge-promo-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        #0d0400, #1a0800, #3d1600, #8b3000, #e86520,
+        #ff6a00, #ffaa33, #ff6a00, #e86520,
+        #8b3000, #3d1600, #1a0800, #0d0400
+    );
+    background-size: 400% 100%;
+    animation: forgePromo-bannerFlow 20s ease infinite;
+    opacity: 0.12;
+}
+
+/* SVG graph background */
+.forge-promo-graph {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.1;
+    pointer-events: none;
+}
+.forge-promo-graph svg {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 75%;
+}
+
+/* Accent lines */
+.forge-promo-accent-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ffaa33, #e86520, transparent);
+    box-shadow: 0 0 12px rgba(232, 101, 32, 0.5);
+    z-index: 3;
+}
+.forge-promo-accent-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(232, 101, 32, 0.25), transparent);
+    z-index: 3;
+}
+
+/* Content layout */
+.forge-promo-content {
+    position: relative;
+    z-index: 2;
+    padding: 28px 0 16px;
+    display: flex;
+    gap: 28px;
+    align-items: center;
+}
+
+.forge-promo-info {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 240px;
+    max-width: 300px;
+}
+
+.forge-promo-title {
+    font-family: 'Teko', sans-serif;
+    font-size: 2.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #e0dcd4;
+    text-shadow: 0 0 20px rgba(232, 101, 32, 0.3);
+    line-height: 1;
+}
+.forge-promo-title span {
+    color: #ffaa33;
+}
+
+.forge-promo-desc {
+    color: #999088;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+.forge-promo-desc strong {
+    color: #e0dcd4;
+    font-weight: 600;
+}
+
+.forge-promo-fine {
+    color: #5a554e;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    margin-top: -2px;
+}
+
+/* Heat CTA button */
+.forge-heat-btn {
+    margin-top: 8px;
+    background: linear-gradient(135deg, #e86520, #c44a10);
+    color: #e0dcd4;
+    border: none;
+    padding: 10px 32px;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    font-family: 'Teko', sans-serif;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 4px 24px rgba(232, 101, 32, 0.4);
+    animation: forgePromo-heatPulse 2s ease infinite;
+    width: fit-content;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+}
+.forge-heat-btn:hover {
+    box-shadow: 0 4px 28px rgba(232, 101, 32, 0.6), 0 0 50px rgba(232, 101, 32, 0.25);
+    transform: translateY(-2px);
+    color: #e0dcd4;
+}
+
+/* Mini player cards (right side) */
+.forge-promo-preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.forge-mini-card {
+    background: rgba(14, 14, 14, 0.6);
+    border: 1px solid #222;
+    border-radius: 5px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    transition: all 0.2s;
+}
+.forge-mini-card:hover {
+    transform: translateX(4px);
+    background: rgba(14, 14, 14, 0.8);
+}
+.forge-mini-card.heat-blazing { border-color: rgba(232, 101, 32, 0.25); }
+.forge-mini-card.heat-warm { border-color: rgba(212, 160, 48, 0.2); }
+.forge-mini-card.heat-cooling { border-color: rgba(68, 153, 187, 0.2); }
+
+/* Heat bar on top of mini cards */
+.forge-mini-heat {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+}
+.forge-mini-heat.blazing {
+    background: linear-gradient(90deg, #f0c840, #e86520);
+    animation: forgePromo-heatBarPulse 1.5s ease infinite;
+}
+.forge-mini-heat.warm {
+    background: #d4a030;
+    opacity: 0.5;
+}
+.forge-mini-heat.cooling {
+    background: #4499bb;
+    opacity: 0.4;
+}
+
+.forge-mini-hex {
+    width: 28px;
+    height: 28px;
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: 'Teko', sans-serif;
+    font-size: 0.7rem;
+    color: #e0dcd4;
+}
+
+.forge-mini-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    color: #e0dcd4;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.forge-mini-role {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.625rem;
+    color: #5a554e;
+    text-transform: uppercase;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.forge-mini-price {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.forge-mini-price.blazing {
+    background: linear-gradient(135deg, #f0c840, #e86520);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.forge-mini-price.warm { color: #d4a030; }
+.forge-mini-price.cooling { color: #4499bb; }
+
+.forge-mini-change {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: right;
+}
+.forge-mini-change.up { color: #44cc66; }
+.forge-mini-change.down { color: #ee4444; }
+
+/* Seamless looping ticker */
+.forge-ticker-wrap {
+    position: relative;
+    z-index: 2;
+    padding: 0 0 14px;
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, black 48px, black calc(100% - 48px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 48px, black calc(100% - 48px), transparent);
+}
+
+.forge-ticker {
+    display: flex;
+    gap: 10px;
+    width: max-content;
+    animation: forgePromo-tickerScroll var(--ticker-duration, 30s) linear infinite;
+}
+.forge-ticker:hover {
+    animation-play-state: paused;
+}
+
+.forge-ticker-item {
+    background: rgba(14, 14, 14, 0.5);
+    border: 1px solid rgba(232, 101, 32, 0.12);
+    border-radius: 5px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+.forge-ticker-item:hover {
+    background: rgba(14, 14, 14, 0.8);
+    border-color: rgba(232, 101, 32, 0.25);
+}
+
+.forge-ticker-hex {
+    width: 24px;
+    height: 24px;
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: 'Teko', sans-serif;
+    font-size: 0.625rem;
+    color: #e0dcd4;
+}
+
+.forge-ticker-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    color: #e0dcd4;
+    font-weight: 600;
+}
+
+.forge-ticker-price {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 0.875rem;
+}
+
+.forge-ticker-change {
+    font-size: 0.625rem;
+    font-weight: 600;
+}
+
+.forge-ticker-sep {
+    width: 1px;
+    height: 20px;
+    background: rgba(232, 101, 32, 0.15);
+    flex-shrink: 0;
+    align-self: center;
+}
+
+/* ═══ Animations ═══ */
+
+@keyframes forgePromo-bannerFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes forgePromo-heatPulse {
+    0%, 100% { box-shadow: 0 4px 20px rgba(232, 101, 32, 0.4); }
+    50% { box-shadow: 0 4px 28px rgba(232, 101, 32, 0.6), 0 0 50px rgba(232, 101, 32, 0.25); }
+}
+
+@keyframes forgePromo-heatBarPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+@keyframes forgePromo-tickerScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+/* ═══ Responsive ═══ */
+
+@media (max-width: 640px) {
+    .forge-promo-content {
+        flex-direction: column;
+        padding: 24px 0 14px;
+        gap: 16px;
+    }
+    .forge-promo-info {
+        min-width: 0;
+        max-width: none;
+    }
+    .forge-promo-preview {
+        width: 100%;
+    }
+    .forge-promo-title {
+        font-size: 1.75rem;
+    }
+}

@@ -13,15 +13,15 @@ export default function SALInviteModal() {
     const navigate = useNavigate()
     const { user, linkedPlayer } = useAuth()
 
-    // Auto-show for tier 5 players
-    useEffect(() => {
-        if (!user || !linkedPlayer) return
-        if (linkedPlayer.division_tier !== 5) return
-        if (localStorage.getItem(SESSION_KEY)) return
-
-        const timer = setTimeout(() => setOpen(true), DELAY_MS)
-        return () => clearTimeout(timer)
-    }, [user, linkedPlayer])
+    // Auto-show for tier 5 players (disabled — SAL is inactive)
+    // useEffect(() => {
+    //     if (!user || !linkedPlayer) return
+    //     if (linkedPlayer.division_tier !== 5) return
+    //     if (localStorage.getItem(SESSION_KEY)) return
+    //
+    //     const timer = setTimeout(() => setOpen(true), DELAY_MS)
+    //     return () => clearTimeout(timer)
+    // }, [user, linkedPlayer])
 
     // Manual trigger from debug tools
     useEffect(() => {

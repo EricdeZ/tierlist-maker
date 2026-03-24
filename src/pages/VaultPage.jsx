@@ -8,7 +8,6 @@ import { tradematchService } from '../services/database'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem, Heart } from 'lucide-react'
-import vaultLogo from '../assets/vault_square.png'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
 import './vault/compdeck.css'
@@ -100,12 +99,9 @@ export default function VaultPage() {
         return (
             <div className="compdeck">
                 <Navbar branding={
-                    <div className="hidden sm:flex items-center gap-2">
-                        <img src={vaultLogo} alt="" className="h-6 cd-icon-glow" />
-                        <span className="cd-head text-sm font-black" style={{ letterSpacing: '0.15em' }}>
-                            <span className="text-[var(--cd-cyan)] cd-text-glow">THE</span>
-                            <span className="text-white">{'\u00A0'}VAULT</span>
-                        </span>
+                    <div className="hidden sm:flex items-center gap-1.5">
+                        <span className="cd-head text-[0.6rem] tracking-[0.4em] text-[var(--cd-cyan)] opacity-55">THE</span>
+                        <span className="cd-head text-sm font-bold tracking-[0.12em]" style={{ background: 'linear-gradient(180deg, #e0e8f0 20%, #00e5ff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>VAULT</span>
                     </div>
                 } />
                 <VaultHeroBanner />
@@ -138,12 +134,9 @@ export default function VaultPage() {
         return (
             <div className="compdeck min-h-screen flex flex-col items-center justify-center text-center px-4">
                 <Navbar branding={
-                    <div className="hidden sm:flex items-center gap-2">
-                        <img src={vaultLogo} alt="" className="h-6 cd-icon-glow" />
-                        <span className="cd-head text-sm font-black" style={{ letterSpacing: '0.15em' }}>
-                            <span className="text-[var(--cd-cyan)] cd-text-glow">THE</span>
-                            <span className="text-white">{'\u00A0'}VAULT</span>
-                        </span>
+                    <div className="hidden sm:flex items-center gap-1.5">
+                        <span className="cd-head text-[0.6rem] tracking-[0.4em] text-[var(--cd-cyan)] opacity-55">THE</span>
+                        <span className="cd-head text-sm font-bold tracking-[0.12em]" style={{ background: 'linear-gradient(180deg, #e0e8f0 20%, #00e5ff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>VAULT</span>
                     </div>
                 } />
                 <div className="flex flex-col items-center gap-4">
@@ -228,12 +221,9 @@ function VaultInner() {
     const ActiveComponent = TAB_COMPONENTS[activeTab] || CCPackShop
 
     const branding = (
-        <div className="hidden sm:flex items-center gap-2">
-            <img src={vaultLogo} alt="" className="h-6 cd-icon-glow" />
-            <span className="cd-head text-sm font-black" style={{ letterSpacing: '0.15em' }}>
-                <span className="text-[var(--cd-cyan)] cd-text-glow">THE</span>
-                <span className="text-white">{'\u00A0'}VAULT</span>
-            </span>
+        <div className="hidden sm:flex items-center gap-1.5">
+            <span className="cd-head text-[0.6rem] tracking-[0.4em] text-[var(--cd-cyan)] opacity-55">THE</span>
+            <span className="cd-head text-sm font-bold tracking-[0.12em]" style={{ background: 'linear-gradient(180deg, #e0e8f0 20%, #00e5ff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>VAULT</span>
         </div>
     )
 

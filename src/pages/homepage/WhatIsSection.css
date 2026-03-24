@@ -1,0 +1,602 @@
+/* ═══════════════════════════════════════════════
+   What Is Section — Rich atmospheric layout
+   ═══════════════════════════════════════════════ */
+
+.wis-section {
+  position: relative;
+  padding: 5rem 1rem;
+  overflow: hidden;
+}
+
+/* Layered background: base + radial warm pools */
+.wis-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(248, 197, 106, 0.06), transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(248, 197, 106, 0.04), transparent 45%),
+    radial-gradient(ellipse at 50% 0%, rgba(88, 101, 242, 0.04), transparent 40%),
+    linear-gradient(180deg, #0c1322 0%, #101829 30%, #0e1625 70%, #0c1322 100%);
+  z-index: 0;
+}
+
+/* Grid overlay — warmer, more visible */
+.wis-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(248, 197, 106, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(248, 197, 106, 0.035) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 10%, transparent 65%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, black 10%, transparent 65%);
+}
+
+/* Large ambient glow behind hero area */
+.wis-ambient-glow {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(248, 197, 106, 0.06) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Secondary ambient — lower, cooler tint */
+.wis-ambient-glow-secondary {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(88, 101, 242, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wis-content {
+  position: relative;
+  z-index: 2;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+/* ─── Header ─── */
+
+.wis-header {
+  text-align: center;
+  margin-bottom: 3.5rem;
+}
+
+.wis-title {
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 900;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #f8c56a 0%, #fde68a 40%, #f8c56a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.75rem;
+  line-height: 1.1;
+  filter: drop-shadow(0 0 30px rgba(248, 197, 106, 0.15));
+}
+
+.wis-tagline {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1.1rem;
+  max-width: 36rem;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════
+   Hero Card (Competitive Hub)
+   ═══════════════════════════════════════════════ */
+
+.wis-hero {
+  background:
+    linear-gradient(135deg, rgba(248, 197, 106, 0.04) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(248, 197, 106, 0.03) 100%);
+  border: 1px solid rgba(248, 197, 106, 0.12);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.wis-hero:hover {
+  border-color: rgba(248, 197, 106, 0.25);
+  box-shadow:
+    0 0 60px rgba(248, 197, 106, 0.06),
+    0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Warm gradient wash — top-right */
+.wis-hero::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -10%;
+  width: 60%;
+  height: 160%;
+  background: radial-gradient(ellipse at 70% 40%, rgba(248, 197, 106, 0.08), transparent 65%);
+  pointer-events: none;
+}
+
+/* Subtle bottom-edge glow */
+.wis-hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248, 197, 106, 0.15), transparent);
+  pointer-events: none;
+}
+
+.wis-hero-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.wis-hero-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f8c56a, #e5a84e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(248, 197, 106, 0.25);
+}
+
+.wis-hero-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #101829;
+}
+
+.wis-hero-title {
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.75rem;
+  color: white;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.wis-hero-desc {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+  max-width: 32rem;
+}
+
+.wis-hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.wis-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.wis-ghost-btn:hover {
+  border-color: rgba(248, 197, 106, 0.3);
+  color: #f8c56a;
+  background: rgba(248, 197, 106, 0.06);
+}
+
+.wis-ghost-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #f8c56a;
+}
+
+.wis-hero-visual {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.wis-access-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #f8c56a, #e5a84e);
+  color: #101829;
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-height: 44px;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(248, 197, 106, 0.2);
+}
+
+.wis-access-btn:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 8px 32px rgba(248, 197, 106, 0.35),
+    0 0 60px rgba(248, 197, 106, 0.15);
+}
+
+.wis-access-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+
+/* ═══════════════════════════════════════════════
+   Feature Card Grids
+   ═══════════════════════════════════════════════ */
+
+.wis-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.wis-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 3rem;
+}
+
+
+/* ═══════════════════════════════════════════════
+   Feature Card — Rich depth
+   ═══════════════════════════════════════════════ */
+
+.wis-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, #151e30 0%, #111927 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  overflow: hidden;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: block;
+}
+
+.wis-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(248, 197, 106, 0.3);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(248, 197, 106, 0.04);
+}
+
+/* Gold left accent bar */
+.wis-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #f8c56a, rgba(248, 197, 106, 0.2));
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.wis-card:hover::before {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(248, 197, 106, 0.3);
+}
+
+/* Top-right corner glow on hover */
+.wis-card::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(248, 197, 106, 0.08), transparent 65%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.wis-card:hover::after {
+  opacity: 1;
+}
+
+.wis-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.wis-card-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  background: rgba(248, 197, 106, 0.1);
+  border: 1px solid rgba(248, 197, 106, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.wis-card:hover .wis-card-icon {
+  background: rgba(248, 197, 106, 0.15);
+  border-color: rgba(248, 197, 106, 0.2);
+  box-shadow: 0 0 12px rgba(248, 197, 106, 0.1);
+}
+
+.wis-card-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #f8c56a;
+}
+
+.wis-card-title {
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  color: white;
+  transition: color 0.3s;
+}
+
+.wis-card:hover .wis-card-title {
+  color: #f8c56a;
+}
+
+.wis-card-desc {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+}
+
+
+/* ═══════════════════════════════════════════════
+   Discord CTA Banner
+   ═══════════════════════════════════════════════ */
+
+.wis-discord-banner {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(88, 101, 242, 0.2);
+  background:
+    linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, rgba(88, 101, 242, 0.03) 50%, rgba(88, 101, 242, 0.06) 100%);
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  overflow: hidden;
+}
+
+/* Purple glow orb */
+.wis-discord-banner::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -5%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(88, 101, 242, 0.15), transparent 65%);
+  pointer-events: none;
+}
+
+/* Bottom edge accent */
+.wis-discord-banner::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(88, 101, 242, 0.3), transparent);
+  pointer-events: none;
+}
+
+.wis-discord-text {
+  position: relative;
+  z-index: 1;
+}
+
+.wis-discord-text h3 {
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: white;
+  margin-bottom: 0.35rem;
+}
+
+.wis-discord-text p {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+}
+
+.wis-discord-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1.75rem;
+  border-radius: 0.75rem;
+  background: #5865F2;
+  color: white;
+  font-family: var(--font-heading), 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s;
+  white-space: nowrap;
+  min-height: 44px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 20px rgba(88, 101, 242, 0.25);
+}
+
+.wis-discord-btn:hover {
+  background: #4752C4;
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px rgba(88, 101, 242, 0.35),
+    0 0 40px rgba(88, 101, 242, 0.1);
+}
+
+.wis-discord-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+
+/* ═══════════════════════════════════════════════
+   Edge transitions — blend into surrounding page
+   ═══════════════════════════════════════════════ */
+
+.wis-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 80px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.wis-edge--top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--color-primary), transparent);
+}
+
+.wis-edge--bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-primary), transparent);
+}
+
+/* Gold accent line at section top */
+.wis-accent-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 10%, rgba(248, 197, 106, 0.2) 50%, transparent 90%);
+  box-shadow: 0 0 12px rgba(248, 197, 106, 0.1);
+}
+
+
+/* ═══════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .wis-hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .wis-hero-desc {
+    max-width: none;
+  }
+
+  .wis-hero-actions {
+    justify-content: center;
+  }
+
+  .wis-hero-icon {
+    margin: 0 auto 1rem;
+  }
+
+  .wis-secondary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wis-tool-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .wis-section {
+    padding: 3rem 1rem;
+  }
+
+  .wis-hero {
+    padding: 1.5rem;
+  }
+
+  .wis-hero-title {
+    font-size: 1.35rem;
+  }
+
+  .wis-secondary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wis-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wis-discord-banner {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .wis-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wis-ghost-btn {
+    justify-content: center;
+  }
+}

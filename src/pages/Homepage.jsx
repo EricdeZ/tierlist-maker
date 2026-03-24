@@ -12,16 +12,17 @@ import { useReadyMatchCount } from '../hooks/useReadyMatchCount'
 import HeroSection from './homepage/HeroSection'
 import ReporterNotification from './homepage/ReporterNotification'
 import LeaguesSection from './homepage/LeaguesSection'
-import ToolsSection from './homepage/ToolsSection'
-import FeaturesSection from './homepage/FeaturesSection'
+import WhatIsSection from './homepage/WhatIsSection'
 import StorySection from './homepage/StorySection'
 import CommunitySection from './homepage/CommunitySection'
 import PassionCTA from './homepage/PassionCTA'
+import VaultPromoSection from './homepage/VaultPromoSection'
+import ForgePromoSection from './homepage/ForgePromoSection'
 import HomepageFooter from './homepage/HomepageFooter'
 
 
 const Homepage = () => {
-    const { user, linkedPlayer, login, loading: authLoading, hasPermission } = useAuth()
+    const { hasPermission } = useAuth()
     const canPreview = (leagueId) => hasPermission('league_preview', leagueId)
     const { count: readyCount, matches: readyMatches, hasReportPermission } = useReadyMatchCount()
     const [leagues, setLeagues] = useState([])
@@ -46,8 +47,6 @@ const Homepage = () => {
         setHeroLight(prev => ({ ...prev, active: false }))
     }, [])
 
-    const sheetRy = heroLight.active ? -4 + (heroLight.x / 100 - 0.5) * 3 : -4
-    const sheetRx = heroLight.active ? 2 + (0.5 - heroLight.y / 100) * 2 : 2
 
     useEffect(() => {
         let cancelled = false
@@ -118,8 +117,6 @@ const Homepage = () => {
                 heroLight={heroLight}
                 handleHeroMove={handleHeroMove}
                 handleHeroLeave={handleHeroLeave}
-                sheetRx={sheetRx}
-                sheetRy={sheetRy}
             />
 
             {hasReportPermission && readyCount > 0 && (
@@ -128,11 +125,13 @@ const Homepage = () => {
 
             <LeaguesSection leagues={mainLeagues} canPreview={canPreview} />
 
+            <VaultPromoSection />
+
+            <ForgePromoSection />
+
             <PassionPromoBanner />
 
-            <ToolsSection user={user} linkedPlayer={linkedPlayer} login={login} authLoading={authLoading} />
-
-            <FeaturesSection />
+            <WhatIsSection />
 
             <StorySection leagueCount={mainLeagues.length} divisionCount={divisionCount} />
 

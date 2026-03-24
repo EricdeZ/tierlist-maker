@@ -8,7 +8,7 @@ export const TRADEMATCH_RULES = {
   max_outgoing_matches: 15,
   max_cards_per_side: 10,
   match_expiry_hours: 24,
-  feed_page_size: 50,
+  feed_page_size: 100,
 }
 
 // ══════════════════════════════════════════════

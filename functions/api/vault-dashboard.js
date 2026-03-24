@@ -448,21 +448,26 @@ async function getCollection(sql, event) {
     return ok({ collection, entries })
 }
 
+function toSlug(name) {
+    return name.trim().toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+}
+
 async function saveCollection(sql, body, user, canApprove) {
     if (!canApprove) return err('Requires vault_approve', 403)
     const { id, name, description, cover_image_url } = body
     if (!name?.trim()) return err('Name required')
+    const slug = toSlug(name)
     if (id) {
         const [row] = await sql`
             UPDATE cc_collections SET name = ${name.trim()}, description = ${description || null},
-                cover_image_url = ${cover_image_url || null}, updated_at = NOW()
+                cover_image_url = ${cover_image_url || null}, slug = ${slug}, updated_at = NOW()
             WHERE id = ${id} RETURNING *
         `
         return ok({ collection: row })
     }
     const [row] = await sql`
-        INSERT INTO cc_collections (name, description, cover_image_url, created_by)
-        VALUES (${name.trim()}, ${description || null}, ${cover_image_url || null}, ${user.id})
+        INSERT INTO cc_collections (name, description, cover_image_url, slug, created_by)
+        VALUES (${name.trim()}, ${description || null}, ${cover_image_url || null}, ${slug}, ${user.id})
         RETURNING *
     `
     return ok({ collection: row })

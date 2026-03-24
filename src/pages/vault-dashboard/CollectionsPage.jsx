@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
-import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText, Eye } from 'lucide-react'
+import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText, Eye, ExternalLink, Upload, Image } from 'lucide-react'
 import CanvasCard from '../vault/components/CanvasCard'
 import CollectionShowcase from './CollectionShowcase'
 
@@ -111,6 +111,17 @@ export default function CollectionsPage() {
                                     <span>{new Date(c.updated_at).toLocaleDateString()}</span>
                                 </div>
                             </div>
+                            {c.slug && c.status === 'active' && (
+                                <a
+                                    href={`/vault/showcase/${c.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-cyan-600/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/25 transition-colors no-underline shrink-0"
+                                >
+                                    <Eye className="w-3 h-3" /> Showcase
+                                </a>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -127,6 +138,28 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
     const [saving, setSaving] = useState(false)
     const [showBrowser, setShowBrowser] = useState(false)
     const [showShowcase, setShowShowcase] = useState(false)
+    const [uploadingCover, setUploadingCover] = useState(false)
+    const coverInputRef = useRef(null)
+
+    const handleCoverUpload = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setUploadingCover(true)
+        try {
+            const res = await vaultDashboardService.uploadAsset(file, {
+                name: `collection-cover-${collection.id || 'new'}`,
+                category: 'collections',
+            })
+            if (res.asset?.url) {
+                setCollection(prev => ({ ...prev, cover_image_url: res.asset.url }))
+            }
+        } catch (err) {
+            console.error('Cover upload failed:', err)
+        } finally {
+            setUploadingCover(false)
+            if (coverInputRef.current) coverInputRef.current.value = ''
+        }
+    }
 
     useEffect(() => {
         if (isNew) return
@@ -224,6 +257,46 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
                     </div>
                 </div>
 
+                {/* Cover Image */}
+                <div>
+                    <label className="block text-xs text-white/50 mb-1">Cover Image</label>
+                    <div className="flex items-center gap-3">
+                        {collection.cover_image_url ? (
+                            <div className="relative group">
+                                <img
+                                    src={collection.cover_image_url}
+                                    alt="Cover"
+                                    className="w-12 h-12 rounded-lg object-cover border border-white/10"
+                                />
+                                <button
+                                    onClick={() => setCollection(prev => ({ ...prev, cover_image_url: null }))}
+                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                                <Image className="w-5 h-5 text-white/20" />
+                            </div>
+                        )}
+                        <button
+                            onClick={() => coverInputRef.current?.click()}
+                            disabled={uploadingCover}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                            {uploadingCover ? 'Uploading...' : <><Upload className="w-3 h-3" /> {collection.cover_image_url ? 'Replace' : 'Upload'}</>}
+                        </button>
+                        <input
+                            ref={coverInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            onChange={handleCoverUpload}
+                            className="hidden"
+                        />
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-2">
                     <button
                         onClick={handleSave}
@@ -260,6 +333,17 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
                     }`}>
                         {collection.status || 'draft'}
                     </span>
+
+                    {collection.slug && collection.status === 'active' && (
+                        <a
+                            href={`/vault/showcase/${collection.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold bg-cyan-600/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/25 transition-colors no-underline"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" /> Showcase
+                        </a>
+                    )}
                 </div>
 
                 {/* Entries */}
