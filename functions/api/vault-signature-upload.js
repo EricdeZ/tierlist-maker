@@ -72,15 +72,14 @@ export async function onRequest(context) {
 
     // --- Request-based sign: standard flow ---
     const [req] = await sql`
-        SELECT sr.id, sr.card_id, sr.signer_player_id, sr.status, c.signature_url
+        SELECT sr.id, sr.card_id, sr.signer_player_id, sr.status, c.signature_url, c.depicted_user_id
         FROM cc_signature_requests sr
         JOIN cc_cards c ON sr.card_id = c.id
         WHERE sr.id = ${requestId}
     `
     if (!req) return json({ error: 'Request not found' }, 404)
     // Check depicted_user_id as alternative auth
-    const [reqCard] = await sql`SELECT depicted_user_id FROM cc_cards WHERE id = ${req.card_id}`
-    const isDepictedUser = reqCard?.depicted_user_id && reqCard.depicted_user_id === user.id
+    const isDepictedUser = req.depicted_user_id && req.depicted_user_id === user.id
     const isLinkedSigner = user.linked_player_id && req.signer_player_id === user.linked_player_id
 
     if (!isDepictedUser && !isLinkedSigner) {
