@@ -509,6 +509,7 @@ function BinderPageContent({ page, color, cardsBySlot }) {
 }
 
 function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, targetSlot }) {
+  const { getTemplate } = useVault()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('player')
 
@@ -583,17 +584,21 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
             </div>
           )}
           {available.map(card => {
-            const isPlayer = (card.cardType || 'god') === 'player'
+            const type = card.cardType || 'god'
+            const isCollection = type === 'collection'
+            const isPlayer = type === 'player'
             return (
               <div
                 key={card.id}
                 className="binder-picker__card"
                 onClick={() => onPick(card.id)}
               >
-                {isPlayer ? (
+                {isCollection ? (
+                  <VaultCard card={card} getTemplate={getTemplate} size={130} holo={false} />
+                ) : isPlayer ? (
                   <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={130} />
                 ) : (
-                  <GameCard type={card.cardType || 'god'} rarity={card.rarity} data={toGameCardData(card)} compact size={130} />
+                  <GameCard type={type} rarity={card.rarity} data={toGameCardData(card)} compact size={130} />
                 )}
               </div>
             )

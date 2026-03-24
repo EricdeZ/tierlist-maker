@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import GameCard from './components/GameCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
+import VaultCard from './components/VaultCard'
 import { vaultService } from '../../services/database'
 import { getHoloEffect } from '../../data/vault/economy'
 import { useVault } from './VaultContext'
 import { PenLine, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function CCSignatureApprovals() {
-  const { refreshCollection, setPendingApprovalCount } = useVault()
+  const { refreshCollection, setPendingApprovalCount, getTemplate } = useVault()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -85,7 +86,9 @@ export default function CCSignatureApprovals() {
                 <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
                   {/* Card with signature preview */}
                   <div className="shrink-0">
-                    {req.cardType === 'player' ? (
+                    {req.cardType === 'collection' ? (
+                      <VaultCard card={req} getTemplate={getTemplate} size={200} holo />
+                    ) : req.cardType === 'player' ? (
                       <TradingCard
                         playerName={pName}
                         teamName={tName}

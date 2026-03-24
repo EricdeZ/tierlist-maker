@@ -1364,6 +1364,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
       {zoomedCard && (
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
+          collectionCard={zoomedCard.collectionCard}
           gameCard={zoomedCard.gameCard}
           playerCard={zoomedCard.playerCard}
           holoType={zoomedCard.holoType}
@@ -1822,9 +1823,10 @@ function TradeOfferPanel({ title, titleColor, cards, packs = [], coreAmount, isR
 // Desktop Trade Card Slot
 // ═══════════════════════════════════════
 function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const { card } = tradeCard
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
+  const isCollection = card.cardType === 'collection'
   const isPlayer = card.cardType === 'player'
 
   let cardData = null
@@ -1847,7 +1849,9 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
         className="w-full cursor-pointer transition-transform hover:scale-105 active:scale-95"
       >
         <div>
-          {isPlayer ? (
+          {isCollection ? (
+            <VaultCard card={card} getTemplate={getTemplate} size={100} holo={false} />
+          ) : isPlayer ? (
             <TradingCard
               playerName={cardData?.playerName || card.godName}
               teamName={cardData?.teamName || ''}
@@ -1895,8 +1899,9 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
 // Collection Picker Card
 // ═══════════════════════════════════════
 function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
-  const { getDefOverride } = useVault()
+  const { getDefOverride, getTemplate } = useVault()
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
+  const isCollection = (card.cardType || 'god') === 'collection'
   const isPlayer = (card.cardType || 'god') === 'player'
   const cardSize = mobile ? 100 : 130
 
@@ -1923,7 +1928,9 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
       }`}
     >
       <div className="rounded overflow-hidden">
-        {isPlayer ? (
+        {isCollection ? (
+          <VaultCard card={card} getTemplate={getTemplate} size={cardSize} holo={false} />
+        ) : isPlayer ? (
           <TradingCard
             playerName={cardData?.playerName || card.godName}
             teamName={cardData?.teamName || ''}
