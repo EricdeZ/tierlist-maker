@@ -70,6 +70,9 @@ const handler = async (event) => {
   if (event.httpMethod === 'GET' && action === 'signed-unique-gallery') {
     return await handleSignedUniqueGallery(sql)
   }
+  if (event.httpMethod === 'GET' && action === 'showcase-collection') {
+    return await handleShowcaseCollection(sql, event.queryStringParameters)
+  }
 
   const user = await requireAuth(event)
   if (!user) {
@@ -98,6 +101,7 @@ const handler = async (event) => {
         case 'collection-owned': return await handleCollectionOwned(sql, user)
         case 'collection-set': return await handleCollectionSet(sql, event.queryStringParameters)
         case 'collection-search': return await handleCollectionSearch(sql, event.queryStringParameters)
+        case 'collection-collections': return await handleCollectionCollections(sql, user)
         case 'card-detail': return await handleCardDetail(sql, event.queryStringParameters)
         case 'gifts': return await handleLoadGifts(sql, user)
         case 'gift-leaderboard': return await handleGiftLeaderboard(sql, user)
@@ -839,6 +843,84 @@ async function handleCollectionOwned(sql, user) {
   }))
 
   return { statusCode: 200, headers, body: JSON.stringify({ gameCards: gameMap, playerCards: playerMap, firstEditions: feMap, recentPulls }) }
+}
+
+// ═══ GET: Collections the user owns cards from ═══
+async function handleCollectionCollections(sql, user) {
+  const ownedRows = await sql`
+    SELECT template_id, array_agg(rarity) AS rarities
+    FROM cc_cards
+    WHERE owner_id = ${user.id} AND card_type = 'collection' AND template_id IS NOT NULL
+    GROUP BY template_id
+  `
+  if (ownedRows.length === 0) {
+    return { statusCode: 200, headers, body: JSON.stringify({ collections: [], owned: {} }) }
+  }
+
+  const ownedTemplateIds = ownedRows.map(r => r.template_id)
+
+  const collectionIds = await sql`
+    SELECT DISTINCT collection_id FROM cc_collection_entries
+    WHERE template_id = ANY(${ownedTemplateIds})
+  `
+  if (collectionIds.length === 0) {
+    return { statusCode: 200, headers, body: JSON.stringify({ collections: [], owned: {} }) }
+  }
+
+  const cIds = collectionIds.map(r => r.collection_id)
+
+  const [collections, entries] = await Promise.all([
+    sql`
+      SELECT id, name, description, cover_image_url
+      FROM cc_collections
+      WHERE id = ANY(${cIds}) AND status = 'active'
+    `,
+    sql`
+      SELECT ce.collection_id, ce.template_id, ce.draft_id,
+             COALESCE(t.name, d.name) AS name,
+             COALESCE(t.card_type, d.card_type) AS card_type,
+             COALESCE(t.template_data, d.template_data) AS template_data
+      FROM cc_collection_entries ce
+      LEFT JOIN cc_card_templates t ON t.id = ce.template_id
+      LEFT JOIN cc_card_drafts d ON d.id = ce.draft_id
+      WHERE ce.collection_id = ANY(${cIds})
+      ORDER BY ce.id
+    `,
+  ])
+
+  const collectionMap = new Map()
+  for (const col of collections) {
+    collectionMap.set(col.id, {
+      id: col.id,
+      name: col.name,
+      description: col.description,
+      coverImageUrl: col.cover_image_url,
+      entries: [],
+    })
+  }
+
+  for (const e of entries) {
+    const col = collectionMap.get(e.collection_id)
+    if (!col) continue
+    col.entries.push({
+      templateId: e.template_id || e.draft_id,
+      isDraft: !e.template_id,
+      name: e.name,
+      cardType: e.card_type,
+      templateData: e.template_data,
+    })
+  }
+
+  const owned = {}
+  for (const r of ownedRows) owned[r.template_id] = r.rarities
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({
+      collections: [...collectionMap.values()].filter(c => c.entries.length > 0),
+      owned,
+    }),
+  }
 }
 
 // ═══ GET: Collection set defs (static — cacheable, no ownership) ═══
@@ -2289,6 +2371,38 @@ async function handleSignedUniqueGallery(sql) {
         signedAt: c.signed_at,
       })),
     }),
+  }
+}
+
+// ═══ Collection Showcase (public) ═══
+
+async function handleShowcaseCollection(sql, params) {
+  const { slug } = params || {}
+  if (!slug) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Slug required' }) }
+
+  const [collection] = await sql`
+    SELECT id, name, description, cover_image_url, slug
+    FROM cc_collections WHERE slug = ${slug} AND status = 'active'
+  `
+  if (!collection) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Collection not found' }) }
+
+  const entries = await sql`
+    SELECT e.id, e.template_id, e.draft_id,
+           COALESCE(t.name, d.notes, 'Draft #' || d.id) AS template_name,
+           COALESCE(t.card_type, d.card_type) AS card_type,
+           COALESCE(t.template_data, d.template_data) AS template_data,
+           COALESCE(t.thumbnail_url, d.thumbnail_url) AS thumbnail_url,
+           CASE WHEN e.draft_id IS NOT NULL THEN 'draft' ELSE 'template' END AS source_type
+    FROM cc_collection_entries e
+    LEFT JOIN cc_card_templates t ON e.template_id = t.id
+    LEFT JOIN cc_card_drafts d ON e.draft_id = d.id
+    WHERE e.collection_id = ${collection.id}
+    ORDER BY e.added_at ASC
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ collection, entries }),
   }
 }
 
