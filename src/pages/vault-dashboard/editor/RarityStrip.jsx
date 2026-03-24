@@ -4,6 +4,7 @@ import StructuredCard from '../preview/StructuredCard'
 import MiniCardPreview from '../preview/MiniCardPreview'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { RARITIES, RARITY_HOLO_MAP } from '../../../data/vault/economy'
+import { STAFF_CARD_THEMES } from '../preview/prebuiltRenderers'
 
 const STRUCTURED_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary']
 const FULL_ART_RARITIES = ['mythic', 'unique']
@@ -214,6 +215,35 @@ export default function RarityStrip({ cardData, onCardDataChange, cardType, elem
                     <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: RARITIES[selected]?.color }}>
                         {RARITIES[selected]?.name} Settings
                     </h4>
+
+                    {/* Staff card theme picker */}
+                    {(cardData.role === 'staff' || cardData.role === 'cheerleader') && (
+                        <div className="mb-3">
+                            <label className={label}>Card Theme</label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                                {Object.entries(STAFF_CARD_THEMES).map(([key, theme]) => {
+                                    const active = (cardData.staffTheme || 'gold') === key
+                                    return (
+                                        <button key={key} onClick={() => onCardDataChange({ ...cardData, staffTheme: key })}
+                                            className={`px-1.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors ${
+                                                active
+                                                    ? 'ring-2 ring-amber-500/60 scale-105'
+                                                    : 'hover:opacity-80'
+                                            }`}
+                                            style={{
+                                                background: theme.bodyBg,
+                                                color: theme.textBright,
+                                                border: `1px solid ${theme.bodyBorder}`,
+                                            }}
+                                        >
+                                            <span style={{ color: theme.accentLight }}>{theme.label}</span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className={label}>Holo Effect</label>

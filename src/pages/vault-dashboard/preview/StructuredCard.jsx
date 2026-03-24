@@ -1,6 +1,7 @@
 import '../../vault/components/GameCard.css'
 import { RARITIES } from '../../../data/vault/economy'
 import { CLASS_DAMAGE } from '../../../data/vault/gods'
+import { STAFF_CARD_THEMES, staffThemeToCssVars } from './prebuiltRenderers'
 
 const ABILITY_ICONS = {
     damage: 'Dmg', aoe_damage: 'AOE', heal: 'Heal', buff: 'Buff',
@@ -16,6 +17,10 @@ export default function StructuredCard({ cardData, rarity = 'common', cardType =
     const scale = size ? parseFloat(size) / 240 : NaN
     const style = { '--card-scale': Number.isFinite(scale) ? scale : 1 }
     if (size) style.width = size
+
+    // Apply staff card theme CSS vars when role is staff
+    const staffTheme = role === 'staff' && d.staffTheme && STAFF_CARD_THEMES[d.staffTheme]
+    if (staffTheme) Object.assign(style, staffThemeToCssVars(staffTheme))
 
     const type = (cardType === 'player' || cardType === 'custom') ? 'god' : cardType
     const blocks = canvasBlocks || d.blocks || []

@@ -29,6 +29,43 @@ export function getResolvedPalette(el) {
     return ROLE_PALETTES[el.role] || ROLE_PALETTES.adc
 }
 
+// Staff card themes for structured cards (common–legendary) — maps to CSS custom properties
+export const STAFF_CARD_THEMES = {
+    gold:       { label: 'Gold',        accent: '#c4a84a', accentLight: '#e0c866', accentDark: '#8a7a2a', accentGlow: '#c4a84a40', bodyBg: '#1e1c10', bodySurface: '#2a2818', bodyBorder: '#4a4428', text: '#e8e0d0', textDim: '#9a9470', textBright: '#fff' },
+    silver:     { label: 'Silver',      accent: '#8a8a9a', accentLight: '#b0b0c0', accentDark: '#5a5a6a', accentGlow: '#8a8a9a40', bodyBg: '#141418', bodySurface: '#1e1e24', bodyBorder: '#38384a', text: '#d8d8e0', textDim: '#808090', textBright: '#fff' },
+    crimson:    { label: 'Crimson',     accent: '#c44a4a', accentLight: '#e06666', accentDark: '#8a2a2a', accentGlow: '#c44a4a40', bodyBg: '#1e1010', bodySurface: '#2a1818', bodyBorder: '#4a2828', text: '#e8d0d0', textDim: '#9a7070', textBright: '#fff' },
+    navy:       { label: 'Navy',        accent: '#4a5cc4', accentLight: '#6678e0', accentDark: '#2a3a8a', accentGlow: '#4a5cc440', bodyBg: '#10101e', bodySurface: '#181830', bodyBorder: '#283050', text: '#d0d0e8', textDim: '#70709a', textBright: '#fff' },
+    emerald:    { label: 'Emerald',     accent: '#2a8a5c', accentLight: '#40b878', accentDark: '#1a6a40', accentGlow: '#2a8a5c40', bodyBg: '#0e1a14', bodySurface: '#16261e', bodyBorder: '#264a38', text: '#d0e8d8', textDim: '#6a9a80', textBright: '#fff' },
+    rose:       { label: 'Rose',        accent: '#c44a72', accentLight: '#e06690', accentDark: '#8a2a4e', accentGlow: '#c44a7240', bodyBg: '#1e1014', bodySurface: '#2a1820', bodyBorder: '#4a2838', text: '#e8d0d8', textDim: '#9a7080', textBright: '#fff' },
+    violet:     { label: 'Violet',      accent: '#8a50c4', accentLight: '#a870e0', accentDark: '#6030a0', accentGlow: '#8a50c440', bodyBg: '#18101e', bodySurface: '#241828', bodyBorder: '#402848', text: '#e0d0e8', textDim: '#8a709a', textBright: '#fff' },
+    teal:       { label: 'Teal',        accent: '#2a9aaa', accentLight: '#50c0d0', accentDark: '#1a7080', accentGlow: '#2a9aaa40', bodyBg: '#0e181c', bodySurface: '#162428', bodyBorder: '#264248', text: '#d0e4e8', textDim: '#6a949a', textBright: '#fff' },
+    obsidian:   { label: 'Obsidian',    accent: '#606070', accentLight: '#808090', accentDark: '#404050', accentGlow: '#60607040', bodyBg: '#0a0a0e', bodySurface: '#121216', bodyBorder: '#2a2a30', text: '#c0c0c8', textDim: '#606068', textBright: '#e0e0e8' },
+    bronze:     { label: 'Bronze',      accent: '#b07040', accentLight: '#d09060', accentDark: '#805020', accentGlow: '#b0704040', bodyBg: '#1c1610', bodySurface: '#282018', bodyBorder: '#443420', text: '#e8dcd0', textDim: '#9a8460', textBright: '#fff' },
+    cream:      { label: 'Cream',       accent: '#8a6a30', accentLight: '#6a5020', accentDark: '#b08840', accentGlow: '#8a6a3040', bodyBg: '#f5f0e8', bodySurface: '#ece4d8', bodyBorder: '#d0c4a8', text: '#3a3428', textDim: '#6a6050', textBright: '#2a2418' },
+    ivory:      { label: 'Ivory',       accent: '#4a8060', accentLight: '#306848', accentDark: '#60a878', accentGlow: '#4a806040', bodyBg: '#f4f6f0', bodySurface: '#e8ece4', bodyBorder: '#c8d0c0', text: '#2a3028', textDim: '#5a6858', textBright: '#1a2018' },
+    slate:      { label: 'Slate',       accent: '#4a6080', accentLight: '#344868', accentDark: '#6080a0', accentGlow: '#4a608040', bodyBg: '#e8ecf0', bodySurface: '#dce2e8', bodyBorder: '#b0bcc8', text: '#2a3040', textDim: '#5a6878', textBright: '#1a2030' },
+    blush:      { label: 'Blush',       accent: '#a05070', accentLight: '#804060', accentDark: '#c06888', accentGlow: '#a0507040', bodyBg: '#f8f0f2', bodySurface: '#f0e4e8', bodyBorder: '#d8c0c8', text: '#3a2028', textDim: '#7a5a68', textBright: '#2a1820' },
+    parchment:  { label: 'Parchment',   accent: '#8a7050', accentLight: '#6a5838', accentDark: '#a88860', accentGlow: '#8a705040', bodyBg: '#f0e8d8', bodySurface: '#e4dcc8', bodyBorder: '#c8b898', text: '#383020', textDim: '#6a6040', textBright: '#282010' },
+    arctic:     { label: 'Arctic',      accent: '#4080b0', accentLight: '#2868a0', accentDark: '#60a0d0', accentGlow: '#4080b040', bodyBg: '#eef2f8', bodySurface: '#e0e8f0', bodyBorder: '#b8c8d8', text: '#1a2840', textDim: '#506878', textBright: '#102030' },
+}
+
+// Convert a STAFF_CARD_THEMES entry to CSS custom properties for StructuredCard inline style
+export function staffThemeToCssVars(theme) {
+    if (!theme) return {}
+    return {
+        '--accent': theme.accent,
+        '--accent-light': theme.accentLight,
+        '--accent-dark': theme.accentDark,
+        '--accent-glow': theme.accentGlow,
+        '--body-bg': theme.bodyBg,
+        '--body-surface': theme.bodySurface,
+        '--body-border': theme.bodyBorder,
+        '--text': theme.text,
+        '--text-dim': theme.textDim,
+        '--text-bright': theme.textBright,
+    }
+}
+
 function hexToRgba(hex, opacity) {
     const r = parseInt(hex.slice(1, 3), 16)
     const g = parseInt(hex.slice(3, 5), 16)
