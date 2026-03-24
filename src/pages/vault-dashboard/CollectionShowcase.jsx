@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { RARITIES } from '../../data/vault/economy'
-import StructuredCard from './preview/StructuredCard'
-import CanvasCard from '../vault/components/CanvasCard'
+import VaultCard from '../vault/components/VaultCard'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_SIZE = 120
@@ -54,6 +53,7 @@ function EntryRow({ entry }) {
     const td = typeof entry.template_data === 'string' ? JSON.parse(entry.template_data) : entry.template_data
     const hasCardData = !!td?.cardData
     const hasElements = !!td?.elements?.length
+    const templateId = entry.template_id || entry.draft_id
 
     return (
         <div>
@@ -68,18 +68,19 @@ function EntryRow({ entry }) {
             <div className="flex gap-3 overflow-x-auto pb-2">
                 {RARITY_ORDER.map(rarity => (
                     <div key={rarity} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                        {hasCardData ? (
-                            <StructuredCard
-                                cardData={td.cardData}
-                                rarity={rarity}
-                                cardType={entry.card_type || 'custom'}
-                                size={CARD_SIZE}
-                            />
-                        ) : hasElements ? (
-                            <CanvasCard
-                                elements={td.elements}
-                                border={td.border}
-                                rarity={rarity}
+                        {(hasCardData || hasElements) ? (
+                            <VaultCard
+                                card={{
+                                    rarity,
+                                    cardType: entry.card_type || 'custom',
+                                    templateId: entry.template_id,
+                                    _templateData: {
+                                        elements: td.elements,
+                                        border: td.border,
+                                        cardData: td.cardData,
+                                        cardType: entry.card_type || 'custom',
+                                    },
+                                }}
                                 size={CARD_SIZE}
                             />
                         ) : (
