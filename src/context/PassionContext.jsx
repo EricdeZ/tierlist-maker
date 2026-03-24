@@ -23,12 +23,15 @@ export const PassionProvider = ({ children }) => {
     const [challengeNotifications, setChallengeNotifications] = useState([])
     const [ember, setEmber] = useState({ balance: 0, currentStreak: 0, canClaimDaily: false, lastDailyClaim: null })
     const initialLoadDone = useRef(false)
+    const lastRefreshTime = useRef(0)
 
     const rank = getRank(totalEarned)
     const nextRank = getNextRank(totalEarned)
 
-    const refreshBalance = useCallback(async () => {
+    const refreshBalance = useCallback(async (force = false) => {
         if (!user) return
+        if (!force && Date.now() - lastRefreshTime.current < 30000) return
+        lastRefreshTime.current = Date.now()
         try {
             const data = await passionService.getBalance()
             setBalance(data.balance)
@@ -65,6 +68,7 @@ export const PassionProvider = ({ children }) => {
             setEmber({ balance: 0, currentStreak: 0, canClaimDaily: false, lastDailyClaim: null })
             setLoading(false)
             initialLoadDone.current = false
+            lastRefreshTime.current = 0
             return
         }
 
