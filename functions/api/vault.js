@@ -869,7 +869,7 @@ async function handleCollectionCollections(sql, user) {
 
   const collectionIds = await sql`
     SELECT DISTINCT collection_id FROM cc_collection_entries
-    WHERE template_id = ANY(${ownedTemplateIds})
+    WHERE template_id = ANY(${ownedTemplateIds}) OR draft_id = ANY(${ownedTemplateIds})
   `
   if (collectionIds.length === 0) {
     return { statusCode: 200, headers, body: JSON.stringify({ collections: [], owned: {} }) }
