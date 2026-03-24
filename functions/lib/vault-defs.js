@@ -437,12 +437,15 @@ async function bulkPreFetch(sql, playerIds, seasonId) {
     for (const r of godAllTimeRows) godAllTimeMap.set(r.player_id, r.god_played)
   }
 
-  // 5) Bulk existing defs lookup
+  // 5) Bulk existing defs lookup (full rows for dirty-checking)
   const existingRows = await sql`
-    SELECT id, player_id, team_id FROM cc_player_defs WHERE season_id = ${seasonId}
+    SELECT id, player_id, team_id, player_name, player_slug, team_name, team_color,
+           role, league_id, league_slug, division_id, division_slug, division_tier,
+           season_slug, card_index, avatar_url, best_god_name
+    FROM cc_player_defs WHERE season_id = ${seasonId}
   `
   const existingMap = new Map()
-  for (const d of existingRows) existingMap.set(`${d.player_id}-${d.team_id}`, d.id)
+  for (const d of existingRows) existingMap.set(`${d.player_id}-${d.team_id}`, d)
 
   return { avatarMap, godTeamMap, godSeasonMap, godAllTimeMap, existingMap }
 }
@@ -529,6 +532,7 @@ export async function generateSelectedDefs(sql, selectedEntries) {
       await bulkPreFetch(sql, playerIds, seasonId)
 
     // Upsert in smaller chunks to stay within memory limits
+    let skipped = 0
     const CHUNK = 10
     for (let i = 0; i < filtered.length; i += CHUNK) {
       const chunk = filtered.slice(i, i + CHUNK)
@@ -537,9 +541,17 @@ export async function generateSelectedDefs(sql, selectedEntries) {
         const cardIndex = indexMap.get(key)
         const avatarUrl = avatarMap.get(e.playerId) || null
         const bestGodName = godTeamMap.get(key) || godSeasonMap.get(e.playerId) || godAllTimeMap.get(e.playerId) || null
-        const existingId = existingMap.get(key)
+        const existing = existingMap.get(key)
 
-        if (existingId) {
+        if (existing) {
+          // Skip if nothing changed
+          if (existing.player_name === e.playerName && existing.player_slug === e.playerSlug &&
+              existing.team_name === e.teamName && existing.team_color === e.teamColor &&
+              existing.role === e.role && existing.card_index === cardIndex &&
+              existing.avatar_url === avatarUrl && existing.best_god_name === bestGodName &&
+              existing.league_id === season.league_id && existing.division_tier === season.division_tier) {
+            return 'skipped'
+          }
           await sql`
             UPDATE cc_player_defs SET
               player_name = ${e.playerName}, player_slug = ${e.playerSlug},
@@ -549,15 +561,17 @@ export async function generateSelectedDefs(sql, selectedEntries) {
               division_tier = ${season.division_tier}, season_slug = ${season.slug},
               card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
               updated_at = NOW()
-            WHERE id = ${existingId}
+            WHERE id = ${existing.id}
           `
-          const normalizedRole = (e.role || 'adc').toLowerCase()
-          await sql`
-            UPDATE cc_cards
-            SET role = ${normalizedRole},
-                card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
-            WHERE def_id = ${existingId} AND card_type = 'player'
-          `
+          if (existing.role !== e.role) {
+            const normalizedRole = (e.role || 'adc').toLowerCase()
+            await sql`
+              UPDATE cc_cards
+              SET role = ${normalizedRole},
+                  card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
+              WHERE def_id = ${existing.id} AND card_type = 'player'
+            `
+          }
           return 'updated'
         } else {
           await sql`
@@ -578,7 +592,8 @@ export async function generateSelectedDefs(sql, selectedEntries) {
       }))
       for (const r of results) {
         if (r === 'created') created++
-        else updated++
+        else if (r === 'updated') updated++
+        else skipped++
       }
     }
   }
@@ -600,6 +615,7 @@ export async function generatePlayerDefs(sql, seasonId) {
 
   let created = 0
   let updated = 0
+  let skipped = 0
   const CHUNK = 50
   for (let i = 0; i < entries.length; i += CHUNK) {
     const chunk = entries.slice(i, i + CHUNK)
@@ -608,9 +624,17 @@ export async function generatePlayerDefs(sql, seasonId) {
       const cardIndex = i + j + 1
       const avatarUrl = avatarMap.get(e.playerId) || null
       const bestGodName = godTeamMap.get(key) || godSeasonMap.get(e.playerId) || godAllTimeMap.get(e.playerId) || null
-      const existingId = existingMap.get(key)
+      const existing = existingMap.get(key)
 
-      if (existingId) {
+      if (existing) {
+        // Skip if nothing changed
+        if (existing.player_name === e.playerName && existing.player_slug === e.playerSlug &&
+            existing.team_name === e.teamName && existing.team_color === e.teamColor &&
+            existing.role === e.role && existing.card_index === cardIndex &&
+            existing.avatar_url === avatarUrl && existing.best_god_name === bestGodName &&
+            existing.league_id === season.league_id && existing.division_tier === season.division_tier) {
+          return 'skipped'
+        }
         await sql`
           UPDATE cc_player_defs SET
             player_name = ${e.playerName}, player_slug = ${e.playerSlug},
@@ -620,15 +644,18 @@ export async function generatePlayerDefs(sql, seasonId) {
             division_tier = ${season.division_tier}, season_slug = ${season.slug},
             card_index = ${cardIndex}, avatar_url = ${avatarUrl}, best_god_name = ${bestGodName},
             updated_at = NOW()
-          WHERE id = ${existingId}
+          WHERE id = ${existing.id}
         `
-        const normalizedRole = (e.role || 'adc').toLowerCase()
-        await sql`
-          UPDATE cc_cards
-          SET role = ${normalizedRole},
-              card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
-          WHERE def_id = ${existingId} AND card_type = 'player'
-        `
+        // Only cascade role to minted cards if role actually changed
+        if (existing.role !== e.role) {
+          const normalizedRole = (e.role || 'adc').toLowerCase()
+          await sql`
+            UPDATE cc_cards
+            SET role = ${normalizedRole},
+                card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
+            WHERE def_id = ${existing.id} AND card_type = 'player'
+          `
+        }
         return 'updated'
       } else {
         await sql`
@@ -649,11 +676,12 @@ export async function generatePlayerDefs(sql, seasonId) {
     }))
     for (const r of results) {
       if (r === 'created') created++
-      else updated++
+      else if (r === 'updated') updated++
+      else skipped++
     }
   }
 
-  return { created, updated, total: entries.length }
+  return { created, updated, skipped, total: entries.length }
 }
 
 /**
