@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { ImagePlus, X } from 'lucide-react'
 import StructuredCard from '../preview/StructuredCard'
-import MiniCardPreview from '../preview/MiniCardPreview'
+import CanvasCard from '../../vault/components/CanvasCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { RARITIES, RARITY_HOLO_MAP } from '../../../data/vault/economy'
 import { STAFF_CARD_THEMES } from '../preview/prebuiltRenderers'
@@ -170,7 +170,7 @@ export default function RarityStrip({ cardData, onCardDataChange, cardType, elem
 
                 {FULL_ART_RARITIES.map(r => (
                     <div key={r} className="rounded-lg p-1.5 opacity-50">
-                        <MiniCardPreview templateData={{ elements, border }} />
+                        <CanvasCard elements={elements} border={border} rarity={r} size={120} />
                         <p className="text-center text-[10px] mt-1 font-semibold" style={{ color: RARITIES[r]?.color }}>
                             {RARITIES[r]?.name}
                         </p>

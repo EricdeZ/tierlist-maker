@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText, Eye } from 'lucide-react'
-import MiniCardPreview from './preview/MiniCardPreview'
+import CanvasCard from '../vault/components/CanvasCard'
 import CollectionShowcase from './CollectionShowcase'
 
 const STATUS_COLORS = {
@@ -291,9 +291,11 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
                                             {entry.thumbnail_url ? (
                                                 <img src={entry.thumbnail_url} alt="" className="w-full aspect-[63/88] object-cover rounded" />
                                             ) : (
-                                                <div className="w-full aspect-[63/88] bg-white/5 rounded flex items-center justify-center">
-                                                    <MiniCardPreview templateData={entry.template_data} size={120} />
-                                                </div>
+                                                <CanvasCard
+                                                    elements={entry.template_data?.elements}
+                                                    border={entry.template_data?.border}
+                                                    size={120}
+                                                />
                                             )}
                                             <div className="mt-1.5">
                                                 <div className="text-xs font-bold text-white truncate">{entry.template_name}</div>

@@ -4,7 +4,7 @@ import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { RARITIES } from '../../data/vault/economy'
 import { FileText, Pencil, Trash2 } from 'lucide-react'
-import MiniCardPreview from './preview/MiniCardPreview'
+import CanvasCard from '../vault/components/CanvasCard'
 
 const STATUS_OPTIONS = ['draft', 'pending_review', 'approved', 'rejected']
 
@@ -132,7 +132,11 @@ export default function DraftsPage() {
                             className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-amber-500/30 cursor-pointer transition-colors"
                         >
                             {/* Preview */}
-                            <MiniCardPreview templateData={d.template_data} />
+                            <CanvasCard
+                                elements={d.template_data?.elements}
+                                border={d.template_data?.border}
+                                size={120}
+                            />
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">

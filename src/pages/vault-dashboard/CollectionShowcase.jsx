@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { RARITIES } from '../../data/vault/economy'
 import StructuredCard from './preview/StructuredCard'
-import MiniCardPreview from './preview/MiniCardPreview'
+import CanvasCard from '../vault/components/CanvasCard'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_SIZE = 120
@@ -76,12 +76,12 @@ function EntryRow({ entry }) {
                                 size={CARD_SIZE}
                             />
                         ) : hasElements ? (
-                            <div style={{
-                                boxShadow: `0 0 8px 2px ${RARITIES[rarity]?.color || '#9ca3af'}40`,
-                                borderRadius: 6,
-                            }}>
-                                <MiniCardPreview templateData={td} />
-                            </div>
+                            <CanvasCard
+                                elements={td.elements}
+                                border={td.border}
+                                rarity={rarity}
+                                size={CARD_SIZE}
+                            />
                         ) : (
                             <div
                                 className="flex items-center justify-center bg-white/5 rounded"
