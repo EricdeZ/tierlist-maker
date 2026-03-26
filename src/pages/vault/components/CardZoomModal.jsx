@@ -21,7 +21,7 @@ function calculateFee(price) {
 }
 
 export default function CardZoomModal({ onClose, gameCard, playerCard, collectionCard, canSell, holoType: holoTypeProp }) {
-  const { collection, refreshCollection, getTemplate } = useVault()
+  const { collection, refreshCollection, getBlueprint } = useVault()
   const { linkedPlayer } = useAuth()
   const [closing, setClosing] = useState(false)
   const [requestingSignature, setRequestingSignature] = useState(false)
@@ -174,7 +174,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
         </button>
 
         {collectionCard && (
-          <VaultCard card={{ ...collectionCard, rarity }} getTemplate={getTemplate} size={280} holo />
+          <VaultCard card={{ ...collectionCard, rarity }} getBlueprint={getBlueprint} size={280} holo />
         )}
 
         {gameCard && !collectionCard && (

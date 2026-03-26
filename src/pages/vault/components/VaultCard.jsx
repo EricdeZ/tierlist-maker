@@ -4,6 +4,7 @@ import EmptyCardSlot from './EmptyCardSlot'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { getHoloEffect } from '../../../data/vault/economy'
 import CanvasCard from './CanvasCard'
+import PassiveIndicator from './PassiveIndicator'
 
 class CardErrorBoundary extends Component {
     state = { hasError: false }
@@ -33,29 +34,35 @@ function extractCanvasProps(elements) {
     return { footer: footer || undefined, banner: banner || undefined, subtitleEl: subtitleEl || undefined, canvasBlocks }
 }
 
-export default function VaultCard({ card, getTemplate, size, holo }) {
-    const tid = card.templateId || card.template_id
-    const template = card._templateData || getTemplate?.(tid)
+export default function VaultCard({ card, getBlueprint, size, holo }) {
+    const bid = card.blueprintId || card.blueprint_id
+    const blueprint = card._blueprintData || getBlueprint?.(bid)
     const rarity = card.rarity || 'common'
-    const hasElements = template?.elements?.length > 0
-    const hasCardData = !!template?.cardData
+    const hasElements = blueprint?.elements?.length > 0
+    const hasCardData = !!blueprint?.cardData
     const isFullArt = FULL_ART_RARITIES.has(rarity)
+    const passiveName = card.passiveName || null
+
+    const indicator = passiveName ? <PassiveIndicator passiveName={passiveName} size={size ? parseFloat(size) : 240} /> : null
 
     // Full art rarities (mythic/unique) with elements → CanvasCard
     if (hasElements && isFullArt) {
         const holoEffect = holo ? getHoloEffect(rarity) : null
         const holoType = card.holoType || card.holo_type || 'reverse'
         return (
-            <CardErrorBoundary fallback={<EmptyCardSlot rarity={rarity} size={size} />}>
-                <CanvasCard
-                    elements={template.elements}
-                    border={template.border}
-                    rarity={rarity}
-                    size={size ? parseFloat(size) : 240}
-                    holo={holo ? { rarity: holoEffect, holoType } : undefined}
-                    signatureUrl={card.signatureUrl}
-                />
-            </CardErrorBoundary>
+            <div style={{ position: 'relative' }}>
+                <CardErrorBoundary fallback={<EmptyCardSlot rarity={rarity} size={size} />}>
+                    <CanvasCard
+                        elements={blueprint.elements}
+                        border={blueprint.border}
+                        rarity={rarity}
+                        size={size ? parseFloat(size) : 240}
+                        holo={holo ? { rarity: holoEffect, holoType } : undefined}
+                        signatureUrl={card.signatureUrl}
+                    />
+                </CardErrorBoundary>
+                {indicator}
+            </div>
         )
     }
 
@@ -63,17 +70,17 @@ export default function VaultCard({ card, getTemplate, size, holo }) {
     // Canvas prebuilt elements (banner, footer, subtitle, blocks) get extracted and passed as props
     if (hasCardData) {
         const cardData = card.signatureUrl
-            ? { ...template.cardData, signatureUrl: card.signatureUrl }
-            : template.cardData
+            ? { ...blueprint.cardData, signatureUrl: card.signatureUrl }
+            : blueprint.cardData
 
-        const canvasProps = hasElements ? extractCanvasProps(template.elements) : {}
+        const canvasProps = hasElements ? extractCanvasProps(blueprint.elements) : {}
 
         const structured = (
             <CardErrorBoundary fallback={<EmptyCardSlot rarity={rarity} size={size} />}>
                 <StructuredCard
                     cardData={cardData}
                     rarity={rarity}
-                    cardType={template.cardType || 'custom'}
+                    cardType={blueprint.cardType || 'custom'}
                     size={size}
                     {...canvasProps}
                 />
@@ -84,12 +91,20 @@ export default function VaultCard({ card, getTemplate, size, holo }) {
             const holoEffect = getHoloEffect(rarity)
             const holoType = card.holoType || card.holo_type || 'reverse'
             return (
-                <TradingCardHolo rarity={holoEffect} holoType={holoType} size={size}>
-                    {structured}
-                </TradingCardHolo>
+                <div style={{ position: 'relative' }}>
+                    <TradingCardHolo rarity={holoEffect} holoType={holoType} size={size}>
+                        {structured}
+                    </TradingCardHolo>
+                    {indicator}
+                </div>
             )
         }
-        return structured
+        return (
+            <div style={{ position: 'relative' }}>
+                {structured}
+                {indicator}
+            </div>
+        )
     }
 
     // Elements but no cardData and not full art → still render via CanvasCard as fallback
@@ -97,16 +112,19 @@ export default function VaultCard({ card, getTemplate, size, holo }) {
         const holoEffect = holo ? getHoloEffect(rarity) : null
         const holoType = card.holoType || card.holo_type || 'reverse'
         return (
-            <CardErrorBoundary fallback={<EmptyCardSlot rarity={rarity} size={size} />}>
-                <CanvasCard
-                    elements={template.elements}
-                    border={template.border}
-                    rarity={rarity}
-                    size={size ? parseFloat(size) : 240}
-                    holo={holo ? { rarity: holoEffect, holoType } : undefined}
-                    signatureUrl={card.signatureUrl}
-                />
-            </CardErrorBoundary>
+            <div style={{ position: 'relative' }}>
+                <CardErrorBoundary fallback={<EmptyCardSlot rarity={rarity} size={size} />}>
+                    <CanvasCard
+                        elements={blueprint.elements}
+                        border={blueprint.border}
+                        rarity={rarity}
+                        size={size ? parseFloat(size) : 240}
+                        holo={holo ? { rarity: holoEffect, holoType } : undefined}
+                        signatureUrl={card.signatureUrl}
+                    />
+                </CardErrorBoundary>
+                {indicator}
+            </div>
         )
     }
 

@@ -36,6 +36,7 @@ function toGameCardData(card, override) {
     serialNumber: card.serialNumber || card.serial_number,
     metadata: override || undefined,
     signatureUrl: card.signatureUrl || card.signature_url || undefined,
+    passiveName: card.passiveName || undefined,
   }
   if (type === 'god') {
     return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd.imageKey }
@@ -73,13 +74,13 @@ function toPlayerCardProps(card) {
  * Pass holo=false to skip the TradingCardHolo wrapper (e.g. inside flip animation).
  */
 function PackCard({ card, size, holo = true, override }) {
-  const { getTemplate } = useVault()
+  const { getBlueprint } = useVault()
   const type = getCardType(card)
   const holoEffect = getHoloEffect(card.rarity)
   const holoType = card.holoType || card.holo_type || 'reverse'
 
-  if (card.templateId) {
-    return <VaultCard card={card} getTemplate={getTemplate} size={size} holo={holo} />
+  if (card.blueprintId) {
+    return <VaultCard card={card} getBlueprint={getBlueprint} size={size} holo={holo} />
   }
 
   const isPlayer = type === 'player'

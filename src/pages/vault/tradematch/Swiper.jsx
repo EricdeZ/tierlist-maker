@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Heart, X as XIcon, Sparkles, Filter } from 'lucide-react'
+import { Heart, X as XIcon, Sparkles, Filter, Undo2 } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
@@ -80,7 +80,7 @@ function avatarUrl(card) {
 
 export default function Swiper({
   feedCards, swiperCards,
-  onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onCardSeen, onResetSeen,
+  onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onCardSeen, onResetSeen, onUndo,
   locked, loading, empty, onGoToPile,
 }) {
   // ── Locked state ──
@@ -145,6 +145,7 @@ export default function Swiper({
       onLoadMore={onLoadMore}
       onCardSeen={onCardSeen}
       onResetSeen={onResetSeen}
+      onUndo={onUndo}
     />
   )
 }
@@ -153,11 +154,12 @@ export default function Swiper({
 // Swipe Stack — original Tinder-style card swiper
 // ══════════════════════════════════════════════
 
-function SwipeStack({ cards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onCardSeen, onResetSeen }) {
+function SwipeStack({ cards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onCardSeen, onResetSeen, onUndo }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterHolo, setFilterHolo] = useState('all')
+  const [swipeHistory, setSwipeHistory] = useState([]) // { cardId, direction }
 
   // Stable deck that only grows (via loadMore), never shrinks from seenCardIds filtering.
   // This prevents the array-shift bug where onCardSeen removes a card mid-swipe,
@@ -269,16 +271,31 @@ function SwipeStack({ cards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onC
     throwCard(direction)
     const cardId = card.card_id
     if (onCardSeen) onCardSeen(cardId)
+    setSwipeHistory(prev => [...prev, { cardId, direction }])
     await new Promise(r => setTimeout(r, 450))
     advanceCard()
     animating.current = false
     setSwiping(false)
     if (direction > 0) {
-      onSwipeRight(cardId).then(result => { if (result?.matched) onMatch(result) }).catch(() => {})
+      onSwipeRight(cardId).then(result => {
+        if (result?.matched) {
+          onMatch(result)
+          // Clear history on match — can't undo a match
+          setSwipeHistory([])
+        }
+      }).catch(() => {})
     } else {
       onSwipeLeft(cardId).catch(() => {})
     }
   }, [card, swiping, throwCard, advanceCard, onSwipeRight, onSwipeLeft, onMatch, onCardSeen])
+
+  const handleUndo = useCallback(async () => {
+    if (animating.current || swiping || !swipeHistory.length) return
+    const last = swipeHistory[swipeHistory.length - 1]
+    setSwipeHistory(prev => prev.slice(0, -1))
+    setCurrentIndex(i => Math.max(0, i - 1))
+    if (onUndo) await onUndo(last.cardId, last.direction)
+  }, [swiping, swipeHistory, onUndo])
 
   const handlePointerDown = useCallback((e) => {
     if (animating.current || swiping) return
@@ -448,7 +465,13 @@ function SwipeStack({ cards, onSwipeRight, onSwipeLeft, onMatch, onLoadMore, onC
         })}
       </div>
 
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-6">
+        <button onClick={handleUndo} disabled={swiping || !swipeHistory.length}
+          className="w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer disabled:opacity-20"
+          style={{ background: 'var(--cd-surface)', border: '2px solid rgba(251, 191, 36, 0.3)', boxShadow: '0 0 15px rgba(251, 191, 36, 0.08)' }}
+          aria-label="Undo">
+          <Undo2 className="w-5 h-5" style={{ color: '#fbbf24' }} />
+        </button>
         <button onClick={() => executeSwipe(-1)} disabled={swiping}
           className="w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer disabled:opacity-40"
           style={{ background: 'var(--cd-surface)', border: '2px solid rgba(239, 68, 68, 0.3)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.08)' }}
@@ -589,7 +612,7 @@ function BrowseGrid({ cards, onSwipeRight, onMatch, onLoadMore, onCardSeen }) {
 
 // ── Grid card (no holo effects, shows tags) ──
 function BrowseCard({ card, onLike, onZoom }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const avatar = avatarUrl(card)
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
@@ -597,11 +620,11 @@ function BrowseCard({ card, onLike, onZoom }) {
   const holoLabel = holoType ? HOLO_LABELS_SHORT[holoType] : null
 
   let cardEl
-  if (type === 'collection') {
+  if (card.blueprint_id || cd._blueprintData) {
     cardEl = (
       <VaultCard
-        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
-        getTemplate={getTemplate}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        getBlueprint={getBlueprint}
         size={GRID_CARD_SIZE}
         holo={false}
       />
@@ -750,11 +773,11 @@ function SwipeFilters({ filterRarity, setFilterRarity, filterHolo, setFilterHolo
 
 // ── Full card visual (with holo) — used in swiper + zoom modal ──
 function SwipeCard({ card, containerWidth }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const avatar = avatarUrl(card)
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
-  const isCollection = type === 'collection'
+  const isCollection = !!card.blueprint_id || !!cd._blueprintData
   const isPlayer = type === 'player'
   const holoType = card.holo_type || null
   const holoEffect = holoType ? getHoloEffect(card.rarity) : null
@@ -768,8 +791,8 @@ function SwipeCard({ card, containerWidth }) {
     const holoEffect2 = holoType ? getHoloEffect(card.rarity) : null
     cardEl = (
       <VaultCard
-        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
-        getTemplate={getTemplate} size={cardSize} holo={!!holoEffect2}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        getBlueprint={getBlueprint} size={cardSize} holo={!!holoEffect2}
       />
     )
   } else if (isPlayer) {

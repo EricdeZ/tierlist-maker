@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useVault } from './VaultContext'
 import { RARITIES, DISMANTLE_TIERS, getDismantleMultiplier, calcDismantleTotal } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
-import { Hammer, Check, Trash2, Info, Copy } from 'lucide-react'
+import { Hammer, Check, Trash2, Info, Copy, Target } from 'lucide-react'
 import emberIcon from '../../assets/ember.png'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
@@ -24,6 +24,7 @@ function toGameCardData(card, override) {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -77,7 +78,7 @@ function useResetCountdown() {
   return timeLeft
 }
 
-function SalvageGauge({ dismantledToday, dismantledValueToday = 0, currentRate }) {
+function SalvageGauge({ dismantledToday, dismantledValueToday = 0, currentRate, boostActive, boostMult }) {
   const pressure = Math.min(((1 - currentRate) / 0.9) * 100, 100)
   const needleAngle = -90 + (pressure / 100) * 180
   const resetIn = useResetCountdown()
@@ -127,6 +128,12 @@ function SalvageGauge({ dismantledToday, dismantledValueToday = 0, currentRate }
         <div className="text-lg font-bold tabular-nums cd-num cd-text-glow" style={{ color }}>{Math.round(currentRate * 100)}%</div>
         <div className="text-[11px] font-bold uppercase tracking-wider cd-head" style={{ color: color + 'bb' }}>{statusLabel}</div>
       </div>
+      {boostActive && boostMult > 1 && (
+        <div className="text-[10px] text-violet-400 font-bold cd-num flex items-center gap-1 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+          &times;{boostMult.toFixed(1)} boost
+        </div>
+      )}
       <div className="text-[11px] text-white/30 mt-0.5 cd-mono">{Math.round(dismantledValueToday * 10) / 10} Cores today ({dismantledToday} cards)</div>
       {dismantledToday > 0 && (
         <div className="text-[10px] text-white/20 mt-0.5 cd-mono">Resets in {resetIn}</div>
@@ -225,11 +232,94 @@ export default function CCDismantle() {
     setResult(null)
   }, [])
 
+  // Drag-to-select
+  const isDragging = useRef(false)
+  const didDrag = useRef(false)
+  const dragStartId = useRef(null)
+
+  useEffect(() => {
+    const handlePointerUp = () => { isDragging.current = false }
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => window.removeEventListener('pointerup', handlePointerUp)
+  }, [])
+
+  const handleDragStart = useCallback((id) => {
+    isDragging.current = true
+    didDrag.current = false
+    dragStartId.current = id
+  }, [])
+
+  const handleDragEnter = useCallback((id) => {
+    if (!isDragging.current || id === dragStartId.current) return
+    if (!didDrag.current) {
+      didDrag.current = true
+      setSelected(prev => { const next = new Set(prev); next.add(dragStartId.current); return next })
+    }
+    setSelected(prev => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    setResult(null)
+  }, [])
+
+  const handleCardClick = useCallback((id) => {
+    if (didDrag.current) { didDrag.current = false; return }
+    toggle(id)
+  }, [toggle])
+
   const dismantleBoostMult = startingFive?.dismantleBoostMult || 1
   const dismantleBoostActive = startingFive?.dismantleBoostActive || false
   const thresholdMult = dismantleBoostActive ? dismantleBoostMult : 1
 
-  const currentMultiplier = getDismantleMultiplier(dismantledValueToday)
+  const currentMultiplier = getDismantleMultiplier(dismantledValueToday, thresholdMult)
+
+  const nextThreshold = useMemo(() => {
+    const tiers = thresholdMult > 1
+      ? DISMANTLE_TIERS.map(t => ({ ...t, upTo: t.upTo === Infinity ? Infinity : t.upTo * thresholdMult }))
+      : DISMANTLE_TIERS
+    let selectedBaseValue = 0
+    for (const card of collection) {
+      if (selected.has(card.id)) selectedBaseValue += RARITIES[card.rarity]?.dismantleValue || 0
+    }
+    const projectedTotal = dismantledValueToday + selectedBaseValue
+    for (const tier of tiers) {
+      if (projectedTotal < tier.upTo && tier.upTo !== Infinity) return tier.upTo
+    }
+    return null
+  }, [dismantledValueToday, selected, collection, thresholdMult])
+
+  const selectToThreshold = useCallback(() => {
+    if (nextThreshold === null) return
+    let selectedBaseValue = 0
+    for (const card of collection) {
+      if (selected.has(card.id)) selectedBaseValue += RARITIES[card.rarity]?.dismantleValue || 0
+    }
+    const budget = nextThreshold - dismantledValueToday - selectedBaseValue
+    if (budget <= 0) return
+    const slotsLeft = 200 - selected.size
+    if (slotsLeft <= 0) return
+    const available = cards
+      .filter(c => !selected.has(c.id))
+      .sort((a, b) => (RARITIES[a.rarity]?.dismantleValue || 0) - (RARITIES[b.rarity]?.dismantleValue || 0))
+    let spent = 0
+    const toAdd = []
+    for (const card of available) {
+      if (toAdd.length >= slotsLeft) break
+      const value = RARITIES[card.rarity]?.dismantleValue || 0
+      if (spent + value > budget) continue
+      toAdd.push(card.id)
+      spent += value
+    }
+    if (toAdd.length === 0) return
+    setSelected(prev => {
+      const next = new Set(prev)
+      for (const id of toAdd) next.add(id)
+      return next
+    })
+    setResult(null)
+  }, [nextThreshold, cards, selected, collection, dismantledValueToday])
 
   const { fullValue, coresTotal, selectedCount, breakdown } = useMemo(() => {
     const selectedCards = []
@@ -295,7 +385,7 @@ export default function CCDismantle() {
       {showRates && (
         <div className="mb-4 p-4 rounded-lg border border-[var(--cd-border)] bg-[var(--cd-surface)]/60">
           <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-            <SalvageGauge dismantledToday={dismantledToday} dismantledValueToday={dismantledValueToday} currentRate={currentMultiplier} />
+            <SalvageGauge dismantledToday={dismantledToday} dismantledValueToday={dismantledValueToday} currentRate={currentMultiplier} boostActive={dismantleBoostActive} boostMult={dismantleBoostMult} />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold cd-head text-[var(--cd-text-mid)] mb-2 uppercase tracking-wider">Base Rates</div>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -393,6 +483,15 @@ export default function CCDismantle() {
         </button>
 
         <div className="flex gap-2 ml-auto">
+          {nextThreshold !== null && (
+            <button
+              onClick={selectToThreshold}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cd-head border border-violet-500/20 text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
+            >
+              <Target className="w-3.5 h-3.5" />
+              Fill to {Math.round(nextThreshold)}
+            </button>
+          )}
           <button
             onClick={selectAllVisible}
             className="px-3 py-1.5 rounded-lg text-xs font-bold cd-head border border-[var(--cd-border)] text-[var(--cd-text-mid)] hover:bg-white/[0.03] transition-all cursor-pointer"
@@ -411,13 +510,15 @@ export default function CCDismantle() {
       </div>
 
       {/* Card grid */}
-      <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+      <div className="flex flex-wrap gap-3 justify-center sm:justify-start select-none">
         {visibleCards.map(card => (
           <DismantleSlot
             key={card.id}
             card={card}
             isSelected={selected.has(card.id)}
-            onToggle={toggle}
+            onToggle={handleCardClick}
+            onDragStart={handleDragStart}
+            onDragEnter={handleDragEnter}
             override={getDefOverride(card)}
           />
         ))}
@@ -523,19 +624,22 @@ export default function CCDismantle() {
   )
 }
 
-function DismantleSlot({ card, isSelected, onToggle, override }) {
-  const { getTemplate } = useVault()
+function DismantleSlot({ card, isSelected, onToggle, onDragStart, onDragEnter, override }) {
+  const { getBlueprint } = useVault()
   const type = getCardType(card)
   const isPlayer = type === 'player'
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
 
   return (
     <div
-      className={`relative isolate cursor-pointer rounded-lg ${isSelected ? '' : 'opacity-80 hover:opacity-100'}`}
+      className={`relative isolate cursor-pointer rounded-lg touch-none [&_img]:pointer-events-none ${isSelected ? '' : 'opacity-80 hover:opacity-100'}`}
+      draggable={false}
+      onPointerDown={() => onDragStart(card.id)}
+      onPointerEnter={() => onDragEnter(card.id)}
       onClick={() => onToggle(card.id)}
     >
-      {type === 'collection' ? (
-        <VaultCard card={card} getTemplate={getTemplate} size={CARD_SIZE} holo={false} />
+      {card.blueprintId ? (
+        <VaultCard card={card} getBlueprint={getBlueprint} size={CARD_SIZE} holo={false} />
       ) : isPlayer ? (
         <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={CARD_SIZE} />
       ) : (

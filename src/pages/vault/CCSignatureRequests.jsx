@@ -10,9 +10,9 @@ import { useVault } from './VaultContext'
 import { PenLine, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 function CardPreview({ req, signatureUrl, size }) {
-  const { getTemplate } = useVault()
-  if (req.cardType === 'collection') {
-    return <VaultCard card={req} getTemplate={getTemplate} size={size} holo />
+  const { getBlueprint } = useVault()
+  if (req.blueprintId) {
+    return <VaultCard card={req} getBlueprint={getBlueprint} size={size} holo />
   }
   if (req.cardType === 'player') {
     return (
@@ -48,9 +48,9 @@ function CardPreview({ req, signatureUrl, size }) {
 }
 
 function CardBg({ req }) {
-  const { getTemplate } = useVault()
-  if (req.cardType === 'collection') {
-    return <VaultCard card={req} getTemplate={getTemplate} holo={false} />
+  const { getBlueprint } = useVault()
+  if (req.blueprintId) {
+    return <VaultCard card={req} getBlueprint={getBlueprint} holo={false} />
   }
   if (req.cardType === 'player') {
     return (

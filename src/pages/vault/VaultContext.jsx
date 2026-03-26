@@ -22,12 +22,12 @@ export function VaultProvider({ children }) {
   const [inventory, setInventory] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 5, giftInventory: [], unseenCount: 0 })
+  const [giftData, setGiftData] = useState({ sent: [], received: [], giftsRemaining: 0, giftInventory: [], unseenCount: 0 })
   const [startingFive, setStartingFive] = useState(null)
   const [defOverrides, setDefOverrides] = useState({})
   const [binder, setBinder] = useState(null)
   const [binderCards, setBinderCards] = useState([])
-  const [templateCache, setTemplateCache] = useState({})
+  const [blueprintCache, setBlueprintCache] = useState({})
   const [vaultBanned, setVaultBanned] = useState(false)
   const [accountTooNew, setAccountTooNew] = useState(null)
   const [vendingCooldownEnd, setVendingCooldownEndRaw] = useState(() => {
@@ -76,7 +76,7 @@ export function VaultProvider({ children }) {
       if (ccData.vault_banned) { setVaultBanned(true); setLoading(false); return }
       if (ccData.account_too_new) { setAccountTooNew(ccData.days_left); setLoading(false); return }
       setCollection(ccData.collection || [])
-      setTemplateCache(ccData.templateCache || {})
+      setBlueprintCache(ccData.blueprintCache || {})
       setStats(ccData.stats || { packsOpened: 0, embers: 0 })
       setPackTypes(ccData.packTypes || [])
       setSalePacks(ccData.salePacks || [])
@@ -125,9 +125,9 @@ export function VaultProvider({ children }) {
     return override || null
   }, [defOverrides])
 
-  const getTemplate = useCallback((templateId) => {
-    return templateCache[templateId] || null
-  }, [templateCache])
+  const getBlueprint = useCallback((blueprintId) => {
+    return blueprintCache[blueprintId] || null
+  }, [blueprintCache])
 
   const refreshCollection = useCallback(async () => {
     try {
@@ -203,14 +203,14 @@ export function VaultProvider({ children }) {
   }, [refreshGifts, refreshBalanceWithRetry])
 
   const mergeInlineTemplates = useCallback((cards) => {
-    const newTemplates = {}
+    const newBlueprints = {}
     for (const card of cards) {
-      if (card._templateData && card.templateId) {
-        newTemplates[card.templateId] = card._templateData
+      if (card._blueprintData && card.blueprintId) {
+        newBlueprints[card.blueprintId] = card._blueprintData
       }
     }
-    if (Object.keys(newTemplates).length > 0) {
-      setTemplateCache(prev => ({ ...prev, ...newTemplates }))
+    if (Object.keys(newBlueprints).length > 0) {
+      setBlueprintCache(prev => ({ ...prev, ...newBlueprints }))
     }
   }, [])
 
@@ -478,7 +478,7 @@ export function VaultProvider({ children }) {
 
   const value = useMemo(() => ({
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
-    loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
+    loaded, loading, vaultBanned, accountTooNew, getDefOverride, blueprintCache, getBlueprint,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     promoGifts, claimPromoGift,
@@ -496,7 +496,7 @@ export function VaultProvider({ children }) {
     pendingReveal, markRevealed,
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
-    loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
+    loaded, loading, vaultBanned, accountTooNew, getDefOverride, blueprintCache, getBlueprint,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     promoGifts, claimPromoGift,

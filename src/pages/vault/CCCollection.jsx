@@ -95,18 +95,14 @@ export default function CCCollection() {
   const [displayLimit, setDisplayLimit] = useState(BATCH_SIZE)
   const [sortMode, setSortMode] = useState('default')
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState(null)
-  const [searchLoading, setSearchLoading] = useState(false)
   const [recentPulls, setRecentPulls] = useState([])
   const [recentOpen, setRecentOpen] = useState(false)
   const [collectionSets, setCollectionSets] = useState(null)
-  const searchTimerRef = useRef(null)
   const loadedSetsRef = useRef(new Set())
 
   const switchSection = useCallback((section) => {
     setActiveSection(section)
     setSearchQuery('')
-    setSearchResults(null)
   }, [])
 
   useEffect(() => {
@@ -170,28 +166,7 @@ export default function CCCollection() {
   // Reset display limit when switching sections or filters
   useEffect(() => {
     setDisplayLimit(BATCH_SIZE)
-  }, [activeSection, viewMode, rarityFilter, sortMode])
-
-  // Debounced player card search
-  useEffect(() => {
-    clearTimeout(searchTimerRef.current)
-    if (searchQuery.trim().length < 2) {
-      setSearchResults(null)
-      setSearchLoading(false)
-      return
-    }
-    setSearchLoading(true)
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const data = await vaultService.searchCollection(searchQuery.trim())
-        setSearchResults(data.results)
-      } catch {
-        setSearchResults([])
-      }
-      setSearchLoading(false)
-    }, 300)
-    return () => clearTimeout(searchTimerRef.current)
-  }, [searchQuery])
+  }, [activeSection, viewMode, rarityFilter, sortMode, searchQuery])
 
   // Build game entries with ownership merged (only collectible types)
   const gameEntries = useMemo(() => {
@@ -264,7 +239,7 @@ export default function CCCollection() {
   const collectionNavItems = useMemo(() => {
     if (!collectionSets?.collections) return []
     return collectionSets.collections.map(col => {
-      const collected = col.entries.filter(e => collectionSets.owned[e.templateId]?.length > 0).length
+      const collected = col.entries.filter(e => collectionSets.owned[e.blueprintId]?.length > 0).length
       return { ...col, collected, total: col.entries.length }
     })
   }, [collectionSets])
@@ -328,13 +303,13 @@ export default function CCCollection() {
         const banner = td?.elements?.find(el => el.type === 'name-banner' && el.visible !== false)
         const cardName = banner?.playerName || td?.cardData?.name || e.name || 'Card'
         return {
-          templateId: e.templateId,
+          blueprintId: e.blueprintId,
           name: cardName,
           index: i + 1,
           cardType: e.cardType,
           templateData: e.templateData,
-          collected: (collectionSets.owned[e.templateId]?.length || 0) > 0,
-          ownedRarities: collectionSets.owned[e.templateId] || [],
+          collected: (collectionSets.owned[e.blueprintId]?.length || 0) > 0,
+          ownedRarities: collectionSets.owned[e.blueprintId] || [],
         }
       })
     } else {
@@ -370,8 +345,21 @@ export default function CCCollection() {
     return entries
   }, [activeSection, gameEntries, allPlayerCards, activePlayerCards, viewMode, rarityFilter, sortMode, searchQuery, collectionSets])
 
-  const hasMore = displayLimit < filteredEntries.length
-  const remaining = filteredEntries.length - displayLimit
+  // For team-grouped player views, extend limit to avoid splitting a team
+  const effectiveDisplayLimit = useMemo(() => {
+    if (!isPlayerSection || activeSection === 'player:all' || displayLimit >= filteredEntries.length) return displayLimit
+    let limit = displayLimit
+    if (limit > 0 && limit < filteredEntries.length) {
+      const lastTeam = filteredEntries[limit - 1].teamName || 'Free Agent'
+      while (limit < filteredEntries.length && (filteredEntries[limit].teamName || 'Free Agent') === lastTeam) {
+        limit++
+      }
+    }
+    return limit
+  }, [displayLimit, filteredEntries, isPlayerSection, activeSection])
+
+  const hasMore = effectiveDisplayLimit < filteredEntries.length
+  const remaining = filteredEntries.length - effectiveDisplayLimit
 
   if (loading) {
     return (
@@ -642,51 +630,6 @@ export default function CCCollection() {
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          {/* Search results mode — API search for player cards across all sets */}
-          {searchQuery.trim().length >= 2 && isPlayerSection ? (
-            <div>
-              <h2 className="text-lg font-bold cd-head text-[var(--cd-text)] mb-3">
-                Search: "{searchQuery.trim()}"
-              </h2>
-              {searchLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="cd-spinner w-6 h-6" />
-                </div>
-              ) : !searchResults || searchResults.length === 0 ? (
-                <div className="text-center py-16 text-[var(--cd-text-dim)]">
-                  <Search className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm font-bold cd-head">No player cards found</p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-                  {searchResults.filter(card => {
-                    if (viewMode === 'owned' && !owned.playerCards?.[card.defId]) return false
-                    if (rarityFilter && !(owned.playerCards?.[card.defId] || []).includes(rarityFilter)) return false
-                    return true
-                  }).map(card => {
-                    const collected = !!owned.playerCards?.[card.defId]
-                    const ownedRarities = owned.playerCards?.[card.defId] || []
-                    const meta = {
-                      leagueSlug: card.leagueSlug,
-                      divisionTier: card.divisionTier,
-                      divisionSlug: card.divisionSlug,
-                      divisionName: card.divisionName,
-                      seasonSlug: card.seasonSlug,
-                    }
-                    return (
-                      <PlayerSlot
-                        key={card.defId}
-                        card={{ ...card, collected, ownedRarities, feRarities: owned.firstEditions?.[card.defId] || [] }}
-                        meta={meta}
-                        onZoom={setZoomedCard}
-                      />
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          ) : (
-          <>
           <div className="flex items-center gap-3 mb-4">
             <RarityFilterBar rarityFilter={rarityFilter} setRarityFilter={setRarityFilter} />
             <SortDropdown sortMode={sortMode} setSortMode={setSortMode} />
@@ -724,7 +667,7 @@ export default function CCCollection() {
               {filteredEntries.length === 0 ? (
                 <div className="text-center py-12 text-[var(--cd-text-dim)]">
                   <Library className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm font-bold cd-head">No cards {rarityFilter || viewMode === 'owned' ? 'found' : 'available'}</p>
+                  <p className="text-sm font-bold cd-head">No cards {searchQuery.trim() || rarityFilter || viewMode === 'owned' ? 'found' : 'available'}</p>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
@@ -750,7 +693,7 @@ export default function CCCollection() {
             ) : (
               <PlayerCardGrid
                 meta={activePlayerSetMeta}
-                cards={filteredEntries.slice(0, displayLimit)}
+                cards={filteredEntries.slice(0, effectiveDisplayLimit)}
                 onZoom={setZoomedCard}
               />
             )
@@ -766,8 +709,6 @@ export default function CCCollection() {
                 Load More ({remaining} remaining)
               </button>
             </div>
-          )}
-          </>
           )}
         </div>
       </div>
@@ -1205,7 +1146,7 @@ function CollectionCardGrid({ collection, entries, owned, onZoom, viewMode }) {
       ) : (
         <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
           {entries.map(entry => (
-            <CollectionEntrySlot key={entry.templateId} entry={entry} onZoom={onZoom} />
+            <CollectionEntrySlot key={entry.blueprintId} entry={entry} onZoom={onZoom} />
           ))}
         </div>
       )}
@@ -1220,10 +1161,9 @@ function CollectionEntrySlot({ entry, onZoom }) {
 
     const handleZoom = () => onZoom({
       collectionCard: {
-        templateId: entry.templateId,
-        _templateData: td,
+        blueprintId: entry.blueprintId,
+        _blueprintData: td,
         rarity,
-        cardType: 'collection',
         ownedRarities: entry.ownedRarities,
       },
       canSell: true,
@@ -1234,10 +1174,9 @@ function CollectionEntrySlot({ entry, onZoom }) {
         <div className="relative">
           <VaultCard
             card={{
-              templateId: entry.templateId,
-              _templateData: td,
+              blueprintId: entry.blueprintId,
+              _blueprintData: td,
               rarity,
-              cardType: 'collection',
             }}
             size={CARD_SIZE}
             holo={false}

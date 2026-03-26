@@ -56,10 +56,10 @@ function apiCardSort(a, b) {
 const CARD_SIZE = 80
 
 function PickerCard({ card, onSelect, disabled, showHolo }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const cd = card.card_data ? (typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data) : {}
   const type = card.card_type || cd.cardType || 'god'
-  const isCollection = type === 'collection'
+  const isCollection = !!card.blueprint_id || !!cd._blueprintData
   const isPlayer = type === 'player' || cd.teamName
   const holoType = card.holo_type || card.holoType || null
   const holoEffect = showHolo && holoType ? getHoloEffect(card.rarity) : null
@@ -68,8 +68,8 @@ function PickerCard({ card, onSelect, disabled, showHolo }) {
   if (isCollection) {
     inner = (
       <VaultCard
-        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
-        getTemplate={getTemplate}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        getBlueprint={getBlueprint}
         size={CARD_SIZE}
         holo={false}
       />

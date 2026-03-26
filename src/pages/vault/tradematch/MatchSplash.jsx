@@ -22,9 +22,9 @@ function feedCardToGameData(card, cd, override) {
 }
 
 function MatchCard({ card, direction }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const cd = card.card_data || {}
-  const isCollection = card.card_type === 'collection'
+  const isCollection = !!card.blueprint_id
   const isPlayer = card.card_type === 'player' || cd.teamName || cd.role
   const type = card.card_type || cd.cardType || 'god'
   const override = type !== 'player' ? getDefOverride({ cardType: type, godId: card.god_id }) : null
@@ -33,8 +33,8 @@ function MatchCard({ card, direction }) {
     <div style={{ animation: `slide-in-${direction} 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both 0.3s` }}>
       {isCollection ? (
         <VaultCard
-          card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: (card.card_data || {})._templateData }}
-          getTemplate={getTemplate}
+          card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: (card.card_data || {})._blueprintData }}
+          getBlueprint={getBlueprint}
           size={120}
           holo={false}
         />

@@ -43,6 +43,7 @@ function toGameCardData(card, override) {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -68,7 +69,7 @@ function toPlayerCardProps(card) {
 }
 
 export default function TradePileManager({ collection, lockedCardIds, tradePile, onToggle, tradePileCount, onStartSwiping }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const [filterRarity, setFilterRarity] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterHolo, setFilterHolo] = useState('all')
@@ -297,8 +298,8 @@ export default function TradePileManager({ collection, lockedCardIds, tradePile,
                   onToggle(card.id)
                 }}
               >
-                {type === 'collection' ? (
-                  <VaultCard card={card} getTemplate={getTemplate} size={CARD_SIZE} holo={false} />
+                {(card.blueprintId || card.cardData?._blueprintData) ? (
+                  <VaultCard card={card} getBlueprint={getBlueprint} size={CARD_SIZE} holo={false} />
                 ) : isPlayer ? (
                   <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={CARD_SIZE} />
                 ) : (

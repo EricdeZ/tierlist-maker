@@ -3,7 +3,8 @@ import { useVault } from './VaultContext'
 import { RARITIES, S5_FLAT_CORES, S5_FLAT_PASSION, S5_REVERSE_MULT, S5_FULL_RATIO,
   S5_FLAT_SCALE, S5_MULT_SCALE,
   S5_ATT_FLAT, S5_ATT_MULT, S5_FULL_ATT_RATIO, S5_ALLSTAR_MODIFIER,
-  STARTING_FIVE_CAP_DAYS, CONSUMABLE_EFFECTS, getHoloEffect } from '../../data/vault/economy'
+  STARTING_FIVE_CAP_DAYS, CONSUMABLE_EFFECTS, getHoloEffect,
+  S5_STAFF_FLAT_CORES, S5_STAFF_MULT } from '../../data/vault/economy'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
@@ -20,6 +21,7 @@ import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy, Alert
 import { CONSUMABLES } from '../../data/vault/buffs'
 import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
+import { FEATURE_FLAGS } from '../../config/featureFlags'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: soloIcon },
@@ -27,6 +29,11 @@ const ROLES = [
   { key: 'mid', label: 'MID', icon: midIcon },
   { key: 'support', label: 'SUPPORT', icon: suppIcon },
   { key: 'adc', label: 'ADC', icon: adcIcon },
+]
+
+const STAFF_SLOTS = [
+  { key: 'cheerleader', label: 'CHEERLEADER' },
+  { key: 'staff', label: 'STAFF' },
 ]
 
 const RARITY_ORDER = ['unique', 'mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
@@ -49,6 +56,7 @@ function toGameCardData(card, override) {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -76,6 +84,12 @@ function toPlayerCardProps(card) {
 // Estimate base contribution for a card (flat income + multiplier)
 function getBaseIncomeEstimate(card) {
   if (!card) return { flatCores: 0, multiplier: 0, type: 'none', sortValue: 0 }
+  // Staff cards: use staff-specific constants
+  if (getCardType(card) === 'staff') {
+    const cores = S5_STAFF_FLAT_CORES[card.rarity] || 0
+    const mult = S5_STAFF_MULT[card.rarity] || 1
+    return { flatCores: cores, multiplier: mult, type: 'staff', sortValue: cores + (mult - 1) * 10 }
+  }
   const ht = card.holoType
   const r = card.rarity
   const flatC = (S5_FLAT_CORES[r] || 0) * S5_FLAT_SCALE
@@ -191,7 +205,8 @@ export default function CCStartingFive() {
   const [error, setError] = useState(null)
   const [s5Leaderboard, setS5Leaderboard] = useState(null)
   const [s5LbLoading, setS5LbLoading] = useState(false)
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
+  const showStaffSlots = FEATURE_FLAGS.STAFF_CARDS_RELEASED || isAdmin
   const slotSize = useSlotSize()
 
   const showError = useCallback((msg) => {
@@ -784,13 +799,18 @@ export default function CCStartingFive() {
         })}
       </div>
 
-      {/* Bench Slot */}
+      {/* Bench + Staff Slots */}
       <div className="mt-4 pt-4 border-t border-gray-700/50">
-        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider cd-head text-center">Bench (50%)</div>
-        <div className="flex justify-center">
-          {slottedCards.bench ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="relative">
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider cd-head text-center">{showStaffSlots ? 'Bench & Staff' : 'Bench (50%)'}</div>
+        <div className="flex justify-center items-start gap-3 sm:gap-4">
+          {/* Bench */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-xs font-bold text-white/40 cd-head tracking-wider">BENCH</span>
+              <span className="text-[10px] text-white/20 cd-num">(50%)</span>
+            </div>
+            <div className="relative">
+              {slottedCards.bench ? (
                 <FilledSlot
                   card={slottedCards.bench}
                   role={{ key: 'bench', label: 'BENCH', icon: null }}
@@ -808,21 +828,66 @@ export default function CCStartingFive() {
                   onAttachRemove={(r, st) => handleAttachUnslot(r, st)}
                   getDefOverride={getDefOverride}
                 />
-              </div>
+              ) : (
+                <button
+                  onClick={() => setPickerRole('bench')}
+                  className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
+                  style={{ width: slotSize, aspectRatio: '63/88' }}
+                >
+                  <Plus size={slotSize < 150 ? 22 : 28} className="opacity-[0.08] group-hover:opacity-30 transition-opacity mb-2 text-white" />
+                  <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
+                    <Plus size={12} />
+                    BENCH
+                  </div>
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              onClick={() => setPickerRole('bench')}
-              className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
-              style={{ width: slotSize, aspectRatio: '63/88' }}
-            >
-              <Plus size={slotSize < 150 ? 22 : 28} className="opacity-[0.08] group-hover:opacity-30 transition-opacity mb-2 text-white" />
-              <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
-                <Plus size={12} />
-                Bench
+          </div>
+
+          {/* Staff Slots — current season only, feature-flagged */}
+          {activeLineup === 'current' && showStaffSlots && STAFF_SLOTS.map(staffSlot => {
+            const card = slottedCards[staffSlot.key]
+            const slotData = slots[staffSlot.key]
+            const isAnimating = slotAnimation?.role === staffSlot.key
+
+            return (
+              <div key={staffSlot.key} className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs font-bold text-white/40 cd-head tracking-wider">{staffSlot.label}</span>
+                </div>
+                <div className="relative">
+                  {card ? (
+                    <StaffFilledSlot
+                      card={card}
+                      role={staffSlot}
+                      slotData={slotData}
+                      isAnimating={isAnimating}
+                      animConfig={isAnimating ? getAnimationConfig(slotAnimation.rarity) : null}
+                      onSwap={() => setPickerRole(staffSlot.key)}
+                      onRemove={() => handleUnslot(staffSlot.key)}
+                      onZoom={() => { setOptionsRole(null); setZoomedCard(card) }}
+                      optionsOpen={optionsRole === staffSlot.key}
+                      onToggleOptions={() => setOptionsRole(optionsRole === staffSlot.key ? null : staffSlot.key)}
+                      size={slotSize}
+                      override={getDefOverride(card)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setPickerRole(staffSlot.key)}
+                      className="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] hover:border-[var(--cd-cyan)]/30 hover:bg-[var(--cd-cyan)]/[0.03] transition-all cursor-pointer"
+                      style={{ width: slotSize, aspectRatio: '63/88' }}
+                    >
+                      <Plus size={slotSize < 150 ? 22 : 28} className="opacity-[0.08] group-hover:opacity-30 transition-opacity mb-2 text-white" />
+                      <div className="flex items-center gap-1 text-[11px] text-white/20 group-hover:text-[var(--cd-cyan)]/60 font-bold cd-head tracking-wider transition-colors">
+                        <Plus size={12} />
+                        {staffSlot.label}
+                      </div>
+                    </button>
+                  )}
+                </div>
               </div>
-            </button>
-          )}
+            )
+          })}
         </div>
       </div>
 
@@ -920,9 +985,9 @@ export default function CCStartingFive() {
       {zoomedCard && (
         <CardZoomModal
           onClose={() => setZoomedCard(null)}
-          collectionCard={getCardType(zoomedCard) === 'collection' ? zoomedCard : undefined}
+          collectionCard={zoomedCard.blueprintId ? zoomedCard : undefined}
           playerCard={getCardType(zoomedCard) === 'player' ? toPlayerCardProps(zoomedCard) : undefined}
-          gameCard={getCardType(zoomedCard) !== 'player' && getCardType(zoomedCard) !== 'collection' ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
+          gameCard={getCardType(zoomedCard) !== 'player' && !zoomedCard.blueprintId ? { type: getCardType(zoomedCard), rarity: zoomedCard.rarity, data: toGameCardData(zoomedCard, getDefOverride(zoomedCard)) } : undefined}
           holoType={zoomedCard.holoType}
         />
       )}
@@ -1230,6 +1295,13 @@ function TutorialModal({ onClose }) {
             <p>Each lineup has a 6th bench slot that accepts any player role. Bench cards contribute at 50% effectiveness — still worth filling if you have spare holos.</p>
           </div>
 
+          {showStaffSlots && (
+            <div>
+              <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">STAFF SLOTS</h4>
+              <p>Two staff slots (Cheerleader and Staff) are available in the current season lineup only. Slot staff-type cards to get a small Cores income bonus and multiplier boost. Staff cards cannot have attachments and don't count toward team synergy.</p>
+            </div>
+          )}
+
           <div>
             <h4 className="font-bold text-white/80 cd-head tracking-wider text-xs mb-1">ROLE MATCHING</h4>
             <p>Player and god cards must match the slot's role (Solo, Jungle, Mid, Support, ADC). Fill-role cards can go in any slot. Item cards can be attached to any slot regardless of role. The bench slot accepts any role. A mismatched role earns zero income.</p>
@@ -1396,8 +1468,98 @@ function EmptySlot({ role, onClick, size = 170 }) {
 }
 
 
+function StaffFilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override }) {
+  const { getBlueprint } = useVault()
+  const color = RARITIES[card.rarity]?.color || '#9ca3af'
+  const type = getCardType(card)
+  const slotRef = useRef(null)
+
+  useEffect(() => {
+    if (!optionsOpen) return
+    const handler = (e) => {
+      if (slotRef.current && !slotRef.current.contains(e.target)) {
+        onToggleOptions()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [optionsOpen, onToggleOptions])
+
+  const cores = S5_STAFF_FLAT_CORES[card.rarity] || 0
+  const mult = S5_STAFF_MULT[card.rarity] || 1
+
+  return (
+    <div className="relative" ref={slotRef}>
+      {isAnimating && animConfig && (
+        <SlotAnimationOverlay config={animConfig} rarity={card.rarity} />
+      )}
+
+      <div
+        className="relative cursor-pointer transition-all"
+        style={{
+          ...(isAnimating ? { '--glow-color': `${color}66`, animation: 's5-glow-pulse 0.8s ease-in-out 2' } : {}),
+          ...(!isAnimating ? { animation: 's5-card-enter 0.3s ease-out' } : {}),
+        }}
+        onClick={onToggleOptions}
+      >
+        {card.blueprintId ? (
+          <VaultCard card={card} getBlueprint={getBlueprint} size={size} holo />
+        ) : (
+          <TradingCardHolo rarity={getHoloEffect(card.rarity)} role="STAFF" holoType={card.holoType || 'reverse'} size={size}>
+            <GameCard type={type} rarity={card.rarity} data={toGameCardData(card, override)} size={size} />
+          </TradingCardHolo>
+        )}
+
+        {optionsOpen && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 bg-[var(--cd-surface)] border border-[var(--cd-border)] rounded-lg overflow-hidden shadow-xl" style={{ minWidth: 130 }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onZoom() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <ZoomIn size={12} /> Zoom
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onSwap() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-[var(--cd-cyan)]/10 hover:text-[var(--cd-cyan)] transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <ArrowRightLeft size={12} /> Swap
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-white/60 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer cd-head tracking-wider"
+            >
+              <Trash2 size={12} /> Remove
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 text-center">
+        <div className="text-[11px] font-bold text-white/70 truncate cd-head" style={{ maxWidth: size }}>
+          {card.godName}
+        </div>
+        <div className="flex items-center justify-center gap-1.5 mt-0.5">
+          <span className="text-[10px] font-bold cd-head" style={{ color }}>{RARITIES[card.rarity]?.name}</span>
+        </div>
+        <div className="flex items-center justify-center gap-2 mt-1 text-[10px] cd-num text-white/40">
+          {cores > 0 && (
+            <span className="flex items-center gap-0.5 text-amber-400">
+              {cores < 1 ? cores.toFixed(2) : cores.toFixed(1)}/d
+            </span>
+          )}
+          {mult > 1 && (
+            <span className="flex items-center gap-0.5 text-emerald-400 font-bold">
+              +{Math.round((mult - 1) * 100)}%
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onRemove, onZoom, optionsOpen, onToggleOptions, size = 170, override, onAttachPicker, onAttachRemove, getDefOverride }) {
-  const { getTemplate } = useVault()
+  const { getBlueprint } = useVault()
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getSlotContribution(slotData)
   const type = getCardType(card)
@@ -1432,8 +1594,8 @@ function FilledSlot({ card, role, slotData, isAnimating, animConfig, onSwap, onR
         onClick={onToggleOptions}
       >
         <div style={card.roleMismatch ? { opacity: 0.5, filter: 'grayscale(0.6)' } : undefined}>
-          {type === 'collection' ? (
-            <VaultCard card={card} getTemplate={getTemplate} size={size} holo />
+          {card.blueprintId ? (
+            <VaultCard card={card} getBlueprint={getBlueprint} size={size} holo />
           ) : isPlayer ? (
             <TradingCard
               {...toPlayerCardProps(card)}
@@ -1721,22 +1883,27 @@ function SlotAnimationOverlay({ config, rarity }) {
 
 
 function CardPicker({ role, collection, slottedCards, allSlottedIds, activeSlots, onSelect, onClose, slotting, getDefOverride, isBench }) {
-  const roleInfo = ROLES.find(r => r.key === role)
+  const roleInfo = ROLES.find(r => r.key === role) || STAFF_SLOTS.find(r => r.key === role)
   const roleIcon = roleInfo?.icon
   const [teamFilter, setTeamFilter] = useState(null)
+  const isStaffSlot = role === 'cheerleader' || role === 'staff'
 
-  // Filter eligible cards — bench slot accepts any player role
+  // Filter eligible cards — bench slot accepts any player role, staff slots accept staff cards only
   const eligibleCards = useMemo(() => {
     const currentPlayerInSlot = slottedCards[role]?.id
     return collection
       .filter(card => {
         const type = getCardType(card)
-        if (type !== 'player') return false
-        if (!isBench) {
-          const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
-          if (cardRole !== role && cardRole !== 'fill') return false
+        if (isStaffSlot) {
+          if (type !== 'staff') return false
+        } else {
+          if (type !== 'player') return false
+          if (!isBench) {
+            const cardRole = (card.role || card.cardData?.role || '').toLowerCase()
+            if (cardRole !== role && cardRole !== 'fill') return false
+          }
+          if (!card.holoType && card.rarity !== 'common') return false
         }
-        if (!card.holoType && card.rarity !== 'common') return false
         if (card.id !== currentPlayerInSlot && allSlottedIds.has(card.id)) return false
         return true
       })
@@ -1747,7 +1914,7 @@ function CardPicker({ role, collection, slottedCards, allSlottedIds, activeSlots
         const bIncome = getBaseIncomeEstimate(b)
         return bIncome.sortValue - aIncome.sortValue
       })
-  }, [collection, slottedCards, allSlottedIds, role, isBench])
+  }, [collection, slottedCards, allSlottedIds, role, isBench, isStaffSlot])
 
   // Build team options from eligible cards
   const teamOptions = useMemo(() => {
@@ -1986,6 +2153,7 @@ function AttachmentPicker({ role, slotType, collection, allSlottedIds, playerRar
 
 
 function PickerCard({ card, onSelect, disabled, override, holoMismatch, teamSynergyPreview, isSynergy }) {
+  const { getBlueprint } = useVault()
   const color = RARITIES[card.rarity]?.color || '#9ca3af'
   const income = getBaseIncomeEstimate(card)
   const type = getCardType(card)
@@ -2017,7 +2185,9 @@ function PickerCard({ card, onSelect, disabled, override, holoMismatch, teamSyne
       className="group flex flex-col items-center rounded-xl p-2 transition-all hover:bg-white/[0.04] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="relative transition-all group-hover:scale-[1.03]">
-        {isPlayer ? (
+        {card.blueprintId ? (
+          <VaultCard card={card} getBlueprint={getBlueprint} size={120} holo />
+        ) : isPlayer ? (
           <TradingCard
             {...toPlayerCardProps(card)}
             rarity={card.rarity}

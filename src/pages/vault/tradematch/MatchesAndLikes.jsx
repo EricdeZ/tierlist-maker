@@ -73,10 +73,10 @@ function Avatar({ discord_id, avatar, username, size = 40 }) {
 }
 
 function CardThumb({ card, showHolo = true }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const cd = card.card_data || {}
   const type = card.card_type || cd.cardType || 'god'
-  const isCollection = type === 'collection'
+  const isCollection = !!card.blueprint_id || !!cd._blueprintData
   const isPlayer = type === 'player' || cd.teamName
   const holoType = card.holo_type || card.holoType || null
   const holoEffect = showHolo && holoType ? getHoloEffect(card.rarity) : null
@@ -86,8 +86,8 @@ function CardThumb({ card, showHolo = true }) {
   if (isCollection) {
     inner = (
       <VaultCard
-        card={{ ...card, cardType: 'collection', templateId: card.template_id, _templateData: cd._templateData }}
-        getTemplate={getTemplate}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        getBlueprint={getBlueprint}
         size={size}
         holo={false}
       />

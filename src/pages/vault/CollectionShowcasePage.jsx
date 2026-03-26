@@ -146,9 +146,9 @@ function buildFakeCard(entry, rarity) {
     const td = typeof entry.template_data === 'string' ? JSON.parse(entry.template_data) : entry.template_data
     return {
         rarity,
-        templateId: entry.template_id,
+        blueprintId: entry.blueprint_id,
         cardType: entry.card_type || 'custom',
-        _templateData: td ? {
+        _blueprintData: td ? {
             elements: td.elements,
             border: td.border,
             cardData: td.cardData,

@@ -771,7 +771,7 @@ function TradeRoom({ tradeId, collection, userId, coreBalance, onEnd, setError, 
 
   const handleZoomCard = (card) => {
     if (!card) return
-    if (card.cardType === 'collection') {
+    if (card.blueprintId) {
       setZoomedCard({ collectionCard: card, holoType: card.holoType })
       return
     }
@@ -1453,10 +1453,10 @@ function MobileCardSlideshow({ cards, onRemoveCard, onZoomCard, canRemove, empty
 }
 
 function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const { card } = tradeCard
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
-  const isCollection = card.cardType === 'collection'
+  const isCollection = !!card.blueprintId
   const isPlayer = card.cardType === 'player'
 
   let cardData = null
@@ -1480,7 +1480,7 @@ function MobileTradeCard({ tradeCard, onRemove, onZoom, canRemove }) {
       >
         <div>
           {isCollection ? (
-            <VaultCard card={card} getTemplate={getTemplate} size={105} holo={false} />
+            <VaultCard card={card} getBlueprint={getBlueprint} size={105} holo={false} />
           ) : isPlayer ? (
               <TradingCard
                 playerName={cardData?.playerName || card.godName}
@@ -1823,10 +1823,10 @@ function TradeOfferPanel({ title, titleColor, cards, packs = [], coreAmount, isR
 // Desktop Trade Card Slot
 // ═══════════════════════════════════════
 function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const { card } = tradeCard
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
-  const isCollection = card.cardType === 'collection'
+  const isCollection = !!card.blueprintId
   const isPlayer = card.cardType === 'player'
 
   let cardData = null
@@ -1850,7 +1850,7 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
       >
         <div>
           {isCollection ? (
-            <VaultCard card={card} getTemplate={getTemplate} size={100} holo={false} />
+            <VaultCard card={card} getBlueprint={getBlueprint} size={100} holo={false} />
           ) : isPlayer ? (
             <TradingCard
               playerName={cardData?.playerName || card.godName}
@@ -1899,9 +1899,9 @@ function DesktopTradeCardSlot({ tradeCard, onRemove, onZoom, canRemove }) {
 // Collection Picker Card
 // ═══════════════════════════════════════
 function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const rarityInfo = RARITIES[card.rarity] || RARITIES.common
-  const isCollection = (card.cardType || 'god') === 'collection'
+  const isCollection = !!card.blueprintId
   const isPlayer = (card.cardType || 'god') === 'player'
   const cardSize = mobile ? 100 : 130
 
@@ -1929,7 +1929,7 @@ function CollectionPickerCard({ card, onAdd, disabled, mobile }) {
     >
       <div className="rounded overflow-hidden">
         {isCollection ? (
-          <VaultCard card={card} getTemplate={getTemplate} size={cardSize} holo={false} />
+          <VaultCard card={card} getBlueprint={getBlueprint} size={cardSize} holo={false} />
         ) : isPlayer ? (
           <TradingCard
             playerName={cardData?.playerName || card.godName}

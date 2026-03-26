@@ -16,7 +16,7 @@ import CardZoomModal from './components/CardZoomModal'
 import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3, Package } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
-const CARD_TYPES = ['god', 'item', 'consumable', 'player']
+const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'staff']
 const HOLO_TYPES = ['holo', 'reverse', 'full']
 const ROLES = ['solo', 'jungle', 'mid', 'support', 'adc']
 const HOLO_TYPE_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art' }
@@ -54,10 +54,10 @@ function buildCardData(card, override) {
 }
 
 function MarketCard({ card, size }) {
-  const { getDefOverride, getTemplate } = useVault()
+  const { getDefOverride, getBlueprint } = useVault()
   const override = getDefOverride(card)
-  if (card.cardType === 'collection') {
-    return <VaultCard card={card} getTemplate={getTemplate} size={size} holo={false} />
+  if (card.blueprintId) {
+    return <VaultCard card={card} getBlueprint={getBlueprint} size={size} holo={false} />
   }
   if (card.cardType === 'player') {
     const d = card.cardData || {}
@@ -294,7 +294,7 @@ export default function CCMarketplace() {
 
   const handleCardZoom = (card) => {
     const type = card.cardType || 'god'
-    if (type === 'collection') {
+    if (card.blueprintId) {
       setZoomedCard({ collectionCard: card, holoType: card.holoType })
       return
     }

@@ -9,7 +9,7 @@ import { useVault } from './VaultContext'
 import { PenLine, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function CCSignatureApprovals() {
-  const { refreshCollection, setPendingApprovalCount, getTemplate } = useVault()
+  const { refreshCollection, setPendingApprovalCount, getBlueprint } = useVault()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -86,8 +86,8 @@ export default function CCSignatureApprovals() {
                 <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
                   {/* Card with signature preview */}
                   <div className="shrink-0">
-                    {req.cardType === 'collection' ? (
-                      <VaultCard card={req} getTemplate={getTemplate} size={200} holo />
+                    {req.blueprintId ? (
+                      <VaultCard card={req} getBlueprint={getBlueprint} size={200} holo />
                     ) : req.cardType === 'player' ? (
                       <TradingCard
                         playerName={pName}

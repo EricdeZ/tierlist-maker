@@ -51,6 +51,7 @@ function toGameCardData(card) {
     name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -74,7 +75,7 @@ function toPlayerCardProps(card) {
 }
 
 function ShareCardRender({ card }) {
-  if ((card.cardType || 'god') === 'collection' && card._templateData) {
+  if (card.blueprintId && card._blueprintData) {
     return <VaultCard card={card} holo={false} />
   }
   const isPlayer = (card.cardType || 'god') === 'player'

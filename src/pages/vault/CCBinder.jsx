@@ -509,7 +509,7 @@ function BinderPageContent({ page, color, cardsBySlot }) {
 }
 
 function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, targetSlot }) {
-  const { getTemplate } = useVault()
+  const { getBlueprint } = useVault()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('player')
 
@@ -585,7 +585,7 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
           )}
           {available.map(card => {
             const type = card.cardType || 'god'
-            const isCollection = type === 'collection'
+            const isCollection = !!card.blueprintId
             const isPlayer = type === 'player'
             return (
               <div
@@ -594,7 +594,7 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
                 onClick={() => onPick(card.id)}
               >
                 {isCollection ? (
-                  <VaultCard card={card} getTemplate={getTemplate} size={130} holo={false} />
+                  <VaultCard card={card} getBlueprint={getBlueprint} size={130} holo={false} />
                 ) : isPlayer ? (
                   <TradingCard {...toPlayerCardProps(card)} rarity={card.rarity} size={130} />
                 ) : (
@@ -615,7 +615,7 @@ function toGameCardData(card) {
   const base = {
     name: card.godName, class: card.godClass, imageUrl: card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: card.metadata || undefined,
-    signatureUrl: card.signatureUrl || undefined,
+    signatureUrl: card.signatureUrl || undefined, passiveName: card.passiveName || undefined,
   }
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
   if (type === 'item') return { ...base, category: cd.category || card.godClass, manaCost: cd.manaCost || 3, effects: cd.effects || {}, passive: cd.passive, imageKey: cd?.imageKey }
@@ -641,9 +641,9 @@ function toPlayerCardProps(card) {
 }
 
 function BinderCardRender({ card }) {
-  const { getTemplate } = useVault()
-  if ((card.cardType || 'god') === 'collection') {
-    return <VaultCard card={card} getTemplate={getTemplate} holo={false} />
+  const { getBlueprint } = useVault()
+  if (card.blueprintId) {
+    return <VaultCard card={card} getBlueprint={getBlueprint} holo={false} />
   }
   const isPlayer = (card.cardType || 'god') === 'player'
   if (isPlayer) {

@@ -24,6 +24,7 @@ function toGameCardData(card, override) {
     name: card.godName, class: card.godClass, imageUrl: override?.custom_image_url || card.imageUrl,
     id: card.godId, serialNumber: card.serialNumber, metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
   const type = card.cardType || 'god'
   if (type === 'god') return { ...base, role: card.role, ability: card.ability || cd.ability, imageKey: cd?.imageKey }
@@ -49,7 +50,7 @@ function toPlayerCardProps(card) {
   }
 }
 
-function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged, linkedPlayer }) {
+function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged, linkedPlayer }) {
   const [changingHolo, setChangingHolo] = useState(false)
   const [requestingSig, setRequestingSig] = useState(false)
   const [sigStatus, setSigStatus] = useState(null) // 'requested' after success
@@ -96,8 +97,8 @@ function UniqueCardEntry({ card, getDefOverride, getTemplate, onHoloTypeChanged,
   }
 
   const renderCard = () => {
-    if (type === 'collection') {
-      return <VaultCard card={{ ...card, holoType: localHoloType }} getTemplate={getTemplate} holo size={280} />
+    if (card.blueprintId) {
+      return <VaultCard card={{ ...card, holoType: localHoloType }} getBlueprint={getBlueprint} holo size={280} />
     }
     if (type === 'player') {
       return (
@@ -190,8 +191,8 @@ function GalleryCardEntry({ card }) {
   const type = card.cardType || 'god'
 
   const renderCard = () => {
-    if (type === 'collection') {
-      return <VaultCard card={card} getTemplate={() => null} holo size={280} />
+    if (card.blueprintId) {
+      return <VaultCard card={card} getBlueprint={() => null} holo size={280} />
     }
     if (type === 'player') {
       return (
@@ -243,7 +244,7 @@ const VIEWS = [
 ]
 
 export default function CCUniqueCards() {
-  const { collection, loaded, getDefOverride, getTemplate, updateCardHoloType } = useVault()
+  const { collection, loaded, getDefOverride, getBlueprint, updateCardHoloType } = useVault()
   const { linkedPlayer } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('subtab') || 'mine'
@@ -326,7 +327,7 @@ export default function CCUniqueCards() {
                   key={card.id}
                   card={card}
                   getDefOverride={getDefOverride}
-                  getTemplate={getTemplate}
+                  getBlueprint={getBlueprint}
                   onHoloTypeChanged={handleHoloTypeChanged}
                   linkedPlayer={linkedPlayer}
                 />
