@@ -5,7 +5,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
-import { ensureStats, openPack, generateGiftPack, grantStarterPacks } from '../lib/vault.js'
+import { ensureStats, openPack, generateGiftPack, grantStarterPacks, rollHoloEffect, rollHoloType } from '../lib/vault.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, CONSUMABLE_DAILY_CAP, isRoleMismatch } from '../lib/starting-five.js'
@@ -168,6 +168,7 @@ const handler = async (event) => {
         case 'redeem-code': return await handleRedeemCode(sql, user, body)
         case 'create-redeem-code': return await handleCreateRedeemCode(sql, event, body)
         case 'toggle-redeem-code': return await handleToggleRedeemCode(sql, event, body)
+        case 'send-promo-gift': return await handleSendPromoGift(sql, user, body, event)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -2750,6 +2751,46 @@ async function handleChangeHoloType(sql, user, body) {
   await sql`UPDATE cc_cards SET holo_type = ${holoType} WHERE id = ${cardId}`
 
   return { statusCode: 200, headers, body: JSON.stringify({ success: true, holoType }) }
+}
+
+// ═══ POST: Send promo gift (owner only) ═══
+async function handleSendPromoGift(sql, user, body, event) {
+  const owner = await requirePermission(event, 'permission_manage')
+  if (!owner) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Owner only' }) }
+
+  const { recipientId, cardType, rarity, templateId, cardConfig, message, tradeable = true } = body
+  if (!recipientId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'recipientId required' }) }
+  if (!cardType) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType required' }) }
+  if (!rarity) return { statusCode: 400, headers, body: JSON.stringify({ error: 'rarity required' }) }
+  if (!cardConfig || typeof cardConfig !== 'object') return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardConfig required' }) }
+
+  const validTypes = ['god', 'item', 'player', 'collection', 'staff', 'custom', 'consumable', 'minion', 'buff']
+  if (!validTypes.includes(cardType)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid cardType' }) }
+
+  const validRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique', 'full_art']
+  if (!validRarities.includes(rarity)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid rarity' }) }
+
+  const [recipient] = await sql`SELECT id FROM users WHERE id = ${recipientId}`
+  if (!recipient) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Recipient not found' }) }
+
+  if (cardType === 'collection') {
+    if (!templateId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'templateId required for collection cards' }) }
+    const [template] = await sql`SELECT id FROM cc_card_templates WHERE id = ${templateId} AND status = 'approved'`
+    if (!template) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Template not found or not approved' }) }
+  }
+
+  const trimmedMsg = message ? String(message).trim().slice(0, 500) : null
+
+  const [gift] = await sql`
+    INSERT INTO cc_promo_gifts (recipient_id, card_type, rarity, template_id, card_config, message, tradeable, created_by)
+    VALUES (${recipientId}, ${cardType}, ${rarity}, ${templateId || null}, ${JSON.stringify(cardConfig)}, ${trimmedMsg}, ${tradeable !== false}, ${user.id})
+    RETURNING id
+  `
+
+  return {
+    statusCode: 200, headers,
+    body: JSON.stringify({ success: true, giftId: gift.id }),
+  }
 }
 
 // ═══ Formatters ═══

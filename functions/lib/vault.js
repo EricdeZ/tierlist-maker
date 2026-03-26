@@ -49,11 +49,11 @@ const RARITY_HOLO_MAP = {
   epic: 'cosmos', legendary: 'gold', mythic: 'rainbow', unique: 'secret',
 }
 
-function rollHoloEffect(rarity) {
+export function rollHoloEffect(rarity) {
   return RARITY_HOLO_MAP[rarity] || 'common'
 }
 
-function rollHoloType(rarity) {
+export function rollHoloType(rarity) {
   if (rarity === 'common') return null
   const types = ['holo', 'reverse', 'full']
   return types[Math.floor(Math.random() * types.length)]
