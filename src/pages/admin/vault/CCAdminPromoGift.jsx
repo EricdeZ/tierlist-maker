@@ -8,9 +8,8 @@ const CARD_TYPES = [
   { value: 'god', label: 'God' },
   { value: 'item', label: 'Item' },
   { value: 'player', label: 'Player' },
-  { value: 'collection', label: 'Collection' },
-  { value: 'staff', label: 'Staff' },
   { value: 'custom', label: 'Custom' },
+  { value: 'collection', label: 'From Collection' },
 ]
 
 const ROLES = [
@@ -176,13 +175,18 @@ export default function CCAdminPromoGift() {
     const cardConfig = {}
     let templateId = null
 
+    let sendCardType = cardType
+    let sendRarity = rarity
+
     if (cardType === 'collection') {
       if (!selectedEntry) { setError('Select a card from the collection'); setSending(false); return }
       templateId = selectedEntry.template_id
+      sendCardType = selectedEntry.card_type || 'collection'
+      sendRarity = selectedEntry.rarity || rarity
       cardConfig.god_id = `collection-${templateId}`
       cardConfig.god_name = selectedEntry.template_name
       cardConfig.god_class = selectedEntry.card_type
-      cardConfig.role = 'staff'
+      cardConfig.role = selectedEntry.card_type || 'collection'
     } else {
       cardConfig.god_id = godId || godName.toLowerCase().replace(/\s+/g, '-')
       cardConfig.god_name = godName
@@ -195,8 +199,8 @@ export default function CCAdminPromoGift() {
     try {
       const data = await vaultDashboardService.sendPromoGift({
         recipientId: recipient.id,
-        cardType,
-        rarity,
+        cardType: sendCardType,
+        rarity: sendRarity,
         templateId,
         cardConfig,
         message: message || null,
@@ -273,35 +277,39 @@ export default function CCAdminPromoGift() {
 
         {/* Card Type + Role */}
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cardType === 'collection' ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
               <label className={labelClass}>Card Type</label>
               <Dropdown value={cardType} onChange={setCardType} options={CARD_TYPES} />
             </div>
-            <div>
-              <label className={labelClass}>Role</label>
-              <Dropdown value={role} onChange={setRole} options={ROLES} placeholder="None" />
-            </div>
+            {cardType !== 'collection' && (
+              <div>
+                <label className={labelClass}>Role</label>
+                <Dropdown value={role} onChange={setRole} options={ROLES} placeholder="None" />
+              </div>
+            )}
           </div>
 
-          {/* Rarity */}
-          <div>
-            <label className={labelClass}>Rarity</label>
-            <div className="flex flex-wrap gap-1.5">
-              {RARITY_OPTIONS.map(r => (
-                <button
-                  key={r.value}
-                  onClick={() => setRarity(r.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    rarity === r.value ? 'ring-2 ring-white/30 scale-105 shadow-lg' : 'opacity-50 hover:opacity-75'
-                  }`}
-                  style={{ borderColor: r.color, color: r.color, background: rarity === r.value ? `${r.color}20` : 'transparent' }}
-                >
-                  {r.label}
-                </button>
-              ))}
+          {/* Rarity — hidden for collection (comes from the card) */}
+          {cardType !== 'collection' && (
+            <div>
+              <label className={labelClass}>Rarity</label>
+              <div className="flex flex-wrap gap-1.5">
+                {RARITY_OPTIONS.map(r => (
+                  <button
+                    key={r.value}
+                    onClick={() => setRarity(r.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                      rarity === r.value ? 'ring-2 ring-white/30 scale-105 shadow-lg' : 'opacity-50 hover:opacity-75'
+                    }`}
+                    style={{ borderColor: r.color, color: r.color, background: rarity === r.value ? `${r.color}20` : 'transparent' }}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Card Configuration */}
@@ -372,6 +380,12 @@ export default function CCAdminPromoGift() {
                           </button>
                         )
                       })}
+                    </div>
+                  )}
+                  {selectedEntry && (
+                    <div className="flex gap-3 mt-2 text-xs text-[var(--color-text-secondary)]">
+                      <span>Type: <span className="text-[var(--color-text-primary)] font-medium">{selectedEntry.card_type}</span></span>
+                      <span>Rarity: <span className="text-[var(--color-text-primary)] font-medium">{selectedEntry.rarity}</span></span>
                     </div>
                   )}
                 </div>
