@@ -243,9 +243,9 @@ export default function CCAdminPromoGift() {
           {recipient ? (
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--cd-input)] border border-[var(--cd-cyan)]/30">
               <div className="w-6 h-6 rounded-full bg-[var(--cd-cyan)]/20 flex items-center justify-center text-xs text-[var(--cd-cyan)] font-bold">
-                {(recipient.playerName || recipient.discordUsername || '?')[0].toUpperCase()}
+                {(recipient.player_name || recipient.discord_username || '?')[0].toUpperCase()}
               </div>
-              <span className="text-sm text-[var(--color-text-primary)] font-medium">{recipient.playerName || recipient.discordUsername}</span>
+              <span className="text-sm text-[var(--color-text-primary)] font-medium">{recipient.player_name || recipient.discord_username}</span>
               <button onClick={() => setRecipient(null)} className="ml-auto text-xs text-red-400 hover:text-red-300 font-medium">Remove</button>
             </div>
           ) : (
@@ -261,7 +261,7 @@ export default function CCAdminPromoGift() {
                       key={u.id} onClick={() => selectRecipient(u)}
                       className="w-full px-3 py-2.5 text-left text-sm hover:bg-white/5 text-[var(--color-text-primary)] border-b border-[var(--cd-border)]/50 last:border-b-0 transition-colors"
                     >
-                      {u.playerName || u.discordUsername}
+                      {u.player_name || u.discord_username}
                     </button>
                   ))}
                 </div>
