@@ -1,7 +1,7 @@
 -- Promo gift packs: owner-to-user scripted card gifts
 CREATE TABLE cc_promo_gifts (
   id SERIAL PRIMARY KEY,
-  recipient_id TEXT NOT NULL REFERENCES users(id),
+  recipient_id INT NOT NULL REFERENCES users(id),
   card_type TEXT NOT NULL,
   rarity TEXT NOT NULL,
   template_id INT REFERENCES cc_card_templates(id),
@@ -11,7 +11,7 @@ CREATE TABLE cc_promo_gifts (
   claimed BOOLEAN NOT NULL DEFAULT false,
   claimed_at TIMESTAMPTZ,
   card_id INT REFERENCES cc_cards(id),
-  created_by TEXT NOT NULL REFERENCES users(id),
+  created_by INT NOT NULL REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_promo_gifts_recipient ON cc_promo_gifts (recipient_id) WHERE claimed = false;
