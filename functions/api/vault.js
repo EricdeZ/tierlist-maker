@@ -2815,31 +2815,32 @@ async function handleClaimPromoGift(sql, user, body) {
   const { giftId } = body
   if (!giftId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'giftId required' }) }
 
-  const [gift] = await sql`
-    SELECT * FROM cc_promo_gifts
-    WHERE id = ${giftId} AND recipient_id = ${user.id} AND claimed = false
-  `
-  if (!gift) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already claimed' }) }
-
-  const config = typeof gift.card_config === 'string' ? JSON.parse(gift.card_config) : gift.card_config
-  const holoEffect = rollHoloEffect(gift.rarity)
-  const holoType = rollHoloType(gift.rarity)
-  const serialNumber = Math.floor(Math.random() * 9999) + 1
-
-  let isFirstEdition = false
-  if (gift.template_id) {
-    const [existing] = await sql`
-      SELECT 1 FROM cc_cards WHERE template_id = ${gift.template_id} AND rarity = ${gift.rarity} LIMIT 1
-    `
-    isFirstEdition = !existing
-  } else if (gift.card_type === 'player' && config.def_id) {
-    const [existing] = await sql`
-      SELECT 1 FROM cc_cards WHERE def_id = ${config.def_id} AND rarity = ${gift.rarity} LIMIT 1
-    `
-    isFirstEdition = !existing
-  }
-
   const card = await transaction(async (tx) => {
+    const [gift] = await tx`
+      SELECT * FROM cc_promo_gifts
+      WHERE id = ${giftId} AND recipient_id = ${user.id} AND claimed = false
+      FOR UPDATE
+    `
+    if (!gift) return null
+
+    const config = typeof gift.card_config === 'string' ? JSON.parse(gift.card_config) : gift.card_config
+    const holoEffect = rollHoloEffect(gift.rarity)
+    const holoType = rollHoloType(gift.rarity)
+    const serialNumber = Math.floor(Math.random() * 9999) + 1
+
+    let isFirstEdition = false
+    if (gift.template_id) {
+      const [existing] = await tx`
+        SELECT 1 FROM cc_cards WHERE template_id = ${gift.template_id} AND rarity = ${gift.rarity} LIMIT 1
+      `
+      isFirstEdition = !existing
+    } else if (gift.card_type === 'player' && config.def_id) {
+      const [existing] = await tx`
+        SELECT 1 FROM cc_cards WHERE def_id = ${config.def_id} AND rarity = ${gift.rarity} LIMIT 1
+      `
+      isFirstEdition = !existing
+    }
+
     const [c] = await tx`
       INSERT INTO cc_cards (
         owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
@@ -2863,10 +2864,11 @@ async function handleClaimPromoGift(sql, user, body) {
       WHERE id = ${giftId}
     `
 
-    return c
+    return { card: c, message: gift.message }
   })
+  if (!card) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already claimed' }) }
 
-  const formatted = [formatCard(card)]
+  const formatted = [formatCard(card.card)]
   await inlineTemplateData(sql, formatted)
 
   return {
@@ -2875,7 +2877,7 @@ async function handleClaimPromoGift(sql, user, body) {
       success: true,
       card: formatted[0],
       packName: 'Special Promo Gift Pack',
-      message: gift.message,
+      message: card.message,
     }),
   }
 }
