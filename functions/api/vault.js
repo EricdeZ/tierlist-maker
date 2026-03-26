@@ -2839,28 +2839,32 @@ async function handleClaimPromoGift(sql, user, body) {
     isFirstEdition = !existing
   }
 
-  const [card] = await sql`
-    INSERT INTO cc_cards (
-      owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
-      serial_number, holo_effect, holo_type, image_url, acquired_via, card_type,
-      card_data, def_id, template_id, is_first_edition, depicted_user_id, trade_locked
-    ) VALUES (
-      ${user.id}, ${user.id}, ${config.god_id || null}, ${config.god_name || null},
-      ${config.god_class || null}, ${config.role || null}, ${gift.rarity},
-      ${serialNumber}, ${holoEffect}, ${holoType},
-      ${config.image_url || null}, 'gift', ${gift.card_type},
-      ${JSON.stringify(config.card_data || {})}, ${config.def_id || null},
-      ${gift.template_id || null}, ${isFirstEdition},
-      ${config.depicted_user_id || null}, ${!gift.tradeable}
-    )
-    RETURNING *
-  `
+  const card = await transaction(async (tx) => {
+    const [c] = await tx`
+      INSERT INTO cc_cards (
+        owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
+        serial_number, holo_effect, holo_type, image_url, acquired_via, card_type,
+        card_data, def_id, template_id, is_first_edition, depicted_user_id, trade_locked
+      ) VALUES (
+        ${user.id}, ${user.id}, ${config.god_id || null}, ${config.god_name || null},
+        ${config.god_class || null}, ${config.role || null}, ${gift.rarity},
+        ${serialNumber}, ${holoEffect}, ${holoType},
+        ${config.image_url || null}, 'gift', ${gift.card_type},
+        ${JSON.stringify(config.card_data || {})}, ${config.def_id || null},
+        ${gift.template_id || null}, ${isFirstEdition},
+        ${config.depicted_user_id || null}, ${!gift.tradeable}
+      )
+      RETURNING *
+    `
 
-  await sql`
-    UPDATE cc_promo_gifts
-    SET claimed = true, claimed_at = NOW(), card_id = ${card.id}
-    WHERE id = ${giftId}
-  `
+    await tx`
+      UPDATE cc_promo_gifts
+      SET claimed = true, claimed_at = NOW(), card_id = ${c.id}
+      WHERE id = ${giftId}
+    `
+
+    return c
+  })
 
   const formatted = [formatCard(card)]
   await inlineTemplateData(sql, formatted)
