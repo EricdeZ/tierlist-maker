@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '../../../context/AuthContext'
 import { vaultDashboardService } from '../../../services/database'
 import { RARITIES } from '../../../data/vault/economy'
+import VaultCard from '../../vault/components/VaultCard'
 
 const CARD_TYPES = [
   { value: 'god', label: 'God' },
@@ -330,33 +331,47 @@ export default function CCAdminPromoGift() {
                   ) : collectionEntries.length === 0 ? (
                     <div className="text-xs text-[var(--color-text-secondary)] py-2">No cards in this collection</div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto rounded-lg border border-[var(--cd-border)] bg-[var(--cd-input)] p-1.5">
-                      {collectionEntries.map(entry => (
-                        <button
-                          key={entry.id}
-                          onClick={() => setSelectedEntry(entry)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
-                            selectedEntry?.id === entry.id
-                              ? 'bg-[var(--cd-cyan)]/15 border border-[var(--cd-cyan)]/40 ring-1 ring-[var(--cd-cyan)]/20'
-                              : 'hover:bg-white/5 border border-transparent'
-                          }`}
-                        >
-                          {entry.thumbnail_url ? (
-                            <img src={entry.thumbnail_url} alt="" className="w-8 h-8 rounded object-cover bg-black/30" />
-                          ) : (
-                            <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center text-xs text-[var(--color-text-secondary)]">?</div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm text-[var(--color-text-primary)] font-medium truncate">{entry.template_name}</div>
-                            <div className="text-xs text-[var(--color-text-secondary)]">{entry.card_type} &middot; {entry.source_type}</div>
-                          </div>
-                          {selectedEntry?.id === entry.id && (
-                            <svg className="w-4 h-4 text-[var(--cd-cyan)] shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-3 gap-3 max-h-[400px] overflow-y-auto rounded-lg border border-[var(--cd-border)] bg-[var(--cd-input)] p-3">
+                      {collectionEntries.map(entry => {
+                        const td = typeof entry.template_data === 'string' ? JSON.parse(entry.template_data) : (entry.template_data || {})
+                        const isSelected = selectedEntry?.id === entry.id
+                        return (
+                          <button
+                            key={entry.id}
+                            onClick={() => setSelectedEntry(entry)}
+                            className={`relative rounded-lg p-2 transition-all text-center ${
+                              isSelected
+                                ? 'bg-[var(--cd-cyan)]/15 ring-2 ring-[var(--cd-cyan)]/50'
+                                : 'hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="flex justify-center pointer-events-none">
+                              <VaultCard
+                                card={{
+                                  rarity: entry.rarity || 'common',
+                                  cardType: entry.card_type || 'custom',
+                                  templateId: entry.template_id,
+                                  _templateData: {
+                                    cardData: td.cardData,
+                                    elements: td.elements,
+                                    border: td.border,
+                                    cardType: entry.card_type || 'custom',
+                                  },
+                                }}
+                                size={100}
+                              />
+                            </div>
+                            <div className="mt-1.5 text-xs text-[var(--color-text-primary)] font-medium truncate">{entry.template_name}</div>
+                            {isSelected && (
+                              <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--cd-cyan)] flex items-center justify-center">
+                                <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
