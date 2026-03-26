@@ -1197,6 +1197,9 @@ export const vaultService = {
     async claimPromoGift(giftId) {
         return apiPost('vault', { action: 'claim-promo-gift' }, { giftId })
     },
+    async logDevice(deviceId, previousIds) {
+        return apiPost('vault-device-log', { action: 'log-login' }, { deviceId, previousIds })
+    },
 }
 
 export const bountyService = {
@@ -1307,6 +1310,9 @@ export const tradematchService = {
     },
     async swipe(cardId) {
         return apiPost('tradematch', { action: 'swipe' }, { cardId })
+    },
+    async unswipe(cardId) {
+        return apiPost('tradematch', { action: 'unswipe' }, { cardId })
     },
     async likes() {
         return apiCall('tradematch', { action: 'likes' })
@@ -1485,31 +1491,45 @@ export const vaultAdminService = {
     async createTestSignatureCard(playerDefId) {
         return apiPost('vault-admin', { action: 'create-test-signature-card' }, { playerDefId })
     },
+    async getDeviceFlags() {
+        return apiCall('vault-device-log', { action: 'flags' })
+    },
+    async investigateUser(username) {
+        return apiCall('vault-device-log', { action: 'investigate', username })
+    },
+    async resolveDeviceFlag(flagId) {
+        return apiPost('vault-device-log', { action: 'resolve-flag' }, { flagId })
+    },
+    async getRecentDeviceLog() {
+        return apiCall('vault-device-log', { action: 'recent-log' })
+    },
 }
 
 // ─── Vault Dashboard (card creator) ───
 
 export const vaultDashboardService = {
-    // Templates
-    async getTemplates(params = {}) { return apiCall('vault-dashboard', { action: 'templates', ...params }) },
-    async getTemplate(id) { return apiCall('vault-dashboard', { action: 'template', id }) },
-    async saveTemplate(data) { return apiPost('vault-dashboard', { action: 'save-template' }, data) },
+    // Blueprints (unified)
+    async getBlueprints(params = {}) { return apiCall('vault-dashboard', { action: 'blueprints', ...params }) },
+    async getBlueprint(id) { return apiCall('vault-dashboard', { action: 'blueprint', id }) },
+    async saveBlueprint(data) { return apiPost('vault-dashboard', { action: 'save-blueprint' }, data) },
 
-    // Drafts
-    async getDrafts(params = {}) { return apiCall('vault-dashboard', { action: 'drafts', ...params }) },
-    async getDraft(id) { return apiCall('vault-dashboard', { action: 'draft', id }) },
-    async saveDraft(data) { return apiPost('vault-dashboard', { action: 'save-draft' }, data) },
+    // Aliases for backwards compatibility
+    async getTemplates(params = {}) { return this.getBlueprints(params) },
+    async getDrafts(params = {}) { return this.getBlueprints(params) },
+    async saveTemplate(data) { return this.saveBlueprint(data) },
+    async saveDraft(data) { return this.saveBlueprint(data) },
+
     async searchUsers(q) { return apiCall('vault-dashboard', { action: 'search-users', q }) },
 
-    // Review workflow
-    async submitForReview(type, id) { return apiPost('vault-dashboard', { action: 'submit-for-review' }, { type, id }) },
-    async approve(type, id) { return apiPost('vault-dashboard', { action: 'approve' }, { type, id }) },
-    async reject(type, id, reason) { return apiPost('vault-dashboard', { action: 'reject' }, { type, id, reason }) },
-    async archiveTemplate(id) { return apiPost('vault-dashboard', { action: 'archive-template' }, { id }) },
-    async deleteItem(type, id) { return apiPost('vault-dashboard', { action: 'delete-item' }, { type, id }) },
-    async renameItem(type, id, name) { return apiPost('vault-dashboard', { action: 'rename-item' }, { type, id, name }) },
+    // Review workflow — no longer needs 'type' parameter
+    async submitForReview(id) { return apiPost('vault-dashboard', { action: 'submit-for-review' }, { id }) },
+    async approve(id) { return apiPost('vault-dashboard', { action: 'approve' }, { id }) },
+    async reject(id, reason) { return apiPost('vault-dashboard', { action: 'reject' }, { id, reason }) },
+    async archiveBlueprint(id) { return apiPost('vault-dashboard', { action: 'archive' }, { id }) },
+    async deleteBlueprint(id) { return apiPost('vault-dashboard', { action: 'delete-item' }, { id }) },
+    async renameBlueprint(id, name) { return apiPost('vault-dashboard', { action: 'rename-item' }, { id, name }) },
 
-    // Assets
+    // Assets (unchanged)
     async getAssets(params = {}) { return apiCall('vault-dashboard', { action: 'assets', ...params }) },
     async getAsset(id) { return apiCall('vault-dashboard', { action: 'asset', id }) },
     async deleteAsset(id) { return apiPost('vault-dashboard', { action: 'delete-asset' }, { id }) },
@@ -1518,13 +1538,13 @@ export const vaultDashboardService = {
     async getCollections() { return apiCall('vault-dashboard', { action: 'collections' }) },
     async getCollection(id) { return apiCall('vault-dashboard', { action: 'collection', id }) },
     async saveCollection(data) { return apiPost('vault-dashboard', { action: 'save-collection' }, data) },
-    async addCollectionEntries(collectionId, templateIds, draftIds) {
-        return apiPost('vault-dashboard', { action: 'add-collection-entries' }, { collection_id: collectionId, template_ids: templateIds, draft_ids: draftIds })
+    async addCollectionEntries(collectionId, blueprintIds) {
+        return apiPost('vault-dashboard', { action: 'add-collection-entries' }, { collection_id: collectionId, blueprint_ids: blueprintIds })
     },
     async removeCollectionEntry(id) { return apiPost('vault-dashboard', { action: 'remove-collection-entry' }, { id }) },
     async setCollectionStatus(id, status) { return apiPost('vault-dashboard', { action: 'collection-status' }, { id, status }) },
 
-    // Uploads (multipart — use fetch directly)
+    // Uploads (unchanged except exportThumbnail no longer needs type)
     async uploadAsset(file, { name, category, tags }) {
         const form = new FormData()
         form.append('file', file)
@@ -1540,11 +1560,11 @@ export const vaultDashboardService = {
         return res.json()
     },
 
-    async exportThumbnail(file, type, id) {
+    async exportThumbnail(file, id) {
         const form = new FormData()
         form.append('file', file)
         const token = localStorage.getItem('auth_token')
-        const res = await fetch(`/api/vault-dashboard-upload?action=export-thumbnail&type=${type}&id=${id}`, {
+        const res = await fetch(`/api/vault-dashboard-upload?action=export-thumbnail&id=${id}`, {
             method: 'POST',
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             body: form,
