@@ -109,10 +109,11 @@ export async function addCard(tx, userId, tradeId, cardId) {
 
   // Lock card row, verify ownership
   const [card] = await tx`
-    SELECT id, owner_id FROM cc_cards WHERE id = ${cardId} FOR UPDATE
+    SELECT id, owner_id, trade_locked FROM cc_cards WHERE id = ${cardId} FOR UPDATE
   `
   if (!card) throw new Error('Card not found')
   if (card.owner_id !== userId) throw new Error('You do not own this card')
+  if (card.trade_locked) throw new Error('This card is trade-locked and cannot be traded')
 
   // Check card not in another active trade
   const [locked] = await tx`

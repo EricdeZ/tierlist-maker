@@ -23,9 +23,10 @@ export async function createListing(sql, userId, { cardId, packInventoryId, pric
   // --- Card listing path (unchanged) ---
 
   // Verify card ownership
-  const [card] = await sql`SELECT id, owner_id FROM cc_cards WHERE id = ${cardId}`
+  const [card] = await sql`SELECT id, owner_id, trade_locked FROM cc_cards WHERE id = ${cardId}`
   if (!card) throw new Error('Card not found')
   if (card.owner_id !== userId) throw new Error('You do not own this card')
+  if (card.trade_locked) throw new Error('This card is trade-locked and cannot be listed')
 
   // Check card not locked in active trade
   const [tradeLock] = await sql`
