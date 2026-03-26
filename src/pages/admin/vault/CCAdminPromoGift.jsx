@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '../../../context/AuthContext'
 import { vaultDashboardService } from '../../../services/database'
 import { RARITIES } from '../../../data/vault/economy'
@@ -12,13 +12,72 @@ const CARD_TYPES = [
   { value: 'custom', label: 'Custom' },
 ]
 
+const ROLES = [
+  { value: '', label: 'None' },
+  { value: 'solo', label: 'Solo' },
+  { value: 'jungle', label: 'Jungle' },
+  { value: 'mid', label: 'Mid' },
+  { value: 'support', label: 'Support' },
+  { value: 'adc', label: 'ADC' },
+]
+
 const RARITY_OPTIONS = Object.entries(RARITIES)
   .filter(([key]) => key !== 'full_art')
   .map(([key, val]) => ({ value: key, label: val.name, color: val.color }))
 
-const selectClass = 'w-full px-3 py-2.5 rounded-lg bg-[var(--cd-input)] border border-[var(--cd-border)] text-[var(--color-text-primary)] text-sm appearance-none cursor-pointer focus:outline-none focus:border-[var(--cd-cyan)]/50 focus:ring-1 focus:ring-[var(--cd-cyan)]/30 transition-colors'
 const inputClass = 'w-full px-3 py-2.5 rounded-lg bg-[var(--cd-input)] border border-[var(--cd-border)] text-[var(--color-text-primary)] text-sm focus:outline-none focus:border-[var(--cd-cyan)]/50 focus:ring-1 focus:ring-[var(--cd-cyan)]/30 transition-colors placeholder:text-[var(--color-text-secondary)]/50'
 const labelClass = 'block text-xs font-semibold text-[var(--color-text-secondary)] mb-1.5 uppercase tracking-wide'
+
+function Dropdown({ value, onChange, options, placeholder, disabled }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const selected = options.find(o => String(o.value) === String(value))
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--cd-input)] border text-sm text-left transition-colors ${
+          open ? 'border-[var(--cd-cyan)]/50 ring-1 ring-[var(--cd-cyan)]/30' : 'border-[var(--cd-border)]'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-[var(--cd-border-hover,var(--cd-border))]'}`}
+      >
+        <span className={selected ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]/60'}>
+          {selected?.label || placeholder || 'Select...'}
+        </span>
+        <svg className={`w-4 h-4 text-[var(--color-text-secondary)] transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 w-full mt-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] max-h-56 overflow-y-auto shadow-xl">
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false) }}
+              className={`w-full px-3 py-2.5 text-left text-sm transition-colors border-b border-[var(--cd-border)]/50 last:border-b-0 ${
+                String(opt.value) === String(value)
+                  ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)]'
+                  : 'text-[var(--color-text-primary)] hover:bg-white/5'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function CCAdminPromoGift() {
   const { hasPermission } = useAuth()
@@ -161,6 +220,11 @@ export default function CCAdminPromoGift() {
 
   const canSend = recipient && (cardType === 'collection' ? !!selectedEntry : !!godName) && !sending
 
+  const collectionOptions = [
+    { value: '', label: collectionsLoading ? 'Loading collections...' : 'Select a collection' },
+    ...collections.map(c => ({ value: String(c.id), label: `${c.name} (${c.entry_count} cards)` })),
+  ]
+
   return (
     <div className="max-w-xl">
       {/* Header */}
@@ -190,11 +254,11 @@ export default function CCAdminPromoGift() {
                 placeholder="Search by username..." className={inputClass}
               />
               {searchResults.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] max-h-48 overflow-y-auto shadow-xl">
+                <div className="absolute z-20 w-full mt-1 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] max-h-48 overflow-y-auto shadow-xl">
                   {searchResults.map(u => (
                     <button
                       key={u.id} onClick={() => selectRecipient(u)}
-                      className="w-full px-3 py-2.5 text-left text-sm hover:bg-[var(--cd-hover)] text-[var(--color-text-primary)] border-b border-[var(--cd-border)] last:border-b-0 transition-colors"
+                      className="w-full px-3 py-2.5 text-left text-sm hover:bg-white/5 text-[var(--color-text-primary)] border-b border-[var(--cd-border)]/50 last:border-b-0 transition-colors"
                     >
                       {u.playerName || u.discordUsername}
                     </button>
@@ -206,35 +270,16 @@ export default function CCAdminPromoGift() {
           )}
         </div>
 
-        {/* Card Type + Rarity row */}
+        {/* Card Type + Role */}
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Card Type</label>
-              <div className="relative">
-                <select value={cardType} onChange={e => setCardType(e.target.value)} className={selectClass}>
-                  {CARD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-                <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </div>
+              <Dropdown value={cardType} onChange={setCardType} options={CARD_TYPES} />
             </div>
             <div>
               <label className={labelClass}>Role</label>
-              <div className="relative">
-                <select value={role} onChange={e => setRole(e.target.value)} className={selectClass}>
-                  <option value="">None</option>
-                  <option value="solo">Solo</option>
-                  <option value="jungle">Jungle</option>
-                  <option value="mid">Mid</option>
-                  <option value="support">Support</option>
-                  <option value="adc">ADC</option>
-                </select>
-                <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </div>
+              <Dropdown value={role} onChange={setRole} options={ROLES} placeholder="None" />
             </div>
           </div>
 
@@ -267,24 +312,13 @@ export default function CCAdminPromoGift() {
               {/* Collection picker */}
               <div>
                 <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Collection</label>
-                <div className="relative">
-                  <select
-                    value={selectedCollectionId}
-                    onChange={e => setSelectedCollectionId(e.target.value)}
-                    className={selectClass}
-                    disabled={collectionsLoading}
-                  >
-                    <option value="">
-                      {collectionsLoading ? 'Loading collections...' : 'Select a collection'}
-                    </option>
-                    {collections.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.entry_count} cards)</option>
-                    ))}
-                  </select>
-                  <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </div>
+                <Dropdown
+                  value={selectedCollectionId}
+                  onChange={setSelectedCollectionId}
+                  options={collectionOptions}
+                  placeholder={collectionsLoading ? 'Loading collections...' : 'Select a collection'}
+                  disabled={collectionsLoading}
+                />
               </div>
 
               {/* Card picker from collection entries */}
@@ -359,7 +393,7 @@ export default function CCAdminPromoGift() {
             <span className="text-sm text-[var(--color-text-primary)]">Tradeable</span>
             <button
               onClick={() => setTradeable(!tradeable)}
-              className={`relative w-10 h-5.5 rounded-full transition-colors ${tradeable ? 'bg-emerald-500' : 'bg-gray-600'}`}
+              className={`relative w-10 rounded-full transition-colors ${tradeable ? 'bg-emerald-500' : 'bg-gray-600'}`}
               style={{ height: '22px' }}
             >
               <div
