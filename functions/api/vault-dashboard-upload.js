@@ -86,7 +86,7 @@ async function handleThumbnailExport(request, sql, bucket, user, url) {
     const type = url.searchParams.get('type')
     const id = parseInt(url.searchParams.get('id'))
 
-    if (!type || !id) return json({ error: 'type and id required' }, 400)
+    if (!id) return json({ error: 'id required' }, 400)
 
     let bytes, ext
     try {
@@ -98,8 +98,7 @@ async function handleThumbnailExport(request, sql, bucket, user, url) {
     const key = `vault-assets/thumbnails/${type}-${id}.${ext}`
     const publicUrl = await uploadToR2(bucket, key, bytes, file.type)
 
-    const table = type === 'template' ? 'cc_card_templates' : 'cc_card_drafts'
-    await sql`UPDATE ${sql.unsafe(table)} SET thumbnail_url = ${publicUrl}, updated_at = NOW() WHERE id = ${id}`
+    await sql`UPDATE cc_card_blueprints SET thumbnail_url = ${publicUrl}, updated_at = NOW() WHERE id = ${id}`
 
     return json({ success: true, thumbnail_url: publicUrl })
 }
