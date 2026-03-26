@@ -49,23 +49,25 @@ async function tagNewCards(sql, userId, formattedCards) {
   }
 }
 
-async function inlineTemplateData(sql, formattedCards) {
-  const collectionCards = formattedCards.filter(c => c.cardType === 'collection' && c.templateId)
-  if (collectionCards.length === 0) return
-  const tids = [...new Set(collectionCards.map(c => c.templateId))]
-  const templates = await sql`
-    SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${tids})
+async function inlineBlueprintData(sql, formattedCards) {
+  const bpCards = formattedCards.filter(c => c.blueprintId)
+  if (bpCards.length === 0) return
+  const bids = [...new Set(bpCards.map(c => c.blueprintId))]
+  const blueprints = await sql`
+    SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${bids})
   `
   const cache = {}
-  for (const t of templates) {
-    const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
-    cache[t.id] = {
+  for (const bp of blueprints) {
+    const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+    cache[bp.id] = {
       cardData: td?.cardData || {},
-      cardType: t.card_type || 'custom',
+      elements: td?.elements || [],
+      border: td?.border || null,
+      cardType: bp.card_type || 'custom',
     }
   }
-  for (const card of collectionCards) {
-    if (cache[card.templateId]) card._templateData = cache[card.templateId]
+  for (const card of bpCards) {
+    if (cache[card.blueprintId]) card._blueprintData = cache[card.blueprintId]
   }
 }
 
@@ -194,7 +196,8 @@ async function handleLoad(sql, user) {
   const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks, promoGifts] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
-             COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
+             COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
+             sp.name AS passive_name
          FROM cc_cards c
          LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
          LEFT JOIN LATERAL (
@@ -202,6 +205,7 @@ async function handleLoad(sql, user) {
            FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
          ) pu ON true
          LEFT JOIN user_preferences pup ON pup.user_id = pu.id
+         LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
          WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
@@ -294,28 +298,30 @@ async function handleLoad(sql, user) {
       WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
     `,
     sql`
-      SELECT id, card_type, rarity, card_config, message, template_id, tradeable, created_at
+      SELECT id, card_type, rarity, card_config, message, blueprint_id, tradeable, created_at
       FROM cc_promo_gifts
       WHERE recipient_id = ${user.id} AND claimed = false
       ORDER BY created_at ASC
     `,
   ])
 
-  // Build template cache for collection cards
-  const collectionTemplateIds = [...new Set(
-    collection.filter(c => c.card_type === 'collection' && c.template_id)
-      .map(c => c.template_id)
+  // Build blueprint cache for blueprint-sourced cards
+  const blueprintIds = [...new Set(
+    collection.filter(c => c.blueprint_id)
+      .map(c => c.blueprint_id)
   )]
-  let templateCache = {}
-  if (collectionTemplateIds.length > 0) {
-    const templates = await sql`
-      SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${collectionTemplateIds})
+  let blueprintCache = {}
+  if (blueprintIds.length > 0) {
+    const blueprints = await sql`
+      SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${blueprintIds})
     `
-    for (const t of templates) {
-      const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
-      templateCache[t.id] = {
+    for (const bp of blueprints) {
+      const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+      blueprintCache[bp.id] = {
         cardData: td?.cardData || {},
-        cardType: t.card_type || 'custom',
+        elements: td?.elements || [],
+        border: td?.border || null,
+        cardType: bp.card_type || 'custom',
       }
     }
   }
@@ -324,7 +330,7 @@ async function handleLoad(sql, user) {
     statusCode: 200, headers,
     body: JSON.stringify({
       collection: collection.map(formatCard),
-      templateCache,
+      blueprintCache,
       stats: formatStats(stats[0]),
       emberBalance: ember[0]?.balance || 0,
       packTypes: packTypes.map(p => ({
@@ -384,7 +390,7 @@ async function handleLoad(sql, user) {
         rarity: g.rarity,
         cardConfig: g.card_config,
         message: g.message,
-        templateId: g.template_id,
+        blueprintId: g.blueprint_id,
         tradeable: g.tradeable,
         createdAt: g.created_at,
       })),
@@ -442,7 +448,7 @@ async function handleOpenInventoryPack(sql, user, body) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
-  await inlineTemplateData(sql, cards)
+  await inlineBlueprintData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
   maybePushChallenges(sql, user.id)
@@ -535,7 +541,7 @@ async function handleOpenPack(sql, user, body) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
-  await inlineTemplateData(sql, cards)
+  await inlineBlueprintData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
   maybePushChallenges(sql, user.id)
@@ -616,7 +622,7 @@ async function handleSalePurchase(sql, user, saleId) {
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
     return formatted
   })
-  await inlineTemplateData(sql, cards)
+  await inlineBlueprintData(sql, cards)
   await tagNewCards(sql, user.id, cards)
 
   maybePushChallenges(sql, user.id)
@@ -874,20 +880,20 @@ async function handleCollectionOwned(sql, user) {
 // ═══ GET: Collections the user owns cards from ═══
 async function handleCollectionCollections(sql, user) {
   const ownedRows = await sql`
-    SELECT template_id, array_agg(rarity) AS rarities
+    SELECT blueprint_id, array_agg(rarity) AS rarities
     FROM cc_cards
-    WHERE owner_id = ${user.id} AND card_type = 'collection' AND template_id IS NOT NULL
-    GROUP BY template_id
+    WHERE owner_id = ${user.id} AND blueprint_id IS NOT NULL
+    GROUP BY blueprint_id
   `
   if (ownedRows.length === 0) {
     return { statusCode: 200, headers, body: JSON.stringify({ collections: [], owned: {} }) }
   }
 
-  const ownedTemplateIds = ownedRows.map(r => r.template_id)
+  const ownedBlueprintIds = ownedRows.map(r => r.blueprint_id)
 
   const collectionIds = await sql`
     SELECT DISTINCT collection_id FROM cc_collection_entries
-    WHERE template_id = ANY(${ownedTemplateIds}) OR draft_id = ANY(${ownedTemplateIds})
+    WHERE blueprint_id = ANY(${ownedBlueprintIds})
   `
   if (collectionIds.length === 0) {
     return { statusCode: 200, headers, body: JSON.stringify({ collections: [], owned: {} }) }
@@ -902,13 +908,10 @@ async function handleCollectionCollections(sql, user) {
       WHERE id = ANY(${cIds}) AND status != 'archived'
     `,
     sql`
-      SELECT ce.collection_id, ce.template_id, ce.draft_id,
-             COALESCE(t.name, d.notes, 'Draft') AS name,
-             COALESCE(t.card_type, d.card_type) AS card_type,
-             COALESCE(t.template_data, d.template_data) AS template_data
+      SELECT ce.collection_id, ce.blueprint_id,
+             bp.name, bp.card_type, bp.template_data
       FROM cc_collection_entries ce
-      LEFT JOIN cc_card_templates t ON t.id = ce.template_id
-      LEFT JOIN cc_card_drafts d ON d.id = ce.draft_id
+      JOIN cc_card_blueprints bp ON bp.id = ce.blueprint_id
       WHERE ce.collection_id = ANY(${cIds})
       ORDER BY ce.id
     `,
@@ -929,8 +932,7 @@ async function handleCollectionCollections(sql, user) {
     const col = collectionMap.get(e.collection_id)
     if (!col) continue
     col.entries.push({
-      templateId: e.template_id || e.draft_id,
-      isDraft: !e.template_id,
+      blueprintId: e.blueprint_id,
       name: e.name,
       cardType: e.card_type,
       templateData: e.template_data,
@@ -938,7 +940,7 @@ async function handleCollectionCollections(sql, user) {
   }
 
   const owned = {}
-  for (const r of ownedRows) owned[r.template_id] = r.rarities
+  for (const r of ownedRows) owned[r.blueprint_id] = r.rarities
 
   return {
     statusCode: 200, headers,
@@ -1020,9 +1022,7 @@ async function handleCollectionSearch(sql, params) {
     ) u ON true
     LEFT JOIN user_preferences up ON up.user_id = u.id
     JOIN divisions div ON d.division_id = div.id
-    JOIN seasons s ON d.season_id = s.id
-    WHERE s.is_active = true
-      AND (d.player_name ILIKE ${'%' + query + '%'} OR u.discord_username ILIKE ${'%' + query + '%'})
+    WHERE (d.player_name ILIKE ${'%' + query + '%'} OR u.discord_username ILIKE ${'%' + query + '%'})
     ORDER BY d.player_name, d.league_slug, d.division_tier
     LIMIT 30
   `
@@ -1439,10 +1439,20 @@ async function handleOpenGift(sql, user, body) {
     // Free gift pack — use dedicated generator
     const cards = await generateGiftPack(sql)
     newCards = []
+    const hasStaffGift = cards.some(c => c.card_type === 'staff')
+    let giftPassiveIds = []
+    if (hasStaffGift) {
+      giftPassiveIds = (await sql`SELECT id FROM cc_staff_passives`).map(r => r.id)
+    }
+
     for (const card of cards) {
+      const giftPassiveId = card.card_type === 'staff' && giftPassiveIds.length > 0
+        ? giftPassiveIds[Math.floor(Math.random() * giftPassiveIds.length)]
+        : null
+
       const [inserted] = await sql`
-        INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
-        VALUES (${user.id}, ${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${'gift'}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null})
+        INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, passive_id)
+        VALUES (${user.id}, ${user.id}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity}, ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url}, ${'gift'}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}, ${card.def_id || null}, ${giftPassiveId})
         RETURNING *
       `
       if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -1505,7 +1515,7 @@ async function handlePendingReveal(sql, user) {
   }
 
   const formatted = cards.map(c => formatCard(c))
-  await inlineTemplateData(sql, formatted)
+  await inlineBlueprintData(sql, formatted)
   await tagNewCards(sql, user.id, formatted)
 
   // Restore reveal order for mixed packs
@@ -1711,6 +1721,7 @@ async function handleDismantle(sql, user, body) {
     UPDATE cc_trades SET match_swipe_b_id = NULL
     WHERE match_swipe_b_id IN (SELECT id FROM cc_swipes WHERE card_id = ANY(${validIds}))
   `
+  await sql`UPDATE cc_promo_gifts SET card_id = NULL WHERE card_id = ANY(${validIds})`
   await sql`DELETE FROM cc_cards WHERE id = ANY(${validIds}) AND owner_id = ${user.id}`
 
   // Grant ember
@@ -1893,17 +1904,24 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
     }
 
     const serialNumber = Math.floor(Math.random() * 9999) + 1
+
+    let passiveId = null
+    if (cardType === 'staff') {
+      const passives = await tx`SELECT id FROM cc_staff_passives`
+      if (passives.length > 0) passiveId = passives[Math.floor(Math.random() * passives.length)].id
+    }
+
     const [card] = await tx`
       INSERT INTO cc_cards (
         owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
         serial_number, holo_effect, holo_type, acquired_via, card_type,
-        def_id
+        def_id, passive_id
       )
       VALUES (
         ${user.id}, ${user.id}, ${godId}, ${body.godName || ''}, ${body.godClass || ''},
         ${body.role || ''}, 'mythic',
         ${serialNumber}, 'rainbow', 'holo', 'black-market', ${cardType},
-        ${defId}
+        ${defId}, ${passiveId}
       )
       RETURNING *
     `
@@ -2392,15 +2410,13 @@ async function handleShowcaseCollection(sql, params) {
   if (!collection) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Collection not found' }) }
 
   const entries = await sql`
-    SELECT e.id, e.template_id, e.draft_id,
-           COALESCE(t.name, d.notes, 'Draft #' || d.id) AS template_name,
-           COALESCE(t.card_type, d.card_type) AS card_type,
-           COALESCE(t.template_data, d.template_data) AS template_data,
-           COALESCE(t.thumbnail_url, d.thumbnail_url) AS thumbnail_url,
-           CASE WHEN e.draft_id IS NOT NULL THEN 'draft' ELSE 'template' END AS source_type
+    SELECT e.id, e.blueprint_id,
+           bp.name AS template_name,
+           bp.card_type,
+           bp.template_data,
+           bp.thumbnail_url
     FROM cc_collection_entries e
-    LEFT JOIN cc_card_templates t ON e.template_id = t.id
-    LEFT JOIN cc_card_drafts d ON e.draft_id = d.id
+    JOIN cc_card_blueprints bp ON e.blueprint_id = bp.id
     WHERE e.collection_id = ${collection.id}
     ORDER BY e.added_at ASC
   `
@@ -2562,7 +2578,8 @@ async function handleLoadBinder(sql, user) {
            c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
            d.best_god_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
-           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
+           sp.name AS passive_name
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
@@ -2571,6 +2588,7 @@ async function handleLoadBinder(sql, user) {
       FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
     ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     WHERE bc.user_id = ${user.id}
     ORDER BY bc.page, bc.slot
   `
@@ -2605,10 +2623,11 @@ async function handleBinderView(sql, params) {
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.serial_number,
            c.holo_effect, c.holo_type, c.image_url, c.card_type, c.card_data,
            c.ability, c.metadata, c.def_id, c.is_first_edition, c.acquired_via, c.created_at,
-           c.template_id,
+           c.blueprint_id,
            d.best_god_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
-           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
+           COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
+           sp.name AS passive_name
     FROM cc_binder_cards bc
     JOIN cc_cards c ON bc.card_id = c.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
@@ -2617,21 +2636,22 @@ async function handleBinderView(sql, params) {
       FROM users u WHERE u.linked_player_id = d.player_id LIMIT 1
     ) pu ON true
     LEFT JOIN user_preferences pup ON pup.user_id = pu.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     WHERE bc.user_id = ${binder.user_id}
     ORDER BY bc.page, bc.slot
   `
 
-  // Inline template data for collection cards in binder
-  const collBinder = cards.filter(c => c.card_type === 'collection' && c.template_id)
-  let binderTemplateCache = {}
-  if (collBinder.length > 0) {
-    const tids = [...new Set(collBinder.map(c => c.template_id))]
-    const templates = await sql`
-      SELECT id, card_type, template_data FROM cc_card_templates WHERE id = ANY(${tids})
+  // Inline blueprint data for blueprint-sourced cards in binder
+  const bpBinder = cards.filter(c => c.blueprint_id)
+  let binderBlueprintCache = {}
+  if (bpBinder.length > 0) {
+    const bids = [...new Set(bpBinder.map(c => c.blueprint_id))]
+    const blueprints = await sql`
+      SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${bids})
     `
-    for (const t of templates) {
-      const td = typeof t.template_data === 'string' ? JSON.parse(t.template_data) : t.template_data
-      binderTemplateCache[t.id] = { cardData: td?.cardData || {}, cardType: t.card_type || 'custom' }
+    for (const bp of blueprints) {
+      const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+      binderBlueprintCache[bp.id] = { cardData: td?.cardData || {}, elements: td?.elements || [], border: td?.border || null, cardType: bp.card_type || 'custom' }
     }
   }
 
@@ -2646,8 +2666,8 @@ async function handleBinderView(sql, params) {
       owner: { username: binder.discord_username, avatar: avatarUrl },
       cards: cards.map(c => {
         const formatted = formatCard(c)
-        if (c.card_type === 'collection' && binderTemplateCache[c.template_id]) {
-          formatted._templateData = binderTemplateCache[c.template_id]
+        if (c.blueprint_id && binderBlueprintCache[c.blueprint_id]) {
+          formatted._blueprintData = binderBlueprintCache[c.blueprint_id]
         }
         return { page: c.page, slot: c.slot, card: formatted }
       }),
@@ -2775,13 +2795,13 @@ async function handleSendPromoGift(sql, user, body, event) {
   const owner = await requirePermission(event, 'permission_manage')
   if (!owner) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Owner only' }) }
 
-  const { recipientId, cardType, rarity, templateId, cardConfig, message, tradeable = true } = body
+  const { recipientId, cardType, rarity, blueprintId, cardConfig, message, tradeable = true } = body
   if (!recipientId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'recipientId required' }) }
   if (!cardType) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardType required' }) }
   if (!rarity) return { statusCode: 400, headers, body: JSON.stringify({ error: 'rarity required' }) }
   if (!cardConfig || typeof cardConfig !== 'object') return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardConfig required' }) }
 
-  const validTypes = ['god', 'item', 'player', 'collection', 'staff', 'custom', 'consumable', 'minion', 'buff']
+  const validTypes = ['god', 'item', 'player', 'staff', 'custom', 'consumable', 'minion', 'buff']
   if (!validTypes.includes(cardType)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid cardType' }) }
 
   const validRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique', 'full_art']
@@ -2790,17 +2810,16 @@ async function handleSendPromoGift(sql, user, body, event) {
   const [recipient] = await sql`SELECT id FROM users WHERE id = ${recipientId}`
   if (!recipient) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Recipient not found' }) }
 
-  if (cardType === 'collection') {
-    if (!templateId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'templateId required for collection cards' }) }
-    const [template] = await sql`SELECT id FROM cc_card_templates WHERE id = ${templateId} AND status = 'approved'`
-    if (!template) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Template not found or not approved' }) }
+  if (body.blueprintId) {
+    const [bp] = await sql`SELECT id FROM cc_card_blueprints WHERE id = ${body.blueprintId} AND status = 'approved'`
+    if (!bp) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Blueprint not found or not approved' }) }
   }
 
   const trimmedMsg = message ? String(message).trim().slice(0, 500) : null
 
   const [gift] = await sql`
-    INSERT INTO cc_promo_gifts (recipient_id, card_type, rarity, template_id, card_config, message, tradeable, created_by)
-    VALUES (${recipientId}, ${cardType}, ${rarity}, ${templateId || null}, ${JSON.stringify(cardConfig)}, ${trimmedMsg}, ${tradeable !== false}, ${user.id})
+    INSERT INTO cc_promo_gifts (recipient_id, card_type, rarity, blueprint_id, card_config, message, tradeable, created_by)
+    VALUES (${recipientId}, ${cardType}, ${rarity}, ${blueprintId || null}, ${JSON.stringify(cardConfig)}, ${trimmedMsg}, ${tradeable !== false}, ${user.id})
     RETURNING id
   `
 
@@ -2829,9 +2848,9 @@ async function handleClaimPromoGift(sql, user, body) {
     const serialNumber = Math.floor(Math.random() * 9999) + 1
 
     let isFirstEdition = false
-    if (gift.template_id) {
+    if (gift.blueprint_id) {
       const [existing] = await tx`
-        SELECT 1 FROM cc_cards WHERE template_id = ${gift.template_id} AND rarity = ${gift.rarity} LIMIT 1
+        SELECT 1 FROM cc_cards WHERE blueprint_id = ${gift.blueprint_id} AND rarity = ${gift.rarity} LIMIT 1
       `
       isFirstEdition = !existing
     } else if (gift.card_type === 'player' && config.def_id) {
@@ -2841,19 +2860,25 @@ async function handleClaimPromoGift(sql, user, body) {
       isFirstEdition = !existing
     }
 
+    let passiveId = null
+    if (gift.card_type === 'staff') {
+      const passives = await tx`SELECT id FROM cc_staff_passives`
+      if (passives.length > 0) passiveId = passives[Math.floor(Math.random() * passives.length)].id
+    }
+
     const [c] = await tx`
       INSERT INTO cc_cards (
         owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
         serial_number, holo_effect, holo_type, image_url, acquired_via, card_type,
-        card_data, def_id, template_id, is_first_edition, depicted_user_id, trade_locked
+        card_data, def_id, blueprint_id, is_first_edition, depicted_user_id, trade_locked, passive_id
       ) VALUES (
         ${user.id}, ${user.id}, ${config.god_id || null}, ${config.god_name || null},
         ${config.god_class || null}, ${config.role || null}, ${gift.rarity},
         ${serialNumber}, ${holoEffect}, ${holoType},
         ${config.image_url || null}, 'gift', ${gift.card_type},
         ${JSON.stringify(config.card_data || {})}, ${config.def_id || null},
-        ${gift.template_id || null}, ${isFirstEdition},
-        ${config.depicted_user_id || null}, ${!gift.tradeable}
+        ${gift.blueprint_id || null}, ${isFirstEdition},
+        ${config.depicted_user_id || null}, ${!gift.tradeable}, ${passiveId}
       )
       RETURNING *
     `
@@ -2869,7 +2894,7 @@ async function handleClaimPromoGift(sql, user, body) {
   if (!card) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift not found or already claimed' }) }
 
   const formatted = [formatCard(card.card)]
-  await inlineTemplateData(sql, formatted)
+  await inlineBlueprintData(sql, formatted)
 
   return {
     statusCode: 200, headers,
@@ -2918,8 +2943,9 @@ function formatCard(row) {
     teamId: row.team_id || row.card_data?.teamId || null,
     defPlayerId: row.def_player_id || null,
     signatureUrl: row.signature_url || null,
-    templateId: row.template_id || null,
+    blueprintId: row.blueprint_id || null,
     tradeLocked: row.trade_locked || false,
+    passiveName: row.passive_name || null,
   }
 }
 
