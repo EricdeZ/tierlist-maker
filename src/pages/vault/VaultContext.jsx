@@ -52,6 +52,7 @@ export function VaultProvider({ children }) {
   const [lockedPackIds, setLockedPackIds] = useState([])
   const [rotationPacks, setRotationPacks] = useState([])
   const [pendingReveal, setPendingReveal] = useState(null)
+  const [promoGifts, setPromoGifts] = useState([])
 
   // Refs for stable callbacks — avoids recreating callbacks when passionCtx/startingFive change
   const passionCtxRef = useRef(passionCtx)
@@ -88,6 +89,7 @@ export function VaultProvider({ children }) {
       setLockedCardIds(ccData.lockedCardIds || [])
       setLockedPackIds(ccData.lockedPackIds || [])
       setRotationPacks(ccData.rotationPacks || [])
+      setPromoGifts(ccData.promoGifts || [])
       if (ccData.vendingCooldown > 0) {
         setVendingCooldownEnd(Date.now() + ccData.vendingCooldown * 1000)
       }
@@ -221,6 +223,14 @@ export function VaultProvider({ children }) {
     refreshBalanceWithRetry()
     return result
   }, [refreshGifts, refreshBalanceWithRetry, mergeInlineTemplates])
+
+  const claimPromoGift = useCallback(async (giftId) => {
+    const result = await vaultService.claimPromoGift(giftId)
+    setCollection(prev => [...prev, result.card])
+    mergeInlineTemplates([result.card])
+    setPromoGifts(prev => prev.filter(g => g.id !== giftId))
+    return result
+  }, [mergeInlineTemplates])
 
   const markGiftsSeen = useCallback(async () => {
     await vaultService.markGiftsSeen()
@@ -471,6 +481,7 @@ export function VaultProvider({ children }) {
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
+    promoGifts, claimPromoGift,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, setPendingTradeCount,
@@ -488,6 +499,7 @@ export function VaultProvider({ children }) {
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, templateCache, getTemplate,
     buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
+    promoGifts, claimPromoGift,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
     binder, binderCards, loadBinder, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare,
     pendingTradeCount, matchTradeCount, matchTradePendingCount, pendingSignatureCount, pendingApprovalCount, inventory, openInventoryPack, refreshInventory, addToInventory,

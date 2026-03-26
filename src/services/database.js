@@ -1194,6 +1194,9 @@ export const vaultService = {
     blackMarketDebugPending() {
         return apiPost('vault', { action: 'black-market-debug-pending' }, {})
     },
+    async claimPromoGift(giftId) {
+        return apiPost('vault', { action: 'claim-promo-gift' }, { giftId })
+    },
 }
 
 export const bountyService = {
