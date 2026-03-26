@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useRef } from 'react'
+import { lazy, Suspense, useEffect, useState, useRef, useCallback } from 'react'
 import { VaultProvider, useVault } from './vault/VaultContext'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -10,6 +10,7 @@ import PageTitle from '../components/PageTitle'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem, Heart } from 'lucide-react'
 import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
+import PackOpening from './vault/components/PackOpening'
 import './vault/compdeck.css'
 
 function lazyRetry(fn) {
@@ -161,12 +162,15 @@ function VaultInner() {
     const { user } = useAuth()
     const { vaultClaimableCount, refreshBalance, inDiscord, loading: passionLoading } = usePassion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, matchTradePendingCount, setMatchTradePendingCount, setMatchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory } = useVault()
+    const { loading, loaded, vaultBanned, accountTooNew, giftData, pendingTradeCount, matchTradeCount, matchTradePendingCount, setMatchTradePendingCount, setMatchTradeCount, pendingSignatureCount, pendingApprovalCount, inventory, promoGifts, claimPromoGift } = useVault()
     const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
     const desktopMoreRef = useRef(null)
     const unseenGifts = giftData?.unseenCount || 0
     const [showTradematchPromo, setShowTradematchPromo] = useState(() => !localStorage.getItem('tradematch-promo-dismissed'))
     const [showDiscordPromo, setShowDiscordPromo] = useState(() => !localStorage.getItem('discord-join-dismissed') && !sessionStorage.getItem('discord-join-dismissed-session'))
+    const [showPromoGift, setShowPromoGift] = useState(false)
+    const [promoGiftResult, setPromoGiftResult] = useState(null)
+    const [promoGiftClaiming, setPromoGiftClaiming] = useState(false)
     const dismissDiscord = () => {
         setShowDiscordPromo(false)
         sessionStorage.setItem('discord-join-dismissed-session', '1')
@@ -174,6 +178,26 @@ function VaultInner() {
         localStorage.setItem('discord-join-dismiss-count', String(count))
         if (count >= 3) localStorage.setItem('discord-join-dismissed', '1')
     }
+
+    useEffect(() => {
+        if (loaded && promoGifts.length > 0 && !promoGiftResult && !promoGiftClaiming) {
+            setShowPromoGift(true)
+        }
+    }, [loaded, promoGifts.length, promoGiftResult, promoGiftClaiming])
+
+    const handleClaimPromoGift = useCallback(async () => {
+        if (promoGifts.length === 0 || promoGiftClaiming) return
+        setPromoGiftClaiming(true)
+        try {
+            const result = await claimPromoGift(promoGifts[0].id)
+            setShowPromoGift(false)
+            setPromoGiftResult(result)
+        } catch (err) {
+            console.error('Failed to claim promo gift:', err)
+        } finally {
+            setPromoGiftClaiming(false)
+        }
+    }, [promoGifts, promoGiftClaiming, claimPromoGift])
 
     // Poll vaultClaimableCount every 60s while vault is visible
     useEffect(() => {
@@ -430,7 +454,60 @@ function VaultInner() {
 
         </div>
 
-        {showTradematchPromo && user && activeTab !== 'tradematch' && (
+        {/* Promo Gift Available popup */}
+        {showPromoGift && promoGifts.length > 0 && !promoGiftResult && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div
+              className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden p-8 text-center"
+              style={{
+                background: 'linear-gradient(135deg, var(--cd-surface) 0%, rgba(212,175,55,0.1) 100%)',
+                border: '1px solid rgba(212,175,55,0.4)',
+                boxShadow: '0 0 60px rgba(212,175,55,0.2)',
+                animation: 'cd-fade-in 0.3s ease-out',
+              }}
+            >
+              <div className="text-4xl mb-4">🎁</div>
+              <h2 className="text-xl font-bold text-[#d4af37] mb-2">Special Promo Gift Pack</h2>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-2">You've received a special gift!</p>
+              {promoGifts[0].message && (
+                <p className="text-sm text-[var(--color-text-primary)] italic mb-4 border-t border-[var(--cd-border)] pt-3 mt-3">
+                  "{promoGifts[0].message}"
+                </p>
+              )}
+              <button
+                onClick={handleClaimPromoGift}
+                disabled={promoGiftClaiming}
+                className="w-full py-3 rounded-xl font-bold text-black transition-all"
+                style={{
+                  background: promoGiftClaiming ? '#888' : 'linear-gradient(135deg, #d4af37, #f0d060)',
+                  cursor: promoGiftClaiming ? 'wait' : 'pointer',
+                }}
+              >
+                {promoGiftClaiming ? 'Opening...' : 'Open Gift'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Promo Gift Pack Opening animation */}
+        {promoGiftResult && (
+          <PackOpening
+            result={{
+              packName: promoGiftResult.packName,
+              cards: [promoGiftResult.card],
+              packOpenId: null,
+              packType: 'promo-gift',
+            }}
+            packType="promo-gift"
+            onClose={() => {
+              setPromoGiftResult(null)
+              // Check for more promo gifts — the useEffect will re-trigger showPromoGift
+            }}
+            onOpenMore={null}
+          />
+        )}
+
+        {showTradematchPromo && user && activeTab !== 'tradematch' && !showPromoGift && !promoGiftResult && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTradematchPromo(false); localStorage.setItem('tradematch-promo-dismissed', '1') }}>
                 <div
                     className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden p-6 text-center"
@@ -464,7 +541,7 @@ function VaultInner() {
             </div>
         )}
 
-        {showDiscordPromo && !passionLoading && !inDiscord && user && !showTradematchPromo && (
+        {showDiscordPromo && !passionLoading && !inDiscord && user && !showTradematchPromo && !showPromoGift && !promoGiftResult && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={dismissDiscord}>
                 <div
                     className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden p-6 text-center"
