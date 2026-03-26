@@ -117,6 +117,7 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
   const rarity = displayRarity
   const rarityInfo = RARITIES[rarity]
   const holoEffect = getHoloEffect(rarity)
+  const tradeLocked = gameCard?.tradeLocked || playerCard?.tradeLocked || collectionCard?.tradeLocked || false
 
   // Use explicit prop (Starting Five), or look up from owned instances (collection), or fall back
   const matchedInstance = ownedInstances.find(i => i.rarity === rarity)
@@ -216,6 +217,17 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
           </span>
         </div>
 
+        {tradeLocked && (
+          <div className="mt-1.5 flex justify-center">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-xs text-red-400 font-medium">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+              Trade Locked
+            </div>
+          </div>
+        )}
+
         {/* Rarity switcher */}
         {ownedRarities.length > 1 && (
           <div className="mt-2 flex gap-1.5 justify-center flex-wrap">
@@ -256,7 +268,9 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
         {canSell && sellableInstances.length > 0 && !sellMode && !sellSuccess && (
           <button
             onClick={() => setSellMode(true)}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[var(--cd-cyan)]/[0.08] border border-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] text-xs font-bold uppercase tracking-wider cd-head hover:bg-[var(--cd-cyan)]/[0.15] transition-all cursor-pointer"
+            disabled={tradeLocked}
+            title={tradeLocked ? 'This card is trade-locked' : ''}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[var(--cd-cyan)]/[0.08] border border-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] text-xs font-bold uppercase tracking-wider cd-head hover:bg-[var(--cd-cyan)]/[0.15] transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Tag className="w-3.5 h-3.5" />
             Sell on Market
