@@ -191,7 +191,7 @@ async function handleLoad(sql, user) {
   `
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks] = await Promise.all([
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks, promoGifts] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar
@@ -293,6 +293,12 @@ async function handleLoad(sql, user) {
       SELECT pack_type_id FROM cc_pack_rotation_schedule
       WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
     `,
+    sql`
+      SELECT id, card_type, rarity, card_config, message, template_id, tradeable, created_at
+      FROM cc_promo_gifts
+      WHERE recipient_id = ${user.id} AND claimed = false
+      ORDER BY created_at ASC
+    `,
   ])
 
   // Build template cache for collection cards
@@ -372,6 +378,16 @@ async function handleLoad(sql, user) {
         const elapsed = (Date.now() - new Date(lastVend[0].created_at).getTime()) / 1000
         return elapsed < VENDING_COOLDOWN_SECONDS ? Math.ceil(VENDING_COOLDOWN_SECONDS - elapsed) : 0
       })(),
+      promoGifts: promoGifts.map(g => ({
+        id: g.id,
+        cardType: g.card_type,
+        rarity: g.rarity,
+        cardConfig: g.card_config,
+        message: g.message,
+        templateId: g.template_id,
+        tradeable: g.tradeable,
+        createdAt: g.created_at,
+      })),
     }),
   }
 }
@@ -2897,6 +2913,7 @@ function formatCard(row) {
     defPlayerId: row.def_player_id || null,
     signatureUrl: row.signature_url || null,
     templateId: row.template_id || null,
+    tradeLocked: row.trade_locked || false,
   }
 }
 
