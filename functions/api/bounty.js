@@ -18,7 +18,7 @@ const VALID_GOD_IDS = new Set([
   ...CONSUMABLES.map(c => `consumable-${c.id}`),
 ])
 
-const VALID_CARD_TYPES = new Set(['god', 'item', 'consumable', 'player'])
+const VALID_CARD_TYPES = new Set(['god', 'item', 'consumable', 'player', 'staff'])
 const VALID_RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique'])
 const VALID_HOLO_TYPES = new Set(['none', 'holo', 'reverse', 'full', 'any_holo'])
 

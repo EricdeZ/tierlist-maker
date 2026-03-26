@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Passive Indicator — Shape Variations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 20px; margin-bottom: 6px; letter-spacing: 2px; text-transform: uppercase; color: #67e8f9; }
+  .subtitle { text-align: center; color: #64748b; font-size: 12px; margin-bottom: 36px; }
+  .row-label { text-align: center; font-size: 13px; font-weight: 700; color: #67e8f9; letter-spacing: 2px; text-transform: uppercase; margin: 36px 0 16px; }
+  .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 32px; margin-bottom: 8px; }
+  .option { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .option-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; }
+  .option-desc { font-size: 9px; color: #475569; max-width: 140px; text-align: center; line-height: 1.4; }
+
+  /* Card shell */
+  .card {
+    width: 160px; aspect-ratio: 63/88;
+    border-radius: 10px; position: relative; overflow: hidden;
+    background: #12141f; border: 2px solid #3b3260;
+    display: flex; flex-direction: column;
+  }
+  .card::after {
+    content: ''; position: absolute; inset: -1px; border-radius: 10px;
+    background: linear-gradient(135deg, rgba(168,85,247,0.2), transparent 40%);
+    pointer-events: none;
+  }
+  .card-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 7px 4px;
+    background: linear-gradient(180deg, #1a1c2e, #15172a);
+    border-bottom: 1px solid #2a2540; flex-shrink: 0;
+  }
+  .card-top-name { font-size: 9px; font-weight: 800; color: #e8e8f0; }
+  .card-top-role { font-size: 6px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 1px; }
+  .card-image {
+    margin: 3px 7px 0; aspect-ratio: 13/9;
+    background: radial-gradient(circle at 40% 30%, #2a2d45, #181b2e);
+    border: 1px solid #2a2540; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .card-image svg { width: 38px; height: 38px; opacity: 0.2; }
+  .card-image svg path { fill: #8888aa; }
+  .card-subtitle {
+    font-size: 5.5px; font-weight: 600; color: #5a5880;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 2px 7px 0; text-align: center; flex-shrink: 0;
+  }
+  .card-ability {
+    flex: 1; margin: 2px 4px; background: #0e1018;
+    border: 1px solid #1e1d30; border-radius: 3px; padding: 4px 5px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .card-ability-name { font-size: 6px; font-weight: 700; color: #a78bfa; margin-bottom: 2px; }
+  .card-ability-desc { font-size: 5.5px; color: #6b6990; line-height: 1.4; }
+  .card-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3px 7px 4px; flex-shrink: 0;
+  }
+  .card-serial { font-size: 5.5px; color: #3a3855; font-weight: 600; }
+  .card-rarity { font-size: 5.5px; font-weight: 700; color: #a855f7; text-transform: uppercase; }
+
+  /* ══════════════════════════════════════════ */
+  /* All indicators: right edge, image level */
+  .ind {
+    position: absolute; z-index: 10; right: -1px; top: 30%;
+    filter: drop-shadow(0 1px 4px rgba(6,182,212,0.35));
+  }
+  .ind svg.icon { width: 13px; height: 13px; }
+  .ind svg.icon path { fill: #0c1520; }
+
+  /* ── 1: Circle ── */
+  .ind-circle {
+    width: 26px; height: 26px; border-radius: 50% 0 0 50%;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── 2: Shield / crest ── */
+  .ind-shield {
+    width: 24px; display: flex; flex-direction: column; align-items: center;
+  }
+  .ind-shield .sh-top {
+    width: 24px; height: 20px;
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+    border-radius: 6px 0 0 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ind-shield .sh-bottom {
+    width: 24px; height: 12px;
+    background: #06b6d4;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+
+  /* ── 3: Hexagon ── */
+  .ind-hex {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    display: flex; align-items: center; justify-content: center;
+    right: -3px;
+  }
+
+  /* ── 4: Diamond / rotated square ── */
+  .ind-diamond {
+    width: 24px; height: 24px;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    transform: rotate(45deg);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    right: -4px;
+  }
+  .ind-diamond svg.icon { transform: rotate(-45deg); }
+
+  /* ── 5: Rounded rectangle / tag ── */
+  .ind-tag {
+    height: 24px; padding: 0 7px 0 9px;
+    background: linear-gradient(90deg, #06b6d4, #67e8f9);
+    border-radius: 12px 0 0 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── 6: Pennant / flag ── */
+  .ind-pennant {
+    width: 24px; display: flex; flex-direction: column; align-items: center;
+  }
+  .ind-pennant .pn-body {
+    width: 24px; height: 26px;
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+    border-radius: 5px 0 0 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ind-pennant .pn-tail {
+    width: 24px; height: 8px;
+    background: linear-gradient(180deg, #06b6d4, #06b6d4);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 40%, 0 100%);
+  }
+
+  /* ── 7: Ribbon / notched ── */
+  .ind-ribbon {
+    width: 28px; height: 26px;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding-bottom: 4px;
+    border-radius: 4px 0 0 0;
+    right: -1px;
+  }
+
+  /* ── 8: Trapezoid / tab ── */
+  .ind-trap {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding-left: 3px;
+  }
+
+  /* ── 9: Teardrop pointing left ── */
+  .ind-tear {
+    width: 28px; height: 26px;
+    background: linear-gradient(90deg, #06b6d4, #67e8f9);
+    border-radius: 50% 0 0 50%;
+    display: flex; align-items: center; justify-content: center;
+    padding-right: 2px;
+  }
+
+  /* ── 10: Star badge ── */
+  .ind-star {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    clip-path: polygon(50% 0%, 63% 30%, 100% 35%, 72% 58%, 80% 95%, 50% 75%, 20% 95%, 28% 58%, 0% 35%, 37% 30%);
+    display: flex; align-items: center; justify-content: center;
+    right: -4px;
+  }
+  .ind-star svg.icon { width: 11px; height: 11px; }
+
+  /* ── 11: Keyhole / lock shape ── */
+  .ind-keyhole {
+    display: flex; flex-direction: column; align-items: center; right: 1px;
+  }
+  .ind-keyhole .kh-circle {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, #67e8f9, #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ind-keyhole .kh-stem {
+    width: 10px; height: 10px;
+    background: #06b6d4;
+    border-radius: 0 0 2px 2px;
+    margin-top: -3px;
+  }
+
+  /* ── 12: Rounded square with notch ── */
+  .ind-notch {
+    width: 26px; height: 28px;
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+    border-radius: 8px 0 0 8px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .ind-notch::after {
+    content: '';
+    position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+    width: 10px; height: 5px;
+    background: #12141f;
+    border-radius: 5px 5px 0 0;
+  }
+
+  .note { text-align: center; margin-top: 32px; color: #475569; font-size: 11px; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto; }
+</style>
+</head>
+<body>
+
+<h1>Shape Variations</h1>
+<p class="subtitle">Same right-edge image-level position, different shapes</p>
+
+<div class="row-label">Geometric</div>
+<div class="row">
+
+  <div class="option">
+    <div class="option-label">Half Circle</div>
+    <div class="card">
+      <div class="ind ind-circle"><svg class="icon" viewBox="0 0 512 512"><path d="M237.4 20.73c-6.1 42.1-26.8 64.2-63.9 64 31.6 4.5 63.8 8 63.9 64.07-.6-46.1 24.5-63.07 64.1-64.07-38-1.5-64.9-16.3-64.1-64zm127.8 11.58c-9.1 14.25-20.8 21.29-38.9 10.28 14.9 11.79 18.6 24.76 10.2 38.97 8.9-11.18 17.5-22.73 39-10.27-17.8-10.06-18.8-23.57-10.3-38.98zM59.68 41.69c-2.7 18.8-12 28.6-28.5 28.5 14.1 2 28.4 3.6 28.5 28.52-.3-20.5 10.9-28.12 28.5-28.52-16.9-.7-28.9-7.3-28.5-28.5zM431 66.28c-2.7 18.8-12 28.6-28.5 28.5 14.1 2 28.4 3.6 28.5 28.52-.3-20.5 10.9-28.12 28.5-28.52-16.9-.7-28.9-7.3-28.5-28.5z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Coach Ray</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Holo Boost</div><div class="card-ability-desc">Increases odds to pull a specific holo type</div></div>
+      <div class="card-footer"><span class="card-serial">#4827</span><span class="card-rarity">EPIC</span></div>
+    </div>
+    <div class="option-desc">Smooth, minimal</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Hexagon</div>
+    <div class="card">
+      <div class="ind ind-hex"><svg class="icon" viewBox="0 0 512 512"><path d="M260.352 8.924 238.037 59.98c-42.626 4.47-81.168 22.782-111.04 50.36l-16.64-16.64-13.214 13.216 16.744 16.744c-26.084 29.167-43.485 66.252-48.117 107.174L17.826 251.79l47.717 20.853c4.285 42.03 22.02 80.115 48.836 109.87z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Manager Jo</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Unique Hunter</div><div class="card-ability-desc">Blocks legendary/mythic, boosts unique</div></div>
+      <div class="card-footer"><span class="card-serial">#2190</span><span class="card-rarity">EPIC</span></div>
+    </div>
+    <div class="option-desc">Game-y, bold</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Diamond</div>
+    <div class="card">
+      <div class="ind ind-diamond"><svg class="icon" viewBox="0 0 512 512"><path d="M255.76 44.764c-6.176 0-12.353 1.384-17.137 4.152L85.87 137.276c-9.57 5.536-9.57 14.29 0 19.826l152.753 88.36c9.57 5.536 24.703 5.536 34.272 0l152.753-88.36c9.57-5.535 9.57-14.29 0-19.825z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Analyst V</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Odds Boost</div><div class="card-ability-desc">Increases overall card pull odds</div></div>
+      <div class="card-footer"><span class="card-serial">#7712</span><span class="card-rarity">RARE</span></div>
+    </div>
+    <div class="option-desc">Gem-like, eye-catching</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Trapezoid</div>
+    <div class="card">
+      <div class="ind ind-trap"><svg class="icon" viewBox="0 0 512 512"><path d="M247.79 18.734C137.967 17.596 19.874 96.94 19.73 244.53l21.403-51.395c-9.485 72.28-7.75 147.236 38.79 202.502L38.2 377.355c39.24 69.774 126.333 90.976 200.855 92.51z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Scout Kim</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Card Generator</div><div class="card-ability-desc">Generates random cards over time</div></div>
+      <div class="card-footer"><span class="card-serial">#0331</span><span class="card-rarity">LEGENDARY</span></div>
+    </div>
+    <div class="option-desc">Clean tab feel</div>
+  </div>
+
+</div>
+
+<div class="row-label">Emblem / Badge</div>
+<div class="row">
+
+  <div class="option">
+    <div class="option-label">Shield</div>
+    <div class="card">
+      <div class="ind ind-shield">
+        <div class="sh-top"><svg class="icon" viewBox="0 0 512 512"><path d="M258.148 20.822c-1.112.008-2.226.026-3.343.055-39.32 1.041-81.507 15.972-123.785 50.404l-6.028 4.91-5.732-5.25c-12.644-11.578-20.276-27.633-25.653-43.716-8.974 36.98-14.631 81.385-9.232 114.523z"/></svg></div>
+        <div class="sh-bottom"></div>
+      </div>
+      <div class="card-top"><span class="card-top-name">Coach Ray</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Card Reroll</div><div class="card-ability-desc">Reroll 1 card per pack</div></div>
+      <div class="card-footer"><span class="card-serial">#5501</span><span class="card-rarity">EPIC</span></div>
+    </div>
+    <div class="option-desc">Heraldic, prestigious</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Pennant</div>
+    <div class="card">
+      <div class="ind ind-pennant">
+        <div class="pn-body"><svg class="icon" viewBox="0 0 512 512"><path d="M105.063 18.03c71.2 31.42 129.344 86.117 152.5 155.75 23.155-69.633 78.953-124.33 150.03-155.75h-36.156c-53.802 15.416-89.834 45.46-107.25 92 2.238-52.074 18.275-78.34 40.25-92H203.094z"/></svg></div>
+        <div class="pn-tail"></div>
+      </div>
+      <div class="card-top"><span class="card-top-name">Medic Alex</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Collector Boost</div><div class="card-ability-desc">Boosts odds for unowned cards</div></div>
+      <div class="card-footer"><span class="card-serial">#8843</span><span class="card-rarity">RARE</span></div>
+    </div>
+    <div class="option-desc">Flag-like, distinct</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Ribbon</div>
+    <div class="card">
+      <div class="ind ind-ribbon"><svg class="icon" viewBox="0 0 512 512"><path d="M272.824 24.318c-14.929.312-25.66 3.246-32.767 8.446L142.899 84.91l-54.106 73.514C77.42 175.98 85.518 210 121.112 188.197l38.9-51.351z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Trainer Li</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Pack Reroll</div><div class="card-ability-desc">Reroll whole pack, lose 1 card</div></div>
+      <div class="card-footer"><span class="card-serial">#6190</span><span class="card-rarity">MYTHIC</span></div>
+    </div>
+    <div class="option-desc">Notched bottom, clean</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Star</div>
+    <div class="card">
+      <div class="ind ind-star"><svg class="icon" viewBox="0 0 512 512"><path d="M237.4 20.73c-6.1 42.1-26.8 64.2-63.9 64 31.6 4.5 63.8 8 63.9 64.07-.6-46.1 24.5-63.07 64.1-64.07-38-1.5-64.9-16.3-64.1-64zm127.8 11.58c-9.1 14.25-20.8 21.29-38.9 10.28 14.9 11.79 18.6 24.76 10.2 38.97 8.9-11.18 17.5-22.73 39-10.27-17.8-10.06-18.8-23.57-10.3-38.98z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Coach Ray</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Holo Boost</div><div class="card-ability-desc">Increases holo type odds</div></div>
+      <div class="card-footer"><span class="card-serial">#3340</span><span class="card-rarity">EPIC</span></div>
+    </div>
+    <div class="option-desc">Flashy, special feel</div>
+  </div>
+
+</div>
+
+<div class="row-label">Rounded / Soft</div>
+<div class="row">
+
+  <div class="option">
+    <div class="option-label">Rounded Tab</div>
+    <div class="card">
+      <div class="ind ind-tag"><svg class="icon" viewBox="0 0 512 512"><path d="M260.352 8.924 238.037 59.98c-42.626 4.47-81.168 22.782-111.04 50.36l-16.64-16.64-13.214 13.216 16.744 16.744c-26.084 29.167-43.485 66.252-48.117 107.174L17.826 251.79l47.717 20.853z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Scout Kim</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Unique Hunter</div><div class="card-ability-desc">Blocks legendary/mythic, boosts unique</div></div>
+      <div class="card-footer"><span class="card-serial">#1122</span><span class="card-rarity">RARE</span></div>
+    </div>
+    <div class="option-desc">Pill shape, sleek</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Teardrop</div>
+    <div class="card">
+      <div class="ind ind-tear"><svg class="icon" viewBox="0 0 512 512"><path d="M255.76 44.764c-6.176 0-12.353 1.384-17.137 4.152L85.87 137.276c-9.57 5.536-9.57 14.29 0 19.826l152.753 88.36c9.57 5.536 24.703 5.536 34.272 0l152.753-88.36c9.57-5.535 9.57-14.29 0-19.825z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Medic Alex</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Odds Boost</div><div class="card-ability-desc">Increases overall pull odds</div></div>
+      <div class="card-footer"><span class="card-serial">#9901</span><span class="card-rarity">LEGENDARY</span></div>
+    </div>
+    <div class="option-desc">Organic, smooth</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Keyhole</div>
+    <div class="card">
+      <div class="ind ind-keyhole">
+        <div class="kh-circle"><svg class="icon" viewBox="0 0 512 512"><path d="M247.79 18.734C137.967 17.596 19.874 96.94 19.73 244.53l21.403-51.395c-9.485 72.28-7.75 147.236 38.79 202.502L38.2 377.355c39.24 69.774 126.333 90.976 200.855 92.51z"/></svg></div>
+        <div class="kh-stem"></div>
+      </div>
+      <div class="card-top"><span class="card-top-name">Trainer Li</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Card Generator</div><div class="card-ability-desc">Generates random cards over time</div></div>
+      <div class="card-footer"><span class="card-serial">#4455</span><span class="card-rarity">MYTHIC</span></div>
+    </div>
+    <div class="option-desc">Unique, mystery vibe</div>
+  </div>
+
+  <div class="option">
+    <div class="option-label">Notched Pill</div>
+    <div class="card">
+      <div class="ind ind-notch"><svg class="icon" viewBox="0 0 512 512"><path d="M105.063 18.03c71.2 31.42 129.344 86.117 152.5 155.75 23.155-69.633 78.953-124.33 150.03-155.75h-36.156c-53.802 15.416-89.834 45.46-107.25 92 2.238-52.074 18.275-78.34 40.25-92H203.094z"/></svg></div>
+      <div class="card-top"><span class="card-top-name">Coach Ray</span><span class="card-top-role">STAFF</span></div>
+      <div class="card-image"><svg viewBox="0 0 512 512"><path d="M256 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 240c-88.4 0-160 35.8-160 80v48h320v-48c0-44.2-71.6-80-160-80z"/></svg></div>
+      <div class="card-subtitle">SUPPORT STAFF</div>
+      <div class="card-ability"><div class="card-ability-name">Collector Boost</div><div class="card-ability-desc">Boosts odds for unowned cards</div></div>
+      <div class="card-footer"><span class="card-serial">#7788</span><span class="card-rarity">RARE</span></div>
+    </div>
+    <div class="option-desc">Subtle, polished</div>
+  </div>
+
+</div>
+
+<div class="note">All positioned on the right edge at image level. Same spot, 12 different shapes.</div>
+
+</body>
+</html>

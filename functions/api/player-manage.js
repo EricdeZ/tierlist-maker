@@ -2,6 +2,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders as headers } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { logAudit } from '../lib/audit.js'
+import { ensurePlayerDef } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -115,7 +116,7 @@ const handler = async (event) => {
             case 'update-player-info':
                 return await updatePlayerInfo(sql, body, admin)
             case 'bulk-enroll-season':
-                return await bulkEnrollSeason(sql, body, admin)
+                return await bulkEnrollSeason(sql, body, admin, event)
             case 'delete-player':
                 return await deletePlayer(sql, body, admin)
             default:
@@ -169,7 +170,7 @@ async function updatePlayerInfo(sql, { player_id, discord_name, tracker_url, mai
  * Creates league_players entries for each player_id in the target season/team.
  * Skips players who already have an active entry in that season.
  */
-async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, admin) {
+async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, admin, event) {
     if (!player_ids?.length || !season_id || !team_id) {
         return {
             statusCode: 400,
@@ -178,7 +179,7 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
         }
     }
 
-    const results = { enrolled: 0, skipped: 0, reactivated: 0, details: [] }
+    const results = { enrolled: 0, skipped: 0, reactivated: 0, details: [], _newLpIds: [] }
 
     // Look up default roles for all players being enrolled
     const playerDefaults = role ? {} : Object.fromEntries(
@@ -210,16 +211,26 @@ async function bulkEnrollSeason(sql, { player_ids, season_id, team_id, role }, a
             results.reactivated++
             results.details.push({ player_id: pid, status: 'reactivated' })
         } else {
-            await sql`
+            const [newLp] = await sql`
                 INSERT INTO league_players (player_id, team_id, season_id, role, is_active)
                 VALUES (${pid}, ${team_id}, ${season_id}, ${effectiveRole}, true)
+                RETURNING id
             `
             results.enrolled++
             results.details.push({ player_id: pid, status: 'enrolled' })
+            results._newLpIds.push(newLp.id)
         }
     }
 
     await logAudit(sql, admin, { action: 'bulk-enroll-season', endpoint: 'player-manage', targetType: 'season', targetId: season_id, details: { team_id, player_count: player_ids.length, enrolled: results.enrolled, skipped: results.skipped, reactivated: results.reactivated } })
+
+    // Auto-generate vault card defs for newly enrolled players (fire-and-forget)
+    if (results._newLpIds.length) {
+        event.waitUntil(
+            Promise.all(results._newLpIds.map(id => ensurePlayerDef(sql, id)))
+                .catch(err => console.error('Auto card def generation failed:', err))
+        )
+    }
 
     return {
         statusCode: 200,

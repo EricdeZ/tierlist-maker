@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import PageTitle from '../../components/PageTitle'
 import { packCreatorService, vaultDashboardService } from '../../services/database'
 
-const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'collection']
+const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'staff']
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const RARITY_COLORS = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',

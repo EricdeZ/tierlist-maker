@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { setImpersonation, clearImpersonation, referralService } from '../services/database.js'
+import { setImpersonation, clearImpersonation, referralService, vaultService } from '../services/database.js'
 
 const AuthContext = createContext(null)
 
@@ -15,6 +15,42 @@ export const AuthProvider = ({ children }) => {
     const [impersonateId, setImpersonateId] = useState(() => localStorage.getItem('impersonate_user_id'))
     const [notification, setNotification] = useState(null)
     const [vaultBanned, setVaultBanned] = useState(false)
+
+    // Device fingerprint tracking for alt detection
+    const trackDevice = useCallback((userId) => {
+        try {
+            const DEVICE_KEY = 'X3Zk'   // btoa('_vd')
+            const HISTORY_KEY = 'X3Zw'  // btoa('_vp')
+
+            let deviceId = localStorage.getItem(DEVICE_KEY)
+            if (!deviceId) {
+                deviceId = crypto.randomUUID()
+                localStorage.setItem(DEVICE_KEY, deviceId)
+            }
+
+            let history = []
+            try {
+                history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+                if (!Array.isArray(history)) history = []
+            } catch { history = [] }
+
+            const encoded = btoa(String(userId))
+            const isNew = !history.includes(encoded)
+
+            const previousIds = isNew && history.length > 0
+                ? history.map(h => { try { return atob(h) } catch { return null } }).filter(Boolean)
+                : null
+
+            if (isNew) {
+                history.push(encoded)
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+            }
+
+            vaultService.logDevice(deviceId, previousIds).catch(() => {})
+        } catch {
+            // Never let tracking break the login flow
+        }
+    }, [])
 
     // On mount: check URL for auth_token (from OAuth redirect)
     useEffect(() => {
@@ -97,6 +133,7 @@ export const AuthProvider = ({ children }) => {
                     setImpersonating(!!data.impersonating)
                     setRealUser(data.realUser || null)
                     setVaultBanned(!!data.vaultBanned)
+                    if (!data.impersonating) trackDevice(data.user.id)
                 }
             } catch {
                 if (!cancelled) {
@@ -116,7 +153,7 @@ export const AuthProvider = ({ children }) => {
 
         fetchUser()
         return () => { cancelled = true }
-    }, [token, impersonateId])
+    }, [token, impersonateId, trackDevice])
 
     // Auto-claim pending website referral for already-logged-in users
     useEffect(() => {

@@ -8,7 +8,7 @@ import { resolvePredictions } from '../lib/predictions.js'
 import { updateForgeAfterMatch } from '../lib/forge.js'
 import { sendChannelMessage } from '../lib/discord.js'
 import { advanceFromMatch } from '../lib/advancement.js'
-import { refreshBestGods, syncRoleToVault } from '../lib/vault-defs.js'
+import { refreshBestGods, updatePlayerRoles, ensurePlayerDef } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -60,55 +60,6 @@ const handler = async (event) => {
             statusCode: 500,
             headers,
             body: JSON.stringify({ error: 'Internal server error' }),
-        }
-    }
-}
-
-/**
- * Update league_player role/secondary_role based on their most recent games.
- * role = what they played last game, secondary_role = the game before that.
- */
-async function updatePlayerRoles(sql, matchId) {
-    const players = await sql`
-        SELECT DISTINCT pgs.league_player_id FROM player_game_stats pgs
-        JOIN league_players lp ON lp.id = pgs.league_player_id
-        WHERE pgs.game_id IN (SELECT id FROM games WHERE match_id = ${matchId})
-        AND pgs.role_played IS NOT NULL
-        AND lp.roster_status != 'sub'
-    `
-
-    for (const { league_player_id } of players) {
-        // Find primary role (most recent game)
-        const [latest] = await sql`
-            SELECT pgs.role_played
-            FROM player_game_stats pgs
-            JOIN games g ON g.id = pgs.game_id
-            WHERE pgs.league_player_id = ${league_player_id}
-            AND pgs.role_played IS NOT NULL
-            ORDER BY g.id DESC
-            LIMIT 1
-        `
-
-        if (latest) {
-            const role = latest.role_played
-            // Secondary = most recent game where they played a different role
-            const [secondary] = await sql`
-                SELECT pgs.role_played
-                FROM player_game_stats pgs
-                JOIN games g ON g.id = pgs.game_id
-                WHERE pgs.league_player_id = ${league_player_id}
-                AND pgs.role_played IS NOT NULL
-                AND pgs.role_played != ${role}
-                ORDER BY g.id DESC
-                LIMIT 1
-            `
-            const secondaryRole = secondary?.role_played || null
-            await sql`
-                UPDATE league_players
-                SET role = ${role}, secondary_role = ${secondaryRole}, updated_at = NOW()
-                WHERE id = ${league_player_id}
-            `
-            await syncRoleToVault(sql, league_player_id, role)
         }
     }
 }
@@ -238,7 +189,7 @@ async function submitMatch(sql, body, admin, event) {
                                 ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
                                 ${player.gpm ?? null}, ${player.structure_damage ?? null},
                                 ${player.self_healing ?? null}, ${player.ally_healing ?? null},
-                                ${player.role_played || null}
+                                ${player.role_played?.toLowerCase() || null}
                             )
                         `
                     }
@@ -265,7 +216,7 @@ async function submitMatch(sql, body, admin, event) {
                                 ${player.damage ?? null}, ${player.mitigated ?? null}, ${player.god_played || 'Unknown'},
                                 ${player.gpm ?? null}, ${player.structure_damage ?? null},
                                 ${player.self_healing ?? null}, ${player.ally_healing ?? null},
-                                ${player.role_played || null}
+                                ${player.role_played?.toLowerCase() || null}
                             )
                         `
                     }
@@ -290,7 +241,7 @@ async function submitMatch(sql, body, admin, event) {
                 }
             }
 
-            return { match_id: matchId, games: gameResults, scheduled_linked: !!scheduled_match_id }
+            return { match_id: matchId, games: gameResults, scheduled_linked: !!scheduled_match_id, newLeaguePlayerIds: playerCache._newLpIds || [] }
         })
 
         if (admin) {
@@ -327,6 +278,14 @@ async function submitMatch(sql, body, admin, event) {
             updatePlayerRoles(sql, result.match_id)
                 .catch(err => console.error('Player role update failed:', err))
         )
+
+        // Auto-generate vault card defs for any newly created league_players (fire-and-forget)
+        if (result.newLeaguePlayerIds.length) {
+            event.waitUntil(
+                Promise.all(result.newLeaguePlayerIds.map(id => ensurePlayerDef(sql, id)))
+                    .catch(err => console.error('Auto card def generation failed:', err))
+            )
+        }
 
         // Refresh best_god_name on card defs for avatar fallback (fire-and-forget)
         event.waitUntil(
@@ -533,6 +492,8 @@ async function resolveLeaguePlayerId(tx, player, teamId, seasonId, cache) {
     `
 
     cache[cacheKey] = newLp.id
+    if (!cache._newLpIds) cache._newLpIds = []
+    cache._newLpIds.push(newLp.id)
     return newLp.id
 }
 export const onRequest = adapt(handler)

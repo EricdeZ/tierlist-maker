@@ -5,7 +5,7 @@ import { requireAuth } from '../lib/auth.js'
 import { getVaultStats, pushChallengeProgress } from '../lib/challenges.js'
 import {
   getTradePile, addToTradePile, removeFromTradePile, getTradePileCount,
-  getSwipeFeed, recordSwipe,
+  getSwipeFeed, recordSwipe, deleteSwipe,
   getLikes, createTradeFromLike,
   getMatches, getOfferDetail,
   offerAddCard, offerRemoveCard, offerSetCore, offerSend, offerAccept, offerCancel,
@@ -56,6 +56,7 @@ const handler = async (event) => {
         case 'trade-pile-add': return await handleTradePileAdd(sql, user, body)
         case 'trade-pile-remove': return await handleTradePileRemove(sql, user, body)
         case 'swipe': return await handleSwipe(sql, user, body)
+        case 'unswipe': return await handleUnswipe(sql, user, body)
         case 'likes-trade': return await handleLikesTrade(sql, user, body)
         case 'offer-add-card': return await handleOfferAddCard(sql, user, body)
         case 'offer-remove-card': return await handleOfferRemoveCard(sql, user, body)
@@ -135,6 +136,13 @@ async function handleSwipe(sql, user, body) {
   }
 
   const result = await recordSwipe(sql, user.id, parseInt(cardId))
+  return { statusCode: 200, headers, body: JSON.stringify(result) }
+}
+
+async function handleUnswipe(sql, user, body) {
+  const { cardId } = body
+  if (!cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+  const result = await deleteSwipe(sql, user.id, parseInt(cardId))
   return { statusCode: 200, headers, body: JSON.stringify(result) }
 }
 

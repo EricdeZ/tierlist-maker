@@ -4,7 +4,7 @@ import { requirePermission, getLeagueIdFromLeaguePlayer, getLeagueIdFromSeason }
 import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
 import { mergeForgeHoldings, sellOwnTeamHoldings, cleanupForgeAfterTeamChange, ensurePlayerSparks } from '../lib/forge.js'
-import { syncRoleToVault } from '../lib/vault-defs.js'
+import { syncRoleToVault, ensurePlayerDef } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -96,7 +96,8 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
     }
 
     const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'fill']
-    if (!validRoles.includes(role.toLowerCase())) {
+    const normalizedRole = role.toLowerCase()
+    if (!validRoles.includes(normalizedRole)) {
         return {
             statusCode: 400,
             headers,
@@ -106,7 +107,7 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
 
     const [updated] = await sql`
         UPDATE league_players
-        SET role = ${role}, secondary_role = ${secondary_role || null}, updated_at = NOW()
+        SET role = ${normalizedRole}, secondary_role = ${secondary_role || null}, updated_at = NOW()
         WHERE id = ${league_player_id}
         RETURNING id, role, secondary_role
     `
@@ -115,7 +116,7 @@ async function changeRole(sql, { league_player_id, role, secondary_role }, admin
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'League player not found' }) }
     }
 
-    await syncRoleToVault(sql, league_player_id, role)
+    await syncRoleToVault(sql, league_player_id, normalizedRole)
     await logAudit(sql, admin, { action: 'change-role', endpoint: 'roster-manage', targetType: 'league_player', targetId: league_player_id, details: { role, secondary_role } })
 
     return {
@@ -312,7 +313,7 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Team not found in this season' }) }
     }
 
-    const effectiveRole = role || player.main_role || 'fill'
+    const effectiveRole = (role || player.main_role || 'fill').toLowerCase()
 
     // Check if player already has an active league_player entry for this season
     const [existing] = await sql`
@@ -353,6 +354,12 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
             details: { reactivated: true },
         })
 
+        // Auto-generate vault card def for new team (fire-and-forget)
+        event.waitUntil(
+            ensurePlayerDef(sql, existing.id)
+                .catch(err => console.error('Auto card def generation failed:', err))
+        )
+
         return {
             statusCode: 200,
             headers,
@@ -377,6 +384,12 @@ async function addPlayerToTeam(sql, { player_id, team_id, season_id, role }, adm
         type: 'pickup', toTeamId: team_id, toTeamName: toTeam.name,
         toStatus: 'member', admin,
     })
+
+    // Auto-generate vault card def (fire-and-forget)
+    event.waitUntil(
+        ensurePlayerDef(sql, result.newLp.id)
+            .catch(err => console.error('Auto card def generation failed:', err))
+    )
 
     return {
         statusCode: 200,
@@ -430,7 +443,7 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_ro
         }
     }
 
-    const effectiveRole = role || main_role || 'fill'
+    const effectiveRole = (role || main_role || 'fill').toLowerCase()
 
     const result = await transaction(async (tx) => {
         const [player] = await tx`
@@ -457,6 +470,12 @@ async function createAndAddPlayer(sql, { name, team_id, season_id, role, main_ro
         type: 'create-and-add', toTeamId: team_id, toTeamName: toTeam?.name,
         toStatus: 'member', admin,
     })
+
+    // Auto-generate vault card def (fire-and-forget)
+    event.waitUntil(
+        ensurePlayerDef(sql, result.league_player.id)
+            .catch(err => console.error('Auto card def generation failed:', err))
+    )
 
     return {
         statusCode: 200,

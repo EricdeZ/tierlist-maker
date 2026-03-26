@@ -1,6 +1,7 @@
 import './GameCard.css'
 import { RARITIES } from '../../../data/vault/economy'
 import { CLASS_DAMAGE, CLASS_ROLE } from '../../../data/vault/gods'
+import PassiveIndicator from './PassiveIndicator'
 
 const ABILITY_ICONS = {
   damage: 'Dmg', aoe_damage: 'AOE', heal: 'Heal', buff: 'Buff',
@@ -24,7 +25,7 @@ function itemCatSlug(category) {
   return category.toLowerCase().replace(/\s+/g, '-')
 }
 
-export default function GameCard({ type = 'god', rarity = 'common', data, compact, size, onClick }) {
+export default function GameCard({ type = 'god', rarity = 'common', data, compact, size, onClick, passiveName }) {
   const rarityInfo = RARITIES[rarity] || RARITIES.common
   const role = type === 'god' ? (data.role || CLASS_ROLE[data.class] || 'mid') : null
   const scale = size ? parseFloat(size) / 240 : NaN
@@ -57,6 +58,7 @@ export default function GameCard({ type = 'god', rarity = 'common', data, compac
           )}
         </div>
       </div>
+      {(passiveName || data.passiveName) && <PassiveIndicator passiveName={passiveName || data.passiveName} size={size ? parseFloat(size) : 240} />}
     </div>
   )
 }

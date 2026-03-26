@@ -2,7 +2,7 @@ import { RARITIES } from '../../../data/vault/economy'
 import WantedPoster from '../components/WantedPoster'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-const CARD_TYPES = ['god', 'player', 'item', 'consumable']
+const CARD_TYPES = ['god', 'player', 'item', 'consumable', 'staff']
 const HOLO_TYPES = ['holo', 'reverse', 'full', 'any_holo']
 const HOLO_LABELS = { holo: 'Holo', reverse: 'Reverse', full: 'Full Art', any_holo: 'All' }
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']

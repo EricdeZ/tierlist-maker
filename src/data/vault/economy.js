@@ -57,8 +57,11 @@ export const DISMANTLE_TIERS = [
   { upTo: Infinity, rate: 0.25 },
 ];
 
-export function getDismantleMultiplier(valueAccumulated) {
-  for (const tier of DISMANTLE_TIERS) {
+export function getDismantleMultiplier(valueAccumulated, thresholdMult = 1) {
+  const tiers = thresholdMult > 1
+    ? DISMANTLE_TIERS.map(t => ({ ...t, upTo: t.upTo === Infinity ? Infinity : t.upTo * thresholdMult }))
+    : DISMANTLE_TIERS;
+  for (const tier of tiers) {
     if (valueAccumulated < tier.upTo) return tier.rate;
   }
   return 0.1;
@@ -151,6 +154,15 @@ export const GOD_SYNERGY_BONUS = 0.40;
 export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 };
 
 export const STARTING_FIVE_CAP_DAYS = 2;
+
+// Staff card slots — flat cores/day + multiplier, no Passion
+export const S5_STAFF_FLAT_CORES = {
+  uncommon: 0.02, rare: 0.05, epic: 0.10, legendary: 0.15, mythic: 0.20, unique: 0.25,
+};
+
+export const S5_STAFF_MULT = {
+  uncommon: 1.03, rare: 1.06, epic: 1.09, legendary: 1.12, mythic: 1.15, unique: 1.18,
+};
 
 export const CONSUMABLE_EFFECTS = {
   'health-pot': {

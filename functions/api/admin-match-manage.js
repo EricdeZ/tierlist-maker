@@ -5,6 +5,7 @@ import { logAudit } from '../lib/audit.js'
 import { getMatchAffectedUsers, recalcMatchChallenges } from '../lib/challenges.js'
 import { recalcForgePerformance } from '../lib/forge.js'
 import { advanceFromMatch } from '../lib/advancement.js'
+import { updatePlayerRoles, recalcPlayerRolesByIds } from '../lib/vault-defs.js'
 
 const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -211,8 +212,15 @@ async function deleteMatch(sql, body, admin, isOwnOnly, event) {
         if (err) return { statusCode: 403, headers, body: JSON.stringify({ error: err }) }
     }
 
-    // Capture affected users and season BEFORE deletion (join chain breaks after)
+    // Capture affected users, players, and season BEFORE deletion (join chain breaks after)
     const affectedUsers = await getMatchAffectedUsers(sql, match_id)
+    const affectedPlayers = await sql`
+        SELECT DISTINCT pgs.league_player_id FROM player_game_stats pgs
+        JOIN league_players lp ON lp.id = pgs.league_player_id
+        WHERE pgs.game_id IN (SELECT id FROM games WHERE match_id = ${match_id})
+        AND pgs.role_played IS NOT NULL AND lp.roster_status != 'sub'
+    `
+    const affectedPlayerIds = affectedPlayers.map(p => p.league_player_id)
     const [matchRow] = await sql`SELECT season_id FROM matches WHERE id = ${match_id}`
 
     await transaction(async (tx) => {
@@ -234,6 +242,14 @@ async function deleteMatch(sql, body, admin, isOwnOnly, event) {
         recalcMatchChallenges(sql, affectedUsers)
             .catch(err => console.error('Challenge recalc after match delete failed:', err))
     )
+
+    // Update player roles from remaining game history (fire-and-forget)
+    if (affectedPlayerIds.length) {
+        event.waitUntil(
+            recalcPlayerRolesByIds(sql, affectedPlayerIds)
+                .catch(err => console.error('Player role update after match delete failed:', err))
+        )
+    }
 
     // Recalculate forge performance scores (fire-and-forget)
     if (matchRow) {
@@ -291,6 +307,12 @@ async function deleteGame(sql, body, admin, isOwnOnly, event) {
     event.waitUntil(
         recalcMatchChallenges(sql, affectedUsers)
             .catch(err => console.error('Challenge recalc after game delete failed:', err))
+    )
+
+    // Update player roles based on remaining games (fire-and-forget)
+    event.waitUntil(
+        updatePlayerRoles(sql, match_id)
+            .catch(err => console.error('Player role update after game delete failed:', err))
     )
 
     // Recalculate forge performance scores (fire-and-forget)
@@ -393,7 +415,7 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
                         ${p.damage || null}, ${p.mitigated || null}, ${p.god_played || 'Unknown'},
                         ${p.gpm || null}, ${p.structure_damage || null},
                         ${p.self_healing || null}, ${p.ally_healing || null},
-                        ${p.role_played || null}
+                        ${p.role_played?.toLowerCase() || null}
                     )
                 `
             }
@@ -410,6 +432,12 @@ async function saveGame(sql, body, admin, isOwnOnly, event) {
         getMatchAffectedUsers(sql, match_id)
             .then(users => recalcMatchChallenges(sql, users))
             .catch(err => console.error('Challenge recalc after game save failed:', err))
+    )
+
+    // Update player roles based on recent games (fire-and-forget)
+    event.waitUntil(
+        updatePlayerRoles(sql, match_id)
+            .catch(err => console.error('Player role update after game save failed:', err))
     )
 
     // Recalculate forge performance scores (fire-and-forget)

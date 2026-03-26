@@ -26,10 +26,6 @@ const handler = async (event) => {
     const body = JSON.parse(event.body || '{}')
     const { deviceId, previousIds } = body
 
-    if (!deviceId) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'deviceId required' }) }
-    }
-
     const ip =
       event.headers?.['cf-connecting-ip'] ||
       event.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -37,7 +33,7 @@ const handler = async (event) => {
 
     await sql`
       INSERT INTO cc_vault_device_log (user_id, device_id, ip_address)
-      VALUES (${user.id}, ${deviceId}, ${ip})
+      VALUES (${user.id}, ${deviceId || null}, ${ip})
     `
 
     if (Array.isArray(previousIds) && previousIds.length > 0) {
@@ -52,14 +48,14 @@ const handler = async (event) => {
 
         const [existing] = await sql`
           SELECT id FROM cc_vault_device_flags
-          WHERE (user_a_id = ${user.id} AND user_b_id = ${prevId})
-             OR (user_a_id = ${prevId} AND user_b_id = ${user.id})
+          WHERE (user_id_a = ${user.id} AND user_id_b = ${prevId})
+             OR (user_id_a = ${prevId} AND user_id_b = ${user.id})
         `
         if (existing) continue
 
         await sql`
-          INSERT INTO cc_vault_device_flags (user_a_id, user_b_id)
-          VALUES (${user.id}, ${prevId})
+          INSERT INTO cc_vault_device_flags (user_id_a, user_id_b, device_id)
+          VALUES (${user.id}, ${prevId}, ${deviceId})
         `
       }
     }
@@ -77,8 +73,9 @@ const handler = async (event) => {
     const flags = await sql`
       SELECT
         f.id,
-        f.user_a_id,
-        f.user_b_id,
+        f.user_id_a,
+        f.user_id_b,
+        f.device_id,
         f.resolved,
         f.resolved_by,
         f.resolved_at,
@@ -88,8 +85,8 @@ const handler = async (event) => {
         ub.discord_username AS user_b_name,
         ub.discord_id       AS user_b_discord_id
       FROM cc_vault_device_flags f
-      JOIN users ua ON ua.id = f.user_a_id
-      JOIN users ub ON ub.id = f.user_b_id
+      JOIN users ua ON ua.id = f.user_id_a
+      JOIN users ub ON ub.id = f.user_id_b
       ORDER BY f.resolved ASC, f.flagged_at DESC
       LIMIT 100
     `
@@ -103,12 +100,17 @@ const handler = async (event) => {
       return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'Permission denied' }) }
     }
 
-    const { userId } = event.queryStringParameters || {}
-    if (!userId) {
-      return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'userId required' }) }
+    const { userId, username } = event.queryStringParameters || {}
+    if (!userId && !username) {
+      return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'userId or username required' }) }
     }
 
-    const uid = parseInt(userId, 10)
+    let uid = userId ? parseInt(userId, 10) : null
+    if (!uid && username) {
+      const [found] = await sql`SELECT id FROM users WHERE LOWER(discord_username) = LOWER(${username}) LIMIT 1`
+      if (!found) return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ matches: [], targetIps: [], targetDevices: [], error: 'User not found' }) }
+      uid = found.id
+    }
 
     const targetIps = await sql`
       SELECT DISTINCT ip_address FROM cc_vault_device_log
@@ -116,7 +118,7 @@ const handler = async (event) => {
     `
     const targetDevices = await sql`
       SELECT DISTINCT device_id FROM cc_vault_device_log
-      WHERE user_id = ${uid}
+      WHERE user_id = ${uid} AND device_id IS NOT NULL
     `
 
     const ipList = targetIps.map(r => r.ip_address)
@@ -178,6 +180,22 @@ const handler = async (event) => {
     }
 
     return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ ok: true }) }
+  }
+
+  if (action === 'recent-log') {
+    const admin = await requirePermission(event, 'cardclash_manage')
+    if (!admin) {
+      return { statusCode: 403, headers: adminHeaders, body: JSON.stringify({ error: 'Permission denied' }) }
+    }
+
+    const logs = await sql`
+      SELECT l.id, l.user_id, u.discord_username, l.device_id, l.ip_address, l.logged_at
+      FROM cc_vault_device_log l
+      JOIN users u ON u.id = l.user_id
+      ORDER BY l.logged_at DESC
+      LIMIT 100
+    `
+    return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ logs }) }
   }
 
   return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }

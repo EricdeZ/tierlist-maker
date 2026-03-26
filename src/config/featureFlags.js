@@ -10,6 +10,7 @@ export const FEATURE_FLAGS = {
     CARD_CLASH_RELEASED: true,             // Card Clash mini-game
     VAULT_OPEN: true,                      // The Vault open to all authenticated users
     VAULT_MAINTENANCE: false,              // The Vault maintenance mode (admins bypass)
+    STAFF_CARDS_RELEASED: false,           // Staff card slots in Starting 5 (admins bypass)
 }
 
 /**

@@ -29,6 +29,14 @@ const S5_FULL_ATT_RATIO = 0.6
 const GOD_SYNERGY_BONUS = 0.40
 export const TEAM_SYNERGY_BONUS = { 2: 0.20, 3: 0.30, 4: 0.45, 5: 0.60, 6: 0.60 }
 
+// Staff card slots — flat cores/day + multiplier, no Passion
+const S5_STAFF_FLAT_CORES = {
+  uncommon: 0.02, rare: 0.05, epic: 0.10, legendary: 0.15, mythic: 0.20, unique: 0.25,
+}
+const S5_STAFF_MULT = {
+  uncommon: 1.03, rare: 1.06, epic: 1.09, legendary: 1.12, mythic: 1.15, unique: 1.18,
+}
+
 // Lower number = higher rarity (matches RARITIES.tier in economy.js)
 const RARITY_TIER = { common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1, mythic: 0, unique: -1 }
 
@@ -90,6 +98,13 @@ export function getCardContribution(holoType, rarity, effectiveness = 1.0) {
   return { type: 'none' }
 }
 
+export function getStaffContribution(rarity) {
+  const cores = S5_STAFF_FLAT_CORES[rarity] || 0
+  const mult = S5_STAFF_MULT[rarity] || 1
+  if (cores === 0 && mult === 1) return { type: 'none' }
+  return { type: 'staff', cores, passion: 0, multiplier: mult }
+}
+
 function getAttachmentBonus(attachment, type, playerHasFlat, playerHasMult, synergy = false) {
   if (!attachment?.holo_type || !attachment?.rarity) return { flatBoost: 0, multAdd: 0 }
 
@@ -127,6 +142,16 @@ export function calculateLineupOutput(cards, teamCounts = {}) {
 
   for (const card of cards) {
     if (isRoleMismatch(card)) continue
+
+    // Staff cards: dedicated path, no attachments, no team synergy
+    if (card.card_type === 'staff') {
+      const staffContrib = getStaffContribution(card.rarity)
+      if (staffContrib.type === 'staff') {
+        totalFlatCores += staffContrib.cores
+        totalMult += (staffContrib.multiplier - 1)
+      }
+      continue
+    }
 
     const effectiveness = card.isBench ? S5_BENCH_EFFECTIVENESS : 1.0
     const contrib = getCardContribution(card.holo_type, card.rarity, effectiveness)
@@ -189,7 +214,7 @@ function reshapeAttachments(row) {
 }
 
 export function isRoleMismatch(card) {
-  if (card.slot_role === 'bench') return false
+  if (card.slot_role === 'bench' || card.slot_role === 'cheerleader' || card.slot_role === 'staff') return false
   return card.slot_role && card.role && card.role !== card.slot_role && card.role !== 'fill'
 }
 
@@ -429,7 +454,7 @@ export async function collectIncome(sql, userId) {
 }
 
 export async function slotCard(sql, userId, cardId, role, slotType = 'player', lineupType = 'current') {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench', 'cheerleader', 'staff']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
   if (!['current', 'allstar'].includes(lineupType)) throw new Error('Invalid lineup type')
 
@@ -451,45 +476,71 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
   if (inBinder) throw new Error('Card is in your binder — remove it first')
 
   if (slotType === 'player') {
-    if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
-    if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
-    if (role !== 'bench' && card.role !== role && card.role !== 'fill') {
-      throw new Error(`Card role (${card.role}) does not match slot (${role})`)
-    }
+    // Staff slots only accept staff cards
+    if (role === 'cheerleader' || role === 'staff') {
+      if (card.card_type !== 'staff') throw new Error('Only staff cards can be slotted in staff/cheerleader slots')
 
-    const [existing] = await sql`
-      SELECT role, lineup_type FROM cc_lineups
-      WHERE user_id = ${userId} AND card_id = ${cardId}
-    `
-    if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
+      // Enforce current lineup only
+      if (lineupType !== 'current') throw new Error('Staff slots are only available in the current season lineup')
 
-    await collectIncome(sql, userId)
+      // Check not already slotted
+      const [existing] = await sql`
+        SELECT role, lineup_type FROM cc_lineups
+        WHERE user_id = ${userId} AND card_id = ${cardId}
+      `
+      if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
 
-    await sql`
-      INSERT INTO cc_lineups (user_id, lineup_type, role, card_id, slotted_at)
-      VALUES (${userId}, ${lineupType}, ${role}, ${cardId}, NOW())
-      ON CONFLICT (user_id, lineup_type, role)
-      DO UPDATE SET card_id = ${cardId}, slotted_at = NOW()
-    `
+      await collectIncome(sql, userId)
 
-    // Check if existing god/item attachments still meet the new player's rarity floor
-    const [slot] = await sql`
-      SELECT god_card_id, item_card_id FROM cc_lineups
-      WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}
-    `
-    if (slot) {
-      if (slot.god_card_id) {
-        const [godCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.god_card_id}`
-        if (godCard && RARITY_TIER[godCard.rarity] > RARITY_TIER[card.rarity]
-          && !(card.rarity === 'unique' && godCard.rarity === 'mythic')) {
-          await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
-        }
+      await sql`
+        INSERT INTO cc_lineups (user_id, lineup_type, role, card_id, slotted_at)
+        VALUES (${userId}, ${lineupType}, ${role}, ${cardId}, NOW())
+        ON CONFLICT (user_id, lineup_type, role)
+        DO UPDATE SET card_id = ${cardId}, god_card_id = NULL, item_card_id = NULL, slotted_at = NOW()
+      `
+    } else {
+      // Existing player card logic
+      if (card.card_type === 'staff') throw new Error('Staff cards can only be slotted in cheerleader or staff slots')
+      if (!card.holo_type && card.rarity !== 'common') throw new Error('Card has no holo type')
+      if (card.card_type !== 'player') throw new Error('Only player cards can be slotted')
+      if (role !== 'bench' && card.role !== role && card.role !== 'fill') {
+        throw new Error(`Card role (${card.role}) does not match slot (${role})`)
       }
-      if (slot.item_card_id) {
-        const [itemCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.item_card_id}`
-        if (itemCard && RARITY_TIER[itemCard.rarity] > RARITY_TIER[card.rarity]
-          && !(card.rarity === 'unique' && itemCard.rarity === 'mythic')) {
-          await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
+
+      const [existing] = await sql`
+        SELECT role, lineup_type FROM cc_lineups
+        WHERE user_id = ${userId} AND card_id = ${cardId}
+      `
+      if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
+
+      await collectIncome(sql, userId)
+
+      await sql`
+        INSERT INTO cc_lineups (user_id, lineup_type, role, card_id, slotted_at)
+        VALUES (${userId}, ${lineupType}, ${role}, ${cardId}, NOW())
+        ON CONFLICT (user_id, lineup_type, role)
+        DO UPDATE SET card_id = ${cardId}, slotted_at = NOW()
+      `
+
+      // Check if existing god/item attachments still meet the new player's rarity floor
+      const [slot] = await sql`
+        SELECT god_card_id, item_card_id FROM cc_lineups
+        WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}
+      `
+      if (slot) {
+        if (slot.god_card_id) {
+          const [godCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.god_card_id}`
+          if (godCard && RARITY_TIER[godCard.rarity] > RARITY_TIER[card.rarity]
+            && !(card.rarity === 'unique' && godCard.rarity === 'mythic')) {
+            await sql`UPDATE cc_lineups SET god_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
+          }
+        }
+        if (slot.item_card_id) {
+          const [itemCard] = await sql`SELECT rarity FROM cc_cards WHERE id = ${slot.item_card_id}`
+          if (itemCard && RARITY_TIER[itemCard.rarity] > RARITY_TIER[card.rarity]
+            && !(card.rarity === 'unique' && itemCard.rarity === 'mythic')) {
+            await sql`UPDATE cc_lineups SET item_card_id = NULL WHERE user_id = ${userId} AND lineup_type = ${lineupType} AND role = ${role}`
+          }
         }
       }
     }
@@ -542,7 +593,7 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
 }
 
 export async function unslotCard(sql, userId, role, lineupType = 'current') {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench', 'cheerleader', 'staff']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
 
   await collectIncome(sql, userId)
@@ -557,7 +608,7 @@ export async function unslotCard(sql, userId, role, lineupType = 'current') {
 }
 
 export async function unslotAttachment(sql, userId, role, slotType, lineupType = 'current') {
-  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench']
+  const validRoles = ['solo', 'jungle', 'mid', 'support', 'adc', 'bench', 'cheerleader', 'staff']
   if (!validRoles.includes(role)) throw new Error('Invalid role')
   if (slotType !== 'god' && slotType !== 'item') throw new Error('slotType must be god or item')
 

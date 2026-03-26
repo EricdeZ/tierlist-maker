@@ -3,26 +3,38 @@ import { useVault } from './VaultContext'
 import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
-import { ChevronLeft, ChevronRight, Share2, Settings, X, Check, BookMarked } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, Settings, X, Check, BookMarked, Palette } from 'lucide-react'
+import { RARITIES } from '../../data/vault/economy'
 import './binder.css'
 
 const PAGES = 10
 const SLOTS_PER_PAGE = 9
 const BINDER_COLORS = [
+  // Classic darks
   { id: '#8b5e3c', name: 'Leather' },
-  { id: '#1a1a2e', name: 'Midnight' },
-  { id: '#2d1b1b', name: 'Crimson' },
-  { id: '#1b2d1b', name: 'Forest' },
-  { id: '#1b1b2d', name: 'Royal' },
-  { id: '#2d2d1b', name: 'Gold' },
-  { id: '#2d1b2d', name: 'Amethyst' },
-  { id: '#1b2d2d', name: 'Teal' },
-  { id: '#111111', name: 'Obsidian' },
   { id: '#2a1f14', name: 'Espresso' },
+  { id: '#111111', name: 'Obsidian' },
+  { id: '#1a1a2e', name: 'Midnight' },
+  // Rich tones
+  { id: '#6b2c2c', name: 'Crimson' },
+  { id: '#2c4a2c', name: 'Forest' },
+  { id: '#2c3a6b', name: 'Royal' },
+  { id: '#6b5c2c', name: 'Gold' },
+  { id: '#5c2c6b', name: 'Amethyst' },
+  { id: '#2c5c5c', name: 'Teal' },
+  // Bolder options
+  { id: '#8b2252', name: 'Rose' },
+  { id: '#1e5631', name: 'Emerald' },
+  { id: '#3d3d8b', name: 'Indigo' },
+  { id: '#8b6914', name: 'Amber' },
+  { id: '#4a6741', name: 'Sage' },
+  { id: '#5b3a6b', name: 'Plum' },
+  { id: '#2a5a7a', name: 'Steel' },
+  { id: '#7a3b3b', name: 'Burgundy' },
 ]
 
 function getBinderBg(color) {
-  return `linear-gradient(145deg, ${lighten(color, 20)}, ${color}, ${darken(color, 20)})`
+  return `linear-gradient(145deg, ${lighten(color, 25)}, ${color}, ${darken(color, 15)})`
 }
 
 function lighten(hex, pct) {
@@ -53,11 +65,12 @@ function rgbToHex(r, g, b) {
 }
 
 export default function CCBinder() {
-  const { collection, binder, binderCards, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare } = useVault()
+  const { collection, binder, binderCards, saveBinder, binderSlotCard, binderUnslotCard, binderGenerateShare, startingFive, lockedCardIds: apiLockedCardIds } = useVault()
 
   const [spread, setSpread] = useState(0) // 0-4 (each spread = 2 pages)
   const [showCover, setShowCover] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
   const [pickerSlot, setPickerSlot] = useState(null) // { page, slot }
   const [flipping, setFlipping] = useState(null) // 'forward' | 'backward' | null
   const [binderName, setBinderName] = useState('')
@@ -94,6 +107,22 @@ export default function CCBinder() {
   }, [binderCards])
 
   const binderCardIds = useMemo(() => new Set(binderCards.map(e => e.card.id)), [binderCards])
+
+  const lockedCardIds = useMemo(() => {
+    const ids = new Set()
+    for (const lineup of [startingFive?.currentSeason, startingFive?.allStar]) {
+      if (!lineup?.slots) continue
+      for (const slot of Object.values(lineup.slots)) {
+        if (slot.card?.id) ids.add(slot.card.id)
+        if (slot.godCard?.id) ids.add(slot.godCard.id)
+        if (slot.itemCard?.id) ids.add(slot.itemCard.id)
+      }
+    }
+    for (const id of (apiLockedCardIds || [])) {
+      ids.add(id)
+    }
+    return ids
+  }, [startingFive, apiLockedCardIds])
 
   const leftPage = spread * 2 + 1
   const rightPage = spread * 2 + 2
@@ -159,6 +188,13 @@ export default function CCBinder() {
     }
   }, [saveBinder, binderName, binderColor])
 
+  const handleColorChange = useCallback(async (newColor) => {
+    setBinderColor(newColor)
+    try {
+      await saveBinder(binderName, newColor)
+    } catch { /* settings save failed silently */ }
+  }, [saveBinder, binderName])
+
   const handleTouchStart = useCallback((e) => {
     touchStartX.current = e.touches[0].clientX
   }, [])
@@ -184,6 +220,17 @@ export default function CCBinder() {
   }, [binder, binderGenerateShare])
 
   const color = binder?.color || binderColor
+
+  // Loading state — wait for binder data before showing cover
+  if (!binder && showCover) {
+    return (
+      <div className="flex flex-col items-center gap-6 py-8">
+        <div className="binder-cover binder-cover--loading">
+          <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+        </div>
+      </div>
+    )
+  }
 
   // Cover view
   if (showCover) {
@@ -270,20 +317,6 @@ export default function CCBinder() {
               maxLength={40}
               className="w-full px-3 py-1.5 rounded-md bg-black/30 border border-white/10 text-white text-sm outline-none focus:border-[var(--cd-cyan)]/40"
             />
-          </div>
-          <div>
-            <label className="block text-[10px] text-white/30 cd-head tracking-widest mb-1.5">BINDER COLOR</label>
-            <div className="binder-color-picker">
-              {BINDER_COLORS.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setBinderColor(c.id)}
-                  className={`binder-color-swatch ${binderColor === c.id ? 'binder-color-swatch--active' : ''}`}
-                  style={{ background: getBinderBg(c.id) }}
-                  title={c.name}
-                />
-              ))}
-            </div>
           </div>
           <button
             onClick={handleSaveSettings}
@@ -415,11 +448,63 @@ export default function CCBinder() {
         </div>
       )}
 
+      {/* Color picker */}
+      <div className="flex justify-center mt-3">
+        <button
+          onClick={() => setShowColorPicker(!showColorPicker)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold cd-head tracking-wider transition-all cursor-pointer ${
+            showColorPicker
+              ? 'bg-white/10 border-white/20 text-white/80'
+              : 'bg-white/[0.03] border-white/10 text-white/40 hover:text-white/70 hover:bg-white/[0.06]'
+          }`}
+        >
+          <Palette size={14} />
+          <span>Change Color</span>
+          <div
+            className="w-4 h-4 rounded-full border border-white/20"
+            style={{ background: getBinderBg(binderColor) }}
+          />
+        </button>
+      </div>
+
+      {showColorPicker && (
+        <div className="binder-color-panel mt-3 mx-auto max-w-lg p-4 rounded-lg bg-white/[0.03] border border-white/10">
+          <div className="flex flex-wrap gap-2 justify-center">
+            {BINDER_COLORS.map(c => (
+              <button
+                key={c.id}
+                onClick={() => handleColorChange(c.id)}
+                className={`binder-color-swatch ${binderColor === c.id ? 'binder-color-swatch--active' : ''}`}
+                style={{ background: getBinderBg(c.id) }}
+                title={c.name}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-3 pt-3 border-t border-white/5">
+            <label className="text-[10px] text-white/30 cd-head tracking-widest">CUSTOM</label>
+            <div className="relative">
+              <input
+                type="color"
+                value={binderColor}
+                onChange={e => handleColorChange(e.target.value)}
+                className="binder-custom-color-input"
+              />
+              <div
+                className="binder-custom-color-preview"
+                style={{ background: getBinderBg(binderColor) }}
+              />
+            </div>
+            <span className="text-[11px] text-white/25 font-mono">{binderColor}</span>
+          </div>
+        </div>
+      )}
+
       {/* Card picker modal */}
       {pickerSlot && (
         <CardPicker
           collection={collection}
           binderCardIds={binderCardIds}
+          lockedCardIds={lockedCardIds}
           onPick={handlePickCard}
           onClose={() => setPickerSlot(null)}
           targetPage={pickerSlot.page}
@@ -440,7 +525,7 @@ function BinderPage({ page, side, color, cardsBySlot, onSlotClick, onRemoveCard 
   return (
     <div
       className={`binder-page binder-page--${side}`}
-      style={{ background: getBinderBg(darken(color, 40)) }}
+      style={{ background: getBinderBg(darken(color, 25)) }}
     >
       <div className="binder-grid">
         {Array.from({ length: SLOTS_PER_PAGE }, (_, i) => {
@@ -475,12 +560,12 @@ function BinderPage({ page, side, color, cardsBySlot, onSlotClick, onRemoveCard 
 
 // Non-interactive page content for flip animation
 function BinderPageContent({ page, color, cardsBySlot }) {
-  if (page < 1 || page > PAGES) return <div style={{ background: getBinderBg(darken(color, 40)), width: '100%', height: '100%' }} />
+  if (page < 1 || page > PAGES) return <div style={{ background: getBinderBg(darken(color, 25)), width: '100%', height: '100%' }} />
 
   return (
     <div
       style={{
-        background: getBinderBg(darken(color, 40)),
+        background: getBinderBg(darken(color, 25)),
         width: '100%',
         height: '100%',
         padding: 16,
@@ -508,16 +593,23 @@ function BinderPageContent({ page, color, cardsBySlot }) {
   )
 }
 
-function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, targetSlot }) {
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
+
+function CardPicker({ collection, binderCardIds, lockedCardIds, onPick, onClose, targetPage, targetSlot }) {
   const { getBlueprint } = useVault()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('player')
+  const [rarityFilter, setRarityFilter] = useState('all')
 
   const available = useMemo(() => {
-    let cards = collection.filter(c => !binderCardIds.has(c.id))
+    let cards = collection.filter(c => !binderCardIds.has(c.id) && !lockedCardIds.has(c.id))
 
     if (filter !== 'all') {
       cards = cards.filter(c => (c.cardType || 'god') === filter)
+    }
+
+    if (rarityFilter !== 'all') {
+      cards = cards.filter(c => c.rarity === rarityFilter)
     }
 
     if (search.length >= 2) {
@@ -529,7 +621,7 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
     }
 
     return cards.slice(0, 100)
-  }, [collection, binderCardIds, search, filter])
+  }, [collection, binderCardIds, lockedCardIds, search, filter, rarityFilter])
 
   return (
     <div className="binder-picker-overlay" onClick={onClose}>
@@ -564,6 +656,32 @@ function CardPicker({ collection, binderCardIds, onPick, onClose, targetPage, ta
                 }`}
               >
                 {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setRarityFilter('all')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold cd-head tracking-wider border transition-all cursor-pointer ${
+                rarityFilter === 'all'
+                  ? 'bg-[var(--cd-cyan)]/10 text-[var(--cd-cyan)] border-[var(--cd-cyan)]/30'
+                  : 'bg-transparent text-white/30 border-white/10 hover:text-white/50 hover:border-white/20'
+              }`}
+            >
+              All
+            </button>
+            {RARITY_ORDER.map(r => (
+              <button
+                key={r}
+                onClick={() => setRarityFilter(r)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold cd-head tracking-wider border transition-all cursor-pointer ${
+                  rarityFilter === r
+                    ? 'border-current/30'
+                    : 'bg-transparent text-white/30 border-white/10 hover:text-white/50 hover:border-white/20'
+                }`}
+                style={rarityFilter === r ? { color: RARITIES[r]?.color, backgroundColor: `${RARITIES[r]?.color}15`, borderColor: `${RARITIES[r]?.color}40` } : undefined}
+              >
+                {RARITIES[r]?.name}
               </button>
             ))}
           </div>

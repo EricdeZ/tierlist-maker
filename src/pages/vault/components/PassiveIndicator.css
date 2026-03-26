@@ -1,0 +1,109 @@
+.passive-indicator {
+  position: absolute;
+  right: -1px;
+  top: 30%;
+  z-index: 8;
+  pointer-events: auto;
+}
+
+/* Rounded tab (pill shape, flat on right edge) */
+.passive-indicator__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(24px * var(--pi-scale, 1));
+  padding: 0 calc(7px * var(--pi-scale, 1)) 0 calc(9px * var(--pi-scale, 1));
+  background: linear-gradient(90deg, #06b6d4, #67e8f9);
+  border-radius: calc(12px * var(--pi-scale, 1)) 0 0 calc(12px * var(--pi-scale, 1));
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgba(6, 182, 212, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+}
+
+.passive-indicator__tab:hover {
+  transform: translateX(-2px);
+  box-shadow: 0 2px 10px rgba(6, 182, 212, 0.5);
+}
+
+.passive-indicator__icon {
+  color: #0c1520;
+  flex-shrink: 0;
+}
+
+/* Expanded panel — slides out from the tab covering the card */
+.passive-indicator__panel {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: right center;
+  width: calc(160px * var(--pi-scale, 1));
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.95), rgba(8, 145, 178, 0.95));
+  backdrop-filter: blur(8px);
+  border-radius: calc(10px * var(--pi-scale, 1)) 0 0 calc(10px * var(--pi-scale, 1));
+  padding: calc(10px * var(--pi-scale, 1)) calc(10px * var(--pi-scale, 1));
+  box-shadow: -4px 2px 16px rgba(6, 182, 212, 0.3);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.passive-indicator--expanded .passive-indicator__tab {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(4px);
+}
+
+.passive-indicator--expanded .passive-indicator__panel {
+  transform: translateY(-50%) scaleX(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.passive-indicator__panel-header {
+  display: flex;
+  align-items: center;
+  gap: calc(5px * var(--pi-scale, 1));
+  margin-bottom: calc(5px * var(--pi-scale, 1));
+}
+
+.passive-indicator__panel-icon {
+  color: #0c1520;
+  flex-shrink: 0;
+}
+
+.passive-indicator__panel-name {
+  font-size: calc(10px * var(--pi-scale, 1));
+  font-weight: 800;
+  color: #0c1520;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.passive-indicator__panel-desc {
+  font-size: calc(8.5px * var(--pi-scale, 1));
+  color: #083344;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.passive-indicator__panel-close {
+  display: block;
+  margin-top: calc(6px * var(--pi-scale, 1));
+  background: none;
+  border: none;
+  color: #0c1520;
+  font-size: calc(7px * var(--pi-scale, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+
+.passive-indicator__panel-close:hover {
+  opacity: 1;
+}

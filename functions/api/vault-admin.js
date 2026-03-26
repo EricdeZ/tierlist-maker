@@ -322,9 +322,15 @@ async function handleGrantCard(sql, body) {
   const serialNumber = Math.floor(Math.random() * 9999) + 1
   const resolvedHoloType = holoType || (rarity && rarity !== 'common' ? ['holo','reverse','full'][Math.floor(Math.random()*3)] : null)
 
+  let passiveId = null
+  if ((cardType || 'god') === 'staff') {
+    const passives = await sql`SELECT id FROM cc_staff_passives`
+    if (passives.length > 0) passiveId = passives[Math.floor(Math.random() * passives.length)].id
+  }
+
   const [card] = await sql`
-    INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
-    VALUES (${userId}, ${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${resolvedHoloType}, ${imageUrl || ''}, 'admin_grant', ${cardType || 'god'}, ${cardData ? JSON.stringify(cardData) : null}, ${defId || null})
+    INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, power, level, xp, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, passive_id)
+    VALUES (${userId}, ${userId}, ${godId}, ${godName}, ${godClass || 'Warrior'}, ${role || 'solo'}, ${rarity || 'common'}, ${power || 50}, 1, 0, ${serialNumber}, ${holoEffect || 'common'}, ${resolvedHoloType}, ${imageUrl || ''}, 'admin_grant', ${cardType || 'god'}, ${cardData ? JSON.stringify(cardData) : null}, ${defId || null}, ${passiveId})
     RETURNING *
   `
 

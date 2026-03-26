@@ -5,6 +5,7 @@ import { logAudit } from '../lib/audit.js'
 import { logRosterTransaction } from '../lib/roster-tx.js'
 import { fetchGuildMembers } from '../lib/discord.js'
 import { cleanupForgeAfterTeamChange } from '../lib/forge.js'
+import { ensurePlayerDef } from '../lib/vault-defs.js'
 
 
 const handler = async (event) => {
@@ -470,6 +471,7 @@ async function applyChanges(sql, body, admin, event) {
     let promotes = 0, demotes = 0, transfers = 0, pickups = 0
     const txLogs = [] // collect transaction log promises
     const forgeCleanups = [] // (playerId, newTeamId) pairs for forge cleanup
+    const newLpIds = [] // newly created league_player IDs for card def generation
 
     // Apply promote/demote
     for (const { leaguePlayerId, newStatus } of statusUpdates) {
@@ -546,10 +548,12 @@ async function applyChanges(sql, body, admin, event) {
                 WHERE id = ${existingLpId}
             `
         } else {
-            await sql`
+            const [newLp] = await sql`
                 INSERT INTO league_players (player_id, team_id, season_id, role, is_active, roster_status)
-                VALUES (${playerId}, ${toTeamId}, ${sid}, ${role || 'fill'}, true, 'member')
+                VALUES (${playerId}, ${toTeamId}, ${sid}, ${(role || 'fill').toLowerCase()}, true, 'member')
+                RETURNING id
             `
+            newLpIds.push(newLp.id)
         }
         pickups++
         forgeCleanups.push({ playerId, newTeamId: toTeamId })
@@ -570,6 +574,11 @@ async function applyChanges(sql, body, admin, event) {
         }).catch(err => console.error('Forge cleanup after roster-sync failed:', err))
         : Promise.resolve()
 
+    const defGenPromise = newLpIds.length > 0
+        ? Promise.all(newLpIds.map(id => ensurePlayerDef(sql, id)))
+            .catch(err => console.error('Auto card def generation after roster-sync failed:', err))
+        : Promise.resolve()
+
     event.waitUntil(Promise.all([
         logAudit(sql, admin, {
             action: 'roster-sync',
@@ -580,6 +589,7 @@ async function applyChanges(sql, body, admin, event) {
         }),
         ...txLogs,
         forgeCleanupPromise,
+        defGenPromise,
     ]))
 
     return {

@@ -41,7 +41,7 @@ function rgbToHex(r, g, b) {
 }
 
 function getBinderBg(color) {
-  return `linear-gradient(145deg, ${lighten(color, 20)}, ${color}, ${darken(color, 20)})`
+  return `linear-gradient(145deg, ${lighten(color, 25)}, ${color}, ${darken(color, 15)})`
 }
 
 function toGameCardData(card) {
@@ -324,7 +324,7 @@ export default function BinderSharePage() {
 
 function ReadOnlyPage({ page, side, color, cardsBySlot }) {
   return (
-    <div className={`binder-page binder-page--${side}`} style={{ background: getBinderBg(darken(color, 40)) }}>
+    <div className={`binder-page binder-page--${side}`} style={{ background: getBinderBg(darken(color, 25)) }}>
       <div className="binder-grid">
         {Array.from({ length: SLOTS_PER_PAGE }, (_, i) => {
           const slot = i + 1
@@ -343,9 +343,9 @@ function ReadOnlyPage({ page, side, color, cardsBySlot }) {
 }
 
 function PageContent({ page, color, cardsBySlot }) {
-  if (page < 1 || page > PAGES) return <div style={{ background: getBinderBg(darken(color, 40)), width: '100%', height: '100%' }} />
+  if (page < 1 || page > PAGES) return <div style={{ background: getBinderBg(darken(color, 25)), width: '100%', height: '100%' }} />
   return (
-    <div style={{ background: getBinderBg(darken(color, 40)), width: '100%', height: '100%', padding: 16, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: getBinderBg(darken(color, 25)), width: '100%', height: '100%', padding: 16, display: 'flex', flexDirection: 'column' }}>
       <div className="binder-grid">
         {Array.from({ length: SLOTS_PER_PAGE }, (_, i) => {
           const slot = i + 1

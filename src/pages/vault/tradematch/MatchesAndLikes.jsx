@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Heart, Clock, MessageCircle, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { Heart, Clock, MessageCircle, ChevronDown, ChevronUp, Check, X } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
@@ -150,22 +150,44 @@ function CardThumb({ card, showHolo = true }) {
   )
 }
 
-function MatchItem({ match, onOpenTrade, userId }) {
+function MatchItem({ match, onOpenTrade, onCloseMatch, userId }) {
   const remaining = timeRemaining(match.created_at)
   const expiringSoon = remaining !== 'Expired' && !remaining.includes('h')
   const isPendingFromMe = match.offer_status === 'pending' && match.offer_by === userId
   const isPendingFromThem = match.offer_status === 'pending' && match.offer_by !== userId
+  const [closing, setClosing] = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
 
   const borderColor = isPendingFromThem ? 'rgba(236,72,153,0.5)' : 'rgba(236,72,153,0.2)'
   const bgGlow = isPendingFromThem ? 'rgba(236,72,153,0.08)' : 'rgba(236,72,153,0.03)'
 
+  const handleClose = async (e) => {
+    e.stopPropagation()
+    if (!confirmClose) {
+      setConfirmClose(true)
+      return
+    }
+    setClosing(true)
+    try {
+      await onCloseMatch(match.id)
+    } catch {
+      setClosing(false)
+      setConfirmClose(false)
+    }
+  }
+
+  const handleCancelClose = (e) => {
+    e.stopPropagation()
+    setConfirmClose(false)
+  }
+
   return (
-    <button
-      onClick={() => onOpenTrade(match.id)}
-      className="w-full text-left flex items-center gap-3 rounded-xl px-4 py-3 transition-all active:scale-[0.98] cursor-pointer"
+    <div
+      className="w-full text-left flex items-center gap-3 rounded-xl px-4 py-3 transition-all cursor-pointer"
       style={{ background: bgGlow, border: `1px solid ${borderColor}` }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--cd-magenta)'; e.currentTarget.style.background = 'rgba(236,72,153,0.1)' }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.background = bgGlow }}
+      onClick={() => onOpenTrade(match.id)}
     >
       <div className="relative">
         <Avatar discord_id={match.partner_discord_id} avatar={match.partner_avatar} username={match.partner_name} size={48} />
@@ -200,8 +222,34 @@ function MatchItem({ match, onOpenTrade, userId }) {
             OPEN
           </span>
         )}
+
+        {confirmClose ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleClose}
+              disabled={closing}
+              className="px-2 py-1 rounded-lg text-[10px] font-bold cd-head tracking-wider text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all cursor-pointer active:scale-95"
+            >
+              {closing ? '...' : 'CONFIRM'}
+            </button>
+            <button
+              onClick={handleCancelClose}
+              className="p-1 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+            title="Close match"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -327,7 +375,7 @@ function LikeGroup({ like, onLikesTrade }) {
   )
 }
 
-export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTrade, loading, userId }) {
+export default function MatchesAndLikes({ matches, likes, onOpenTrade, onCloseMatch, onLikesTrade, loading, userId }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -364,7 +412,7 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onLikesTr
         ) : (
           <div className="flex flex-col gap-2">
             {matches.map((match) => (
-              <MatchItem key={match.id} match={match} onOpenTrade={onOpenTrade} userId={userId} />
+              <MatchItem key={match.id} match={match} onOpenTrade={onOpenTrade} onCloseMatch={onCloseMatch} userId={userId} />
             ))}
           </div>
         )}

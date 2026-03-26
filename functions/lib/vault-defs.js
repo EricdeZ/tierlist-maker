@@ -2,20 +2,75 @@
 // Generates one cc_player_defs row per player-team-season combination
 
 /**
+ * Determine primary and secondary role for a league_player from their game history.
+ * Primary = most played role (by game count), ties broken by most recent game.
+ * Secondary = second most played role, same tie-break.
+ * league_player_id is already scoped to a specific player+team+season.
+ */
+async function recalcRoleForPlayer(sql, league_player_id) {
+  const roles = await sql`
+    SELECT LOWER(pgs.role_played) as role, COUNT(*)::int as games, MAX(g.id) as last_game_id
+    FROM player_game_stats pgs
+    JOIN games g ON g.id = pgs.game_id
+    WHERE pgs.league_player_id = ${league_player_id}
+    AND pgs.role_played IS NOT NULL
+    GROUP BY LOWER(pgs.role_played)
+    ORDER BY games DESC, last_game_id DESC
+  `
+  if (!roles.length) return
+
+  const role = roles[0].role
+  const secondaryRole = roles[1]?.role || null
+  await sql`
+    UPDATE league_players
+    SET role = ${role}, secondary_role = ${secondaryRole}, updated_at = NOW()
+    WHERE id = ${league_player_id}
+  `
+  await syncRoleToVault(sql, league_player_id, role)
+}
+
+/**
+ * Update league_player roles for all players in a match, then cascade to vault.
+ * Call after any match submit, game save, or game delete.
+ */
+export async function updatePlayerRoles(sql, matchId) {
+  const players = await sql`
+    SELECT DISTINCT pgs.league_player_id FROM player_game_stats pgs
+    JOIN league_players lp ON lp.id = pgs.league_player_id
+    WHERE pgs.game_id IN (SELECT id FROM games WHERE match_id = ${matchId})
+    AND pgs.role_played IS NOT NULL
+    AND lp.roster_status != 'sub'
+  `
+  for (const { league_player_id } of players) {
+    await recalcRoleForPlayer(sql, league_player_id)
+  }
+}
+
+/**
+ * Recalculate roles for specific league_player_ids from their remaining game history.
+ * Use when the match itself has been deleted and updatePlayerRoles(matchId) can't find the players.
+ */
+export async function recalcPlayerRolesByIds(sql, leaguePlayerIds) {
+  for (const league_player_id of leaguePlayerIds) {
+    await recalcRoleForPlayer(sql, league_player_id)
+  }
+}
+
+/**
  * Sync a role change from league_players to unfrozen vault defs and their minted cards.
  * Call after any league_players.role update to keep vault data consistent.
  */
 export async function syncRoleToVault(sql, leaguePlayerId, role) {
+  const normalizedRole = role.toLowerCase()
   await sql`
     UPDATE cc_player_defs
-    SET role = ${role}, updated_at = NOW()
+    SET role = ${normalizedRole}, updated_at = NOW()
     FROM league_players lp
     WHERE lp.id = ${leaguePlayerId}
     AND cc_player_defs.player_id = lp.player_id
     AND cc_player_defs.season_id = lp.season_id
     AND cc_player_defs.frozen_stats IS NULL
   `
-  const normalizedRole = role.toLowerCase()
   await sql`
     UPDATE cc_cards
     SET role = ${normalizedRole},
@@ -264,11 +319,13 @@ async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
     WHERE player_id = ${e.playerId} AND team_id = ${e.teamId} AND season_id = ${seasonId}
   `
 
+  const normalizedRole = (e.role || 'adc').toLowerCase()
+
   if (existing) {
     await sql`
       UPDATE cc_player_defs SET
         player_name = ${e.playerName}, player_slug = ${e.playerSlug},
-        team_name = ${e.teamName}, team_color = ${e.teamColor}, role = ${e.role},
+        team_name = ${e.teamName}, team_color = ${e.teamColor}, role = ${normalizedRole},
         league_id = ${season.league_id}, league_slug = ${season.league_slug},
         division_id = ${season.division_id}, division_slug = ${season.division_slug},
         division_tier = ${season.division_tier}, season_slug = ${season.slug},
@@ -277,7 +334,6 @@ async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
       WHERE id = ${existing.id}
     `
     // Cascade role + card_data.role to minted cards from this def
-    const normalizedRole = (e.role || 'adc').toLowerCase()
     await sql`
       UPDATE cc_cards
       SET role = ${normalizedRole},
@@ -294,13 +350,78 @@ async function upsertPlayerDef(sql, e, seasonId, season, cardIndex) {
         card_index, avatar_url, best_god_name
       ) VALUES (
         ${e.playerId}, ${e.teamId}, ${seasonId}, ${season.league_id}, ${season.division_id},
-        ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${e.role},
+        ${e.playerName}, ${e.playerSlug}, ${e.teamName}, ${e.teamColor}, ${normalizedRole},
         ${season.league_slug}, ${season.division_slug}, ${season.slug}, ${season.division_tier},
         ${cardIndex}, ${avatarUrl}, ${bestGodName}
       )
     `
     return 'created'
   }
+}
+
+/**
+ * Auto-generate a card def for a single league_player by ID.
+ * Resolves all needed context (player, team, season, league metadata) from the DB.
+ * No-ops if a def already exists for this player+team+season combo.
+ */
+export async function ensurePlayerDef(sql, leaguePlayerId) {
+  const [lp] = await sql`
+    SELECT lp.player_id, lp.team_id, lp.season_id, lp.role,
+           p.name AS player_name, p.slug AS player_slug,
+           t.name AS team_name, t.color AS team_color,
+           s.slug AS season_slug,
+           d.id AS division_id, d.slug AS division_slug, d.tier AS division_tier,
+           l.id AS league_id, l.slug AS league_slug
+    FROM league_players lp
+    JOIN players p ON p.id = lp.player_id
+    JOIN teams t ON t.id = lp.team_id
+    JOIN seasons s ON s.id = lp.season_id
+    JOIN divisions d ON d.id = s.division_id
+    JOIN leagues l ON l.id = d.league_id
+    WHERE lp.id = ${leaguePlayerId}
+  `
+  if (!lp) return
+
+  const [existing] = await sql`
+    SELECT id FROM cc_player_defs
+    WHERE player_id = ${lp.player_id} AND team_id = ${lp.team_id} AND season_id = ${lp.season_id}
+  `
+  if (existing) return
+
+  // Compute card_index: count existing defs in this season + 1
+  const [{ count }] = await sql`
+    SELECT COUNT(*)::int FROM cc_player_defs WHERE season_id = ${lp.season_id}
+  `
+  const cardIndex = count + 1
+
+  let avatarUrl = null
+  const [userRow] = await sql`
+    SELECT u.discord_id, u.discord_avatar,
+           COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    WHERE u.linked_player_id = ${lp.player_id}
+  `
+  if (userRow?.allow_avatar && userRow.discord_id && userRow.discord_avatar) {
+    avatarUrl = `https://cdn.discordapp.com/avatars/${userRow.discord_id}/${userRow.discord_avatar}.webp?size=256`
+  }
+
+  const bestGodName = await findBestGod(sql, lp.player_id, lp.team_id, lp.season_id)
+  const normalizedRole = (lp.role || 'fill').toLowerCase()
+
+  await sql`
+    INSERT INTO cc_player_defs (
+      player_id, team_id, season_id, league_id, division_id,
+      player_name, player_slug, team_name, team_color, role,
+      league_slug, division_slug, season_slug, division_tier,
+      card_index, avatar_url, best_god_name
+    ) VALUES (
+      ${lp.player_id}, ${lp.team_id}, ${lp.season_id}, ${lp.league_id}, ${lp.division_id},
+      ${lp.player_name}, ${lp.player_slug}, ${lp.team_name}, ${lp.team_color}, ${normalizedRole},
+      ${lp.league_slug}, ${lp.division_slug}, ${lp.season_slug}, ${lp.division_tier},
+      ${cardIndex}, ${avatarUrl}, ${bestGodName}
+    )
+  `
 }
 
 /**
@@ -504,7 +625,7 @@ export async function generateSelectedDefs(sql, selectedEntries) {
           playerSlug: player.slug,
           teamName: team.name,
           teamColor: team.color,
-          role: roleMap.get(e.playerId) || null,
+          role: (roleMap.get(e.playerId) || 'adc').toLowerCase(),
         }
       })
     if (!filtered.length) continue
@@ -564,11 +685,10 @@ export async function generateSelectedDefs(sql, selectedEntries) {
             WHERE id = ${existing.id}
           `
           if (existing.role !== e.role) {
-            const normalizedRole = (e.role || 'adc').toLowerCase()
             await sql`
               UPDATE cc_cards
-              SET role = ${normalizedRole},
-                  card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(normalizedRole.toUpperCase())}::jsonb)
+              SET role = ${e.role},
+                  card_data = jsonb_set(COALESCE(card_data, '{}'::jsonb), '{role}', ${JSON.stringify(e.role.toUpperCase())}::jsonb)
               WHERE def_id = ${existing.id} AND card_type = 'player'
             `
           }

@@ -108,7 +108,6 @@ export default function CCGifts() {
           result={openResult}
           packType={openResult.packType || 'gift'}
           onClose={() => setOpenResult(null)}
-          onOpenMore={() => setOpenResult(null)}
         />
       )}
     </div>

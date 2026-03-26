@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useVault } from './VaultContext';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
@@ -335,7 +335,7 @@ export default function SaleVendingMachine() {
       // Cooldown is set by VaultContext after successful purchase
       setTimeout(() => {
         setPhase('dropped');
-        setPendingResult({ ...result, packType: selectedSlot.pack.packTypeId || selectedSlot.pack.id });
+        setPendingResult({ ...result, packType: selectedSlot.pack.packTypeId || selectedSlot.pack.id, _salePackId: selectedSlot.pack.id, _salePackCost: selectedSlot.pack.price });
       }, 2000);
     } catch (err) {
       // Handle server-side cooldown (429)
@@ -547,11 +547,13 @@ export default function SaleVendingMachine() {
         </div>
 
         {openResult && (
-          <PackOpening
-            result={openResult}
-            packType={openResult.packType}
-            onClose={closeResult}
-            onOpenMore={closeResult}
+          <SalePackOpening
+            openResult={openResult}
+            setOpenResult={setOpenResult}
+            closeResult={closeResult}
+            buySalePack={buySalePack}
+            emberBalance={emberBalance}
+            cooldownLeft={cooldownLeft}
           />
         )}
       </div>
@@ -561,5 +563,43 @@ export default function SaleVendingMachine() {
         <PackZoomModal slot={zoomedSlot} onClose={() => setZoomedSlot(null)} packTypesMap={packTypesMap} />
       )}
     </AlleyScene>
+  );
+}
+
+function SalePackOpening({ openResult, setOpenResult, closeResult, buySalePack, emberBalance, cooldownLeft }) {
+  const openKeyRef = useRef(0);
+  const saleId = openResult._salePackId;
+  const cost = openResult._salePackCost ?? 0;
+  const canAfford = saleId && emberBalance >= cost;
+  const hasStock = openResult.stock > 0;
+  const canBuy = canAfford && hasStock && cooldownLeft <= 0;
+  const showButton = saleId && hasStock && cooldownLeft <= 0;
+
+  const handleOpenMore = useCallback(async () => {
+    if (!canBuy) return;
+    try {
+      const result = await buySalePack(saleId);
+      if (!result) return;
+      openKeyRef.current += 1;
+      setOpenResult({ ...result, packType: openResult.packType, _salePackId: saleId, _salePackCost: cost });
+    } catch (err) {
+      alert(err.message || 'Failed to open pack');
+    }
+  }, [canBuy, buySalePack, saleId, openResult.packType, cost, setOpenResult]);
+
+  const openMoreLabel = showButton ? (
+    <>Open More ({cost} <img src={emberIcon} alt="Cores" className="inline h-4 w-auto -mt-0.5" />)</>
+  ) : null;
+
+  return (
+    <PackOpening
+      key={openKeyRef.current}
+      result={openResult}
+      packType={openResult.packType}
+      onClose={closeResult}
+      onOpenMore={showButton ? handleOpenMore : null}
+      openMoreLabel={openMoreLabel}
+      openMoreDisabled={showButton && !canAfford}
+    />
   );
 }

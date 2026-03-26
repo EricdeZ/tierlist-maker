@@ -107,7 +107,8 @@ function PackCard({ card, size, holo = true, override }) {
   return gameCard
 }
 
-function SummaryView({ cards, result, onOpenMore, onClose }) {
+function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisabled, onClose }) {
+  const [openMoreLoading, setOpenMoreLoading] = useState(false)
   const { getDefOverride } = useVault()
   const gridRef = useRef(null)
   const [activeIdx, setActiveIdx] = useState(0)
@@ -234,11 +235,17 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
       )}
       <div className="pack-opening__summary-actions">
         {onOpenMore && (
-          <button onClick={onOpenMore} className="pack-opening__summary-btn pack-opening__summary-btn--primary">
-            Open More
+          <button
+            onClick={() => { if (openMoreDisabled || openMoreLoading) return; setOpenMoreLoading(true); Promise.resolve(onOpenMore()).catch(() => setOpenMoreLoading(false)) }}
+            disabled={openMoreDisabled || openMoreLoading}
+            className={`pack-opening__summary-btn pack-opening__summary-btn--primary${openMoreDisabled ? ' pack-opening__summary-btn--disabled' : ''}${openMoreLoading ? ' pack-opening__summary-btn--loading' : ''}`}
+          >
+            {openMoreLoading ? (
+              <><span className="pack-opening__btn-spinner" /> Opening...</>
+            ) : openMoreDisabled ? 'Oh no you are broke!' : (openMoreLabel || 'Open More')}
           </button>
         )}
-        <button onClick={onClose} className="pack-opening__summary-btn pack-opening__summary-btn--secondary">
+        <button onClick={onClose} disabled={openMoreLoading} className="pack-opening__summary-btn pack-opening__summary-btn--secondary">
           Close
         </button>
       </div>
@@ -246,7 +253,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
   )
 }
 
-export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
+export default function PackOpening({ result, packType, onClose, onOpenMore, openMoreLabel, openMoreDisabled, skipTear, skipToStack, onReplay }) {
   const { getDefOverride, packTypesMap } = useVault()
   const packColor = packType === 'promo-gift' ? '#d4af37' : packTypesMap?.[packType]?.color
   const [phase, setPhase] = useState(skipToStack ? 'stack' : skipTear ? 'ripping' : 'enter')
@@ -738,7 +745,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ski
 
       {/* ═══ Summary — show all cards after reveal ═══ */}
       {phase === 'summary' && (
-        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} onClose={onClose} />
+        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} openMoreLabel={openMoreLabel} openMoreDisabled={openMoreDisabled} onClose={onClose} />
       )}
 
       {onReplay && (

@@ -7,7 +7,7 @@ import { bountyService } from '../../../services/database'
 import WantedPoster from '../components/WantedPoster'
 import { X, Loader2 } from 'lucide-react'
 
-const CARD_TYPES = ['god', 'player', 'item', 'consumable']
+const CARD_TYPES = ['god', 'player', 'item', 'consumable', 'staff']
 
 const ROLE_LABELS = { solo: 'Solo', jungle: 'Jungle', mid: 'Mid', support: 'Support', adc: 'ADC' }
 

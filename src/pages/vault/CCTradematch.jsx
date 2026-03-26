@@ -98,6 +98,15 @@ export default function CCTradematch() {
     })
   }, [user?.id])
 
+  const unmarkCardSeen = useCallback((cardId) => {
+    setSeenCardIds(prev => {
+      const next = new Set(prev)
+      next.delete(cardId)
+      saveSeenCardIds(user?.id, next)
+      return next
+    })
+  }, [user?.id])
+
   // swiperCards = filtered for swipe mode (excludes seen), feedCards = all (for browse grid)
   const swiperCards = useMemo(() =>
     feedCards.filter(c => !seenCardIds.has(c.card_id)),
@@ -232,6 +241,13 @@ export default function CCTradematch() {
     // No API call needed — just advance locally
   }, [])
 
+  const handleUndo = useCallback(async (cardId, direction) => {
+    unmarkCardSeen(cardId)
+    if (direction > 0) {
+      try { await tradematchService.unswipe(cardId) } catch (err) { console.error('Failed to unswipe:', err) }
+    }
+  }, [unmarkCardSeen])
+
   const handleMatch = useCallback((data) => {
     setMatchResult(data)
   }, [])
@@ -287,6 +303,12 @@ export default function CCTradematch() {
     setActiveTradeId(null)
     refetchMatches()
   }, [refetchMatches])
+
+  const handleCloseMatch = useCallback(async (tradeId) => {
+    await tradematchService.offerCancel(tradeId)
+    setMatches(prev => prev.filter(m => m.id !== tradeId))
+    setMatchTradeCount(prev => Math.max(0, prev - 1))
+  }, [setMatchTradeCount])
 
   const handleDismissMatch = useCallback(() => {
     setMatchResult(null)
@@ -392,6 +414,7 @@ export default function CCTradematch() {
           onLoadMore={handleLoadMoreFeed}
           onCardSeen={markCardSeen}
           onResetSeen={resetSeenCards}
+          onUndo={handleUndo}
           locked={pileIsLocked}
           loading={loading}
           empty={!loading && feedCards.length === 0}
@@ -404,6 +427,7 @@ export default function CCTradematch() {
           matches={matches}
           likes={likes}
           onOpenTrade={handleOpenTrade}
+          onCloseMatch={handleCloseMatch}
           onLikesTrade={handleLikesTrade}
           loading={loading}
           userId={user?.id}

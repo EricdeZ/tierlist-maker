@@ -331,16 +331,91 @@ function MyPacks() {
 
       {/* Pack opening ceremony */}
       {openResult && (
-        <PackOpening
-          result={openResult}
-          packType={openResult.packType}
-          onClose={closeResult}
-          onOpenMore={closeResult}
+        <InventoryPackOpening
+          openResult={openResult}
+          setOpenResult={setOpenResult}
+          closeResult={closeResult}
+          inventory={inventory}
+          lockedSet={lockedSet}
+          openInventoryPack={openInventoryPack}
+          packTypesMap={packTypesMap}
         />
       )}
 
       <PackLeaderboard />
     </div>
+  );
+}
+
+function InventoryPackOpening({ openResult, setOpenResult, closeResult, inventory, lockedSet, openInventoryPack, packTypesMap }) {
+  const openKeyRef = useRef(0);
+
+  const handleOpenMore = useCallback(async () => {
+    const nextPack = getNextInventoryPack(inventory, lockedSet, openResult.packType);
+    if (!nextPack) return;
+    try {
+      const result = await openInventoryPack(nextPack.id);
+      if (!result) return;
+      openKeyRef.current += 1;
+      setOpenResult({ ...result, packType: nextPack.packTypeId });
+    } catch (err) {
+      alert(err.message || 'Failed to open pack');
+    }
+  }, [inventory, lockedSet, openResult.packType, openInventoryPack, setOpenResult]);
+
+  const nextPack = getNextInventoryPack(inventory, lockedSet, openResult.packType);
+
+  return (
+    <PackOpening
+      key={openKeyRef.current}
+      result={openResult}
+      packType={openResult.packType}
+      onClose={closeResult}
+      onOpenMore={nextPack ? handleOpenMore : null}
+    />
+  );
+}
+
+function getNextInventoryPack(inventory, lockedSet, preferType) {
+  if (!inventory?.length) return null;
+  const available = inventory.filter(i => !lockedSet.has(i.id));
+  if (!available.length) return null;
+  const sameType = available.find(i => i.packTypeId === preferType);
+  return sameType || available[0];
+}
+
+function ShopPackOpening({ openResult, setOpenResult, closeResult, buyPack, packTypesMap, emberBalance }) {
+  const openKeyRef = useRef(0);
+  const pack = packTypesMap[openResult.packType];
+  const cost = pack?.cost ?? 0;
+  const canAfford = emberBalance >= cost;
+
+  const handleOpenMore = useCallback(async () => {
+    if (!canAfford) return;
+    try {
+      const result = await buyPack(openResult.packType);
+      if (!result) return;
+      openKeyRef.current += 1;
+      setOpenResult({ ...result, packType: openResult.packType });
+    } catch (err) {
+      alert(err.message || 'Failed to open pack');
+    }
+  }, [canAfford, buyPack, openResult.packType, setOpenResult]);
+
+  const openMoreLabel = pack ? (
+    <>Open More ({cost} <img src={emberIcon} alt="Cores" className="inline h-4 w-auto -mt-0.5" />)</>
+  ) : 'Open More';
+
+  return (
+    <PackOpening
+      key={openKeyRef.current}
+      result={openResult}
+      packType={openResult.packType}
+      onClose={closeResult}
+      onOpenMore={handleOpenMore}
+      openMoreLabel={openMoreLabel}
+      openMoreDisabled={!canAfford}
+    />
   );
 }
 
@@ -442,7 +517,6 @@ export default function PackShopRouter() {
           result={pendingReveal}
           packType={pendingReveal.packType}
           onClose={markRevealed}
-          onOpenMore={markRevealed}
         />
       )}
     </>
@@ -454,6 +528,7 @@ export default function PackShopRouter() {
 // ═══════════════════════════════════════════════
 function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResult, claimableCount, quantity, setQuantity }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const quantityBeforeFocus = useRef(1);
   const scrollRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -593,10 +668,24 @@ function MobilePackShowcase({ packs, packTypesMap, emberBalance, onBuy, openResu
                     disabled={quantity <= 1}
                     className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
                   >−</button>
-                  <span className="text-lg font-bold text-white cd-num w-6 text-center">{quantity}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={quantity}
+                    onFocus={() => { quantityBeforeFocus.current = quantity; setQuantity(''); }}
+                    onChange={e => {
+                      const v = e.target.value.replace(/\D/g, '');
+                      if (v === '') { setQuantity(''); return; }
+                      const n = Math.min(99, Math.max(1, parseInt(v, 10)));
+                      const max = Math.floor(emberBalance / pack.cost);
+                      setQuantity(Math.min(n, max));
+                    }}
+                    onBlur={() => { if (!quantity) setQuantity(quantityBeforeFocus.current); }}
+                    className="text-lg font-bold text-white cd-num w-8 text-center bg-transparent border-b border-white/30 outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
                   <button
-                    onClick={() => setQuantity(q => q + 1)}
-                    disabled={emberBalance < pack.cost * (quantity + 1)}
+                    onClick={() => setQuantity(q => Math.min(99, Math.min(q + 1, Math.floor(emberBalance / pack.cost))))}
+                    disabled={quantity >= 99 || emberBalance < pack.cost * (quantity + 1)}
                     className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
                   >+</button>
                 </div>
@@ -651,6 +740,7 @@ function RotationCountdown() {
 // Special Rotation Section
 // ═══════════════════════════════════════════════
 function RotationSection({ packs, packTypesMap, emberBalance, onBuy, loading, quantity, setQuantity }) {
+  const quantityBeforeFocus = useRef(1);
   const [selectedPack, setSelectedPack] = useState(null);
 
   // Reset quantity when changing selected rotation pack
@@ -760,10 +850,24 @@ function RotationSection({ packs, packTypesMap, emberBalance, onBuy, loading, qu
               disabled={quantity <= 1}
               className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
             >−</button>
-            <span className="text-lg font-bold text-white cd-num w-6 text-center">{quantity}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={quantity}
+              onFocus={() => { quantityBeforeFocus.current = quantity; setQuantity(''); }}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, '');
+                if (v === '') { setQuantity(''); return; }
+                const n = Math.min(99, Math.max(1, parseInt(v, 10)));
+                const max = Math.floor(emberBalance / selected.cost);
+                setQuantity(Math.min(n, max));
+              }}
+              onBlur={() => { if (!quantity) setQuantity(quantityBeforeFocus.current); }}
+              className="text-lg font-bold text-white cd-num w-8 text-center bg-transparent border-b border-white/30 outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
             <button
-              onClick={() => setQuantity(q => q + 1)}
-              disabled={emberBalance < selected.cost * (quantity + 1)}
+              onClick={() => setQuantity(q => Math.min(99, Math.min(q + 1, Math.floor(emberBalance / selected.cost))))}
+              disabled={quantity >= 99 || emberBalance < selected.cost * (quantity + 1)}
               className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-base flex items-center justify-center cursor-pointer"
             >+</button>
           </div>
@@ -800,6 +904,7 @@ function PackShop() {
   const { openResult, setOpenResult, closeResult } = usePendingPackOpen();
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const quantityBeforeFocus = useRef(1);
 
   const handleBuyPack = useCallback(async (packType) => {
     try {
@@ -980,10 +1085,24 @@ function PackShop() {
                       disabled={quantity <= 1}
                       className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-lg flex items-center justify-center cursor-pointer"
                     >−</button>
-                    <span className="text-xl font-bold text-white cd-num w-8 text-center">{quantity}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={quantity}
+                      onFocus={() => { quantityBeforeFocus.current = quantity; setQuantity(''); }}
+                      onChange={e => {
+                        const v = e.target.value.replace(/\D/g, '');
+                        if (v === '') { setQuantity(''); return; }
+                        const n = Math.min(99, Math.max(1, parseInt(v, 10)));
+                        const max = Math.floor(emberBalance / pack.cost);
+                        setQuantity(Math.min(n, max));
+                      }}
+                      onBlur={() => { if (!quantity) setQuantity(quantityBeforeFocus.current); }}
+                      className="text-xl font-bold text-white cd-num w-10 text-center bg-transparent border-b border-white/30 outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
                     <button
-                      onClick={() => setQuantity(q => q + 1)}
-                      disabled={emberBalance < pack.cost * (quantity + 1)}
+                      onClick={() => setQuantity(q => Math.min(99, Math.min(q + 1, Math.floor(emberBalance / pack.cost))))}
+                      disabled={quantity >= 99 || emberBalance < pack.cost * (quantity + 1)}
                       className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cd-head text-lg flex items-center justify-center cursor-pointer"
                     >+</button>
                   </div>
@@ -1084,11 +1203,13 @@ function PackShop() {
 
       {/* Pack opening ceremony */}
       {openResult && (
-        <PackOpening
-          result={openResult}
-          packType={openResult.packType}
-          onClose={closeResult}
-          onOpenMore={closeResult}
+        <ShopPackOpening
+          openResult={openResult}
+          setOpenResult={setOpenResult}
+          closeResult={closeResult}
+          buyPack={buyPack}
+          packTypesMap={packTypesMap}
+          emberBalance={emberBalance}
         />
       )}
     </div>
