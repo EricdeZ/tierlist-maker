@@ -445,31 +445,43 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
     cards = generateRarityPack({ cards: pack.cards_per_pack, guarantees: pack.guarantees || [] })
   }
 
+  // Load staff passive IDs for random assignment to staff cards
+  const hasStaff = cards.some(c => c.card_type === 'staff')
+  let staffPassiveIds = []
+  if (hasStaff) {
+    staffPassiveIds = (await sql`SELECT id FROM cc_staff_passives`).map(r => r.id)
+  }
+
   const newCards = []
   for (const card of cards) {
     // Atomic first-edition check + insert in a single statement to minimize race window.
     // First edition = first-ever pull of this player def_id at this rarity (only when Vault is public).
     const checkFE = process.env.VAULT_OPEN === 'true' && (
       (card.card_type === 'player' && !!card.def_id) ||
-      (card.card_type === 'collection' && !!card.template_id)
+      (!!card.blueprint_id)
     )
 
+    const passiveId = card.card_type === 'staff' && staffPassiveIds.length > 0
+      ? staffPassiveIds[Math.floor(Math.random() * staffPassiveIds.length)]
+      : null
+
     const [inserted] = await sql`
-      INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, template_id, is_first_edition, depicted_user_id)
+      INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity, serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id, blueprint_id, is_first_edition, depicted_user_id, passive_id)
       SELECT ${userId}, ${userId}, ${card.god_id}, ${card.god_name}, ${card.god_class}, ${card.role}, ${card.rarity},
              ${card.serial_number}, ${card.holo_effect}, ${card.holo_type}, ${card.image_url},
              ${card.acquired_via}, ${card.card_type}, ${card.card_data ? JSON.stringify(card.card_data) : null}::jsonb,
              ${card.def_id || null},
-             ${card.template_id || null},
+             ${card.blueprint_id || null},
              ${checkFE}::boolean AND NOT EXISTS (
                SELECT 1 FROM cc_cards
                WHERE rarity = ${card.rarity}
                  AND (
-                   (${card.card_type} = 'collection' AND template_id = ${card.template_id || 0})
-                   OR (${card.card_type} != 'collection' AND def_id = ${card.def_id || 0})
+                   (${card.blueprint_id || null}::int IS NOT NULL AND blueprint_id = ${card.blueprint_id || 0})
+                   OR (${card.blueprint_id || null}::int IS NULL AND def_id = ${card.def_id || 0})
                  )
              ),
-             ${card.depicted_user_id || null}
+             ${card.depicted_user_id || null},
+             ${passiveId}
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
@@ -740,22 +752,16 @@ async function generateConfiguredPack(sql, pack) {
 
 async function generateCollectionCard(sql, collectionId) {
   const entries = await sql`
-    SELECT COALESCE(t.id, d.id) AS id,
-           COALESCE(t.name, d.notes, 'Draft') AS name,
-           COALESCE(t.card_type, d.card_type) AS card_type,
-           COALESCE(t.depicted_user_id, d.depicted_user_id) AS depicted_user_id,
-           CASE WHEN e.draft_id IS NOT NULL THEN 'draft' ELSE 'template' END AS source_type
+    SELECT bp.id, bp.name, bp.card_type, bp.depicted_user_id
     FROM cc_collection_entries e
-    LEFT JOIN cc_card_templates t ON e.template_id = t.id AND t.status = 'approved'
-    LEFT JOIN cc_card_drafts d ON e.draft_id = d.id AND d.status = 'approved'
+    JOIN cc_card_blueprints bp ON e.blueprint_id = bp.id AND bp.status = 'approved'
     JOIN cc_collections c ON e.collection_id = c.id
     WHERE e.collection_id = ${collectionId}
       AND c.status = 'active'
-      AND (t.id IS NOT NULL OR d.id IS NOT NULL)
   `
   if (entries.length === 0) return null
 
-  const template = entries[Math.floor(Math.random() * entries.length)]
+  const blueprint = entries[Math.floor(Math.random() * entries.length)]
   const rarity = rollRarity('common')
   const holoEffect = rollHoloEffect(rarity)
   const holoType = rollHoloType(rarity)
@@ -763,21 +769,21 @@ async function generateCollectionCard(sql, collectionId) {
   const [col] = await sql`SELECT name FROM cc_collections WHERE id = ${collectionId}`
 
   return {
-    god_id: `collection-${template.id}`,
-    god_name: template.name,
-    god_class: template.card_type || 'custom',
-    role: 'collection',
+    god_id: `blueprint-${blueprint.id}`,
+    god_name: blueprint.name,
+    god_class: blueprint.card_type || 'custom',
+    role: blueprint.card_type || 'custom',
     rarity,
     serial_number: Math.floor(Math.random() * 9999) + 1,
     holo_effect: holoEffect,
     holo_type: holoType,
     image_url: null,
     acquired_via: 'pack',
-    card_type: 'collection',
+    card_type: blueprint.card_type,
     card_data: { collectionId, collectionName: col?.name || 'Collection' },
     def_id: null,
-    template_id: template.id,
-    depicted_user_id: template.depicted_user_id || null,
+    blueprint_id: blueprint.id,
+    depicted_user_id: blueprint.depicted_user_id || null,
   }
 }
 
