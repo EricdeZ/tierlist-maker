@@ -431,6 +431,50 @@ CHECK (status IN ('pending', 'processing', 'used', 'skipped'))
 CHECK(status IN ('open', 'accepted', 'cancelled', 'expired'))
 CHECK(pick_mode IN ('regular', 'fearless', 'fearless_picks', 'fearless_bans'))
 
+## Vault (cc_*) Tables
+
+### cc_card_blueprints
+Unified table merging `cc_card_templates` (admin-created) and `cc_card_drafts` (user-submitted). Created by migration 149.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | integer | NO | auto-increment |
+| name | text | NO | |
+| description | text | YES | |
+| card_type | text | NO | |
+| rarity | text | NO | |
+| status | text | NO | 'draft' |
+| template_data | jsonb | NO | '{}' |
+| thumbnail_url | text | YES | |
+| target_player_id | integer | YES | |
+| rejection_reason | text | YES | |
+| depicted_user_id | integer | YES | FK → users.id (SET NULL) |
+| created_by | integer | YES | FK → users.id |
+| approved_by | integer | YES | FK → users.id |
+| approved_at | timestamptz | YES | |
+| source | text | NO | ('template' or 'draft') |
+| legacy_template_id | integer | YES | original cc_card_templates.id |
+| legacy_draft_id | integer | YES | original cc_card_drafts.id |
+| created_at | timestamptz | YES | NOW() |
+| updated_at | timestamptz | YES | NOW() |
+
+INDEX idx_cc_card_blueprints_status ON (status)
+INDEX idx_cc_card_blueprints_created_by ON (created_by)
+INDEX idx_cc_card_blueprints_status_creator ON (status, created_by)
+
+### cc_cards (blueprint_id column added in migration 149)
+`blueprint_id INTEGER REFERENCES cc_card_blueprints(id) ON DELETE SET NULL` — backfilled from template_id or draft god_id pattern. Old `template_id` column retained for safety.
+
+INDEX idx_cc_cards_blueprint ON (blueprint_id)
+
+### cc_collection_entries (blueprint_id column added in migration 149)
+`blueprint_id INTEGER REFERENCES cc_card_blueprints(id) ON DELETE RESTRICT` — backfilled from template_id/draft_id. Old columns retained.
+
+UNIQUE INDEX idx_cc_collection_entries_blueprint ON (collection_id, blueprint_id) WHERE blueprint_id IS NOT NULL
+
+### cc_promo_gifts (blueprint_id column added in migration 149)
+`blueprint_id INTEGER REFERENCES cc_card_blueprints(id)` — backfilled from template_id. Old column retained.
+
 ## Views
 
 ### season_hierarchy
