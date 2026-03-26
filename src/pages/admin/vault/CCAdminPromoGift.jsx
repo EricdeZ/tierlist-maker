@@ -8,8 +8,9 @@ const CARD_TYPES = [
   { value: 'god', label: 'God' },
   { value: 'item', label: 'Item' },
   { value: 'player', label: 'Player' },
+  { value: 'staff', label: 'Staff' },
   { value: 'custom', label: 'Custom' },
-  { value: 'collection', label: 'From Collection' },
+  { value: 'blueprint', label: 'From Blueprint' },
 ]
 
 const ROLES = [
@@ -114,9 +115,9 @@ export default function CCAdminPromoGift() {
 
   if (!hasPermission('permission_manage')) return null
 
-  // Load collections when card type switches to collection
+  // Load collections when card type switches to blueprint
   useEffect(() => {
-    if (cardType !== 'collection') return
+    if (cardType !== 'blueprint') return
     setCollectionsLoading(true)
     vaultDashboardService.getCollections()
       .then(data => setCollections((data.collections || []).filter(c => c.status === 'active')))
@@ -137,7 +138,7 @@ export default function CCAdminPromoGift() {
 
   // Reset collection state when switching away
   useEffect(() => {
-    if (cardType !== 'collection') {
+    if (cardType !== 'blueprint') {
       setSelectedCollectionId('')
       setCollectionEntries([])
       setSelectedEntry(null)
@@ -173,17 +174,17 @@ export default function CCAdminPromoGift() {
     setResult(null)
 
     const cardConfig = {}
-    let templateId = null
+    let blueprintId = null
 
     let sendCardType = cardType
-    if (cardType === 'collection') {
+    if (cardType === 'blueprint') {
       if (!selectedEntry) { setError('Select a card from the collection'); setSending(false); return }
-      templateId = selectedEntry.template_id
-      sendCardType = selectedEntry.card_type || 'collection'
-      cardConfig.god_id = `collection-${templateId}`
+      blueprintId = selectedEntry.blueprint_id
+      sendCardType = selectedEntry.card_type || 'custom'
+      cardConfig.god_id = `blueprint-${blueprintId}`
       cardConfig.god_name = selectedEntry.template_name
       cardConfig.god_class = selectedEntry.card_type
-      cardConfig.role = selectedEntry.card_type || 'collection'
+      cardConfig.role = selectedEntry.card_type || 'custom'
     } else {
       cardConfig.god_id = godId || godName.toLowerCase().replace(/\s+/g, '-')
       cardConfig.god_name = godName
@@ -198,7 +199,7 @@ export default function CCAdminPromoGift() {
         recipientId: recipient.id,
         cardType: sendCardType,
         rarity,
-        templateId,
+        blueprintId,
         cardConfig,
         message: message || null,
         tradeable,
@@ -220,7 +221,7 @@ export default function CCAdminPromoGift() {
     }
   }, [recipient, cardType, rarity, selectedEntry, godId, godName, godClass, role, imageUrl, message, tradeable])
 
-  const canSend = recipient && (cardType === 'collection' ? !!selectedEntry : !!godName) && !sending
+  const canSend = recipient && (cardType === 'blueprint' ? !!selectedEntry : !!godName) && !sending
 
   const collectionOptions = [
     { value: '', label: collectionsLoading ? 'Loading collections...' : 'Select a collection' },
@@ -274,12 +275,12 @@ export default function CCAdminPromoGift() {
 
         {/* Card Type + Role */}
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
-          <div className={cardType === 'collection' ? '' : 'grid grid-cols-2 gap-4'}>
+          <div className={cardType === 'blueprint' ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
               <label className={labelClass}>Card Type</label>
               <Dropdown value={cardType} onChange={setCardType} options={CARD_TYPES} />
             </div>
-            {cardType !== 'collection' && (
+            {cardType !== 'blueprint' && (
               <div>
                 <label className={labelClass}>Role</label>
                 <Dropdown value={role} onChange={setRole} options={ROLES} placeholder="None" />
@@ -311,7 +312,7 @@ export default function CCAdminPromoGift() {
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
           <label className={labelClass + ' !mb-0'}>Card Details</label>
 
-          {cardType === 'collection' ? (
+          {cardType === 'blueprint' ? (
             <div className="space-y-3">
               {/* Collection picker */}
               <div>
@@ -353,8 +354,8 @@ export default function CCAdminPromoGift() {
                                 card={{
                                   rarity: entry.rarity || 'common',
                                   cardType: entry.card_type || 'custom',
-                                  templateId: entry.template_id,
-                                  _templateData: {
+                                  blueprintId: entry.blueprint_id,
+                                  _blueprintData: {
                                     cardData: td.cardData,
                                     elements: td.elements,
                                     border: td.border,

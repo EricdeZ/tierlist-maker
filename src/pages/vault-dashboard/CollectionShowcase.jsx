@@ -53,16 +53,13 @@ function EntryRow({ entry }) {
     const td = typeof entry.template_data === 'string' ? JSON.parse(entry.template_data) : entry.template_data
     const hasCardData = !!td?.cardData
     const hasElements = !!td?.elements?.length
-    const templateId = entry.template_id || entry.draft_id
+    const blueprintId = entry.blueprint_id
 
     return (
         <div>
             <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm font-bold text-white">{entry.template_name}</span>
                 <span className="text-[10px] text-white/30 uppercase">{entry.card_type}</span>
-                {entry.source_type === 'draft' && (
-                    <span className="text-[10px] text-blue-400/60">draft</span>
-                )}
             </div>
 
             <div className="flex gap-3 overflow-x-auto pb-2">
@@ -73,8 +70,8 @@ function EntryRow({ entry }) {
                                 card={{
                                     rarity,
                                     cardType: entry.card_type || 'custom',
-                                    templateId: entry.template_id,
-                                    _templateData: {
+                                    blueprintId,
+                                    _blueprintData: {
                                         elements: td.elements,
                                         border: td.border,
                                         cardData: td.cardData,

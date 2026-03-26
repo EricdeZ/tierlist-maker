@@ -6,7 +6,7 @@ import { RARITIES } from '../../data/vault/economy'
 import { Search, FileText, Pencil, Trash2 } from 'lucide-react'
 import CanvasCard from '../vault/components/CanvasCard'
 
-const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom']
+const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom', 'staff']
 const STATUS_OPTIONS = ['draft', 'pending_review', 'approved', 'rejected', 'archived']
 
 const STATUS_COLORS = {
@@ -37,58 +37,58 @@ export default function TemplatesPage() {
     const [filterType, setFilterType] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
 
-    const fetchTemplates = useCallback(async () => {
+    const fetchBlueprints = useCallback(async () => {
         setLoading(true)
         try {
             const params = {}
             if (filterStatus) params.status = filterStatus
             if (filterRarity) params.rarity = filterRarity
             if (filterType) params.card_type = filterType
-            const data = await vaultDashboardService.getTemplates(params)
-            setTemplates(data.templates || [])
+            const data = await vaultDashboardService.getBlueprints(params)
+            setTemplates(data.blueprints || [])
         } catch (err) {
-            console.error('Failed to load templates:', err)
+            console.error('Failed to load blueprints:', err)
         } finally {
             setLoading(false)
         }
     }, [filterStatus, filterRarity, filterType])
 
     useEffect(() => {
-        fetchTemplates()
-    }, [fetchTemplates])
+        fetchBlueprints()
+    }, [fetchBlueprints])
 
     const handleApprove = async (e, id) => {
         e.stopPropagation()
-        await vaultDashboardService.approve('template', id)
-        fetchTemplates()
+        await vaultDashboardService.approve(id)
+        fetchBlueprints()
     }
 
     const handleReject = async (e, id) => {
         e.stopPropagation()
         const reason = prompt('Rejection reason (optional):')
-        await vaultDashboardService.reject('template', id, reason)
-        fetchTemplates()
+        await vaultDashboardService.reject(id, reason)
+        fetchBlueprints()
     }
 
     const handleArchive = async (e, id) => {
         e.stopPropagation()
-        await vaultDashboardService.archiveTemplate(id)
-        fetchTemplates()
+        await vaultDashboardService.archiveBlueprint(id)
+        fetchBlueprints()
     }
 
     const handleRename = async (e, template) => {
         e.stopPropagation()
-        const newName = prompt('Rename template:', template.name)
+        const newName = prompt('Rename blueprint:', template.name)
         if (newName === null || !newName.trim()) return
-        await vaultDashboardService.renameItem('template', template.id, newName)
-        fetchTemplates()
+        await vaultDashboardService.renameBlueprint(template.id, newName)
+        fetchBlueprints()
     }
 
     const handleDelete = async (e, id) => {
         e.stopPropagation()
-        if (!confirm('Delete this template? This cannot be undone.')) return
-        await vaultDashboardService.deleteItem('template', id)
-        fetchTemplates()
+        if (!confirm('Delete this blueprint? This cannot be undone.')) return
+        await vaultDashboardService.deleteBlueprint(id)
+        fetchBlueprints()
     }
 
     const filtered = searchQuery
@@ -164,7 +164,7 @@ export default function TemplatesPage() {
                     {filtered.map(t => (
                         <div
                             key={t.id}
-                            onClick={() => navigate('/vault-dashboard', { state: { loadTemplate: t.id } })}
+                            onClick={() => navigate('/vault-dashboard', { state: { loadBlueprint: t.id } })}
                             className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-amber-500/30 cursor-pointer transition-colors"
                         >
                             {/* Preview */}

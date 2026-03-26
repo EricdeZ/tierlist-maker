@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Save, Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers, FilePlus, FolderOpen } from 'lucide-react'
+import { Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers, FilePlus, FolderOpen } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultDashboardService } from '../../services/database'
 import CardCanvas from './preview/CardCanvas'
@@ -10,7 +10,7 @@ import RarityStrip from './editor/RarityStrip'
 import HoloPreview from './preview/HoloPreview'
 import { exportCardToPNG, downloadBlob } from './preview/ExportCanvas'
 
-const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom']
+const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom', 'staff']
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'full_art']
 const ZOOM_LEVELS = [75, 100, 125, 150]
 
@@ -113,15 +113,16 @@ export default function CardCreator() {
 
         const load = async () => {
             try {
-                let data, type
-                if (state.loadDraft) {
+                let data
+                if (state.loadBlueprint) {
+                    const res = await vaultDashboardService.getBlueprint(state.loadBlueprint)
+                    data = res.blueprint
+                } else if (state.loadDraft) {
                     const res = await vaultDashboardService.getDraft(state.loadDraft)
                     data = res.draft
-                    type = 'draft'
                 } else if (state.loadTemplate) {
                     const res = await vaultDashboardService.getTemplate(state.loadTemplate)
                     data = res.template
-                    type = 'template'
                 }
                 if (!data) return
 
@@ -131,7 +132,7 @@ export default function CardCreator() {
                 setRarity(data.rarity || 'full_art')
                 setElements(td?.elements || [])
                 setBorder(td?.border || { enabled: true, color: '#d4af37', width: 3, radius: 12 })
-                setSaveTarget({ type, id: data.id })
+                setSaveTarget({ id: data.id })
                 setStatus(data.status || 'draft')
                 if (td?.cardData) setCardData(td.cardData)
                 if (data.depicted_user_id) {
@@ -410,13 +411,11 @@ export default function CardCreator() {
     }, [])
 
     // Save
-    const handleSave = useCallback(async (type) => {
+    const handleSave = useCallback(async () => {
         setSaving(true)
         setError(null)
         try {
-            // Strip non-serializable props (File objects, blob URLs without R2 upload)
             const cleanElements = elements.map(({ _pendingFile, ...el }) => {
-                // Replace blob URLs with null if not yet uploaded to R2
                 if (el.type === 'image' && el.url?.startsWith('blob:') && !el.assetId) {
                     return { ...el, url: null }
                 }
@@ -430,17 +429,10 @@ export default function CardCreator() {
                 template_data: templateData,
                 depicted_user_id: depictedUser?.id || null,
             }
-            if (type === 'template') {
-                if (saveTarget?.type === 'template') payload.id = saveTarget.id
-                const res = await vaultDashboardService.saveTemplate(payload)
-                setSaveTarget({ type: 'template', id: res.template?.id })
-                setStatus(res.template?.status || 'draft')
-            } else {
-                if (saveTarget?.type === 'draft') payload.id = saveTarget.id
-                const res = await vaultDashboardService.saveDraft(payload)
-                setSaveTarget({ type: 'draft', id: res.draft?.id })
-                setStatus(res.draft?.status || 'draft')
-            }
+            if (saveTarget?.id) payload.id = saveTarget.id
+            const res = await vaultDashboardService.saveBlueprint(payload)
+            setSaveTarget({ id: res.blueprint?.id })
+            setStatus(res.blueprint?.status || 'draft')
             setDirty(false)
         } catch (e) {
             console.error('Save failed:', e)
@@ -448,11 +440,11 @@ export default function CardCreator() {
         } finally {
             setSaving(false)
         }
-    }, [name, cardType, rarity, elements, border, saveTarget, depictedUser])
+    }, [name, cardType, rarity, elements, border, saveTarget, depictedUser, cardData])
 
     const handleSubmit = useCallback(async () => {
         if (!saveTarget) return
-        await vaultDashboardService.submitForReview(saveTarget.type, saveTarget.id)
+        await vaultDashboardService.submitForReview(saveTarget.id)
         setStatus('pending_review')
     }, [saveTarget])
 
@@ -513,13 +505,9 @@ export default function CardCreator() {
 
                 <div className="flex-1" />
 
-                <button onClick={() => handleSave('draft')} disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50">
-                    <Save size={14} /> Draft
-                </button>
-                <button onClick={() => handleSave('template')} disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50">
-                    <Save size={14} /> Template
+                <button onClick={handleSave} disabled={saving}
+                    className="px-3 py-1.5 text-xs font-bold rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50">
+                    {saving ? 'Saving...' : 'Save'}
                 </button>
                 <button onClick={handleExport}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors">
@@ -656,11 +644,11 @@ export default function CardCreator() {
                 )}
                 {canApprove && status === 'pending_review' && (
                     <>
-                        <button onClick={async () => { await vaultDashboardService.approve(saveTarget.type, saveTarget.id); setStatus('approved') }}
+                        <button onClick={async () => { await vaultDashboardService.approve(saveTarget.id); setStatus('approved') }}
                             className="px-3 py-1 bg-green-700 hover:bg-green-600 text-white rounded-lg transition-colors">
                             <Check size={12} className="inline mr-1" /> Approve
                         </button>
-                        <button onClick={async () => { await vaultDashboardService.reject(saveTarget.type, saveTarget.id); setStatus('rejected') }}
+                        <button onClick={async () => { await vaultDashboardService.reject(saveTarget.id); setStatus('rejected') }}
                             className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded-lg transition-colors">
                             <X size={12} className="inline mr-1" /> Reject
                         </button>

@@ -211,9 +211,8 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
     const handleAddEntries = async (selectedItems) => {
         if (!collection.id) return
         try {
-            const templateIds = selectedItems.filter(i => i.type === 'template').map(i => i.id)
-            const draftIds = selectedItems.filter(i => i.type === 'draft').map(i => i.id)
-            await vaultDashboardService.addCollectionEntries(collection.id, templateIds, draftIds)
+            const blueprintIds = selectedItems.map(i => i.id)
+            await vaultDashboardService.addCollectionEntries(collection.id, blueprintIds)
             const data = await vaultDashboardService.getCollection(collection.id)
             setEntries(data.entries || [])
         } catch (err) {
@@ -405,7 +404,7 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
             {/* Template browser modal */}
             {showBrowser && (
                 <TemplateBrowser
-                    existingEntries={entries.map(e => ({ id: e.template_id || e.draft_id, type: e.source_type || 'template' }))}
+                    existingEntries={entries}
                     onAdd={handleAddEntries}
                     onClose={() => setShowBrowser(false)}
                 />
@@ -420,40 +419,33 @@ function TemplateBrowser({ existingEntries, onAdd, onClose }) {
     const [selected, setSelected] = useState(new Map())
     const [search, setSearch] = useState('')
     const [typeFilter, setTypeFilter] = useState('')
-    const [sourceFilter, setSourceFilter] = useState('')
 
     useEffect(() => {
-        Promise.all([
-            vaultDashboardService.getTemplates({ status: 'approved' }),
-            vaultDashboardService.getDrafts({ status: 'approved' }),
-        ]).then(([tData, dData]) => {
-            const templates = (tData.templates || []).map(t => ({ ...t, _type: 'template', _key: `t-${t.id}` }))
-            const drafts = (dData.drafts || []).map(d => ({ ...d, name: d.notes || `Draft #${d.id}`, _type: 'draft', _key: `d-${d.id}` }))
-            setItems([...templates, ...drafts])
+        vaultDashboardService.getBlueprints({ status: 'approved' }).then(data => {
+            setItems(data.blueprints || [])
             setLoading(false)
         }).catch(() => setLoading(false))
     }, [])
 
     const existingKeys = useMemo(() =>
-        new Set(existingEntries.map(e => e.type === 'draft' ? `d-${e.id}` : `t-${e.id}`)),
+        new Set(existingEntries.map(e => e.blueprint_id)),
         [existingEntries]
     )
 
     const filtered = useMemo(() => {
-        let list = items.filter(i => !existingKeys.has(i._key))
+        let list = items.filter(i => !existingKeys.has(i.id))
         if (search.trim()) {
             const q = search.toLowerCase()
             list = list.filter(i => i.name?.toLowerCase().includes(q))
         }
         if (typeFilter) list = list.filter(i => i.card_type === typeFilter)
-        if (sourceFilter) list = list.filter(i => i._type === sourceFilter)
         return list
-    }, [items, existingKeys, search, typeFilter, sourceFilter])
+    }, [items, existingKeys, search, typeFilter])
 
     const toggleSelect = (item) => {
         setSelected(prev => {
             const next = new Map(prev)
-            next.has(item._key) ? next.delete(item._key) : next.set(item._key, { id: item.id, type: item._type })
+            next.has(item.id) ? next.delete(item.id) : next.set(item.id, { id: item.id })
             return next
         })
     }
@@ -477,15 +469,6 @@ function TemplateBrowser({ existingEntries, onAdd, onClose }) {
                         />
                     </div>
                     <select
-                        value={sourceFilter}
-                        onChange={e => setSourceFilter(e.target.value)}
-                        className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
-                    >
-                        <option value="">All sources</option>
-                        <option value="template">Templates</option>
-                        <option value="draft">Drafts</option>
-                    </select>
-                    <select
                         value={typeFilter}
                         onChange={e => setTypeFilter(e.target.value)}
                         className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
@@ -508,26 +491,29 @@ function TemplateBrowser({ existingEntries, onAdd, onClose }) {
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                             {filtered.map(item => (
                                 <div
-                                    key={item._key}
+                                    key={item.id}
                                     onClick={() => toggleSelect(item)}
                                     className={`rounded-lg p-2 cursor-pointer transition-all border ${
-                                        selected.has(item._key)
+                                        selected.has(item.id)
                                             ? 'bg-amber-500/15 border-amber-500/40'
                                             : 'bg-white/[0.03] border-white/5 hover:border-white/15'
                                     }`}
                                 >
                                     {item.thumbnail_url ? (
                                         <img src={item.thumbnail_url} alt="" className="w-full aspect-[63/88] object-cover rounded" />
+                                    ) : item.template_data?.elements ? (
+                                        <CanvasCard
+                                            elements={item.template_data.elements}
+                                            border={item.template_data.border}
+                                            size={120}
+                                        />
                                     ) : (
                                         <div className="w-full aspect-[63/88] bg-white/5 rounded flex items-center justify-center text-[10px] text-white/20">
                                             No preview
                                         </div>
                                     )}
                                     <div className="mt-1 text-[10px] font-bold text-white truncate">{item.name}</div>
-                                    <div className="flex items-center gap-1 text-[9px] text-white/30">
-                                        <span>{item.card_type}</span>
-                                        {item._type === 'draft' && <span className="text-blue-400/60">draft</span>}
-                                    </div>
+                                    <div className="text-[9px] text-white/30">{item.card_type}</div>
                                 </div>
                             ))}
                         </div>
