@@ -52,7 +52,7 @@ const defaultLoadResponse = {
     lockedCardIds: [],
     lockedPackIds: [],
     rotationPacks: [],
-    templateCache: {},
+    blueprintCache: {},
 }
 
 beforeEach(() => {

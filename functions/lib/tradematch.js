@@ -201,6 +201,21 @@ export async function recordSwipe(sql, swiperId, cardId) {
   }
 }
 
+export async function deleteSwipe(sql, swiperId, cardId) {
+  // Only delete if the swipe hasn't resulted in an active trade
+  const [trade] = await sql`
+    SELECT t.id FROM cc_trades t
+    JOIN cc_swipes s ON s.id = t.match_swipe_a_id OR s.id = t.match_swipe_b_id
+    WHERE s.swiper_id = ${swiperId} AND s.card_id = ${cardId} AND t.status = 'active'
+  `
+  if (trade) throw new Error('Cannot undo — this swipe already matched')
+
+  await sql`
+    DELETE FROM cc_swipes WHERE swiper_id = ${swiperId} AND card_id = ${cardId}
+  `
+  return { ok: true }
+}
+
 // ══════════════════════════════════════════════
 // Likes
 // ══════════════════════════════════════════════
@@ -309,7 +324,7 @@ export async function getOfferDetail(sql, userId, tradeId) {
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
            c.holo_effect, c.holo_type, c.power, c.level,
            c.card_data, c.def_id, c.card_type, c.owner_id,
-           c.template_id
+           c.blueprint_id
     FROM cc_trade_cards tc
     JOIN cc_cards c ON tc.card_id = c.id
     WHERE tc.trade_id = ${tradeId}

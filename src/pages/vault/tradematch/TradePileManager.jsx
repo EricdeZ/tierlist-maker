@@ -10,7 +10,7 @@ const MIN_TRADE_PILE = 10
 const PAGE_SIZE = 40
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
-const TYPE_ORDER = ['player', 'god', 'item', 'consumable', 'collection']
+const TYPE_ORDER = ['player', 'god', 'item', 'consumable', 'staff', 'custom']
 
 function tiebreak(a, b) {
   const ta = TYPE_ORDER.indexOf(getCardType(a))
