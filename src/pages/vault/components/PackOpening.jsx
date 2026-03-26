@@ -78,7 +78,7 @@ function PackCard({ card, size, holo = true, override }) {
   const holoEffect = getHoloEffect(card.rarity)
   const holoType = card.holoType || card.holo_type || 'reverse'
 
-  if (type === 'collection') {
+  if (card.templateId) {
     return <VaultCard card={card} getTemplate={getTemplate} size={size} holo={holo} />
   }
 
@@ -247,7 +247,7 @@ function SummaryView({ cards, result, onOpenMore, onClose }) {
 
 export default function PackOpening({ result, packType, onClose, onOpenMore, skipTear, skipToStack, onReplay }) {
   const { getDefOverride, packTypesMap } = useVault()
-  const packColor = packTypesMap?.[packType]?.color
+  const packColor = packType === 'promo-gift' ? '#d4af37' : packTypesMap?.[packType]?.color
   const [phase, setPhase] = useState(skipToStack ? 'stack' : skipTear ? 'ripping' : 'enter')
   const [tearProgress, setTearProgress] = useState(0)
   const [tearSide, setTearSide] = useState(null)
