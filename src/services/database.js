@@ -1551,6 +1551,10 @@ export const vaultDashboardService = {
         })
         return res.json()
     },
+
+    async sendPromoGift(data) {
+        return apiPost('vault', { action: 'send-promo-gift' }, data)
+    },
 }
 
 export const patchNotesService = {
