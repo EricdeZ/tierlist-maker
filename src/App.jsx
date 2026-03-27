@@ -97,6 +97,7 @@ import PatchNotesDetail from "./pages/patchnotes/PatchNotesDetail.jsx";
 const AnniversaryPage = lazy(() => import("./pages/AnniversaryPage.jsx"));
 import Players from "./pages/Players.jsx";
 import TournamentSignup from "./pages/TournamentSignup.jsx";
+import TournamentRules from "./pages/TournamentRules.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import VaultPage from "./pages/VaultPage.jsx";
 import CardSharePage from "./pages/vault/CardSharePage.jsx";
@@ -279,7 +280,8 @@ function App() {
                             {/* SAL signup page */}
                             <Route path="sal/signup" element={<SALSignup />} />
 
-                            {/* Tournament signup */}
+                            {/* Tournament pages */}
+                            <Route path="tournaments/rules" element={<TournamentRules />} />
                             <Route path="tournaments/:slug" element={<TournamentSignup />} />
 
                             {/* Organization page */}

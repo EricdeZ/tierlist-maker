@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { tournamentService } from '../services/database'
 import { Calendar, Shield, ExternalLink, CheckCircle, Clock, XCircle } from 'lucide-react'
@@ -24,7 +24,9 @@ function StatusBadge({ status }) {
 
 function formatDate(dateStr) {
     if (!dateStr) return ''
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00')
+    if (isNaN(date)) return ''
+    return date.toLocaleDateString('en-US', {
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     })
 }
@@ -50,6 +52,7 @@ export default function TournamentSignup() {
     const [signupRole, setSignupRole] = useState('player')
     const [availableDraftDate, setAvailableDraftDate] = useState(false)
     const [availableGameDates, setAvailableGameDates] = useState([])
+    const [rulesAccepted, setRulesAccepted] = useState(false)
 
     // Easter egg hunt state
     const [gameState, setGameState] = useState('idle')
@@ -267,6 +270,7 @@ export default function TournamentSignup() {
                         <div className="mb-3">
                             <span className="text-(--color-text-secondary) text-sm">Draft Day (Captains Only):</span>
                             <div className="text-(--color-text) font-medium">{formatDate(tournament.draft_date)}</div>
+                            <div className="text-(--color-text-secondary) text-xs mt-0.5">Check-in: 7:30 PM EST | Start: 8:00 PM EST</div>
                         </div>
                     )}
                     {gameDates.length > 0 && (
@@ -275,6 +279,7 @@ export default function TournamentSignup() {
                             {gameDates.map(d => (
                                 <div key={d} className="text-(--color-text) font-medium">{formatDate(d)}</div>
                             ))}
+                            <div className="text-(--color-text-secondary) text-xs mt-0.5">Check-in: 7:30 PM EST | Start: 8:00 PM EST</div>
                         </div>
                     )}
                 </div>
@@ -440,9 +445,32 @@ export default function TournamentSignup() {
                             </div>
                         )}
 
+                        {/* Rules Acknowledgment */}
+                        <div>
+                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                rulesAccepted
+                                    ? isEaster ? 'bg-green-500/10 border-green-500/30' : 'bg-(--color-accent)/10 border-(--color-accent)/30'
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    checked={rulesAccepted}
+                                    onChange={e => setRulesAccepted(e.target.checked)}
+                                    required
+                                    className="w-4 h-4 mt-0.5 rounded accent-(--color-accent)"
+                                />
+                                <span className="text-(--color-text) text-sm">
+                                    I have read and agree to the{' '}
+                                    <Link to="/tournaments/rules" target="_blank" className="text-(--color-accent) underline hover:opacity-80">
+                                        Tournament Rules
+                                    </Link>
+                                </span>
+                            </label>
+                        </div>
+
                         <button
                             type="submit"
-                            disabled={submitting || availableGameDates.length < gameDates.length || (signupRole !== 'player' && !availableDraftDate)}
+                            disabled={submitting || !rulesAccepted || availableGameDates.length < gameDates.length || (signupRole !== 'player' && !availableDraftDate)}
                             className={`w-full py-3 rounded-lg font-semibold transition-opacity disabled:opacity-40 ${isEaster ? 'easter-submit-btn' : 'bg-(--color-accent) text-black hover:opacity-90'}`}
                         >
                             {submitting ? 'Submitting...' : 'Sign Up'}
