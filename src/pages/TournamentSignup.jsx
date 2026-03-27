@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import lazyRetry from '../utils/lazyRetry'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { tournamentService } from '../services/database'
 import { Calendar, Shield, ExternalLink, CheckCircle, Clock, XCircle } from 'lucide-react'
 
-const EasterCanvas = lazy(() => import('./tournament/EasterCanvas'))
-const EasterHUD = lazy(() => import('./tournament/EasterHUD'))
+const EasterCanvas = lazyRetry(() => import('./tournament/EasterCanvas'))
+const EasterHUD = lazyRetry(() => import('./tournament/EasterHUD'))
 
 function StatusBadge({ status }) {
     const config = {

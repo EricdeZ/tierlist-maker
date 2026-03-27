@@ -1,5 +1,6 @@
 // src/App.jsx
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
+import lazyRetry from './utils/lazyRetry'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PassionProvider } from './context/PassionContext'
@@ -94,15 +95,15 @@ import TournamentManager from "./pages/admin/TournamentManager.jsx";
 import Features from "./pages/Features.jsx";
 import PatchNotes from "./pages/PatchNotes.jsx";
 import PatchNotesDetail from "./pages/patchnotes/PatchNotesDetail.jsx";
-const AnniversaryPage = lazy(() => import("./pages/AnniversaryPage.jsx"));
+const AnniversaryPage = lazyRetry(() => import("./pages/AnniversaryPage.jsx"));
 import Players from "./pages/Players.jsx";
 import TournamentSignup from "./pages/TournamentSignup.jsx";
 import TournamentRules from "./pages/TournamentRules.jsx";
 import SnoozOverlay from "./pages/SnoozOverlay.jsx";
 import VaultPage from "./pages/VaultPage.jsx";
 import CardSharePage from "./pages/vault/CardSharePage.jsx";
-const BinderSharePage = lazy(() => import("./pages/vault/BinderSharePage.jsx"));
-const CollectionShowcasePage = lazy(() => import("./pages/vault/CollectionShowcasePage.jsx"));
+const BinderSharePage = lazyRetry(() => import("./pages/vault/BinderSharePage.jsx"));
+const CollectionShowcasePage = lazyRetry(() => import("./pages/vault/CollectionShowcasePage.jsx"));
 import BgRemover from "./pages/BgRemover.jsx";
 import SketchPad from "./pages/SketchPad.jsx";
 // Codex
@@ -114,13 +115,13 @@ import CodexImages from "./pages/codex/CodexImages.jsx";
 import CodexWordle from "./pages/codex/CodexWordle.jsx";
 
 // Vault Dashboard (card creator)
-const VaultDashboardLayout = lazy(() => import('./components/layout/VaultDashboardLayout'))
-const CardCreator = lazy(() => import('./pages/vault-dashboard/CardCreator'))
-const TemplatesPage = lazy(() => import('./pages/vault-dashboard/TemplatesPage'))
-const DraftsPage = lazy(() => import('./pages/vault-dashboard/DraftsPage'))
-const AssetsPage = lazy(() => import('./pages/vault-dashboard/AssetsPage'))
-const CollectionsPage = lazy(() => import('./pages/vault-dashboard/CollectionsPage'))
-const PlayerDashboard = lazy(() => import('./pages/dashboard/PlayerDashboard'))
+const VaultDashboardLayout = lazyRetry(() => import('./components/layout/VaultDashboardLayout'))
+const CardCreator = lazyRetry(() => import('./pages/vault-dashboard/CardCreator'))
+const TemplatesPage = lazyRetry(() => import('./pages/vault-dashboard/TemplatesPage'))
+const DraftsPage = lazyRetry(() => import('./pages/vault-dashboard/DraftsPage'))
+const AssetsPage = lazyRetry(() => import('./pages/vault-dashboard/AssetsPage'))
+const CollectionsPage = lazyRetry(() => import('./pages/vault-dashboard/CollectionsPage'))
+const PlayerDashboard = lazyRetry(() => import('./pages/dashboard/PlayerDashboard'))
 
 function HomeRoute() {
     const { user, loading } = useAuth()

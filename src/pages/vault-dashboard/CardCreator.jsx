@@ -111,11 +111,12 @@ export default function CardCreator() {
         const state = location.state
         if (!state) return
 
+        const isDuplicate = !!state.duplicateBlueprint
         const load = async () => {
             try {
                 let data
-                if (state.loadBlueprint) {
-                    const res = await vaultDashboardService.getBlueprint(state.loadBlueprint)
+                if (state.loadBlueprint || state.duplicateBlueprint) {
+                    const res = await vaultDashboardService.getBlueprint(state.loadBlueprint || state.duplicateBlueprint)
                     data = res.blueprint
                 } else if (state.loadDraft) {
                     const res = await vaultDashboardService.getDraft(state.loadDraft)
@@ -127,13 +128,13 @@ export default function CardCreator() {
                 if (!data) return
 
                 const td = typeof data.template_data === 'string' ? JSON.parse(data.template_data) : data.template_data
-                setName(data.name || '')
+                setName(isDuplicate ? `${data.name || 'Untitled'} (Copy)` : (data.name || ''))
                 setCardType(data.card_type || 'player')
                 setRarity(data.rarity || 'full_art')
                 setElements(td?.elements || [])
                 setBorder(td?.border || { enabled: true, color: '#d4af37', width: 3, radius: 12 })
-                setSaveTarget({ id: data.id })
-                setStatus(data.status || 'draft')
+                setSaveTarget(isDuplicate ? null : { id: data.id })
+                setStatus(isDuplicate ? 'draft' : (data.status || 'draft'))
                 if (td?.cardData) setCardData(td.cardData)
                 if (data.depicted_user_id) {
                     setDepictedUser({
@@ -146,7 +147,7 @@ export default function CardCreator() {
                 } else {
                     setDepictedUser(null)
                 }
-                setDirty(false)
+                setDirty(isDuplicate)
                 seedNextId(td?.elements)
                 loadedRef.current = true
                 // Clear navigation state so refresh doesn't re-fetch

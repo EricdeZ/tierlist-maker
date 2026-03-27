@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { RARITIES } from '../../data/vault/economy'
-import { Search, FileText, Pencil, Trash2 } from 'lucide-react'
+import { Search, FileText, Pencil, Trash2, Copy } from 'lucide-react'
 import CanvasCard from '../vault/components/CanvasCard'
 
 const CARD_TYPES = ['player', 'god', 'item', 'consumable', 'minion', 'buff', 'custom', 'staff']
@@ -203,6 +203,13 @@ export default function TemplatesPage() {
 
                             {/* Actions */}
                             <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                    onClick={e => { e.stopPropagation(); navigate('/vault-dashboard', { state: { duplicateBlueprint: t.id } }) }}
+                                    className="p-1.5 text-gray-400 hover:text-cyan-400 transition-colors"
+                                    title="Duplicate"
+                                >
+                                    <Copy size={14} />
+                                </button>
                                 <button
                                     onClick={e => handleRename(e, t)}
                                     className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors"

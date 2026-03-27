@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import lazyRetry from '../../utils/lazyRetry';
 import { useSearchParams } from 'react-router-dom';
 import { useVault } from './VaultContext';
 import { usePassion } from '../../context/PassionContext';
@@ -10,8 +11,8 @@ import { Package } from 'lucide-react';
 import emberIcon from '../../assets/ember.png';
 import PackLeaderboard from './components/PackLeaderboard';
 
-const CCPackSale = lazy(() => import('./CCPackSale'));
-const CCBlackMarket = lazy(() => import('./CCBlackMarket'));
+const CCPackSale = lazyRetry(() => import('./CCPackSale'));
+const CCBlackMarket = lazyRetry(() => import('./CCBlackMarket'));
 
 // ═══════════════════════════════════════════════
 // Convert Link

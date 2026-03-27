@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import lazyRetry from '../../../utils/lazyRetry'
 import { createPortal } from 'react-dom'
 import GameCard from './GameCard'
 import VaultCard from './VaultCard'
@@ -11,7 +12,7 @@ import { useVault } from '../VaultContext'
 import { useAuth } from '../../../context/AuthContext'
 import { X, Tag, PenLine } from 'lucide-react'
 
-const DirectSignModal = lazy(() => import('./DirectSignModal'))
+const DirectSignModal = lazyRetry(() => import('./DirectSignModal'))
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 

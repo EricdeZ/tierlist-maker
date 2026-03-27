@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState, useRef, useCallback } from 'react'
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react'
 import { VaultProvider, useVault } from './vault/VaultContext'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePassion } from '../context/PassionContext'
 import { FEATURE_FLAGS } from '../config/featureFlags'
 import { tradematchService } from '../services/database'
+import lazyRetry from '../utils/lazyRetry'
 import Navbar from '../components/layout/Navbar'
 import PageTitle from '../components/PageTitle'
 import { Package, BookOpen, Settings, Library, ArrowRightLeft, Star, Store, Gift, Handshake, Hammer, Users, BookMarked, Crosshair, MoreHorizontal, Gem, Heart } from 'lucide-react'
@@ -12,14 +13,6 @@ import VaultHeroBanner from './vault/VaultHeroBanner'
 import VaultTabBar from './vault/VaultTabBar'
 import PackOpening from './vault/components/PackOpening'
 import './vault/compdeck.css'
-
-function lazyRetry(fn) {
-    return lazy(() => fn().catch(() => {
-        // Retry once after a brief delay (transient network failure).
-        // Persistent chunk failures (stale deploy) are handled by ErrorBoundary.
-        return new Promise(resolve => setTimeout(resolve, 1000)).then(fn)
-    }))
-}
 
 const CCPackShop = lazyRetry(() => import('./vault/CCPackShop'))
 const CCCardCatalog = lazyRetry(() => import('./vault/CCCardCatalog'))

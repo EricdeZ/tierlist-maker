@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, Suspense } from 'react'
+import lazyRetry from '../../utils/lazyRetry'
 import { useSearchParams } from 'react-router-dom'
 import { useVault } from './VaultContext'
 import { useAuth } from '../../context/AuthContext'
@@ -10,7 +11,7 @@ import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
 import { PenLine, Check, Clock, Loader2, User } from 'lucide-react'
 
-const DirectSignModal = lazy(() => import('./components/DirectSignModal'))
+const DirectSignModal = lazyRetry(() => import('./components/DirectSignModal'))
 
 const HOLO_TYPES = [
   { key: 'holo', label: 'Holo', desc: 'Flat Cores' },

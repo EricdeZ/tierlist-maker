@@ -355,6 +355,175 @@ function combineMasks(a, b, mode) {
 }
 
 // ============================================================
+// Contract / Expand selection mask (morphological erode/dilate)
+// ============================================================
+function contractMask(mask, width, height, px) {
+    if (px === 0) return mask
+    const expand = px < 0
+    const radius = Math.abs(px)
+    const out = new Uint8Array(mask)
+    for (let pass = 0; pass < radius; pass++) {
+        const src = pass === 0 ? mask : new Uint8Array(out)
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const pi = y * width + x
+                if (expand) {
+                    // Dilate: if any neighbor is 255, become 255
+                    if (src[pi] === 255) continue
+                    let found = false
+                    for (let dy = -1; dy <= 1 && !found; dy++) {
+                        for (let dx = -1; dx <= 1 && !found; dx++) {
+                            const nx = x + dx, ny = y + dy
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height && src[ny * width + nx] === 255) found = true
+                        }
+                    }
+                    if (found) out[pi] = 255
+                } else {
+                    // Erode: if any neighbor is 0, become 0
+                    if (src[pi] === 0) continue
+                    let found = false
+                    for (let dy = -1; dy <= 1 && !found; dy++) {
+                        for (let dx = -1; dx <= 1 && !found; dx++) {
+                            const nx = x + dx, ny = y + dy
+                            if (nx < 0 || nx >= width || ny < 0 || ny >= height || src[ny * width + nx] === 0) found = true
+                        }
+                    }
+                    if (found) out[pi] = 0
+                }
+            }
+        }
+    }
+    return out
+}
+
+// ============================================================
+// Refine Edge — color-aware alpha matting at selection boundary
+// ============================================================
+function refineEdge(mask, imageData, width, height, radius) {
+    const r = Math.max(2, radius)
+    const out = new Uint8Array(mask)
+    const data = imageData.data
+
+    // Find boundary pixels (within r px of edge)
+    const boundary = new Uint8Array(width * height)
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pi = y * width + x
+            let onEdge = false
+            for (let dy = -r; dy <= r && !onEdge; dy++) {
+                for (let dx = -r; dx <= r && !onEdge; dx++) {
+                    const nx = x + dx, ny = y + dy
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue
+                    if (Math.sqrt(dx * dx + dy * dy) > r) continue
+                    if (mask[ny * width + nx] !== mask[pi]) onEdge = true
+                }
+            }
+            if (onEdge) boundary[pi] = 1
+        }
+    }
+
+    // For each boundary pixel, compute alpha based on color similarity to
+    // foreground (selected) vs background (unselected) neighborhoods
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pi = y * width + x
+            if (!boundary[pi]) continue
+
+            // Sample foreground and background average colors in neighborhood
+            let fgR = 0, fgG = 0, fgB = 0, fgCount = 0
+            let bgR = 0, bgG = 0, bgB = 0, bgCount = 0
+
+            for (let dy = -r; dy <= r; dy++) {
+                const ny = y + dy
+                if (ny < 0 || ny >= height) continue
+                for (let dx = -r; dx <= r; dx++) {
+                    const nx = x + dx
+                    if (nx < 0 || nx >= width) continue
+                    if (dx * dx + dy * dy > r * r) continue
+                    const ni = ny * width + nx
+                    if (boundary[ni]) continue // skip other boundary pixels
+                    const ci = ni * 4
+                    if (mask[ni] === 255) {
+                        fgR += data[ci]; fgG += data[ci + 1]; fgB += data[ci + 2]; fgCount++
+                    } else {
+                        bgR += data[ci]; bgG += data[ci + 1]; bgB += data[ci + 2]; bgCount++
+                    }
+                }
+            }
+
+            if (fgCount === 0 || bgCount === 0) continue
+
+            fgR /= fgCount; fgG /= fgCount; fgB /= fgCount
+            bgR /= bgCount; bgG /= bgCount; bgB /= bgCount
+
+            // This pixel's color
+            const ci = pi * 4
+            const pr = data[ci], pg = data[ci + 1], pb = data[ci + 2]
+
+            // Distance to foreground vs background
+            const dFg = Math.sqrt((pr - fgR) ** 2 + (pg - fgG) ** 2 + (pb - fgB) ** 2)
+            const dBg = Math.sqrt((pr - bgR) ** 2 + (pg - bgG) ** 2 + (pb - bgB) ** 2)
+            const total = dFg + dBg
+
+            if (total < 1) continue
+
+            // Alpha = how much this pixel looks like foreground
+            const alpha = Math.round(clamp(dBg / total, 0, 1) * 255)
+            out[pi] = alpha
+        }
+    }
+    return out
+}
+
+// ============================================================
+// Smooth alpha along cut edges (anti-alias after deletion)
+// ============================================================
+function smoothCutEdges(imageData, width, height, radius) {
+    if (radius < 1) return imageData
+    const out = new ImageData(new Uint8ClampedArray(imageData.data), width, height)
+    const d = out.data
+    const r = Math.ceil(radius)
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pi = y * width + x
+            const a = d[pi * 4 + 3]
+            // Only process pixels near transparency boundaries
+            if (a === 0 || a === 255) {
+                let nearBoundary = false
+                for (let dy = -1; dy <= 1 && !nearBoundary; dy++) {
+                    for (let dx = -1; dx <= 1 && !nearBoundary; dx++) {
+                        const nx = x + dx, ny = y + dy
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue
+                        const na = d[(ny * width + nx) * 4 + 3]
+                        if ((a === 0 && na > 0) || (a === 255 && na < 255)) nearBoundary = true
+                    }
+                }
+                if (!nearBoundary) continue
+            }
+
+            // Weighted average of alpha in neighborhood
+            let sum = 0, weight = 0
+            for (let dy = -r; dy <= r; dy++) {
+                const ny = y + dy
+                if (ny < 0 || ny >= height) continue
+                for (let dx = -r; dx <= r; dx++) {
+                    const nx = x + dx
+                    if (nx < 0 || nx >= width) continue
+                    const dist = Math.sqrt(dx * dx + dy * dy)
+                    if (dist > radius) continue
+                    const w = 1 - dist / (radius + 0.001)
+                    sum += d[(ny * width + nx) * 4 + 3] * w
+                    weight += w
+                }
+            }
+            if (weight > 0) d[pi * 4 + 3] = Math.round(sum / weight)
+        }
+    }
+    return out
+}
+
+// ============================================================
 // Magnetic Lasso — find edge-snapped path between two points
 // ============================================================
 function snapToEdge(x, y, sobelData, radius) {
@@ -377,10 +546,9 @@ function snapToEdge(x, y, sobelData, radius) {
 }
 
 // ============================================================
-// Brush — apply stroke to ImageData
+// Brush — accumulate stroke into an opacity map (max, not additive)
 // ============================================================
-function applyBrush(imageData, cx, cy, brushSize, hardness, erasing, edgeAware, sobelData) {
-    const { width, height, data } = imageData
+function stampBrush(strokeMap, width, height, cx, cy, brushSize, hardness, edgeAware, sobelData) {
     const r = brushSize / 2
     const x0 = Math.max(0, Math.floor(cx - r))
     const y0 = Math.max(0, Math.floor(cy - r))
@@ -404,14 +572,27 @@ function applyBrush(imageData, cx, cy, brushSize, hardness, erasing, edgeAware, 
                 if (edgeMag > 0.3) strength *= Math.max(0, 1 - (edgeMag - 0.3) / 0.4)
             }
 
-            const pi = (y * width + x) * 4
-            if (erasing) {
-                data[pi + 3] = Math.round(data[pi + 3] * (1 - strength))
-            } else {
-                data[pi + 3] = Math.min(255, Math.round(data[pi + 3] + (255 - data[pi + 3]) * strength))
-            }
+            const pi = y * width + x
+            // Max blending — no compounding as brush overlaps itself
+            if (strength > strokeMap[pi]) strokeMap[pi] = strength
         }
     }
+}
+
+function compositeStroke(snapshot, strokeMap, width, height, erasing) {
+    const out = new ImageData(new Uint8ClampedArray(snapshot.data), width, height)
+    const d = out.data
+    for (let i = 0; i < strokeMap.length; i++) {
+        const s = strokeMap[i]
+        if (s === 0) continue
+        const pi = i * 4
+        if (erasing) {
+            d[pi + 3] = Math.round(d[pi + 3] * (1 - s))
+        } else {
+            d[pi + 3] = Math.min(255, Math.round(d[pi + 3] + (255 - d[pi + 3]) * s))
+        }
+    }
+    return out
 }
 
 // ============================================================
@@ -440,11 +621,16 @@ export default function BgRemover() {
     // --- Selection state ---
     const [selectionMask, setSelectionMask] = useState(null)
     const [featherRadius, setFeatherRadius] = useState(0)
+    const [contractPx, setContractPx] = useState(0)
+    const [edgeSmooth, setEdgeSmooth] = useState(2)
     const [marchOffset, setMarchOffset] = useState(0)
+    const [mousePos, setMousePos] = useState(null)
 
     // --- Lasso state ---
     const [lassoPoints, setLassoPoints] = useState([])
     const [isDrawingLasso, setIsDrawingLasso] = useState(false)
+    const [lassoPreview, setLassoPreview] = useState(null) // cursor follow point
+    const lassoDragging = useRef(false) // true when freehand dragging
 
     // --- Magnetic lasso state ---
     const [magAnchors, setMagAnchors] = useState([])
@@ -482,6 +668,8 @@ export default function BgRemover() {
     const sobelRef = useRef(null)
     const marchTimer = useRef(null)
     const lastBrushPos = useRef(null)
+    const strokeMapRef = useRef(null)    // Float32Array — max opacity per pixel for current stroke
+    const strokeSnapshotRef = useRef(null) // ImageData — workingData frozen at stroke start
 
     // --- Checker pattern ---
     const checker = useMemo(() => {
@@ -783,15 +971,47 @@ export default function BgRemover() {
         }
 
         // Lasso path preview
-        if (isDrawingLasso && lassoPoints.length > 1) {
+        if (isDrawingLasso && lassoPoints.length > 0) {
+            // Placed points
             ctx.strokeStyle = 'rgba(34,211,238,0.8)'
             ctx.lineWidth = 1.5
-            ctx.setLineDash([4, 4])
             ctx.beginPath()
             ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y)
             for (let i = 1; i < lassoPoints.length; i++) ctx.lineTo(lassoPoints[i].x, lassoPoints[i].y)
+            // Preview line to cursor
+            if (lassoPreview) ctx.lineTo(lassoPreview.x, lassoPreview.y)
             ctx.stroke()
-            ctx.setLineDash([])
+
+            // Closing line preview (dashed)
+            if (lassoPreview && lassoPoints.length > 1) {
+                ctx.strokeStyle = 'rgba(34,211,238,0.3)'
+                ctx.setLineDash([4, 4])
+                ctx.beginPath()
+                ctx.moveTo(lassoPreview.x, lassoPreview.y)
+                ctx.lineTo(lassoPoints[0].x, lassoPoints[0].y)
+                ctx.stroke()
+                ctx.setLineDash([])
+            }
+
+            // Anchor dots
+            ctx.fillStyle = 'rgba(34,211,238,0.9)'
+            for (const p of lassoPoints) {
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2)
+                ctx.fill()
+            }
+
+            // Start point highlight (bigger when close to closing)
+            if (lassoPoints.length > 2 && lassoPreview) {
+                const start = lassoPoints[0]
+                const dx = lassoPreview.x - start.x, dy = lassoPreview.y - start.y
+                const near = Math.sqrt(dx * dx + dy * dy) < 10
+                ctx.strokeStyle = near ? 'rgba(34,211,238,1)' : 'rgba(34,211,238,0.4)'
+                ctx.lineWidth = near ? 2 : 1
+                ctx.beginPath()
+                ctx.arc(start.x, start.y, near ? 6 : 4, 0, Math.PI * 2)
+                ctx.stroke()
+            }
         }
 
         // Magnetic lasso preview
@@ -812,7 +1032,20 @@ export default function BgRemover() {
                 ctx.fill()
             }
         }
-    }, [selectionMask, marchOffset, tool, size, isDrawingLasso, lassoPoints, isDrawingMag, magAnchors, magPreview])
+
+        // Brush cursor
+        if (tool === 'brush' && mousePos) {
+            ctx.strokeStyle = 'rgba(34,211,238,0.7)'
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.arc(mousePos.x, mousePos.y, brushSize / 2, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.fillStyle = brushErasing ? 'rgba(255,100,100,0.5)' : 'rgba(100,255,100,0.5)'
+            ctx.beginPath()
+            ctx.arc(mousePos.x, mousePos.y, 2, 0, Math.PI * 2)
+            ctx.fill()
+        }
+    }, [selectionMask, marchOffset, tool, size, isDrawingLasso, lassoPoints, lassoPreview, isDrawingMag, magAnchors, magPreview, mousePos, brushSize, brushErasing])
 
     // --- Mouse handlers ---
     const handleMouseDown = useCallback((e) => {
@@ -831,15 +1064,38 @@ export default function BgRemover() {
             e.preventDefault()
             brushDrag.current = true
             lastBrushPos.current = { x, y }
-            const newData = new ImageData(new Uint8ClampedArray(workingData.data), workingData.width, workingData.height)
-            applyBrush(newData, x, y, brushSize, brushHardness, brushErasing, edgeAware, sobelRef.current)
-            setWorkingData(newData)
+            // Freeze snapshot + init stroke accumulator
+            strokeSnapshotRef.current = new ImageData(new Uint8ClampedArray(workingData.data), workingData.width, workingData.height)
+            strokeMapRef.current = new Float32Array(workingData.width * workingData.height)
+            stampBrush(strokeMapRef.current, workingData.width, workingData.height, x, y, brushSize, brushHardness, edgeAware, sobelRef.current)
+            setWorkingData(compositeStroke(strokeSnapshotRef.current, strokeMapRef.current, workingData.width, workingData.height, brushErasing))
         }
 
         if (tool === 'lasso') {
             e.preventDefault()
-            setIsDrawingLasso(true)
-            setLassoPoints([{ x, y }])
+            lassoDragging.current = true
+            if (!isDrawingLasso) {
+                // Start new lasso
+                setIsDrawingLasso(true)
+                setLassoPoints([{ x, y }])
+            } else {
+                // Close if clicking near start
+                if (lassoPoints.length > 2) {
+                    const start = lassoPoints[0]
+                    const ddx = x - start.x, ddy = y - start.y
+                    if (Math.sqrt(ddx * ddx + ddy * ddy) < 10) {
+                        const mask = rasterizePath(lassoPoints, size.w, size.h)
+                        setSelectionMask(mask)
+                        setLassoPoints([])
+                        setIsDrawingLasso(false)
+                        setLassoPreview(null)
+                        lassoDragging.current = false
+                        return
+                    }
+                }
+                // Add click point
+                setLassoPoints(prev => [...prev, { x, y }])
+            }
         }
 
         if (tool === 'magLasso' && !isDrawingMag) {
@@ -857,7 +1113,7 @@ export default function BgRemover() {
                 cropDrag.current = { handle, startRx: rx, startRy: ry, startCrop: { ...crop } }
             }
         }
-    }, [tool, workingData, brushSize, brushHardness, brushErasing, edgeAware, screenToCanvas, pan, crop, getRelCoords, hitTest, isDrawingMag])
+    }, [tool, workingData, brushSize, brushHardness, brushErasing, edgeAware, screenToCanvas, pan, crop, getRelCoords, hitTest, isDrawingMag, isDrawingLasso, lassoPoints, size, selectionMask])
 
     const handleMouseMove = useCallback((e) => {
         // Pan drag
@@ -881,29 +1137,39 @@ export default function BgRemover() {
             }
         }
 
-        // Brush drag
-        if (tool === 'brush' && brushDrag.current && workingData) {
+        // Brush drag — stamp into stroke map, composite from frozen snapshot
+        if (tool === 'brush' && brushDrag.current && strokeMapRef.current && strokeSnapshotRef.current) {
             const last = lastBrushPos.current
             const dx = x - last.x, dy = y - last.y
             const dist = Math.sqrt(dx * dx + dy * dy)
             const step = Math.max(1, brushSize / 6)
-            const newData = new ImageData(new Uint8ClampedArray(workingData.data), workingData.width, workingData.height)
+            const sMap = strokeMapRef.current
+            const snap = strokeSnapshotRef.current
             if (dist < step) {
-                applyBrush(newData, x, y, brushSize, brushHardness, brushErasing, edgeAware, sobelRef.current)
+                stampBrush(sMap, snap.width, snap.height, x, y, brushSize, brushHardness, edgeAware, sobelRef.current)
             } else {
                 const steps = Math.ceil(dist / step)
                 for (let i = 0; i <= steps; i++) {
                     const t = i / steps
-                    applyBrush(newData, last.x + dx * t, last.y + dy * t, brushSize, brushHardness, brushErasing, edgeAware, sobelRef.current)
+                    stampBrush(sMap, snap.width, snap.height, last.x + dx * t, last.y + dy * t, brushSize, brushHardness, edgeAware, sobelRef.current)
                 }
             }
             lastBrushPos.current = { x, y }
-            setWorkingData(newData)
+            setWorkingData(compositeStroke(snap, sMap, snap.width, snap.height, brushErasing))
         }
 
-        // Lasso drawing
+        // Lasso: freehand while dragging, preview line when hovering
         if (tool === 'lasso' && isDrawingLasso) {
-            setLassoPoints(prev => [...prev, { x, y }])
+            if (lassoDragging.current) {
+                // Freehand: add points as we drag (throttle by distance)
+                setLassoPoints(prev => {
+                    const last = prev[prev.length - 1]
+                    if (!last) return [...prev, { x, y }]
+                    const d = Math.sqrt((x - last.x) ** 2 + (y - last.y) ** 2)
+                    return d > 3 ? [...prev, { x, y }] : prev
+                })
+            }
+            setLassoPreview({ x, y })
         }
 
         // Magnetic lasso preview
@@ -956,20 +1222,17 @@ export default function BgRemover() {
             return
         }
 
-        // End brush stroke — push history
+        // End brush stroke — push history, clean up stroke state
         if (tool === 'brush' && brushDrag.current && workingData) {
             brushDrag.current = false
             lastBrushPos.current = null
+            strokeMapRef.current = null
+            strokeSnapshotRef.current = null
             pushHistory(workingData)
         }
 
-        // End lasso — create selection
-        if (tool === 'lasso' && isDrawingLasso && lassoPoints.length > 2 && size) {
-            setIsDrawingLasso(false)
-            const mask = rasterizePath(lassoPoints, size.w, size.h)
-            setSelectionMask(mask)
-            setLassoPoints([])
-        }
+        // Lasso: stop freehand drag but keep path open
+        if (tool === 'lasso') lassoDragging.current = false
 
         // End crop drag
         cropDrag.current = null
@@ -1025,7 +1288,20 @@ export default function BgRemover() {
     }, [tool, srcData, size, screenToCanvas, tolerance, selectionMask, isDrawingMag, magAnchors])
 
     // Double-click to close mag lasso
+    const closeLasso = useCallback(() => {
+        if (lassoPoints.length > 2 && size) {
+            const mask = rasterizePath(lassoPoints, size.w, size.h)
+            setSelectionMask(mask)
+            setLassoPoints([])
+            setIsDrawingLasso(false)
+            setLassoPreview(null)
+        }
+    }, [lassoPoints, size])
+
     const handleDoubleClick = useCallback(() => {
+        if (tool === 'lasso' && isDrawingLasso && lassoPoints.length > 2) {
+            closeLasso()
+        }
         if (tool === 'magLasso' && isDrawingMag && magAnchors.length > 2 && size) {
             const mask = rasterizePath(magAnchors, size.w, size.h)
             setSelectionMask(mask)
@@ -1033,7 +1309,7 @@ export default function BgRemover() {
             setIsDrawingMag(false)
             setMagPreview(null)
         }
-    }, [tool, isDrawingMag, magAnchors, size])
+    }, [tool, isDrawingLasso, lassoPoints, closeLasso, isDrawingMag, magAnchors, size])
 
     // --- Scroll zoom (always active, cursor-centered) ---
     const handleWheel = useCallback((e) => {
@@ -1060,34 +1336,45 @@ export default function BgRemover() {
     }, [zoom, pan])
 
     // --- Selection actions ---
-    const deleteSelection = useCallback(() => {
-        if (!selectionMask || !workingData) return
-        const mask = featherRadius > 0 ? featherMask(selectionMask, size.w, size.h, featherRadius) : selectionMask
-        const newData = new ImageData(new Uint8ClampedArray(workingData.data), workingData.width, workingData.height)
+    // Pipeline: contract/expand → refine edge → feather → apply → smooth cut edges
+    const applyMaskDeletion = useCallback((rawMask) => {
+        if (!rawMask || !workingData || !srcData) return
+        const { w, h } = size
+        // 1. Contract or expand
+        let mask = contractPx !== 0 ? contractMask(rawMask, w, h, contractPx) : rawMask
+        // 2. Refine edge (color-aware matting)
+        mask = refineEdge(mask, srcData, w, h, Math.max(3, featherRadius + 2))
+        // 3. Feather
+        if (featherRadius > 0) mask = featherMask(mask, w, h, featherRadius)
+        // 4. Apply alpha
+        let newData = new ImageData(new Uint8ClampedArray(workingData.data), w, h)
         for (let i = 0; i < mask.length; i++) {
             if (mask[i] > 0) {
                 newData.data[i * 4 + 3] = Math.round(newData.data[i * 4 + 3] * (1 - mask[i] / 255))
             }
         }
+        // 5. Smooth cut edges (anti-alias)
+        if (edgeSmooth > 0) newData = smoothCutEdges(newData, w, h, edgeSmooth)
         setWorkingData(newData)
         pushHistory(newData)
         setSelectionMask(null)
-    }, [selectionMask, workingData, featherRadius, size, pushHistory])
+    }, [workingData, srcData, size, contractPx, featherRadius, edgeSmooth, pushHistory])
+
+    const deleteSelection = useCallback(() => {
+        if (!selectionMask) return
+        applyMaskDeletion(selectionMask)
+    }, [selectionMask, applyMaskDeletion])
 
     const keepSelection = useCallback(() => {
-        if (!selectionMask || !workingData) return
-        const inv = invertMask(selectionMask)
-        const mask = featherRadius > 0 ? featherMask(inv, size.w, size.h, featherRadius) : inv
-        const newData = new ImageData(new Uint8ClampedArray(workingData.data), workingData.width, workingData.height)
-        for (let i = 0; i < mask.length; i++) {
-            if (mask[i] > 0) {
-                newData.data[i * 4 + 3] = Math.round(newData.data[i * 4 + 3] * (1 - mask[i] / 255))
-            }
-        }
-        setWorkingData(newData)
-        pushHistory(newData)
-        setSelectionMask(null)
-    }, [selectionMask, workingData, featherRadius, size, pushHistory])
+        if (!selectionMask) return
+        applyMaskDeletion(invertMask(selectionMask))
+    }, [selectionMask, applyMaskDeletion])
+
+    const refineSelection = useCallback(() => {
+        if (!selectionMask || !srcData) return
+        const refined = refineEdge(selectionMask, srcData, size.w, size.h, Math.max(4, featherRadius + 3))
+        setSelectionMask(refined)
+    }, [selectionMask, srcData, size, featherRadius])
 
     const invertSelection = useCallback(() => {
         if (!selectionMask) return
@@ -1101,6 +1388,8 @@ export default function BgRemover() {
         setIsDrawingLasso(false)
         setIsDrawingMag(false)
         setMagPreview(null)
+        setLassoPreview(null)
+        lassoDragging.current = false
     }, [])
 
     // --- Keyboard shortcuts ---
@@ -1123,6 +1412,7 @@ export default function BgRemover() {
                     case 'x': if (image) { e.preventDefault(); setBrushErasing(v => !v) } return
                     case '[': if (image) { e.preventDefault(); setBrushSize(s => Math.max(1, s - 5)) } return
                     case ']': if (image) { e.preventDefault(); setBrushSize(s => Math.min(200, s + 5)) } return
+                    case 'enter': if (isDrawingLasso) { e.preventDefault(); closeLasso() } return
                     case 'escape': clearSelection(); return
                     case 'delete': if (selectionMask) { e.preventDefault(); deleteSelection() } return
                 }
@@ -1145,7 +1435,7 @@ export default function BgRemover() {
         document.addEventListener('keydown', h)
         document.addEventListener('keyup', up)
         return () => { document.removeEventListener('keydown', h); document.removeEventListener('keyup', up) }
-    }, [image, switchTool, clearSelection, selectionMask, deleteSelection, undo, redo, invertSelection])
+    }, [image, switchTool, clearSelection, selectionMask, deleteSelection, undo, redo, invertSelection, isDrawingLasso, closeLasso])
 
     // --- Paste ---
     useEffect(() => {
@@ -1244,8 +1534,7 @@ export default function BgRemover() {
         return 'default'
     }
 
-    // --- Brush cursor overlay (drawn via mouse move on overlay) ---
-    const [mousePos, setMousePos] = useState(null)
+    // --- Brush cursor position (drawn in overlay effect) ---
     const handleOverlayMouseMove = useCallback((e) => {
         if (tool === 'brush') {
             const { x, y } = screenToCanvas(e)
@@ -1254,25 +1543,6 @@ export default function BgRemover() {
             setMousePos(null)
         }
     }, [tool, screenToCanvas])
-
-    // Draw brush cursor
-    useEffect(() => {
-        if (!overlayRef.current || !mousePos || tool !== 'brush') return
-        const ctx = overlayRef.current.getContext('2d')
-        // We need to re-draw the overlay since we're layering brush cursor on it
-        // The marching ants effect handles the rest, so just add brush cursor
-        ctx.strokeStyle = 'rgba(34,211,238,0.7)'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(mousePos.x, mousePos.y, brushSize / 2, 0, Math.PI * 2)
-        ctx.stroke()
-
-        // Inner dot
-        ctx.fillStyle = brushErasing ? 'rgba(255,100,100,0.5)' : 'rgba(100,255,100,0.5)'
-        ctx.beginPath()
-        ctx.arc(mousePos.x, mousePos.y, 2, 0, Math.PI * 2)
-        ctx.fill()
-    }, [mousePos, tool, brushSize, brushErasing])
 
     const naturalW = crop && crop.rw < 1 - MIN_CROP ? Math.round(crop.rw * (image?.width || 0)) : image?.width
     const naturalH = crop && crop.rh < 1 - MIN_CROP ? Math.round(crop.rh * (image?.height || 0)) : image?.height
@@ -1306,7 +1576,7 @@ export default function BgRemover() {
                                 : tool === 'brush'
                                     ? `${brushErasing ? 'Erasing' : 'Restoring'} — paint on the image. [/] resize, X swap.`
                                     : tool === 'lasso'
-                                        ? 'Draw around the area to select. Release to close.'
+                                        ? 'Click to place points, drag to freehand. Double-click or Enter to close.'
                                         : tool === 'magLasso'
                                             ? 'Click to place anchor points along edges. Double-click to close.'
                                             : tool === 'wand'
@@ -1434,13 +1704,27 @@ export default function BgRemover() {
 
                         {/* Selection tool options */}
                         {hasSelection && (
-                            <>
-                                <label className="text-[11px] text-gray-500 uppercase tracking-widest shrink-0">Feather</label>
-                                <input type="range" min={0} max={20} value={featherRadius} onChange={(e) => setFeatherRadius(+e.target.value)} className={sliderClasses} style={{ maxWidth: 120 }} />
-                                <span className="text-sm text-gray-400 font-mono tabular-nums w-7 text-right">{featherRadius}</span>
+                            <div className="flex items-center gap-3 flex-wrap w-full">
+                                {/* Row 1: Sliders */}
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <label className="text-[11px] text-gray-500 uppercase tracking-widest shrink-0">Feather</label>
+                                    <input type="range" min={0} max={20} value={featherRadius} onChange={(e) => setFeatherRadius(+e.target.value)} className={sliderClasses} style={{ maxWidth: 100 }} />
+                                    <span className="text-sm text-gray-400 font-mono tabular-nums w-5 text-right">{featherRadius}</span>
+
+                                    <label className="text-[11px] text-gray-500 uppercase tracking-widest shrink-0 ml-1">Smooth</label>
+                                    <input type="range" min={0} max={8} value={edgeSmooth} onChange={(e) => setEdgeSmooth(+e.target.value)} className={sliderClasses} style={{ maxWidth: 80 }} />
+                                    <span className="text-sm text-gray-400 font-mono tabular-nums w-5 text-right">{edgeSmooth}</span>
+
+                                    <label className="text-[11px] text-gray-500 uppercase tracking-widest shrink-0 ml-1" title="Negative = contract, Positive = expand">Grow</label>
+                                    <input type="range" min={-10} max={10} value={contractPx} onChange={(e) => setContractPx(+e.target.value)} className={sliderClasses} style={{ maxWidth: 80 }} />
+                                    <span className="text-sm text-gray-400 font-mono tabular-nums w-7 text-right">{contractPx > 0 ? `+${contractPx}` : contractPx}</span>
+                                </div>
 
                                 {selectionMask && (
-                                    <div className="flex items-center gap-1.5 ml-2">
+                                    <div className="flex items-center gap-1.5 ml-auto">
+                                        <button onClick={refineSelection} className="px-2.5 py-1 text-[11px] rounded bg-purple-500/15 text-purple-300 border border-purple-400/20 hover:bg-purple-500/25 transition-colors" title="Color-aware edge refinement">
+                                            Refine Edge
+                                        </button>
                                         <button onClick={deleteSelection} className="px-2.5 py-1 text-[11px] rounded bg-red-500/15 text-red-300 border border-red-400/20 hover:bg-red-500/25 transition-colors">
                                             Delete
                                         </button>
@@ -1455,7 +1739,7 @@ export default function BgRemover() {
                                         </button>
                                     </div>
                                 )}
-                            </>
+                            </div>
                         )}
 
                         {/* Crop: clear */}
