@@ -742,16 +742,19 @@ async function getMatchReview(sql, lf) {
     const scheduledMatches = await sql`
         SELECT sm.id, sm.team1_id, sm.team2_id, sm.scheduled_date, sm.week,
                t1.name as team1_name, t2.name as team2_name,
-               d.name as division_name
+               d.name as division_name,
+               ss.name as stage_name, sg.name as group_name, sr.name as round_name
         FROM scheduled_matches sm
-        JOIN teams t1 ON sm.team1_id = t1.id
-        JOIN teams t2 ON sm.team2_id = t2.id
+        LEFT JOIN teams t1 ON sm.team1_id = t1.id
+        LEFT JOIN teams t2 ON sm.team2_id = t2.id
         JOIN seasons s ON sm.season_id = s.id
         JOIN divisions d ON s.division_id = d.id
         JOIN leagues l ON d.league_id = l.id
+        LEFT JOIN season_stages ss ON sm.stage_id = ss.id
+        LEFT JOIN stage_groups sg ON sm.group_id = sg.id
+        LEFT JOIN stage_rounds sr ON sm.round_id = sr.id
         WHERE sm.status = 'scheduled' ${lf}
-        ORDER BY sm.scheduled_date DESC
-        LIMIT 50
+        ORDER BY d.name, ss.sort_order NULLS FIRST, sm.scheduled_date DESC
     `
 
     return { statusCode: 200, headers, body: JSON.stringify({ unmatched, matched, scheduledMatches }) }

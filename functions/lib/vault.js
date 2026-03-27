@@ -448,8 +448,11 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
   // Load staff passive IDs for random assignment to staff cards
   const hasStaff = cards.some(c => c.card_type === 'staff')
   let staffPassiveIds = []
+  let staffPassiveMap = {}
   if (hasStaff) {
-    staffPassiveIds = (await sql`SELECT id FROM cc_staff_passives`).map(r => r.id)
+    const passives = await sql`SELECT id, name FROM cc_staff_passives`
+    staffPassiveIds = passives.map(r => r.id)
+    staffPassiveMap = Object.fromEntries(passives.map(r => [r.id, r.name]))
   }
 
   const newCards = []
@@ -485,6 +488,7 @@ export async function openPack(sql, userId, packType, { skipPayment = false } = 
       RETURNING *
     `
     if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
+    if (inserted.passive_id) inserted.passive_name = staffPassiveMap[inserted.passive_id] || null
     newCards.push(inserted)
   }
 
@@ -567,7 +571,7 @@ function pickWeightedType(types) {
   return types[types.length - 1]
 }
 
-const STATIC_POOL_SIZES = { god: GODS.length, item: ITEMS.length, consumable: CONSUMABLES.length }
+const STATIC_POOL_SIZES = { god: GODS.length, item: ITEMS.length, consumable: CONSUMABLES.length, collection: 10 }
 
 function pickTypeForSlot(slot) {
   const types = slot.types || ['god']
@@ -722,9 +726,9 @@ async function generateConfiguredPack(sql, pack) {
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i]
 
-    // Handle collection slots — skip normal type-picking entirely
+    // Legacy: handle old-format collection-only slots
     if (slot.type === 'collection' && slot.collectionId) {
-      const card = await generateCollectionCard(sql, slot.collectionId)
+      const card = await generateCollectionCard(sql, [slot.collectionId])
       if (card) {
         card._revealOrder = i
         cards.push(card)
@@ -736,7 +740,10 @@ async function generateConfiguredPack(sql, pack) {
     const type = forcedTypes[i] || pickTypeForSlot(slot)
 
     let card
-    if (type === 'player') {
+    if (type === 'collection') {
+      card = await generateCollectionCard(sql, slot.collectionIds || [], rarity)
+      if (!card) card = generateCardByType('god', rarity) // fallback if no collection entries
+    } else if (type === 'player') {
       card = divisionIds.length > 0
         ? await generatePlayerCardByDivisions(sql, rarity, divisionIds)
         : await generatePlayerCard(sql, rarity, pack.league_id)
@@ -750,27 +757,34 @@ async function generateConfiguredPack(sql, pack) {
   return cards
 }
 
-async function generateCollectionCard(sql, collectionId) {
+async function generateCollectionCard(sql, collectionIds, rarityOverride) {
+  if (!collectionIds || collectionIds.length === 0) return null
+
   const entries = await sql`
-    SELECT bp.id, bp.name, bp.card_type, bp.depicted_user_id
+    SELECT bp.id, bp.name, bp.card_type, bp.depicted_user_id, bp.template_data, e.collection_id
     FROM cc_collection_entries e
     JOIN cc_card_blueprints bp ON e.blueprint_id = bp.id AND bp.status = 'approved'
     JOIN cc_collections c ON e.collection_id = c.id
-    WHERE e.collection_id = ${collectionId}
+    WHERE e.collection_id = ANY(${collectionIds})
       AND c.status = 'active'
   `
   if (entries.length === 0) return null
 
   const blueprint = entries[Math.floor(Math.random() * entries.length)]
-  const rarity = rollRarity('common')
+  // Resolve display name from template_data (cardData.name or name-banner element)
+  const td = typeof blueprint.template_data === 'string' ? JSON.parse(blueprint.template_data) : blueprint.template_data
+  const displayName = td?.cardData?.name
+    || td?.elements?.find(el => el.type === 'name-banner')?.playerName
+    || blueprint.name
+  const rarity = rarityOverride || rollRarity('common')
   const holoEffect = rollHoloEffect(rarity)
   const holoType = rollHoloType(rarity)
 
-  const [col] = await sql`SELECT name FROM cc_collections WHERE id = ${collectionId}`
+  const [col] = await sql`SELECT name FROM cc_collections WHERE id = ${blueprint.collection_id}`
 
   return {
     god_id: `blueprint-${blueprint.id}`,
-    god_name: blueprint.name,
+    god_name: displayName,
     god_class: blueprint.card_type || 'custom',
     role: blueprint.card_type || 'custom',
     rarity,
@@ -780,7 +794,7 @@ async function generateCollectionCard(sql, collectionId) {
     image_url: null,
     acquired_via: 'pack',
     card_type: blueprint.card_type,
-    card_data: { collectionId, collectionName: col?.name || 'Collection' },
+    card_data: { collectionId: blueprint.collection_id, collectionName: col?.name || 'Collection' },
     def_id: null,
     blueprint_id: blueprint.id,
     depicted_user_id: blueprint.depicted_user_id || null,

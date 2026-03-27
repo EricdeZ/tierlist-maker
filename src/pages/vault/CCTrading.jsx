@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { tradingService } from '../../services/database'
+import useInfiniteScroll from '../../hooks/useInfiniteScroll'
 import { RARITIES } from '../../data/vault/economy'
 import CardEffectDisplay from './components/CardEffectDisplay'
 import { GODS } from '../../data/vault/gods'
@@ -85,6 +86,8 @@ export default function CCTrading() {
   }, [setSearchParams])
   const [pending, setPending] = useState([])
   const [historyTrades, setHistoryTrades] = useState([])
+  const [historyHasMore, setHistoryHasMore] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [activeTrade, setActiveTrade] = useState(() => {
     const tid = new URLSearchParams(window.location.search).get('tradeId')
     return tid ? parseInt(tid) : null
@@ -119,14 +122,27 @@ export default function CCTrading() {
     }
   }, [setView])
 
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (offset = 0) => {
+    setHistoryLoading(true)
     try {
-      const data = await tradingService.history()
-      setHistoryTrades(data.trades || [])
+      const data = await tradingService.history(offset)
+      const newTrades = data.trades || []
+      if (offset === 0) {
+        setHistoryTrades(newTrades)
+      } else {
+        setHistoryTrades(prev => [...prev, ...newTrades])
+      }
+      setHistoryHasMore(!!data.hasMore)
     } catch (err) {
       console.error('Failed to fetch trade history:', err)
+    } finally {
+      setHistoryLoading(false)
     }
   }, [])
+
+  const loadMoreHistory = useCallback(() => {
+    fetchHistory(historyTrades.length)
+  }, [fetchHistory, historyTrades.length])
 
   useEffect(() => { fetchPending() }, [fetchPending])
 
@@ -277,7 +293,7 @@ export default function CCTrading() {
         />
       )}
 
-      {view === 'history' && <HistoryView trades={historyTrades} />}
+      {view === 'history' && <HistoryView trades={historyTrades} hasMore={historyHasMore} loading={historyLoading} loadMore={loadMoreHistory} />}
 
       {view === 'room' && activeTrade && (
         <TradeRoom
@@ -432,8 +448,10 @@ function TradeRow({ trade, action, actionDisabled, onAction, onCancel, countdown
 // ═══════════════════════════════════════
 // History View
 // ═══════════════════════════════════════
-function HistoryView({ trades }) {
-  if (trades.length === 0) {
+function HistoryView({ trades, hasMore, loading, loadMore }) {
+  const scrollRef = useInfiniteScroll(loadMore, hasMore, loading)
+
+  if (!loading && trades.length === 0) {
     return (
       <div className="text-center py-20 text-white/30">
         <History className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -462,6 +480,11 @@ function HistoryView({ trades }) {
           </span>
         </div>
       ))}
+      {(hasMore || loading) && (
+        <div ref={scrollRef} className="flex justify-center py-6">
+          <Loader2 className="w-5 h-5 text-white/20 animate-spin" />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,16 +1,30 @@
-# The Vault — OB31 Patch Notes
+# The Vault — Quality of Life Update
 
-## New Homepage
-The site has a brand new landing page. Check it out at [smitecomp.com/landing](https://smitecomp.com/landing).
+## Binder
+- You can now **change your binder color** from the binder page
+- Better **card selector** for adding cards to binder slots
 
-## SMITE 2 OB31 Patch Notes
-OB31 is almost live — read the full breakdown with god and item changes at [smitecomp.com/patchnotes/ob31](https://smitecomp.com/patchnotes/ob31).
+## Dismantling
+- **Auto-fill** when dismantling — quickly select cards to break down
+- **Drag cards** directly into the dismantle area
 
-## Swiper Bug Fixes
-- Swiper now shows **all cards on other players' trade piles**
-- Fixed a bug where swiping could skip cards when the feed updated mid-swipe
-- Fixed feed not refreshing properly when returning to the swiper tab
+## Collection
+- Fixed **search** to filter your collection
+- Fixed teams not fully loading on the collection page
 
-## Coming Soon
-The groundwork for **special cards and collections** is now in place. More details soon — might be a good time to save some Cores.
+## Trading
+- **Trade Match**: added a go back button to revisit previous steps
+- **Trade Match**: added a close button to exit a match early
 
+## Packs
+- **Open More** button after opening a pack now actually works
+
+## Data Fixes
+- Fixed role inconsistencies across cards
+- Fixed god data inconsistencies across cards
+- Upgraded backend monitoring system
+
+## Other
+- **Promo gift sendout system** for the first special drop
+- **Join Discord** popup for new users
+- **Easter Invitational** tournament signup is live !!!

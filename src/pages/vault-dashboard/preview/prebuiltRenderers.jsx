@@ -102,7 +102,7 @@ export function renderPrebuiltContent(el) {
                         fontWeight: 800,
                         color: el.nameColor || p.textBright,
                         letterSpacing: 0.4,
-                        textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                        textShadow: el.nameShadow === 0 ? 'none' : `0 1px ${4 * (el.nameShadow ?? 0.6)}px rgba(0,0,0,${el.nameShadow ?? 0.6})`,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',

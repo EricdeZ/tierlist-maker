@@ -1254,8 +1254,8 @@ export const tradingService = {
     async poll(tradeId) {
         return apiCall('trading', { action: 'poll', tradeId })
     },
-    async history() {
-        return apiCall('trading', { action: 'history' })
+    async history(offset = 0) {
+        return apiCall('trading', { action: 'history', offset: String(offset) })
     },
     async searchUsers(q) {
         return apiCall('trading', { action: 'search-users', q })
@@ -1346,6 +1346,9 @@ export const tradematchService = {
     },
     async offerCancel(tradeId) {
         return apiPost('tradematch', { action: 'offer-cancel' }, { tradeId })
+    },
+    async history() {
+        return apiCall('tradematch', { action: 'history' })
     },
 }
 

@@ -20,7 +20,7 @@ export async function getTradePile(sql, userId) {
     SELECT tp.id, tp.card_id, tp.created_at,
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
            c.holo_effect, c.holo_type, c.power, c.level,
-           c.card_data, c.def_id, c.card_type
+           c.card_data, c.def_id, c.card_type, c.blueprint_id
     FROM cc_trade_pile tp
     JOIN cc_cards c ON tp.card_id = c.id
     WHERE tp.user_id = ${userId}
@@ -95,12 +95,14 @@ export async function getSwipeFeed(sql, userId, offset = 0) {
     SELECT tp.card_id, tp.user_id AS owner_id,
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
            c.holo_effect, c.holo_type, c.power, c.level,
-           c.card_data, c.def_id, c.card_type,
+           c.card_data, c.def_id, c.card_type, c.blueprint_id,
+           sp.name AS passive_name,
            u.discord_username AS owner_name, u.discord_avatar AS owner_avatar, u.discord_id AS owner_discord_id,
            CASE WHEN bu.user_id IS NOT NULL THEN 1 ELSE 0 END AS has_boost,
            CASE WHEN mg.god_id IS NULL THEN 1 ELSE 0 END AS is_novel
     FROM cc_trade_pile tp
     JOIN cc_cards c ON tp.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     JOIN users u ON tp.user_id = u.id
     LEFT JOIN cc_swipes sw ON sw.swiper_id = ${userId} AND sw.card_id = tp.card_id
     LEFT JOIN boost_users bu ON tp.user_id = bu.user_id
@@ -225,11 +227,13 @@ export async function getLikes(sql, userId) {
   return sql`
     SELECT s.id AS swipe_id, s.swiper_id, s.card_id, s.created_at,
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
-           c.holo_effect, c.holo_type, c.power, c.level, c.card_data,
+           c.holo_effect, c.holo_type, c.power, c.level, c.card_data, c.blueprint_id,
+           sp.name AS passive_name,
            u.discord_username AS swiper_name, u.discord_avatar AS swiper_avatar, u.discord_id AS swiper_discord_id
     FROM cc_swipes s
     JOIN cc_trade_pile tp ON s.card_id = tp.card_id AND tp.user_id = ${userId}
     JOIN cc_cards c ON s.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     JOIN users u ON s.swiper_id = u.id
     WHERE s.card_owner_id = ${userId}
       AND c.owner_id = ${userId}
@@ -297,6 +301,26 @@ export async function getMatches(sql, userId) {
   `
 }
 
+export async function getMatchHistory(sql, userId) {
+  return sql`
+    SELECT t.id, t.player_a_id, t.player_b_id, t.status,
+           t.player_a_core, t.player_b_core,
+           t.updated_at,
+           u.discord_username AS partner_name, u.discord_avatar AS partner_avatar, u.discord_id AS partner_discord_id,
+           COUNT(tc.id) FILTER (WHERE tc.offered_by = t.player_a_id)::int AS player_a_cards,
+           COUNT(tc.id) FILTER (WHERE tc.offered_by = t.player_b_id)::int AS player_b_cards
+    FROM cc_trades t
+    JOIN users u ON u.id = CASE WHEN t.player_a_id = ${userId} THEN t.player_b_id ELSE t.player_a_id END
+    LEFT JOIN cc_trade_cards tc ON tc.trade_id = t.id
+    WHERE (t.player_a_id = ${userId} OR t.player_b_id = ${userId})
+      AND t.mode = 'match'
+      AND t.status IN ('completed', 'cancelled', 'expired')
+    GROUP BY t.id, u.discord_username, u.discord_avatar, u.discord_id
+    ORDER BY t.updated_at DESC
+    LIMIT 20
+  `
+}
+
 // ══════════════════════════════════════════════
 // Offer Negotiation
 // ══════════════════════════════════════════════
@@ -324,9 +348,10 @@ export async function getOfferDetail(sql, userId, tradeId) {
            c.god_id, c.god_name, c.rarity, c.serial_number, c.image_url,
            c.holo_effect, c.holo_type, c.power, c.level,
            c.card_data, c.def_id, c.card_type, c.owner_id,
-           c.blueprint_id
+           c.blueprint_id, sp.name AS passive_name
     FROM cc_trade_cards tc
     JOIN cc_cards c ON tc.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     WHERE tc.trade_id = ${tradeId}
   `
 

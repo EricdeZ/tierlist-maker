@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Heart, Clock, MessageCircle, ChevronDown, ChevronUp, Check, X } from 'lucide-react'
+import { Heart, Clock, ChevronDown, ChevronUp, Check, X, History } from 'lucide-react'
 import GameCard from '../components/GameCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
@@ -86,7 +86,7 @@ function CardThumb({ card, showHolo = true }) {
   if (isCollection) {
     inner = (
       <VaultCard
-        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, passiveName: card.passive_name, _blueprintData: cd._blueprintData }}
         getBlueprint={getBlueprint}
         size={size}
         holo={false}
@@ -124,6 +124,7 @@ function CardThumb({ card, showHolo = true }) {
         rarity={card.rarity}
         data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={size}
+        passiveName={card.passive_name}
       />
     )
     inner = holoEffect ? (
@@ -375,7 +376,104 @@ function LikeGroup({ like, onLikesTrade }) {
   )
 }
 
-export default function MatchesAndLikes({ matches, likes, onOpenTrade, onCloseMatch, onLikesTrade, loading, userId }) {
+function relativeDate(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+const STATUS_BADGE = {
+  completed: { label: 'COMPLETED', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)' },
+  cancelled: { label: 'CANCELLED', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' },
+  expired: { label: 'EXPIRED', color: 'var(--cd-text-dim)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' },
+}
+
+function tradeSummary(trade) {
+  const myParts = []
+  const theirParts = []
+  if (trade.my_cards > 0) myParts.push(`${trade.my_cards} card${trade.my_cards !== 1 ? 's' : ''}`)
+  if (trade.my_core > 0) myParts.push(`${trade.my_core.toLocaleString()} Cores`)
+  if (trade.their_cards > 0) theirParts.push(`${trade.their_cards} card${trade.their_cards !== 1 ? 's' : ''}`)
+  if (trade.their_core > 0) theirParts.push(`${trade.their_core.toLocaleString()} Cores`)
+  if (myParts.length && theirParts.length) return `${myParts.join(' + ')} for ${theirParts.join(' + ')}`
+  if (myParts.length) return `Gave ${myParts.join(' + ')}`
+  if (theirParts.length) return `Got ${theirParts.join(' + ')}`
+  return 'No items exchanged'
+}
+
+function HistoryItem({ trade }) {
+  const badge = STATUS_BADGE[trade.status] || STATUS_BADGE.expired
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <Avatar discord_id={trade.partner_discord_id} avatar={trade.partner_avatar} username={trade.partner_name} size={36} />
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm truncate" style={{ color: 'var(--cd-text)' }}>
+          @{trade.partner_name}
+        </p>
+        <p className="text-xs truncate" style={{ color: 'var(--cd-text-dim)' }}>
+          {tradeSummary(trade)}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <span
+          className="px-2 py-0.5 rounded text-[10px] font-bold cd-head tracking-wider"
+          style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.border}` }}
+        >
+          {badge.label}
+        </span>
+        <span className="text-[10px]" style={{ color: 'var(--cd-text-dim)' }}>
+          {relativeDate(trade.updated_at)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function PastTrades({ history }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <section>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-2 w-full text-left cursor-pointer group"
+      >
+        <History className="w-4 h-4" style={{ color: 'var(--cd-text-dim)' }} />
+        <h2 className="cd-head text-sm font-bold tracking-wider uppercase" style={{ color: 'var(--cd-text-dim)' }}>
+          Past Trades
+        </h2>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold cd-head" style={{ color: 'var(--cd-text-dim)', background: 'rgba(255,255,255,0.06)' }}>
+          {history.length}
+        </span>
+        <div className="flex-1" />
+        {expanded ? (
+          <ChevronUp className="w-4 h-4 transition-transform" style={{ color: 'var(--cd-text-dim)' }} />
+        ) : (
+          <ChevronDown className="w-4 h-4 transition-transform" style={{ color: 'var(--cd-text-dim)' }} />
+        )}
+      </button>
+      {expanded && (
+        <div className="flex flex-col gap-2 mt-3">
+          {history.map((trade) => (
+            <HistoryItem key={trade.id} trade={trade} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+export default function MatchesAndLikes({ matches, likes, history, onOpenTrade, onCloseMatch, onLikesTrade, loading, userId }) {
+  const [likesOpen, setLikesOpen] = useState(true)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -418,26 +516,45 @@ export default function MatchesAndLikes({ matches, likes, onOpenTrade, onCloseMa
         )}
       </section>
 
-      {/* Likes — secondary section */}
+      {/* Likes — collapsible, open by default */}
       <section>
-        <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={() => setLikesOpen(o => !o)}
+          className="flex items-center gap-2 w-full text-left cursor-pointer mb-3"
+        >
           <h2 className="cd-head text-sm font-bold tracking-wider uppercase" style={{ color: 'var(--cd-text-dim)' }}>
             Interested in your cards
           </h2>
-        </div>
+          {likes?.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold cd-head" style={{ color: 'var(--cd-text-dim)', background: 'rgba(255,255,255,0.06)' }}>
+              {likes.length}
+            </span>
+          )}
+          <div className="flex-1" />
+          {likesOpen ? (
+            <ChevronUp className="w-4 h-4" style={{ color: 'var(--cd-text-dim)' }} />
+          ) : (
+            <ChevronDown className="w-4 h-4" style={{ color: 'var(--cd-text-dim)' }} />
+          )}
+        </button>
 
-        {!likes?.length ? (
-          <p className="text-sm py-8 text-center" style={{ color: 'var(--cd-text-dim)' }}>
-            No likes yet — keep swiping!
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {likes.map((like) => (
-              <LikeGroup key={like.user_id} like={like} onLikesTrade={onLikesTrade} />
-            ))}
-          </div>
+        {likesOpen && (
+          !likes?.length ? (
+            <p className="text-sm py-8 text-center" style={{ color: 'var(--cd-text-dim)' }}>
+              No likes yet — keep swiping!
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {likes.map((like) => (
+                <LikeGroup key={like.user_id} like={like} onLikesTrade={onLikesTrade} />
+              ))}
+            </div>
+          )
         )}
       </section>
+
+      {/* Past Trades — collapsible */}
+      {history?.length > 0 && <PastTrades history={history} />}
     </div>
   )
 }

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePassion } from '../../context/PassionContext'
 import { useVault } from './VaultContext'
 import { marketplaceService } from '../../services/database'
+import useInfiniteScroll from '../../hooks/useInfiniteScroll'
 import { RARITIES } from '../../data/vault/economy'
 import passionCoin from '../../assets/passion/passion.png'
 import emberIcon from '../../assets/ember.png'
@@ -13,7 +14,7 @@ import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import PackArt from './components/PackArt'
 import CardZoomModal from './components/CardZoomModal'
-import { Search, X, ChevronLeft, ChevronRight, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3, Package } from 'lucide-react'
+import { Search, X, Tag, ShoppingCart, Plus, Loader2, AlertTriangle, RefreshCw, BarChart3, Package } from 'lucide-react'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'staff']
@@ -50,6 +51,7 @@ function buildCardData(card, override) {
     ...d,
     metadata: override || undefined,
     signatureUrl: card.signatureUrl || undefined,
+    passiveName: card.passiveName || undefined,
   }
 }
 
@@ -117,6 +119,7 @@ export default function CCMarketplace() {
   const [listings, setListings] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [browseKey, setBrowseKey] = useState(0)
   const [loading, setLoading] = useState(false)
   const [myListings, setMyListings] = useState(null)
   const [myActiveCardCount, setMyActiveCardCount] = useState(0)
@@ -159,14 +162,19 @@ export default function CCMarketplace() {
       if (role.length) params.role = role.join(',')
       if (search) params.search = search
       const data = await marketplaceService.list(params)
-      setListings(data.listings || [])
+      const newListings = data.listings || []
+      if (page === 0) {
+        setListings(newListings)
+      } else {
+        setListings(prev => [...prev, ...newListings])
+      }
       setTotal(data.total || 0)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [page, sort, itemTypeFilter, rarity, cardType, holoType, role, search])
+  }, [page, sort, itemTypeFilter, rarity, cardType, holoType, role, search, browseKey])
 
   const fetchMyListings = useCallback(async () => {
     try {
@@ -214,7 +222,8 @@ export default function CCMarketplace() {
     setPage(0)
   }
 
-  const totalPages = Math.ceil(total / limit)
+  const browseHasMore = listings.length < total && !loading
+  const loadMoreBrowse = useCallback(() => setPage(p => p + 1), [])
 
   const listedCardIds = useMemo(() => {
     if (!myListings) return new Set()
@@ -373,18 +382,17 @@ export default function CCMarketplace() {
 
       {view === 'browse' && (
         <BrowseView
-          listings={listings} total={total} page={page} totalPages={totalPages} loading={loading}
+          listings={listings} total={total} loading={loading} hasMore={browseHasMore} loadMore={loadMoreBrowse}
           search={searchInput} setSearch={setSearchInput} onSearch={handleSearch}
           rarity={rarity} toggleRarity={toggleRarity}
           cardType={cardType} toggleCardType={toggleCardType}
           holoType={holoType} toggleHoloType={toggleHoloType}
           role={role} toggleRole={toggleRole}
           sort={sort} setSort={(s) => { setSort(s); setPage(0) }}
-          setPage={setPage}
           onBuy={(listing) => setBuyModal(listing)}
           onZoom={handleCardZoom}
           userId={user?.id}
-          onRefresh={fetchListings}
+          onRefresh={() => { setPage(0); setBrowseKey(k => k + 1) }}
           showStats={showStats}
           setShowStats={setShowStats}
           itemTypeFilter={itemTypeFilter}
@@ -457,17 +465,18 @@ export default function CCMarketplace() {
 // Browse View
 // ═══════════════════════════════════════
 function BrowseView({
-  listings, total, page, totalPages, loading,
+  listings, total, loading, hasMore, loadMore,
   search, setSearch, onSearch,
   rarity, toggleRarity,
   cardType, toggleCardType,
   holoType, toggleHoloType,
   role, toggleRole,
   sort, setSort,
-  setPage, onBuy, onZoom, userId, onRefresh,
+  onBuy, onZoom, userId, onRefresh,
   showStats, setShowStats,
   itemTypeFilter, setItemTypeFilter,
 }) {
+  const browseScrollRef = useInfiniteScroll(loadMore, hasMore, loading)
   const ITEM_TYPE_OPTIONS = [
     { value: 'all', label: 'All' },
     { value: 'card', label: 'Cards' },
@@ -620,7 +629,7 @@ function BrowseView({
         </button>
       </div>
 
-      {loading ? (
+      {loading && listings.length === 0 ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 text-[var(--cd-cyan)] animate-spin" />
         </div>
@@ -631,40 +640,25 @@ function BrowseView({
           <p className="text-sm mt-1">Try adjusting your filters</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-          {listings.map(listing => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              onBuy={() => onBuy(listing)}
-              onZoom={listing.itemType === 'pack' ? undefined : () => onZoom(listing.card)}
-              isSelf={listing.sellerId === userId}
-              showStats={showStats}
-            />
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-6">
-          <button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-            className="text-white/40 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-default"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm text-white/50 cd-mono">
-            {page + 1} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-            disabled={page >= totalPages - 1}
-            className="text-white/40 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-default"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
+        <>
+          <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
+            {listings.map(listing => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                onBuy={() => onBuy(listing)}
+                onZoom={listing.itemType === 'pack' ? undefined : () => onZoom(listing.card)}
+                isSelf={listing.sellerId === userId}
+                showStats={showStats}
+              />
+            ))}
+          </div>
+          {(hasMore || loading) && (
+            <div ref={browseScrollRef} className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 text-white/20 animate-spin" />
+            </div>
+          )}
+        </>
       )}
     </>
   )
@@ -846,6 +840,8 @@ function MyListingsView({ listings, onCancel, onZoom, actionLoading, activeCardC
 // ═══════════════════════════════════════
 // Create Listing View
 // ═══════════════════════════════════════
+const SELL_BATCH = 48
+
 function CreateListingView({ cards, packs, packTypesMap, activeCardCount, activePackCount, maxCardListings, maxPackListings, onCreate, onCreatePack }) {
   const [sellTab, setSellTab] = useState('card')
   const [filter, setFilter] = useState('')
@@ -853,12 +849,15 @@ function CreateListingView({ cards, packs, packTypesMap, activeCardCount, active
   const [cardType, setCardType] = useState([])
   const [holoType, setHoloType] = useState([])
   const [role, setRole] = useState([])
+  const [displayLimit, setDisplayLimit] = useState(SELL_BATCH)
 
   const toggleRarity = (r) => setRarity(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const toggleCardType = (t) => setCardType(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
   const toggleHoloType = (h) => setHoloType(prev => prev.includes(h) ? prev.filter(x => x !== h) : [...prev, h])
   const toggleRole = (r) => setRole(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const hasFilters = rarity.length > 0 || cardType.length > 0 || holoType.length > 0 || role.length > 0
+
+  useEffect(() => { setDisplayLimit(SELL_BATCH) }, [filter, rarity, cardType, holoType, role])
 
   const filtered = useMemo(() => {
     let list = cards
@@ -878,6 +877,9 @@ function CreateListingView({ cards, packs, packTypesMap, activeCardCount, active
       return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
     })
   }, [cards, filter, rarity, cardType, holoType, role])
+
+  const sellHasMore = displayLimit < filtered.length
+  const sellScrollRef = useInfiniteScroll(() => setDisplayLimit(l => l + SELL_BATCH), sellHasMore, false)
 
   const isCardLimitReached = activeCardCount >= maxCardListings
   const isPackLimitReached = activePackCount >= maxPackListings
@@ -1012,17 +1014,24 @@ function CreateListingView({ cards, packs, packTypesMap, activeCardCount, active
                   <p className="text-sm">{hasFilters || filter ? 'No cards match your filters' : 'No cards available to sell'}</p>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
-                  {filtered.map(card => (
-                      <div
-                        key={card.id}
-                        className="cursor-pointer card-zoomable"
-                        onClick={() => onCreate(card.id)}
-                      >
-                        <MarketCard card={card} size={CREATE_CARD_SIZE} />
-                      </div>
-                  ))}
-                </div>
+                <>
+                  <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+                    {filtered.slice(0, displayLimit).map(card => (
+                        <div
+                          key={card.id}
+                          className="cursor-pointer card-zoomable"
+                          onClick={() => onCreate(card.id)}
+                        >
+                          <MarketCard card={card} size={CREATE_CARD_SIZE} />
+                        </div>
+                    ))}
+                  </div>
+                  {sellHasMore && (
+                    <div ref={sellScrollRef} className="flex justify-center py-6">
+                      <Loader2 className="w-5 h-5 text-white/20 animate-spin" />
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

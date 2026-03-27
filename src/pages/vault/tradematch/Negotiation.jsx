@@ -51,7 +51,7 @@ function OfferCard({ card, onRemove, showRemove }) {
   if (isCollection) {
     inner = (
       <VaultCard
-        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, passiveName: card.passive_name, _blueprintData: cd._blueprintData }}
         getBlueprint={getBlueprint}
         size={CARD_SIZE}
         holo={false}
@@ -89,6 +89,7 @@ function OfferCard({ card, onRemove, showRemove }) {
         rarity={card.rarity}
         data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={CARD_SIZE}
+        passiveName={card.passive_name}
       />
     )
     inner = holoEffect ? (

@@ -638,6 +638,12 @@ export default function CardSidebar({
                                 </div>
                             </div>
                             <div>
+                                <label className={label}>Name Shadow: {sel.nameShadow === 0 ? 'Off' : Math.round((sel.nameShadow ?? 0.6) * 100) + '%'}</label>
+                                <input type="range" min={0} max={1} step={0.05} value={sel.nameShadow ?? 0.6}
+                                    onChange={e => onUpdateElement(sel.id, { nameShadow: parseFloat(e.target.value) })}
+                                    className="w-full accent-amber-500" />
+                            </div>
+                            <div>
                                 <label className={label}>BG Opacity: {Math.round((sel.bgOpacity ?? 1) * 100)}%</label>
                                 <input type="range" min={0} max={1} step={0.05} value={sel.bgOpacity ?? 1}
                                     onChange={e => onUpdateElement(sel.id, { bgOpacity: parseFloat(e.target.value) })}

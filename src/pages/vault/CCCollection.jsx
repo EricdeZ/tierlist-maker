@@ -11,7 +11,8 @@ import VaultCard from './components/VaultCard'
 import CardZoomModal from './components/CardZoomModal'
 import { getLeagueLogo } from '../../utils/leagueImages'
 import { getDivisionImage } from '../../utils/divisionImages'
-import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock, ArrowUpDown, Package } from 'lucide-react'
+import { Library, Trophy, Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Clock, ArrowUpDown, Package, Loader2 } from 'lucide-react'
+import useInfiniteScroll from '../../hooks/useInfiniteScroll'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const BATCH_SIZE = 50
@@ -360,6 +361,7 @@ export default function CCCollection() {
 
   const hasMore = effectiveDisplayLimit < filteredEntries.length
   const remaining = filteredEntries.length - effectiveDisplayLimit
+  const scrollRef = useInfiniteScroll(() => setDisplayLimit(l => l + BATCH_SIZE), hasMore, false)
 
   if (loading) {
     return (
@@ -700,14 +702,8 @@ export default function CCCollection() {
           )}
 
           {hasMore && (
-            <div className="flex justify-center mt-6">
-              <button
-                onClick={() => setDisplayLimit(l => l + BATCH_SIZE)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[var(--cd-surface)] border border-[var(--cd-border)] text-sm font-bold text-[var(--cd-text-mid)] hover:bg-white/[0.06] hover:text-[var(--cd-text)] transition-all cursor-pointer cd-head"
-              >
-                <ChevronDown className="w-4 h-4" />
-                Load More ({remaining} remaining)
-              </button>
+            <div ref={scrollRef} className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 text-white/20 animate-spin" />
             </div>
           )}
         </div>

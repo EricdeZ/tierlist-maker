@@ -28,7 +28,7 @@ const handler = async (event) => {
       switch (action) {
         case 'poll': return await handlePoll(sql, user, event.queryStringParameters)
         case 'pending': return await handlePending(sql, user)
-        case 'history': return await handleHistory(sql, user)
+        case 'history': return await handleHistory(sql, user, event.queryStringParameters)
         case 'search-users': return await handleSearchUsers(sql, event.queryStringParameters)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
@@ -64,12 +64,14 @@ async function handlePoll(sql, user, params) {
   if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
 
   const { trade, cards, packs } = await pollTrade(sql, user.id, parseInt(tradeId))
+  const formatted = cards.map(formatTradeCard)
+  await embedTradeBlueprints(sql, formatted)
 
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
       trade: formatTrade(trade, user.id),
-      cards: cards.map(formatTradeCard),
+      cards: formatted,
       packs: packs.map(formatTradePack),
     }),
   }
@@ -96,7 +98,9 @@ async function handlePending(sql, user) {
 }
 
 // ═══ GET: Trade history ═══
-async function handleHistory(sql, user) {
+async function handleHistory(sql, user, params) {
+  const limit = 20
+  const offset = Math.max(0, parseInt(params?.offset) || 0)
   const trades = await sql`
     SELECT t.*, u.discord_username AS partner_name, u.discord_avatar AS partner_avatar, u.discord_id AS partner_discord_id
     FROM cc_trades t
@@ -105,11 +109,12 @@ async function handleHistory(sql, user) {
       AND t.status IN ('completed', 'cancelled', 'expired')
       AND t.mode = 'direct'
     ORDER BY t.updated_at DESC
-    LIMIT 20
+    LIMIT ${limit + 1} OFFSET ${offset}
   `
+  const hasMore = trades.length > limit
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ trades: trades.map(t => formatPendingTrade(t, user.id)) }),
+    body: JSON.stringify({ trades: trades.slice(0, limit).map(t => formatPendingTrade(t, user.id)), hasMore }),
   }
 }
 
@@ -301,6 +306,8 @@ function formatTradeCard(row) {
       isConnected: row.card_data?.isConnected ?? null,
       bestGodName: row.best_god_name || null,
       signatureUrl: row.signature_url || null,
+      passiveName: row.passive_name || null,
+      blueprintId: row.blueprint_id || null,
     },
   }
 }
@@ -325,6 +332,43 @@ function avatarUrl(discordId, avatar) {
   return discordId && avatar
     ? `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.webp?size=64`
     : null
+}
+
+async function embedTradeBlueprints(sql, tradeCards) {
+  const bids = [...new Set(
+    tradeCards.filter(tc => tc.card?.blueprintId).map(tc => tc.card.blueprintId)
+  )]
+  if (bids.length === 0) return
+  const blueprints = await sql`
+    SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${bids})
+  `
+  const cache = {}
+  for (const bp of blueprints) {
+    const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+    cache[bp.id] = {
+      cardData: td?.cardData || {},
+      elements: td?.elements || [],
+      border: td?.border || null,
+      cardType: bp.card_type || 'custom',
+    }
+  }
+  for (const tc of tradeCards) {
+    if (tc.card?.blueprintId && cache[tc.card.blueprintId]) {
+      const bpData = cache[tc.card.blueprintId]
+      tc.card._blueprintData = bpData
+      const name = getBlueprintDisplayName(bpData)
+      if (name) tc.card.godName = name
+    }
+  }
+}
+
+function getBlueprintDisplayName(bpData) {
+  if (bpData.cardData?.name) return bpData.cardData.name
+  if (bpData.elements?.length > 0) {
+    const banner = bpData.elements.find(el => el.type === 'name-banner')
+    if (banner?.playerName) return banner.playerName
+  }
+  return null
 }
 
 export const onRequest = adapt(handler)

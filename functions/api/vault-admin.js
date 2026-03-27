@@ -249,7 +249,7 @@ async function handleUpdateCard(sql, body) {
   const { id, updates } = body
   if (!id) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'id required' }) }
 
-  const allowed = ['rarity', 'power', 'level', 'xp', 'holo_effect', 'image_url', 'metadata']
+  const allowed = ['rarity', 'power', 'level', 'xp', 'holo_effect', 'image_url', 'metadata', 'passive_id']
 
   for (const key of Object.keys(updates)) {
     if (!allowed.includes(key)) {
@@ -278,6 +278,14 @@ async function handleUpdateCard(sql, body) {
   }
   if (updates.metadata !== undefined) {
     await sql`UPDATE cc_cards SET metadata = ${JSON.stringify(updates.metadata)} WHERE id = ${id}`
+  }
+  if (updates.passive_id !== undefined) {
+    const pid = updates.passive_id === null ? null : parseInt(updates.passive_id)
+    if (pid) {
+      const [exists] = await sql`SELECT id FROM cc_staff_passives WHERE id = ${pid}`
+      if (!exists) return { statusCode: 400, headers: adminHeaders, body: JSON.stringify({ error: 'Invalid passive_id' }) }
+    }
+    await sql`UPDATE cc_cards SET passive_id = ${pid} WHERE id = ${id}`
   }
 
   const [card] = await sql`
@@ -345,6 +353,14 @@ async function handleDeleteCard(sql, body) {
   // Clear from lineups and trade references first
   await sql`UPDATE cc_lineups SET card_id = NULL WHERE card_id = ${id}`
   await sql`DELETE FROM cc_trade_cards WHERE card_id = ${id}`
+  await sql`
+    UPDATE cc_trades SET match_swipe_a_id = NULL
+    WHERE match_swipe_a_id IN (SELECT id FROM cc_swipes WHERE card_id = ${id})
+  `
+  await sql`
+    UPDATE cc_trades SET match_swipe_b_id = NULL
+    WHERE match_swipe_b_id IN (SELECT id FROM cc_swipes WHERE card_id = ${id})
+  `
   await sql`DELETE FROM cc_cards WHERE id = ${id}`
 
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify({ deleted: true }) }

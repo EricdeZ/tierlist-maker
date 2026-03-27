@@ -72,6 +72,7 @@ export default function CCTradematch() {
   const [matchResult, setMatchResult] = useState(null)
   const [matches, setMatches] = useState([])
   const [likes, setLikes] = useState([])
+  const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTradeId, setActiveTradeId] = useState(null)
@@ -152,13 +153,15 @@ export default function CCTradematch() {
     if (!silent) setLoading(true)
     else setRefreshing(true)
     try {
-      const [matchData, likeData] = await Promise.all([
+      const [matchData, likeData, historyData] = await Promise.all([
         tradematchService.matches(),
         tradematchService.likes(),
+        tradematchService.history(),
       ])
       const m = matchData.matches || []
       setMatches(m)
       setLikes(likeData.likes || [])
+      setHistory(historyData.history || [])
       setMatchTradeCount(m.length)
       const pending = m.filter(t => (t.offer_status === 'pending' && t.offer_by !== user?.id) || (t.offer_status === 'negotiating' && !t.offer_by)).length
       setMatchTradePendingCount(pending)
@@ -426,6 +429,7 @@ export default function CCTradematch() {
         <MatchesAndLikes
           matches={matches}
           likes={likes}
+          history={history}
           onOpenTrade={handleOpenTrade}
           onCloseMatch={handleCloseMatch}
           onLikesTrade={handleLikesTrade}

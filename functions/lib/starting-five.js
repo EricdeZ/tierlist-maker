@@ -230,7 +230,9 @@ export async function tick(sql, userId) {
   await ensureState(sql, userId)
 
   const cards = await sql`
-    SELECT l.role AS slot_role, l.lineup_type, c.*, pd.best_god_name, pd.team_id AS team_id,
+    SELECT l.role AS slot_role, l.lineup_type, c.*,
+      sp.name AS passive_name,
+      pd.best_god_name, pd.team_id AS team_id,
       pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
       COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
       g.id AS god_id, g.rarity AS god_rarity, g.holo_type AS god_holo_type,
@@ -245,6 +247,7 @@ export async function tick(sql, userId) {
       i.def_id AS item_def_id, i.is_first_edition AS item_is_first_edition
     FROM cc_lineups l
     JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     LEFT JOIN cc_player_defs pd ON c.def_id = pd.id AND c.card_type = 'player'
     LEFT JOIN LATERAL (
       SELECT u.id, u.discord_id, u.discord_avatar
@@ -627,6 +630,7 @@ export async function useConsumable(sql, userId, cardId) {
   const [card] = await sql`
     SELECT id, rarity, card_type, card_data FROM cc_cards
     WHERE id = ${cardId} AND owner_id = ${userId}
+    FOR UPDATE
   `
   if (!card) throw new Error('Card not found')
   if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be used')
@@ -764,7 +768,16 @@ export async function useConsumable(sql, userId, cardId) {
 
   // Remove from trade pile before destroying
   await sql`DELETE FROM cc_trade_pile WHERE card_id = ${cardId}`
-  // Destroy the card
+  // Detach any trade references to swipes for this card so CASCADE can proceed
+  await sql`
+    UPDATE cc_trades SET match_swipe_a_id = NULL
+    WHERE match_swipe_a_id IN (SELECT id FROM cc_swipes WHERE card_id = ${cardId})
+  `
+  await sql`
+    UPDATE cc_trades SET match_swipe_b_id = NULL
+    WHERE match_swipe_b_id IN (SELECT id FROM cc_swipes WHERE card_id = ${cardId})
+  `
+  // Destroy the card (cascades to cc_swipes, cc_binder_cards, etc.)
   await sql`DELETE FROM cc_cards WHERE id = ${cardId}`
 
   return { ...(await tick(sql, userId)), consumableResult: result }

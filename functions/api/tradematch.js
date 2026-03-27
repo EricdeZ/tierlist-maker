@@ -7,7 +7,7 @@ import {
   getTradePile, addToTradePile, removeFromTradePile, getTradePileCount,
   getSwipeFeed, recordSwipe, deleteSwipe,
   getLikes, createTradeFromLike,
-  getMatches, getOfferDetail,
+  getMatches, getMatchHistory, getOfferDetail,
   offerAddCard, offerRemoveCard, offerSetCore, offerSend, offerAccept, offerCancel,
   TRADEMATCH_RULES,
 } from '../lib/tradematch.js'
@@ -44,6 +44,7 @@ const handler = async (event) => {
         case 'swipe-feed': return await handleSwipeFeed(sql, user, event.queryStringParameters)
         case 'likes': return await handleLikes(sql, user)
         case 'matches': return await handleMatches(sql, user)
+        case 'history': return await handleHistory(sql, user)
         case 'offer-detail': return await handleOfferDetail(sql, user, event.queryStringParameters)
         case 'pending-count': return await handlePendingCount(sql, user)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) }
@@ -84,6 +85,7 @@ async function handleGetTradePile(sql, user) {
     getTradePile(sql, user.id),
     getTradePileCount(sql, user.id),
   ])
+  await embedRawBlueprints(sql, cards)
   return {
     statusCode: 200, headers,
     body: JSON.stringify({ cards, count, minRequired: TRADEMATCH_RULES.min_trade_pile }),
@@ -94,6 +96,7 @@ async function handleViewTradePile(sql, params) {
   const userId = parseInt(params.userId)
   if (!userId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'userId required' }) }
   const cards = await getTradePile(sql, userId)
+  await embedRawBlueprints(sql, cards)
   return { statusCode: 200, headers, body: JSON.stringify({ cards }) }
 }
 
@@ -123,6 +126,7 @@ async function handleSwipeFeed(sql, user, params) {
   }
   const offset = parseInt(params.offset) || 0
   const cards = await getSwipeFeed(sql, user.id, offset)
+  await embedRawBlueprints(sql, cards)
   return { statusCode: 200, headers, body: JSON.stringify({ cards, locked: false }) }
 }
 
@@ -148,6 +152,7 @@ async function handleUnswipe(sql, user, body) {
 
 async function handleLikes(sql, user) {
   const likes = await getLikes(sql, user.id)
+  await embedRawBlueprints(sql, likes)
   // Group by swiper
   const grouped = {}
   for (const like of likes) {
@@ -177,6 +182,26 @@ async function handleMatches(sql, user) {
   return { statusCode: 200, headers, body: JSON.stringify({ matches }) }
 }
 
+async function handleHistory(sql, user) {
+  const trades = await getMatchHistory(sql, user.id)
+  const history = trades.map(t => {
+    const isA = t.player_a_id === user.id
+    return {
+      id: t.id,
+      status: t.status,
+      partner_name: t.partner_name,
+      partner_avatar: t.partner_avatar,
+      partner_discord_id: t.partner_discord_id,
+      my_cards: isA ? t.player_a_cards : t.player_b_cards,
+      their_cards: isA ? t.player_b_cards : t.player_a_cards,
+      my_core: isA ? t.player_a_core : t.player_b_core,
+      their_core: isA ? t.player_b_core : t.player_a_core,
+      updated_at: t.updated_at,
+    }
+  })
+  return { statusCode: 200, headers, body: JSON.stringify({ history }) }
+}
+
 async function handlePendingCount(sql, user) {
   const [row] = await sql`
     SELECT COUNT(*) FILTER (WHERE offer_status = 'pending' AND offer_by != ${user.id})::int AS pending,
@@ -199,6 +224,7 @@ async function handleOfferDetail(sql, user, params) {
   const tradeId = parseInt(params.tradeId)
   if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
   const result = await getOfferDetail(sql, user.id, tradeId)
+  await embedRawBlueprints(sql, result.cards || [])
   return { statusCode: 200, headers, body: JSON.stringify(result) }
 }
 
@@ -256,6 +282,42 @@ async function handleOfferCancel(sql, user, body) {
   if (!tradeId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'tradeId required' }) }
   await offerCancel(sql, user.id, parseInt(tradeId))
   return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+}
+
+// Embed blueprint template data on raw SQL rows that have blueprint_id
+async function embedRawBlueprints(sql, cards) {
+  const bids = [...new Set(cards.filter(c => c.blueprint_id).map(c => c.blueprint_id))]
+  if (bids.length === 0) return
+  const blueprints = await sql`
+    SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${bids})
+  `
+  const cache = {}
+  for (const bp of blueprints) {
+    const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+    cache[bp.id] = {
+      cardData: td?.cardData || {},
+      elements: td?.elements || [],
+      border: td?.border || null,
+      cardType: bp.card_type || 'custom',
+    }
+  }
+  for (const c of cards) {
+    if (c.blueprint_id && cache[c.blueprint_id]) {
+      const bpData = cache[c.blueprint_id]
+      c.card_data = { ...(c.card_data || {}), _blueprintData: bpData }
+      const name = getBlueprintDisplayName(bpData)
+      if (name) c.god_name = name
+    }
+  }
+}
+
+function getBlueprintDisplayName(bpData) {
+  if (bpData.cardData?.name) return bpData.cardData.name
+  if (bpData.elements?.length > 0) {
+    const banner = bpData.elements.find(el => el.type === 'name-banner')
+    if (banner?.playerName) return banner.playerName
+  }
+  return null
 }
 
 export const onRequest = adapt(handler)

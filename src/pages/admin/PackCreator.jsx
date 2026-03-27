@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import PageTitle from '../../components/PageTitle'
 import { packCreatorService, vaultDashboardService } from '../../services/database'
 
-const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'staff']
+const CARD_TYPES = ['god', 'item', 'consumable', 'player', 'staff', 'collection']
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const RARITY_COLORS = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',
@@ -119,45 +119,64 @@ function SlotEditor({ slot, index, onChange, onRemove, onDuplicate, onMoveUp, on
         </div>
       )}
 
-      {/* Collection slot — show collection picker instead of rarity range */}
-      {slot.types.length === 1 && slot.types[0] === 'collection' ? (
+      {/* Collection picker — shown when 'collection' is one of the types */}
+      {slot.types.includes('collection') && (
         <div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Collection</div>
-          <select
-            value={slot.collectionId || ''}
-            onChange={e => onChange({ ...slot, type: 'collection', collectionId: parseInt(e.target.value) || null })}
-            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white w-full"
-          >
-            <option value="">Select collection...</option>
-            {(collections || []).map(c => <option key={c.id} value={c.id}>{c.name} ({c.entry_count} cards)</option>)}
-          </select>
-        </div>
-      ) : (
-        /* Rarity range */
-        <div className="flex gap-3">
-          <div>
-            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Min Rarity</div>
-            <select
-              value={slot.minRarity || 'common'}
-              onChange={e => updateField('minRarity', e.target.value)}
-              className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
-            >
-              {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Collections</div>
+          <div className="flex flex-wrap gap-1.5">
+            {(collections || []).map(c => {
+              const selected = (slot.collectionIds || []).includes(c.id)
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    const ids = selected
+                      ? (slot.collectionIds || []).filter(id => id !== c.id)
+                      : [...(slot.collectionIds || []), c.id]
+                    onChange({ ...slot, collectionIds: ids })
+                  }}
+                  className={`px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+                    selected
+                      ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                      : 'bg-white/[0.03] text-white/30 border border-white/5 hover:border-white/15'
+                  }`}
+                >
+                  {c.name} ({c.entry_count})
+                </button>
+              )
+            })}
           </div>
-          <div>
-            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Max Rarity</div>
-            <select
-              value={slot.maxRarity || ''}
-              onChange={e => updateField('maxRarity', e.target.value || null)}
-              className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
-            >
-              <option value="">No cap</option>
-              {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
+          {(slot.collectionIds || []).length === 0 && (
+            <div className="text-[10px] text-white/30 italic mt-1">No collections selected — collection cards won't generate</div>
+          )}
         </div>
       )}
+
+      {/* Rarity range */}
+      <div className="flex gap-3">
+        <div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Min Rarity</div>
+          <select
+            value={slot.minRarity || 'common'}
+            onChange={e => updateField('minRarity', e.target.value)}
+            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
+          >
+            {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Max Rarity</div>
+          <select
+            value={slot.maxRarity || ''}
+            onChange={e => updateField('maxRarity', e.target.value || null)}
+            className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white"
+          >
+            <option value="">No cap</option>
+            {RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+      </div>
     </div>
   )
 }
@@ -270,13 +289,13 @@ function PackForm({ initial, divisions, collections, onSave, onCancel, saving })
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    // Clean slots: remove empty group labels, handle collection slot shape
+    // Clean slots: remove empty group labels, preserve collectionIds when collection type is selected
     const cleanedSlots = form.slots.map(s => {
-      if (s.types.length === 1 && s.types[0] === 'collection' && s.collectionId) {
-        return { type: 'collection', collectionId: s.collectionId, ...(s.group ? { group: s.group } : {}) }
-      }
-      const { group, collectionId, ...rest } = s
-      return group ? { ...rest, group } : rest
+      const { group, collectionIds, ...rest } = s
+      const out = { ...rest }
+      if (group) out.group = group
+      if (s.types.includes('collection') && collectionIds?.length > 0) out.collectionIds = collectionIds
+      return out
     })
     // Clean group constraints: remove groups with no constraints
     const cleanedConstraints = {}
@@ -506,16 +525,13 @@ function PackForm({ initial, divisions, collections, onSave, onCancel, saving })
             <div key={i} className="flex items-center gap-1.5">
               <span className="text-white/30 font-mono w-6">#{i+1}</span>
               {s.group && <span className="text-amber-400/60 text-[10px] font-bold">[{s.group}]</span>}
-              {s.types.length === 1 && s.types[0] === 'collection' ? (
-                <span className="text-purple-400">collection{s.collectionId ? ` #${s.collectionId}` : ''}</span>
-              ) : (
-                <>
-                  <span>{s.types.join('/')}</span>
-                  <span style={{ color: RARITY_COLORS[s.minRarity] }}>{s.minRarity}+</span>
-                  {s.maxRarity && <span className="text-white/30">cap: <span style={{ color: RARITY_COLORS[s.maxRarity] }}>{s.maxRarity}</span></span>}
-                  {Object.keys(s.typeWeights || {}).length > 0 && <span className="text-white/20">(weighted)</span>}
-                  {s.weightByCardCount && !Object.keys(s.typeWeights || {}).length && <span className="text-white/20">(by pool size)</span>}
-                </>
+              <span>{s.types.join('/')}</span>
+              <span style={{ color: RARITY_COLORS[s.minRarity] }}>{s.minRarity}+</span>
+              {s.maxRarity && <span className="text-white/30">cap: <span style={{ color: RARITY_COLORS[s.maxRarity] }}>{s.maxRarity}</span></span>}
+              {Object.keys(s.typeWeights || {}).length > 0 && <span className="text-white/20">(weighted)</span>}
+              {s.weightByCardCount && !Object.keys(s.typeWeights || {}).length && <span className="text-white/20">(by pool size)</span>}
+              {s.types.includes('collection') && s.collectionIds?.length > 0 && (
+                <span className="text-purple-400/60">{s.collectionIds.length} collection{s.collectionIds.length !== 1 ? 's' : ''}</span>
               )}
             </div>
           ))}
@@ -581,12 +597,12 @@ export default function PackCreator() {
       if (mode === 'create') {
         const result = await packCreatorService.create(data)
         setPackTypes(prev => [...prev, result.packType])
+        setMode(null)
+        setTemplate(null)
       } else {
         const result = await packCreatorService.update(data)
         setPackTypes(prev => prev.map(p => p.id === data.id ? result.packType : p))
       }
-      setMode(null)
-      setTemplate(null)
     } catch (err) {
       setError(err.message)
     } finally {

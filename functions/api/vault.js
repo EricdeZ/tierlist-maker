@@ -67,7 +67,11 @@ async function inlineBlueprintData(sql, formattedCards) {
     }
   }
   for (const card of bpCards) {
-    if (cache[card.blueprintId]) card._blueprintData = cache[card.blueprintId]
+    if (cache[card.blueprintId]) {
+      card._blueprintData = cache[card.blueprintId]
+      const name = getBlueprintDisplayName(cache[card.blueprintId])
+      if (name) card.godName = name
+    }
   }
 }
 
@@ -323,6 +327,14 @@ async function handleLoad(sql, user) {
         border: td?.border || null,
         cardType: bp.card_type || 'custom',
       }
+    }
+  }
+
+  // Resolve blueprint display names onto collection cards
+  for (const c of collection) {
+    if (c.blueprint_id && blueprintCache[c.blueprint_id]) {
+      const name = getBlueprintDisplayName(blueprintCache[c.blueprint_id])
+      if (name) c.god_name = name
     }
   }
 
@@ -1441,8 +1453,11 @@ async function handleOpenGift(sql, user, body) {
     newCards = []
     const hasStaffGift = cards.some(c => c.card_type === 'staff')
     let giftPassiveIds = []
+    let giftPassiveMap = {}
     if (hasStaffGift) {
-      giftPassiveIds = (await sql`SELECT id FROM cc_staff_passives`).map(r => r.id)
+      const passives = await sql`SELECT id, name FROM cc_staff_passives`
+      giftPassiveIds = passives.map(r => r.id)
+      giftPassiveMap = Object.fromEntries(passives.map(r => [r.id, r.name]))
     }
 
     for (const card of cards) {
@@ -1456,6 +1471,7 @@ async function handleOpenGift(sql, user, body) {
         RETURNING *
       `
       if (card._revealOrder != null) inserted._revealOrder = card._revealOrder
+      if (inserted.passive_id) inserted.passive_name = giftPassiveMap[inserted.passive_id] || null
       newCards.push(inserted)
     }
     await ensureStats(sql, user.id)
@@ -1507,7 +1523,12 @@ async function handlePendingReveal(sql, user) {
   }
 
   const cardIds = pending.card_ids
-  const cards = await sql`SELECT * FROM cc_cards WHERE id = ANY(${cardIds}) AND owner_id = ${user.id}`
+  const cards = await sql`
+    SELECT c.*, sp.name AS passive_name
+    FROM cc_cards c
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
+    WHERE c.id = ANY(${cardIds}) AND c.owner_id = ${user.id}
+  `
   if (!cards.length) {
     // Cards gone (dismantled/traded) — auto-reveal stale record
     await sql`UPDATE cc_pack_opens SET revealed_at = NOW() WHERE user_id = ${user.id} AND revealed_at IS NULL`
@@ -1906,9 +1927,14 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
     const serialNumber = Math.floor(Math.random() * 9999) + 1
 
     let passiveId = null
+    let passiveName = null
     if (cardType === 'staff') {
-      const passives = await tx`SELECT id FROM cc_staff_passives`
-      if (passives.length > 0) passiveId = passives[Math.floor(Math.random() * passives.length)].id
+      const passives = await tx`SELECT id, name FROM cc_staff_passives`
+      if (passives.length > 0) {
+        const picked = passives[Math.floor(Math.random() * passives.length)]
+        passiveId = picked.id
+        passiveName = picked.name
+      }
     }
 
     const [card] = await tx`
@@ -1925,6 +1951,7 @@ async function handleBlackMarketClaimMythic(sql, user, body) {
       )
       RETURNING *
     `
+    card.passive_name = passiveName
 
     await tx`
       UPDATE cc_stats SET pending_mythic_claim = pending_mythic_claim - 1
@@ -2169,7 +2196,9 @@ async function handleUseConsumable(sql, user, body) {
   if (!cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
-  const state = await applyConsumable(sql, user.id, cardId)
+  const state = await transaction(async (tx) => {
+    return await applyConsumable(tx, user.id, cardId)
+  })
 
   maybePushChallenges(sql, user.id)
 
@@ -2365,12 +2394,14 @@ async function handleRejectSignature(sql, user, body) {
 
 async function handleSignedUniqueGallery(sql) {
   const cards = await sql`
-    SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
+    SELECT c.*, sp.name AS passive_name,
+           d.best_god_name, d.team_id, d.player_id AS def_player_id,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
            COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
            ou.discord_username AS owner_name,
            sr.signed_at
     FROM cc_cards c
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id
     LEFT JOIN LATERAL (
       SELECT u.id, u.discord_id, u.discord_avatar
@@ -2665,6 +2696,10 @@ async function handleBinderView(sql, params) {
       binder: { name: binder.name, color: binder.color },
       owner: { username: binder.discord_username, avatar: avatarUrl },
       cards: cards.map(c => {
+        if (c.blueprint_id && binderBlueprintCache[c.blueprint_id]) {
+          const name = getBlueprintDisplayName(binderBlueprintCache[c.blueprint_id])
+          if (name) c.god_name = name
+        }
         const formatted = formatCard(c)
         if (c.blueprint_id && binderBlueprintCache[c.blueprint_id]) {
           formatted._blueprintData = binderBlueprintCache[c.blueprint_id]
@@ -2861,9 +2896,14 @@ async function handleClaimPromoGift(sql, user, body) {
     }
 
     let passiveId = null
+    let passiveName = null
     if (gift.card_type === 'staff') {
-      const passives = await tx`SELECT id FROM cc_staff_passives`
-      if (passives.length > 0) passiveId = passives[Math.floor(Math.random() * passives.length)].id
+      const passives = await tx`SELECT id, name FROM cc_staff_passives`
+      if (passives.length > 0) {
+        const picked = passives[Math.floor(Math.random() * passives.length)]
+        passiveId = picked.id
+        passiveName = picked.name
+      }
     }
 
     const [c] = await tx`
@@ -2882,6 +2922,7 @@ async function handleClaimPromoGift(sql, user, body) {
       )
       RETURNING *
     `
+    c.passive_name = passiveName
 
     await tx`
       UPDATE cc_promo_gifts
@@ -2908,6 +2949,15 @@ async function handleClaimPromoGift(sql, user, body) {
 }
 
 // ═══ Formatters ═══
+function getBlueprintDisplayName(bpData) {
+  if (bpData.cardData?.name) return bpData.cardData.name
+  if (bpData.elements?.length > 0) {
+    const banner = bpData.elements.find(el => el.type === 'name-banner')
+    if (banner?.playerName) return banner.playerName
+  }
+  return null
+}
+
 function formatCard(row) {
   return {
     id: row.id,

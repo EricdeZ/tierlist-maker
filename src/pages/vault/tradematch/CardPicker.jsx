@@ -68,7 +68,7 @@ function PickerCard({ card, onSelect, disabled, showHolo }) {
   if (isCollection) {
     inner = (
       <VaultCard
-        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, passiveName: card.passiveName || card.passive_name, _blueprintData: cd._blueprintData }}
         getBlueprint={getBlueprint}
         size={CARD_SIZE}
         holo={false}
@@ -106,6 +106,7 @@ function PickerCard({ card, onSelect, disabled, showHolo }) {
         rarity={card.rarity}
         data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={CARD_SIZE}
+        passiveName={card.passiveName || card.passive_name}
       />
     )
     inner = holoEffect ? (

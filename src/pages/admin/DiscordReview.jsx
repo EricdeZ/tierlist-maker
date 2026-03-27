@@ -445,13 +445,29 @@ function ReviewTab({ unmatched, matched, scheduledMatches, selectedItems, toggle
                                     className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--color-secondary)] border border-[var(--color-border)] text-[var(--color-text)] text-sm"
                                 >
                                     <option value="">Assign to match...</option>
-                                    {scheduledMatches.map(sm => (
-                                        <option key={sm.id} value={sm.id}>
-                                            {sm.team1_name} vs {sm.team2_name} — {sm.division_name}
-                                            {sm.week ? ` W${sm.week}` : ''}
-                                            {sm.scheduled_date ? ` (${new Date(sm.scheduled_date).toLocaleDateString()})` : ''}
-                                        </option>
-                                    ))}
+                                    {(() => {
+                                        const groups = []
+                                        let lastGroup = null
+                                        for (const sm of scheduledMatches) {
+                                            const group = `${sm.division_name}${sm.stage_name ? ` — ${sm.stage_name}` : ''}`
+                                            if (group !== lastGroup) {
+                                                groups.push({ label: group, matches: [] })
+                                                lastGroup = group
+                                            }
+                                            groups[groups.length - 1].matches.push(sm)
+                                        }
+                                        return groups.map(g => (
+                                            <optgroup key={g.label} label={g.label}>
+                                                {g.matches.map(sm => (
+                                                    <option key={sm.id} value={sm.id}>
+                                                        {sm.team1_name || 'TBD'} vs {sm.team2_name || 'TBD'}
+                                                        {sm.round_name ? ` — ${sm.round_name}` : sm.week ? ` W${sm.week}` : ''}
+                                                        {sm.scheduled_date ? ` (${new Date(sm.scheduled_date).toLocaleDateString()})` : ''}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))
+                                    })()}
                                 </select>
                                 <button
                                     onClick={assignToMatch}

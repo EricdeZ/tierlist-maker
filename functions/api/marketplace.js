@@ -58,7 +58,8 @@ async function handleList(sql, params) {
   const rows = await sql`
     SELECT l.id, l.seller_id, l.card_id, l.core_price, l.created_at, l.item_type, l.pack_inventory_id,
            c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
-           c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url,
+           c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url, c.blueprint_id,
+           sp.name AS passive_name,
            d.best_god_name,
            u.discord_username AS seller_name, u.discord_avatar AS seller_avatar, u.discord_id AS seller_discord_id,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
@@ -67,6 +68,7 @@ async function handleList(sql, params) {
            pi.pack_type_id
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     LEFT JOIN LATERAL (
       SELECT u.id, u.discord_id, u.discord_avatar
@@ -128,11 +130,13 @@ async function handleList(sql, params) {
 
   const total = filtered.length
   const pageItems = filtered.slice(offset, offset + lim)
+  const listings = pageItems.map(formatListing)
+  await embedBlueprints(sql, listings)
 
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
-      listings: pageItems.map(formatListing),
+      listings,
       total,
       page: parseInt(page),
       limit: lim,
@@ -144,7 +148,8 @@ async function handleList(sql, params) {
 async function handleMyListings(sql, user) {
   const rows = await sql`
     SELECT l.*, c.god_id, c.god_name, c.god_class, c.role, c.rarity, c.holo_effect, c.holo_type, c.image_url,
-           c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url,
+           c.card_type, c.card_data, c.serial_number, c.def_id, c.signature_url, c.blueprint_id,
+           sp.name AS passive_name,
            d.best_god_name,
            bu.discord_username AS buyer_name,
            pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
@@ -153,6 +158,7 @@ async function handleMyListings(sql, user) {
            pi.pack_type_id
     FROM cc_market_listings l
     LEFT JOIN cc_cards c ON l.card_id = c.id
+    LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
     LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
     LEFT JOIN LATERAL (
       SELECT u.id, u.discord_id, u.discord_avatar
@@ -172,15 +178,18 @@ async function handleMyListings(sql, user) {
   const activeCards = listings.filter(l => l.status === 'active' && l.item_type === 'card').length
   const activePacks = listings.filter(l => l.status === 'active' && l.item_type === 'pack').length
 
+  const formatted = listings.map(l => ({
+    ...formatListing(l),
+    status: l.status,
+    buyerName: l.buyer_name || null,
+    soldAt: l.sold_at,
+  }))
+  await embedBlueprints(sql, formatted)
+
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
-      listings: listings.map(l => ({
-        ...formatListing(l),
-        status: l.status,
-        buyerName: l.buyer_name || null,
-        soldAt: l.sold_at,
-      })),
+      listings: formatted,
       activeCardCount: activeCards,
       activePackCount: activePacks,
       maxCardListings: MARKET_RULES.max_card_listings_per_user,
@@ -255,6 +264,44 @@ async function handleCancel(sql, user, body) {
   }
 }
 
+// ═══ Blueprint embedding ═══
+async function embedBlueprints(sql, listings) {
+  const bids = [...new Set(
+    listings.filter(l => l.card?.blueprintId).map(l => l.card.blueprintId)
+  )]
+  if (bids.length === 0) return
+  const blueprints = await sql`
+    SELECT id, card_type, template_data FROM cc_card_blueprints WHERE id = ANY(${bids})
+  `
+  const cache = {}
+  for (const bp of blueprints) {
+    const td = typeof bp.template_data === 'string' ? JSON.parse(bp.template_data) : bp.template_data
+    cache[bp.id] = {
+      cardData: td?.cardData || {},
+      elements: td?.elements || [],
+      border: td?.border || null,
+      cardType: bp.card_type || 'custom',
+    }
+  }
+  for (const l of listings) {
+    if (l.card?.blueprintId && cache[l.card.blueprintId]) {
+      const bpData = cache[l.card.blueprintId]
+      l.card._blueprintData = bpData
+      const name = getBlueprintDisplayName(bpData)
+      if (name) l.card.godName = name
+    }
+  }
+}
+
+function getBlueprintDisplayName(bpData) {
+  if (bpData.cardData?.name) return bpData.cardData.name
+  if (bpData.elements?.length > 0) {
+    const banner = bpData.elements.find(el => el.type === 'name-banner')
+    if (banner?.playerName) return banner.playerName
+  }
+  return null
+}
+
 // ═══ Formatters ═══
 function formatListing(row) {
   const base = {
@@ -306,6 +353,8 @@ function formatListing(row) {
       isConnected: row.card_data?.isConnected ?? null,
       bestGodName: row.best_god_name || null,
       signatureUrl: row.signature_url || null,
+      blueprintId: row.blueprint_id || null,
+      passiveName: row.passive_name || null,
     },
   }
 }

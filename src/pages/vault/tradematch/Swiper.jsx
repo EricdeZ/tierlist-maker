@@ -623,7 +623,7 @@ function BrowseCard({ card, onLike, onZoom }) {
   if (card.blueprint_id || cd._blueprintData) {
     cardEl = (
       <VaultCard
-        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, passiveName: card.passive_name, _blueprintData: cd._blueprintData }}
         getBlueprint={getBlueprint}
         size={GRID_CARD_SIZE}
         holo={false}
@@ -651,6 +651,7 @@ function BrowseCard({ card, onLike, onZoom }) {
         type={type} rarity={card.rarity}
         data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
         size={GRID_CARD_SIZE}
+        passiveName={card.passive_name}
       />
     )
   }
@@ -791,7 +792,7 @@ function SwipeCard({ card, containerWidth }) {
     const holoEffect2 = holoType ? getHoloEffect(card.rarity) : null
     cardEl = (
       <VaultCard
-        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, _blueprintData: cd._blueprintData }}
+        card={{ ...card, cardType: card.card_type, blueprintId: card.blueprint_id, passiveName: card.passive_name, _blueprintData: cd._blueprintData }}
         getBlueprint={getBlueprint} size={cardSize} holo={!!holoEffect2}
       />
     )
@@ -816,7 +817,7 @@ function SwipeCard({ card, containerWidth }) {
     const gameCardEl = (
       <GameCard type={type} rarity={card.rarity}
         data={resolvedData || { name: card.god_name, slug: card.god_id, imageUrl: card.image_url }}
-        size={cardSize} />
+        size={cardSize} passiveName={card.passive_name} />
     )
     cardEl = holoEffect ? (
       <TradingCardHolo rarity={holoEffect} holoType={holoType || 'reverse'} size={cardSize}>
