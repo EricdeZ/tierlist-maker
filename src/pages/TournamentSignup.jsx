@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { tournamentService } from '../services/database'
 import { Calendar, Shield, ExternalLink, CheckCircle, Clock, XCircle } from 'lucide-react'
@@ -24,7 +24,9 @@ function StatusBadge({ status }) {
 
 function formatDate(dateStr) {
     if (!dateStr) return ''
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00')
+    if (isNaN(date)) return ''
+    return date.toLocaleDateString('en-US', {
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     })
 }
@@ -50,6 +52,7 @@ export default function TournamentSignup() {
     const [signupRole, setSignupRole] = useState('player')
     const [availableDraftDate, setAvailableDraftDate] = useState(false)
     const [availableGameDates, setAvailableGameDates] = useState([])
+    const [rulesAccepted, setRulesAccepted] = useState(false)
 
     // Easter egg hunt state
     const [gameState, setGameState] = useState('idle')
@@ -228,12 +231,17 @@ export default function TournamentSignup() {
             )}
 
             <div className="max-w-3xl mx-auto py-8 px-4 relative z-2">
-                {/* Easter hedge banner */}
+                {/* Easter crest banner */}
                 {isEaster && (
-                    <div className="easter-hedge-banner">
-                        <span className="easter-hedge-text" data-text={tournament.name}>
-                            {tournament.name}
-                        </span>
+                    <div className="easter-crest-banner">
+                        <div className="easter-crest-divider-row">
+                            <div className="easter-crest-line" />
+                            <span className="easter-crest-subtitle">SmiteComp Presents</span>
+                            <div className="easter-crest-line right" />
+                        </div>
+                        <h1 className="easter-crest-title">{tournament.name}</h1>
+                        <div className="easter-crest-accent" />
+                        <div className="easter-crest-date">April 2026</div>
                     </div>
                 )}
 
@@ -265,30 +273,35 @@ export default function TournamentSignup() {
                     </h2>
                     {tournament.draft_date && (
                         <div className="mb-3">
-                            <span className="text-(--color-text-secondary) text-sm">Draft Day (Captains Only):</span>
+                            <span className={isEaster ? 'easter-section-label' : 'text-(--color-text-secondary) text-sm'}>Draft Day (Captains Only)</span>
                             <div className="text-(--color-text) font-medium">{formatDate(tournament.draft_date)}</div>
+                            <div className="text-(--color-text-secondary) text-xs mt-0.5">Check-in: 7:30 PM EST | Start: 8:00 PM EST</div>
                         </div>
+                    )}
+                    {tournament.draft_date && gameDates.length > 0 && isEaster && (
+                        <div className="easter-divider my-3" />
                     )}
                     {gameDates.length > 0 && (
                         <div>
-                            <span className="text-(--color-text-secondary) text-sm">Game Days:</span>
+                            <span className={isEaster ? 'easter-section-label' : 'text-(--color-text-secondary) text-sm'}>Game Days</span>
                             {gameDates.map(d => (
                                 <div key={d} className="text-(--color-text) font-medium">{formatDate(d)}</div>
                             ))}
+                            <div className="text-(--color-text-secondary) text-xs mt-0.5">Check-in: 7:30 PM EST | Start: 8:00 PM EST</div>
                         </div>
                     )}
                 </div>
 
                 {/* Discord Requirement */}
                 {tournament.discord_invite_url && (
-                    <div className="mb-8 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/20">
+                    <div className={`mb-8 p-4 ${isEaster ? 'easter-discord-card' : 'rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/20'}`}>
                         <div className="flex items-center gap-3">
                             <div className="text-(--color-text) text-sm font-medium">You must join the SmiteComp Discord to participate</div>
                             <a
                                 href={tournament.discord_invite_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752C4] transition-colors"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752C4] transition-colors ${isEaster ? 'rounded-sm' : 'rounded-lg'}`}
                             >
                                 Join Discord <ExternalLink className="w-3.5 h-3.5" />
                             </a>
@@ -440,9 +453,32 @@ export default function TournamentSignup() {
                             </div>
                         )}
 
+                        {/* Rules Acknowledgment */}
+                        <div>
+                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                rulesAccepted
+                                    ? isEaster ? 'bg-green-500/10 border-green-500/30' : 'bg-(--color-accent)/10 border-(--color-accent)/30'
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    checked={rulesAccepted}
+                                    onChange={e => setRulesAccepted(e.target.checked)}
+                                    required
+                                    className="w-4 h-4 mt-0.5 rounded accent-(--color-accent)"
+                                />
+                                <span className="text-(--color-text) text-sm">
+                                    I have read and agree to the{' '}
+                                    <Link to="/tournaments/rules" target="_blank" className="text-(--color-accent) underline hover:opacity-80">
+                                        Tournament Rules
+                                    </Link>
+                                </span>
+                            </label>
+                        </div>
+
                         <button
                             type="submit"
-                            disabled={submitting || availableGameDates.length < gameDates.length || (signupRole !== 'player' && !availableDraftDate)}
+                            disabled={submitting || !rulesAccepted || availableGameDates.length < gameDates.length || (signupRole !== 'player' && !availableDraftDate)}
                             className={`w-full py-3 rounded-lg font-semibold transition-opacity disabled:opacity-40 ${isEaster ? 'easter-submit-btn' : 'bg-(--color-accent) text-black hover:opacity-90'}`}
                         >
                             {submitting ? 'Submitting...' : 'Sign Up'}
