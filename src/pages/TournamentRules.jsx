@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import PageTitle from '../components/PageTitle'
 import Navbar from '../components/layout/Navbar'
-import { Search, ChevronRight, X, ScrollText, Scale, Swords, Trophy, Shield, Clock, Tv, Users, AlertTriangle, MessageSquare, Medal, Pause, Gavel } from 'lucide-react'
+import { Search, ChevronRight, X, ScrollText, Scale, Swords, Trophy, Shield, Clock, Tv, Users, AlertTriangle, MessageSquare, Medal, Pause, Gavel, ExternalLink } from 'lucide-react'
 
 const RULES_DATA = [
     {
@@ -394,13 +394,20 @@ export default function TournamentRules() {
                     <p>
                         The SmiteComp Easter Invitational is a community tournament with the expectation of providing
                         a gamified draft experience and entertainment with some high quality SMITE.
-                        SmiteComp is open to players of all skill levels and incorporates cross-platform play —
-                        available on PC, Microsoft Xbox, Sony PlayStation, and Nintendo Switch.
+                        SmiteComp is open to players of all skill levels and incorporates cross-platform play.
                     </p>
                     <p>
                         All tournament related issues, questions, or concerns are to be directed towards SmiteComp
-                        tournament organizers (Aprillis, ProcrasteNate, & Fish1n), as well as league management on occasion.
+                        tournament organizers and league management via the Discord.
                     </p>
+                    <a
+                        href="https://discord.gg/vAdQMp65nK"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752C4] transition-colors"
+                    >
+                        Join SmiteComp Discord <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                 </div>
 
                 <div className="flex gap-8 relative">

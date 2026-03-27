@@ -1,24 +1,33 @@
-/* Easter Invitational — themed tournament page styles */
+/* Easter Invitational — Tournament Crest theme */
 
-/* Grass background */
+/* Grass texture background with vignette */
 .easter-bg {
     min-height: 100vh;
     position: relative;
-    background-color: #2d5a1e;
-    background-image:
-        radial-gradient(ellipse at 20% 30%, #3a7a28 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 60%, #3a7a28 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, #4a8a38 0%, transparent 35%),
-        radial-gradient(ellipse at 85% 15%, #357a25 0%, transparent 30%),
-        repeating-linear-gradient(87deg, transparent 0px, rgba(34, 100, 20, 0.08) 1px, transparent 3px),
-        repeating-linear-gradient(3deg, transparent 0px, rgba(34, 100, 20, 0.06) 1px, transparent 4px);
+    background-color: #152e0e;
 }
 
-/* When a real grass texture is available */
-.easter-bg.has-texture {
+.easter-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
     background-image: url('../../assets/easter/grass-tile.jpg');
-    background-repeat: repeat;
     background-size: 256px 256px;
+    background-repeat: repeat;
+    filter: brightness(0.4) saturate(1.2);
+    z-index: 0;
+}
+
+.easter-bg::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 30%, transparent 10%, rgba(0, 0, 0, 0.35) 70%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, transparent 12%, transparent 88%, rgba(0, 0, 0, 0.5) 100%),
+        radial-gradient(ellipse at 50% 0%, rgba(74, 222, 128, 0.1) 0%, transparent 50%);
+    z-index: 0;
+    pointer-events: none;
 }
 
 /* Canvas overlay */
@@ -32,95 +41,142 @@
     pointer-events: none;
 }
 
-/* Hedge banner */
-.easter-hedge-banner {
+/* Crest header */
+.easter-crest-banner {
     position: relative;
     z-index: 2;
     text-align: center;
-    padding: 2.5rem 1rem 1.5rem;
+    padding: 2.5rem 1rem 1rem;
 }
 
-.easter-hedge-text {
-    font-size: clamp(2rem, 6vw, 4.5rem);
-    font-weight: 900;
-    letter-spacing: 0.1em;
+.easter-crest-divider-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.easter-crest-line {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(74, 222, 128, 0.5));
+}
+
+.easter-crest-line.right {
+    background: linear-gradient(270deg, transparent, rgba(74, 222, 128, 0.5));
+}
+
+.easter-crest-subtitle {
+    font-size: 0.625rem;
+    color: rgba(74, 222, 128, 0.5);
+    letter-spacing: 0.5em;
     text-transform: uppercase;
-    background: linear-gradient(180deg, #4ade80 0%, #16a34a 40%, #0d6a28 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
-    position: relative;
-    display: inline-block;
+    font-weight: 500;
 }
 
-/* Leaf texture overlay on hedge text */
-.easter-hedge-text::after {
-    content: attr(data-text);
-    position: absolute;
-    inset: 0;
-    font-size: inherit;
-    font-weight: inherit;
-    letter-spacing: inherit;
-    text-transform: inherit;
-    background: repeating-radial-gradient(circle at 3px 3px, rgba(34, 197, 94, 0.18) 0px, transparent 2px);
-    background-size: 6px 6px;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    pointer-events: none;
+.easter-crest-title {
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #fff;
+    text-shadow:
+        0 0 60px rgba(74, 222, 128, 0.25),
+        0 0 120px rgba(74, 222, 128, 0.1),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+    line-height: 1.1;
 }
 
-/* Form card — glassmorphism over grass */
+.easter-crest-accent {
+    width: 140px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(74, 222, 128, 0.5), transparent);
+    margin: 0.875rem auto 0.5rem;
+}
+
+.easter-crest-date {
+    font-size: 0.6875rem;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+/* Form card — dark glass over grass */
 .easter-form-card {
     position: relative;
     z-index: 2;
-    background: rgba(255, 255, 255, 0.08) !important;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(74, 222, 128, 0.15) !important;
-    border-radius: 1rem !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(74, 222, 128, 0.1) !important;
+    border-radius: 2px !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .easter-form-card input[type="text"],
 .easter-form-card input[type="url"],
 .easter-form-card select {
-    padding: 0.75rem 1rem;
-    border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(74, 222, 128, 0.15);
+    padding: 0.625rem 0.875rem;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(74, 222, 128, 0.08);
 }
 
 .easter-form-card input:focus,
 .easter-form-card select:focus {
-    border-color: rgba(74, 222, 128, 0.4);
+    border-color: rgba(74, 222, 128, 0.3);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.1);
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.08);
 }
 
-/* Inner info cards */
-.easter-form-card .easter-info-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(74, 222, 128, 0.1);
-    border-radius: 0.75rem;
+/* Easter section labels */
+.easter-form-card .easter-section-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(74, 222, 128, 0.4);
 }
 
 /* Radio/checkbox labels */
-.easter-form-card label[class*="rounded-lg"] {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(74, 222, 128, 0.1);
+.easter-form-card label[class*="rounded-lg"],
+.easter-form-card label[class*="rounded"] {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(74, 222, 128, 0.06);
+    border-radius: 2px;
 }
-.easter-form-card label[class*="rounded-lg"]:hover {
-    background: rgba(255, 255, 255, 0.08);
+.easter-form-card label[class*="rounded-lg"]:hover,
+.easter-form-card label[class*="rounded"]:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Divider line inside cards */
+.easter-form-card .easter-divider {
+    height: 1px;
+    background: rgba(74, 222, 128, 0.08);
+}
+
+/* Discord card override for Easter */
+.easter-discord-card {
+    background: rgba(88, 101, 242, 0.12) !important;
+    border: 1px solid rgba(88, 101, 242, 0.2) !important;
+    border-radius: 2px !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.easter-discord-card a {
+    border-radius: 2px !important;
 }
 
 /* Submit button — Easter green gradient */
 .easter-submit-btn {
-    background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%) !important;
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.9) 0%, rgba(22, 163, 74, 0.9) 100%) !important;
     color: white !important;
     font-weight: 700;
-    border-radius: 0.75rem;
+    border-radius: 2px;
     transition: filter 0.2s;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .easter-submit-btn:hover:not(:disabled) {
     filter: brightness(1.1);
@@ -147,7 +203,7 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(74, 222, 128, 0.2);
-    border-radius: 0.75rem;
+    border-radius: 2px;
     padding: 0.5rem 1rem;
     color: white;
     font-size: 0.875rem;
@@ -192,8 +248,11 @@
 
 /* Responsive */
 @media (max-width: 640px) {
-    .easter-hedge-text {
+    .easter-crest-title {
         letter-spacing: 0.05em;
+    }
+    .easter-crest-line {
+        width: 30px;
     }
     .easter-hud {
         top: 0.5rem;
