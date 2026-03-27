@@ -694,8 +694,11 @@ export async function onRequest(context) {
     const html = await response.text()
     const injected = injectOGTags(html, tags)
 
+    const headers = new Headers(response.headers)
+    headers.set('Cache-Control', 'no-cache')
+
     return new Response(injected, {
         status: response.status,
-        headers: response.headers,
+        headers,
     })
 }
