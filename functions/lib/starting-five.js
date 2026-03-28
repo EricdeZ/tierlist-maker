@@ -1,6 +1,7 @@
 // Starting 5 — passive income from slotted cards
 import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
+import { checkSwapCooldown, applySwapCooldown, initPassiveState } from './passives.js'
 
 const S5_FLAT_CORES = {
   uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 7.05, unique: 8.01,
@@ -493,6 +494,15 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
       `
       if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
 
+      // Check swap cooldown before slotting staff card
+      if (role === 'staff') {
+        const cooldown = await checkSwapCooldown(sql, userId)
+        if (cooldown) {
+          const remaining = Math.ceil((new Date(cooldown.cooldownUntil).getTime() - Date.now()) / 3600_000)
+          throw new Error(`Staff slot on cooldown — ${remaining}h remaining`)
+        }
+      }
+
       await collectIncome(sql, userId)
 
       await sql`
@@ -501,6 +511,18 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
         ON CONFLICT (user_id, lineup_type, role)
         DO UPDATE SET card_id = ${cardId}, god_card_id = NULL, item_card_id = NULL, slotted_at = NOW()
       `
+
+      // Initialize passive state for the newly slotted staff card
+      if (role === 'staff') {
+        const [staffCard] = await sql`
+          SELECT sp.name AS passive_name FROM cc_cards c
+          JOIN cc_staff_passives sp ON c.passive_id = sp.id
+          WHERE c.id = ${cardId}
+        `
+        if (staffCard) {
+          await initPassiveState(sql, userId, staffCard.passive_name)
+        }
+      }
     } else {
       // Existing player card logic
       if (card.card_type === 'staff') throw new Error('Staff cards can only be slotted in cheerleader or staff slots')
@@ -600,6 +622,21 @@ export async function unslotCard(sql, userId, role, lineupType = 'current') {
   if (!validRoles.includes(role)) throw new Error('Invalid role')
 
   await collectIncome(sql, userId)
+
+  // Apply swap cooldown when unslotting a staff card
+  if (role === 'staff') {
+    const [staffSlot] = await sql`
+      SELECT c.passive_id, sp.name AS passive_name
+      FROM cc_lineups l
+      JOIN cc_cards c ON l.card_id = c.id
+      JOIN cc_staff_passives sp ON c.passive_id = sp.id
+      WHERE l.user_id = ${userId} AND l.lineup_type = ${lineupType} AND l.role = 'staff'
+        AND l.card_id IS NOT NULL
+    `
+    if (staffSlot) {
+      await applySwapCooldown(sql, userId, staffSlot.passive_name)
+    }
+  }
 
   await sql`
     UPDATE cc_lineups

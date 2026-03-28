@@ -49,7 +49,7 @@ export default function PassivePanel({ passiveState, onUpdate }) {
   )
 }
 
-function ChargePips({ charges, maxCharges, progressPct, nextChargeIn }) {
+function ChargePips({ charges, maxCharges, nextChargeIn }) {
   return (
     <div className="flex items-center gap-2 mt-2">
       <div className="flex gap-1">
