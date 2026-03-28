@@ -1200,6 +1200,11 @@ export const vaultService = {
     async logDevice(deviceId, previousIds) {
         return apiPost('vault-device-log', { action: 'log-login' }, { deviceId, previousIds })
     },
+    toggleUniqueHunter: (enabled) => apiPost('vault', { action: 'toggle-unique-hunter' }, { enabled }),
+    setHoloChoice: (holoChoice) => apiPost('vault', { action: 'set-holo-choice' }, { holoChoice }),
+    claimGeneratedCard: (generatedCardId) => apiPost('vault', { action: 'claim-generated-card' }, { generatedCardId }),
+    rerollCard: (sessionId, cardIndex) => apiPost('vault', { action: 'reroll-card' }, { sessionId, cardIndex }),
+    rerollPack: (sessionId) => apiPost('vault', { action: 'reroll-pack' }, { sessionId }),
 }
 
 export const bountyService = {

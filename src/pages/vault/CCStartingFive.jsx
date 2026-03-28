@@ -13,6 +13,7 @@ import CardZoomModal from './components/CardZoomModal'
 import { getTeamCounts, getTeamSynergyPreview, isGodSynergy } from './starting-five/synergyHelpers'
 import SynergyPlanner from './starting-five/SynergyPlanner'
 import PassivesGuide from './starting-five/PassivesGuide'
+import PassivePanel from './starting-five/PassivePanel'
 import soloIcon from '../../assets/roles/solo.webp'
 import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
@@ -189,7 +190,7 @@ function useSlotSize() {
 }
 
 export default function CCStartingFive() {
-  const { collection, startingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable: applyS5Consumable, getDefOverride } = useVault()
+  const { collection, startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable: applyS5Consumable, getDefOverride } = useVault()
   const [activeLineup, setActiveLineup] = useState('current')
   const [pickerRole, setPickerRole] = useState(null)
   const [optionsRole, setOptionsRole] = useState(null)
@@ -891,6 +892,11 @@ export default function CCStartingFive() {
             )
           })}
         </div>
+
+        <PassivePanel
+          passiveState={lineupData?.passiveState}
+          onUpdate={() => loadStartingFive()}
+        />
       </div>
 
       {/* Leaderboard */}

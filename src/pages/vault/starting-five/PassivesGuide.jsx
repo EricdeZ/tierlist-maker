@@ -25,12 +25,7 @@ export default function PassivesGuide() {
 
       {expanded && (
         <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-[var(--cd-border)]">
-          <div className="flex items-center gap-2 mt-3 mb-4 px-3 py-2 rounded-lg bg-amber-400/10 border border-amber-400/20">
-            <Clock size={14} className="text-amber-400 shrink-0" />
-            <span className="text-xs text-amber-300/90 font-medium">Coming soon — passives are not yet active</span>
-          </div>
-
-          <div className="space-y-2">
+          <div className="space-y-2 mt-3">
             {PASSIVES_LIST.map(p => (
               <div key={p.key} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02]">
                 <div className="shrink-0 mt-0.5 text-white/50">
