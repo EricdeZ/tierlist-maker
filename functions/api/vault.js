@@ -6,6 +6,7 @@ import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks, rollHoloEffect, rollHoloType } from '../lib/vault.js'
+import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown } from '../lib/passives.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, CONSUMABLE_DAILY_CAP, isRoleMismatch } from '../lib/starting-five.js'
@@ -144,7 +145,7 @@ const handler = async (event) => {
     if (event.httpMethod === 'POST') {
       const body = event.body ? JSON.parse(event.body) : {}
       switch (action) {
-        case 'open-pack': return await handleOpenPack(sql, user, body)
+        case 'open-pack': return await handleOpenPack(sql, user, body, event)
         case 'open-inventory-pack': return await handleOpenInventoryPack(sql, user, body)
         case 'send-gift': return await handleSendGift(sql, user, body, event)
         case 'open-gift': return await handleOpenGift(sql, user, body)
@@ -176,6 +177,11 @@ const handler = async (event) => {
         case 'toggle-redeem-code': return await handleToggleRedeemCode(sql, event, body)
         case 'send-promo-gift': return await handleSendPromoGift(sql, user, body, event)
         case 'claim-promo-gift': return await handleClaimPromoGift(sql, user, body)
+        case 'reroll-card': return await handleRerollCard(sql, user, body)
+        case 'reroll-pack': return await handleRerollPack(sql, user, body)
+        case 'claim-generated-card': return await handleClaimGeneratedCard(sql, user, body)
+        case 'toggle-unique-hunter': return await handleToggleUniqueHunter(sql, user, body)
+        case 'set-holo-choice': return await handleSetHoloChoice(sql, user, body)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
       }
     }
@@ -528,7 +534,7 @@ async function handleBuyPacksToInventory(sql, user, body) {
 }
 
 // ═══ POST: Open pack ═══
-async function handleOpenPack(sql, user, body) {
+async function handleOpenPack(sql, user, body, event) {
   const { packType, saleId } = body
 
   // Sale purchase — atomic stock decrement + payment in transaction
@@ -547,7 +553,10 @@ async function handleOpenPack(sql, user, body) {
     if (!inRotation) return { statusCode: 400, headers, body: JSON.stringify({ error: 'This pack is not currently in rotation' }) }
   }
 
-  const result = await openPack(sql, user.id, packType)
+  // Load active passive for odds modification
+  const passive = await getActivePassive(sql, user.id)
+
+  const result = await openPack(sql, user.id, packType, { passive })
   const cards = result.cards.map((c) => {
     const formatted = formatCard(c)
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
@@ -558,12 +567,180 @@ async function handleOpenPack(sql, user, body) {
 
   maybePushChallenges(sql, user.id)
 
+  // Build reroll state if passive provides reroll charges
+  let rerollState = null
+  if (passive) {
+    const cardRerollCharges = passive.passiveName === 'card_reroll' ? (passive.charges || 0) : 0
+    const packRerollCharges = passive.passiveName === 'pack_reroll' ? (passive.charges || 0) : 0
+
+    if (cardRerollCharges > 0 || packRerollCharges > 0) {
+      const rarityIdx = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
+      const staffRarityIdx = rarityIdx[passive.staffRarity] || 0
+
+      const eligibleCardIndices = result.cards
+        .map((c, i) => ({ i, rarity: c.rarity }))
+        .filter(c => (rarityIdx[c.rarity] || 0) <= staffRarityIdx)
+        .map(c => c.i)
+
+      const [session] = await sql`
+        INSERT INTO cc_pack_sessions (user_id, cards, odds_context, reroll_count)
+        VALUES (${user.id}, ${JSON.stringify(result.cards)}::jsonb, ${JSON.stringify({})}::jsonb, 0)
+        RETURNING id
+      `
+
+      rerollState = {
+        sessionId: session.id,
+        cardRerollCharges,
+        packRerollCharges,
+        eligibleCardIndices,
+      }
+    }
+  }
+
+  // Cleanup expired pack sessions (fire-and-forget)
+  event.waitUntil(sql`DELETE FROM cc_pack_sessions WHERE expires_at < NOW()`)
+
   return { statusCode: 200, headers, body: JSON.stringify({
     packName: result.packName,
     packType,
     cards,
     packOpenId: result.packOpenId,
+    rerollState,
   }) }
+}
+
+// ═══ POST: Reroll a single card in an open pack ═══
+async function handleRerollCard(sql, user, body) {
+  const { sessionId, cardIndex } = body
+
+  const passive = await getActivePassive(sql, user.id)
+  if (!passive || passive.passiveName !== 'card_reroll') {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No card reroll passive active' }) }
+  }
+
+  const [session] = await sql`
+    SELECT * FROM cc_pack_sessions
+    WHERE id = ${sessionId} AND user_id = ${user.id} AND expires_at > NOW()
+  `
+  if (!session) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack session expired' }) }
+
+  const cards = session.cards
+  if (cardIndex < 0 || cardIndex >= cards.length) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid card index' }) }
+  }
+
+  const rarityIdx = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
+  if ((rarityIdx[cards[cardIndex].rarity] || 0) > (rarityIdx[passive.staffRarity] || 0)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card rarity too high for reroll' }) }
+  }
+
+  const chargesRemaining = await spendCharge(sql, user.id, 'card_reroll', passive.staffRarity)
+
+  const { createOddsContext } = await import('../lib/odds.js')
+  const { applyPassiveToContext } = await import('../lib/passives.js')
+  const { generateCardForReroll } = await import('../lib/vault.js')
+
+  let ctx = createOddsContext()
+  ctx = applyPassiveToContext(ctx, passive.passiveName, passive.staffRarity, passive)
+
+  const newCard = await generateCardForReroll(sql, user.id, cards[cardIndex].rarity, ctx)
+
+  // Delete old card from cc_cards
+  if (cards[cardIndex].id) {
+    await sql`DELETE FROM cc_cards WHERE id = ${cards[cardIndex].id} AND owner_id = ${user.id}`
+  }
+
+  // Update session
+  cards[cardIndex] = newCard
+  await sql`UPDATE cc_pack_sessions SET cards = ${JSON.stringify(cards)}::jsonb WHERE id = ${sessionId}`
+
+  const formatted = formatCard(newCard)
+  return { statusCode: 200, headers, body: JSON.stringify({ newCard: formatted, chargesRemaining }) }
+}
+
+// ═══ POST: Reroll the entire pack ═══
+async function handleRerollPack(sql, user, body) {
+  const { sessionId } = body
+
+  const passive = await getActivePassive(sql, user.id)
+  if (!passive || passive.passiveName !== 'pack_reroll') {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'No pack reroll passive active' }) }
+  }
+
+  const [session] = await sql`
+    SELECT * FROM cc_pack_sessions
+    WHERE id = ${sessionId} AND user_id = ${user.id} AND expires_at > NOW()
+  `
+  if (!session) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack session expired' }) }
+
+  // Spend charge only on first reroll of a pack
+  let chargesRemaining = passive.charges
+  if (session.reroll_count === 0) {
+    chargesRemaining = await spendCharge(sql, user.id, 'pack_reroll', passive.staffRarity)
+  }
+
+  const oldCards = session.cards
+
+  // Pick card to remove
+  const removeIdx = pickCardToRemove(oldCards, passive.staffRarity, session.reroll_count)
+  const remaining = oldCards.filter((_, i) => i !== removeIdx)
+
+  // Delete ALL old cards from cc_cards
+  for (const oldCard of oldCards) {
+    if (oldCard.id) {
+      await sql`DELETE FROM cc_cards WHERE id = ${oldCard.id} AND owner_id = ${user.id}`
+    }
+  }
+
+  // Re-generate remaining cards with same rarities
+  const { createOddsContext } = await import('../lib/odds.js')
+  const { applyPassiveToContext } = await import('../lib/passives.js')
+  const { generateCardForReroll } = await import('../lib/vault.js')
+
+  let ctx = createOddsContext()
+  ctx = applyPassiveToContext(ctx, passive.passiveName, passive.staffRarity, passive)
+
+  const newCards = []
+  for (const oldCard of remaining) {
+    const newCard = await generateCardForReroll(sql, user.id, oldCard.rarity, ctx)
+    newCards.push(newCard)
+  }
+
+  // Update session
+  const newRerollCount = session.reroll_count + 1
+  await sql`
+    UPDATE cc_pack_sessions
+    SET cards = ${JSON.stringify(newCards)}::jsonb, reroll_count = ${newRerollCount}
+    WHERE id = ${sessionId}
+  `
+
+  const formattedCards = newCards.map(c => formatCard(c))
+
+  return { statusCode: 200, headers, body: JSON.stringify({
+    cards: formattedCards,
+    chargesRemaining,
+  }) }
+}
+
+// ═══ POST: Claim a generated card from Card Generator ═══
+async function handleClaimGeneratedCard(sql, user, body) {
+  const { generatedCardId } = body
+  const card = await claimGeneratedCard(sql, user.id, generatedCardId)
+  return { statusCode: 200, headers, body: JSON.stringify({ card: formatCard(card) }) }
+}
+
+// ═══ POST: Toggle Unique Hunter on/off ═══
+async function handleToggleUniqueHunter(sql, user, body) {
+  const { enabled } = body
+  await toggleUniqueHunter(sql, user.id, !!enabled)
+  return { statusCode: 200, headers, body: JSON.stringify({ enabled: !!enabled }) }
+}
+
+// ═══ POST: Set Holo Boost choice ═══
+async function handleSetHoloChoice(sql, user, body) {
+  const { holoChoice } = body
+  await setHoloChoice(sql, user.id, holoChoice)
+  return { statusCode: 200, headers, body: JSON.stringify({ holoChoice }) }
 }
 
 // ═══ POST: Sale purchase — transactional stock + payment ═══
@@ -2054,7 +2231,50 @@ function formatS5Response(state, extra = {}) {
 
 async function handleStartingFive(sql, user) {
   const state = await tick(sql, user.id)
-  return formatS5Response(state)
+
+  // Load passive state
+  const passiveData = await getActivePassive(sql, user.id)
+  let passiveState = null
+  if (passiveData) {
+    const generatedCards = passiveData.passiveName === 'card_generator'
+      ? await getGeneratedCards(sql, user.id)
+      : []
+
+    // Trigger Card Generator if charges available
+    if (passiveData.passiveName === 'card_generator' && passiveData.charges > 0) {
+      try {
+        const { generatePassiveCard } = await import('../lib/passives.js')
+        await spendCharge(sql, user.id, 'card_generator', passiveData.staffRarity)
+        const newGen = await generatePassiveCard(sql, user.id, passiveData.staffRarity)
+        if (newGen) generatedCards.unshift(newGen)
+        // Refresh passive data after spending
+        const refreshed = await getActivePassive(sql, user.id)
+        if (refreshed) Object.assign(passiveData, refreshed)
+      } catch {
+        // Charge may have been spent between check and spend — ignore
+      }
+    }
+
+    const cooldown = await checkSwapCooldown(sql, user.id)
+
+    passiveState = {
+      name: passiveData.passiveName,
+      staffRarity: passiveData.staffRarity,
+      charges: passiveData.charges,
+      maxCharges: passiveData.maxCharges,
+      chargeProgressPct: passiveData.chargeProgressPct,
+      nextChargeIn: passiveData.nextChargeIn,
+      cooldownUntil: cooldown?.cooldownUntil || null,
+      enabled: passiveData.enabled,
+      holoChoice: passiveData.holoChoice,
+      generatedCards: generatedCards.map(g => ({ id: g.id, rarity: g.rarity || g.card_data?.rarity, createdAt: g.created_at })),
+    }
+  }
+
+  const resp = formatS5Response(state)
+  const parsed = JSON.parse(resp.body)
+  parsed.passiveState = passiveState
+  return { ...resp, body: JSON.stringify(parsed) }
 }
 
 async function handleS5Leaderboard(sql, user) {
