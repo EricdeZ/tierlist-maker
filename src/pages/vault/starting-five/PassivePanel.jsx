@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { PassiveIcon, getPassiveInfo } from '../../../data/vault/passives'
 import { vaultService } from '../../../services/database'
 import { Zap, Clock, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
+import MiniPackFlip from '../components/MiniPackFlip'
 
 const RARITY_LABEL = {
   uncommon: 'Minor', rare: 'Moderate', epic: 'Notable',
@@ -138,30 +139,37 @@ function UniqueHunterToggle({ enabled, onToggle }) {
 
 function GeneratedCards({ cards, onClaim }) {
   const [claiming, setClaiming] = useState(null)
+  const [claimedCard, setClaimedCard] = useState(null)
 
   const handleClaim = useCallback(async (id) => {
     if (claiming) return
     setClaiming(id)
     try {
-      await vaultService.claimGeneratedCard(id)
-      onClaim?.()
+      const result = await vaultService.claimGeneratedCard(id)
+      setClaimedCard(result.card)
+      setClaiming(null)
     } catch {
       setClaiming(null)
     }
-  }, [claiming, onClaim])
+  }, [claiming])
 
   return (
-    <div className="flex gap-2 mt-3 flex-wrap">
-      {cards.map(c => (
-        <button
-          key={c.id}
-          onClick={() => handleClaim(c.id)}
-          disabled={!!claiming}
-          className="w-12 h-16 rounded-lg bg-gradient-to-b from-cyan-400/20 to-cyan-400/5 border border-cyan-400/20 animate-pulse hover:animate-none hover:border-cyan-400/50 transition-colors cursor-pointer flex items-center justify-center"
-        >
-          {claiming === c.id ? <Loader2 size={14} className="animate-spin text-cyan-400" /> : <Zap size={14} className="text-cyan-400" />}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="flex gap-2 mt-3 flex-wrap">
+        {cards.map(c => (
+          <button
+            key={c.id}
+            onClick={() => handleClaim(c.id)}
+            disabled={!!claiming}
+            className="w-12 h-16 rounded-lg bg-gradient-to-b from-cyan-400/20 to-cyan-400/5 border border-cyan-400/20 animate-pulse hover:animate-none hover:border-cyan-400/50 transition-colors cursor-pointer flex items-center justify-center"
+          >
+            {claiming === c.id ? <Loader2 size={14} className="animate-spin text-cyan-400" /> : <Zap size={14} className="text-cyan-400" />}
+          </button>
+        ))}
+      </div>
+      {claimedCard && (
+        <MiniPackFlip card={claimedCard} onClose={() => { setClaimedCard(null); onClaim?.() }} />
+      )}
+    </>
   )
 }
