@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { Loader2 } from 'lucide-react'
 import PackArt from './PackArt'
 import GameCard from './GameCard'
 import VaultCard from './VaultCard'
@@ -7,6 +8,7 @@ import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { RARITIES, getHoloEffect } from '../../../data/vault/economy'
 import { useVault } from '../VaultContext'
+import { vaultService } from '../../../services/database'
 import cardBackImg from '../../../assets/card_backsite.png'
 import './PackOpening.css'
 
@@ -107,7 +109,7 @@ function PackCard({ card, size, holo = true, override }) {
   return gameCard
 }
 
-function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisabled, onClose }) {
+function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisabled, onClose, rerollState, rerollingPack, packRerollCount, onPackReroll }) {
   const [openMoreLoading, setOpenMoreLoading] = useState(false)
   const { getDefOverride } = useVault()
   const gridRef = useRef(null)
@@ -233,6 +235,19 @@ function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisable
           </div>
         </div>
       )}
+      {rerollState?.packRerollCharges > 0 && !rerollingPack && (
+        <button
+          onClick={onPackReroll}
+          className="mt-4 px-5 py-2.5 rounded-xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-300 text-sm font-medium hover:bg-cyan-400/20 transition-colors cursor-pointer"
+        >
+          {packRerollCount === 0 ? 'Reroll Pack' : packRerollCount === 1 ? 'Reroll Again' : 'Reroll Once More'}
+        </button>
+      )}
+      {rerollingPack && (
+        <div className="mt-4 flex items-center gap-2 text-white/40 text-sm">
+          <Loader2 size={16} className="animate-spin" /> Rerolling...
+        </div>
+      )}
       <div className="pack-opening__summary-actions">
         {onOpenMore && (
           <button
@@ -266,6 +281,10 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
   const [revealParticles, setRevealParticles] = useState([])
   const [anticipationSparks, setAnticipationSparks] = useState([])
   const [rarityBanner, setRarityBanner] = useState(null)
+  const [rerollState, setRerollState] = useState(result.rerollState || null)
+  const [rerollingCard, setRerollingCard] = useState(null)
+  const [rerollingPack, setRerollingPack] = useState(false)
+  const [packRerollCount, setPackRerollCount] = useState(0)
   const bannerKeyRef = useRef(0)
 
   const packRef = useRef(null)
@@ -276,17 +295,17 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
   const antSparkTimerRef = useRef(null)
 
   const isMixed = (result.packType || '').includes('mixed') || result.cards.some(c => c._revealOrder != null || c.card_type)
-  const cards = useMemo(() => {
-    const sorted = [...result.cards]
-    if (isMixed && sorted.some(c => c._revealOrder != null)) {
-      // Mixed packs: use assigned reveal order
+  const sortCards = useCallback((raw) => {
+    const sorted = [...raw]
+    const mixed = (result.packType || '').includes('mixed') || raw.some(c => c._revealOrder != null || c.card_type)
+    if (mixed && sorted.some(c => c._revealOrder != null)) {
       sorted.sort((a, b) => (a._revealOrder ?? 99) - (b._revealOrder ?? 99))
     } else {
-      // Rarity packs: common first, rarest last
       sorted.sort((a, b) => (RARITY_TIER[b.rarity] ?? 5) - (RARITY_TIER[a.rarity] ?? 5))
     }
     return sorted
-  }, [result.cards, isMixed])
+  }, [result.packType])
+  const [cards, setCards] = useState(() => sortCards(result.cards))
 
   const topIndex = useMemo(() => {
     for (let i = 0; i < cards.length; i++) {
@@ -383,6 +402,65 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
   useEffect(() => () => {
     if (antSparkTimerRef.current) clearInterval(antSparkTimerRef.current)
   }, [])
+
+  // ─── Card reroll — flip back, replace, re-flip ───
+  const handleCardReroll = useCallback(async (cardIndex) => {
+    if (!rerollState || rerollingCard !== null) return
+    setRerollingCard(cardIndex)
+
+    try {
+      const result = await vaultService.rerollCard(rerollState.sessionId, cardIndex)
+
+      // Flip card back (dismiss it so it leaves, then we un-dismiss with new data)
+      setCardFlipped(false)
+      setFlipPhase(null)
+
+      // Replace card data after brief delay for flip-back
+      setTimeout(() => {
+        setCards(prev => {
+          const next = [...prev]
+          next[cardIndex] = result.newCard
+          return next
+        })
+        setRerollState(prev => ({
+          ...prev,
+          cardRerollCharges: result.chargesRemaining,
+          eligibleCardIndices: result.chargesRemaining > 0 ? prev.eligibleCardIndices : [],
+        }))
+        setTimeout(() => {
+          setRerollingCard(null)
+        }, 300)
+      }, 600)
+    } catch {
+      setRerollingCard(null)
+    }
+  }, [rerollState, rerollingCard])
+
+  // ─── Pack reroll — reset to pre-flip state, replay animation ───
+  const handlePackReroll = useCallback(async () => {
+    if (!rerollState || rerollingPack) return
+    setRerollingPack(true)
+
+    try {
+      const result = await vaultService.rerollPack(rerollState.sessionId)
+
+      // Reset to pre-flip state — replay animation
+      setPhase('emerging')
+      setRevealedSet(new Set())
+      setCardFlipped(false)
+      setFlipPhase(null)
+      setCards(sortCards(result.cards))
+      setPackRerollCount(prev => prev + 1)
+      setRerollState(prev => ({
+        ...prev,
+        packRerollCharges: result.chargesRemaining,
+      }))
+    } catch {
+      // ignore
+    } finally {
+      setRerollingPack(false)
+    }
+  }, [rerollState, rerollingPack, sortCards])
 
   // ─── Auto sparks during ripping — scaled by rarest card ───
   useEffect(() => {
@@ -697,6 +775,22 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
                     )}
                   </div>
                 </div>
+                {/* Card reroll button */}
+                {isTop && topFlipPhase === 'revealed'
+                  && rerollState?.cardRerollCharges > 0
+                  && rerollState.eligibleCardIndices?.includes(i)
+                  && rerollingCard === null && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCardReroll(i) }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center hover:bg-cyan-400/30 transition-colors cursor-pointer z-10"
+                    title="Reroll this card"
+                  >
+                    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} className="text-cyan-300">
+                      <path d="M1 4v6h6M23 20v-6h-6" />
+                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+                    </svg>
+                  </button>
+                )}
                 {/* Expanding ring burst (epic+) */}
                 {isTop && topFlipPhase === 'revealed' && tier <= 2 && (
                   <>
@@ -745,7 +839,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
 
       {/* ═══ Summary — show all cards after reveal ═══ */}
       {phase === 'summary' && (
-        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} openMoreLabel={openMoreLabel} openMoreDisabled={openMoreDisabled} onClose={onClose} />
+        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} openMoreLabel={openMoreLabel} openMoreDisabled={openMoreDisabled} onClose={onClose} rerollState={rerollState} rerollingPack={rerollingPack} packRerollCount={packRerollCount} onPackReroll={handlePackReroll} />
       )}
 
       {onReplay && (
