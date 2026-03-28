@@ -264,6 +264,47 @@ export async function claimGeneratedCard(sql, userId, generatedCardId) {
   return inserted
 }
 
+export async function generatePassiveCard(sql, userId, staffRarity) {
+  const config = CARD_GENERATOR[staffRarity]
+  if (!config) return null
+
+  const { createOddsContext, rollRarityFromContext, rollHoloTypeFromContext } = await import('./odds.js')
+  const { GODS, CLASS_ROLE, getGodImageUrl } = await import('./vault-data.js')
+  const { rollHoloEffect } = await import('./vault.js')
+
+  // Build boosted context capped at staff rarity
+  let ctx = createOddsContext()
+  const oddsBoostMult = ODDS_BOOST[staffRarity] || 1
+  for (const r of RARITY_ORDER) {
+    if (r !== 'common') ctx.rarity[r] *= oddsBoostMult
+  }
+
+  const rarity = rollRarityFromContext(ctx, 'common', config.rarityCap)
+  const god = GODS[Math.floor(Math.random() * GODS.length)]
+  const role = god.role || CLASS_ROLE[god.class] || 'mid'
+
+  const cardData = {
+    card_type: 'god',
+    god_id: god.slug,
+    god_name: god.name,
+    god_class: god.class,
+    role,
+    rarity,
+    serial_number: Math.floor(Math.random() * 9999) + 1,
+    holo_effect: rollHoloEffect(rarity),
+    holo_type: rollHoloTypeFromContext(ctx, rarity),
+    image_url: getGodImageUrl(god),
+  }
+
+  const [gen] = await sql`
+    INSERT INTO cc_generated_cards (user_id, card_data, rarity)
+    VALUES (${userId}, ${JSON.stringify(cardData)}::jsonb, ${rarity})
+    RETURNING id, rarity, created_at
+  `
+
+  return gen
+}
+
 // ════════════════════════════════════════════
 // Apply passive to OddsContext
 // ════════════════════════════════════════════
