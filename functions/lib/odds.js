@@ -71,6 +71,29 @@ export function applyPackOverrides(ctx, oddsConfig) {
     next.maxRarity = oddsConfig.maxRarity
   }
 
+  if (oddsConfig.typeOdds && typeof oddsConfig.typeOdds === 'object') {
+    next.typeOdds = {}
+    for (const [type, overrides] of Object.entries(oddsConfig.typeOdds)) {
+      if (overrides?.rarity && typeof overrides.rarity === 'object') {
+        next.typeOdds[type] = { rarity: {} }
+        for (const [k, v] of Object.entries(overrides.rarity)) {
+          if (BASE_RARITY_WEIGHTS[k] !== undefined && typeof v === 'number' && v >= 0) {
+            next.typeOdds[type].rarity[k] = v
+          }
+        }
+      }
+    }
+  }
+
+  return next
+}
+
+export function getContextForType(ctx, type) {
+  if (!ctx.typeOdds || !ctx.typeOdds[type]) return ctx
+  const next = { ...ctx, rarity: { ...ctx.rarity } }
+  for (const [k, v] of Object.entries(ctx.typeOdds[type].rarity)) {
+    next.rarity[k] = v
+  }
   return next
 }
 
