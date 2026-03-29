@@ -2,7 +2,7 @@
 import { grantEmber } from './ember.js'
 import { GODS, ITEMS, CONSUMABLES, CLASS_ROLE, getGodImageUrl, getItemImageUrl } from './vault-data.js'
 import { computePlayerStats } from './vault-defs.js'
-import { createOddsContext, applyPackOverrides, rollRarityFromContext, rollHoloTypeFromContext, selectFromPool, RARITY_ORDER as OddsRarityOrder } from './odds.js'
+import { createOddsContext, applyPackOverrides, rollRarityFromContext, rollHoloTypeFromContext, selectFromPool, getContextForType, RARITY_ORDER as OddsRarityOrder } from './odds.js'
 
 const RARITIES = {
   common:    { name: 'Common',    dropRate: 0.60, color: '#9ca3af', holoEffects: ['common'] },
@@ -373,10 +373,11 @@ async function generatePlayerCardByDivisions(sql, rarity, divisionIds, ctx = nul
   }
 }
 
-function generateCardByType(type, rarity, ctx = null) {
+async function generateCardByType(type, rarity, ctx = null, sql = null) {
   switch (type) {
     case 'item': return generateItemCard(rarity, ctx)
     case 'consumable': return generateConsumableCard(rarity, ctx)
+    case 'staff': return sql ? generateStaffCard(sql, rarity, ctx) : generateCard(rarity, ctx)
     default: return generateCard(rarity, ctx)
   }
 }
@@ -503,8 +504,27 @@ export async function openPack(sql, userId, packType, { skipPayment = false, pas
   return { packName: pack.name, cards: newCards, packOpenId: packOpen.id }
 }
 
-export async function generateCardForReroll(sql, userId, oldRarity, ctx) {
-  const rarity = rollRarity(oldRarity, ctx)
+export async function generateCardForReroll(sql, userId, oldRarity, ctx, { lockRarity = false } = {}) {
+  const rarity = lockRarity ? oldRarity : rollRarity(oldRarity, ctx)
+
+  // Unique rerolls must pull from available unique player defs
+  if (rarity === 'unique') {
+    const playerCard = await generateUniquePlayerForReroll(sql, rarity, ctx)
+    if (playerCard) {
+      const [inserted] = await sql`
+        INSERT INTO cc_cards (owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
+          serial_number, holo_effect, holo_type, image_url, acquired_via, card_type, card_data, def_id)
+        VALUES (${userId}, ${userId}, ${playerCard.god_id}, ${playerCard.god_name}, ${playerCard.god_class}, ${playerCard.role},
+          ${playerCard.rarity}, ${playerCard.serial_number}, ${playerCard.holo_effect}, ${playerCard.holo_type}, ${playerCard.image_url},
+          'reroll', ${playerCard.card_type}, ${playerCard.card_data ? JSON.stringify(playerCard.card_data) : null}::jsonb,
+          ${playerCard.def_id || null})
+        RETURNING *
+      `
+      return inserted
+    }
+    // No available unique defs — fall through to mythic
+  }
+
   const card = generateCard(rarity, ctx)
   card.holo_type = rollHoloType(rarity, ctx)
 
@@ -517,6 +537,44 @@ export async function generateCardForReroll(sql, userId, oldRarity, ctx) {
     RETURNING *
   `
   return inserted
+}
+
+// Pick a player def that doesn't already have a unique card globally
+async function generateUniquePlayerForReroll(sql, rarity, ctx) {
+  const defs = await sql`
+    SELECT pd.* FROM cc_player_defs pd
+    WHERE pd.id NOT IN (
+      SELECT DISTINCT def_id FROM cc_cards WHERE rarity = 'unique' AND def_id IS NOT NULL
+    )
+    ORDER BY RANDOM() LIMIT 1
+  `
+  if (defs.length === 0) return null
+
+  const def = defs[0]
+  const stats = def.frozen_stats || {}
+  const role = (def.role || 'adc').toUpperCase()
+
+  return {
+    card_type: 'player',
+    god_id: `player-${def.player_id}`,
+    god_name: def.player_name || 'Unknown',
+    god_class: def.team_name || '',
+    role,
+    rarity: 'unique',
+    serial_number: Math.floor(Math.random() * 9999) + 1,
+    holo_effect: rollHoloEffect('unique'),
+    holo_type: rollHoloType('unique', ctx),
+    image_url: def.avatar_url || '',
+    def_id: def.id,
+    card_data: {
+      teamName: def.team_name,
+      teamColor: def.team_color || '#6366f1',
+      leagueName: def.league_name || '',
+      divisionName: def.division_name || '',
+      seasonName: def.season_name || '',
+      stats,
+    },
+  }
 }
 
 function normalizeGuarantees(raw) {
@@ -567,7 +625,7 @@ async function generateMixedPack(sql, leagueId, ctx = null) {
 
     const card = type === 'player'
       ? await generatePlayerCard(sql, rarity, leagueId, ctx)
-      : generateCardByType(type, rarity, ctx)
+      : await generateCardByType(type, rarity, ctx)
     card._revealOrder = i
     cards.push(card)
   }
@@ -751,19 +809,20 @@ async function generateConfiguredPack(sql, pack, ctx = null) {
       continue
     }
 
-    const rarity = rollRarityBounded(slot.minRarity || 'common', slot.maxRarity || null, ctx)
     const type = forcedTypes[i] || pickTypeForSlot(slot)
+    const typeCtx = getContextForType(ctx, type)
+    const rarity = rollRarityBounded(slot.minRarity || 'common', slot.maxRarity || null, typeCtx)
 
     let card
     if (type === 'collection') {
       card = await generateCollectionCard(sql, slot.collectionIds || [], rarity)
-      if (!card) card = generateCardByType('god', rarity, ctx) // fallback if no collection entries
+      if (!card) card = await generateCardByType('god', rarity, typeCtx, sql)
     } else if (type === 'player') {
       card = divisionIds.length > 0
-        ? await generatePlayerCardByDivisions(sql, rarity, divisionIds, ctx)
-        : await generatePlayerCard(sql, rarity, pack.league_id, ctx)
+        ? await generatePlayerCardByDivisions(sql, rarity, divisionIds, typeCtx)
+        : await generatePlayerCard(sql, rarity, pack.league_id, typeCtx)
     } else {
-      card = generateCardByType(type, rarity, ctx)
+      card = await generateCardByType(type, rarity, typeCtx, sql)
     }
     card._revealOrder = i
     cards.push(card)
@@ -816,6 +875,41 @@ async function generateCollectionCard(sql, collectionIds, rarityOverride) {
   }
 }
 
+async function generateStaffCard(sql, rarity, ctx = null) {
+  const blueprints = await sql`
+    SELECT id, name, card_type, depicted_user_id, template_data
+    FROM cc_card_blueprints
+    WHERE card_type = 'staff' AND status = 'approved'
+  `
+  if (blueprints.length === 0) return generateCard(rarity, ctx)
+
+  const blueprint = ctx ? selectFromPool(ctx, blueprints) : blueprints[Math.floor(Math.random() * blueprints.length)]
+  const td = typeof blueprint.template_data === 'string' ? JSON.parse(blueprint.template_data) : blueprint.template_data
+  const displayName = td?.cardData?.name
+    || td?.elements?.find(el => el.type === 'name-banner')?.playerName
+    || blueprint.name
+  const holoEffect = rollHoloEffect(rarity)
+  const holoType = rollHoloType(rarity)
+
+  return {
+    god_id: `blueprint-${blueprint.id}`,
+    god_name: displayName,
+    god_class: 'staff',
+    role: 'staff',
+    rarity,
+    serial_number: Math.floor(Math.random() * 9999) + 1,
+    holo_effect: holoEffect,
+    holo_type: holoType,
+    image_url: null,
+    acquired_via: 'pack',
+    card_type: 'staff',
+    card_data: {},
+    def_id: null,
+    blueprint_id: blueprint.id,
+    depicted_user_id: blueprint.depicted_user_id || null,
+  }
+}
+
 // Gift pack: 7 cards, both leagues
 // Slot 0-3: god/item/consumable (common), one guaranteed player card
 // Slot 4: guaranteed uncommon+ rarity upgrade
@@ -843,7 +937,7 @@ export async function generateGiftPack(sql) {
     // No leagueId filter — pulls from both leagues
     const card = type === 'player'
       ? await generatePlayerCard(sql, rarity, null)
-      : generateCardByType(type, rarity)
+      : await generateCardByType(type, rarity)
     card.acquired_via = 'gift'
     card._revealOrder = i
     cards.push(card)
