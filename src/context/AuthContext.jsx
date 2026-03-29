@@ -54,6 +54,15 @@ export const AuthProvider = ({ children }) => {
 
     // On mount: check URL for auth_token (from OAuth redirect)
     useEffect(() => {
+        // Auto-auth on tunnel domain
+        if (window.location.hostname.endsWith('.trycloudflare.com') && !localStorage.getItem('auth_token')) {
+            const tunnelToken = import.meta.env.VITE_TUNNEL_AUTH_TOKEN
+            if (tunnelToken) {
+                localStorage.setItem('auth_token', tunnelToken)
+                setToken(tunnelToken)
+            }
+        }
+
         const params = new URLSearchParams(window.location.search)
         const urlToken = params.get('auth_token')
         const authError = params.get('auth_error')

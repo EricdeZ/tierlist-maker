@@ -109,7 +109,7 @@ function PackCard({ card, size, holo = true, override }) {
   return gameCard
 }
 
-function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisabled, onClose, rerollState, rerollingPack, packRerollCount, onPackReroll }) {
+function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisabled, onClose, rerollState, rerollingPack, packRerollCount, onPackReroll, rerollingCard, onCardReroll }) {
   const [openMoreLoading, setOpenMoreLoading] = useState(false)
   const { getDefOverride } = useVault()
   const gridRef = useRef(null)
@@ -200,6 +200,20 @@ function SummaryView({ cards, result, onOpenMore, openMoreLabel, openMoreDisable
           >
             <PackCard card={card} size={cardSize} holo override={getDefOverride(card)} />
             {card.isNew && <div className="pack-opening__summary-new">NEW</div>}
+            {rerollState?.cardRerollCharges > 0
+              && rerollState.eligibleCardIndices?.includes(i)
+              && rerollingCard === null && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onCardReroll(i) }}
+                className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-cyan-500 border border-cyan-400 flex items-center justify-center hover:bg-cyan-400 transition-colors cursor-pointer z-10 shadow-lg"
+                title="Reroll this card"
+              >
+                <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} className="text-white">
+                  <path d="M1 4v6h6M23 20v-6h-6" />
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+                </svg>
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -782,10 +796,10 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
                   && rerollingCard === null && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleCardReroll(i) }}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center hover:bg-cyan-400/30 transition-colors cursor-pointer z-10"
+                    className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-cyan-500 border border-cyan-400 flex items-center justify-center hover:bg-cyan-400 transition-colors cursor-pointer z-10 shadow-lg"
                     title="Reroll this card"
                   >
-                    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} className="text-cyan-300">
+                    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} className="text-white">
                       <path d="M1 4v6h6M23 20v-6h-6" />
                       <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
                     </svg>
@@ -839,7 +853,7 @@ export default function PackOpening({ result, packType, onClose, onOpenMore, ope
 
       {/* ═══ Summary — show all cards after reveal ═══ */}
       {phase === 'summary' && (
-        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} openMoreLabel={openMoreLabel} openMoreDisabled={openMoreDisabled} onClose={onClose} rerollState={rerollState} rerollingPack={rerollingPack} packRerollCount={packRerollCount} onPackReroll={handlePackReroll} />
+        <SummaryView cards={cards} result={result} onOpenMore={onOpenMore} openMoreLabel={openMoreLabel} openMoreDisabled={openMoreDisabled} onClose={onClose} rerollState={rerollState} rerollingPack={rerollingPack} packRerollCount={packRerollCount} onPackReroll={handlePackReroll} rerollingCard={rerollingCard} onCardReroll={handleCardReroll} />
       )}
 
       {onReplay && (

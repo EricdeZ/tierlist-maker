@@ -20,13 +20,14 @@ export default function PassivePanel({ passiveState, onUpdate }) {
 
   return (
     <div className="cd-panel cd-corners rounded-xl p-4 mt-4">
+      <div className="text-[10px] font-bold cd-head tracking-widest text-white/30 uppercase mb-3">Active Passive</div>
       <div className="flex items-center gap-2.5 mb-3">
         <div className="text-cyan-400">
           <PassiveIcon passive={name} size={20} />
         </div>
         <div>
           <div className="text-sm font-bold text-white/90">{info.name}</div>
-          <div className="text-xs text-white/40">{label} boost</div>
+          <div className="text-xs text-white/40 mt-0.5">{info.description} <span className="text-cyan-400/60">({label.toLowerCase()})</span></div>
         </div>
       </div>
 
@@ -51,20 +52,25 @@ export default function PassivePanel({ passiveState, onUpdate }) {
 
 function ChargePips({ charges, maxCharges, nextChargeIn }) {
   return (
-    <div className="flex items-center gap-2 mt-2">
+    <div className="flex items-center gap-3 mt-2 px-3 py-2 rounded-lg bg-white/[0.03]">
+      <div className="flex items-center gap-1.5">
+        <Zap size={12} className="text-cyan-400" />
+        <span className="text-sm font-bold text-white/90">{charges}</span>
+        <span className="text-xs text-white/30">/ {maxCharges}</span>
+      </div>
       <div className="flex gap-1">
         {Array.from({ length: maxCharges }).map((_, i) => (
           <div
             key={i}
-            className={`w-2.5 h-2.5 rounded-full transition-colors ${
-              i < charges ? 'bg-cyan-400' : 'bg-white/10'
+            className={`w-3 h-3 rounded-full transition-colors ${
+              i < charges ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'bg-white/10'
             }`}
           />
         ))}
       </div>
       {nextChargeIn && charges < maxCharges && (
-        <span className="text-[10px] text-white/30 flex items-center gap-1">
-          <Clock size={10} /> {nextChargeIn}
+        <span className="text-[10px] text-white/40 flex items-center gap-1 ml-auto">
+          <Clock size={10} /> Next in {nextChargeIn}
         </span>
       )}
     </div>

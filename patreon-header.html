@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1600px;
+    height: 480px;
+    background: #101829;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 120px;
+    overflow: hidden;
+  }
+  .ranks {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+  .rank {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .rank img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(248, 197, 106, 0.15));
+  }
+  .rank span {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <div class="ranks">
+    <div class="rank">
+      <img src="src/assets/ranks/clay.png" />
+      <span>Clay</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/amber.png" />
+      <span>Amber</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/bronze.png" />
+      <span>Bronze</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/silver.png" />
+      <span>Silver</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/gold.png" />
+      <span>Gold</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/platinum.png" />
+      <span>Platinum</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/diamond.png" />
+      <span>Diamond</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/obsidian.png" />
+      <span>Obsidian</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/master.png" />
+      <span>Master</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/demigod.png" />
+      <span>Demigod</span>
+    </div>
+    <div class="rank">
+      <img src="src/assets/ranks/deity.png" />
+      <span>Deity</span>
+    </div>
+  </div>
+</body>
+</html>

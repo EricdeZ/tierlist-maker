@@ -1,8 +1,21 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../../../context/AuthContext'
-import { vaultDashboardService } from '../../../services/database'
+import { vaultDashboardService, vaultAdminService } from '../../../services/database'
 import { RARITIES } from '../../../data/vault/economy'
+import { GODS, CLASS_ROLE } from '../../../data/vault/gods'
+import { ITEMS } from '../../../data/vault/items'
 import VaultCard from '../../vault/components/VaultCard'
+
+const GOD_CDN = 'https://cdn.smitesource.com/cdn-cgi/image/width=256,format=auto,quality=75'
+const ITEM_CDN = 'https://cdn.smitesource.com/cdn-cgi/image/width=128,format=auto,quality=75'
+
+function getGodCardImageUrl(god) {
+  return `${GOD_CDN}/Gods/${god.imageKey}/Default/t_GodCard_${god.imageKey}.png`
+}
+
+function getItemCardImageUrl(item) {
+  return `${ITEM_CDN}/${item.imageKey}.png`
+}
 
 const CARD_TYPES = [
   { value: 'god', label: 'God' },
@@ -92,13 +105,24 @@ export default function CCAdminPromoGift() {
   // Card config
   const [cardType, setCardType] = useState('god')
   const [rarity, setRarity] = useState('legendary')
+
+  // Definition picker state
+  const [selectedDef, setSelectedDef] = useState(null)
+  const [defSearch, setDefSearch] = useState('')
+
+  // Player def search (API-based)
+  const [playerDefs, setPlayerDefs] = useState([])
+  const [playerSearching, setPlayerSearching] = useState(false)
+  const playerSearchTimer = useRef(null)
+
+  // Manual entry (staff/custom only)
   const [godName, setGodName] = useState('')
   const [godId, setGodId] = useState('')
   const [godClass, setGodClass] = useState('')
   const [role, setRole] = useState('')
   const [imageUrl, setImageUrl] = useState('')
 
-  // Collection picker
+  // Collection picker (blueprint)
   const [collections, setCollections] = useState([])
   const [collectionsLoading, setCollectionsLoading] = useState(false)
   const [selectedCollectionId, setSelectedCollectionId] = useState('')
@@ -113,7 +137,40 @@ export default function CCAdminPromoGift() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
 
-  if (!hasPermission('permission_manage')) return null
+  // Reset definition when card type changes
+  useEffect(() => {
+    setSelectedDef(null)
+    setDefSearch('')
+    setPlayerDefs([])
+  }, [cardType])
+
+  // Filtered gods/items based on search
+  const filteredDefs = useMemo(() => {
+    const q = defSearch.toLowerCase().trim()
+    if (cardType === 'god') {
+      const list = q ? GODS.filter(g => g.name.toLowerCase().includes(q) || g.class.toLowerCase().includes(q)) : GODS
+      return list.slice(0, 30)
+    }
+    if (cardType === 'item') {
+      const list = q ? ITEMS.filter(i => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)) : ITEMS
+      return list.slice(0, 30)
+    }
+    return []
+  }, [cardType, defSearch])
+
+  // Player def search (debounced API)
+  const searchPlayerDefs = useCallback((q) => {
+    clearTimeout(playerSearchTimer.current)
+    if (q.trim().length < 2) { setPlayerDefs([]); return }
+    playerSearchTimer.current = setTimeout(async () => {
+      setPlayerSearching(true)
+      try {
+        const data = await vaultAdminService.searchPlayerDefs(q)
+        setPlayerDefs(data.defs || [])
+      } catch { setPlayerDefs([]) }
+      finally { setPlayerSearching(false) }
+    }, 300)
+  }, [])
 
   // Load collections when card type switches to blueprint
   useEffect(() => {
@@ -175,8 +232,8 @@ export default function CCAdminPromoGift() {
 
     const cardConfig = {}
     let blueprintId = null
-
     let sendCardType = cardType
+
     if (cardType === 'blueprint') {
       if (!selectedEntry) { setError('Select a card from the collection'); setSending(false); return }
       blueprintId = selectedEntry.blueprint_id
@@ -185,7 +242,39 @@ export default function CCAdminPromoGift() {
       cardConfig.god_name = selectedEntry.template_name
       cardConfig.god_class = selectedEntry.card_type
       cardConfig.role = selectedEntry.card_type || 'custom'
+    } else if (cardType === 'god' && selectedDef) {
+      cardConfig.god_id = selectedDef.slug
+      cardConfig.god_name = selectedDef.name
+      cardConfig.god_class = selectedDef.class
+      cardConfig.role = CLASS_ROLE[selectedDef.class] || 'mid'
+      cardConfig.image_url = getGodCardImageUrl(selectedDef)
+      cardConfig.card_data = {
+        slug: selectedDef.slug,
+        imageKey: selectedDef.imageKey,
+        ability: selectedDef.ability,
+      }
+    } else if (cardType === 'item' && selectedDef) {
+      cardConfig.god_id = `item-${selectedDef.id}`
+      cardConfig.god_name = selectedDef.name
+      cardConfig.god_class = selectedDef.category
+      cardConfig.role = null
+      cardConfig.image_url = getItemCardImageUrl(selectedDef)
+      cardConfig.card_data = {
+        itemId: selectedDef.id,
+        slug: selectedDef.slug,
+        category: selectedDef.category,
+        manaCost: selectedDef.manaCost,
+        effects: selectedDef.effects,
+        passive: selectedDef.passive,
+      }
+    } else if (cardType === 'player' && selectedDef) {
+      // Just send def_id — backend resolves full player data at claim time
+      cardConfig.def_id = selectedDef.id
+      cardConfig.god_name = selectedDef.player_name
+      cardConfig.god_class = (selectedDef.role || 'adc').toUpperCase()
+      cardConfig.role = (selectedDef.role || 'adc').toLowerCase()
     } else {
+      // Manual entry (staff/custom)
       cardConfig.god_id = godId || godName.toLowerCase().replace(/\s+/g, '-')
       cardConfig.god_name = godName
       cardConfig.god_class = godClass
@@ -206,6 +295,8 @@ export default function CCAdminPromoGift() {
       })
       setResult(`Gift sent! ID: ${data.giftId}`)
       setRecipient(null)
+      setSelectedDef(null)
+      setDefSearch('')
       setGodName('')
       setGodId('')
       setGodClass('')
@@ -219,14 +310,125 @@ export default function CCAdminPromoGift() {
     } finally {
       setSending(false)
     }
-  }, [recipient, cardType, rarity, selectedEntry, godId, godName, godClass, role, imageUrl, message, tradeable])
+  }, [recipient, cardType, rarity, selectedDef, selectedEntry, godId, godName, godClass, role, imageUrl, message, tradeable])
 
-  const canSend = recipient && (cardType === 'blueprint' ? !!selectedEntry : !!godName) && !sending
+  const needsDef = cardType === 'god' || cardType === 'item' || cardType === 'player'
+  const canSend = recipient && (
+    cardType === 'blueprint' ? !!selectedEntry :
+    needsDef ? !!selectedDef :
+    !!godName
+  ) && !sending
 
   const collectionOptions = [
     { value: '', label: collectionsLoading ? 'Loading collections...' : 'Select a collection' },
     ...collections.map(c => ({ value: String(c.id), label: `${c.name} (${c.entry_count} cards)` })),
   ]
+
+  // --- Render helpers for definition pickers ---
+
+  const renderSelectedDef = () => {
+    if (!selectedDef) return null
+    let label, sublabel, imgUrl
+    if (cardType === 'god') {
+      label = selectedDef.name
+      sublabel = `${selectedDef.class} / ${CLASS_ROLE[selectedDef.class] || 'mid'}`
+      imgUrl = getGodCardImageUrl(selectedDef)
+    } else if (cardType === 'item') {
+      label = selectedDef.name
+      sublabel = selectedDef.category
+      imgUrl = getItemCardImageUrl(selectedDef)
+    } else if (cardType === 'player') {
+      label = selectedDef.player_name
+      sublabel = `${selectedDef.team_name} / ${selectedDef.role || 'adc'} / ${selectedDef.season_slug}`
+    }
+    return (
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--cd-input)] border border-[var(--cd-cyan)]/30">
+        {imgUrl && <img src={imgUrl} alt="" className="w-10 h-10 rounded object-cover" />}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-[var(--color-text-primary)] truncate">{label}</div>
+          <div className="text-xs text-[var(--color-text-secondary)]">{sublabel}</div>
+        </div>
+        <button onClick={() => { setSelectedDef(null); setDefSearch('') }} className="text-xs text-red-400 hover:text-red-300 font-medium shrink-0">Change</button>
+      </div>
+    )
+  }
+
+  const renderGodPicker = () => (
+    <div className="space-y-2">
+      <input
+        type="text" value={defSearch} onChange={e => setDefSearch(e.target.value)}
+        placeholder="Search gods..." className={inputClass}
+      />
+      <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto rounded-lg border border-[var(--cd-border)] bg-[var(--cd-input)] p-2">
+        {filteredDefs.map(god => (
+          <button
+            key={god.slug}
+            onClick={() => setSelectedDef(god)}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <img src={getGodCardImageUrl(god)} alt="" className="w-12 h-12 rounded object-cover" />
+            <span className="text-[10px] text-[var(--color-text-primary)] font-medium truncate w-full text-center">{god.name}</span>
+          </button>
+        ))}
+        {filteredDefs.length === 0 && (
+          <div className="col-span-4 text-xs text-[var(--color-text-secondary)] py-4 text-center">No gods match</div>
+        )}
+      </div>
+    </div>
+  )
+
+  const renderItemPicker = () => (
+    <div className="space-y-2">
+      <input
+        type="text" value={defSearch} onChange={e => setDefSearch(e.target.value)}
+        placeholder="Search items..." className={inputClass}
+      />
+      <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto rounded-lg border border-[var(--cd-border)] bg-[var(--cd-input)] p-2">
+        {filteredDefs.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setSelectedDef(item)}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <img src={getItemCardImageUrl(item)} alt="" className="w-10 h-10 rounded object-contain" />
+            <span className="text-[10px] text-[var(--color-text-primary)] font-medium truncate w-full text-center">{item.name}</span>
+          </button>
+        ))}
+        {filteredDefs.length === 0 && (
+          <div className="col-span-4 text-xs text-[var(--color-text-secondary)] py-4 text-center">No items match</div>
+        )}
+      </div>
+    </div>
+  )
+
+  const renderPlayerPicker = () => (
+    <div className="space-y-2">
+      <input
+        type="text" value={defSearch}
+        onChange={e => { setDefSearch(e.target.value); searchPlayerDefs(e.target.value) }}
+        placeholder="Search players..." className={inputClass}
+      />
+      {playerSearching && <div className="text-xs text-[var(--color-text-secondary)]">Searching...</div>}
+      {playerDefs.length > 0 && (
+        <div className="max-h-[250px] overflow-y-auto rounded-lg border border-[var(--cd-border)] bg-[var(--cd-input)]">
+          {playerDefs.map(def => (
+            <button
+              key={def.id}
+              onClick={() => { setSelectedDef(def); setPlayerDefs([]) }}
+              className="w-full px-3 py-2.5 text-left text-sm hover:bg-white/5 border-b border-[var(--cd-border)]/50 last:border-b-0 transition-colors"
+            >
+              <span className="text-[var(--color-text-primary)] font-medium">{def.player_name}</span>
+              <span className="text-[var(--color-text-secondary)] ml-2">
+                {def.team_name} / {def.role || 'adc'} / {def.league_slug}-{def.division_slug}-{def.season_slug}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  if (!hasPermission('permission_manage')) return null
 
   return (
     <div className="max-w-xl">
@@ -275,12 +477,12 @@ export default function CCAdminPromoGift() {
 
         {/* Card Type + Role */}
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
-          <div className={cardType === 'blueprint' ? '' : 'grid grid-cols-2 gap-4'}>
+          <div className={!needsDef && cardType !== 'blueprint' ? 'grid grid-cols-2 gap-4' : ''}>
             <div>
               <label className={labelClass}>Card Type</label>
               <Dropdown value={cardType} onChange={setCardType} options={CARD_TYPES} />
             </div>
-            {cardType !== 'blueprint' && (
+            {!needsDef && cardType !== 'blueprint' && (
               <div>
                 <label className={labelClass}>Role</label>
                 <Dropdown value={role} onChange={setRole} options={ROLES} placeholder="None" />
@@ -308,13 +510,18 @@ export default function CCAdminPromoGift() {
           </div>
         </div>
 
-        {/* Card Configuration */}
+        {/* Card Definition / Details */}
         <div className="bg-[var(--color-secondary)] rounded-xl border border-white/10 p-4 space-y-4">
-          <label className={labelClass + ' !mb-0'}>Card Details</label>
+          <label className={labelClass + ' !mb-0'}>
+            {needsDef ? 'Select Card' : 'Card Details'}
+          </label>
 
-          {cardType === 'blueprint' ? (
+          {cardType === 'god' && (selectedDef ? renderSelectedDef() : renderGodPicker())}
+          {cardType === 'item' && (selectedDef ? renderSelectedDef() : renderItemPicker())}
+          {cardType === 'player' && (selectedDef ? renderSelectedDef() : renderPlayerPicker())}
+
+          {cardType === 'blueprint' && (
             <div className="space-y-3">
-              {/* Collection picker */}
               <div>
                 <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Collection</label>
                 <Dropdown
@@ -326,7 +533,6 @@ export default function CCAdminPromoGift() {
                 />
               </div>
 
-              {/* Card picker from collection entries */}
               {selectedCollectionId && (
                 <div>
                   <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Card</label>
@@ -386,7 +592,9 @@ export default function CCAdminPromoGift() {
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {(cardType === 'staff' || cardType === 'custom') && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-[var(--color-text-secondary)] mb-1">Name</label>

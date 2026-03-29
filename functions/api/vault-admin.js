@@ -5,7 +5,7 @@ import { adapt } from '../lib/adapter.js'
 import { getDB, adminHeaders, transaction } from '../lib/db.js'
 import { requirePermission } from '../lib/auth.js'
 import { SignJWT } from 'jose'
-import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs, previewPlayerDefs, generateSelectedDefs } from '../lib/vault-defs.js'
+import { generatePlayerDefs, freezeSeasonStats, backfillCardDefs, backfillRoles, previewPlayerDefs, generateSelectedDefs } from '../lib/vault-defs.js'
 
 const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET)
 
@@ -52,6 +52,7 @@ const handler = async (event) => {
         case 'generate-player-defs':   return await handleGeneratePlayerDefs(sql, body)
         case 'freeze-season-stats':    return await handleFreezeSeasonStats(sql, body)
         case 'backfill-card-defs':     return await handleBackfillCardDefs(sql)
+        case 'backfill-roles':         return await handleBackfillRoles(sql)
         case 'refresh-best-gods':     return await handleRefreshBestGods(sql)
         case 'generate-selected-defs': return await handleGenerateSelectedDefs(sql, body)
         case 'exclude-player-def':     return await handleExcludePlayerDef(sql, body, user)
@@ -501,6 +502,12 @@ async function handleFreezeSeasonStats(sql, body) {
 // ═══ POST: Backfill def_id on existing player cards ═══
 async function handleBackfillCardDefs(sql) {
   const result = await backfillCardDefs(sql)
+  return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
+}
+
+// ═══ POST: Backfill roles from game history (fixes cross-team sync) ═══
+async function handleBackfillRoles(sql) {
+  const result = await transaction(async (tx) => backfillRoles(tx))
   return { statusCode: 200, headers: adminHeaders, body: JSON.stringify(result) }
 }
 

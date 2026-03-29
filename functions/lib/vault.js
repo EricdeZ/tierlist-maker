@@ -410,8 +410,8 @@ export async function grantStarterPacks(sql, userId) {
 // ════════════════════════════════════════════
 // Open a pack
 // ════════════════════════════════════════════
-export async function openPack(sql, userId, packType, { skipPayment = false, passive = null } = {}) {
-  const [pack] = skipPayment
+export async function openPack(sql, userId, packType, { skipPayment = false, skipEnabledCheck = false, passive = null } = {}) {
+  const [pack] = (skipPayment || skipEnabledCheck)
     ? await sql`SELECT * FROM cc_pack_types WHERE id = ${packType}`
     : await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
   if (!pack) throw new Error('Invalid pack type')

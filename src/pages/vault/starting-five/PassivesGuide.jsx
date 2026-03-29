@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { STAFF_PASSIVES, PassiveIcon } from '../../../data/vault/passives'
 
 const PASSIVES_LIST = Object.entries(STAFF_PASSIVES).map(([key, info]) => ({
@@ -11,14 +11,14 @@ export default function PassivesGuide() {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="cd-panel cd-corners rounded-xl mb-6 sm:mb-8 overflow-hidden">
+    <div className="cd-panel cd-corners rounded-xl mt-4 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Clock size={14} className="text-amber-400" />
-          <span className="text-xs font-bold cd-head tracking-wider text-white/60">STAFF PASSIVES</span>
+          <BookOpen size={14} className="text-white/40" />
+          <span className="text-xs font-bold cd-head tracking-wider text-white/60">PASSIVES GUIDE</span>
         </div>
         {expanded ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
       </button>
@@ -37,6 +37,13 @@ export default function PassivesGuide() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 px-3 py-3 rounded-lg bg-white/[0.02] border border-white/5">
+            <div className="text-xs font-semibold text-white/60 mb-1.5">Swap Cooldown</div>
+            <div className="text-xs text-white/40 leading-relaxed">
+              Removing a staff card from your staff slot triggers a cooldown before you can slot a new one. The cooldown duration depends on the passive of the card you removed — more powerful passives have longer cooldowns. This prevents rapidly swapping between passives to exploit different effects.
+            </div>
           </div>
         </div>
       )}

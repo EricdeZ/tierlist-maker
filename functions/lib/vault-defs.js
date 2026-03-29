@@ -68,6 +68,7 @@ export async function syncRoleToVault(sql, leaguePlayerId, role) {
     FROM league_players lp
     WHERE lp.id = ${leaguePlayerId}
     AND cc_player_defs.player_id = lp.player_id
+    AND cc_player_defs.team_id = lp.team_id
     AND cc_player_defs.season_id = lp.season_id
     AND cc_player_defs.frozen_stats IS NULL
   `
@@ -79,6 +80,7 @@ export async function syncRoleToVault(sql, leaguePlayerId, role) {
     WHERE cc_cards.def_id = d.id
     AND cc_cards.card_type = 'player'
     AND d.player_id = (SELECT player_id FROM league_players WHERE id = ${leaguePlayerId})
+    AND d.team_id = (SELECT team_id FROM league_players WHERE id = ${leaguePlayerId})
     AND d.season_id = (SELECT season_id FROM league_players WHERE id = ${leaguePlayerId})
     AND d.frozen_stats IS NULL
   `
@@ -833,6 +835,25 @@ export async function freezeSeasonStats(sql, seasonId) {
  * Backfill def_id on existing player cards that don't have one.
  * Matches by player_id from card_data and team_name.
  */
+/**
+ * Recalculate roles for all league_players with game history, then sync to vault.
+ * Fixes cards that had wrong roles due to cross-team sync bug.
+ */
+export async function backfillRoles(sql) {
+  const players = await sql`
+    SELECT DISTINCT lp.id AS league_player_id
+    FROM league_players lp
+    JOIN player_game_stats pgs ON pgs.league_player_id = lp.id
+    WHERE pgs.role_played IS NOT NULL
+  `
+  let updated = 0
+  for (const { league_player_id } of players) {
+    await recalcRoleForPlayer(sql, league_player_id)
+    updated++
+  }
+  return { updated, total: players.length }
+}
+
 export async function backfillCardDefs(sql) {
   const result = await sql`
     UPDATE cc_cards c

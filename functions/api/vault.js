@@ -6,6 +6,7 @@ import { getDB, headers, transaction } from '../lib/db.js'
 import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks, rollHoloEffect, rollHoloType } from '../lib/vault.js'
+import { computePlayerStats } from '../lib/vault-defs.js'
 import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown } from '../lib/passives.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
@@ -226,6 +227,7 @@ async function handleLoad(sql, user) {
       LEFT JOIN leagues l ON pt.league_id = l.id
       WHERE pt.enabled = true
          OR pt.id IN (SELECT pack_type_id FROM cc_pack_inventory WHERE user_id = ${user.id})
+         OR ${user.role === 'admin'}
       ORDER BY pt.sort_order
     `,
     sql`
@@ -486,7 +488,7 @@ async function handleBuyPacksToInventory(sql, user, body) {
   if (!packType || !qty || qty < 1) return { statusCode: 400, headers, body: JSON.stringify({ error: 'packType and quantity (>= 1) required' }) }
   if (qty > 100) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Maximum 100 packs per purchase' }) }
 
-  const [pack] = await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND enabled = true`
+  const [pack] = await sql`SELECT * FROM cc_pack_types WHERE id = ${packType} AND (enabled = true OR ${user.role === 'admin'})`
   if (!pack) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Pack not found' }) }
 
   // Rotation-only packs can only be purchased when in the current rotation
@@ -556,7 +558,8 @@ async function handleOpenPack(sql, user, body, event) {
   // Load active passive for odds modification
   const passive = await getActivePassive(sql, user.id)
 
-  const result = await openPack(sql, user.id, packType, { passive })
+  const isAdmin = user.role === 'admin'
+  const result = await openPack(sql, user.id, packType, { passive, skipEnabledCheck: isAdmin })
   const cards = result.cards.map((c) => {
     const formatted = formatCard(c)
     if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
@@ -629,6 +632,14 @@ async function handleRerollCard(sql, user, body) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid card index' }) }
   }
 
+  // Promo gift cards cannot be rerolled
+  if (cards[cardIndex].id) {
+    const [check] = await sql`SELECT acquired_via FROM cc_cards WHERE id = ${cards[cardIndex].id}`
+    if (check?.acquired_via === 'gift') {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift cards cannot be rerolled' }) }
+    }
+  }
+
   const rarityIdx = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
   if ((rarityIdx[cards[cardIndex].rarity] || 0) > (rarityIdx[passive.staffRarity] || 0)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Card rarity too high for reroll' }) }
@@ -681,6 +692,13 @@ async function handleRerollPack(sql, user, body) {
 
   const oldCards = session.cards
 
+  // Promo gift cards cannot be rerolled
+  for (const c of oldCards) {
+    if (c.acquired_via === 'gift') {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Gift cards cannot be rerolled' }) }
+    }
+  }
+
   // Pick card to remove
   const removeIdx = pickCardToRemove(oldCards, passive.staffRarity, session.reroll_count)
   const remaining = oldCards.filter((_, i) => i !== removeIdx)
@@ -702,7 +720,7 @@ async function handleRerollPack(sql, user, body) {
 
   const newCards = []
   for (const oldCard of remaining) {
-    const newCard = await generateCardForReroll(sql, user.id, oldCard.rarity, ctx)
+    const newCard = await generateCardForReroll(sql, user.id, oldCard.rarity, ctx, { lockRarity: true })
     newCards.push(newCard)
   }
 
@@ -2229,52 +2247,54 @@ function formatS5Response(state, extra = {}) {
   }
 }
 
-async function handleStartingFive(sql, user) {
-  const state = await tick(sql, user.id)
+async function loadPassiveState(sql, userId) {
+  const passiveData = await getActivePassive(sql, userId)
+  if (!passiveData) return null
 
-  // Load passive state
-  const passiveData = await getActivePassive(sql, user.id)
-  let passiveState = null
-  if (passiveData) {
-    const generatedCards = passiveData.passiveName === 'card_generator'
-      ? await getGeneratedCards(sql, user.id)
-      : []
+  const generatedCards = passiveData.passiveName === 'card_generator'
+    ? await getGeneratedCards(sql, userId)
+    : []
 
-    // Trigger Card Generator if charges available
-    if (passiveData.passiveName === 'card_generator' && passiveData.charges > 0) {
-      try {
-        const { generatePassiveCard } = await import('../lib/passives.js')
-        await spendCharge(sql, user.id, 'card_generator', passiveData.staffRarity)
-        const newGen = await generatePassiveCard(sql, user.id, passiveData.staffRarity)
-        if (newGen) generatedCards.unshift(newGen)
-        // Refresh passive data after spending
-        const refreshed = await getActivePassive(sql, user.id)
-        if (refreshed) Object.assign(passiveData, refreshed)
-      } catch {
-        // Charge may have been spent between check and spend — ignore
-      }
-    }
-
-    const cooldown = await checkSwapCooldown(sql, user.id)
-
-    passiveState = {
-      name: passiveData.passiveName,
-      staffRarity: passiveData.staffRarity,
-      charges: passiveData.charges,
-      maxCharges: passiveData.maxCharges,
-      chargeProgressPct: passiveData.chargeProgressPct,
-      nextChargeIn: passiveData.nextChargeIn,
-      cooldownUntil: cooldown?.cooldownUntil || null,
-      enabled: passiveData.enabled,
-      holoChoice: passiveData.holoChoice,
-      generatedCards: generatedCards.map(g => ({ id: g.id, rarity: g.rarity || g.card_data?.rarity, createdAt: g.created_at })),
+  // Trigger Card Generator if charges available
+  if (passiveData.passiveName === 'card_generator' && passiveData.charges > 0) {
+    try {
+      const { generatePassiveCard } = await import('../lib/passives.js')
+      await spendCharge(sql, userId, 'card_generator', passiveData.staffRarity)
+      const newGen = await generatePassiveCard(sql, userId, passiveData.staffRarity)
+      if (newGen) generatedCards.unshift(newGen)
+      const refreshed = await getActivePassive(sql, userId)
+      if (refreshed) Object.assign(passiveData, refreshed)
+    } catch {
+      // Charge may have been spent between check and spend — ignore
     }
   }
 
-  const resp = formatS5Response(state)
+  const cooldown = await checkSwapCooldown(sql, userId)
+
+  return {
+    name: passiveData.passiveName,
+    staffRarity: passiveData.staffRarity,
+    charges: passiveData.charges,
+    maxCharges: passiveData.maxCharges,
+    chargeProgressPct: passiveData.chargeProgressPct,
+    nextChargeIn: passiveData.nextChargeIn,
+    cooldownUntil: cooldown?.cooldownUntil || null,
+    enabled: passiveData.enabled,
+    holoChoice: passiveData.holoChoice,
+    generatedCards: generatedCards.map(g => ({ id: g.id, rarity: g.rarity || g.card_data?.rarity, createdAt: g.created_at })),
+  }
+}
+
+function formatS5WithPassive(resp, passiveState) {
   const parsed = JSON.parse(resp.body)
   parsed.passiveState = passiveState
   return { ...resp, body: JSON.stringify(parsed) }
+}
+
+async function handleStartingFive(sql, user) {
+  const state = await tick(sql, user.id)
+  const passiveState = await loadPassiveState(sql, user.id)
+  return formatS5WithPassive(formatS5Response(state), passiveState)
 }
 
 async function handleS5Leaderboard(sql, user) {
@@ -2384,7 +2404,8 @@ async function handleSlotCard(sql, user, body) {
 
   maybePushChallenges(sql, user.id)
 
-  return formatS5Response(state)
+  const passiveState = await loadPassiveState(sql, user.id)
+  return formatS5WithPassive(formatS5Response(state), passiveState)
 }
 
 async function handleUnslotCard(sql, user, body) {
@@ -2396,7 +2417,8 @@ async function handleUnslotCard(sql, user, body) {
 
   maybePushChallenges(sql, user.id)
 
-  return formatS5Response(state)
+  const passiveState = await loadPassiveState(sql, user.id)
+  return formatS5WithPassive(formatS5Response(state), passiveState)
 }
 
 async function handleUnslotAttachment(sql, user, body) {
@@ -2408,7 +2430,8 @@ async function handleUnslotAttachment(sql, user, body) {
 
   maybePushChallenges(sql, user.id)
 
-  return formatS5Response(state)
+  const passiveState = await loadPassiveState(sql, user.id)
+  return formatS5WithPassive(formatS5Response(state), passiveState)
 }
 
 async function handleUseConsumable(sql, user, body) {
@@ -3098,6 +3121,41 @@ async function handleClaimPromoGift(sql, user, body) {
     if (!gift) return null
 
     const config = typeof gift.card_config === 'string' ? JSON.parse(gift.card_config) : gift.card_config
+
+    // Resolve player def data at claim time for fresh stats + avatar
+    if (gift.card_type === 'player' && config.def_id) {
+      const [def] = await tx`SELECT * FROM cc_player_defs WHERE id = ${config.def_id}`
+      if (!def) {
+        config.god_id = config.god_id || `player-def-${config.def_id}`
+      } else {
+        const stats = def.frozen_stats || await computePlayerStats(tx, def.player_id, def.team_id, def.season_id)
+        config.god_id = `player-${def.player_id}-t${def.team_id}`
+        config.god_name = def.player_name
+        config.god_class = (def.role || 'adc').toUpperCase()
+        config.role = (def.role || 'adc').toLowerCase()
+        config.card_data = {
+          defId: def.id,
+          playerId: def.player_id,
+          teamName: def.team_name,
+          teamColor: def.team_color || '#6366f1',
+          seasonName: def.season_slug,
+          leagueName: def.league_slug,
+          divisionName: def.division_slug,
+          role: (def.role || 'adc').toUpperCase(),
+          stats,
+          bestGod: stats.bestGod,
+        }
+        const [prefRow] = await tx`
+          SELECT u.discord_id, u.discord_avatar, COALESCE(up.allow_discord_avatar, true) AS allow_avatar
+          FROM users u LEFT JOIN user_preferences up ON up.user_id = u.id
+          WHERE u.linked_player_id = ${def.player_id}
+        `
+        if (prefRow?.allow_avatar && prefRow.discord_id && prefRow.discord_avatar) {
+          config.image_url = `https://cdn.discordapp.com/avatars/${prefRow.discord_id}/${prefRow.discord_avatar}.webp?size=256`
+        }
+      }
+    }
+
     const holoEffect = rollHoloEffect(gift.rarity)
     const holoType = rollHoloType(gift.rarity)
     const serialNumber = Math.floor(Math.random() * 9999) + 1

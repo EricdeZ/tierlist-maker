@@ -756,7 +756,6 @@ export default function CCStartingFive() {
       })()}
 
       <SynergyPlanner collection={collection} startingFive={startingFive} />
-      <PassivesGuide />
 
       {/* 5 Role Slots */}
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
@@ -894,9 +893,10 @@ export default function CCStartingFive() {
         </div>
 
         <PassivePanel
-          passiveState={lineupData?.passiveState}
+          passiveState={startingFive?.passiveState}
           onUpdate={() => loadStartingFive()}
         />
+        <PassivesGuide />
       </div>
 
       {/* Leaderboard */}

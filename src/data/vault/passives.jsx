@@ -17,13 +17,13 @@ export const RARITY_LABEL = {
 }
 
 export const STAFF_PASSIVES = {
-  odds_boost:      { name: 'Odds Boost',      description: 'Increases card pull odds across all rarities' },
-  holo_boost:      { name: 'Holo Boost',       description: 'Boosts your chosen holo type when opening packs' },
-  card_reroll:     { name: 'Card Reroll',       description: 'Re-flip a card during pack opening for a new pull' },
-  pack_reroll:     { name: 'Pack Reroll',       description: 'Reopen your entire pack for fresh cards' },
-  unique_hunter:   { name: 'Unique Hunter',     description: 'Sacrifice rare pulls for a better shot at unique cards' },
-  collector_boost: { name: 'Collector Boost',   description: 'Increases your chances of pulling cards you don\'t own' },
-  card_generator:  { name: 'Card Generator',    description: 'Generates claimable cards over time' },
+  odds_boost:      { name: 'Odds Boost',      description: 'Increases your chance of pulling higher rarity cards from every pack. Higher rarity staff cards provide a stronger boost.' },
+  holo_boost:      { name: 'Holo Boost',       description: 'Pick a holo type (Holo, Reverse, or Full Art) and increase its drop rate when opening packs. Higher rarity staff cards shift the odds more heavily in your favor.' },
+  card_reroll:     { name: 'Card Reroll',       description: 'After flipping a card, re-flip it for a brand new pull. Can only target cards up to your staff card\'s rarity. Higher rarity staff cards charge faster and hold more charges.' },
+  pack_reroll:     { name: 'Pack Reroll',       description: 'Reopen your entire pack for fresh cards, but lose one card each time. Higher rarity staff cards protect your best cards from being lost and charge faster.' },
+  unique_hunter:   { name: 'Unique Hunter',     description: 'Toggle on to block legendary and mythic pulls — their odds get funneled toward unique cards instead. Higher rarity staff cards redirect more of the blocked odds into unique chance.' },
+  collector_boost: { name: 'Collector Boost',   description: 'Cards you don\'t already own are more likely to appear when opening packs. Higher rarity staff cards give a much stronger preference toward new cards.' },
+  card_generator:  { name: 'Card Generator',    description: 'Passively generates claimable cards over time, capped at your staff card\'s rarity. Higher rarity staff cards generate faster and can produce rarer cards.' },
 }
 
 export function PassiveIcon({ passive, size = 24, className = '' }) {

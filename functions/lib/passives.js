@@ -30,12 +30,12 @@ const CARD_REROLL = {
 }
 
 const PACK_REROLL = {
-  uncommon: { hoursPerCharge: 72, maxCharges: 1, lowCardLossBias: 0.55 },
-  rare:      { hoursPerCharge: 48, maxCharges: 1, lowCardLossBias: 0.65 },
-  epic:      { hoursPerCharge: 36, maxCharges: 2, lowCardLossBias: 0.72 },
-  legendary: { hoursPerCharge: 24, maxCharges: 2, lowCardLossBias: 0.80 },
-  mythic:    { hoursPerCharge: 18, maxCharges: 3, lowCardLossBias: 0.88 },
-  unique:    { hoursPerCharge: 12, maxCharges: 3, lowCardLossBias: 0.93 },
+  uncommon: { hoursPerCharge: 72, maxCharges: 1, lowCardLossBias: 0.45 },
+  rare:      { hoursPerCharge: 48, maxCharges: 1, lowCardLossBias: 0.50 },
+  epic:      { hoursPerCharge: 36, maxCharges: 2, lowCardLossBias: 0.55 },
+  legendary: { hoursPerCharge: 24, maxCharges: 2, lowCardLossBias: 0.62 },
+  mythic:    { hoursPerCharge: 18, maxCharges: 3, lowCardLossBias: 0.70 },
+  unique:    { hoursPerCharge: 12, maxCharges: 3, lowCardLossBias: 0.75 },
 }
 
 const CARD_GENERATOR = {
@@ -112,7 +112,12 @@ export async function getActivePassive(sql, userId) {
   const row = rows[0]
   const state = await getPassiveState(sql, userId, row.passive_name)
   const config = getChargeConfig(row.passive_name, row.rarity)
-  const chargeInfo = config ? computeCharges(state, config) : null
+  // Owner (user 1) always has max charges for testing
+  const chargeInfo = config
+    ? userId === 1
+      ? { charges: config.maxCharges, maxCharges: config.maxCharges, chargeProgressPct: 1, nextChargeIn: null }
+      : computeCharges(state, config)
+    : null
 
   return {
     passiveName: row.passive_name,
@@ -151,6 +156,9 @@ export async function initPassiveState(sql, userId, passiveName) {
 }
 
 export async function spendCharge(sql, userId, passiveName, staffRarity) {
+  // Owner (user 1) has unlimited charges
+  if (userId === 1) return 99
+
   const config = getChargeConfig(passiveName, staffRarity)
   if (!config) throw new Error('Passive has no charges')
 

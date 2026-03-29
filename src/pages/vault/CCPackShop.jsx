@@ -3,6 +3,8 @@ import lazyRetry from '../../utils/lazyRetry';
 import { useSearchParams } from 'react-router-dom';
 import { useVault } from './VaultContext';
 import { usePassion } from '../../context/PassionContext';
+import { useAuth } from '../../context/AuthContext';
+import { FEATURE_FLAGS } from '../../config/featureFlags';
 import PackArt from './components/PackArt';
 import PackOpening from './components/PackOpening';
 import usePendingPackOpen from './components/usePendingPackOpen';
@@ -894,9 +896,11 @@ function RotationSection({ packs, packTypesMap, emberBalance, onBuy, loading, qu
 function PackShop() {
   const { ember, buyPack, buyPacksToInventory, packTypes, packTypesMap, rotationPacks } = useVault();
   const { claimEmberDaily, claimableCount } = usePassion();
+  const { isAdmin } = useAuth();
+  const showStaffPacks = FEATURE_FLAGS.STAFF_CARDS_RELEASED || isAdmin;
   const leaguePacks = useMemo(() =>
-    packTypes.filter(p => p.leagueId && !p.rotationOnly).map(p => p.id),
-    [packTypes]
+    packTypes.filter(p => (p.leagueId && !p.rotationOnly) || (showStaffPacks && p.id === 'staff-mixed')).map(p => p.id),
+    [packTypes, showStaffPacks]
   );
   const activeRotationPacks = useMemo(() =>
     (rotationPacks || []).filter(id => packTypesMap[id]),

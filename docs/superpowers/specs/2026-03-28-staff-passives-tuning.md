@@ -55,12 +55,12 @@ Charge-based. Reroll the entire pack after flipping (same rarities). Each reroll
 
 | Staff Rarity | Hours/Charge | Max Charges | Low-Card-Loss Bias |
 |-------------|-------------|-------------|-------------------|
-| uncommon | 72 | 1 | 0.55 |
-| rare | 48 | 1 | 0.65 |
-| epic | 36 | 2 | 0.72 |
-| legendary | 24 | 2 | 0.80 |
-| mythic | 18 | 3 | 0.88 |
-| unique | 12 | 3 | 0.93 |
+| uncommon | 72 | 1 | 0.45 |
+| rare | 48 | 1 | 0.50 |
+| epic | 36 | 2 | 0.55 |
+| legendary | 24 | 2 | 0.62 |
+| mythic | 18 | 3 | 0.70 |
+| unique | 12 | 3 | 0.75 |
 
 **Low-Card-Loss Bias** = probability the removed card comes from the bottom half of the pack's rarity spread.
 
