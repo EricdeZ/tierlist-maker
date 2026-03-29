@@ -39,12 +39,12 @@ const PACK_REROLL = {
 }
 
 const CARD_GENERATOR = {
-  uncommon: { hoursPerCharge: 72, maxCharges: 1, rarityCap: 'uncommon' },
-  rare:      { hoursPerCharge: 48, maxCharges: 2, rarityCap: 'rare' },
-  epic:      { hoursPerCharge: 36, maxCharges: 2, rarityCap: 'epic' },
-  legendary: { hoursPerCharge: 24, maxCharges: 3, rarityCap: 'legendary' },
-  mythic:    { hoursPerCharge: 16, maxCharges: 3, rarityCap: 'mythic' },
-  unique:    { hoursPerCharge: 10, maxCharges: 4, rarityCap: 'unique' },
+  uncommon: { hoursPerCharge: 8,  maxCharges: 5,  rarityCap: 'uncommon' },
+  rare:      { hoursPerCharge: 6,  maxCharges: 7,  rarityCap: 'rare' },
+  epic:      { hoursPerCharge: 4,  maxCharges: 10, rarityCap: 'epic' },
+  legendary: { hoursPerCharge: 3,  maxCharges: 14, rarityCap: 'legendary' },
+  mythic:    { hoursPerCharge: 2,  maxCharges: 17, rarityCap: 'mythic' },
+  unique:    { hoursPerCharge: 1,  maxCharges: 20, rarityCap: 'unique' },
 }
 
 const SWAP_COOLDOWN_HOURS = {
@@ -140,7 +140,7 @@ async function getPassiveState(sql, userId, passiveName) {
   if (rows.length > 0) return rows[0]
 
   // No row yet — return defaults (row created on first slot)
-  return { charges: 0, last_charged_at: new Date(), cooldown_until: null, enabled: true, holo_choice: null }
+  return { charges: 0, last_charged_at: new Date(), cooldown_until: null, enabled: true, holo_choice: null, generator_pool: 'god' }
 }
 
 // ════════════════════════════════════════════
@@ -242,6 +242,41 @@ export async function getGeneratedCards(sql, userId) {
   `
 }
 
+export async function claimAllGeneratedCards(sql, userId) {
+  const gens = await sql`
+    SELECT * FROM cc_generated_cards
+    WHERE user_id = ${userId} AND claimed_at IS NULL
+    ORDER BY created_at ASC
+  `
+  if (gens.length === 0) return []
+
+  const cards = []
+  for (const gen of gens) {
+    const cd = gen.card_data
+    const [inserted] = await sql`
+      INSERT INTO cc_cards (
+        owner_id, original_owner_id, god_id, god_name, god_class, role, rarity,
+        serial_number, holo_effect, holo_type, image_url, acquired_via, card_type,
+        card_data, def_id, blueprint_id, depicted_user_id
+      ) VALUES (
+        ${userId}, ${userId}, ${cd.god_id}, ${cd.god_name}, ${cd.god_class},
+        ${cd.role}, ${cd.rarity}, ${cd.serial_number},
+        ${cd.holo_effect}, ${cd.holo_type}, ${cd.image_url},
+        'passive_generator', ${cd.card_type},
+        ${cd.card_data ? JSON.stringify(cd.card_data) : null}::jsonb,
+        ${cd.def_id || null}, ${cd.blueprint_id || null},
+        ${cd.depicted_user_id || null}
+      ) RETURNING *
+    `
+    cards.push(inserted)
+  }
+
+  const ids = gens.map(g => g.id)
+  await sql`UPDATE cc_generated_cards SET claimed_at = NOW() WHERE id = ANY(${ids})`
+
+  return cards
+}
+
 export async function claimGeneratedCard(sql, userId, generatedCardId) {
   const [gen] = await sql`
     SELECT * FROM cc_generated_cards
@@ -276,37 +311,34 @@ export async function generatePassiveCard(sql, userId, staffRarity) {
   const config = CARD_GENERATOR[staffRarity]
   if (!config) return null
 
-  const { createOddsContext, rollRarityFromContext, rollHoloTypeFromContext } = await import('./odds.js')
-  const { GODS, CLASS_ROLE, getGodImageUrl } = await import('./vault-data.js')
-  const { rollHoloEffect } = await import('./vault.js')
+  const { createOddsContext, rollRarityFromContext } = await import('./odds.js')
+  const { generateCard, generateConsumableCard, generatePlayerCard } = await import('./vault.js')
 
   // Build boosted context capped at staff rarity
-  let ctx = createOddsContext()
+  const ctx = createOddsContext()
   const oddsBoostMult = ODDS_BOOST[staffRarity] || 1
   for (const r of RARITY_ORDER) {
     if (r !== 'common') ctx.rarity[r] *= oddsBoostMult
   }
 
   const rarity = rollRarityFromContext(ctx, 'common', config.rarityCap)
-  const god = GODS[Math.floor(Math.random() * GODS.length)]
-  const role = god.role || CLASS_ROLE[god.class] || 'mid'
 
-  const cardData = {
-    card_type: 'god',
-    god_id: god.slug,
-    god_name: god.name,
-    god_class: god.class,
-    role,
-    rarity,
-    serial_number: Math.floor(Math.random() * 9999) + 1,
-    holo_effect: rollHoloEffect(rarity),
-    holo_type: rollHoloTypeFromContext(ctx, rarity),
-    image_url: getGodImageUrl(god),
+  // Pick randomly from combined pool: gods (50%), players (30%), consumables (20%)
+  const roll = Math.random()
+  let card
+  if (roll < 0.5) {
+    card = generateCard(rarity, ctx)
+  } else if (roll < 0.8) {
+    card = await generatePlayerCard(sql, rarity, null, ctx)
+  } else {
+    card = generateConsumableCard(rarity, ctx)
   }
+
+  card.acquired_via = 'passive_generator'
 
   const [gen] = await sql`
     INSERT INTO cc_generated_cards (user_id, card_data, rarity)
-    VALUES (${userId}, ${JSON.stringify(cardData)}::jsonb, ${rarity})
+    VALUES (${userId}, ${JSON.stringify(card)}::jsonb, ${rarity})
     RETURNING id, rarity, created_at
   `
 

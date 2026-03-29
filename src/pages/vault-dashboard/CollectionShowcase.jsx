@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { vaultDashboardService } from '../../services/database'
 import { RARITIES } from '../../data/vault/economy'
 import VaultCard from '../vault/components/VaultCard'
+import FanShowcase from './FanShowcase'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
 const CARD_SIZE = 120
@@ -34,6 +35,10 @@ export default function CollectionShowcase({ id, onBack }) {
             <h1 className="text-xl font-bold text-white mb-1">{collection?.name || 'Collection'} — Showcase</h1>
             {collection?.description && (
                 <p className="text-sm text-white/40 mb-6">{collection.description}</p>
+            )}
+
+            {entries.length > 0 && (
+                <FanShowcase entries={entries} collection={collection} />
             )}
 
             {entries.length === 0 ? (

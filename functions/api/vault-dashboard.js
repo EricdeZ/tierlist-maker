@@ -167,6 +167,12 @@ async function saveBlueprint(sql, body, user, canApprove) {
     const { id, name, description, card_type, rarity, template_data, target_player_id, depicted_user_id } = body
     if (!card_type || !rarity || !template_data) return err('card_type, rarity, template_data required')
 
+    // Banner playerName is the source of truth for the display name
+    const td = template_data || {}
+    const banner = td.elements?.find(el => el.type === 'name-banner')
+    const bannerName = banner?.playerName && banner.playerName !== 'Player Name' ? banner.playerName : null
+    const resolvedName = bannerName || name || 'Card'
+
     let resolvedTargetPlayerId = target_player_id || null
     if (depicted_user_id && !target_player_id) {
         const [depictedUser] = await sql`SELECT linked_player_id FROM users WHERE id = ${depicted_user_id}`
@@ -181,7 +187,7 @@ async function saveBlueprint(sql, body, user, canApprove) {
 
         const [row] = await sql`
             UPDATE cc_card_blueprints
-            SET name = ${(name || 'Untitled').trim()}, description = ${description || null}, card_type = ${card_type},
+            SET name = ${resolvedName.trim()}, description = ${description || null}, card_type = ${card_type},
                 rarity = ${rarity}, template_data = ${JSON.stringify(template_data)},
                 target_player_id = ${resolvedTargetPlayerId},
                 depicted_user_id = ${depicted_user_id !== undefined ? (depicted_user_id || null) : existing.depicted_user_id},
@@ -195,7 +201,7 @@ async function saveBlueprint(sql, body, user, canApprove) {
     } else {
         const [row] = await sql`
             INSERT INTO cc_card_blueprints (name, description, card_type, rarity, template_data, target_player_id, created_by, depicted_user_id, source)
-            VALUES (${(name || 'Untitled').trim()}, ${description || null}, ${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${resolvedTargetPlayerId}, ${user.id}, ${depicted_user_id || null}, 'blueprint')
+            VALUES (${resolvedName.trim()}, ${description || null}, ${card_type}, ${rarity}, ${JSON.stringify(template_data)}, ${resolvedTargetPlayerId}, ${user.id}, ${depicted_user_id || null}, 'blueprint')
             RETURNING *
         `
         return ok({ blueprint: row })
@@ -222,7 +228,7 @@ async function approveItem(sql, body, user, canApprove) {
 
     const [row] = await sql`SELECT * FROM cc_card_blueprints WHERE id = ${id}`
     if (!row) return err('Not found', 404)
-    if (row.status !== 'pending_review') return err('Only pending items can be approved')
+    if (row.status !== 'pending_review' && row.status !== 'draft') return err('Only pending or draft items can be approved')
 
     // Auto-increment footer counters
     const td = typeof row.template_data === 'string' ? JSON.parse(row.template_data) : row.template_data

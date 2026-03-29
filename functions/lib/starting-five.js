@@ -667,7 +667,6 @@ export async function useConsumable(sql, userId, cardId) {
   const [card] = await sql`
     SELECT id, rarity, card_type, card_data FROM cc_cards
     WHERE id = ${cardId} AND owner_id = ${userId}
-    FOR UPDATE
   `
   if (!card) throw new Error('Card not found')
   if (card.card_type !== 'consumable') throw new Error('Only consumable cards can be used')

@@ -424,7 +424,7 @@ export default function CardCreator() {
             })
             const templateData = { elements: cleanElements, border, cardData }
             const payload = {
-                name: name || 'Untitled',
+                name,
                 card_type: cardType,
                 rarity,
                 template_data: templateData,

@@ -3,10 +3,17 @@ import { PassiveIcon, getPassiveInfo } from '../../../data/vault/passives'
 import { vaultService } from '../../../services/database'
 import { Zap, Clock, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
 import MiniPackFlip from '../components/MiniPackFlip'
+import cardBackImg from '../../../assets/card_backsite.png'
 
 const RARITY_LABEL = {
   uncommon: 'Minor', rare: 'Moderate', epic: 'Notable',
   legendary: 'Strong', mythic: 'Major', unique: 'Major',
+}
+
+const RARITY_GLOW = {
+  common: 'rgba(156,163,175,0.3)', uncommon: 'rgba(34,197,94,0.3)', rare: 'rgba(59,130,246,0.3)',
+  epic: 'rgba(168,85,247,0.3)', legendary: 'rgba(255,140,0,0.3)', mythic: 'rgba(239,68,68,0.3)',
+  unique: 'rgba(232,232,255,0.3)',
 }
 
 export default function PassivePanel({ passiveState, onUpdate }) {
@@ -43,7 +50,7 @@ export default function PassivePanel({ passiveState, onUpdate }) {
         <UniqueHunterToggle enabled={enabled} onToggle={onUpdate} />
       )}
 
-      {name === 'card_generator' && generatedCards?.length > 0 && (
+      {name === 'card_generator' && (
         <GeneratedCards cards={generatedCards} onClaim={onUpdate} />
       )}
     </div>
@@ -144,37 +151,64 @@ function UniqueHunterToggle({ enabled, onToggle }) {
 }
 
 function GeneratedCards({ cards, onClaim }) {
-  const [claiming, setClaiming] = useState(null)
-  const [claimedCard, setClaimedCard] = useState(null)
+  const [claiming, setClaiming] = useState(false)
+  const [claimedCards, setClaimedCards] = useState(null)
 
-  const handleClaim = useCallback(async (id) => {
+  const handleClaimAll = useCallback(async () => {
     if (claiming) return
-    setClaiming(id)
+    setClaiming(true)
     try {
-      const result = await vaultService.claimGeneratedCard(id)
-      setClaimedCard(result.card)
-      setClaiming(null)
+      const result = await vaultService.claimAllGeneratedCards()
+      if (result.cards?.length > 0) setClaimedCards(result.cards)
+      else setClaiming(false)
     } catch {
-      setClaiming(null)
+      setClaiming(false)
     }
   }, [claiming])
 
+  if (!cards?.length) {
+    return (
+      <div className="mt-3 px-3 py-2 rounded-lg bg-white/[0.02] text-center">
+        <span className="text-[11px] text-white/20">No cards ready</span>
+      </div>
+    )
+  }
+
   return (
     <>
-      <div className="flex gap-2 mt-3 flex-wrap">
-        {cards.map(c => (
+      <div className="mt-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] text-white/30 font-bold tracking-wider uppercase">
+            Ready to claim ({cards.length})
+          </div>
           <button
-            key={c.id}
-            onClick={() => handleClaim(c.id)}
-            disabled={!!claiming}
-            className="w-12 h-16 rounded-lg bg-gradient-to-b from-cyan-400/20 to-cyan-400/5 border border-cyan-400/20 animate-pulse hover:animate-none hover:border-cyan-400/50 transition-colors cursor-pointer flex items-center justify-center"
+            onClick={handleClaimAll}
+            disabled={claiming}
+            className="px-3 py-1 text-xs rounded-lg bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 hover:bg-cyan-400/30 transition-all cursor-pointer disabled:opacity-50"
           >
-            {claiming === c.id ? <Loader2 size={14} className="animate-spin text-cyan-400" /> : <Zap size={14} className="text-cyan-400" />}
+            {claiming ? <Loader2 size={12} className="animate-spin" /> : `Claim ${cards.length > 1 ? 'All' : ''}`}
           </button>
-        ))}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {cards.map(c => (
+            <div
+              key={c.id}
+              className="relative"
+              style={{ width: 42, aspectRatio: '63 / 88' }}
+            >
+              <img
+                src={cardBackImg}
+                alt=""
+                draggable={false}
+                className="w-full h-full object-fill rounded-sm"
+                style={{ boxShadow: `0 0 8px ${RARITY_GLOW[c.rarity] || RARITY_GLOW.common}` }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
-      {claimedCard && (
-        <MiniPackFlip card={claimedCard} onClose={() => { setClaimedCard(null); onClaim?.() }} />
+      {claimedCards && (
+        <MiniPackFlip cards={claimedCards} onClose={() => { setClaimedCards(null); setClaiming(false); onClaim?.() }} />
       )}
     </>
   )

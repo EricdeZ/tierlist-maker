@@ -224,13 +224,13 @@ export default function TemplatesPage() {
                                 >
                                     <Trash2 size={14} />
                                 </button>
-                                {canApprove && t.status === 'pending_review' && (
+                                {canApprove && (t.status === 'draft' || t.status === 'pending_review') && (
                                     <>
                                         <button
                                             onClick={e => handleApprove(e, t.id)}
                                             className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors"
                                         >
-                                            Approve
+                                            {t.status === 'draft' ? 'Accept' : 'Approve'}
                                         </button>
                                         <button
                                             onClick={e => handleReject(e, t.id)}

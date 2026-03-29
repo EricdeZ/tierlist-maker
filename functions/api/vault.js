@@ -7,7 +7,7 @@ import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks, rollHoloEffect, rollHoloType } from '../lib/vault.js'
 import { computePlayerStats } from '../lib/vault-defs.js'
-import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown } from '../lib/passives.js'
+import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, claimAllGeneratedCards, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown } from '../lib/passives.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, CONSUMABLE_DAILY_CAP, isRoleMismatch } from '../lib/starting-five.js'
@@ -181,6 +181,7 @@ const handler = async (event) => {
         case 'reroll-card': return await handleRerollCard(sql, user, body)
         case 'reroll-pack': return await handleRerollPack(sql, user, body)
         case 'claim-generated-card': return await handleClaimGeneratedCard(sql, user, body)
+        case 'claim-all-generated-cards': return await handleClaimAllGeneratedCards(sql, user)
         case 'toggle-unique-hunter': return await handleToggleUniqueHunter(sql, user, body)
         case 'set-holo-choice': return await handleSetHoloChoice(sql, user, body)
         default: return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) }
@@ -747,6 +748,12 @@ async function handleClaimGeneratedCard(sql, user, body) {
   return { statusCode: 200, headers, body: JSON.stringify({ card: formatCard(card) }) }
 }
 
+// ═══ POST: Claim all generated cards from Card Generator ═══
+async function handleClaimAllGeneratedCards(sql, user) {
+  const cards = await claimAllGeneratedCards(sql, user.id)
+  return { statusCode: 200, headers, body: JSON.stringify({ cards: cards.map(formatCard) }) }
+}
+
 // ═══ POST: Toggle Unique Hunter on/off ═══
 async function handleToggleUniqueHunter(sql, user, body) {
   const { enabled } = body
@@ -760,6 +767,8 @@ async function handleSetHoloChoice(sql, user, body) {
   await setHoloChoice(sql, user.id, holoChoice)
   return { statusCode: 200, headers, body: JSON.stringify({ holoChoice }) }
 }
+
+// ═══ POST: Set Card Generator pool ═══
 
 // ═══ POST: Sale purchase — transactional stock + payment ═══
 const VENDING_COOLDOWN_SECONDS = 28
@@ -1138,9 +1147,12 @@ async function handleCollectionCollections(sql, user) {
   for (const e of entries) {
     const col = collectionMap.get(e.collection_id)
     if (!col) continue
+    const td = typeof e.template_data === 'string' ? JSON.parse(e.template_data) : e.template_data
+    const displayName = getBlueprintDisplayName({ cardData: td?.cardData || {}, elements: td?.elements || [] })
+      || e.name
     col.entries.push({
       blueprintId: e.blueprint_id,
-      name: e.name,
+      name: displayName,
       cardType: e.card_type,
       templateData: e.template_data,
     })
@@ -2439,9 +2451,7 @@ async function handleUseConsumable(sql, user, body) {
   if (!cardId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
   }
-  const state = await transaction(async (tx) => {
-    return await applyConsumable(tx, user.id, cardId)
-  })
+  const state = await applyConsumable(sql, user.id, cardId)
 
   maybePushChallenges(sql, user.id)
 
@@ -2695,9 +2705,16 @@ async function handleShowcaseCollection(sql, params) {
     ORDER BY e.added_at ASC
   `
 
+  const resolved = entries.map(e => {
+    const td = typeof e.template_data === 'string' ? JSON.parse(e.template_data) : e.template_data
+    const displayName = getBlueprintDisplayName({ cardData: td?.cardData || {}, elements: td?.elements || [] })
+      || e.template_name
+    return { ...e, template_name: displayName }
+  })
+
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ collection, entries }),
+    body: JSON.stringify({ collection, entries: resolved }),
   }
 }
 

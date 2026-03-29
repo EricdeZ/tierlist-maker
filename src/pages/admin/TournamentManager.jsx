@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { tournamentService } from '../../services/database'
-import { Plus, Save, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Shield, ChevronLeft, Trash2 } from 'lucide-react'
+import { Plus, Save, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Shield, ChevronLeft, Trash2, Download } from 'lucide-react'
 
 function formatDate(dateStr) {
     if (!dateStr) return ''
@@ -158,6 +158,30 @@ export default function TournamentManager() {
         } catch (err) {
             showToast(err.message, 'error')
         }
+    }
+
+    const handleExportCSV = () => {
+        const rows = [['Discord Username', 'Smite Name', 'Role', 'Tracker URL', 'Available Game Dates', 'Available for Draft', 'Status', 'Signed Up']]
+        for (const s of filteredSignups) {
+            rows.push([
+                s.discord_username || '',
+                s.smite_name || '',
+                s.signup_role || '',
+                s.tracker_url || '',
+                (s.available_game_dates || []).join('; '),
+                s.available_draft_date ? 'Yes' : 'No',
+                s.status || '',
+                s.created_at ? new Date(s.created_at).toLocaleDateString() : '',
+            ])
+        }
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${selected?.slug || 'tournament'}-signups${filter !== 'all' ? `-${filter}` : ''}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
     }
 
     const filteredSignups = signups.filter(s => filter === 'all' || s.status === filter)
@@ -331,6 +355,13 @@ export default function TournamentManager() {
                                 {counts.total} total / {counts.pending} pending / {counts.approved} approved ({counts.captains} captains) / {counts.rejected} rejected
                             </span>
                         </h2>
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={filteredSignups.length === 0}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-(--color-text-secondary) text-sm hover:bg-white/10 hover:text-(--color-text) transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            <Download className="w-4 h-4" /> Export CSV
+                        </button>
                     </div>
 
                     {/* Filter tabs */}

@@ -373,6 +373,8 @@ async function generatePlayerCardByDivisions(sql, rarity, divisionIds, ctx = nul
   }
 }
 
+export { generateCard, generateItemCard, generateConsumableCard, generatePlayerCard }
+
 async function generateCardByType(type, rarity, ctx = null, sql = null) {
   switch (type) {
     case 'item': return generateItemCard(rarity, ctx)
@@ -849,7 +851,8 @@ async function generateCollectionCard(sql, collectionIds, rarityOverride) {
   const td = typeof blueprint.template_data === 'string' ? JSON.parse(blueprint.template_data) : blueprint.template_data
   const displayName = td?.cardData?.name
     || td?.elements?.find(el => el.type === 'name-banner')?.playerName
-    || blueprint.name
+    || (blueprint.name !== 'Untitled' ? blueprint.name : null)
+    || 'Card'
   const rarity = rarityOverride || rollRarity('common')
   const holoEffect = rollHoloEffect(rarity)
   const holoType = rollHoloType(rarity)
@@ -887,7 +890,8 @@ async function generateStaffCard(sql, rarity, ctx = null) {
   const td = typeof blueprint.template_data === 'string' ? JSON.parse(blueprint.template_data) : blueprint.template_data
   const displayName = td?.cardData?.name
     || td?.elements?.find(el => el.type === 'name-banner')?.playerName
-    || blueprint.name
+    || (blueprint.name !== 'Untitled' ? blueprint.name : null)
+    || 'Card'
   const holoEffect = rollHoloEffect(rarity)
   const holoType = rollHoloType(rarity)
 

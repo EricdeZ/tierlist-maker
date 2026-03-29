@@ -1203,6 +1203,7 @@ export const vaultService = {
     toggleUniqueHunter: (enabled) => apiPost('vault', { action: 'toggle-unique-hunter' }, { enabled }),
     setHoloChoice: (holoChoice) => apiPost('vault', { action: 'set-holo-choice' }, { holoChoice }),
     claimGeneratedCard: (generatedCardId) => apiPost('vault', { action: 'claim-generated-card' }, { generatedCardId }),
+    claimAllGeneratedCards: () => apiPost('vault', { action: 'claim-all-generated-cards' }, {}),
     rerollCard: (sessionId, cardIndex) => apiPost('vault', { action: 'reroll-card' }, { sessionId, cardIndex }),
     rerollPack: (sessionId) => apiPost('vault', { action: 'reroll-pack' }, { sessionId }),
 }
