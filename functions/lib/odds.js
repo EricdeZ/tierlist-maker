@@ -92,7 +92,7 @@ export function getContextForType(ctx, type) {
   if (!ctx.typeOdds || !ctx.typeOdds[type]) return ctx
   const next = { ...ctx, rarity: { ...ctx.rarity } }
   for (const [k, v] of Object.entries(ctx.typeOdds[type].rarity)) {
-    next.rarity[k] = v
+    if (next.rarity[k] !== undefined) next.rarity[k] = v
   }
   return next
 }
