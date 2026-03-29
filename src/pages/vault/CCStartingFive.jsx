@@ -804,7 +804,7 @@ export default function CCStartingFive() {
       {/* Bench + Staff Slots */}
       <div className="mt-4 pt-4 border-t border-gray-700/50">
         <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider cd-head text-center">{showStaffSlots ? 'Bench & Staff' : 'Bench (50%)'}</div>
-        <div className="flex justify-center items-start gap-3 sm:gap-4">
+        <div className="flex flex-wrap justify-center items-start gap-3 sm:gap-4">
           {/* Bench */}
           <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-1.5 mb-1">

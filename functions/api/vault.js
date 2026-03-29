@@ -3160,18 +3160,7 @@ async function handleClaimPromoGift(sql, user, body) {
     const holoType = rollHoloType(gift.rarity)
     const serialNumber = Math.floor(Math.random() * 9999) + 1
 
-    let isFirstEdition = false
-    if (gift.blueprint_id) {
-      const [existing] = await tx`
-        SELECT 1 FROM cc_cards WHERE blueprint_id = ${gift.blueprint_id} AND rarity = ${gift.rarity} LIMIT 1
-      `
-      isFirstEdition = !existing
-    } else if (gift.card_type === 'player' && config.def_id) {
-      const [existing] = await tx`
-        SELECT 1 FROM cc_cards WHERE def_id = ${config.def_id} AND rarity = ${gift.rarity} LIMIT 1
-      `
-      isFirstEdition = !existing
-    }
+    const isFirstEdition = false
 
     let passiveId = null
     let passiveName = null
