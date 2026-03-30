@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
-import { STAFF_PASSIVES, PassiveIcon } from '../../../data/vault/passives'
+import { STAFF_PASSIVES, PASSIVE_COLORS, PassiveIcon } from '../../../data/vault/passives'
 
 const PASSIVES_LIST = Object.entries(STAFF_PASSIVES).map(([key, info]) => ({
   key,
@@ -26,17 +26,20 @@ export default function PassivesGuide() {
       {expanded && (
         <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-[var(--cd-border)]">
           <div className="space-y-2 mt-3">
-            {PASSIVES_LIST.map(p => (
-              <div key={p.key} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02]">
-                <div className="shrink-0 mt-0.5 text-white/50">
-                  <PassiveIcon passive={p.key} size={20} />
+            {PASSIVES_LIST.map(p => {
+              const color = PASSIVE_COLORS[p.key]
+              return (
+                <div key={p.key} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02]">
+                  <div className="shrink-0 mt-0.5" style={{ color: color?.primary }}>
+                    <PassiveIcon passive={p.key} size={20} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: color?.primary }}>{p.name}</div>
+                    <div className="text-xs text-white/40 mt-0.5 leading-relaxed">{p.description}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-white/80">{p.name}</div>
-                  <div className="text-xs text-white/40 mt-0.5 leading-relaxed">{p.description}</div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="mt-4 px-3 py-3 rounded-lg bg-white/[0.02] border border-white/5">

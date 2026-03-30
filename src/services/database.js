@@ -1139,6 +1139,9 @@ export const vaultService = {
     async changeHoloType(cardId, holoType) {
         return apiPost('vault', { action: 'change-holo-type' }, { cardId, holoType })
     },
+    async changePassive(cardId, passiveName) {
+        return apiPost('vault', { action: 'change-passive' }, { cardId, passiveName })
+    },
     async getPendingSignatures() {
         return apiCall('vault', { action: 'pending-signatures' })
     },

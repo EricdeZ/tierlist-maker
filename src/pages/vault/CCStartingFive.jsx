@@ -19,11 +19,12 @@ import jungleIcon from '../../assets/roles/jungle.webp'
 import midIcon from '../../assets/roles/mid.webp'
 import suppIcon from '../../assets/roles/supp.webp'
 import adcIcon from '../../assets/roles/adc.webp'
-import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy, AlertTriangle, ChevronLeft } from 'lucide-react'
+import { Plus, X, ArrowRightLeft, Trash2, ZoomIn, HelpCircle, Zap, Trophy, AlertTriangle, ChevronLeft, Clock } from 'lucide-react'
 import { CONSUMABLES } from '../../data/vault/buffs'
 import { useAuth } from '../../context/AuthContext'
 import { vaultService } from '../../services/database'
 import { FEATURE_FLAGS } from '../../config/featureFlags'
+import { STAFF_PASSIVES, PassiveIcon } from '../../data/vault/passives'
 
 const ROLES = [
   { key: 'solo', label: 'SOLO', icon: soloIcon },
@@ -40,6 +41,35 @@ const STAFF_SLOTS = [
 
 const RARITY_ORDER = ['unique', 'mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common']
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
+
+function SwapCooldownTimer({ cooldownUntil }) {
+  const [, setTick] = useState(0)
+  const end = cooldownUntil ? new Date(cooldownUntil).getTime() : 0
+  const active = end > Date.now()
+
+  useEffect(() => {
+    if (!active) return
+    const id = setInterval(() => {
+      if (Date.now() >= end) clearInterval(id)
+      setTick(t => t + 1)
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [end, active])
+
+  if (!active) return null
+
+  const remaining = Math.max(0, end - Date.now())
+  const hours = Math.floor(remaining / 3_600_000)
+  const minutes = Math.ceil((remaining % 3_600_000) / 60_000)
+  const label = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+
+  return (
+    <div className="flex items-center gap-1.5 text-amber-400/60 text-[10px] cd-head mt-1">
+      <Clock size={10} />
+      Swap cooldown: {label}
+    </div>
+  )
+}
 
 function getCardType(card) {
   return card.cardType || 'god'
@@ -204,6 +234,7 @@ export default function CCStartingFive() {
   const [slottingConsumable, setSlottingConsumable] = useState(false)
   const [consumableResult, setConsumableResult] = useState(null)
   const [pendingLineupAction, setPendingLineupAction] = useState(null)
+  const [pendingStaffSlot, setPendingStaffSlot] = useState(null)
   const [error, setError] = useState(null)
   const [s5Leaderboard, setS5Leaderboard] = useState(null)
   const [s5LbLoading, setS5LbLoading] = useState(false)
@@ -395,9 +426,16 @@ export default function CCStartingFive() {
 
   const hasActiveBuffs = activeBuffs.length > 0
   const handleSlot = useCallback((cardId, role) => {
+    if (role === 'staff') {
+      const card = collection.find(c => c.id === cardId)
+      const passiveName = card?.passiveName
+      const cooldownHours = startingFive?.passiveState?.swapCooldownHours?.[passiveName]
+      setPendingStaffSlot({ cardId, role, passiveName, cooldownHours })
+      return
+    }
     if (hasActiveBuffs) { setPendingLineupAction(() => () => executeSlot(cardId, role)); return }
     executeSlot(cardId, role)
-  }, [hasActiveBuffs, executeSlot])
+  }, [hasActiveBuffs, executeSlot, collection, startingFive?.passiveState?.swapCooldownHours])
   const handleUnslot = useCallback((role) => {
     if (hasActiveBuffs) { setPendingLineupAction(() => () => executeUnslot(role)); return }
     executeUnslot(role)
@@ -887,6 +925,7 @@ export default function CCStartingFive() {
                     </button>
                   )}
                 </div>
+                {staffSlot.key === 'staff' && !card && <SwapCooldownTimer cooldownUntil={startingFive?.passiveState?.cooldownUntil} />}
               </div>
             )
           })}
@@ -971,6 +1010,47 @@ export default function CCStartingFive() {
                 <button onClick={() => { const action = pendingLineupAction; setPendingLineupAction(null); action(); }}
                   className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer">
                   Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingStaffSlot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPendingStaffSlot(null)}>
+          <div className="relative w-full max-w-sm bg-[var(--cd-surface)] border border-[var(--cd-border)] sm:rounded-xl overflow-hidden sm:mx-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--cd-border)]">
+              <h3 className="text-base font-bold cd-head text-[var(--cd-text)] tracking-wider">Staff Slot Cooldown</h3>
+              <button onClick={() => setPendingStaffSlot(null)} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-white/60">
+                Removing this card from the staff slot will trigger a{' '}
+                <span className="text-amber-400 font-bold">{pendingStaffSlot.cooldownHours || '?'}h cooldown</span> before you can slot another staff card.
+              </p>
+              {pendingStaffSlot.passiveName && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/[0.03]">
+                  <PassiveIcon passive={pendingStaffSlot.passiveName} size={16} className="text-white/50" />
+                  <span className="text-xs font-bold cd-head text-white/60">{STAFF_PASSIVES[pendingStaffSlot.passiveName]?.name}</span>
+                </div>
+              )}
+              <div className="flex gap-2 justify-center pt-2">
+                <button onClick={() => setPendingStaffSlot(null)}
+                  className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer text-red-400">
+                  Cancel
+                </button>
+                <button onClick={() => {
+                  const { cardId, role } = pendingStaffSlot
+                  setPendingStaffSlot(null)
+                  if (hasActiveBuffs) { setPendingLineupAction(() => () => executeSlot(cardId, role)); return }
+                  executeSlot(cardId, role)
+                }}
+                  className="cd-btn-solid cd-btn-action cd-clip-btn px-4 py-2 text-xs font-bold cd-head cursor-pointer">
+                  Slot Card
                 </button>
               </div>
             </div>

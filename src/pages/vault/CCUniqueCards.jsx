@@ -9,7 +9,8 @@ import GameCard from './components/GameCard'
 import VaultCard from './components/VaultCard'
 import TradingCard from '../../components/TradingCard'
 import TradingCardHolo from '../../components/TradingCardHolo'
-import { PenLine, Check, Clock, Loader2, User } from 'lucide-react'
+import { STAFF_PASSIVES, PASSIVE_COLORS, PassiveIcon } from '../../data/vault/passives'
+import { PenLine, Check, Clock, Loader2, User, RefreshCw } from 'lucide-react'
 
 const DirectSignModal = lazyRetry(() => import('./components/DirectSignModal'))
 
@@ -51,13 +52,40 @@ function toPlayerCardProps(card) {
   }
 }
 
-function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged, linkedPlayer }) {
+function CooldownLabel({ cooldownEnd }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (Date.now() >= cooldownEnd) clearInterval(id)
+      setTick(t => t + 1)
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [cooldownEnd])
+
+  const remaining = Math.max(0, cooldownEnd - Date.now())
+  const hours = Math.floor(remaining / 3_600_000)
+  const minutes = Math.ceil((remaining % 3_600_000) / 60_000)
+  const label = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+
+  return (
+    <div className="flex items-center gap-1.5 text-white/30 text-[10px] cd-head">
+      <Clock size={10} />
+      Swap available in {label}
+    </div>
+  )
+}
+
+function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged, onPassiveChanged, linkedPlayer }) {
   const [changingHolo, setChangingHolo] = useState(false)
+  const [changingPassive, setChangingPassive] = useState(false)
+  const [passivePickerOpen, setPassivePickerOpen] = useState(false)
   const [requestingSig, setRequestingSig] = useState(false)
   const [sigStatus, setSigStatus] = useState(null) // 'requested' after success
   const [directSignMode, setDirectSignMode] = useState(false)
   const [error, setError] = useState(null)
   const [localHoloType, setLocalHoloType] = useState(card.holoType)
+  const [localPassive, setLocalPassive] = useState(card.passiveName)
+  const [localChangedAt, setLocalChangedAt] = useState(card.passiveChangedAt)
 
   const override = getDefOverride(card)
   const holoEffect = card.rarity === 'unique' ? 'unique' : (card.holoEffect || getHoloEffect(card.rarity))
@@ -65,8 +93,14 @@ function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged
 
   const cardPlayerId = card.defPlayerId || card.cardData?._testPlayerId
   const isUnsigned = !card.signatureUrl && sigStatus !== 'requested'
-  const canDirectSign = isUnsigned && cardPlayerId && linkedPlayer && linkedPlayer.id === cardPlayerId
+  const isDepictedUser = card.depictedUserId && user && card.depictedUserId === user.id
+  const isLinkedPlayer = cardPlayerId && linkedPlayer && linkedPlayer.id === cardPlayerId
+  const canDirectSign = isUnsigned && (isDepictedUser || isLinkedPlayer)
   const canRequestSignature = type === 'player' && card.defId && isUnsigned && !canDirectSign
+
+  const COOLDOWN_MS = 48 * 60 * 60 * 1000
+  const cooldownEnd = localChangedAt ? new Date(localChangedAt).getTime() + COOLDOWN_MS : 0
+  const isOnCooldown = cooldownEnd > Date.now()
 
   const handleHoloChange = async (newType) => {
     if (newType === localHoloType || changingHolo) return
@@ -80,6 +114,25 @@ function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged
       setError(err.message || 'Failed to change holo type')
     } finally {
       setChangingHolo(false)
+    }
+  }
+
+  const isStaff = (card.cardType || 'god') === 'staff'
+
+  const handlePassiveChange = async (passiveKey) => {
+    if (passiveKey === localPassive || changingPassive) return
+    setChangingPassive(true)
+    setError(null)
+    try {
+      const res = await vaultService.changePassive(card.id, passiveKey)
+      setLocalPassive(passiveKey)
+      setLocalChangedAt(res.passiveChangedAt)
+      onPassiveChanged(card.id, passiveKey, res.passiveChangedAt)
+      setPassivePickerOpen(false)
+    } catch (err) {
+      setError(err.message || 'Failed to change passive')
+    } finally {
+      setChangingPassive(false)
     }
   }
 
@@ -121,24 +174,72 @@ function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged
     <div className="flex flex-col items-center gap-3">
       {renderCard()}
 
-      {/* Holo Type Switcher */}
-      <div className="flex items-center gap-1">
-        {HOLO_TYPES.map(ht => (
+      {isStaff ? (
+        /* Passive Picker for staff cards */
+        <div className="flex flex-col items-center gap-2 w-full max-w-[280px]">
           <button
-            key={ht.key}
-            onClick={() => handleHoloChange(ht.key)}
-            disabled={changingHolo}
-            className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all cursor-pointer cd-head ${
-              localHoloType === ht.key
-                ? 'bg-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/40'
-                : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60 hover:border-white/20'
+            onClick={() => !isOnCooldown && setPassivePickerOpen(!passivePickerOpen)}
+            disabled={changingPassive || isOnCooldown}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all cd-head border ${
+              isOnCooldown
+                ? 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed'
+                : 'bg-[var(--cd-magenta)]/15 text-[var(--cd-magenta)] border-[var(--cd-magenta)]/30 hover:bg-[var(--cd-magenta)]/25 cursor-pointer'
             }`}
-            title={ht.desc}
           >
-            {ht.label}
+            {changingPassive ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {localPassive ? STAFF_PASSIVES[localPassive]?.name || localPassive : 'Set Passive'}
           </button>
-        ))}
-      </div>
+          {isOnCooldown && <CooldownLabel cooldownEnd={cooldownEnd} />}
+          {passivePickerOpen && !isOnCooldown && (
+            <div className="w-full rounded-lg border border-white/10 bg-[#0a0a12] overflow-hidden">
+              {Object.entries(STAFF_PASSIVES).map(([key, info]) => {
+                const color = PASSIVE_COLORS[key]
+                const isActive = key === localPassive
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handlePassiveChange(key)}
+                    disabled={changingPassive || isActive}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-all cursor-pointer ${
+                      isActive
+                        ? 'text-white/90'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white/80'
+                    }`}
+                    style={isActive ? { backgroundColor: `${color?.primary}22` } : undefined}
+                  >
+                    <span className="shrink-0" style={{ color: color?.primary }}>
+                      <PassiveIcon passive={key} size={16} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-bold cd-head uppercase tracking-wider" style={isActive ? { color: color?.primary } : undefined}>{info.name}</div>
+                      <div className="text-[10px] text-white/30 leading-tight mt-0.5">{info.description}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Holo Type Switcher for non-staff cards */
+        <div className="flex items-center gap-1">
+          {HOLO_TYPES.map(ht => (
+            <button
+              key={ht.key}
+              onClick={() => handleHoloChange(ht.key)}
+              disabled={changingHolo}
+              className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all cursor-pointer cd-head ${
+                localHoloType === ht.key
+                  ? 'bg-[var(--cd-cyan)]/20 text-[var(--cd-cyan)] border border-[var(--cd-cyan)]/40'
+                  : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60 hover:border-white/20'
+              }`}
+              title={ht.desc}
+            >
+              {ht.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Signature Section */}
       {card.signatureUrl ? (
@@ -245,7 +346,7 @@ const VIEWS = [
 ]
 
 export default function CCUniqueCards() {
-  const { collection, loaded, getDefOverride, getBlueprint, updateCardHoloType } = useVault()
+  const { collection, loaded, getDefOverride, getBlueprint, updateCardHoloType, updateCardPassive } = useVault()
   const { linkedPlayer } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('subtab') || 'mine'
@@ -276,6 +377,10 @@ export default function CCUniqueCards() {
 
   const handleHoloTypeChanged = (cardId, newType) => {
     updateCardHoloType(cardId, newType)
+  }
+
+  const handlePassiveChanged = (cardId, newPassive, passiveChangedAt) => {
+    updateCardPassive(cardId, newPassive, passiveChangedAt)
   }
 
   if (!loaded) {
@@ -330,6 +435,7 @@ export default function CCUniqueCards() {
                   getDefOverride={getDefOverride}
                   getBlueprint={getBlueprint}
                   onHoloTypeChanged={handleHoloTypeChanged}
+                  onPassiveChanged={handlePassiveChanged}
                   linkedPlayer={linkedPlayer}
                 />
               ))}

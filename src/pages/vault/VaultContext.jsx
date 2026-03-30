@@ -155,6 +155,10 @@ export function VaultProvider({ children }) {
     setCollection(prev => prev.map(c => c.id === cardId ? { ...c, holoType: newHoloType } : c))
   }, [])
 
+  const updateCardPassive = useCallback((cardId, newPassiveName, passiveChangedAt) => {
+    setCollection(prev => prev.map(c => c.id === cardId ? { ...c, passiveName: newPassiveName, passiveChangedAt } : c))
+  }, [])
+
   const refreshSalePacks = useCallback(async () => {
     try {
       const ccData = await vaultService.load()
@@ -479,7 +483,7 @@ export function VaultProvider({ children }) {
   const value = useMemo(() => ({
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, blueprintCache, getBlueprint,
-    buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
+    buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, updateCardPassive, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     promoGifts, claimPromoGift,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,
@@ -497,7 +501,7 @@ export function VaultProvider({ children }) {
   }), [
     collection, passion, ember, stats, packTypes, packTypesMap, salePacks,
     loaded, loading, vaultBanned, accountTooNew, getDefOverride, blueprintCache, getBlueprint,
-    buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, refreshSalePacks, refreshBalance, claimEmberDaily,
+    buyPack, buyPacksToInventory, buySalePack, convertPassionToEmber, dismantleCards, blackMarketTurnIn, blackMarketClaimMythic, refreshCollection, updateCardHoloType, updateCardPassive, refreshSalePacks, refreshBalance, claimEmberDaily,
     giftData, sendGift, openGift, markGiftsSeen, refreshGifts, buyGiftPack,
     promoGifts, claimPromoGift,
     startingFive, loadStartingFive, slotS5Card, unslotS5Card, unslotS5Attachment, collectS5Income, useS5Consumable,

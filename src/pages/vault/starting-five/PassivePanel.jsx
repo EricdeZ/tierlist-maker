@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { PassiveIcon, getPassiveInfo } from '../../../data/vault/passives'
+import { PassiveIcon, getPassiveInfo, PASSIVE_COLORS } from '../../../data/vault/passives'
 import { vaultService } from '../../../services/database'
 import { Zap, Clock, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
 import MiniPackFlip from '../components/MiniPackFlip'
@@ -24,17 +24,18 @@ export default function PassivePanel({ passiveState, onUpdate }) {
   if (!info) return null
 
   const label = RARITY_LABEL[staffRarity] || ''
+  const color = PASSIVE_COLORS[name] || PASSIVE_COLORS.collector_boost
 
   return (
     <div className="cd-panel cd-corners rounded-xl p-4 mt-4">
       <div className="text-[10px] font-bold cd-head tracking-widest text-white/30 uppercase mb-3">Active Passive</div>
       <div className="flex items-center gap-2.5 mb-3">
-        <div className="text-cyan-400">
+        <div style={{ color: color.primary }}>
           <PassiveIcon passive={name} size={20} />
         </div>
         <div>
           <div className="text-sm font-bold text-white/90">{info.name}</div>
-          <div className="text-xs text-white/40 mt-0.5">{info.description} <span className="text-cyan-400/60">({label.toLowerCase()})</span></div>
+          <div className="text-xs text-white/40 mt-0.5">{info.description} <span style={{ color: color.primary, opacity: 0.6 }}>({label.toLowerCase()})</span></div>
         </div>
       </div>
 

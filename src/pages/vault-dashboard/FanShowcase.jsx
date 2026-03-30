@@ -52,13 +52,15 @@ export default function FanShowcase({ entries, collection }) {
         setExporting(true)
         try {
             const el = fanRef.current
-            const rect = el.getBoundingClientRect()
+            // Use the inline style dimensions (set from computed layout) for exact sizing
+            const w = parseInt(el.style.width) || el.offsetWidth
+            const h = parseInt(el.style.height) || el.offsetHeight
             const dataUrl = await toPng(el, {
-                width: Math.ceil(rect.width),
-                height: Math.ceil(rect.height),
+                width: w,
+                height: h,
                 pixelRatio: 2,
                 backgroundColor: null,
-                filter: (node) => !node.dataset?.fanBg,
+                style: { margin: '0', padding: '0' },
             })
             const a = document.createElement('a')
             a.href = dataUrl
@@ -263,49 +265,82 @@ function SelectedCard({ sel, idx, onRemove, onRarityChange, onMoveLeft, onMoveRi
     )
 }
 
-const FanPreview = forwardRef(function FanPreview({ selected, settings }, ref) {
+// Calculate the tight bounding box of all rotated cards
+function computeFanLayout(selected, settings) {
     const { angle, overlap, cardSize, arc } = settings
     const count = selected.length
     const cardHeight = cardSize * (88 / 63)
     const center = (count - 1) / 2
-
-    // Higher overlap% = less spacing between cards
     const spacing = cardSize * (1 - overlap / 100)
+    const rad = Math.PI / 180
 
-    // Container sizing
-    const totalSpread = spacing * (count - 1)
-    const maxRotation = angle * Math.ceil(count / 2)
-    const rotationPadding = Math.sin(maxRotation * Math.PI / 180) * cardHeight * 0.5
-    const containerWidth = totalSpread + cardSize + rotationPadding * 2
-    const arcMax = center > 0 ? arc * center * center : 0
-    const containerHeight = cardHeight + arcMax + 40
+    // For each card, compute the 4 rotated corners relative to origin (0,0)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    const cards = selected.map((sel, idx) => {
+        const off = idx - center
+        const rot = angle * off * rad
+        const cx = spacing * off // center x before rotation
+        const cy = arc * off * off // center y (arc offset)
+        const hw = cardSize / 2
+        const hh = cardHeight / 2
+
+        // 4 corners of the unrotated card centered at (cx, cy)
+        const corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]
+        for (const [dx, dy] of corners) {
+            const rx = cx + dx * Math.cos(rot) - dy * Math.sin(rot)
+            const ry = cy + dx * Math.sin(rot) + dy * Math.cos(rot)
+            minX = Math.min(minX, rx)
+            minY = Math.min(minY, ry)
+            maxX = Math.max(maxX, rx)
+            maxY = Math.max(maxY, ry)
+        }
+
+        return { cx, cy, rotation: angle * off }
+    })
+
+    const width = maxX - minX
+    const height = maxY - minY
+    // Offset so that all cards fit within (0,0)→(width,height)
+    const offsetX = -minX
+    const offsetY = -minY
+
+    return { cards, width, height, offsetX, offsetY, cardSize, cardHeight }
+}
+
+const FanPreview = forwardRef(function FanPreview({ selected, settings }, ref) {
+    const { angle, overlap, cardSize, arc } = settings
+    const count = selected.length
+    const layout = computeFanLayout(selected, settings)
+    const { cards, width, height, offsetX, offsetY, cardHeight } = layout
 
     return (
         <div
             ref={ref}
             className="relative mx-auto"
             style={{
-                width: Math.max(containerWidth, cardSize + 40),
-                height: Math.max(containerHeight, 200),
+                width: Math.ceil(width),
+                height: Math.ceil(height),
             }}
         >
             {selected.map((sel, idx) => {
                 const td = typeof sel.entry.template_data === 'string' ? JSON.parse(sel.entry.template_data) : sel.entry.template_data
-                const offset = idx - center
-                const rotation = angle * offset
-                const xOffset = spacing * offset
-                const yOffset = arc * offset * offset
+                const { cx, cy, rotation } = cards[idx]
+                // Position: card center at (offsetX + cx, offsetY + cy), then shift by half-size so top-left is placed
+                const left = offsetX + cx - cardSize / 2
+                const top = offsetY + cy - cardHeight / 2
 
                 return (
                     <div
                         key={sel.id}
                         className="absolute"
                         style={{
-                            left: '50%',
-                            top: 20,
-                            transform: `translateX(${xOffset - cardSize / 2}px) translateY(${yOffset}px) rotate(${rotation}deg)`,
-                            transformOrigin: 'center bottom',
-                            zIndex: count - Math.abs(Math.round(offset)),
+                            left,
+                            top,
+                            width: cardSize,
+                            height: cardHeight,
+                            transform: `rotate(${rotation}deg)`,
+                            transformOrigin: 'center center',
+                            zIndex: count - Math.abs(Math.round(idx - (count - 1) / 2)),
                             filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6))',
                         }}
                     >

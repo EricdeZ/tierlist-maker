@@ -7,7 +7,7 @@ import { requireAuth, requirePermission } from '../lib/auth.js'
 import { jwtVerify } from 'jose'
 import { ensureStats, openPack, generateGiftPack, grantStarterPacks, rollHoloEffect, rollHoloType } from '../lib/vault.js'
 import { computePlayerStats } from '../lib/vault-defs.js'
-import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, claimAllGeneratedCards, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown } from '../lib/passives.js'
+import { getActivePassive, spendCharge, getGeneratedCards, claimGeneratedCard, claimAllGeneratedCards, toggleUniqueHunter, setHoloChoice, pickCardToRemove, checkSwapCooldown, SWAP_COOLDOWN_HOURS } from '../lib/passives.js'
 import { ensureEmberBalance, grantEmber } from '../lib/ember.js'
 import { pushChallengeProgress, getVaultStats } from '../lib/challenges.js'
 import { tick, collectIncome, slotCard, unslotCard, unslotAttachment, useConsumable as applyConsumable, getBuffTotals, checkSynergy, getCardContribution, getAttachmentBonusInfo, calculateLineupOutput, S5_ALLSTAR_MODIFIER, TEAM_SYNERGY_BONUS, CONSUMABLE_DAILY_CAP, isRoleMismatch } from '../lib/starting-five.js'
@@ -169,6 +169,7 @@ const handler = async (event) => {
         case 'binder-generate-share': return await handleBinderGenerateShare(sql, user, event)
         case 'request-signature': return await handleRequestSignature(sql, user, body)
         case 'change-holo-type': return await handleChangeHoloType(sql, user, body)
+        case 'change-passive': return await handleChangePassive(sql, user, body)
         case 'decline-signature': return await handleDeclineSignature(sql, user, body)
         case 'approve-signature': return await handleApproveSignature(sql, user, body)
         case 'reject-signature': return await handleRejectSignature(sql, user, body)
@@ -2260,8 +2261,14 @@ function formatS5Response(state, extra = {}) {
 }
 
 async function loadPassiveState(sql, userId) {
+  const cooldown = await checkSwapCooldown(sql, userId)
   const passiveData = await getActivePassive(sql, userId)
-  if (!passiveData) return null
+
+  if (!passiveData) {
+    // No staff card slotted — still return swap cooldown info if any
+    if (!cooldown) return null
+    return { cooldownUntil: cooldown.cooldownUntil, swapCooldownHours: SWAP_COOLDOWN_HOURS }
+  }
 
   const generatedCards = passiveData.passiveName === 'card_generator'
     ? await getGeneratedCards(sql, userId)
@@ -2281,8 +2288,6 @@ async function loadPassiveState(sql, userId) {
     }
   }
 
-  const cooldown = await checkSwapCooldown(sql, userId)
-
   return {
     name: passiveData.passiveName,
     staffRarity: passiveData.staffRarity,
@@ -2294,6 +2299,7 @@ async function loadPassiveState(sql, userId) {
     enabled: passiveData.enabled,
     holoChoice: passiveData.holoChoice,
     generatedCards: generatedCards.map(g => ({ id: g.id, rarity: g.rarity || g.card_data?.rarity, createdAt: g.created_at })),
+    swapCooldownHours: SWAP_COOLDOWN_HOURS,
   }
 }
 
@@ -3085,6 +3091,38 @@ async function handleChangeHoloType(sql, user, body) {
   return { statusCode: 200, headers, body: JSON.stringify({ success: true, holoType }) }
 }
 
+// ═══ POST: Change passive on unique staff card (48h cooldown) ═══
+async function handleChangePassive(sql, user, body) {
+  const { cardId, passiveName } = body
+  if (!cardId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cardId required' }) }
+  if (!passiveName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'passiveName required' }) }
+
+  const [passive] = await sql`SELECT id, name FROM cc_staff_passives WHERE name = ${passiveName}`
+  if (!passive) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid passive name' }) }
+
+  const [card] = await sql`
+    SELECT id, owner_id, rarity, card_type, passive_changed_at FROM cc_cards WHERE id = ${cardId}
+  `
+  if (!card) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Card not found' }) }
+  if (card.owner_id !== user.id) return { statusCode: 403, headers, body: JSON.stringify({ error: 'You do not own this card' }) }
+  if (card.rarity !== 'unique') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only unique cards can change passive' }) }
+  if (card.card_type !== 'staff') return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only staff cards can change passive' }) }
+
+  if (card.passive_changed_at) {
+    const cooldownMs = 48 * 60 * 60 * 1000
+    const elapsed = Date.now() - new Date(card.passive_changed_at).getTime()
+    if (elapsed < cooldownMs) {
+      const readyAt = new Date(new Date(card.passive_changed_at).getTime() + cooldownMs).toISOString()
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Passive change on cooldown', readyAt }) }
+    }
+  }
+
+  const now = new Date().toISOString()
+  await sql`UPDATE cc_cards SET passive_id = ${passive.id}, passive_changed_at = ${now} WHERE id = ${cardId}`
+
+  return { statusCode: 200, headers, body: JSON.stringify({ success: true, passiveName, passiveChangedAt: now }) }
+}
+
 // ═══ POST: Send promo gift (owner only) ═══
 async function handleSendPromoGift(sql, user, body, event) {
   const owner = await requirePermission(event, 'permission_manage')
@@ -3276,6 +3314,7 @@ function formatCard(row) {
     bestGodFull: row._bestGodFull || null,
     teamId: row.team_id || row.card_data?.teamId || null,
     defPlayerId: row.def_player_id || null,
+    depictedUserId: row.depicted_user_id || null,
     signatureUrl: row.signature_url || null,
     blueprintId: row.blueprint_id || null,
     tradeLocked: row.trade_locked || false,

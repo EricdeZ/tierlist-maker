@@ -7,6 +7,7 @@ import VaultCard from './components/VaultCard'
 import Navbar from '../../components/layout/Navbar'
 import PageTitle from '../../components/PageTitle'
 import { ArrowLeft, X } from 'lucide-react'
+import FanShowcase from '../vault-dashboard/FanShowcase'
 import './compdeck.css'
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'unique']
@@ -83,6 +84,10 @@ export default function CollectionShowcasePage() {
                     )}
                     <p className="text-xs text-white/20 mt-2">{entries.length} card{entries.length !== 1 ? 's' : ''} in this collection</p>
                 </div>
+
+                {entries.length > 0 && (
+                    <FanShowcase entries={entries} collection={collection} />
+                )}
 
                 {entries.length === 0 ? (
                     <div className="text-center py-20 text-white/30 text-sm">No cards in this collection yet</div>

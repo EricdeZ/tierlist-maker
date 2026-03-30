@@ -16,6 +16,16 @@ export const RARITY_LABEL = {
   legendary: 'Strong', mythic: 'Major', unique: 'Major',
 }
 
+export const PASSIVE_COLORS = {
+  odds_boost:      { primary: '#f59e0b', light: '#fbbf24', shadow: 'rgba(245,158,11,0.35)', shadowHover: 'rgba(245,158,11,0.5)', panelFrom: 'rgba(245,158,11,0.95)', panelTo: 'rgba(180,117,8,0.95)', panelShadow: 'rgba(245,158,11,0.3)' },
+  holo_boost:      { primary: '#ec4899', light: '#f472b6', shadow: 'rgba(236,72,153,0.35)', shadowHover: 'rgba(236,72,153,0.5)', panelFrom: 'rgba(236,72,153,0.95)', panelTo: 'rgba(190,58,123,0.95)', panelShadow: 'rgba(236,72,153,0.3)' },
+  card_reroll:     { primary: '#10b981', light: '#34d399', shadow: 'rgba(16,185,129,0.35)', shadowHover: 'rgba(16,185,129,0.5)', panelFrom: 'rgba(16,185,129,0.95)', panelTo: 'rgba(12,140,98,0.95)', panelShadow: 'rgba(16,185,129,0.3)' },
+  pack_reroll:     { primary: '#f97316', light: '#fb923c', shadow: 'rgba(249,115,22,0.35)', shadowHover: 'rgba(249,115,22,0.5)', panelFrom: 'rgba(249,115,22,0.95)', panelTo: 'rgba(194,90,17,0.95)', panelShadow: 'rgba(249,115,22,0.3)' },
+  unique_hunter:   { primary: '#a855f7', light: '#c084fc', shadow: 'rgba(168,85,247,0.35)', shadowHover: 'rgba(168,85,247,0.5)', panelFrom: 'rgba(168,85,247,0.95)', panelTo: 'rgba(130,66,192,0.95)', panelShadow: 'rgba(168,85,247,0.3)' },
+  collector_boost: { primary: '#06b6d4', light: '#67e8f9', shadow: 'rgba(6,182,212,0.35)', shadowHover: 'rgba(6,182,212,0.5)', panelFrom: 'rgba(6,182,212,0.95)', panelTo: 'rgba(8,145,178,0.95)', panelShadow: 'rgba(6,182,212,0.3)' },
+  card_generator:  { primary: '#3b82f6', light: '#60a5fa', shadow: 'rgba(59,130,246,0.35)', shadowHover: 'rgba(59,130,246,0.5)', panelFrom: 'rgba(59,130,246,0.95)', panelTo: 'rgba(47,104,197,0.95)', panelShadow: 'rgba(59,130,246,0.3)' },
+}
+
 export const STAFF_PASSIVES = {
   odds_boost:      { name: 'Odds Boost',      description: 'Increases your chance of pulling higher rarity cards from every pack. Higher rarity staff cards provide a stronger boost.' },
   holo_boost:      { name: 'Holo Boost',       description: 'Pick a holo type (Holo, Reverse, or Full Art) and increase its drop rate when opening packs. Higher rarity staff cards shift the odds more heavily in your favor.' },

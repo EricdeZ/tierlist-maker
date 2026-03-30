@@ -1,7 +1,7 @@
 // Starting 5 — passive income from slotted cards
 import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
-import { checkSwapCooldown, applySwapCooldown, initPassiveState } from './passives.js'
+import { applySwapCooldown, initPassiveState } from './passives.js'
 
 const S5_FLAT_CORES = {
   uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 7.05, unique: 8.01,
@@ -493,15 +493,6 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
         WHERE user_id = ${userId} AND card_id = ${cardId}
       `
       if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
-
-      // Check swap cooldown before slotting staff card
-      if (role === 'staff') {
-        const cooldown = await checkSwapCooldown(sql, userId)
-        if (cooldown) {
-          const remaining = Math.ceil((new Date(cooldown.cooldownUntil).getTime() - Date.now()) / 3600_000)
-          throw new Error(`Staff slot on cooldown — ${remaining}h remaining`)
-        }
-      }
 
       await collectIncome(sql, userId)
 

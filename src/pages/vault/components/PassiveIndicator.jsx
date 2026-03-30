@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PassiveIcon, STAFF_PASSIVES } from '../../../data/vault/passives'
+import { PassiveIcon, STAFF_PASSIVES, PASSIVE_COLORS } from '../../../data/vault/passives'
 import './PassiveIndicator.css'
 
 export default function PassiveIndicator({ passiveName, size = 240 }) {
@@ -9,13 +9,23 @@ export default function PassiveIndicator({ passiveName, size = 240 }) {
   const info = STAFF_PASSIVES[passiveName]
   if (!info) return null
 
-  const scale = Math.max(0.5, Math.min(1, size / 240))
-  const iconSize = Math.round(14 * scale)
+  const colors = PASSIVE_COLORS[passiveName] || PASSIVE_COLORS.collector_boost
+  const scale = Math.max(0.7, Math.min(1.4, size / 200))
+  const iconSize = Math.round(22 * scale)
 
   return (
     <div
       className={`passive-indicator ${expanded ? 'passive-indicator--expanded' : ''}`}
-      style={{ '--pi-scale': scale }}
+      style={{
+        '--pi-scale': scale,
+        '--pi-primary': colors.primary,
+        '--pi-light': colors.light,
+        '--pi-shadow': colors.shadow,
+        '--pi-shadow-hover': colors.shadowHover,
+        '--pi-panel-from': colors.panelFrom,
+        '--pi-panel-to': colors.panelTo,
+        '--pi-panel-shadow': colors.panelShadow,
+      }}
     >
       <div
         className="passive-indicator__tab"
@@ -27,7 +37,7 @@ export default function PassiveIndicator({ passiveName, size = 240 }) {
 
       <div className="passive-indicator__panel" onClick={(e) => e.stopPropagation()}>
         <div className="passive-indicator__panel-header">
-          <PassiveIcon passive={passiveName} size={Math.round(18 * scale)} className="passive-indicator__panel-icon" />
+          <PassiveIcon passive={passiveName} size={Math.round(22 * scale)} className="passive-indicator__panel-icon" />
           <span className="passive-indicator__panel-name">{info.name}</span>
         </div>
         <p className="passive-indicator__panel-desc">{info.description}</p>

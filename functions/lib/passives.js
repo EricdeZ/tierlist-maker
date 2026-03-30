@@ -47,7 +47,7 @@ const CARD_GENERATOR = {
   unique:    { hoursPerCharge: 1,  maxCharges: 20, rarityCap: 'unique' },
 }
 
-const SWAP_COOLDOWN_HOURS = {
+export const SWAP_COOLDOWN_HOURS = {
   odds_boost: 12, holo_boost: 12, card_reroll: 24, pack_reroll: 24,
   unique_hunter: 6, collector_boost: 12, card_generator: 48,
 }

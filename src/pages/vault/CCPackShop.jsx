@@ -1024,7 +1024,7 @@ function PackShop() {
                   style={{ maxHeight: focusedPack ? 0 : 30, opacity: focusedPack ? 0 : 1, marginTop: focusedPack ? 0 : 20 }}
                 >
                   <span className="text-xs text-white/30 cd-head tracking-widest group-hover:text-white/50 transition-colors">
-                    {pack.leagueName || ''}
+                    {pack.leagueName || pack.name || ''}
                   </span>
                 </div>
               </div>
