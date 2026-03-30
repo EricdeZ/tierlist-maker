@@ -625,7 +625,7 @@ async function generateMixedPack(sql, leagueId, ctx = null) {
       type = typeAssignments[typeIdx++]
     }
 
-    const card = type === 'player'
+    const card = (type === 'player' || rarity === 'unique')
       ? await generatePlayerCard(sql, rarity, leagueId, ctx)
       : await generateCardByType(type, rarity, ctx)
     card._revealOrder = i
@@ -817,7 +817,12 @@ async function generateConfiguredPack(sql, pack, ctx = null) {
     const rarity = rollRarityBounded(slot.minRarity || 'common', maxRarity, typeCtx)
 
     let card
-    if (type === 'collection') {
+    if (rarity === 'unique' && type !== 'player') {
+      // Only player cards can be unique — force player generation when unique is rolled
+      card = divisionIds.length > 0
+        ? await generatePlayerCardByDivisions(sql, rarity, divisionIds, typeCtx)
+        : await generatePlayerCard(sql, rarity, pack.league_id, typeCtx)
+    } else if (type === 'collection') {
       card = await generateCollectionCard(sql, slot.collectionIds || [], rarity)
       if (!card) card = await generateCardByType('god', rarity, typeCtx, sql)
     } else if (type === 'player') {

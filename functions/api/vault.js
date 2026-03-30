@@ -120,7 +120,7 @@ const handler = async (event) => {
 
     if (event.httpMethod === 'GET') {
       switch (action) {
-        case 'load': return await handleLoad(sql, user)
+        case 'load': return await handleLoad(sql, user, event)
         case 'definition-overrides': return await handleDefinitionOverrides(sql)
         case 'collection-catalog': return await handleCollectionCatalog(sql)
         case 'collection-owned': return await handleCollectionOwned(sql, user)
@@ -197,7 +197,7 @@ const handler = async (event) => {
 }
 
 // ═══ GET: Load state ═══
-async function handleLoad(sql, user) {
+async function handleLoad(sql, user, event) {
   // Ensure stats + ember balance rows exist in a single CTE
   await sql`
     WITH s AS (INSERT INTO cc_stats (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING),
@@ -206,11 +206,21 @@ async function handleLoad(sql, user) {
   `
   await grantStarterPacks(sql, user.id)
 
-  const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, _expired, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks, promoGifts] = await Promise.all([
+  // Fire-and-forget: expire stale trades without blocking the response
+  event.waitUntil(sql`
+    UPDATE cc_trades SET status = 'expired', updated_at = NOW()
+    WHERE (status IN ('waiting', 'active') AND mode = 'direct'
+           AND last_polled_at < NOW() - make_interval(mins => 2))
+       OR (status = 'active' AND mode = 'match'
+           AND created_at < NOW() - interval '24 hours')
+  `)
+
+  const [collection, stats, ember, packTypes, salePacks, tradeCount, matchTradeCount, inventory, lastVend, lockedCards, lockedPacks, pendingSignatures, rotationPacks, promoGifts] = await Promise.all([
     sql`SELECT c.*, d.best_god_name, d.team_id, d.player_id AS def_player_id,
              pu.discord_id AS player_discord_id, pu.discord_avatar AS player_discord_avatar,
              COALESCE(pup.allow_discord_avatar, true) AS allow_discord_avatar,
-             sp.name AS passive_name
+             sp.name AS passive_name,
+             COALESCE(c.depicted_user_id, bp.depicted_user_id) AS depicted_user_id
          FROM cc_cards c
          LEFT JOIN cc_player_defs d ON c.def_id = d.id AND c.card_type = 'player'
          LEFT JOIN LATERAL (
@@ -219,6 +229,7 @@ async function handleLoad(sql, user) {
          ) pu ON true
          LEFT JOIN user_preferences pup ON pup.user_id = pu.id
          LEFT JOIN cc_staff_passives sp ON c.passive_id = sp.id
+         LEFT JOIN cc_card_blueprints bp ON c.blueprint_id = bp.id
          WHERE c.owner_id = ${user.id} ORDER BY c.created_at DESC`,
     sql`SELECT * FROM cc_stats WHERE user_id = ${user.id}`,
     sql`SELECT balance FROM ember_balances WHERE user_id = ${user.id}`,
@@ -264,13 +275,6 @@ async function handleLoad(sql, user) {
       JOIN cc_pack_types pt ON i.pack_type_id = pt.id
       WHERE i.user_id = ${user.id}
       ORDER BY i.created_at
-    `,
-    sql`
-      UPDATE cc_trades SET status = 'expired', updated_at = NOW()
-      WHERE (status IN ('waiting', 'active') AND mode = 'direct'
-             AND last_polled_at < NOW() - make_interval(mins => 2))
-         OR (status = 'active' AND mode = 'match'
-             AND created_at < NOW() - interval '24 hours')
     `,
     sql`
       SELECT created_at FROM ember_transactions
@@ -2315,7 +2319,9 @@ async function handleStartingFive(sql, user) {
   return formatS5WithPassive(formatS5Response(state), passiveState)
 }
 
-async function handleS5Leaderboard(sql, user) {
+const S5_LEADERBOARD_CACHE_MINUTES = 5
+
+async function computeS5Leaderboard(sql) {
   const rows = await sql`
     SELECT l.user_id, l.role AS slot_role, l.lineup_type,
       c.rarity, c.holo_type, c.card_type, c.role,
@@ -2352,7 +2358,6 @@ async function handleS5Leaderboard(sql, user) {
 
   const entries = []
   for (const u of Object.values(byUser)) {
-    // Reshape cards and split by lineup type
     const shaped = u.cards.map(c => {
       c.isBench = c.slot_role === 'bench'
       c._godCard = c.god_rarity ? { rarity: c.god_rarity, holo_type: c.god_holo_type, god_name: c.god_god_name } : null
@@ -2399,6 +2404,30 @@ async function handleS5Leaderboard(sql, user) {
   }
 
   entries.sort((a, b) => b.totalCap - a.totalCap)
+  return entries
+}
+
+async function handleS5Leaderboard(sql, user) {
+  // Check for cached leaderboard (avoids expensive global query on every request)
+  const [cached] = await sql`
+    SELECT data FROM cc_cache
+    WHERE key = 's5_leaderboard'
+      AND computed_at > NOW() - make_interval(mins => ${S5_LEADERBOARD_CACHE_MINUTES})
+  `
+
+  let entries
+  if (cached) {
+    entries = typeof cached.data === 'string' ? JSON.parse(cached.data) : cached.data
+  } else {
+    entries = await computeS5Leaderboard(sql)
+    // Store in cache (upsert)
+    await sql`
+      INSERT INTO cc_cache (key, data, computed_at)
+      VALUES ('s5_leaderboard', ${JSON.stringify(entries)}::jsonb, NOW())
+      ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, computed_at = NOW()
+    `
+  }
+
   const top = entries.slice(0, 20).map((e, i) => ({ ...e, position: i + 1 }))
   const myEntry = entries.find(e => e.userId === user.id)
   const myPosition = myEntry ? entries.indexOf(myEntry) + 1 : null
@@ -2673,17 +2702,19 @@ async function handleSignedUniqueGallery(sql) {
       AND c.signature_url IS NOT NULL
       AND c.god_id NOT LIKE 'test-sig-%'
     ORDER BY sr.signed_at DESC NULLS LAST, c.id DESC
+    LIMIT 50
   `
+
+  const formatted = cards.map(c => ({
+    ...formatCard(c),
+    ownerName: c.owner_name,
+    signedAt: c.signed_at,
+  }))
+  await inlineBlueprintData(sql, formatted)
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({
-      cards: cards.map(c => ({
-        ...formatCard(c),
-        ownerName: c.owner_name,
-        signedAt: c.signed_at,
-      })),
-    }),
+    body: JSON.stringify({ cards: formatted }),
   }
 }
 

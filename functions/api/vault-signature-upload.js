@@ -42,9 +42,11 @@ export async function onRequest(context) {
     if (directCardId) {
         const [card] = await sql`
             SELECT c.id, c.owner_id, c.rarity, c.signature_url, c.card_data,
-                   c.depicted_user_id, d.player_id
+                   COALESCE(c.depicted_user_id, bp.depicted_user_id) AS depicted_user_id,
+                   d.player_id
             FROM cc_cards c
             LEFT JOIN cc_player_defs d ON c.def_id = d.id
+            LEFT JOIN cc_card_blueprints bp ON c.blueprint_id = bp.id
             WHERE c.id = ${directCardId}
         `
         if (!card) return json({ error: 'Card not found' }, 404)
@@ -72,9 +74,11 @@ export async function onRequest(context) {
 
     // --- Request-based sign: standard flow ---
     const [req] = await sql`
-        SELECT sr.id, sr.card_id, sr.signer_player_id, sr.status, c.signature_url, c.depicted_user_id
+        SELECT sr.id, sr.card_id, sr.signer_player_id, sr.status, c.signature_url,
+               COALESCE(c.depicted_user_id, bp.depicted_user_id) AS depicted_user_id
         FROM cc_signature_requests sr
         JOIN cc_cards c ON sr.card_id = c.id
+        LEFT JOIN cc_card_blueprints bp ON c.blueprint_id = bp.id
         WHERE sr.id = ${requestId}
     `
     if (!req) return json({ error: 'Request not found' }, 404)
