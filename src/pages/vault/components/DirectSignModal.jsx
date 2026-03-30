@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import SignatureCanvas from './SignatureCanvas'
 import GameCard from './GameCard'
+import VaultCard from './VaultCard'
 import TradingCard from '../../../components/TradingCard'
 import TradingCardHolo from '../../../components/TradingCardHolo'
 import { vaultService } from '../../../services/database'
@@ -10,14 +11,14 @@ import { CLASS_ROLE } from '../../../data/vault/gods'
 import { useVault } from '../VaultContext'
 import { X } from 'lucide-react'
 
-function CardBg({ card, playerCard, gameCard }) {
+function CardBg({ card, playerCard, gameCard, getBlueprint }) {
+  if (card?.blueprintId) {
+    return <VaultCard card={card} getBlueprint={getBlueprint} holo={false} />
+  }
   if (playerCard) {
     return (
       <TradingCard
-        playerName={playerCard.playerName}
-        teamName={playerCard.teamName}
-        teamColor={playerCard.teamColor}
-        role={playerCard.role || 'solo'}
+        {...playerCard}
         rarity="unique"
       />
     )
@@ -34,14 +35,21 @@ function CardBg({ card, playerCard, gameCard }) {
   return null
 }
 
-function CardPreview({ card, playerCard, gameCard, signatureUrl }) {
+function CardPreview({ card, playerCard, gameCard, signatureUrl, getBlueprint }) {
+  if (card?.blueprintId) {
+    return (
+      <VaultCard
+        card={{ ...card, signatureUrl, holoType: card.holoType || 'reverse' }}
+        getBlueprint={getBlueprint}
+        holo
+        size={240}
+      />
+    )
+  }
   if (playerCard) {
     return (
       <TradingCard
-        playerName={playerCard.playerName}
-        teamName={playerCard.teamName}
-        teamColor={playerCard.teamColor}
-        role={playerCard.role || 'solo'}
+        {...playerCard}
         rarity="unique"
         size={240}
         holo={{ rarity: getHoloEffect('unique'), holoType: 'reverse' }}
@@ -65,7 +73,7 @@ function CardPreview({ card, playerCard, gameCard, signatureUrl }) {
   return null
 }
 
-export default function DirectSignModal({ cardId, playerCard, gameCard, onClose }) {
+export default function DirectSignModal({ cardId, card, getBlueprint, playerCard, gameCard, onClose }) {
   const { refreshCollection } = useVault()
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState(null)
@@ -124,14 +132,14 @@ export default function DirectSignModal({ cardId, playerCard, gameCard, onClose 
               onConfirm={handleConfirm}
               onCancel={handleClose}
               onStrokeChange={setLiveSignatureUrl}
-              cardBackground={<CardBg playerCard={playerCard} gameCard={gameCard} />}
+              cardBackground={<CardBg card={card} playerCard={playerCard} gameCard={gameCard} getBlueprint={getBlueprint} />}
             />
 
             <div className="flex flex-col items-center gap-2">
               <div className="text-[10px] text-[#e8e8ff]/40 uppercase tracking-wider cd-head">
                 Live Preview
               </div>
-              <CardPreview playerCard={playerCard} gameCard={gameCard} signatureUrl={liveSignatureUrl} />
+              <CardPreview card={card} playerCard={playerCard} gameCard={gameCard} signatureUrl={liveSignatureUrl} getBlueprint={getBlueprint} />
             </div>
           </div>
         </div>

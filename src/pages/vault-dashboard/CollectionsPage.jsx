@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import compressImage from './compressImage'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { Search, Plus, X, Trash2, Archive, CheckCircle, FileText, Eye, ExternalLink, Upload, Image } from 'lucide-react'
@@ -146,7 +147,8 @@ function CollectionEditor({ id, canApprove, onBack, onCreated }) {
         if (!file) return
         setUploadingCover(true)
         try {
-            const res = await vaultDashboardService.uploadAsset(file, {
+            const compressed = await compressImage(file)
+            const res = await vaultDashboardService.uploadAsset(compressed, {
                 name: `collection-cover-${collection.id || 'new'}`,
                 category: 'collections',
             })

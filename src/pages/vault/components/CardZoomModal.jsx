@@ -349,8 +349,10 @@ export default function CardZoomModal({ onClose, gameCard, playerCard, collectio
           <Suspense fallback={null}>
             <DirectSignModal
               cardId={matchedInstance.id}
-              playerCard={playerCard}
-              gameCard={gameCard}
+              card={matchedInstance}
+              getBlueprint={getBlueprint}
+              playerCard={!matchedInstance.blueprintId ? playerCard : null}
+              gameCard={!matchedInstance.blueprintId ? gameCard : null}
               onClose={() => setDirectSignMode(false)}
             />
           </Suspense>

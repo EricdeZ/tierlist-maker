@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Download, Send, Check, X, ZoomIn, ZoomOut, Eye, Layers, FilePlus, FolderOpen } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { vaultDashboardService } from '../../services/database'
+import compressImage from './compressImage'
 import CardCanvas from './preview/CardCanvas'
 import CardSidebar from './editor/CardSidebar'
 import RaritySetPanel from './editor/RaritySetPanel'
@@ -182,39 +183,10 @@ export default function CardCreator() {
         setDirty(true)
     }, [])
 
-    // Resize image client-side to stay under 2MB upload limit
-    const resizeImage = useCallback((file) => {
-        const MAX_BYTES = 1.8 * 1024 * 1024 // target under 2MB limit
-        if (file.size <= MAX_BYTES && /^image\/webp$/.test(file.type)) return Promise.resolve(file)
-        return new Promise((resolve) => {
-            const img = new Image()
-            img.onload = () => {
-                const tryCompress = (maxDim, quality) => {
-                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
-                    const canvas = document.createElement('canvas')
-                    canvas.width = Math.round(img.width * scale)
-                    canvas.height = Math.round(img.height * scale)
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-                    canvas.toBlob((blob) => {
-                        if (blob.size > MAX_BYTES && quality > 0.4) {
-                            tryCompress(maxDim * 0.75, quality - 0.15)
-                        } else {
-                            URL.revokeObjectURL(img.src)
-                            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
-                        }
-                    }, 'image/webp', quality)
-                }
-                tryCompress(2048, 0.85)
-            }
-            img.onerror = () => resolve(file)
-            img.src = URL.createObjectURL(file)
-        })
-    }, [])
-
     // Upload image to R2 and replace blob URL
     const handleUploadImage = useCallback(async (file, elementId) => {
         try {
-            const resized = await resizeImage(file)
+            const resized = await compressImage(file)
             const res = await vaultDashboardService.uploadAsset(resized, {
                 name: file.name.replace(/\.[^.]+$/, ''),
                 category: 'character',
@@ -230,12 +202,12 @@ export default function CardCreator() {
         } catch (e) {
             console.error('Upload failed:', e)
         }
-    }, [resizeImage])
+    }, [])
 
     // Upload shared structured card image to R2
     const handleUploadRarityImage = useCallback(async (file) => {
         try {
-            const resized = await resizeImage(file)
+            const resized = await compressImage(file)
             const res = await vaultDashboardService.uploadAsset(resized, {
                 name: file.name.replace(/\.[^.]+$/, ''),
                 category: 'character',
@@ -248,7 +220,7 @@ export default function CardCreator() {
         } catch (e) {
             console.error('Rarity image upload failed:', e)
         }
-    }, [resizeImage])
+    }, [])
 
     // Add image from file (drop or browse)
     const addImageFromFile = useCallback((file, x = 0, y = 0) => {

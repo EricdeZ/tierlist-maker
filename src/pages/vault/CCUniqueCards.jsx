@@ -260,8 +260,10 @@ function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged
             <Suspense fallback={null}>
               <DirectSignModal
                 cardId={card.id}
-                playerCard={type === 'player' ? toPlayerCardProps(card) : null}
-                gameCard={type !== 'player' ? { type, data: toGameCardData(card, override) } : null}
+                card={card}
+                getBlueprint={getBlueprint}
+                playerCard={!card.blueprintId && type === 'player' ? toPlayerCardProps(card) : null}
+                gameCard={!card.blueprintId && type !== 'player' ? { type, data: toGameCardData(card, override) } : null}
                 onClose={() => setDirectSignMode(false)}
               />
             </Suspense>

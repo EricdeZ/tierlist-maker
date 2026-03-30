@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import compressImage from './compressImage'
 import { vaultDashboardService } from '../../services/database'
 import { useAuth } from '../../context/AuthContext'
 import { Upload, Search, Trash2, X, Image, Filter } from 'lucide-react'
@@ -251,7 +252,8 @@ function UploadModal({ onClose, onComplete }) {
         setError(null)
         try {
             const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
-            const data = await vaultDashboardService.uploadAsset(file, {
+            const compressed = await compressImage(file)
+            const data = await vaultDashboardService.uploadAsset(compressed, {
                 name: name || file.name,
                 category,
                 tags: tagList,
