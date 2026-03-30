@@ -813,7 +813,8 @@ async function generateConfiguredPack(sql, pack, ctx = null) {
 
     const type = forcedTypes[i] || pickTypeForSlot(slot)
     const typeCtx = getContextForType(ctx, type)
-    const rarity = rollRarityBounded(slot.minRarity || 'common', slot.maxRarity || null, typeCtx)
+    const maxRarity = type === 'staff' ? 'mythic' : (slot.maxRarity || null)
+    const rarity = rollRarityBounded(slot.minRarity || 'common', maxRarity, typeCtx)
 
     let card
     if (type === 'collection') {

@@ -75,7 +75,7 @@ function CooldownLabel({ cooldownEnd }) {
   )
 }
 
-function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged, onPassiveChanged, linkedPlayer }) {
+function UniqueCardEntry({ card, getDefOverride, getBlueprint, onHoloTypeChanged, onPassiveChanged, linkedPlayer, user }) {
   const [changingHolo, setChangingHolo] = useState(false)
   const [changingPassive, setChangingPassive] = useState(false)
   const [passivePickerOpen, setPassivePickerOpen] = useState(false)
@@ -347,7 +347,7 @@ const VIEWS = [
 
 export default function CCUniqueCards() {
   const { collection, loaded, getDefOverride, getBlueprint, updateCardHoloType, updateCardPassive } = useVault()
-  const { linkedPlayer } = useAuth()
+  const { user, linkedPlayer } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('subtab') || 'mine'
   const setView = useCallback((key) => {
@@ -437,6 +437,7 @@ export default function CCUniqueCards() {
                   onHoloTypeChanged={handleHoloTypeChanged}
                   onPassiveChanged={handlePassiveChanged}
                   linkedPlayer={linkedPlayer}
+                  user={user}
                 />
               ))}
             </div>
