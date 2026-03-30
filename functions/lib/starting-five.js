@@ -1,7 +1,7 @@
 // Starting 5 — passive income from slotted cards
 import { grantEmber } from './ember.js'
 import { grantPassion } from './passion.js'
-import { applySwapCooldown, initPassiveState } from './passives.js'
+import { applySwapCooldown, checkSwapCooldown, initPassiveState } from './passives.js'
 
 const S5_FLAT_CORES = {
   uncommon: 0.62, rare: 1.47, epic: 3.25, legendary: 6.27, mythic: 7.05, unique: 8.01,
@@ -493,6 +493,28 @@ export async function slotCard(sql, userId, cardId, role, slotType = 'player', l
         WHERE user_id = ${userId} AND card_id = ${cardId}
       `
       if (existing) throw new Error(`Card is already slotted in ${existing.lineup_type}/${existing.role}`)
+
+      // Enforce swap cooldown for staff slot
+      if (role === 'staff') {
+        const cooldown = await checkSwapCooldown(sql, userId)
+        if (cooldown) {
+          const remaining = Math.ceil((new Date(cooldown.cooldownUntil) - new Date()) / 3600000)
+          throw new Error(`Staff swap on cooldown — ${remaining}h remaining`)
+        }
+
+        // Apply cooldown for the outgoing staff card (if replacing one)
+        const [outgoing] = await sql`
+          SELECT sp.name AS passive_name
+          FROM cc_lineups l
+          JOIN cc_cards c ON l.card_id = c.id
+          JOIN cc_staff_passives sp ON c.passive_id = sp.id
+          WHERE l.user_id = ${userId} AND l.lineup_type = ${lineupType} AND l.role = 'staff'
+            AND l.card_id IS NOT NULL
+        `
+        if (outgoing) {
+          await applySwapCooldown(sql, userId, outgoing.passive_name)
+        }
+      }
 
       await collectIncome(sql, userId)
 

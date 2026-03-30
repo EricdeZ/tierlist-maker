@@ -550,63 +550,75 @@ async function handleOpenPack(sql, user, body, event) {
     return await handleSalePurchase(sql, user, saleId)
   }
 
-  // Rotation-only packs can only be purchased when in the current rotation
-  const [rotCheck] = await sql`SELECT rotation_only FROM cc_pack_types WHERE id = ${packType}`
-  if (rotCheck?.rotation_only) {
-    const [inRotation] = await sql`
-      SELECT 1 FROM cc_pack_rotation_schedule
-      WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
-        AND pack_type_id = ${packType}
-    `
-    if (!inRotation) return { statusCode: 400, headers, body: JSON.stringify({ error: 'This pack is not currently in rotation' }) }
-  }
-
-  // Load active passive for odds modification
-  const passive = await getActivePassive(sql, user.id)
-
-  const isAdmin = user.role === 'admin'
-  const result = await openPack(sql, user.id, packType, { passive, skipEnabledCheck: isAdmin })
-  const cards = result.cards.map((c) => {
-    const formatted = formatCard(c)
-    if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
-    return formatted
-  })
-  await inlineBlueprintData(sql, cards)
-  await tagNewCards(sql, user.id, cards)
-
-  maybePushChallenges(sql, user.id)
-
-  // Build reroll state if passive provides reroll charges
-  let rerollState = null
-  if (passive) {
-    const cardRerollCharges = passive.passiveName === 'card_reroll' ? (passive.charges || 0) : 0
-    const packRerollCharges = passive.passiveName === 'pack_reroll' ? (passive.charges || 0) : 0
-
-    if (cardRerollCharges > 0 || packRerollCharges > 0) {
-      const rarityIdx = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
-      const staffRarityIdx = rarityIdx[passive.staffRarity] || 0
-
-      const eligibleCardIndices = result.cards
-        .map((c, i) => ({ i, rarity: c.rarity }))
-        .filter(c => (rarityIdx[c.rarity] || 0) <= staffRarityIdx)
-        .map(c => c.i)
-
-      const [session] = await sql`
-        INSERT INTO cc_pack_sessions (user_id, cards, odds_context, reroll_count)
-        VALUES (${user.id}, ${JSON.stringify(result.cards)}::jsonb, ${JSON.stringify({})}::jsonb, 0)
-        RETURNING id
+  // Wrap all DB work in a transaction to use a single WebSocket connection.
+  // Without this, large packs (jumbo = 18 cards) exceed CF's 50 subrequest limit
+  // because each neon() HTTP call counts as a separate subrequest.
+  const txResult = await transaction(async (tx) => {
+    // Rotation-only packs can only be purchased when in the current rotation
+    const [rotCheck] = await tx`SELECT rotation_only FROM cc_pack_types WHERE id = ${packType}`
+    if (rotCheck?.rotation_only) {
+      const [inRotation] = await tx`
+        SELECT 1 FROM cc_pack_rotation_schedule
+        WHERE date = (SELECT MAX(date) FROM cc_pack_rotation_schedule WHERE date <= CURRENT_DATE)
+          AND pack_type_id = ${packType}
       `
+      if (!inRotation) return { error: 'This pack is not currently in rotation' }
+    }
 
-      rerollState = {
-        sessionId: session.id,
-        cardRerollCharges,
-        packRerollCharges,
-        eligibleCardIndices,
+    // Load active passive for odds modification
+    const passive = await getActivePassive(tx, user.id)
+
+    const isAdmin = user.role === 'admin'
+    const result = await openPack(tx, user.id, packType, { passive, skipEnabledCheck: isAdmin })
+    const cards = result.cards.map((c) => {
+      const formatted = formatCard(c)
+      if (c._revealOrder != null) formatted._revealOrder = c._revealOrder
+      return formatted
+    })
+    await inlineBlueprintData(tx, cards)
+    await tagNewCards(tx, user.id, cards)
+
+    // Build reroll state if passive provides reroll charges
+    let rerollState = null
+    if (passive) {
+      const cardRerollCharges = passive.passiveName === 'card_reroll' ? (passive.charges || 0) : 0
+      const packRerollCharges = passive.passiveName === 'pack_reroll' ? (passive.charges || 0) : 0
+
+      if (cardRerollCharges > 0 || packRerollCharges > 0) {
+        const rarityIdx = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, unique: 6 }
+        const staffRarityIdx = rarityIdx[passive.staffRarity] || 0
+
+        const eligibleCardIndices = result.cards
+          .map((c, i) => ({ i, rarity: c.rarity }))
+          .filter(c => (rarityIdx[c.rarity] || 0) <= staffRarityIdx)
+          .map(c => c.i)
+
+        const [session] = await tx`
+          INSERT INTO cc_pack_sessions (user_id, cards, odds_context, reroll_count)
+          VALUES (${user.id}, ${JSON.stringify(result.cards)}::jsonb, ${JSON.stringify({})}::jsonb, 0)
+          RETURNING id
+        `
+
+        rerollState = {
+          sessionId: session.id,
+          cardRerollCharges,
+          packRerollCharges,
+          eligibleCardIndices,
+        }
       }
     }
+
+    return { result, cards, rerollState, passive }
+  })
+
+  if (txResult.error) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: txResult.error }) }
   }
 
-  // Cleanup expired pack sessions (fire-and-forget)
+  const { result, cards, rerollState } = txResult
+
+  // Fire-and-forget outside the transaction (uses HTTP sql, 1 subrequest each)
+  maybePushChallenges(sql, user.id)
   event.waitUntil(sql`DELETE FROM cc_pack_sessions WHERE expires_at < NOW()`)
 
   return { statusCode: 200, headers, body: JSON.stringify({

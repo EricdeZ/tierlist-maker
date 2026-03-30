@@ -425,17 +425,29 @@ export default function CCStartingFive() {
   }, [unslotS5Attachment, showError, activeLineup])
 
   const hasActiveBuffs = activeBuffs.length > 0
+  const staffCooldownActive = startingFive?.passiveState?.cooldownUntil && new Date(startingFive.passiveState.cooldownUntil) > new Date()
   const handleSlot = useCallback((cardId, role) => {
     if (role === 'staff') {
-      const card = collection.find(c => c.id === cardId)
-      const passiveName = card?.passiveName
-      const cooldownHours = startingFive?.passiveState?.swapCooldownHours?.[passiveName]
-      setPendingStaffSlot({ cardId, role, passiveName, cooldownHours })
+      if (staffCooldownActive) {
+        showError('Staff swap is on cooldown')
+        return
+      }
+      // Only show cooldown confirmation when replacing an existing staff card
+      if (slottedCards.staff) {
+        const card = collection.find(c => c.id === cardId)
+        const passiveName = card?.passiveName
+        const cooldownHours = startingFive?.passiveState?.swapCooldownHours?.[passiveName]
+        setPendingStaffSlot({ cardId, role, passiveName, cooldownHours })
+        return
+      }
+      // Empty slot — no cooldown, slot directly
+      if (hasActiveBuffs) { setPendingLineupAction(() => () => executeSlot(cardId, role)); return }
+      executeSlot(cardId, role)
       return
     }
     if (hasActiveBuffs) { setPendingLineupAction(() => () => executeSlot(cardId, role)); return }
     executeSlot(cardId, role)
-  }, [hasActiveBuffs, executeSlot, collection, startingFive?.passiveState?.swapCooldownHours])
+  }, [hasActiveBuffs, executeSlot, collection, slottedCards.staff, startingFive?.passiveState?.swapCooldownHours, staffCooldownActive, showError])
   const handleUnslot = useCallback((role) => {
     if (hasActiveBuffs) { setPendingLineupAction(() => () => executeUnslot(role)); return }
     executeUnslot(role)
@@ -1029,8 +1041,8 @@ export default function CCStartingFive() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-sm text-white/60">
-                Removing this card from the staff slot will trigger a{' '}
-                <span className="text-amber-400 font-bold">{pendingStaffSlot.cooldownHours || '?'}h cooldown</span> before you can slot another staff card.
+                Swapping your staff card will trigger a{' '}
+                <span className="text-amber-400 font-bold">{pendingStaffSlot.cooldownHours || '?'}h cooldown</span> before you can swap again.
               </p>
               {pendingStaffSlot.passiveName && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/[0.03]">
