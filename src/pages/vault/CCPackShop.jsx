@@ -899,7 +899,7 @@ function PackShop() {
   const { isAdmin } = useAuth();
   const showStaffPacks = FEATURE_FLAGS.STAFF_CARDS_RELEASED || isAdmin;
   const leaguePacks = useMemo(() =>
-    packTypes.filter(p => (p.leagueId && !p.rotationOnly) || (showStaffPacks && p.id === 'staff-mixed')).map(p => p.id),
+    packTypes.filter(p => (p.leagueId && !p.rotationOnly) || (showStaffPacks && (p.id === 'staff-mixed' || p.id === 'staff-jumbo'))).map(p => p.id),
     [packTypes, showStaffPacks]
   );
   const activeRotationPacks = useMemo(() =>

@@ -15,6 +15,7 @@ const PACK_FEATURED_GODS = {
   gift: ['Cupid', 'Cupid', 'Cupid', 'Cupid', 'Cupid'],
   'promo-gift': ['Zeus', 'Thor', 'Ra', 'Odin', 'Athena'],
   'staff-mixed': ['Discordia', 'Bellona', 'Athena', 'Hecate', 'Sol'],
+  'staff-jumbo': ['Discordia', 'Bellona', 'Athena', 'Hecate', 'Sol'],
 }
 
 function getFeaturedGodUrl(tier, seed) {
@@ -66,7 +67,7 @@ export default function PackArt({
   const hasBadges = leagueLogo || divisionIcon
 
   // Build inline color overrides for packs without a CSS data-tier rule
-  const CSS_TIERS = new Set(['standard', 'premium', 'elite', 'legendary', 'mixed', 'osl-mixed', 'bsl-mixed', 'gift', 'promo-gift', 'staff-mixed'])
+  const CSS_TIERS = new Set(['standard', 'premium', 'elite', 'legendary', 'mixed', 'osl-mixed', 'bsl-mixed', 'gift', 'promo-gift', 'staff-mixed', 'staff-jumbo'])
   const colorStyle = {}
   if (color && !CSS_TIERS.has(tier)) {
     colorStyle['--pack-accent'] = color

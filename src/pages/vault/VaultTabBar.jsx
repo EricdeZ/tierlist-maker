@@ -84,9 +84,9 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
       <div className="fixed bottom-0 left-0 right-0 z-[98] bg-[var(--cd-edge)] backdrop-blur-md border-t border-[var(--cd-border)] px-2 pb-[env(safe-area-inset-bottom)]">
         {/* Pack sub-toggles — second row when on packs tab */}
         {activeTab === 'packs' && onPackModeChange && (
-          <div className="flex items-center justify-center gap-1.5 pt-1.5 pb-0.5 max-w-lg mx-auto">
+          <div className="flex items-center justify-center gap-1 pt-1.5 pb-0.5 max-w-lg mx-auto">
             {[
-              { key: 'my-packs', label: 'MY PACKS', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', badge: myPacksCount },
+              { key: 'my-packs', label: 'MY PACKS', shortLabel: 'PACKS', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', badge: myPacksCount },
               { key: 'shop', label: 'SHOP', active: 'bg-white/10 text-white border-white/30' },
               { key: 'sale', label: 'LIMITED', active: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
               { key: 'black-market', label: 'BLACK MARKET', shortLabel: 'BM', active: 'bg-red-500/15 text-red-400 border-red-500/30' },
@@ -94,12 +94,12 @@ export default function VaultTabBar({ tabs, activeTab, onTabChange, unseenGifts,
               <button
                 key={m.key}
                 onClick={() => onPackModeChange(m.key)}
-                className={`relative px-3 py-0.5 font-bold uppercase tracking-widest border rounded transition-all cursor-pointer ${
+                className={`relative px-2 py-0.5 font-bold uppercase border rounded transition-all cursor-pointer shrink min-w-0 ${
                   packMode === m.key ? m.active : 'bg-transparent text-white/30 border-white/10'
                 }`}
-                style={{ fontFamily: "'Teko', sans-serif", fontSize: 11, letterSpacing: '0.15em' }}
+                style={{ fontFamily: "'Teko', sans-serif", fontSize: 11, letterSpacing: '0.1em' }}
               >
-                {m.shortLabel ? (<><span className="hidden min-[360px]:inline">{m.label}</span><span className="min-[360px]:hidden">{m.shortLabel}</span></>) : m.label}
+                {m.shortLabel ? (<><span className="hidden min-[400px]:inline">{m.label}</span><span className="min-[400px]:hidden">{m.shortLabel}</span></>) : m.label}
                 {m.badge > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-emerald-500 text-[8px] font-bold text-black flex items-center justify-center">
                     {m.badge}
