@@ -422,4 +422,4 @@ export function pickCardToRemove(cards, staffRarity, rerollCount) {
 }
 
 // Export tuning tables for frontend display
-export { CARD_REROLL, PACK_REROLL, CARD_GENERATOR, SWAP_COOLDOWN_HOURS }
+export { CARD_REROLL, PACK_REROLL, CARD_GENERATOR }
